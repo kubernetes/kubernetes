@@ -52,7 +52,7 @@ func Validate_Condition(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -84,7 +84,7 @@ func Validate_Condition(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -115,13 +115,13 @@ func Validate_Condition(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -146,7 +146,7 @@ func Validate_Condition(
 			}
 			// call field-attached validations
 			// custom validation
-			if e := ValidateCustom_Condition_LastTransitionTime(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := ValidateCustom_Condition_LastTransitionTime(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -171,7 +171,7 @@ func Validate_Condition(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -226,7 +226,7 @@ func Validate_ConditionStatus(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *v1.ConditionStatus) (errs field.ErrorList) {
 
-	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForConditionStatus, nil).MarkAlpha(); len(e) != 0 {
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForConditionStatus, nil).MarkBeta(); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -254,7 +254,7 @@ func Validate_ManagedFieldsEntry(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -288,7 +288,7 @@ func Validate_ManagedFieldsOperationType(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *v1.ManagedFieldsOperationType) (errs field.ErrorList) {
 
-	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForManagedFieldsOperationType, nil).MarkAlpha(); len(e) != 0 {
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForManagedFieldsOperationType, nil).MarkBeta(); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
@@ -351,10 +351,10 @@ func Validate_ObjectMeta(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -385,7 +385,7 @@ func Validate_ObjectMeta(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if e := validate.UpdateValue(ctx, op, fldPath, obj, oldObj,
@@ -396,10 +396,10 @@ func Validate_ObjectMeta(
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+			if e := validate.Monotonic(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.Monotonic(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return
@@ -424,7 +424,7 @@ func Validate_ObjectMeta(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -453,10 +453,10 @@ func Validate_ObjectMeta(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -485,10 +485,10 @@ func Validate_ObjectMeta(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -520,7 +520,7 @@ func Validate_ObjectMeta(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -554,7 +554,7 @@ func Validate_ObjectMeta(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -595,7 +595,7 @@ func Validate_OwnerReference(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -624,7 +624,7 @@ func Validate_OwnerReference(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -653,7 +653,7 @@ func Validate_OwnerReference(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -682,7 +682,7 @@ func Validate_OwnerReference(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}

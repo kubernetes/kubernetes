@@ -334,8 +334,8 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
-	// +k8s:alpha(since:"1.37")=+k8s:optional
-	// +k8s:alpha(since:"1.37")=+k8s:immutable
+	// +k8s:beta(since:"1.38")=+k8s:optional
+	// +k8s:beta(since:"1.38")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -554,9 +554,9 @@ type PodCertificateRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// certificateChain is populated with an issued certificate by the signer.

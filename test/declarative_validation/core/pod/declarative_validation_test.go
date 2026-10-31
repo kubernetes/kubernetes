@@ -74,7 +74,7 @@ func TestDeclarativeValidate(t *testing.T) {
 					api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists},
 				)),
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+					field.Invalid(field.NewPath("spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 				},
 			},
 			"activeDeadlineSeconds valid": {

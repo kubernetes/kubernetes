@@ -224,9 +224,9 @@ message DeviceTaintRuleStatus {
   // +listMapKey=type
   // +patchStrategy=merge
   // +patchMergeKey=type
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
@@ -545,8 +545,8 @@ message ResourcePoolStatusRequestStatus {
   // +patchStrategy=merge
   // +patchMergeKey=type
   // +k8s:maxItems=10
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
 }
 

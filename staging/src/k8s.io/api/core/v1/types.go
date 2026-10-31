@@ -4450,8 +4450,8 @@ type Toleration struct {
 	// key is the taint key that the toleration applies to. Empty means match all taint keys.
 	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:format=k8s-label-key
 	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
 	// operator represents a key's relationship to the value.
 	// Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
@@ -4655,7 +4655,7 @@ type PodSpec struct {
 	// tolerations specifies the pod's tolerations.
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	Tolerations []Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 	// hostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
 	// file if specified.
@@ -4887,7 +4887,7 @@ type PodSpec struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=10
-	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
+	// +k8s:beta(since: "1.38")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
 }
 
@@ -6064,7 +6064,7 @@ type ReplicationControllerSpec struct {
 	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:optional
 	// +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
 	Template *PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
@@ -6334,7 +6334,7 @@ type ServiceStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
+	// +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:opaqueType
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 }
 
@@ -7005,9 +7005,9 @@ type NodeSpec struct {
 
 	// providerID is the ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:update=NoModify
-	// +k8s:alpha(since: "1.36")=+k8s:update=NoUnset
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:update=NoModify
+	// +k8s:beta(since: "1.38")=+k8s:update=NoUnset
 	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`
 	// unschedulable controls node schedulability of new pods. By default, node is schedulable.
 	// More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration
@@ -8484,7 +8484,7 @@ type Secret struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:immutable
 	Type SecretType `json:"type,omitempty" protobuf:"bytes,3,opt,name=type,casttype=SecretType"`
 }
 

@@ -160,7 +160,7 @@ func ValidateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rb
 	allErrs := ValidateRoleBinding(roleBinding)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
 
-	allErrs = append(allErrs, validation.ValidateImmutableField(roleBinding.RoleRef, oldRoleBinding.RoleRef, field.NewPath("roleRef")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, validation.ValidateImmutableField(roleBinding.RoleRef, oldRoleBinding.RoleRef, field.NewPath("roleRef")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
 
 	return allErrs
 }

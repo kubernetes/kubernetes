@@ -211,7 +211,7 @@ func TestCreate(t *testing.T) {
 			// No spec fields set: validation rejects with union error.
 			makeDecision: allowDecision,
 			assertFeatureAgnostic: &assertions{
-				err: `.authorization.k8s.io "" is invalid: [spec: Invalid value: null: exactly one of nonResourceAttributes or resourceAttributes must be specified, spec.user: Invalid value: "": at least one of user or group must be specified]`,
+				err: ".authorization.k8s.io \"\" is invalid: [spec.user: Invalid value: \"\": at least one of user or group must be specified, spec: Invalid value: \"\": must specify one of: `resourceAttributes`, `nonResourceAttributes`]",
 			},
 		},
 		"nonresource rejected": {
