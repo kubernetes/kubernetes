@@ -591,6 +591,65 @@ func TestUnsupportedControllerPod(t *testing.T) {
 	verifyEventEmitted(t, dc, "CalculateExpectedPodCountFailed")
 }
 
+// TestSyncReturnsErrorAfterFailSafe verifies that when trySync fails, sync still
+// returns an error after failSafe so the workqueue requeues the PDB. A successful
+// failSafe write must not be treated as a finished sync.
+func TestSyncReturnsErrorAfterFailSafe(t *testing.T) {
+	failSafeWriteErr := fmt.Errorf("status write failed")
+	cases := map[string]struct {
+		failSafeErr error
+	}{
+		"failSafe succeeds, return trySync error": {},
+		"failSafe fails, return status write error": {
+			failSafeErr: failSafeWriteErr,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			dc, ps := newFakeDisruptionController(ctx)
+			if tc.failSafeErr != nil {
+				dc.getUpdater = func() updater {
+					return func(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
+						return tc.failSafeErr
+					}
+				}
+			}
+
+			pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromString("28%"))
+			add(t, dc.pdbStore, pdb)
+
+			pod, _ := newPod(t, "naked")
+			isController := true
+			pod.OwnerReferences = append(pod.OwnerReferences, metav1.OwnerReference{
+				APIVersion: "apps.test.io/v1",
+				Kind:       "TestWorkload",
+				Name:       "fake-controller",
+				UID:        "b7329742-8daa-493a-8881-6ca07139172b",
+				Controller: &isController,
+			})
+			add(t, dc.podStore, pod)
+
+			err := dc.sync(ctx, pdbName)
+			if err == nil {
+				t.Fatal("expected sync to return an error so the key is requeued")
+			}
+			if tc.failSafeErr != nil {
+				if err != tc.failSafeErr {
+					t.Fatalf("got error %v, want failSafe error %v", err, tc.failSafeErr)
+				}
+				return
+			}
+			ps.VerifyDisruptionAllowed(t, pdbName, 0)
+			got := ps.Get(pdbName)
+			cond := apimeta.FindStatusCondition(got.Status.Conditions, policy.DisruptionAllowedCondition)
+			if cond == nil || cond.Reason != policy.SyncFailedReason {
+				t.Fatalf("expected DisruptionAllowed condition with reason %q, got %#v", policy.SyncFailedReason, cond)
+			}
+		})
+	}
+}
+
 // Verify that disruption controller is not erroring when unmanaged pods are found
 func TestStatusForUnmanagedPod(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
