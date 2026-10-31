@@ -23,7 +23,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
@@ -245,22 +245,22 @@ func (in *JobSchedulingConfiguration) DeepCopyInto(out *JobSchedulingConfigurati
 	*out = *in
 	if in.SchedulingPolicy != nil {
 		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
-		*out = new(v1alpha3.WorkloadPodGroupSchedulingPolicy)
+		*out = new(schedulingv1.WorkloadPodGroupSchedulingPolicy)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.SchedulingConstraints != nil {
 		in, out := &in.SchedulingConstraints, &out.SchedulingConstraints
-		*out = new(v1alpha3.WorkloadPodGroupSchedulingConstraints)
+		*out = new(schedulingv1.WorkloadPodGroupSchedulingConstraints)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.DisruptionMode != nil {
 		in, out := &in.DisruptionMode, &out.DisruptionMode
-		*out = new(v1alpha3.WorkloadPodGroupDisruptionMode)
+		*out = new(schedulingv1.WorkloadPodGroupDisruptionMode)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ResourceClaims != nil {
 		in, out := &in.ResourceClaims, &out.ResourceClaims
-		*out = make([]v1alpha3.WorkloadPodGroupResourceClaim, len(*in))
+		*out = make([]schedulingv1.WorkloadPodGroupResourceClaim, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

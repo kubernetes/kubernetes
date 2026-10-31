@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,7 +35,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -62,6 +63,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	jobcontroller "k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
+	"k8s.io/kubernetes/pkg/controller/scheduling/podgroupprotection"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
@@ -3172,10 +3174,37 @@ func cleanUp(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1
 }
 
 func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
-	closeFn, restConfig, clientSet, ns := setup(t, "orphan-pod-finalizers")
-	t.Cleanup(closeFn)
-	for _, policy := range []metav1.DeletionPropagation{metav1.DeletePropagationOrphan, metav1.DeletePropagationBackground, metav1.DeletePropagationForeground} {
-		t.Run(string(policy), func(t *testing.T) {
+	cases := map[string]struct {
+		policy          metav1.DeletionPropagation
+		workloadWithJob bool
+	}{
+		"Orphan": {
+			policy: metav1.DeletePropagationOrphan,
+		},
+		"Background": {
+			policy: metav1.DeletePropagationBackground,
+		},
+		"Foreground": {
+			policy: metav1.DeletePropagationForeground,
+		},
+		// Pods referencing a terminating PodGroup through spec.schedulingGroup
+		// must still be garbage collected, so the PodGroup protection
+		// finalizer can be released.
+		"Background with WorkloadWithJob": {
+			policy:          metav1.DeletePropagationBackground,
+			workloadWithJob: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if tc.workloadWithJob {
+				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.GenericWorkload: true,
+					features.WorkloadWithJob: true,
+				})
+			}
+			closeFn, restConfig, clientSet, ns := setup(t, "orphan-pod-finalizers")
+			t.Cleanup(closeFn)
 			informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "controller-informers")), 0)
 			// Make the job controller significantly slower to trigger race condition.
 			restConfig.QPS = 1
@@ -3186,6 +3215,18 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			restConfig.QPS = restConfigQPS
 			restConfig.Burst = restConfigBurst
 			runGC := util.CreateGCController(ctx, t, *restConfig, informerSet)
+			if tc.workloadWithJob {
+				pgpc, err := podgroupprotection.NewPodGroupProtectionController(klog.FromContext(ctx),
+					informerSet.Scheduling().V1beta1().PodGroups(),
+					informerSet.Scheduling().V1beta1().CompositePodGroups(),
+					informerSet.Core().V1().Pods(),
+					clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "podgroup-protection-controller")),
+					false)
+				if err != nil {
+					t.Fatalf("Failed to create PodGroupProtectionController: %v", err)
+				}
+				go pgpc.Run(ctx, 1)
+			}
 			informerSet.Start(ctx.Done())
 			go jc.Run(ctx, 1)
 			runGC()
@@ -3203,10 +3244,14 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 				Ready:       ptr.To[int32](0),
 				Terminating: ptr.To[int32](0),
 			})
+			var podGroup *schedulingv1beta1.PodGroup
+			if tc.workloadWithJob {
+				podGroup = waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
+			}
 
 			// Delete Job. The GC should delete the pods in cascade.
 			err = clientSet.BatchV1().Jobs(jobObj.Namespace).Delete(ctx, jobObj.Name, metav1.DeleteOptions{
-				PropagationPolicy: &policy,
+				PropagationPolicy: &tc.policy,
 			})
 			if err != nil {
 				t.Fatalf("Failed to delete job: %v", err)
@@ -3214,6 +3259,27 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			validateNoOrphanPodsWithFinalizers(ctx, t, clientSet, jobObj)
 			// Pods never finished, so they are not counted in the metric.
 			validateTerminatedPodsTrackingFinalizerMetric(ctx, t, 0)
+
+			if podGroup != nil {
+				if err := wait.PollUntilContextTimeout(ctx, waitInterval, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{
+						LabelSelector: metav1.FormatLabelSelector(jobObj.Spec.Selector),
+					})
+					if err != nil {
+						return false, err
+					}
+					if len(pods.Items) != 0 {
+						return false, nil
+					}
+					_, err = clientSet.SchedulingV1beta1().PodGroups(podGroup.Namespace).Get(ctx, podGroup.Name, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						return true, nil
+					}
+					return false, err
+				}); err != nil {
+					t.Errorf("Failed waiting for pods and PodGroup %s to be garbage collected: %v", podGroup.Name, err)
+				}
+			}
 		})
 	}
 }
@@ -5173,11 +5239,11 @@ func TestJobGangScheduling(t *testing.T) {
 				Completions:    ptr.To[int32](4),
 				CompletionMode: new(batchv1.IndexedCompletion),
 				Scheduling: &batchv1.JobSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
 					},
-					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 					},
 				},
 			},
@@ -5193,11 +5259,17 @@ func TestJobGangScheduling(t *testing.T) {
 				Completions:    ptr.To[int32](4),
 				CompletionMode: new(batchv1.IndexedCompletion),
 				Scheduling: &batchv1.JobSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{
+							MinCount: new(int32(2)),
+						},
 					},
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{
+							{
+								Key: "topology.kubernetes.io/rack",
+							},
+						},
 					},
 				},
 			},
@@ -5213,14 +5285,20 @@ func TestJobGangScheduling(t *testing.T) {
 				Completions:    ptr.To[int32](6),
 				CompletionMode: new(batchv1.IndexedCompletion),
 				Scheduling: &batchv1.JobSchedulingConfiguration{
-					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](6)},
+					SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{
+							MinCount: new(int32(6)),
+						},
 					},
-					DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-						All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+					DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{
+						All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 					},
-					SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-						Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+					SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+						Topology: []schedulingv1.WorkloadTopologyConstraint{
+							{
+								Key: "topology.kubernetes.io/zone",
+							},
+						},
 					},
 				},
 			},
@@ -5237,15 +5315,28 @@ func TestJobGangScheduling(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			closeFn, restConfig, clientSet, ns := setup(t, "gang-scheduling")
 			t.Cleanup(closeFn)
-			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-			t.Cleanup(cancel)
 
-			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+			jobObj, err := createJobWithDefaults(t.Context(), clientSet, ns.Name, &batchv1.Job{
 				Spec: tc.jobSpec,
 			})
 			if err != nil {
 				t.Fatalf("Failed to create Job: %v", err)
 			}
+			podGroupClient := clientSet.SchedulingV1beta1().PodGroups(ns.Name)
+			basicPolicy := schedulingv1beta1.PodGroupSchedulingPolicy{Basic: &schedulingv1beta1.BasicSchedulingPolicy{}}
+			var byoPodGroup *schedulingv1beta1.PodGroup
+			if sg := tc.jobSpec.Template.Spec.SchedulingGroup; sg != nil {
+				byoPodGroup, err = podGroupClient.Create(t.Context(), &schedulingv1beta1.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: *sg.PodGroupName},
+					Spec:       schedulingv1beta1.PodGroupSpec{SchedulingPolicy: basicPolicy},
+				}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create user PodGroup: %v", err)
+				}
+			}
+
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
 
 			// verify scheduling objects exist before pods, then unsuspend.
 			if tc.suspend {
@@ -5338,6 +5429,29 @@ func TestJobGangScheduling(t *testing.T) {
 					if *pod.Spec.SchedulingGroup.PodGroupName != podGroup.Name {
 						t.Errorf("Pod %s schedulingGroup = %q, want %q", pod.Name, *pod.Spec.SchedulingGroup.PodGroupName, podGroup.Name)
 					}
+					if slices.ContainsFunc(pod.OwnerReferences, func(ref metav1.OwnerReference) bool { return ref.Kind == "PodGroup" }) {
+						t.Errorf("Pod %s ownerReferences = %+v, want no PodGroup owner", pod.Name, pod.OwnerReferences)
+					}
+				}
+			}
+
+			// A user-provided PodGroup is used as is, without ownerReferences to or from it.
+			if byoPodGroup != nil {
+				got, err := podGroupClient.Get(ctx, byoPodGroup.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get user PodGroup %s: %v", byoPodGroup.Name, err)
+				}
+				if len(got.OwnerReferences) != 0 {
+					t.Errorf("User PodGroup %s ownerReferences = %+v, want none", got.Name, got.OwnerReferences)
+				}
+				pods, err := getJobPods(ctx, t, clientSet, jobObj, func(v1.PodStatus) bool { return true })
+				if err != nil {
+					t.Fatalf("Failed to get job pods: %v", err)
+				}
+				for _, pod := range pods {
+					if slices.ContainsFunc(pod.OwnerReferences, func(ref metav1.OwnerReference) bool { return ref.Kind == "PodGroup" }) {
+						t.Errorf("Pod %s ownerReferences = %+v, want no PodGroup owner", pod.Name, pod.OwnerReferences)
+					}
 				}
 			}
 
@@ -5398,8 +5512,8 @@ func TestJobGangSchedulingElasticScaling(t *testing.T) {
 			Completions:    ptr.To[int32](8),
 			CompletionMode: new(batchv1.IndexedCompletion),
 			Scheduling: &batchv1.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
 				},
 			},
 		},
@@ -5465,8 +5579,8 @@ func TestJobGangSchedulingSuspendResume(t *testing.T) {
 			CompletionMode: new(batchv1.IndexedCompletion),
 			Suspend:        new(true),
 			Scheduling: &batchv1.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)},
 				},
 			},
 		},
@@ -5529,118 +5643,171 @@ func TestJobGangSchedulingSuspendResume(t *testing.T) {
 	verifyPodsInPodGroup("after second resume")
 }
 
-// TestJobDelegatedPodGroup verifies that a non-root Job whose parent controller
-// owns the Workload and delegates PodGroup management (via the group-template
-// annotation) gets a PodGroup materialized from the parent's persisted template,
-// without the Job controller creating or taking ownership of a Workload.
+// TestJobDelegatedPodGroup verifies Jobs that select a template in an external
+// Workload through the workload-name and group-template-name annotations. The
+// controller creates only the runtime PodGroup, from the persisted template.
 func TestJobDelegatedPodGroup(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.GenericWorkload: true,
 		features.WorkloadWithJob: true,
 	})
 
-	closeFn, restConfig, clientSet, ns := setup(t, "delegated-podgroup")
-	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(cancel)
-
 	const (
-		parentKind   = "SuperJob"
-		parentGroup  = "example.com"
-		parentName   = "parent-superjob"
-		templateName = "workers"
+		parentKind       = "SuperJob"
+		parentGroup      = "example.com"
+		parentName       = "parent-superjob"
+		workloadName     = "parent-workload"
+		templateName     = "workers"
+		templateMinCount = int32(3)
+		parallelism      = int32(3)
 	)
 
-	// A parent-owned Workload with a named gang template. Its spec.controllerRef
-	// points at the parent controller so the Job controller can discover it. The
-	// delegated PodGroup must be materialized from this persisted template rather
-	// than compiled from the Job spec.
-	parentWorkload, err := clientSet.SchedulingV1beta1().Workloads(ns.Name).Create(ctx, &schedulingv1beta1.Workload{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "parent-workload",
-			Namespace: ns.Name,
+	cases := map[string]struct {
+		ownedByParent   bool
+		jobCount        int
+		jobScheduling   *batchv1.JobSchedulingConfiguration
+		initialTemplate string
+	}{
+		"parent-owned Workload": {
+			ownedByParent:   true,
+			jobCount:        1,
+			initialTemplate: templateName,
 		},
-		Spec: schedulingv1beta1.WorkloadSpec{
-			ControllerRef: &schedulingv1beta1.TypedLocalObjectReference{
-				APIGroup: parentGroup,
-				Kind:     parentKind,
-				Name:     parentName,
-			},
-			PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
-				Name: templateName,
-				SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
-					Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: 3},
+		"standalone Job with a bring-your-own Workload ignores its spec.scheduling": {
+			jobCount:        1,
+			initialTemplate: templateName,
+			jobScheduling: &batchv1.JobSchedulingConfiguration{
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](2)},
 				},
-			}},
+			},
 		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Failed to create parent Workload: %v", err)
-	}
-
-	// A non-root Job owned by the parent controller, delegating PodGroup
-	// management via the group-template annotation.
-	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        "delegated-job",
-			Annotations: map[string]string{apischeduling.GroupTemplateNameAnnotation: templateName},
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion: parentGroup + "/v1",
-				Kind:       parentKind,
-				Name:       parentName,
-				UID:        types.UID("parent-superjob-uid"),
-				Controller: new(true),
-			}},
+		"sibling Jobs selecting the same template get their own PodGroups": {
+			ownedByParent:   true,
+			jobCount:        2,
+			initialTemplate: templateName,
 		},
-		Spec: batchv1.JobSpec{
-			Parallelism:    new(int32(3)),
-			Completions:    new(int32(3)),
-			CompletionMode: new(batchv1.IndexedCompletion),
-		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to create delegated Job: %v", err)
 	}
 
-	// The controller creates a PodGroup owned by the Job, but never a Workload
-	// (the parent owns the only Workload).
-	podGroup := waitForPodGroup(ctx, t, clientSet, jobObj, false, wait.ForeverTestTimeout)
-	waitForWorkload(ctx, t, clientSet, jobObj, true, 10*time.Second)
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			closeFn, restConfig, clientSet, ns := setup(t, "delegated-podgroup")
+			t.Cleanup(closeFn)
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
 
-	// The PodGroup is materialized from the parent's persisted template.
-	if podGroup.Spec.WorkloadRef == nil ||
-		podGroup.Spec.WorkloadRef.WorkloadName != parentWorkload.Name ||
-		podGroup.Spec.WorkloadRef.TemplateName != templateName {
-		t.Errorf("PodGroup workloadRef = %+v, want workload %q template %q",
-			podGroup.Spec.WorkloadRef, parentWorkload.Name, templateName)
-	}
-	if podGroup.Spec.SchedulingPolicy.Gang == nil || podGroup.Spec.SchedulingPolicy.Gang.MinCount != 3 {
-		t.Errorf("PodGroup gang = %+v, want minCount 3", podGroup.Spec.SchedulingPolicy.Gang)
-	}
+			workloadClient := clientSet.SchedulingV1beta1().Workloads(ns.Name)
+			createWorkload := func(template string) {
+				wl := &schedulingv1beta1.Workload{
+					ObjectMeta: metav1.ObjectMeta{Name: workloadName, Namespace: ns.Name},
+					Spec: schedulingv1beta1.WorkloadSpec{
+						PodGroupTemplates: []schedulingv1beta1.PodGroupTemplate{{
+							Name: template,
+							SchedulingPolicy: schedulingv1beta1.PodGroupSchedulingPolicy{
+								Gang: &schedulingv1beta1.GangSchedulingPolicy{MinCount: templateMinCount},
+							},
+						}},
+					},
+				}
+				if tc.ownedByParent {
+					wl.Spec.ControllerRef = &schedulingv1beta1.TypedLocalObjectReference{
+						APIGroup: parentGroup,
+						Kind:     parentKind,
+						Name:     parentName,
+					}
+				}
+				if _, err := workloadClient.Create(ctx, wl, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create Workload with template %q: %v", template, err)
+				}
+			}
+			if tc.initialTemplate != "" {
+				createWorkload(tc.initialTemplate)
+			}
 
-	// The PodGroup carries a controller ownerRef to the Job and does NOT link the
-	// parent-owned Workload as an owner (delegated mode).
-	var hasJobController bool
-	for _, ref := range podGroup.OwnerReferences {
-		if ref.Kind == "Workload" {
-			t.Errorf("delegated PodGroup unexpectedly links Workload owner %q", ref.Name)
-		}
-		if ref.Kind == "Job" && ref.UID == jobObj.UID && ref.Controller != nil && *ref.Controller {
-			hasJobController = true
-		}
-	}
-	if !hasJobController {
-		t.Errorf("PodGroup missing controller ownerReference to Job %q; got %+v", jobObj.Name, podGroup.OwnerReferences)
-	}
+			jobs := make([]*batchv1.Job, tc.jobCount)
+			for i := range jobs {
+				job := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("delegated-job-%d", i),
+						Annotations: map[string]string{
+							apischeduling.WorkloadNameAnnotation:      workloadName,
+							apischeduling.GroupTemplateNameAnnotation: templateName,
+						},
+					},
+					Spec: batchv1.JobSpec{
+						Parallelism:    new(parallelism),
+						Completions:    new(parallelism),
+						CompletionMode: new(batchv1.IndexedCompletion),
+						Scheduling:     tc.jobScheduling,
+					},
+				}
+				if tc.ownedByParent {
+					job.OwnerReferences = []metav1.OwnerReference{{
+						APIVersion: parentGroup + "/v1",
+						Kind:       parentKind,
+						Name:       parentName,
+						UID:        types.UID("parent-superjob-uid"),
+						Controller: new(true),
+					}}
+				}
+				var err error
+				if jobs[i], err = createJobWithDefaults(ctx, clientSet, ns.Name, job); err != nil {
+					t.Fatalf("Failed to create Job %s: %v", job.Name, err)
+				}
+			}
 
-	// The delegated Job never takes ownership of the parent Workload.
-	gotParent, err := clientSet.SchedulingV1beta1().Workloads(ns.Name).Get(ctx, parentWorkload.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Failed to get parent Workload: %v", err)
-	}
-	for _, ref := range gotParent.OwnerReferences {
-		if ref.UID == jobObj.UID {
-			t.Errorf("parent Workload unexpectedly owned by delegated Job %q", jobObj.Name)
-		}
+			podGroupNames := sets.New[string]()
+			for _, job := range jobs {
+				podGroup := waitForPodGroup(ctx, t, clientSet, job, false, wait.ForeverTestTimeout)
+				podGroupNames.Insert(podGroup.Name)
+				if ref := podGroup.Spec.WorkloadRef; ref == nil || ref.WorkloadName != workloadName || ref.TemplateName != templateName {
+					t.Errorf("Job %s: PodGroup workloadRef = %+v, want workload %q template %q", job.Name, ref, workloadName, templateName)
+				}
+				if gang := podGroup.Spec.SchedulingPolicy.Gang; gang == nil || gang.MinCount != templateMinCount {
+					t.Errorf("Job %s: PodGroup gang = %+v, want minCount %d from the template", job.Name, gang, templateMinCount)
+				}
+				for _, ref := range podGroup.OwnerReferences {
+					if ref.Kind == "Workload" {
+						t.Errorf("Job %s: PodGroup links the external Workload %q as an owner", job.Name, ref.Name)
+					}
+				}
+				if !metav1.IsControlledBy(podGroup, job) {
+					t.Errorf("Job %s: PodGroup is not controlled by the Job; ownerReferences %+v", job.Name, podGroup.OwnerReferences)
+				}
+				waitForWorkload(ctx, t, clientSet, job, true, wait.ForeverTestTimeout)
+
+				validateJobsPodsStatusOnly(ctx, t, clientSet, job, "", podsByStatus{
+					Active: int(parallelism), Ready: new(int32(0)), Terminating: new(int32(0)),
+				})
+				pods, err := getJobPods(ctx, t, clientSet, job, func(v1.PodStatus) bool { return true })
+				if err != nil {
+					t.Fatalf("Failed to get pods of Job %s: %v", job.Name, err)
+				}
+				for _, pod := range pods {
+					if sg := pod.Spec.SchedulingGroup; sg == nil || sg.PodGroupName == nil || *sg.PodGroupName != podGroup.Name {
+						t.Errorf("Job %s: pod %s schedulingGroup = %+v, want podGroupName %q", job.Name, pod.Name, sg, podGroup.Name)
+					}
+				}
+			}
+			if podGroupNames.Len() != len(jobs) {
+				t.Errorf("Got %d distinct PodGroups for %d Jobs: %v", podGroupNames.Len(), len(jobs), sets.List(podGroupNames))
+			}
+
+			// The external Workload is neither adopted nor reconciled from spec.scheduling.
+			wl, err := workloadClient.Get(ctx, workloadName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get Workload %s: %v", workloadName, err)
+			}
+			for _, job := range jobs {
+				for _, ref := range wl.OwnerReferences {
+					if ref.UID == job.UID {
+						t.Errorf("Workload %s is owned by Job %s", workloadName, job.Name)
+					}
+				}
+			}
+			if gang := wl.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang; gang == nil || gang.MinCount != templateMinCount {
+				t.Errorf("Workload %s template gang = %+v, want minCount %d unchanged", workloadName, gang, templateMinCount)
+			}
+		})
 	}
 }

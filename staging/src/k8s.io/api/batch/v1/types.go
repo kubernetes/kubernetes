@@ -18,7 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -504,8 +504,9 @@ type JobSpec struct {
 	// When set, it specifies the scheduling policy (basic or gang), topology
 	// constraints, disruption mode, and shared resource claims.
 	// When omitted, the Job defaults to the basic scheduling policy, which behaves
-	// as standard pod-by-pod scheduling.
-	// This field is alpha-level and requires the WorkloadWithJob feature gate.
+	// as standard pod-by-pod scheduling. This field is gated by the WorkloadWithJob
+	// feature gate.
+	//
 	// This field is immutable, including whether it is set at all, only
 	// policy.gang.minCount may be changed after creation.
 	//
@@ -531,7 +532,7 @@ type JobSchedulingConfiguration struct {
 	// +k8s:optional
 	// +k8s:update=NoSet
 	// +k8s:update=NoUnset
-	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
 
 	// schedulingConstraints defines scheduling constraints (e.g. topology)
 	// for the Job's pods.
@@ -540,7 +541,7 @@ type JobSchedulingConfiguration struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
 
 	// disruptionMode defines the mode in which the Job's pods can be disrupted.
 	// One of Single, All.
@@ -550,7 +551,7 @@ type JobSchedulingConfiguration struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
 
 	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Job. Pods consume the devices allocated to a PodGroup's claim by
@@ -571,7 +572,7 @@ type JobSchedulingConfiguration struct {
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=4
 	// +k8s:immutable
-	ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 }
 
 // JobStatus represents the current state of a Job.
