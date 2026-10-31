@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"k8s.io/ktesting"
@@ -1671,6 +1672,194 @@ func Test_getUncoreCacheID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := getUncoreCacheID(tt.args); got != tt.want {
 				t.Errorf("getUncoreCacheID() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCPUsByCore(t *testing.T) {
+	tests := []struct {
+		name    string
+		details CPUDetails
+		want    map[int][]int
+	}{
+		{
+			name: "simple custom cpudetails - noHT",
+			details: map[int]CPUInfo{
+				0: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				1: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				2: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				3: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				4: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				5: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				6: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				7: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			},
+			want: map[int][]int{
+				0: {0},
+				1: {1},
+				2: {2},
+				3: {3},
+				4: {4},
+				5: {5},
+				6: {6},
+				7: {7},
+			},
+		},
+		{
+			name: "simple custom cpudetails - HT",
+			details: map[int]CPUInfo{
+				0: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				1: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				2: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				3: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				4: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				5: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				6: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				7: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+			},
+			want: map[int][]int{
+				0: {0, 4},
+				1: {1, 5},
+				2: {2, 6},
+				3: {7, 3},
+			},
+		},
+		{
+			name: "complex real case: xeon gold 6320",
+			details: map[int]CPUInfo{
+				0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				9:  {CoreID: 9, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				10: {CoreID: 10, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				11: {CoreID: 11, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				12: {CoreID: 12, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				13: {CoreID: 13, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				14: {CoreID: 14, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				15: {CoreID: 15, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				16: {CoreID: 16, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				17: {CoreID: 17, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				18: {CoreID: 18, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				19: {CoreID: 19, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				20: {CoreID: 20, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				21: {CoreID: 21, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				22: {CoreID: 22, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				23: {CoreID: 23, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				24: {CoreID: 24, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				25: {CoreID: 25, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				26: {CoreID: 26, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				27: {CoreID: 27, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				28: {CoreID: 28, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				29: {CoreID: 29, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				30: {CoreID: 30, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				31: {CoreID: 31, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				32: {CoreID: 32, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				33: {CoreID: 33, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				34: {CoreID: 34, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				35: {CoreID: 35, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				36: {CoreID: 36, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				37: {CoreID: 37, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				38: {CoreID: 38, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				39: {CoreID: 39, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				40: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				41: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				42: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				43: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				44: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				45: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				46: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				47: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				48: {CoreID: 8, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				49: {CoreID: 9, SocketID: 0, NUMANodeID: 0, UncoreCacheID: 0},
+				50: {CoreID: 10, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				51: {CoreID: 11, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				52: {CoreID: 12, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				53: {CoreID: 13, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				54: {CoreID: 14, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				55: {CoreID: 15, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				56: {CoreID: 16, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				57: {CoreID: 17, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				58: {CoreID: 18, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				59: {CoreID: 19, SocketID: 0, NUMANodeID: 1, UncoreCacheID: 0},
+				60: {CoreID: 20, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				61: {CoreID: 21, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				62: {CoreID: 22, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				63: {CoreID: 23, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				64: {CoreID: 24, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				65: {CoreID: 25, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				66: {CoreID: 26, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				67: {CoreID: 27, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				68: {CoreID: 28, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				69: {CoreID: 29, SocketID: 1, NUMANodeID: 2, UncoreCacheID: 0},
+				70: {CoreID: 30, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				71: {CoreID: 31, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				72: {CoreID: 32, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				73: {CoreID: 33, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				74: {CoreID: 34, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				75: {CoreID: 35, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				76: {CoreID: 36, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				77: {CoreID: 37, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				78: {CoreID: 38, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+				79: {CoreID: 39, SocketID: 1, NUMANodeID: 3, UncoreCacheID: 0},
+			},
+			want: map[int][]int{
+				0:  {0, 40},
+				1:  {1, 41},
+				2:  {2, 42},
+				3:  {3, 43},
+				4:  {4, 44},
+				5:  {5, 45},
+				6:  {6, 46},
+				7:  {7, 47},
+				8:  {8, 48},
+				9:  {9, 49},
+				10: {10, 50},
+				11: {11, 51},
+				12: {12, 52},
+				13: {13, 53},
+				14: {14, 54},
+				15: {15, 55},
+				16: {16, 56},
+				17: {17, 57},
+				18: {18, 58},
+				19: {19, 59},
+				20: {20, 60},
+				21: {21, 61},
+				22: {22, 62},
+				23: {23, 63},
+				24: {24, 64},
+				25: {25, 65},
+				26: {26, 66},
+				27: {27, 67},
+				28: {28, 68},
+				29: {29, 69},
+				30: {30, 70},
+				31: {31, 71},
+				32: {32, 72},
+				33: {33, 73},
+				34: {34, 74},
+				35: {35, 75},
+				36: {36, 76},
+				37: {37, 77},
+				38: {38, 78},
+				39: {39, 79},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.details.CPUsByCore()
+			if diff := cmp.Diff(tt.want, got, cmpopts.SortSlices(func(a, b int) bool {
+				return a < b
+			})); diff != "" {
+				t.Errorf("CPUsByCore() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
