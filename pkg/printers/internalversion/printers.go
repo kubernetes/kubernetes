@@ -944,19 +944,53 @@ var (
 	podFailedConditions  = []metav1.TableRowCondition{{Type: metav1.RowCompleted, Status: metav1.ConditionTrue, Reason: string(api.PodFailed), Message: "The pod failed."}}
 )
 
+func formatReadyCount(ready, total int) string {
+	switch total {
+	case 1:
+		switch ready {
+		case 0:
+			return "0/1"
+		case 1:
+			return "1/1"
+		}
+	case 2:
+		switch ready {
+		case 0:
+			return "0/2"
+		case 1:
+			return "1/2"
+		case 2:
+			return "2/2"
+		}
+	}
+	var buf [24]byte
+	b := strconv.AppendInt(buf[:0], int64(ready), 10)
+	b = append(b, '/')
+	b = strconv.AppendInt(b, int64(total), 10)
+	return string(b)
+}
+
 func printPodList(podList *api.PodList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(podList.Items))
+	rows := make([]metav1.TableRow, len(podList.Items))
 	for i := range podList.Items {
-		r, err := printPod(&podList.Items[i], options)
+		r, err := printPodRow(&podList.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
-		rows = append(rows, r...)
+		rows[i] = r
 	}
 	return rows, nil
 }
 
 func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row, err := printPodRow(pod, options)
+	if err != nil {
+		return nil, err
+	}
+	return []metav1.TableRow{row}, nil
+}
+
+func printPodRow(pod *api.Pod, options printers.GenerateOptions) (metav1.TableRow, error) {
 	restarts := 0
 	restartableInitContainerRestarts := 0
 	totalContainers := len(pod.Spec.Containers)
@@ -988,11 +1022,14 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		row.Conditions = podFailedConditions
 	}
 
-	initContainers := make(map[string]*api.Container)
-	for i := range pod.Spec.InitContainers {
-		initContainers[pod.Spec.InitContainers[i].Name] = &pod.Spec.InitContainers[i]
-		if podutil.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
-			totalContainers++
+	var initContainers map[string]*api.Container
+	if len(pod.Spec.InitContainers) > 0 {
+		initContainers = make(map[string]*api.Container, len(pod.Spec.InitContainers))
+		for i := range pod.Spec.InitContainers {
+			initContainers[pod.Spec.InitContainers[i].Name] = &pod.Spec.InitContainers[i]
+			if podutil.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+				totalContainers++
+			}
 		}
 	}
 
@@ -1104,7 +1141,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 		restartsStr = fmt.Sprintf("%d (%s ago)", restarts, translateTimestampSince(lastRestartDate))
 	}
 
-	row.Cells = append(row.Cells, pod.Name, fmt.Sprintf("%d/%d", readyContainers, totalContainers), reason, restartsStr, translateTimestampSince(pod.CreationTimestamp))
+	readyStr := formatReadyCount(readyContainers, totalContainers)
+	ageStr := translateTimestampSince(pod.CreationTimestamp)
 	if options.Wide {
 		nodeName := pod.Spec.NodeName
 		nominatedNodeName := pod.Status.NominatedNodeName
@@ -1137,12 +1175,14 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 					}
 				}
 			}
-			readinessGates = fmt.Sprintf("%d/%d", trueConditions, len(pod.Spec.ReadinessGates))
+			readinessGates = formatReadyCount(trueConditions, len(pod.Spec.ReadinessGates))
 		}
-		row.Cells = append(row.Cells, podIP, nodeName, nominatedNodeName, readinessGates)
+		row.Cells = []interface{}{pod.Name, readyStr, reason, restartsStr, ageStr, podIP, nodeName, nominatedNodeName, readinessGates}
+	} else {
+		row.Cells = []interface{}{pod.Name, readyStr, reason, restartsStr, ageStr}
 	}
 
-	return []metav1.TableRow{row}, nil
+	return row, nil
 }
 
 func hasPodReadyCondition(conditions []api.PodCondition) bool {
