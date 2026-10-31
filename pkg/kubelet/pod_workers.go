@@ -1680,6 +1680,11 @@ func (p *podWorkers) removeTerminatedWorker(logger klog.Logger, uid types.UID, s
 				status.gracePeriod = 1
 			}
 			p.requeueLastPodUpdate(uid, status)
+			// As in UpdatePod, a running sync must not delay termination: it may wait for volumes
+			// that will never be mounted, as the pod is no longer in the pod manager.
+			if status.cancelFn != nil {
+				status.cancelFn()
+			}
 			logger.V(4).Info("Pod is orphaned and still running, began terminating", "podUID", uid)
 			return false
 		default:
