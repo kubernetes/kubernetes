@@ -300,6 +300,10 @@ func expectAction(t *testing.T, actions []k8stesting.Action, expected [][]string
 }
 
 func TestController_canDeleteCIDR(t *testing.T) {
+	deleting := func(cidr *networkingapiv1.ServiceCIDR) *networkingapiv1.ServiceCIDR {
+		cidr.DeletionTimestamp = ptr.To(metav1.Now())
+		return cidr
+	}
 	tests := []struct {
 		name       string
 		cidrs      []*networkingapiv1.ServiceCIDR
@@ -423,9 +427,64 @@ func TestController_canDeleteCIDR(t *testing.T) {
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			want:       true,
 		},
+		{
+			name: "CIDR with same range overlapping being deleted and IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.0.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       false,
+		},
+		{
+			name: "CIDR with smaller range overlapping being deleted and IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/26", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.0.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       false,
+		},
+		{
+			name: "CIDR with larger range overlapping being deleted and IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.0.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       false,
+		},
+		{
+			name: "CIDR with larger range overlapping being deleted and no IPs",
+			cidrs: []*networkingapiv1.ServiceCIDR{
+				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+				deleting(makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/64")),
+			},
+			ips: []*networkingapiv1.IPAddress{
+				makeIPAddress("192.168.1.23"),
+			},
+			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
+			want:       true,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			// canDeleteCIDR is only called for ServiceCIDRs being deleted.
+			deleting(tc.cidrSynced)
+			for _, cidr := range tc.cidrs {
+				if cidr.Name == tc.cidrSynced.Name {
+					deleting(cidr)
+				}
+			}
 			tCtx := ktesting.Init(t)
 			_, controller := newController(tCtx, t, tc.cidrs, tc.ips)
 			got, err := controller.canDeleteCIDR(tCtx, tc.cidrSynced)
