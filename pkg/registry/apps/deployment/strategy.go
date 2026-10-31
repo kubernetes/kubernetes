@@ -167,14 +167,44 @@ func (deploymentStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 }
 
 // dropDisabledSchedulingFields clears spec.scheduling when the
-// WorkloadWithDeployment gate is off, unless the old object already had it
-// (so we don't break round-trips for existing objects).
+// WorkloadWithDeployment gate is off (unless the old object already had it, so we
+// don't break round-trips for existing objects), and drops gated sub-fields when
+// their own gates are off.
 func dropDisabledSchedulingFields(spec *apps.DeploymentSpec, oldSpec *apps.DeploymentSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) ||
-		(oldSpec != nil && oldSpec.Scheduling != nil) {
+	var oldScheduling *apps.DeploymentSchedulingConfiguration
+	if oldSpec != nil {
+		oldScheduling = oldSpec.Scheduling
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) && oldScheduling == nil {
+		spec.Scheduling = nil
+	}
+	if spec.Scheduling == nil {
 		return
 	}
-	spec.Scheduling = nil
+
+	dropDisabledSchedulingConstraints(spec.Scheduling, oldScheduling)
+	dropDisabledResourceClaims(spec.Scheduling, oldScheduling)
+}
+
+// dropDisabledSchedulingConstraints clears schedulingConstraints when the
+// TopologyAwareWorkloadScheduling gate is off, unless the old object already set it.
+func dropDisabledSchedulingConstraints(scheduling, oldScheduling *apps.DeploymentSchedulingConfiguration) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) ||
+		(oldScheduling != nil && oldScheduling.SchedulingConstraints != nil) {
+		return
+	}
+	scheduling.SchedulingConstraints = nil
+}
+
+// dropDisabledResourceClaims clears resourceClaims when the DRAWorkloadResourceClaims
+// gate is off, unless the old object already set them.
+func dropDisabledResourceClaims(scheduling, oldScheduling *apps.DeploymentSchedulingConfiguration) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) ||
+		(oldScheduling != nil && len(oldScheduling.ResourceClaims) > 0) {
+		return
+	}
+	scheduling.ResourceClaims = nil
 }
 
 type deploymentStatusStrategy struct {

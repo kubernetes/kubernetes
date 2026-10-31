@@ -765,3 +765,30 @@ func TestCleanupReplicaSetPodGroupHandlesCacheMiss(t *testing.T) {
 		t.Fatalf("PodGroup GET error = %v, want NotFound after cleanup", err)
 	}
 }
+
+func TestNewReplicaSetControllerSchedulingDisabledWhenAPINotServed(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:        true,
+		features.WorkloadWithDeployment: true,
+	})
+
+	tCtx := ktesting.Init(t)
+	client := fake.NewSimpleClientset()
+	sharedInformers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+
+	rsc, err := NewReplicaSetController(
+		tCtx,
+		sharedInformers.Apps().V1().ReplicaSets(),
+		sharedInformers.Core().V1().Pods(),
+		nil,
+		nil,
+		client,
+		BurstReplicas,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rsc.schedulingEnabled {
+		t.Error("schedulingEnabled = true, want false when the scheduling informers are nil")
+	}
+}

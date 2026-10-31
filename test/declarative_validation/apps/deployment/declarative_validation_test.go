@@ -374,6 +374,26 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					field.Invalid(schedulingPath.Child("schedulingPolicy"), nil, "").WithOrigin("update"),
 				},
 			},
+			"removing scheduling after creation is immutable": {
+				enableWorkloadWithDeployment: true,
+				oldScheduling:                &apps.DeploymentSchedulingConfiguration{},
+				scheduling:                   nil,
+				expectedErrs: field.ErrorList{
+					field.Invalid(schedulingPath, nil, "").WithOrigin("update"),
+				},
+			},
+			"removing policy is immutable": {
+				enableWorkloadWithDeployment: true,
+				oldScheduling: &apps.DeploymentSchedulingConfiguration{
+					SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+					},
+				},
+				scheduling: &apps.DeploymentSchedulingConfiguration{},
+				expectedErrs: field.ErrorList{
+					field.Invalid(schedulingPath.Child("schedulingPolicy"), nil, "").WithOrigin("update"),
+				},
+			},
 			"changing constraints is immutable": {
 				enableWorkloadWithDeployment: true,
 				oldScheduling: &apps.DeploymentSchedulingConfiguration{

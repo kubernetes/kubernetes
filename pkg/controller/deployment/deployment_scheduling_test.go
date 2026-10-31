@@ -28,10 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -534,5 +537,29 @@ func TestEnsureWorkloadForDeploymentRejectsUnexpectedPodGroupTemplateCount(t *te
 				}
 			}
 		})
+	}
+}
+
+func TestNewDeploymentControllerWorkloadListerNilWhenAPINotServed(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadWithDeployment, true)
+
+	_, ctx := ktesting.NewTestContext(t)
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+
+	dc, err := NewDeploymentController(
+		ctx,
+		informerFactory.Apps().V1().Deployments(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Core().V1().Pods(),
+		nil,
+		client,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dc.workloadLister != nil {
+		t.Error("workloadLister = non-nil, want nil when the workload informer is nil")
 	}
 }
