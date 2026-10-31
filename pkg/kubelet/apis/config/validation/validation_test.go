@@ -400,7 +400,22 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			conf.MemorySwap.SwapBehavior = "invalid-behavior"
 			return conf
 		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\", \"NoSwap\" or \"WorkloadControlledSwap\"",
+	}, {
+		name: "MemorySwap.SwapBehavior WorkloadControlledSwap without feature gate enabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"WorkloadControlledSwap": false}
+			conf.MemorySwap.SwapBehavior = "WorkloadControlledSwap"
+			return conf
+		},
+		errMsg: "invalid configuration: memorySwap.swapBehavior \"WorkloadControlledSwap\" requires feature gate WorkloadControlledSwap",
+	}, {
+		name: "MemorySwap.SwapBehavior WorkloadControlledSwap with feature gate enabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.FeatureGates = map[string]bool{"WorkloadControlledSwap": true}
+			conf.MemorySwap.SwapBehavior = "WorkloadControlledSwap"
+			return conf
+		},
 	}, {
 		name: "CrashLoopBackOff.MaxContainerRestartPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
