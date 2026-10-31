@@ -113,10 +113,14 @@ func NewTypedRateLimitingQueueWithConfig[T comparable](rateLimiter TypedRateLimi
 		})
 	}
 
-	return &rateLimitingType[T]{
+	ret := &rateLimitingType[T]{
 		TypedDelayingInterface: config.DelayingQueue,
 		rateLimiter:            rateLimiter,
 	}
+	if _, ok := config.DelayingQueue.(Pausable); ok {
+		return &pausableRateLimitingType[T]{ret}
+	}
+	return ret
 }
 
 // NewNamedRateLimitingQueue constructs a new named workqueue with rateLimited queuing ability.
@@ -158,4 +162,21 @@ func (q *rateLimitingType[T]) NumRequeues(item T) int {
 
 func (q *rateLimitingType[T]) Forget(item T) {
 	q.rateLimiter.Forget(item)
+}
+
+// pausableRateLimitingType is the rate limiting queue returned when the
+// wrapped delaying queue implements Pausable, so that a rate limiting queue
+// only satisfies Pausable when Pause actually takes effect.
+type pausableRateLimitingType[T comparable] struct {
+	*rateLimitingType[T]
+}
+
+// Pause stops Get from returning items until Resume or ShutDown is called.
+func (q *pausableRateLimitingType[T]) Pause() {
+	q.TypedDelayingInterface.(Pausable).Pause()
+}
+
+// Resume allows Get to return items again after Pause.
+func (q *pausableRateLimitingType[T]) Resume() {
+	q.TypedDelayingInterface.(Pausable).Resume()
 }
