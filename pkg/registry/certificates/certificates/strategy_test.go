@@ -229,3 +229,19 @@ func TestStatusUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestStrategyUpdateRejectsSpecChange(t *testing.T) {
+	oldObj := &certapi.CertificateSigningRequest{
+		Spec: certapi.CertificateSigningRequestSpec{
+			ExpirationSeconds: ptr.To[int32](86400),
+		},
+	}
+	newObj := oldObj.DeepCopy()
+	newObj.Spec.ExpirationSeconds = ptr.To[int32](3600)
+
+	Strategy.PrepareForUpdate(context.TODO(), newObj, oldObj.DeepCopy())
+	errs := Strategy.ValidateUpdate(context.TODO(), newObj, oldObj)
+	if len(errs) == 0 || errs[0].Field != "spec" {
+		t.Fatalf("expected an immutable spec error, got %v", errs)
+	}
+}
