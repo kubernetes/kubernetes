@@ -631,12 +631,70 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		if server := config.overrides.ClusterInfo.Server; len(server) > 0 {
 			icc.Host = server
 		}
-		if len(config.overrides.AuthInfo.Token) > 0 || len(config.overrides.AuthInfo.TokenFile) > 0 {
-			icc.BearerToken = config.overrides.AuthInfo.Token
-			icc.BearerTokenFile = config.overrides.AuthInfo.TokenFile
+
+		// Credentials provided on the command line replace the in-cluster
+		// service account credentials, which are only used when no other
+		// credentials are provided.
+		authInfo := config.overrides.AuthInfo
+		clientCertAndKey := (len(authInfo.ClientCertificate) > 0 || len(authInfo.ClientCertificateData) > 0) &&
+			(len(authInfo.ClientKey) > 0 || len(authInfo.ClientKeyData) > 0)
+		if len(authInfo.Token) > 0 || len(authInfo.TokenFile) > 0 || len(authInfo.Username) > 0 || clientCertAndKey {
+			icc.BearerToken = ""
+			icc.BearerTokenFile = ""
 		}
-		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
-			icc.TLSClientConfig.CAFile = certificateAuthorityFile
+		if len(authInfo.Token) > 0 || len(authInfo.TokenFile) > 0 {
+			icc.BearerToken = authInfo.Token
+			icc.BearerTokenFile = authInfo.TokenFile
+		}
+		if len(authInfo.Username) > 0 {
+			icc.Username = authInfo.Username
+			icc.Password = authInfo.Password
+		}
+		if clientCertAndKey {
+			icc.CertFile = authInfo.ClientCertificate
+			icc.CertData = authInfo.ClientCertificateData
+			icc.KeyFile = authInfo.ClientKey
+			icc.KeyData = authInfo.ClientKeyData
+		}
+
+		// * An override of --insecure-skip-tls-verify=true and no accompanying CA/CA data should clear already-set CA/CA data
+		// otherwise, the in-cluster CA reference would return an error that "CA and insecure-skip-tls-verify couldn't both be set".
+		// * An override of --certificate-authority should also override TLS skip settings and CA data, otherwise existing CA data will take precedence.
+		caLen := len(config.overrides.ClusterInfo.CertificateAuthority)
+		caDataLen := len(config.overrides.ClusterInfo.CertificateAuthorityData)
+		if config.overrides.ClusterInfo.InsecureSkipTLSVerify || caLen > 0 || caDataLen > 0 {
+			icc.Insecure = config.overrides.ClusterInfo.InsecureSkipTLSVerify
+			icc.CAFile = config.overrides.ClusterInfo.CertificateAuthority
+			icc.CAData = config.overrides.ClusterInfo.CertificateAuthorityData
+		}
+
+		// if the --tls-server-name has been set in overrides, use that value.
+		// if the --server has been set in overrides, then use the value of --tls-server-name specified on the CLI too.  This gives the property
+		// that setting a --server will effectively clear the KUBECONFIG value of tls-server-name if it is specified on the command line which is
+		// usually correct.
+		if config.overrides.ClusterInfo.TLSServerName != "" || config.overrides.ClusterInfo.Server != "" {
+			icc.TLSClientConfig.ServerName = config.overrides.ClusterInfo.TLSServerName
+		}
+
+		if config.overrides.ClusterInfo.DisableCompression {
+			icc.DisableCompression = true
+		}
+
+		if len(config.overrides.AuthInfo.Impersonate) > 0 {
+			icc.Impersonate = restclient.ImpersonationConfig{
+				UserName: config.overrides.AuthInfo.Impersonate,
+				UID:      config.overrides.AuthInfo.ImpersonateUID,
+				Groups:   config.overrides.AuthInfo.ImpersonateGroups,
+				Extra:    config.overrides.AuthInfo.ImpersonateUserExtra,
+			}
+		}
+
+		if len(config.overrides.Timeout) > 0 {
+			timeout, err := ParseTimeout(config.overrides.Timeout)
+			if err != nil {
+				return nil, err
+			}
+			icc.Timeout = timeout
 		}
 	}
 
