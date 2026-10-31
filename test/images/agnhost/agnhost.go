@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/dns"
 	"k8s.io/kubernetes/test/images/agnhost/entrypoint-tester"
 	externalmetrics "k8s.io/kubernetes/test/images/agnhost/external-metrics"
+	fakemetricsserver "k8s.io/kubernetes/test/images/agnhost/fake-metrics-server"
 	"k8s.io/kubernetes/test/images/agnhost/fakegitserver"
 	"k8s.io/kubernetes/test/images/agnhost/fakeregistryserver"
 	grpchealthchecking "k8s.io/kubernetes/test/images/agnhost/grpc-health-checking"
@@ -75,6 +76,7 @@ func main() {
 	rootCmd.AddCommand(entrypoint.CmdEntrypointTester)
 	rootCmd.AddCommand(fakegitserver.CmdFakeGitServer)
 	rootCmd.AddCommand(fakeregistryserver.CmdFakeRegistryServer)
+	rootCmd.AddCommand(fakemetricsserver.CmdFakeMetricsServer)
 	rootCmd.AddCommand(guestbook.CmdGuestbook)
 	rootCmd.AddCommand(inclusterclient.CmdInClusterClient)
 	rootCmd.AddCommand(liveness.CmdLiveness)
