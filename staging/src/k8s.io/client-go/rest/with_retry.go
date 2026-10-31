@@ -24,8 +24,18 @@ import (
 	"net/url"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/klog/v2"
 )
+
+// retryAfterJitterFactor adds up to 10% of the retry wait at random before
+// the next attempt. The server sends the same Retry-After to every client it
+// rejects in a given second, so exact waits bring them all back together
+// (https://github.com/kubernetes/kubernetes/issues/105521). The jitter is
+// meant to spread those retries; the added latency grows with the fraction,
+// and 10% keeps the worst case at a tenth of the server's wait.
+const retryAfterJitterFactor = 0.1
 
 // IsRetryableErrorFunc allows the client to provide its own function
 // that determines whether the specified err from the server is retryable.
@@ -215,10 +225,16 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	}
 
 	// if we are here, we have made attempt(s) at least once before.
+	delay := r.retryAfter.Wait
 	if request.backoff != nil {
-		delay := request.backoff.CalculateBackoffWithContext(ctx, url)
-		if r.retryAfter.Wait > delay {
-			delay = r.retryAfter.Wait
+		if backoffDelay := request.backoff.CalculateBackoffWithContext(ctx, url); backoffDelay > delay {
+			delay = backoffDelay
+		}
+		// Jitter the delay that wins, not only Retry-After: a cohort held at
+		// the same backoff ceiling is in lockstep too, so the sleep may exceed
+		// that ceiling by the jitter fraction.
+		if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientRetryAfterJitter) {
+			delay = wait.Jitter(delay, retryAfterJitterFactor)
 		}
 		request.backoff.SleepWithContext(ctx, delay)
 	}
@@ -231,7 +247,8 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		return err
 	}
 
-	klog.FromContext(ctx).V(4).Info("Got a Retry-After response", "delay", r.retryAfter.Wait, "attempt", r.retryAfter.Attempt, "url", request.URL())
+	klog.FromContext(ctx).V(4).Info("Got a Retry-After response",
+		"retryAfter", r.retryAfter.Wait, "delay", delay, "attempt", r.retryAfter.Attempt, "url", request.URL())
 	return nil
 }
 
