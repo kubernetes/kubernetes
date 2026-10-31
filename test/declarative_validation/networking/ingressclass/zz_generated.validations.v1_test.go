@@ -77,6 +77,9 @@ func init() {
 			"spec.parameters.name": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.parameters.scope": {
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }
