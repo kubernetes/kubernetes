@@ -48,18 +48,31 @@ func (f *frameworkImpl) fillNominationExtensions() {
 	}
 }
 
-// RunNominationExtensionsAddNominatedPod calls AddNominatedPod of all plugins.
-func (f *frameworkImpl) RunNominationExtensionsAddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod) {
+// RunNominationExtensionsPrepareNomination calls PrepareNomination of all plugins.
+func (f *frameworkImpl) RunNominationExtensionsPrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
 	for _, ext := range f.nominationExtensions {
-		ext.AddNominatedPod(f.nominationExtensionsContext(ctx, ext), state, pod, nodeName, victims)
+		ext.PrepareNomination(f.nominationExtensionsContext(ctx, ext), state, pod, nodeName)
 	}
 }
 
-// RunNominationExtensionsRemoveNominatedPod calls RemoveNominatedPod of all plugins.
-func (f *frameworkImpl) RunNominationExtensionsRemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
+// RunNominationExtensionsAddNomination calls AddNomination of all plugins and
+// returns the events of all of them.
+func (f *frameworkImpl) RunNominationExtensionsAddNomination(ctx context.Context, pod *v1.Pod, nodeName string) []framework.NominationEvent {
+	var events []framework.NominationEvent
 	for _, ext := range f.nominationExtensions {
-		ext.RemoveNominatedPod(f.nominationExtensionsContext(ctx, ext), pod, nodeName, preemptionFailed)
+		events = append(events, ext.AddNomination(f.nominationExtensionsContext(ctx, ext), pod, nodeName).Events...)
 	}
+	return events
+}
+
+// RunNominationExtensionsRemoveNomination calls RemoveNomination of all
+// plugins and returns the events of all of them.
+func (f *frameworkImpl) RunNominationExtensionsRemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) []framework.NominationEvent {
+	var events []framework.NominationEvent
+	for _, ext := range f.nominationExtensions {
+		events = append(events, ext.RemoveNomination(f.nominationExtensionsContext(ctx, ext), pod, nodeName).Events...)
+	}
+	return events
 }
 
 // RunNominationExtensionsPodEligibleToPreempt returns the result of the first
@@ -73,7 +86,7 @@ func (f *frameworkImpl) RunNominationExtensionsPodEligibleToPreempt(ctx context.
 	return true, ""
 }
 
-func (f *frameworkImpl) nominationExtensionsContext(ctx context.Context, ext framework.NominationExtensions) context.Context {
+func (f *frameworkImpl) nominationExtensionsContext(ctx context.Context, ext fwk.Plugin) context.Context {
 	logger := klog.FromContext(ctx)
 	if !logger.V(4).Enabled() {
 		return ctx

@@ -179,41 +179,98 @@ type RankNodesPlugin interface {
 	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 }
 
-// NominationExtensions is an optional interface for plugins which keep state
-// about pods that got nominated by preemption: resources held for the
-// preemptor, or resources of preempted pods which get reclaimed only after
-// those pods are gone.
+// NominationEvent describes resources which became available, as the
+// informer would report it if a pod had released them, for example a
+// ResourceClaim update which removes an allocation.
+type NominationEvent struct {
+	Event  fwk.ClusterEvent
+	OldObj interface{}
+	NewObj interface{}
+}
+
+// NominationChangeResult is what a plugin returns when a nomination got
+// added or removed.
+type NominationChangeResult struct {
+	// Events describe resources which became available because of the
+	// change. The scheduling queue lets pods with lower or equal priority
+	// retry with them, like after a real release of those resources.
+	Events []NominationEvent
+}
+
+// NominationExtensions is an optional interface for plugins which keep
+// in-memory state about the resources that a nominated pod is going to get
+// on its nominated node ("resource nominations").
+//
+// The scheduler's PodNominator decides when a pod is nominated to a node and
+// reports every nomination it adds and removes. A change of the nominated
+// node is a removal followed by an addition. Plugins track the "confirmed"
+// resource nomination of a pod between AddNomination and RemoveNomination.
+//
+// None of these calls applies resource nominations for scheduling. That is
+// left to PreFilterExtensions: the framework calls AddPod and RemovePod for
+// the nominated pods which apply to the pod being filtered (by priority, not
+// the pod itself, not pods already on the node), and plugins apply the
+// confirmed resource nomination of such a pod there.
 //
 // The interface is internal to kube-scheduler and only used when the
 // DRAPreemption feature gate is enabled. It may change or move into the
 // framework before KEP-5690 graduates.
 type NominationExtensions interface {
 	fwk.Plugin
-	// AddNominatedPod is called by preemption with the scheduling cycle's
-	// state after it picked nodeName for pod and before it starts to
-	// preempt the victims.
-	AddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod)
-	// RemoveNominatedPod is called when the nomination of pod ends: the pod
-	// got scheduled, deleted or bound elsewhere, its nominated node changed
-	// or got cleared, or the preemption failed. A non-empty nodeName limits
-	// the removal to a nomination for that node, because the notification
-	// about an older nomination may arrive after the pod got nominated again.
-	// preemptionFailed is true if not all victims could be preempted, so
-	// some of them may keep their resources.
-	RemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool)
-	// PodEligibleToPreempt reports whether pod may start another preemption.
-	// nodeName is the node the pod is currently nominated to, if any.
-	// If not, the string explains why.
+	// PrepareNomination is called when a PostFilter plugin of this
+	// scheduler nominated pod to nodeName, right before the PodNominator
+	// nominates it. Plugins record the resources selected for the pod on
+	// nodeName in state as the pod's "candidate" resource nomination, so
+	// that AddNomination can confirm it. A later PrepareNomination for the
+	// same pod replaces the candidate. The nomination may still not happen,
+	// for example if the pod got deleted, so plugins drop candidates when
+	// the pod is deleted.
+	//
+	// It exists only because the PodNominator gets nominations without the
+	// CycleState of the cycle which made them, so AddNomination can't read
+	// the selected resources. It may go away once nominations carry the
+	// information which a cycle selected besides the node, which may be
+	// more than resources, e.g. a topology placement.
+	PrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
+	// AddNomination is called when the PodNominator nominated pod to
+	// nodeName. Plugins confirm the candidate resource nomination prepared
+	// for nodeName, if any. Nominations made by others, for example read
+	// from the API, have no candidate.
+	//
+	// The result is empty for now. It is meant for waking up pods whose
+	// nominations conflict with the new one.
+	AddNomination(ctx context.Context, pod *v1.Pod, nodeName string) NominationChangeResult
+	// RemoveNomination is called when the nomination of pod to nodeName
+	// ended, including when the pod got bound (Spec.NodeName set) or
+	// deleted. Plugins return events for the resources of the confirmed
+	// resource nomination which become available, as if a pod using them
+	// got removed, e.g. ResourceClaim updates which clear the nominated
+	// allocation, and drop it. They may keep it as the candidate, unless
+	// a newer one exists, so that a nomination which gets added back to the
+	// same node gets it again.
+	//
+	// An explicit nomination to the same node by a PostFilter plugin is
+	// reported as a removal followed by an addition, so that the previous
+	// confirmed resource nomination gets released and replaced.
+	RemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) NominationChangeResult
+	// PodEligibleToPreempt reports whether pod may start another preemption,
+	// or whether resources released for its earlier nomination are still
+	// being reclaimed. nodeName is the node the pod is currently nominated
+	// to, if any. If not eligible, the string explains why.
 	PodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nodeName string) (bool, string)
 }
 
 // NominationExtensionsRunner runs the NominationExtensions of the plugins of
 // a profile. All methods are no-ops when no plugin implements them.
 type NominationExtensionsRunner interface {
-	// RunNominationExtensionsAddNominatedPod calls AddNominatedPod of all plugins.
-	RunNominationExtensionsAddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod)
-	// RunNominationExtensionsRemoveNominatedPod calls RemoveNominatedPod of all plugins.
-	RunNominationExtensionsRemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool)
+	// RunNominationExtensionsPrepareNomination calls PrepareNomination of all plugins.
+	RunNominationExtensionsPrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
+	// RunNominationExtensionsAddNomination calls AddNomination of all plugins
+	// and returns the events of all of them.
+	RunNominationExtensionsAddNomination(ctx context.Context, pod *v1.Pod, nodeName string) []NominationEvent
+	// RunNominationExtensionsRemoveNomination calls RemoveNomination of all
+	// plugins and returns the events of all of them.
+	RunNominationExtensionsRemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) []NominationEvent
 	// RunNominationExtensionsPodEligibleToPreempt returns the result of the
 	// first plugin which reports that the pod is not eligible.
 	RunNominationExtensionsPodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nodeName string) (bool, string)
