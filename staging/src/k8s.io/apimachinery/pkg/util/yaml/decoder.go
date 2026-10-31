@@ -361,7 +361,7 @@ func (d *YAMLOrJSONDecoder) consumeWhitespace() error {
 	consumed := 0
 	for {
 		buf, err := d.stream.ReadN(4)
-		if err != nil && err == io.EOF { //nolint:errorlint
+		if err != nil && err == io.EOF && len(buf) == 0 { //nolint:errorlint
 			return err
 		}
 		r, sz := utf8.DecodeRune(buf)
