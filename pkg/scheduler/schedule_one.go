@@ -127,6 +127,9 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
+	podStatusMutators := framework.NewPodStatusMutators()
+	state.Write(framework.PodStatusMutatorsKey, podStatusMutators)
+
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -387,6 +390,11 @@ func (sched *Scheduler) bindingCycle(
 	if bindingPod != nil && !bindingPod.MarkPrebound() {
 		err := context.Cause(ctx)
 		return fwk.AsStatus(err)
+	}
+
+	// Flush aggregated pod status updates registered by PreBind plugins.
+	if status := sched.patchAggregatedPodStatus(ctx, schedFramework, state, assumedPod); !status.IsSuccess() {
+		return status
 	}
 
 	// Run "bind" plugins.
@@ -703,6 +711,39 @@ func prioritizeNodes(
 		}
 	}
 	return nodesScores, nil
+}
+
+// patchAggregatedPodStatus applies all registered PodStatusMutatorFunc mutators in CycleState
+// and writes the aggregated changes to the API server in a single PatchPodStatus request.
+func (sched *Scheduler) patchAggregatedPodStatus(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, pod *v1.Pod) *fwk.Status {
+	data, err := state.Read(framework.PodStatusMutatorsKey)
+	if err != nil || data == nil {
+		return nil
+	}
+	mutators, ok := data.(*framework.PodStatusMutators)
+	if !ok {
+		return nil
+	}
+
+	fns := mutators.Mutators()
+	if len(fns) == 0 {
+		return nil
+	}
+
+	baseStatus := pod.Status.DeepCopy()
+	targetStatus := pod.Status.DeepCopy()
+	for _, mutate := range fns {
+		if err := mutate(baseStatus, targetStatus); err != nil {
+			return fwk.AsStatus(fmt.Errorf("mutating pod status: %w", err))
+		}
+	}
+
+	if err := util.PatchPodStatus(ctx, schedFramework.ClientSet(), pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
+		return fwk.AsStatus(fmt.Errorf("patching aggregated pod status for %s/%s: %w", pod.Namespace, pod.Name, err))
+	}
+
+	pod.Status = *targetStatus
+	return nil
 }
 
 // bind binds a pod to a given node defined in a binding object.
