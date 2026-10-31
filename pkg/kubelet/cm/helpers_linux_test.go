@@ -1505,3 +1505,57 @@ func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestResourceConfigForPodSwap(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+					v1.ResourceSwap:   resource.MustParse("512Mi"),
+				},
+			},
+			Containers: []v1.Container{
+				{Resources: getResourceRequirements(getResourceList("100m", "512Mi"), getResourceList("200m", "1Gi"))},
+			},
+		},
+	}
+
+	t.Run("sets memory.swap.max when PodLevelResources and WorkloadControlledSwap are enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WorkloadControlledSwap, true)
+
+		rc := ResourceConfigForPod(pod, true, QuotaPeriod, false, kubeletconfig.NoneMemoryReservationPolicy)
+		expected := strconv.FormatInt(512*1024*1024, 10)
+		if got := rc.Unified[Cgroup2MaxSwapFilename]; got != expected {
+			t.Fatalf("expected Unified[%q] = %q, got %q", Cgroup2MaxSwapFilename, expected, got)
+		}
+	})
+
+	t.Run("omits memory.swap.max when WorkloadControlledSwap is disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.WorkloadControlledSwap, false)
+
+		rc := ResourceConfigForPod(pod, true, QuotaPeriod, false, kubeletconfig.NoneMemoryReservationPolicy)
+		if _, found := rc.Unified[Cgroup2MaxSwapFilename]; found {
+			t.Fatalf("expected Unified[%q] to be omitted when WorkloadControlledSwap is disabled, got %v", Cgroup2MaxSwapFilename, rc.Unified)
+		}
+	})
+
+	t.Run("podContainerManager strips memory.swap.max on NoSwap or missing swap controller", func(t *testing.T) {
+		origSwapAvailable := isSwapControllerAvailable
+		defer func() { isSwapControllerAvailable = origSwapAvailable }()
+
+		isSwapControllerAvailable = func() bool { return true }
+		pcmNoSwap := &podContainerManagerImpl{memorySwapBehavior: "NoSwap"}
+		if pcmNoSwap.isNodeSwapEnabled() {
+			t.Fatalf("expected isNodeSwapEnabled() == false when memorySwapBehavior is NoSwap")
+		}
+
+		isSwapControllerAvailable = func() bool { return false }
+		pcmSwapNoController := &podContainerManagerImpl{memorySwapBehavior: "WorkloadControlledSwap"}
+		if pcmSwapNoController.isNodeSwapEnabled() {
+			t.Fatalf("expected isNodeSwapEnabled() == false when swap controller is unavailable")
+		}
+	})
+}
