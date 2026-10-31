@@ -255,7 +255,14 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 		expectCreate      []runtime.Object
 	}{
 		{
-			testName:    "existing endpoints extra service ports missing port no update",
+			testName:      "existing endpoints satisfy",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+		},
+		{
+			testName:    "existing endpoints extra service ports missing port",
 			serviceName: "foo",
 			ip:          "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{
@@ -263,7 +270,34 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
 			initialState: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate: nil,
+			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{
+				{Name: "foo", Port: 8080, Protocol: "TCP"},
+				{Name: "bar", Port: 1000, Protocol: "TCP"},
+			}),
+		},
+		{
+			testName:      "existing endpoints wrong port",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+		},
+		{
+			testName:      "existing endpoints wrong protocol",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+		},
+		{
+			testName:      "existing endpoints wrong port name",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
+			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}}),
 		},
 		{
 			testName:    "existing endpoints extra service ports, wrong ports, wrong IP",
@@ -274,7 +308,10 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
 			initialState: makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{
+				{Name: "foo", Port: 8080, Protocol: "TCP"},
+				{Name: "bar", Port: 1000, Protocol: "TCP"},
+			}),
 		},
 		{
 			testName:      "no existing endpoints",
