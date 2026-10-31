@@ -48,6 +48,7 @@ type Config struct {
 	// PressureTransitionPeriod is duration the kubelet has to wait before transitioning out of a pressure condition.
 	PressureTransitionPeriod time.Duration
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
+	// A negative value defers to the pod's terminationGracePeriodSeconds.
 	MaxPodGracePeriodSeconds int64
 	// Thresholds define the set of conditions monitored to trigger eviction.
 	Thresholds []evictionapi.Threshold
