@@ -85,7 +85,8 @@ func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 	return []fwk.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
-		// deleting an existing Pod may make it schedulable.
+		// deleting an existing Pod may make it schedulable. Deleting the last pod that matched
+		// required affinity may also make a self-affinity pod schedulable (vacuous satisfaction).
 		// - UpdatePodLabel. Updating on an existing Pod's labels (e.g., removal) may make
 		// an unschedulable Pod schedulable.
 		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
@@ -216,7 +217,10 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 		return fwk.QueueSkip, nil
 	}
 
-	// Pod is deleted. Return Queue when the deleted pod matches the target pod's anti-affinity or vice versa.
+	// Pod is deleted. Return Queue when:
+	// - the deleted pod matches the target pod's anti-affinity or vice versa, or
+	// - the deleted pod matched the target's required affinity and the target satisfies its own
+	//   affinity terms (last peer gone → self-affinity / vacuous satisfaction in Filter).
 
 	if podMatchesAnyAffinityTerms(antiTerms, originalPod) {
 		logger.V(5).Info("a scheduled pod was deleted and it matches the target pod's anti-affinity. The pod may be schedulable now",
@@ -234,7 +238,15 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 		return fwk.Queue, nil
 	}
 
-	logger.V(5).Info("a scheduled pod was deleted but it doesn't match the target pod's anti-affinity, nor vice versa",
+	// Deleting the last pod that matched required affinity can unlock the
+	// self-affinity / vacuous-satisfaction path in Filter (#87621, #141354).
+	if podMatchesAllAffinityTerms(terms, originalPod) && podMatchesAllAffinityTerms(terms, pod) {
+		logger.V(5).Info("a scheduled pod matching the target pod's affinity was deleted; the target may now be schedulable via self-affinity",
+			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
+		return fwk.Queue, nil
+	}
+
+	logger.V(5).Info("a scheduled pod was deleted but it doesn't match the target pod's anti-affinity, nor unlock self-affinity",
 		"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
 	return fwk.QueueSkip, nil
 }
