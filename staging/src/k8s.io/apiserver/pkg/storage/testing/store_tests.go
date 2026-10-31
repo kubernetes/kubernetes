@@ -6357,7 +6357,7 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store Interfa
 	}
 }
 
-func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interface, codec runtime.Codec) {
+func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interface, prefix string, codec runtime.Codec) {
 	mustState := func(obj runtime.Object) *storage.ObjState {
 		state, err := storage.GetStateFromObject(store.Versioner(), codec, obj, true)
 		require.NoError(t, err)
@@ -6365,52 +6365,51 @@ func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interfac
 	}
 
 	key, existing := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
+	existingRev, err := strconv.ParseInt(existing.ResourceVersion, 10, 64)
+	require.NoError(t, err)
 	_, emptyKeyErr := storage.PrepareKey("/pods/", "", false)
 
 	stale := existing.DeepCopy()
 	stale.ResourceVersion = "999999"
 
 	tests := []struct {
-		name          string
-		key           string
-		origState     *storage.ObjState
-		expectSuccess bool
-		expectError   error
-		expectOut     *example.Pod
-		expectStored  *example.Pod
+		name         string
+		key          string
+		origState    *storage.ObjState
+		expectError  error
+		expectOut    *example.Pod
+		expectStored *example.Pod
 	}{
 		{
-			name:          "conflicts on stale revision",
-			key:           key,
-			origState:     mustState(stale),
-			expectSuccess: false,
-			expectOut:     &example.Pod{},
-			expectStored:  existing,
+			name:         "conflicts on stale revision",
+			key:          key,
+			origState:    mustState(stale),
+			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: existing,
 		},
 		{
-			name:          "conflicts when key does not exist",
-			key:           "/pods/test-ns/missing",
-			origState:     mustState(existing.DeepCopy()),
-			expectSuccess: false,
-			expectOut:     &example.Pod{},
-			expectStored:  nil,
+			name:         "conflicts when key does not exist",
+			key:          "/pods/test-ns/missing",
+			origState:    mustState(existing.DeepCopy()),
+			expectError:  storage.NewResourceVersionConflictsError(prefix+"/pods/test-ns/missing", existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: nil,
 		},
 		{
-			name:          "rejects empty key",
-			key:           "",
-			origState:     mustState(existing.DeepCopy()),
-			expectSuccess: false,
-			expectError:   emptyKeyErr,
-			expectOut:     &example.Pod{},
+			name:        "rejects empty key",
+			key:         "",
+			origState:   mustState(existing.DeepCopy()),
+			expectError: emptyKeyErr,
+			expectOut:   &example.Pod{},
 		},
 		// Placed last because it deletes key from storage.
 		{
-			name:          "deletes object at matching revision",
-			key:           key,
-			origState:     mustState(existing.DeepCopy()),
-			expectSuccess: true,
-			expectOut:     existing,
-			expectStored:  nil,
+			name:         "deletes object at matching revision",
+			key:          key,
+			origState:    mustState(existing.DeepCopy()),
+			expectOut:    existing,
+			expectStored: nil,
 		},
 	}
 
@@ -6418,12 +6417,11 @@ func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interfac
 		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			out := &example.Pod{}
-			success, err := store.DeleteOnce(ctx, tt.key, tt.origState, out)
+			err := store.DeleteOnce(ctx, tt.key, tt.origState, out)
 			require.Equal(t, tt.expectError, err)
-			require.Equal(t, tt.expectSuccess, success)
 
 			wantOut := tt.expectOut.DeepCopy()
-			if tt.expectSuccess {
+			if tt.expectError == nil {
 				require.NotEmpty(t, out.ResourceVersion)
 				require.NotEqual(t, tt.expectOut.ResourceVersion, out.ResourceVersion)
 				wantOut.ResourceVersion = out.ResourceVersion
@@ -6480,41 +6478,39 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 		obj            *example.Pod
 		ignoreNotFound bool
 		expectState    *storage.ObjState
-		expectSuccess  bool
 		expectError    error
 		expectOut      *example.Pod
 		expectRV       string
 		expectStored   *example.Pod
 	}{
 		{
-			name:          "noop update returns existing object without changing revision",
-			key:           key,
-			origState:     mustState(existing.DeepCopy()),
-			obj:           existing,
-			expectState:   mustStorageState(existing.DeepCopy()),
-			expectSuccess: true,
-			expectOut:     existing,
-			expectRV:      existing.ResourceVersion,
-			expectStored:  existing,
+			name:         "noop update returns existing object without changing revision",
+			key:          key,
+			origState:    mustState(existing.DeepCopy()),
+			obj:          existing,
+			expectState:  mustStorageState(existing.DeepCopy()),
+			expectOut:    existing,
+			expectRV:     existing.ResourceVersion,
+			expectStored: existing,
 		},
 		{
-			name:          "noop update returns refreshed state when stored object differs",
-			key:           key,
-			origState:     mustState(updated.DeepCopy()),
-			obj:           updated,
-			expectState:   mustStorageState(existing.DeepCopy()),
-			expectSuccess: false,
-			expectOut:     &example.Pod{},
-			expectStored:  existing,
+			name:         "noop update conflicts and returns refreshed state when stored object differs",
+			key:          key,
+			origState:    mustState(updated.DeepCopy()),
+			obj:          updated,
+			expectState:  mustStorageState(existing.DeepCopy()),
+			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: existing,
 		},
 		{
-			name:          "conflicts on stale revision",
-			key:           key,
-			origState:     mustState(stale),
-			obj:           updated,
-			expectSuccess: false,
-			expectOut:     &example.Pod{},
-			expectStored:  existing,
+			name:         "conflicts on stale revision",
+			key:          key,
+			origState:    mustState(stale),
+			obj:          updated,
+			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: existing,
 		},
 		{
 			name:           "conflicts when creating with zero revision on existing key",
@@ -6522,37 +6518,35 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			origState:      mustState(&example.Pod{}),
 			obj:            updated,
 			ignoreNotFound: true,
-			expectSuccess:  false,
+			expectError:    storage.NewResourceVersionConflictsError(prefix+key, existingRev),
 			expectOut:      &example.Pod{},
 			expectStored:   existing,
 		},
 		{
-			name:          "conflicts when key does not exist",
-			key:           "/pods/test-ns/missing",
-			origState:     mustState(existing.DeepCopy()),
-			obj:           updated,
-			expectSuccess: false,
-			expectOut:     &example.Pod{},
-			expectStored:  nil,
+			name:         "conflicts when key does not exist",
+			key:          "/pods/test-ns/missing",
+			origState:    mustState(existing.DeepCopy()),
+			obj:          updated,
+			expectError:  storage.NewResourceVersionConflictsError(prefix+"/pods/test-ns/missing", existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: nil,
 		},
 		{
-			name:          "noop update fails when key is missing and ignoreNotFound is false",
-			key:           "/pods/test-ns/missing",
-			origState:     mustState(existing.DeepCopy()),
-			obj:           existing,
-			expectSuccess: false,
-			expectError:   storage.NewKeyNotFoundError(prefix+"/pods/test-ns/missing", existingRev),
-			expectOut:     &example.Pod{},
-			expectStored:  nil,
+			name:         "noop update fails when key is missing and ignoreNotFound is false",
+			key:          "/pods/test-ns/missing",
+			origState:    mustState(existing.DeepCopy()),
+			obj:          existing,
+			expectError:  storage.NewKeyNotFoundError(prefix+"/pods/test-ns/missing", existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: nil,
 		},
 		{
-			name:          "rejects empty key",
-			key:           "",
-			origState:     mustState(existing.DeepCopy()),
-			obj:           updated,
-			expectSuccess: false,
-			expectError:   emptyKeyErr,
-			expectOut:     &example.Pod{},
+			name:        "rejects empty key",
+			key:         "",
+			origState:   mustState(existing.DeepCopy()),
+			obj:         updated,
+			expectError: emptyKeyErr,
+			expectOut:   &example.Pod{},
 		},
 		{
 			name:           "creates object when origState has zero revision",
@@ -6561,20 +6555,18 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			obj:            created,
 			ignoreNotFound: true,
 			expectState:    mustState(&example.Pod{}),
-			expectSuccess:  true,
 			expectOut:      created,
 			expectStored:   created,
 		},
 		// Placed last because it mutates key in storage.
 		{
-			name:          "updates object at matching revision",
-			key:           key,
-			origState:     mustState(existing.DeepCopy()),
-			obj:           updated,
-			expectState:   mustState(existing.DeepCopy()),
-			expectSuccess: true,
-			expectOut:     updated,
-			expectStored:  updated,
+			name:         "updates object at matching revision",
+			key:          key,
+			origState:    mustState(existing.DeepCopy()),
+			obj:          updated,
+			expectState:  mustState(existing.DeepCopy()),
+			expectOut:    updated,
+			expectStored: updated,
 		},
 	}
 
@@ -6582,20 +6574,19 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			out := &example.Pod{}
-			state, success, err := store.UpdateOnce(ctx, tt.key, tt.origState, tt.obj.DeepCopy(), 0, out, tt.ignoreNotFound)
+			state, err := store.UpdateOnce(ctx, tt.key, tt.origState, tt.obj.DeepCopy(), 0, out, tt.ignoreNotFound)
 			require.Equal(t, tt.expectError, err)
-			require.Equal(t, tt.expectSuccess, success)
 			require.Equal(t, tt.expectState, state)
 
 			if tt.expectRV != "" {
 				require.Equal(t, tt.expectRV, out.ResourceVersion)
-			} else if tt.expectSuccess {
+			} else if tt.expectError == nil {
 				require.NotEmpty(t, out.ResourceVersion)
 				require.NotEqual(t, tt.expectOut.ResourceVersion, out.ResourceVersion)
 			}
 
 			wantOut := tt.expectOut.DeepCopy()
-			if tt.expectSuccess {
+			if tt.expectError == nil {
 				wantOut.ResourceVersion = out.ResourceVersion
 			}
 			require.Equal(t, wantOut, out)
@@ -6610,7 +6601,7 @@ func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interfac
 			} else {
 				require.NoError(t, err)
 				wantStored := tt.expectStored.DeepCopy()
-				if tt.expectSuccess {
+				if tt.expectError == nil {
 					wantStored.ResourceVersion = out.ResourceVersion
 				}
 				require.Equal(t, wantStored, got)

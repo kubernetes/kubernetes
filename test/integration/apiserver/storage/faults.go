@@ -333,14 +333,14 @@ func (s *bookmarkDroppingStore) Delete(ctx context.Context, key string, out runt
 	return err
 }
 
-func (s *bookmarkDroppingStore) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) (bool, error) {
+func (s *bookmarkDroppingStore) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
 	s.writeMu.RLock()
 	defer s.writeMu.RUnlock()
-	success, err := s.Interface.DeleteOnce(ctx, key, origState, out)
-	if err == nil && success {
+	err := s.Interface.DeleteOnce(ctx, key, origState, out)
+	if err == nil {
 		s.writesSeen.Add(1)
 	}
-	return success, err
+	return err
 }
 
 func (s *bookmarkDroppingStore) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
@@ -353,14 +353,14 @@ func (s *bookmarkDroppingStore) GuaranteedUpdate(ctx context.Context, key string
 	return err
 }
 
-func (s *bookmarkDroppingStore) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
+func (s *bookmarkDroppingStore) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, error) {
 	s.writeMu.RLock()
 	defer s.writeMu.RUnlock()
-	state, success, err := s.Interface.UpdateOnce(ctx, key, origState, obj, ttl, destination, ignoreNotFound)
-	if err == nil && success {
+	state, err := s.Interface.UpdateOnce(ctx, key, origState, obj, ttl, destination, ignoreNotFound)
+	if err == nil {
 		s.writesSeen.Add(1)
 	}
-	return state, success, err
+	return state, err
 }
 
 func (s *bookmarkDroppingStore) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {

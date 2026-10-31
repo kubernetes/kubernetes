@@ -91,7 +91,7 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
 }
 
-func (c *CacheDelegator) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) (bool, error) {
+func (c *CacheDelegator) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
 	return c.storage.DeleteOnce(ctx, key, origState, out)
 }
 
@@ -206,7 +206,7 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
-func (c *CacheDelegator) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
+func (c *CacheDelegator) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, error) {
 	return c.storage.UpdateOnce(ctx, key, origState, obj, ttl, destination, ignoreNotFound)
 }
 
