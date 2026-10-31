@@ -305,6 +305,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "OptionalNodeOperations", func(tCtx ktesting.TContext) { testOptionalNodeOperations(tCtx, true) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, true) })
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, true) })
+				runSubTest(tCtx, "ListTypeAttributes", testListTypeAttributes)
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				runSubTest(tCtx, "PrioritizedListScoring", func(tCtx ktesting.TContext) { testPrioritizedListScoring(tCtx) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
