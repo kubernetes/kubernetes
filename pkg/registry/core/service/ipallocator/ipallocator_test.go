@@ -430,14 +430,14 @@ func TestIPAllocatorClusterIPMetrics(t *testing.T) {
 
 	// Check initial state
 	em := testMetrics{
-		free:      0,
+		free:      254,
 		used:      0,
 		allocated: 0,
 		errors:    0,
 	}
 	expectMetrics(t, cidrIPv4, em)
 	em = testMetrics{
-		free:      0,
+		free:      65535, // IPv6 clusterIP range is capped to 2^16 and considers the broadcast address as valid
 		used:      0,
 		allocated: 0,
 		errors:    0,
@@ -521,6 +521,35 @@ func TestIPAllocatorClusterIPMetrics(t *testing.T) {
 	expectMetrics(t, cidrIPv6, em)
 }
 
+func TestIPAllocatorEnableMetricsInitializesGauges(t *testing.T) {
+	clearMetrics()
+	cidr := "10.1.0.0/16"
+	_, clusterCIDR, err := netutils.ParseCIDRSloppy(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := newTestAllocator(clusterCIDR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.EnableMetrics()
+
+	if _, err := testutil.GetGaugeMetricValue(clusterIPAvailable.WithLabelValues(cidr)); err != nil {
+		t.Fatalf("available_ips gauge missing for %s before any allocation: %v", cidr, err)
+	}
+	if _, err := testutil.GetGaugeMetricValue(clusterIPAllocated.WithLabelValues(cidr)); err != nil {
+		t.Fatalf("allocated_ips gauge missing for %s before any allocation: %v", cidr, err)
+	}
+
+	em := testMetrics{
+		free:      65534,
+		used:      0,
+		allocated: 0,
+		errors:    0,
+	}
+	expectMetrics(t, cidr, em)
+}
+
 func TestIPAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 	clearMetrics()
 	// create IPv4 allocator
@@ -533,7 +562,7 @@ func TestIPAllocatorClusterIPAllocatedMetrics(t *testing.T) {
 	a.EnableMetrics()
 
 	em := testMetrics{
-		free:      0,
+		free:      126,
 		used:      0,
 		allocated: 0,
 		errors:    0,

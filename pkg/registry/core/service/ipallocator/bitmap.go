@@ -341,6 +341,9 @@ func (r *Range) Destroy() {
 func (r *Range) EnableMetrics() {
 	registerMetrics()
 	r.metrics = &metricsRecorder{}
+	label := r.CIDR()
+	r.metrics.setAllocated(label.String(), r.Used())
+	r.metrics.setAvailable(label.String(), r.Free())
 }
 
 // calculateIPOffset calculates the integer offset of ip from base such that
