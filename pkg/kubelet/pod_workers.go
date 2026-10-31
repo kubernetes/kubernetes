@@ -1462,6 +1462,11 @@ func (p *podWorkers) completeTerminating(logger klog.Logger, podUID types.UID) {
 		logger.V(4).Info("Pod worker was terminated but did not have terminatingAt set, likely programmer error", "podUID", podUID)
 	}
 	status.terminatedAt = p.clock.Now()
+	// at that point, all containers are provably dead (that is the postcondition of
+	// SyncTerminatingPod).
+	if p.startedStaticPodsByFullname[status.fullname] == podUID {
+		delete(p.startedStaticPodsByFullname, status.fullname)
+	}
 	for _, ch := range status.notifyPostTerminating {
 		close(ch)
 	}
@@ -1527,10 +1532,6 @@ func (p *podWorkers) completeTerminated(logger klog.Logger, podUID types.UID) {
 	}
 	status.finished = true
 	status.working = false
-
-	if p.startedStaticPodsByFullname[status.fullname] == podUID {
-		delete(p.startedStaticPodsByFullname, status.fullname)
-	}
 }
 
 // completeWork requeues on error or the next sync interval and then immediately executes any pending
