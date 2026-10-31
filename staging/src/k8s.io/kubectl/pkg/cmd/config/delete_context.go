@@ -59,8 +59,7 @@ func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess
 
 	args := cmd.Flags().Args()
 	if len(args) != 1 {
-		cmd.Help()
-		return nil
+		return cmdutil.UsageErrorf(cmd, "context to delete is required")
 	}
 
 	configFile := configAccess.GetDefaultFilename()
