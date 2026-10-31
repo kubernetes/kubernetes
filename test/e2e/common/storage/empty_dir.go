@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -296,7 +295,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		gomega.Expect(result).To(gomega.Equal(message), "match expected string %s with %s", message, resultString)
 	})
 
-	f.Context("EmptyDirVolumeMode [LinuxOnly]", feature.EmptyDirVolumeMode, framework.WithFeatureGate(kubefeatures.EmptyDirVolumeMode), func() {
+	f.Context("EmptyDirVolumeMode [LinuxOnly]", framework.WithFeatureGate(kubefeatures.EmptyDirVolumeMode), func() {
 		ginkgo.It("should set mode 0750 on emptyDir directory", func(ctx context.Context) {
 			mode := int32(0o750)
 			pod := createEmptyDirModePod(ctx, f, &mode)
