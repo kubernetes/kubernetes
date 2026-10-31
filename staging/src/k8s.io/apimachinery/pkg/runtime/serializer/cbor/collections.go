@@ -47,22 +47,34 @@ func streamEncodeCollections(obj runtime.Object, w io.Writer, mode modes.EncMode
 	if _, ok := obj.(json.Marshaler); ok {
 		return false, nil
 	}
-	typeMeta, listMeta, items, err := getListMeta(obj)
+	typeMeta, listMeta, itemsValue, err := getListMetaValue(obj)
 	if err == nil {
-		return true, streamingEncodeList(w, typeMeta, listMeta, items, mode)
+		return true, streamingEncodeList(w, typeMeta, listMeta, itemsValue, mode)
 	}
 	return false, nil
 }
 
 // getListMeta implements list extraction logic for cbor stream serialization.
 func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []interface{}, error) {
-	listValue, err := conversion.EnforcePtr(list)
+	typeMeta, listMeta, itemsValue, err := getListMetaValue(list)
 	if err != nil {
 		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, err
 	}
+	items, err := getListItems(itemsValue)
+	if err != nil {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, err
+	}
+	return typeMeta, listMeta, items, nil
+}
+
+func getListMetaValue(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, reflect.Value, error) {
+	listValue, err := conversion.EnforcePtr(list)
+	if err != nil {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, err
+	}
 	listType := listValue.Type()
 	if listType.NumField() != 3 {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected ListType to have 3 fields")
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf("expected ListType to have 3 fields")
 	}
 	// The streaming encoder reproduces the field names and layout implied by the
 	// json struct tags (kind, apiVersion, metadata, items). The CBOR encoder,
@@ -73,39 +85,39 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []inter
 	// honors the cbor tag correctly.
 	for i := 0; i < listType.NumField(); i++ {
 		if _, ok := listType.Field(i).Tag.Lookup("cbor"); ok {
-			return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected list field %d to have no cbor tag", i)
+			return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf("expected list field %d to have no cbor tag", i)
 		}
 	}
 	// TypeMeta
 	typeMeta, ok := listValue.Field(0).Interface().(metav1.TypeMeta)
 	if !ok {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected TypeMeta field to have TypeMeta type")
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf("expected TypeMeta field to have TypeMeta type")
 	}
 	if !listType.Field(0).Anonymous {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be embedded`)
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf(`expected TypeMeta json field tag to be embedded`)
 	}
 	if jsonTag, jsonTagExists := listType.Field(0).Tag.Lookup("json"); !jsonTagExists {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag`)
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf(`expected TypeMeta json field tag`)
 	} else if jsonTag != "" && jsonTag != ",inline" {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be "" or ",inline"`)
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf(`expected TypeMeta json field tag to be "" or ",inline"`)
 	}
 	// ListMeta
 	listMeta, ok := listValue.Field(1).Interface().(metav1.ListMeta)
 	if !ok {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected ListMeta field to have ListMeta type")
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf("expected ListMeta field to have ListMeta type")
 	}
 	if listType.Field(1).Tag.Get("json") != "metadata,omitempty" {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected ListMeta json field tag to be "metadata,omitempty"`)
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf(`expected ListMeta json field tag to be "metadata,omitempty"`)
 	}
 	// Items
 	if listType.Field(2).Tag.Get("json") != "items" {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected Items json field tag to be "items"`)
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf(`expected Items json field tag to be "items"`)
 	}
-	items, err := getListItems(listValue.Field(2))
-	if err != nil {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, err
+	itemsValue := listValue.Field(2)
+	if itemsValue.Kind() != reflect.Slice {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, reflect.Value{}, fmt.Errorf("expected Items field to be a slice, got %s", itemsValue.Kind())
 	}
-	return typeMeta, listMeta, items, nil
+	return typeMeta, listMeta, itemsValue, nil
 }
 
 // getListItems returns the elements of a list's Items field as addressable
@@ -132,56 +144,26 @@ func getListItems(itemsValue reflect.Value) ([]interface{}, error) {
 	return items, nil
 }
 
-type cborMapEntry struct {
-	key   string
-	write func() error
-}
-
-func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []interface{}, mode modes.EncMode) error {
-	var entries []cborMapEntry
-
+func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, itemsValue reflect.Value, mode modes.EncMode) error {
+	const (
+		entryKind uint8 = iota
+		entryItems
+		entryMetadata
+		entryAPIVersion
+	)
+	var entries [4]uint8
+	nEntries := 0
 	if typeMeta.Kind != "" {
-		entries = append(entries, cborMapEntry{
-			key: "kind",
-			write: func() error {
-				return encodeKeyValuePair(w, "kind", typeMeta.Kind, mode)
-			},
-		})
+		entries[nEntries] = entryKind
+		nEntries++
 	}
-	entries = append(entries, cborMapEntry{
-		key: "items",
-		write: func() error {
-			if err := mode.MarshalTo("items", w); err != nil {
-				return err
-			}
-			if items == nil {
-				_, err := w.Write([]byte{0xf6}) // CBOR null
-				return err
-			}
-			if err := writeArrayHead(w, len(items)); err != nil {
-				return err
-			}
-			for _, item := range items {
-				if err := mode.MarshalTo(item, w); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-	})
-	entries = append(entries, cborMapEntry{
-		key: "metadata",
-		write: func() error {
-			return encodeKeyValuePair(w, "metadata", listMeta, mode)
-		},
-	})
+	entries[nEntries] = entryItems
+	nEntries++
+	entries[nEntries] = entryMetadata
+	nEntries++
 	if typeMeta.APIVersion != "" {
-		entries = append(entries, cborMapEntry{
-			key: "apiVersion",
-			write: func() error {
-				return encodeKeyValuePair(w, "apiVersion", typeMeta.APIVersion, mode)
-			},
-		})
+		entries[nEntries] = entryAPIVersion
+		nEntries++
 	}
 
 	// entries is built in a fixed order (kind, items, metadata, apiVersion).
@@ -190,18 +172,46 @@ func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.
 	// nondeterministic modes (SortFastShuffle) we rotate the encoding for-loop
 	// by a random initial offset.
 	start := 0
-	if !mode.IsDeterministic() && len(entries) > 0 {
-		start = rand.Intn(len(entries))
+	if !mode.IsDeterministic() && nEntries > 0 {
+		start = rand.Intn(nEntries)
 	}
 
-	if err := writeMapHead(w, len(entries)); err != nil {
+	if err := writeMapHead(w, nEntries); err != nil {
 		return err
 	}
 
-	for i := 0; i < len(entries); i++ {
-		entry := entries[(start+i)%len(entries)]
-		if err := entry.write(); err != nil {
-			return err
+	for i := 0; i < nEntries; i++ {
+		switch entries[(start+i)%nEntries] {
+		case entryKind:
+			if err := encodeKeyValuePair(w, "kind", typeMeta.Kind, mode); err != nil {
+				return err
+			}
+		case entryItems:
+			if err := mode.MarshalTo("items", w); err != nil {
+				return err
+			}
+			if itemsValue.IsNil() {
+				var nullByte [1]byte
+				nullByte[0] = 0xf6 // CBOR null
+				if _, err := w.Write(nullByte[:]); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := writeArrayHead(w, itemsValue.Len()); err != nil {
+				return err
+			}
+			if err := modes.EncodeItemsValueBatched(w, itemsValue, mode); err != nil {
+				return err
+			}
+		case entryMetadata:
+			if err := encodeKeyValuePair(w, "metadata", listMeta, mode); err != nil {
+				return err
+			}
+		case entryAPIVersion:
+			if err := encodeKeyValuePair(w, "apiVersion", typeMeta.APIVersion, mode); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
