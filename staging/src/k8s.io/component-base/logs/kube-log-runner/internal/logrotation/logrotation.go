@@ -17,7 +17,9 @@ limitations under the License.
 package logrotation
 
 import (
+	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,6 +40,8 @@ type rotationFile struct {
 	currentSize   int64
 	lasSyncTime   time.Time
 	flushInterval time.Duration
+	// set after a failed rotation so that retries on every write log only once
+	rotationFailing bool
 }
 
 func Open(filePath string, flushInterval time.Duration, maxSize int64, maxAge time.Duration) (io.WriteCloser, error) {
@@ -91,9 +95,17 @@ func (w *rotationFile) Write(p []byte) (n int, err error) {
 
 		// if file size over maxsize rotate the log file
 		if w.currentSize >= w.maxSize {
-			err = w.rotate()
-			if err != nil {
-				return 0, err
+			// p is already written, so a failed rotation must not fail the
+			// write: os/exec stops copying on the first error, which breaks
+			// the pipe and kills the wrapped process with SIGPIPE. Keep
+			// appending to the current file and retry on the next write.
+			if err := w.rotate(); err != nil {
+				if !w.rotationFailing {
+					log.Printf("Failed to rotate log file %q, will retry on next write: %v", w.filePath, err)
+				}
+				w.rotationFailing = true
+			} else {
+				w.rotationFailing = false
 			}
 		}
 	}
@@ -108,25 +120,38 @@ func (w *rotationFile) rotate() error {
 	// Remove the extension from the filename
 	pathWithoutExt := strings.TrimSuffix(w.filePath, ext)
 
-	rotateFilePath := pathWithoutExt + "-" + time.Now().Format(timeLayout) + ext
+	timestamp := time.Now().Format(timeLayout)
+	rotateFilePath := pathWithoutExt + "-" + timestamp + ext
 
 	if w.filePath == rotateFilePath {
 		return nil
 	}
 
-	err := w.file.Close()
-	if err != nil {
-		return err
+	// Rotating more than once per second would otherwise rename over, and
+	// silently discard, the previous backup. clean() still matches the ".N"
+	// suffix because time.Parse accepts it as fractional seconds.
+	for i := 1; ; i++ {
+		if _, err := os.Lstat(rotateFilePath); err != nil {
+			break
+		}
+		rotateFilePath = fmt.Sprintf("%s-%s.%d%s", pathWithoutExt, timestamp, i, ext)
 	}
 
-	err = os.Rename(w.filePath, rotateFilePath)
-	if err != nil {
-		return err
-	}
+	closeErr := w.file.Close()
+	renameErr := os.Rename(w.filePath, rotateFilePath)
 
+	// Reopen even if the rename failed, otherwise w.file stays closed and
+	// every later write fails with "file already closed".
+	var err error
 	w.file, err = os.OpenFile(w.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
+	}
+	if renameErr != nil {
+		return renameErr
+	}
+	if closeErr != nil {
+		log.Printf("Failed to close log file %q before rotation: %v", w.filePath, closeErr)
 	}
 
 	w.currentSize = 0
