@@ -1625,7 +1625,7 @@ func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.Pe
 
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr, seLinuxTranslator)
-	fakeASW := cache.NewActualStateOfWorld("fake", fakeVolumePluginMgr)
+	fakeASW := cache.NewActualStateOfWorld("fake", fakeVolumePluginMgr, nil)
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeStateProvider := &fakePodStateProvider{}
 

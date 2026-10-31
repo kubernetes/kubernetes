@@ -78,6 +78,23 @@ func (s *stateMemory) GetContainerResources(podUID types.UID, containerName stri
 	return v1.ResourceRequirements{}, false
 }
 
+// GetPodVolumes returns current volumes information for a pod
+func (s *stateMemory) GetPodVolumes(podUID types.UID) ([]v1.Volume, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pod, ok := s.pods[podUID]
+	if !ok || len(pod.Spec.Volumes) == 0 {
+		return nil, false
+	}
+
+	volumes := make([]v1.Volume, len(pod.Spec.Volumes))
+	for i := range pod.Spec.Volumes {
+		volumes[i] = *pod.Spec.Volumes[i].DeepCopy()
+	}
+	return volumes, true
+}
+
 // GetPodLevelResources returns current resources information at pod-level
 func (s *stateMemory) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
 	s.RLock()
@@ -244,6 +261,54 @@ func (s *stateMemory) SetEmptyDirVolumeLimit(logger klog.Logger, podUID types.UI
 	}
 
 	logger.V(3).Info("Updated emptyDir volume limit", "podUID", podUID, "volumeName", volumeName, "emptyDir", emptyDir)
+	return nil
+}
+
+func (s *stateMemory) SetPodVolume(logger klog.Logger, podUID types.UID, volume v1.Volume) error {
+	err := s.updatePod(podUID, func(pod *v1.Pod) error {
+		pod.Spec.Volumes = slices.Clone(pod.Spec.Volumes)
+		volCopy := *volume.DeepCopy()
+		for i := range pod.Spec.Volumes {
+			if pod.Spec.Volumes[i].Name == volume.Name {
+				// Preserve an already-actuated EmptyDir.SizeLimit, which is updated via SetEmptyDirVolumeLimit.
+				if pod.Spec.Volumes[i].EmptyDir != nil && pod.Spec.Volumes[i].EmptyDir.SizeLimit != nil && volCopy.EmptyDir != nil {
+					sizeLimitCopy := *pod.Spec.Volumes[i].EmptyDir.SizeLimit
+					volCopy.EmptyDir.SizeLimit = &sizeLimitCopy
+				}
+				pod.Spec.Volumes[i] = volCopy
+				return nil
+			}
+		}
+
+		pod.Spec.Volumes = append(pod.Spec.Volumes, volCopy)
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	logger.V(3).Info("Updated pod volume information", "podUID", podUID, "volumeName", volume.Name)
+	return nil
+}
+
+func (s *stateMemory) RemovePodVolume(logger klog.Logger, podUID types.UID, volumeName string) error {
+	s.Lock()
+	defer s.Unlock()
+
+	stored, ok := s.pods[podUID]
+	if !ok {
+		return nil
+	}
+
+	idx := slices.IndexFunc(stored.Spec.Volumes, func(v v1.Volume) bool { return v.Name == volumeName })
+	if idx == -1 {
+		return nil
+	}
+
+	pod := *stored
+	pod.Spec.Volumes = slices.Delete(slices.Clone(pod.Spec.Volumes), idx, idx+1)
+	s.pods[podUID] = &pod
+	logger.V(3).Info("Removed pod volume information", "podUID", podUID, "volumeName", volumeName)
 	return nil
 }
 

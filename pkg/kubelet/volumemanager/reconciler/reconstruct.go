@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // readyToUnmount returns true when reconciler can start unmounting volumes.
@@ -93,6 +94,18 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 
 		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
+	}
+	if rc.actuatedState != nil {
+		for _, uid := range rc.actuatedState.GetPodUIDs() {
+			vols, _ := rc.actuatedState.GetPodVolumes(uid)
+			for _, vol := range vols {
+				if !rc.actualStateOfWorld.VolumeExistsWithSpecName(volumetypes.UniquePodName(uid), vol.Name) {
+					if err := rc.actuatedState.RemovePodVolume(logger, uid, vol.Name); err != nil {
+						logger.Error(err, "Failed to remove unreconstructed volume from actuated state", "podUID", uid, "volumeName", vol.Name)
+					}
+				}
+			}
+		}
 	}
 	logger.V(2).Info("Volume reconstruction finished")
 }

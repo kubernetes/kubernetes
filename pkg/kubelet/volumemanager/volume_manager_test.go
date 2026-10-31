@@ -324,7 +324,8 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 		&record.FakeRecorder{},
 		volumetest.NewBlockVolumePathHandler(),
 		nil,
-		0)
+		0,
+		nil)
 
 	tCtx := ktesting.Init(t)
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
@@ -531,7 +532,8 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 		fakeRecorder,
 		fakePathHandler,
 		nil,
-		0)
+		0,
+		nil)
 
 	return vm
 }
@@ -1034,7 +1036,8 @@ func TestVolumeManager_ResizeEphemeralVolume(t *testing.T) {
 				&record.FakeRecorder{},
 				volumetest.NewBlockVolumePathHandler(),
 				nil,
-				0)
+				0,
+				nil)
 
 			// Test ResizeEphemeralVolume
 			err = manager.ResizeEphemeralVolume(pod, "vol1", tt.newSize)

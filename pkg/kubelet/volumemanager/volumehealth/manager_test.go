@@ -127,7 +127,7 @@ func newTestManager(t *testing.T, statusUpdater StatusUpdater, client csi.Health
 	logger, _ := ktesting.NewTestContext(t)
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, util.NewFakeSELinuxLabelTranslator())
-	asw := cache.NewActualStateOfWorld("node1", volumePluginMgr)
+	asw := cache.NewActualStateOfWorld("node1", volumePluginMgr, nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod-uid-1", Namespace: "ns"},

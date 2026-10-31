@@ -7088,3 +7088,82 @@ func TestSyncResultErrorsMetric(t *testing.T) {
 		})
 	}
 }
+
+func TestInitializeActuatedPod_PreservesActuatedVolumes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	memLimit := resource.MustParse("100Mi")
+	cmVol := v1.Volume{
+		Name: "cm-vol",
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: "my-cm"},
+			},
+		},
+	}
+	memVol := v1.Volume{
+		Name: "mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &memLimit,
+			},
+		},
+	}
+	unmountedVol := v1.Volume{
+		Name: "unmounted-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-uid-1",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					},
+				},
+			},
+			Volumes: []v1.Volume{cmVol, memVol, unmountedVol},
+		},
+	}
+
+	// Simulate VolumeManager recording cm-vol during WaitForAttachAndMount (before InitializeActuatedPod).
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, cmVol))
+
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	actuatedPod, ok := m.actuatedState.GetPod(pod.UID)
+	require.True(t, ok)
+	require.Equal(t, "pod1", actuatedPod.Name)
+	require.Equal(t, "ns1", actuatedPod.Namespace)
+
+	actuatedVols, ok := m.actuatedState.GetPodVolumes(pod.UID)
+	require.True(t, ok)
+	require.Equal(t, []v1.Volume{cmVol, memVol}, actuatedVols)
+
+	// Mark the pod content as removable; GarbageCollect should keep the pod in actuatedState while volumes remain mounted.
+	m.podStateProvider.(*fakePodStateProvider).removed[pod.UID] = struct{}{}
+	require.NoError(t, m.GarbageCollect(tCtx, kubecontainer.GCPolicy{}, true, false))
+	require.True(t, m.actuatedState.HasPod(pod.UID))
+
+	// Once all volumes are unmounted and removed from actuatedState, GarbageCollect removes the pod entry.
+	require.NoError(t, m.actuatedState.RemovePodVolume(tCtx.Logger(), pod.UID, cmVol.Name))
+	require.NoError(t, m.actuatedState.RemovePodVolume(tCtx.Logger(), pod.UID, memVol.Name))
+	require.NoError(t, m.GarbageCollect(tCtx, kubecontainer.GCPolicy{}, true, false))
+	require.False(t, m.actuatedState.HasPod(pod.UID))
+}

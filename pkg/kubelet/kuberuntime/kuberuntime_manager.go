@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -257,6 +258,7 @@ func NewKubeGenericRuntimeManager(
 	tokenManager *token.Manager,
 	getServiceAccount plugin.GetServiceAccountFunc,
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder,
+	actuatedState state.State,
 ) (KubeGenericRuntime, []images.PostImageGCHook, error) {
 	logger := klog.FromContext(ctx)
 
@@ -376,12 +378,20 @@ func NewKubeGenericRuntimeManager(
 		versionCacheTTL,
 	)
 
-	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile, keepOnlyResourceValues)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
+	if actuatedState == nil {
+		actuatedState, err = NewActuatedStateCheckpoint(logger, rootDirectory)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
+		}
 	}
+	kubeRuntimeManager.actuatedState = actuatedState
 
 	return kubeRuntimeManager, imageGCHooks, nil
+}
+
+// NewActuatedStateCheckpoint initializes the checkpoint store for actuated pod state.
+func NewActuatedStateCheckpoint(logger klog.Logger, rootDirectory string) (state.State, error) {
+	return state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile, keepOnlyResourceValues)
 }
 
 // Type returns the type of the container runtime.
@@ -836,9 +846,9 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	}
 	stored, hasPod := m.actuatedState.GetPod(allocatedPod.UID)
 	// TODO: In v1.39, when the V1 checkpoint format is no longer supported, we will still need to
-	// check stored.Name == "" (and preserve stored.Spec.Resources below) because SyncPod calls
-	// UpdateActuatedPodLevelResources before InitializeActuatedPod, which creates a nameless pod
-	// entry with only pod-level resources populated.
+	// check stored.Name == "" (and preserve stored.Spec.Resources and stored.Spec.Volumes below)
+	// because SyncPod calls UpdateActuatedPodLevelResources and WaitForAttachAndMount before
+	// InitializeActuatedPod, which creates a nameless pod entry.
 	if hasPod && !state.IsMigratedFromV1(stored) {
 		return
 	}
@@ -847,15 +857,42 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	if hasPod {
 		// TODO: Remove V1 overlay in v1.39 when the V1 checkpoint format is no longer supported,
 		// while still preserving stored.Spec.Resources set by UpdateActuatedPodLevelResources.
-		actuatedPod, _ = state.UpdatePodFromV1(allocatedPod, stored)
+		var updated bool
+		actuatedPod, updated = state.UpdatePodFromV1(allocatedPod, stored)
+		if !updated {
+			podCopy := *allocatedPod
+			actuatedPod = &podCopy
+		}
+	} else {
+		podCopy := *allocatedPod
+		actuatedPod = &podCopy
 	}
+	var actuatedVolumes []v1.Volume
+	if hasPod {
+		actuatedVolumes = slices.Clone(stored.Spec.Volumes)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		for _, vol := range actuatedPod.Spec.Volumes {
+			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
+				continue
+			}
+			if slices.ContainsFunc(actuatedVolumes, func(v v1.Volume) bool { return v.Name == vol.Name }) {
+				continue
+			}
+			actuatedVolumes = append(actuatedVolumes, v1.Volume{
+				Name:         vol.Name,
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: vol.EmptyDir.Medium, SizeLimit: vol.EmptyDir.SizeLimit}},
+			})
+		}
+	}
+	actuatedPod.Spec.Volumes = actuatedVolumes
 	if err := m.actuatedState.SetPod(logger, actuatedPod); err != nil {
 		logger.Error(err, "Failed to initialize actuated pod resource info checkpoint", "pod", klog.KObj(actuatedPod))
 	}
 }
 
-// keepOnlyResourceValues strips everything from pod.Spec except the resizable resources, because
-// those are all the actuated state holds.
+// keepOnlyResourceValues strips everything from pod.Spec except the resizable resources and
+// actuated volumes, because those are all the actuated state holds.
 func keepOnlyResourceValues(pod *v1.Pod) {
 	var spec v1.PodSpec
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
@@ -872,17 +909,7 @@ func keepOnlyResourceValues(pod *v1.Pod) {
 			spec.Containers = append(spec.Containers, actuated)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
-		for _, vol := range pod.Spec.Volumes {
-			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&vol) {
-				continue
-			}
-			spec.Volumes = append(spec.Volumes, v1.Volume{
-				Name:         vol.Name,
-				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: vol.EmptyDir.Medium, SizeLimit: vol.EmptyDir.SizeLimit}},
-			})
-		}
-	}
+	spec.Volumes = pod.Spec.Volumes
 	pod.Spec = spec
 }
 
@@ -2342,8 +2369,11 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podU
 // GarbageCollect removes dead containers using the specified container gc policy.
 func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	logger := klog.FromContext(ctx)
-	// Remove terminated pods from the actuated state.
+	// Remove terminated pods from the actuated state once all their volumes are unmounted.
 	for _, uid := range m.actuatedState.GetPodUIDs() {
+		if vols, _ := m.actuatedState.GetPodVolumes(uid); len(vols) > 0 {
+			continue
+		}
 		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
 			if err := m.actuatedState.RemovePod(logger, uid); err != nil {
 				// No need to act on the error beyond logging it here.

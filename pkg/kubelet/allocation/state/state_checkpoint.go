@@ -135,6 +135,11 @@ func (sc *stateCheckpoint) GetContainerResources(podUID types.UID, containerName
 	return sc.cache.GetContainerResources(podUID, containerName)
 }
 
+// GetPodVolumes returns current volumes information for a pod
+func (sc *stateCheckpoint) GetPodVolumes(podUID types.UID) ([]v1.Volume, bool) {
+	return sc.cache.GetPodVolumes(podUID)
+}
+
 // GetPodLevelResources returns current resources information at pod-level
 func (sc *stateCheckpoint) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
 	return sc.cache.GetPodLevelResources(podUID)
@@ -187,6 +192,24 @@ func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(logger klog.Logger, podUID typ
 	return sc.storeState(logger)
 }
 
+// SetPodVolume sets volume information for a pod
+func (sc *stateCheckpoint) SetPodVolume(logger klog.Logger, podUID types.UID, volume v1.Volume) error {
+	err := sc.cache.SetPodVolume(logger, podUID, volume)
+	if err != nil {
+		return err
+	}
+	return sc.storeState(logger)
+}
+
+// RemovePodVolume removes volume information for a pod
+func (sc *stateCheckpoint) RemovePodVolume(logger klog.Logger, podUID types.UID, volumeName string) error {
+	err := sc.cache.RemovePodVolume(logger, podUID, volumeName)
+	if err != nil {
+		return err
+	}
+	return sc.storeState(logger)
+}
+
 // SetPod sets pod allocation information
 func (sc *stateCheckpoint) SetPod(logger klog.Logger, pod *v1.Pod) error {
 	err := sc.cache.SetPod(logger, pod)
@@ -221,6 +244,10 @@ func (sc *noopStateCheckpoint) GetContainerResources(_ types.UID, _ string) (v1.
 	return v1.ResourceRequirements{}, false
 }
 
+func (sc *noopStateCheckpoint) GetPodVolumes(_ types.UID) ([]v1.Volume, bool) {
+	return nil, false
+}
+
 func (sc *noopStateCheckpoint) GetPodLevelResources(_ types.UID) (*v1.ResourceRequirements, bool) {
 	return nil, false
 }
@@ -250,6 +277,14 @@ func (sc *noopStateCheckpoint) SetPodLevelResources(_ klog.Logger, _ types.UID, 
 }
 
 func (sc *noopStateCheckpoint) SetEmptyDirVolumeLimit(_ klog.Logger, _ types.UID, _ string, _ *v1.EmptyDirVolumeSource) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetPodVolume(_ klog.Logger, _ types.UID, _ v1.Volume) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) RemovePodVolume(_ klog.Logger, _ types.UID, _ string) error {
 	return nil
 }
 

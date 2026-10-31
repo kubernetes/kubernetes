@@ -455,7 +455,8 @@ func newTestKubeletWithImageList(
 		kubelet.recorder,
 		volumetest.NewBlockVolumePathHandler(),
 		kubelet.statusManager,
-		0)
+		0,
+		nil)
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
@@ -555,6 +556,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		token.NewManager(kubelet.kubeClient),
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
 		kubelet.podStartupLatencyTracker,
+		nil,
 	)
 }
 
