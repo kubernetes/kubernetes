@@ -74,6 +74,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/utils/lru"
 	"k8s.io/utils/ptr"
 )
 
@@ -91,6 +92,10 @@ const (
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 
 	actuatedPodsStateFile = "actuated_pods_state"
+
+	// maxContainerStartFailureCacheEntries bounds createContainerFailureCache, mirroring
+	// the size used by the kubelet's own per-container reason cache.
+	maxContainerStartFailureCacheEntries = 1000
 )
 
 var (
@@ -204,8 +209,21 @@ type kubeGenericRuntimeManager struct {
 	// Uses sync.OnceValue for lazy initialization
 	getSwapControllerAvailable func() bool
 
+	// createContainerFailureCache remembers the most recent pre-run container start failure
+	// (e.g. CreateContainerConfigError) per backoff key. A container that never reaches a
+	// running state has no lastState.terminated to preserve that error once backoff starts
+	// suppressing retries, so this cache is what lets doBackOff keep reporting the real
+	// error instead of a generic backoff reason while retries are rate-limited.
+	createContainerFailureCache *lru.Cache
+
 	// Records first initContainer start time and last initContainer finish time
 	podInitContainerTimeRecorder PodInitContainerTimeRecorder
+}
+
+// containerStartFailure is the value type stored in createContainerFailureCache.
+type containerStartFailure struct {
+	err error
+	msg string
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and streaming runtime.
@@ -288,6 +306,7 @@ func NewKubeGenericRuntimeManager(
 		memoryReservationPolicy:      memoryReservationPolicy,
 		podLogsDirectory:             podLogsDirectory,
 		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
+		createContainerFailureCache:  lru.New(maxContainerStartFailureCacheEntries),
 	}
 
 	// Initialize swap controller availability check with lazy evaluation
@@ -1757,6 +1776,17 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
 
+		// RunPodSandbox failures never produce a container status for doBackOff's
+		// per-container check to key off, and unlike that path, there's no
+		// container-level waiting reason to preserve here either (reasonCache only
+		// reads StartContainer results, never CreatePodSandbox ones). So this only
+		// needs to gate retries, not preserve a specific error.
+		if isInBackOff, msg, err := m.doSandboxBackOff(ctx, pod, backOff); isInBackOff {
+			createSandboxResult.Fail(err, msg)
+			logger.V(4).Info("Backing off creating pod sandbox for pod", "pod", klog.KObj(pod))
+			return
+		}
+
 		// ConvertPodSysctlsVariableToDotsSeparator converts sysctl variable
 		// in the Pod.Spec.SecurityContext.Sysctls slice into a dot as a separator.
 		// runc uses the dot as the separator to verify whether the sysctl variable
@@ -1794,6 +1824,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			}
 			metrics.StartedPodsErrorsTotal.Inc()
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
+			// Only the RunPodSandbox CRI call itself reaches the runtime and forks conmon;
+			// the local, pre-CRI steps in createPodSandbox (config generation, log directory
+			// creation, runtime class lookup) are free to retry and are deliberately left on
+			// the flat pod-worker retry cadence instead, mirroring the container-side split
+			// between ErrCreateContainerConfig and ErrCreateContainer/ErrRunContainer.
+			if errors.Is(err, ErrRunPodSandbox) {
+				backOff.Next(GetSandboxBackoffKey(pod), backOff.Clock.Now())
+			}
 			logger.Error(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
@@ -1895,6 +1933,33 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 				metrics.StartedHostProcessContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
 			}
 			startContainerResult.Fail(err, msg)
+			// startContainer failed before the container ever reached a running state
+			// (e.g. CreateContainer was rejected because the memory limit is below the
+			// runtime's floor). Such attempts never produce a container status, so
+			// doBackOff's exit-time check below can never see them, and these failures
+			// would otherwise just repeat at the flat pod-worker retry period forever
+			// instead of escalating. Feed the same per-container backoff tracker used by
+			// CrashLoopBackOff so retries are exponentially rate-limited too, and cache
+			// this error so doBackOff can keep reporting it (instead of a generic backoff
+			// reason) for as long as backoff suppresses the next retry.
+			//
+			// Scoped to ErrCreateContainer/ErrRunContainer only: these are the failures
+			// that actually reach the container runtime (CreateContainer/StartContainer),
+			// so retrying them repeatedly has a real runtime-side cost. ErrCreateContainerConfig
+			// and ErrPreCreateHook/ErrPreStartHook fail before any CRI call and are
+			// effectively free to retry, so they're deliberately left on the flat
+			// pod-worker retry cadence instead of being penalized here.
+			//
+			// Only advance the backoff here when the container has no exited status at all:
+			// if it does, doBackOff's own exited-status handling below already advances the
+			// same key once it permits this retry, and advancing it again here would double
+			// the exponential growth for a single failed attempt.
+			if (errors.Is(err, ErrCreateContainer) || errors.Is(err, kubecontainer.ErrRunContainer)) &&
+				findExitedContainerStatus(podStatus, spec.container.Name) == nil {
+				key := GetBackoffKey(pod, spec.container)
+				backOff.Next(key, backOff.Clock.Now())
+				m.recordContainerStartFailure(key, err, msg)
+			}
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
 			switch {
@@ -2122,27 +2187,80 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 	return res, nil
 }
 
+// findExitedContainerStatus returns the exited container status for containerName in
+// podStatus, or nil if the container has no exited status (e.g. it has never run).
+func findExitedContainerStatus(podStatus *kubecontainer.PodStatus, containerName string) *kubecontainer.Status {
+	for _, c := range podStatus.ContainerStatuses {
+		if c.Name == containerName && c.State == kubecontainer.ContainerStateExited {
+			return c
+		}
+	}
+	return nil
+}
+
+// recordContainerStartFailure remembers err/msg from a pre-run container start failure
+// (see createContainerFailureCache) so doBackOff can keep reporting it while backoff
+// suppresses further retries.
+func (m *kubeGenericRuntimeManager) recordContainerStartFailure(key string, err error, msg string) {
+	m.createContainerFailureCache.Add(key, containerStartFailure{err: err, msg: msg})
+}
+
+// doSandboxBackOff returns whether pod sandbox creation is currently in backoff, mirroring
+// doBackOff's gating but keyed on the pod rather than a container (see GetSandboxBackoffKey).
+func (m *kubeGenericRuntimeManager) doSandboxBackOff(ctx context.Context, pod *v1.Pod, backOff *flowcontrol.Backoff) (bool, string, error) {
+	logger := klog.FromContext(ctx)
+	key := GetSandboxBackoffKey(pod)
+
+	if !backOff.IsInBackOffSinceUpdate(key, backOff.Clock.Now()) {
+		return false, "", nil
+	}
+
+	backoff := backOff.Get(key)
+	err := fmt.Errorf("back-off %s creating pod sandbox for pod=%s", backoff, format.Pod(pod))
+	logger.V(3).Info("Back-off creating pod sandbox", "err", err.Error())
+
+	return true, err.Error(), kubecontainer.NewBackoffError(kubecontainer.ErrCreatePodSandbox, backOff.Clock.Now().Add(backoff))
+}
+
 // If a container is still in backoff, the function will return a brief backoff error and
 // a detailed error message.
 func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, string, error) {
 	logger := klog.FromContext(ctx)
-	var cStatus *kubecontainer.Status
-	for _, c := range podStatus.ContainerStatuses {
-		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {
-			cStatus = c
-			break
-		}
-	}
+	key := GetBackoffKey(pod, container)
 
+	cStatus := findExitedContainerStatus(podStatus, container.Name)
 	if cStatus == nil {
+		// The container has never produced an exited status (e.g. it keeps failing at
+		// CreateContainer, before ever reaching a running state), so the exited-status
+		// based check below can never see it. Fall back to the update-time based backoff
+		// advanced by the start() closure above.
+		//
+		// Unlike a container that ran and exited, there is no lastState.terminated to
+		// preserve the original failure once it does. So rather than reporting a generic
+		// backoff reason here (which would erase the specific error, e.g.
+		// CreateContainerConfigError, that out-of-tree controllers may key off of), reuse
+		// the actual error cached by the start() closure at the time of the last real
+		// failure and just attach the backoff timing to it.
+		if backOff.IsInBackOffSinceUpdate(key, backOff.Clock.Now()) {
+			failureErr, msg := ErrCreateContainerBackOff, fmt.Sprintf("back-off creating container=%s pod=%s", container.Name, format.Pod(pod))
+			if cached, ok := m.createContainerFailureCache.Get(key); ok {
+				failure := cached.(containerStartFailure)
+				failureErr, msg = failure.err, failure.msg
+			}
+			if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
+				m.recorder.WithLogger(logger).Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
+					"Back-off creating container %s in pod %s", container.Name, format.Pod(pod))
+			}
+			backoff := backOff.Get(key)
+			logger.V(3).Info("Back-off creating container", "err", failureErr.Error())
+			return true, msg, kubecontainer.NewBackoffError(failureErr, backOff.Clock.Now().Add(backoff))
+		}
 		return false, "", nil
 	}
 
 	logger.V(3).Info("Checking backoff for container in pod", "containerName", container.Name, "pod", klog.KObj(pod))
 	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
 	ts := cStatus.FinishedAt
-	// backOff requires a unique key to identify the container.
-	key := GetBackoffKey(pod, container)
 	if backOff.IsInBackOffSince(key, ts) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.WithLogger(logger).Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
