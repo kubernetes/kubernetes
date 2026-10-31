@@ -113,13 +113,11 @@ func (pl *PodTopologySpread) filterTopologySpreadConstraints(constraints []v1.To
 				NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,  // If NodeAffinityPolicy is nil, we treat NodeAffinityPolicy as "Honor".
 				NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore, // If NodeTaintsPolicy is nil, we treat NodeTaintsPolicy as "Ignore".
 			}
-			if pl.enableNodeInclusionPolicyInPodTopologySpread {
-				if c.NodeAffinityPolicy != nil {
-					tsc.NodeAffinityPolicy = *c.NodeAffinityPolicy
-				}
-				if c.NodeTaintsPolicy != nil {
-					tsc.NodeTaintsPolicy = *c.NodeTaintsPolicy
-				}
+			if c.NodeAffinityPolicy != nil {
+				tsc.NodeAffinityPolicy = *c.NodeAffinityPolicy
+			}
+			if c.NodeTaintsPolicy != nil {
+				tsc.NodeTaintsPolicy = *c.NodeTaintsPolicy
 			}
 			result = append(result, tsc)
 		}
