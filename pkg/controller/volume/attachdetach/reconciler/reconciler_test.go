@@ -1877,11 +1877,14 @@ func waitForCondition(interval time.Duration, fn wait.ConditionFunc) error {
 func testForceDetachMetric(t *testing.T, inputForceDetachMetricCounter int, reason string) {
 	t.Helper()
 
-	actualForceDetachMericCounter, err := metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(reason))
+	// The reconciler records the metric after starting the asynchronous detach operation.
+	var actualForceDetachMetricCounter float64
+	err := waitForCondition(5*time.Millisecond, func() (bool, error) {
+		var err error
+		actualForceDetachMetricCounter, err = metricstestutil.GetCounterMetricValue(metrics.ForceDetachMetricCounter.WithLabelValues(reason))
+		return actualForceDetachMetricCounter == float64(inputForceDetachMetricCounter), err
+	})
 	if err != nil {
-		t.Errorf("Error getting actualForceDetachMericCounter")
-	}
-	if actualForceDetachMericCounter != float64(inputForceDetachMetricCounter) {
-		t.Errorf("Expected desiredForceDetachMericCounter to be %d, got %v", inputForceDetachMetricCounter, actualForceDetachMericCounter)
+		t.Errorf("Waiting for force detach metric with reason %q to reach %d: got %v: %v", reason, inputForceDetachMetricCounter, actualForceDetachMetricCounter, err)
 	}
 }
