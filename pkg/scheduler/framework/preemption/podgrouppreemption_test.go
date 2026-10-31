@@ -1425,7 +1425,7 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePodGroup().Name("victim-pg2").UID("victim-pg2").Namespace(v1.NamespaceDefault).Priority(highPriority).DisruptionModeAll().MinCount(2).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
-				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).BasicPolicy().DisruptionModeAll().Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).BasicPolicy().Obj(),
 				[]*v1.Pod{
 					st.MakePod().Name("p-a").UID("p-a").Priority(highPriority).Obj(),
 					st.MakePod().Name("p-b").UID("p-b").Priority(highPriority).Obj(),

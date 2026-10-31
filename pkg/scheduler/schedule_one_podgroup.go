@@ -203,6 +203,7 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 // - the hierarchy does not exceed WorkloadMaxTreeDepth (and has no CompositePodGroup at depth WorkloadMaxTreeDepth),
 // - all groups in the hierarchy reference the same Workload as the root group,
 // - no gang parent group has a basic child group,
+// - no basic group in a CompositePodGroup hierarchy has All disruption mode,
 // - no parent group with All disruption mode has a child group with Single disruption mode,
 // - all Pods in a group hierarchy have matching scheduler name,
 // - all entities in a group hierarchy have the same priority as the root group,
@@ -313,6 +314,11 @@ func (sched *Scheduler) validatePodGroupSubtree(
 	// breaking the depth constraint.
 	if podGroupInfo.GetType() == fwk.CompositePodGroupKeyType && depth == schedulingv1beta1.WorkloadMaxTreeDepth {
 		return newValidationErrorf("hierarchy depth exceeds maximum allowed depth %d at %q", schedulingv1beta1.WorkloadMaxTreeDepth, podGroupInfo.GetKey())
+	}
+
+	// Disallow basic scheduling policy with All disruption mode on CompositePodGroup hierarchies.
+	if (parent != nil || podGroupInfo.GetType() == fwk.CompositePodGroupKeyType) && podGroupInfo.IsBasic() && podGroupInfo.HasDisruptionModeAll() {
+		return newValidationErrorf("basic pod group %q cannot have All disruption mode", podGroupInfo.GetKey())
 	}
 
 	if err := validateChildPodGroup(podGroupInfo, parent); err != nil {

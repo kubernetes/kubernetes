@@ -201,6 +201,19 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"disruption mode all": {
 			input: mkValidWorkload(setDisruptionModeAll(0)),
 		},
+		"basic policy with disruption mode all": {
+			input: mkValidWorkload(setBasicPolicy(0), setDisruptionModeAll(0)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
+		},
+		"both basic and gang policy with disruption mode all": {
+			input: mkValidWorkload(setBothPolicies(0), setDisruptionModeAll(0)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
+		},
 		"disruption mode with neither single nor all": {
 			input:        mkValidWorkload(setDisruptionModeNeither(0)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("disruptionMode"), nil, "").WithOrigin("union")},
@@ -441,6 +454,51 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:                         mkValidWorkload(setCPGDisruptionModeAll(0), setNestedPGDisruptionModeAll(0, 0)),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
+		},
+		"cpg basic policy with disruption mode all": {
+			input:                         mkValidWorkload(setCPGBasicPolicy(0), setCPGDisruptionModeAll(0), setNestedPGDisruptionModeAll(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
+		},
+		"cpg with both basic and gang policy and disruption mode all": {
+			input:                         mkValidWorkload(setCPGPolicyBoth(0), setCPGDisruptionModeAll(0), setNestedPGDisruptionModeAll(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("schedulingPolicy"), nil, "").WithOrigin("union"),
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
+		},
+		"nested cpg basic policy with disruption mode all": {
+			input: mkValidWorkload(
+				setCPGBasicPolicy(0),
+				addNestedCompositePodGroupTemplate(0, "sub"),
+				setNestedCPGBasicPolicy(0, 0),
+				func(obj *scheduling.Workload) {
+					obj.Spec.CompositePodGroupTemplates[0].CompositePodGroupTemplates[0].DisruptionMode = &scheduling.CompositeDisruptionMode{
+						All: &scheduling.AllCompositeDisruptionMode{},
+					}
+					obj.Spec.CompositePodGroupTemplates[0].CompositePodGroupTemplates[0].PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{
+						All: &scheduling.AllDisruptionMode{},
+					}
+				},
+			),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("compositePodGroupTemplates").Index(0).Child("disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
+		},
+		"nested pg basic policy with disruption mode all": {
+			input:                         mkValidWorkload(setCPGBasicPolicy(0), setNestedPGBasicPolicy(0, 0), setNestedPGDisruptionModeAll(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "compositePodGroupTemplates").Index(0).Child("podGroupTemplates").Index(0).Child("disruptionMode"), nil, `cannot have "all" disruption mode when scheduling policy is "basic"`).MarkFromImperative(),
+			},
 		},
 		"cpg disruption mode all with child pg disruption mode single": {
 			input:                         mkValidWorkload(setCPGDisruptionModeAll(0), setNestedPGDisruptionModeSingle(0, 0)),
@@ -889,6 +947,16 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"valid update": {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1")),
+		},
+		"valid update with existing basic policy and disruption mode all": {
+			oldObj:    mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0), setDisruptionModeAll(0)),
+			updateObj: mkValidWorkload(setResourceVersion("1"), setBasicPolicy(0), setDisruptionModeAll(0)),
+		},
+		"valid cpg update with existing basic policy and disruption mode all": {
+			oldObj:                        mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), setCPGDisruptionModeAll(0), setNestedPGBasicPolicy(0, 0), setNestedPGDisruptionModeAll(0, 0)),
+			updateObj:                     mkValidWorkload(setResourceVersion("1"), setCPGBasicPolicy(0), setCPGDisruptionModeAll(0), setNestedPGBasicPolicy(0, 0), setNestedPGDisruptionModeAll(0, 0)),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
 		},
 		"valid update with unchanged controllerRef": {
 			oldObj:    mkValidWorkload(setResourceVersion("1"), setControllerRef("apps", "Deployment", "my-deployment")),
