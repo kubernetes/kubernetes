@@ -126,7 +126,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 	if typeParams.Tags.GenerateClient || hasTypeMetaField(t) {
 		g.generateIsApplyConfiguration(typeParams.ApplyConfig.ApplyConfiguration, sw)
 	}
-	g.generateWithFuncs(t, typeParams, sw, nil, &[]string{})
+	g.generateWithFuncs(t, typeParams, sw, nil, &[]string{}, nil)
 	g.generateGetters(t, typeParams, sw, nil)
 	return sw.Error()
 }
@@ -190,9 +190,18 @@ func (g *applyConfigurationGenerator) generateGetters(t *types.Type, typeParams 
 }
 
 func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams,
-	generated *[]string) {
+	generated *[]string, shadowed sets.Set[string]) {
+	// Direct fields take precedence over promoted fields, regardless of declaration order.
+	directFields := sets.New[string]()
 	for _, member := range t.Members {
-		if blocklisted(t, member) {
+		if !member.Embedded && !blocklisted(t, member) {
+			if _, ok := lookupJSONTags(member); ok {
+				directFields.Insert(member.Name)
+			}
+		}
+	}
+	for _, member := range t.Members {
+		if blocklisted(t, member) || (!member.Embedded && shadowed.Has(member.Name)) {
 			continue
 		}
 		memberType := g.refGraph.applyConfigForType(member.Type)
@@ -213,7 +222,7 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 				EmbeddedIn: embed,
 			}
 			if memberParams.Member.Embedded {
-				g.generateWithFuncs(member.Type, typeParams, sw, &memberParams, generated)
+				g.generateWithFuncs(member.Type, typeParams, sw, &memberParams, generated, shadowed.Union(directFields))
 				if !jsonTags.inline {
 					// non-inlined embeds are nillable and need a "ensure exists" utility function
 					sw.Do(ensureEmbedExists, memberParams)
