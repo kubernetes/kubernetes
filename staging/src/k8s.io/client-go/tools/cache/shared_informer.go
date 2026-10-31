@@ -924,6 +924,8 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 				return s.handleBatchDeltas(logger, deltas, isInInitialList)
 			},
 			WatchErrorHandlerWithContext: s.watchErrorHandler,
+			Identifier:                   s.identifier,
+			InformerMetricsProvider:      s.informerMetricsProvider,
 		}
 
 		s.controller = New(cfg)

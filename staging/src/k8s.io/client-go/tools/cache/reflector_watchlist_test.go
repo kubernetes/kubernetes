@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
@@ -628,6 +629,78 @@ func TestWatchList(t *testing.T) {
 			verifyListCounter(t, listWatcher, scenario.expectedListRequests)
 			verifyRequestOptions(t, listWatcher, scenario.expectedRequestOptions)
 			verifyStore(t, store, scenario.expectedStoreContent)
+		})
+	}
+}
+
+func TestWatchListDurationMetricVerb(t *testing.T) {
+	scenarios := []struct {
+		name                  string
+		useWatchList          bool
+		watchOptionsPredicate func(options metav1.ListOptions) error
+		expectedVerb          string
+	}{
+		{
+			name:         "LIST",
+			expectedVerb: "list",
+		},
+		{
+			name:         "WatchList",
+			useWatchList: true,
+			expectedVerb: "watch",
+		},
+		{
+			name:         "WatchList falls back to LIST",
+			useWatchList: true,
+			watchOptionsPredicate: func(options metav1.ListOptions) error {
+				if ptr.Deref(options.SendInitialEvents, false) {
+					return fmt.Errorf("dummy error")
+				}
+				return nil
+			},
+			expectedVerb: "list",
+		},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			listWatcher, _, reflector, ctx, cancel := testData(ctx)
+			defer cancel(nil)
+
+			informerName, err := NewInformerName(t.Name())
+			require.NoError(t, err)
+			defer informerName.Release()
+
+			observed := make(chan string, 2)
+			reflector.metrics = newReflectorMetrics(
+				informerName.WithResource(v1.SchemeGroupVersion.WithResource("pods")),
+				fakeListDurationMetricsProvider{observed: observed},
+			)
+			reflector.useWatchList = scenario.useWatchList
+			listWatcher.watchOptionsPredicate = scenario.watchOptionsPredicate
+			listWatcher.customListResponse = &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_ = reflector.ListAndWatchWithContext(ctx)
+			}()
+			if scenario.expectedVerb == "watch" {
+				listWatcher.fakeWatcher.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "1",
+					Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+				}})
+			}
+
+			select {
+			case verb := <-observed:
+				require.Equal(t, scenario.expectedVerb, verb)
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("timed out waiting for the list duration to be observed")
+			}
+			cancel(nil)
+			<-done
+			require.Empty(t, observed, "expected exactly one list duration observation")
 		})
 	}
 }

@@ -54,7 +54,24 @@ type InformerMetricsProvider interface {
 	// The returned metric should check id.Reserved() before updating to support
 	// dynamic informers that may shut down while the process is still running.
 	NewStoreResourceVersionMetric(id InformerNameAndResource) GaugeMetric
+
+	// NewListDurationMetric returns a histogram metric for tracking the time taken by
+	// the reflector to fetch the initial state (via LIST or WatchList) and replace
+	// the contents of its store. Only successful attempts are observed.
+	// The duration is measured in seconds.
+	// verb is ListVerbList or ListVerbWatch. WatchList uses the watch API verb.
+	// When WatchList falls back to LIST, the observation uses ListVerbList and
+	// includes the failed WatchList attempt.
+	// The returned metric should check id.Reserved() before updating to support
+	// dynamic informers that may shut down while the process is still running.
+	NewListDurationMetric(id InformerNameAndResource, verb string) HistogramMetric
 }
+
+// Values for the verb passed to InformerMetricsProvider.NewListDurationMetric.
+const (
+	ListVerbList  = "list"
+	ListVerbWatch = "watch"
+)
 
 // fifoMetrics holds all metrics for a FIFO.
 type fifoMetrics struct {
@@ -65,6 +82,12 @@ type fifoMetrics struct {
 // storeMetrics holds all metrics for a store.
 type storeMetrics struct {
 	storeResourceVersion GaugeMetric
+}
+
+// reflectorMetrics holds all metrics for a reflector.
+type reflectorMetrics struct {
+	listDuration      HistogramMetric
+	watchListDuration HistogramMetric
 }
 
 // SetInformerMetricsProvider sets the metrics provider for all subsequently created
@@ -126,6 +149,23 @@ func (m *lazyStoreResourceVersionMetric) Set(value float64) {
 	m.metric.Set(value)
 }
 
+func newReflectorMetrics(id InformerNameAndResource, metricsProvider InformerMetricsProvider) *reflectorMetrics {
+	if metricsProvider == nil {
+		metricsProvider = globalInformerMetricsProvider
+	}
+	metrics := &reflectorMetrics{
+		listDuration:      noopMetric{},
+		watchListDuration: noopMetric{},
+	}
+
+	if id.Reserved() {
+		metrics.listDuration = metricsProvider.NewListDurationMetric(id, ListVerbList)
+		metrics.watchListDuration = metricsProvider.NewListDurationMetric(id, ListVerbWatch)
+	}
+
+	return metrics
+}
+
 func (noopInformerMetricsProvider) NewQueuedItemMetric(InformerNameAndResource) GaugeMetric {
 	return noopMetric{}
 }
@@ -135,5 +175,9 @@ func (noopInformerMetricsProvider) NewProcessingLatencyMetric(InformerNameAndRes
 }
 
 func (noopInformerMetricsProvider) NewStoreResourceVersionMetric(InformerNameAndResource) GaugeMetric {
+	return noopMetric{}
+}
+
+func (noopInformerMetricsProvider) NewListDurationMetric(InformerNameAndResource, string) HistogramMetric {
 	return noopMetric{}
 }
