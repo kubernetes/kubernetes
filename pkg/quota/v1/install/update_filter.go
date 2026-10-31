@@ -21,7 +21,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/feature"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	"k8s.io/utils/clock"
@@ -59,17 +58,39 @@ func DefaultUpdateFilter() func(resource schema.GroupVersionResource, oldObj, ne
 	}
 }
 
-// hasResourcesChanged function to compare resources in container statuses
+// hasResourcesChanged function to compare resources in container statuses.
+// It iterates over newPod statuses to detect both changes to existing resources
+// and the initial population of resources (when oldPod has no container statuses yet).
 func hasResourcesChanged(oldPod *v1.Pod, newPod *v1.Pod) bool {
-	for _, oldStatus := range oldPod.Status.ContainerStatuses {
-		newStatus, ok := podutil.GetContainerStatus(newPod.Status.ContainerStatuses, oldStatus.Name)
-		if ok && !apiequality.Semantic.DeepEqual(oldStatus.Resources, newStatus.Resources) {
-			return true
-		}
+	if containerStatusResourcesChanged(oldPod.Status.ContainerStatuses, newPod.Status.ContainerStatuses) {
+		return true
 	}
-	for _, oldInitContainerStatus := range oldPod.Status.InitContainerStatuses {
-		newInitContainerStatus, ok := podutil.GetContainerStatus(newPod.Status.InitContainerStatuses, oldInitContainerStatus.Name)
-		if ok && !apiequality.Semantic.DeepEqual(oldInitContainerStatus.Resources, newInitContainerStatus.Resources) {
+	if containerStatusResourcesChanged(oldPod.Status.InitContainerStatuses, newPod.Status.InitContainerStatuses) {
+		return true
+	}
+	return false
+}
+
+// containerStatusResourcesChanged returns true if any container's Resources
+// field changed between oldStatuses and newStatuses. It iterates over newStatuses
+// to detect both modifications and the initial population of Resources
+// (e.g., when a newly-created pod receives its first Kubelet status update).
+func containerStatusResourcesChanged(oldStatuses, newStatuses []v1.ContainerStatus) bool {
+	oldStatusMap := make(map[string]*v1.ContainerStatus, len(oldStatuses))
+	for i := range oldStatuses {
+		oldStatusMap[oldStatuses[i].Name] = &oldStatuses[i]
+	}
+	for i := range newStatuses {
+		newStatus := &newStatuses[i]
+		oldStatus, found := oldStatusMap[newStatus.Name]
+		if !found {
+			// Container status is new; if it has Resources populated, resources changed.
+			if newStatus.Resources != nil {
+				return true
+			}
+			continue
+		}
+		if !apiequality.Semantic.DeepEqual(oldStatus.Resources, newStatus.Resources) {
 			return true
 		}
 	}
