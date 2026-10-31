@@ -6081,16 +6081,18 @@
             ],
             "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod."
           },
-          "volumeHealth": {
-            "description": "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+          "volumeStatuses": {
+            "description": "VolumeStatuses contains the status of individual volumes used by this pod. This is an ALPHA field.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.PodVolumeHealth"
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.PodVolumeStatus"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
               "name"
             ],
-            "x-kubernetes-list-type": "map"
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           }
         },
         "type": "object"
@@ -6198,30 +6200,16 @@
         },
         "type": "object"
       },
-      "io.k8s.api.core.v1.PodVolumeHealth": {
-        "description": "PodVolumeHealth contains health information for a volume used by a pod, reported by the CSI node plugin via the kubelet.",
+      "io.k8s.api.core.v1.PodVolumeStatus": {
+        "description": "PodVolumeStatus represents the status of an individual volume used by a pod.",
         "properties": {
-          "healthConditions": {
-            "description": "healthConditions is the set of adverse conditions reported by the CSI node plugin for this volume on this node. At most 16 conditions may be reported.",
-            "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "status",
-              "reason"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "status",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "lastTransitionTime": {
+          "healthStatus": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthStatus"
               }
             ],
-            "description": "lastTransitionTime is when the current set of conditions first appeared."
+            "description": "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet."
           },
           "name": {
             "default": "",
@@ -8475,7 +8463,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.VolumeHealthCondition": {
-        "description": "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+        "description": "VolumeHealthCondition represents an adverse health condition reported for a volume. Both pod and PVC reuse this type to report volume health in their status fields.",
         "properties": {
           "message": {
             "description": "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
@@ -8488,7 +8476,7 @@
           },
           "status": {
             "default": "",
-            "description": "status is the machine-parseable health category. Possible values: - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability.",
+            "description": "status is the machine-parseable health category. Possible values are : - \"Unknown\": the driver is reporting a unknown health condition. Volume should not be considered healthy. - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability. - \"Healthy\" : the volume is healthy.\n\nThis field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change. A future version of CSI driver may emit health conditions about which Kubernetes component aren't aware.\n\nA writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status as unknown.\n\nA reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting purpose.",
             "type": "string"
           }
         },
@@ -8499,10 +8487,10 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.VolumeHealthStatus": {
-        "description": "VolumeHealthStatus contains health information for a volume reported by the CSI controller plugin.",
+        "description": "VolumeHealthStatus contains health information for a volume reported by a CSI controller or node plugin.",
         "properties": {
           "healthConditions": {
-            "description": "healthConditions is the set of adverse conditions reported by the CSI controller plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+            "description": "healthConditions is the set of adverse conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
             "items": {
               "$ref": "#/components/schemas/io.k8s.api.core.v1.VolumeHealthCondition"
             },
@@ -8521,7 +8509,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "lastTransitionTime is when the current set of conditions first appeared."
+            "description": "lastTransitionTime is when the current set of (status, reason) pairs first appeared. Changes to condition messages do not affect this field."
           }
         },
         "type": "object"

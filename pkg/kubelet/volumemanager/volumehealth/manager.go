@@ -44,7 +44,7 @@ type CSINodeUpdater interface {
 type HealthClientFactory func(driverName string) csi.HealthClient
 
 // Manager periodically probes CSI volume and storage health and writes results
-// to PodStatus.VolumeHealth and CSINode.Status.StorageHealth.
+// to PodStatus.VolumeStatuses[*].HealthStatus and CSINode.Status.StorageHealth.
 type Manager interface {
 	Run(ctx context.Context)
 }

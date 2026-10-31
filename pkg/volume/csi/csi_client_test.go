@@ -1388,6 +1388,51 @@ func TestMapStorageHealthVolumeCapability(t *testing.T) {
 	}
 }
 
+func TestMapStorageBackendHealthStatuses(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		status     csipbv1.StorageHealthErrorType
+		wantStatus storagev1.StorageHealthStatusType
+	}{
+		{
+			name:       "unreachable",
+			status:     csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE,
+			wantStatus: storagev1.StorageUnreachable,
+		},
+		{
+			name:       "degraded",
+			status:     csipbv1.StorageHealthErrorType_STORAGE_DEGRADED,
+			wantStatus: storagev1.StorageDegraded,
+		},
+		{
+			name:       "unknown",
+			status:     csipbv1.StorageHealthErrorType_UNKNOWN_STORAGE_HEALTH_ERROR_TYPE,
+			wantStatus: storagev1.StorageHealthUnknown,
+		},
+		{
+			name:       "future status",
+			status:     csipbv1.StorageHealthErrorType(100),
+			wantStatus: storagev1.StorageHealthUnknown,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conditions, err := mapStorageBackendHealth([]*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{{
+				Status:  tc.status,
+				Reason:  "DriverReportedHealth",
+				Message: "backend health details",
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, []storagev1.StorageHealthCondition{{
+				Status:  tc.wantStatus,
+				Reason:  "DriverReportedHealth",
+				Message: "backend health details",
+			}}, conditions)
+		})
+	}
+}
+
 func TestMapStorageBackendHealthLimit(t *testing.T) {
 	entries := make([]*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth, maxStorageHealthConditions+1)
 	for i := range entries {

@@ -789,12 +789,8 @@ func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_Sto
 		if entry == nil {
 			continue
 		}
-		status, ok := mapStorageHealthStatus(entry.GetStatus())
-		if !ok {
-			continue
-		}
 		condition := storagev1.StorageHealthCondition{
-			Status:  status,
+			Status:  mapStorageHealthStatus(entry.GetStatus()),
 			Reason:  entry.GetReason(),
 			Message: entry.GetMessage(),
 		}
@@ -844,14 +840,14 @@ func mapStorageHealthVolumeCapability(capability *csipbv1.VolumeCapability) (api
 	return accessMode, volumeMode, nil
 }
 
-func mapStorageHealthStatus(status csipbv1.StorageHealthErrorType) (storagev1.StorageHealthStatusType, bool) {
+func mapStorageHealthStatus(status csipbv1.StorageHealthErrorType) storagev1.StorageHealthStatusType {
 	switch status {
 	case csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE:
-		return storagev1.StorageUnreachable, true
+		return storagev1.StorageUnreachable
 	case csipbv1.StorageHealthErrorType_STORAGE_DEGRADED:
-		return storagev1.StorageDegraded, true
+		return storagev1.StorageDegraded
 	default:
-		return "", false
+		return storagev1.StorageHealthUnknown
 	}
 }
 

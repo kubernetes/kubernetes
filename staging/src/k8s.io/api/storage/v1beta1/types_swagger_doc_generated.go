@@ -169,7 +169,7 @@ func (StorageClassList) SwaggerDoc() map[string]string {
 var map_StorageHealth = map[string]string{
 	"":                 "StorageHealth contains storage backend health reported by a CSI driver on a node.",
 	"name":             "name is the CSI driver name, matching CSINodeDriver.name.",
-	"healthConditions": "healthConditions are the adverse storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+	"healthConditions": "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
 }
 
 func (StorageHealth) SwaggerDoc() map[string]string {
@@ -177,8 +177,8 @@ func (StorageHealth) SwaggerDoc() map[string]string {
 }
 
 var map_StorageHealthCondition = map[string]string{
-	"":                   "StorageHealthCondition represents an adverse health condition reported by a CSI driver for its storage backend on a node.",
-	"status":             "status is the health status category. One of \"StorageUnreachable\", \"StorageDegraded\".",
+	"":                   "StorageHealthCondition represents a health condition reported by a CSI driver for its storage backend on a node.",
+	"status":             "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"Healthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.",
 	"reason":             "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 bytes.",
 	"message":            "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 	"accessMode":         "accessMode is the access mode affected. Nil means all access modes are affected.",
