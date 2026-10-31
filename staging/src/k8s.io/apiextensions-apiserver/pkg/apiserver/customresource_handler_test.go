@@ -650,13 +650,13 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	}
 }
 
-// TestServeResourceCreateRacesCRDDeletion reproduces the narrow race window described in
-// https://github.com/kubernetes/kubernetes/issues/99181: a CR create request can observe a
-// non-terminating CRD, but the CRD is marked as terminating (deletion started) while the
-// request is still in flight, before the create is actually admitted and written to storage.
-// It verifies that the create is rejected instead of being allowed to persist a CR whose CRD
-// has since started terminating.
-func TestServeResourceCreateRacesCRDDeletion(t *testing.T) {
+// runServeResourceCreateRacesChange exercises crdHandler.serveResource's create path while
+// midChange mutates the informer cache after the justCreated sleep. It reproduces the narrow
+// race window from https://github.com/kubernetes/kubernetes/issues/99181: the create observes a
+// non-terminating CRD, then the CRD is mutated while the request is still in flight, and the
+// create must be forbidden rather than persisting a CR whose CRD no longer allows it. It
+// returns the HTTP status the create produced.
+func runServeResourceCreateRacesChange(t *testing.T, midChange func(store cache.Store, crd *apiextensionsv1.CustomResourceDefinition)) int {
 	cl := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
 	crdInformer := sharedInformers.Apiextensions().V1().CustomResourceDefinitions()
@@ -746,15 +746,10 @@ func TestServeResourceCreateRacesCRDDeletion(t *testing.T) {
 		handlerFunc.ServeHTTP(recorder, req)
 	}()
 
-	// Give serveResource time to enter the justCreated sleep, then simulate the CRD delete
-	// completing while the create request is still in flight -- the exact race from the issue.
+	// Give serveResource time to enter the justCreated sleep, then apply the in-flight cache
+	// mutation -- the exact race window from the issue.
 	time.Sleep(500 * time.Millisecond)
-	terminatingCRD := crd.DeepCopy()
-	deletionTime := metav1.Now()
-	terminatingCRD.DeletionTimestamp = &deletionTime
-	if err := crdInformer.Informer().GetStore().Update(terminatingCRD); err != nil {
-		t.Fatal(err)
-	}
+	midChange(crdInformer.Informer().GetStore(), crd)
 
 	select {
 	case <-done:
@@ -762,8 +757,42 @@ func TestServeResourceCreateRacesCRDDeletion(t *testing.T) {
 		t.Fatal("timed out waiting for create request to complete")
 	}
 
-	if recorder.Code != http.StatusForbidden {
-		t.Errorf("expected create to be forbidden once CRD deletion was recorded mid-flight, got status %d body %s", recorder.Code, recorder.Body.String())
+	return recorder.Code
+}
+
+// TestServeResourceCreateRacesCRDDeletion reproduces the narrow race window described in
+// https://github.com/kubernetes/kubernetes/issues/99181: a CR create request can observe a
+// non-terminating CRD, but the CRD is marked as terminating (deletion started) while the
+// request is still in flight, before the create is actually admitted and written to storage.
+// It verifies that the create is rejected instead of being allowed to persist a CR whose CRD
+// has since started terminating.
+func TestServeResourceCreateRacesCRDDeletion(t *testing.T) {
+	code := runServeResourceCreateRacesChange(t, func(store cache.Store, crd *apiextensionsv1.CustomResourceDefinition) {
+		// Simulate the CRD delete completing while the create is still in flight.
+		terminatingCRD := crd.DeepCopy()
+		deletionTime := metav1.Now()
+		terminatingCRD.DeletionTimestamp = &deletionTime
+		if err := store.Update(terminatingCRD); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if code != http.StatusForbidden {
+		t.Errorf("expected create to be forbidden once CRD deletion was recorded mid-flight, got status %d", code)
+	}
+}
+
+// TestServeResourceCreateRacesCRDDeletedFromCache covers the deeper half of #99181: by the
+// time the create is admitted the CRD has been fully removed from the cache (finalizer
+// cleared, object gone), not merely marked terminating. The create must still be forbidden so
+// no orphan CR is written to etcd.
+func TestServeResourceCreateRacesCRDDeletedFromCache(t *testing.T) {
+	code := runServeResourceCreateRacesChange(t, func(store cache.Store, crd *apiextensionsv1.CustomResourceDefinition) {
+		if err := store.Delete(crd); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if code != http.StatusForbidden {
+		t.Errorf("expected create to be forbidden once the CRD was removed from the cache, got status %d", code)
 	}
 }
 
