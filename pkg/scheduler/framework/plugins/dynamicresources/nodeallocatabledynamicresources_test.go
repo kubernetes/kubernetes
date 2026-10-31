@@ -1402,11 +1402,11 @@ func TestExtractPodNodeAllocatableResourceClaimStatus(t *testing.T) {
 
 	t.Run("unknown node", func(t *testing.T) {
 		state := framework.NewCycleState()
-		state.Write(stateKey, &stateData{
+		state.Write(stateKey, &stateData{filterResults: &filterResults{
 			nodeAllocations: map[string]nodeAllocation{
 				nodeName: {nodeAllocatableResourceClaimStatuses: cloneNodeAllocatableResourceClaimStatuses(original)},
 			},
-		})
+		}})
 		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, state, "other-node")
 		if got != nil {
 			t.Errorf("ExtractPodNodeAllocatableResourceClaimStatus() = %v, want nil", got)
@@ -1415,11 +1415,11 @@ func TestExtractPodNodeAllocatableResourceClaimStatus(t *testing.T) {
 
 	t.Run("returns a copy not the cycle-state slice", func(t *testing.T) {
 		state := framework.NewCycleState()
-		draState := &stateData{
+		draState := &stateData{filterResults: &filterResults{
 			nodeAllocations: map[string]nodeAllocation{
 				nodeName: {nodeAllocatableResourceClaimStatuses: cloneNodeAllocatableResourceClaimStatuses(original)},
 			},
-		}
+		}}
 		state.Write(stateKey, draState)
 
 		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, state, nodeName)

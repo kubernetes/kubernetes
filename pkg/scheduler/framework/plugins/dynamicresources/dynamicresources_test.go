@@ -4912,7 +4912,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	for _, podGroup := range podGroups {
 		tc.podGroupManager.AddGenericPodGroup(fwk.NewGenericPodGroup(podGroup))
 	}
-	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, podGroups, nil)
+	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nodes, podGroups, nil)
 
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
@@ -6445,7 +6445,7 @@ func TestPodGroupPostFilter(t *testing.T) {
 
 			for _, pod := range tc.unscheduledPods {
 				// Initialize the stateData of the pod with unavailable claims
-				s := &stateData{}
+				s := &stateData{filterResults: &filterResults{}}
 				userClaims, err := testCtx.p.podResourceClaims(pod)
 				require.NoError(tCtx, err)
 				extendedResourceClaim := findExtendedResourceClaim(pod, testClaims)
