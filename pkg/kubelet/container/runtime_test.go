@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -765,27 +766,21 @@ func TestRuntimeFeaturesString(t *testing.T) {
 	}
 }
 
-func TestSortContainerStatusesByCreationTime(t *testing.T) {
-	now := time.Now()
-	statuses := SortContainerStatusesByCreationTime{
-		{CreatedAt: now.Add(2 * time.Hour)},
-		{CreatedAt: now},
-		{CreatedAt: now.Add(1 * time.Hour)},
+func TestSortContainerStatusesByRestartCount(t *testing.T) {
+	statuses := SortContainerStatusesByRestartCount{
+		{ID: ContainerID{ID: "e"}, RestartCount: 0, CreatedAt: time.Unix(40, 0)},
+		{ID: ContainerID{ID: "d"}, RestartCount: 1, CreatedAt: time.Unix(30, 0)},
+		{ID: ContainerID{ID: "b"}, RestartCount: 2, CreatedAt: time.Unix(10, 0)},
+		{ID: ContainerID{ID: "c"}, RestartCount: 2, CreatedAt: time.Unix(20, 0)},
+		{ID: ContainerID{ID: "a"}, RestartCount: 2, CreatedAt: time.Unix(20, 0)},
 	}
 
-	// Test Len
-	assert.Len(t, statuses, 3, "Len()")
-
-	// Test Swap
-	original1 := statuses[1]
-	original2 := statuses[2]
-	statuses.Swap(1, 2)
-	assert.Equal(t, original1, statuses[2], "Swap(0, 1) did not work correctly (0)")
-	assert.Equal(t, original2, statuses[1], "Swap(0, 1) did not work correctly (1)")
-
-	// Test Less
-	assert.True(t, statuses.Less(1, 0), "Less(1, 0) should be true")
-	assert.False(t, statuses.Less(0, 1), "Less(0, 1) should be false")
+	sort.Sort(statuses)
+	var ids []string
+	for _, status := range statuses {
+		ids = append(ids, status.ID.ID)
+	}
+	assert.Equal(t, []string{"a", "c", "b", "d", "e"}, ids)
 }
 
 func TestNewCommandRunner(t *testing.T) {

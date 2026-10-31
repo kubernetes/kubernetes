@@ -2721,8 +2721,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 	containerStatusesCopy := make([]*kubecontainer.Status, len(podStatus.ContainerStatuses))
 	copy(containerStatusesCopy, podStatus.ContainerStatuses)
 
-	// Make the latest container status comes first.
-	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(containerStatusesCopy)))
+	// Use restart count so a clock rollback cannot make an older instance current.
+	sort.Sort(kubecontainer.SortContainerStatusesByRestartCount(containerStatusesCopy))
 	// Set container statuses according to the statuses seen in pod status
 	containerSeen := map[string]int{}
 	for _, cStatus := range containerStatusesCopy {
