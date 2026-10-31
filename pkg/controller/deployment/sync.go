@@ -309,6 +309,12 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	// deployment. If there is no active replica set, then we should scale up the newest replica set.
 	if activeOrLatest := deploymentutil.FindActiveOrLatest(newRS, oldRSs); activeOrLatest != nil {
 		if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
+			// Ensure that we have up-to-date "desired-replicas" annotation on replicaset
+			if _, _, err := dc.scaleReplicaSet(
+				ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment, true,
+			); err != nil {
+				return err
+			}
 			return nil
 		}
 		_, _, err := dc.scaleReplicaSet(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment, false)
