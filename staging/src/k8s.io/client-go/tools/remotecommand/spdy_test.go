@@ -189,7 +189,6 @@ func TestSPDYExecutorStream(t *testing.T) {
 func TestSPDYExecutorNonZeroExitCode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		ctx, err := createHTTPStreams(writer, request, &StreamOptions{
-			Stdin:  strings.NewReader("input"),
 			Stdout: &bytes.Buffer{},
 		})
 		if err != nil {
@@ -230,7 +229,6 @@ func TestSPDYExecutorNonZeroExitCode(t *testing.T) {
 
 	var stdout bytes.Buffer
 	err = exec.StreamWithContext(context.Background(), StreamOptions{
-		Stdin:  strings.NewReader("input"),
 		Stdout: &stdout,
 	})
 	if err == nil {
