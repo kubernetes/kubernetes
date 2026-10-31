@@ -182,8 +182,14 @@ func Convert_autoscaling_ObjectMetricStatus_To_v1_ObjectMetricStatus(in *autosca
 }
 
 func Convert_v1_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *autoscalingv1.ObjectMetricStatus, out *autoscaling.ObjectMetricStatus, s conversion.Scope) error {
+	var currentValue *resource.Quantity
+
+	if in.AverageValue == nil {
+		currentValue = &in.CurrentValue
+	}
+
 	out.Current = autoscaling.MetricValueStatus{
-		Value:        &in.CurrentValue,
+		Value:        currentValue,
 		AverageValue: in.AverageValue,
 	}
 	out.DescribedObject = autoscaling.CrossVersionObjectReference{
@@ -405,7 +411,7 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 	if behaviorEnc, hasConstraints := out.Annotations[autoscaling.BehaviorSpecsAnnotation]; hasConstraints {
 		// TODO: this is unmarshaling an internal type. Fix this without breaking backwards compatibility.
 		var behavior autoscaling.HorizontalPodAutoscalerBehavior
-		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err == nil && behavior != (autoscaling.HorizontalPodAutoscalerBehavior{}) {
+		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err == nil {
 			out.Spec.Behavior = &behavior
 		}
 	}
