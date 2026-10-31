@@ -1132,6 +1132,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	suspendCondChanged := false
 	// Remove active pods if Job failed.
 	if jobCtx.finishedCondition != nil {
+		if len(jobCtx.activePods) > 0 {
+			if err := jm.persistInterimCondition(ctx, jobCtx); err != nil {
+				return err
+			}
+		}
 		deletedReady, deleted, err := jm.deleteActivePods(ctx, &job, jobCtx.activePods)
 		if deleted != active || !satisfiedExpectations {
 			// Can't declare the Job as finished yet, as there might be remaining
@@ -1213,6 +1218,43 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 	}
 
 	return manageJobErr
+}
+
+// persistInterimCondition adds a newly evaluated interim FailureTarget or
+// SuccessCriteriaMet condition to the Job status before the active pods are
+// deleted. Deleted pods are counted as failed by subsequent syncs, so if the
+// condition was not persisted before the deletion, a sync interrupted after
+// the deletion could lead to a different outcome, such as
+// BackoffLimitExceeded instead of DeadlineExceeded, or a failure instead of
+// meeting the success policy.
+// Once the condition is persisted, subsequent syncs respect it as the
+// pre-existing condition.
+func (jm *Controller) persistInterimCondition(ctx context.Context, jobCtx *syncJobCtx) error {
+	cond := jobCtx.finishedCondition
+	// A pre-existing FailureTarget condition is already transformed into the
+	// Failed condition by syncJob, but check it explicitly so that the
+	// condition is never added twice.
+	failureTarget := findConditionByType(jobCtx.job.Status.Conditions, batch.JobFailureTarget)
+	isNewFailureTarget := cond.Type == batch.JobFailureTarget && (failureTarget == nil || failureTarget.Status != v1.ConditionTrue)
+	isNewSuccessCriteriaMet := isSuccessCriteriaMetCondition(cond) && hasSuccessCriteriaMetCondition(jobCtx.job) == nil
+	if !isNewFailureTarget && !isNewSuccessCriteriaMet {
+		return nil
+	}
+	job := jobCtx.job.DeepCopy()
+	job.Status.Conditions = append(job.Status.Conditions, *cond)
+	newJob, err := jm.updateStatusHandler(ctx, job)
+	if err != nil {
+		return fmt.Errorf("adding interim %s condition before deleting active pods: %w", cond.Type, err)
+	}
+	*jobCtx.job = *newJob
+	if jobCtx.job.Status.UncountedTerminatedPods == nil {
+		jobCtx.job.Status.UncountedTerminatedPods = &batch.UncountedTerminatedPods{}
+	}
+	if isNewFailureTarget {
+		// Continue as if the FailureTarget condition was pre-existing.
+		jobCtx.finishedCondition = newFailedConditionForFailureTarget(cond, jm.clock.Now())
+	}
+	return nil
 }
 
 func (jm *Controller) newFailureCondition(reason, message string) *batch.JobCondition {

@@ -973,6 +973,16 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedDeletions:   2,
 			expectedActive:      2,
 			expectedTerminating: ptr.To[int32](0),
+			// The interim condition is persisted before deleting the active pods,
+			// so it is preserved even if the deletions fail.
+			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobFailureTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonBackoffLimitExceeded,
+					Message: "Job has reached the specified backoff limit",
+				},
+			},
 		},
 		"indexed job repeated completed index": {
 			parallelism:    2,
