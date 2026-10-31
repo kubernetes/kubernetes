@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/features"
@@ -50,6 +51,13 @@ func addControllerRole(controllerRoles *[]rbacv1.ClusterRole, controllerRoleBind
 	*controllerRoleBindings = append(*controllerRoleBindings,
 		rbacv1helpers.NewClusterBinding(role.Name).SAs("kube-system", role.Name[len(saRolePrefix):]).BindingOrDie())
 	addClusterRoleBindingLabel(*controllerRoleBindings)
+}
+
+// fgAddControllerRole is like addControllerRole but will only add the roles if fg is enabled
+func fgAddControllerRole(fg featuregate.Feature, controllerRoles *[]rbacv1.ClusterRole, controllerRoleBindings *[]rbacv1.ClusterRoleBinding, role rbacv1.ClusterRole) {
+	if utilfeature.DefaultFeatureGate.Enabled(fg) {
+		addControllerRole(controllerRoles, controllerRoleBindings, role)
+	}
 }
 
 func eventsRule() rbacv1.PolicyRule {
@@ -473,6 +481,21 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		})
 	}
+
+	fgAddControllerRole(features.KubeServingCertificatesSigner, &controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		Name: saRolePrefix + "kube-service-serving-signer",
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services").RuleOrDie(),
+			// signing rules
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie(),
+			rbacv1helpers.NewRule("update").Groups(certificatesGroup).Resources("podcertificaterequests/status").RuleOrDie(),
+			// trust bundle publishing rules
+			rbacv1helpers.NewRule("attest").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/service-serving").RuleOrDie(),
+			rbacv1helpers.NewRule("sign").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/service-serving").RuleOrDie(),
+			rbacv1helpers.NewRule("create", "update", "delete", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
 		Rules: []rbacv1.PolicyRule{
