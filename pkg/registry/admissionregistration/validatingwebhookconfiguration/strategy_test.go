@@ -58,6 +58,7 @@ func validValidatingWebhookConfiguration() *admissionregistration.ValidatingWebh
 	thirty := int32(30)
 	none := admissionregistration.SideEffectClassNone
 	servicePath := "/"
+	port := int32(443)
 	return &admissionregistration.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -69,7 +70,7 @@ func validValidatingWebhookConfiguration() *admissionregistration.ValidatingWebh
 					Name:      "foo",
 					Namespace: "bar",
 					Path:      &servicePath,
-					Port:      443,
+					Port:      &port,
 				},
 			},
 			FailurePolicy:           &ignore,

@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
@@ -403,7 +404,7 @@ func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, op
 	case cc.URL != nil:
 		allErrors = append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
 	case cc.Service != nil:
-		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
+		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, ptr.Deref(cc.Service.Port, 0))...)
 	}
 
 	if !opts.ignoreMatchConditions {
@@ -461,7 +462,7 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 	case cc.URL != nil:
 		allErrors = append(allErrors, webhook.ValidateWebhookURL(fldPath.Child("clientConfig").Child("url"), *cc.URL, true)...)
 	case cc.Service != nil:
-		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
+		allErrors = append(allErrors, webhook.ValidateWebhookService(fldPath.Child("clientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, ptr.Deref(cc.Service.Port, 0))...)
 	}
 
 	if !opts.ignoreMatchConditions {
