@@ -206,13 +206,14 @@ func newInformerManager[T clusterTrustBundle](ctx context.Context, handlers clus
 }
 
 func (m *InformerManager[T]) dropCacheFor(ctb *T) {
+	ctbName := m.ctbHandlers.GetName(ctb)
 	if ctbSignerName := m.ctbHandlers.GetSignerName(ctb); ctbSignerName != "" {
 		m.normalizationCache.RemoveAll(func(key any) bool {
-			return key.(cacheKeyType).signerName == ctbSignerName
+			return key.(cacheKeyType).signerName == ctbSignerName || key.(cacheKeyType).ctbName == ctbName
 		})
 	} else {
 		m.normalizationCache.RemoveAll(func(key any) bool {
-			return key.(cacheKeyType).ctbName == m.ctbHandlers.GetName(ctb)
+			return key.(cacheKeyType).ctbName == ctbName
 		})
 	}
 }
