@@ -281,6 +281,74 @@ func (SupplementalGroupsPolicy) EnumDescriptor() ([]byte, []int) {
 	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{3}
 }
 
+// PodNetwork selects whether a sandbox network namespace is attached to the
+// pod network.
+// See https://kep.k8s.io/6313 for more details.
+type PodNetwork int32
+
+const (
+	// POD_NETWORK_DEFAULT attaches the sandbox network namespace to the pod
+	// network. The runtime performs its configured network plumbing (e.g.,
+	// invokes CNI plugins on Linux). This is the default and matches
+	// historical behavior.
+	PodNetwork_POD_NETWORK_DEFAULT PodNetwork = 0
+	// POD_NETWORK_NONE creates the sandbox network namespace with only the
+	// loopback interface configured (up) and does not attach it to the pod
+	// network:
+	// - The runtime MUST NOT perform its pod network plumbing when the
+	//   sandbox is created or torn down (e.g., MUST NOT invoke CNI ADD or
+	//   DEL on Linux).
+	// - PodSandboxStatus.network MUST NOT report any IP: the field MAY be
+	//   omitted, or set with an empty ip and no additional_ips.
+	// - The sandbox resolver configuration (/etc/resolv.conf) MUST be
+	//   generated from PodSandboxConfig.dns_config exactly as given, even
+	//   when it is empty. The runtime MUST NOT fall back to the host's
+	//   configuration.
+	// Sandboxes with this value only run on nodes whose runtime reports
+	// RuntimeFeatures.pod_network_none; a runtime that does not support it
+	// never receives it from a kubelet.
+	PodNetwork_POD_NETWORK_NONE PodNetwork = 1
+)
+
+// Enum value maps for PodNetwork.
+var (
+	PodNetwork_name = map[int32]string{
+		0: "POD_NETWORK_DEFAULT",
+		1: "POD_NETWORK_NONE",
+	}
+	PodNetwork_value = map[string]int32{
+		"POD_NETWORK_DEFAULT": 0,
+		"POD_NETWORK_NONE":    1,
+	}
+)
+
+func (x PodNetwork) Enum() *PodNetwork {
+	p := new(PodNetwork)
+	*p = x
+	return p
+}
+
+func (x PodNetwork) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PodNetwork) Descriptor() protoreflect.EnumDescriptor {
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[4].Descriptor()
+}
+
+func (PodNetwork) Type() protoreflect.EnumType {
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[4]
+}
+
+func (x PodNetwork) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PodNetwork.Descriptor instead.
+func (PodNetwork) EnumDescriptor() ([]byte, []int) {
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{4}
+}
+
 type PodSandboxState int32
 
 const (
@@ -311,11 +379,11 @@ func (x PodSandboxState) String() string {
 }
 
 func (PodSandboxState) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[4].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[5].Descriptor()
 }
 
 func (PodSandboxState) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[4]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[5]
 }
 
 func (x PodSandboxState) Number() protoreflect.EnumNumber {
@@ -324,7 +392,7 @@ func (x PodSandboxState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PodSandboxState.Descriptor instead.
 func (PodSandboxState) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{4}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{5}
 }
 
 // CgroupMountMode defines how the cgroup filesystem is mounted in a container.
@@ -370,11 +438,11 @@ func (x CgroupMountMode) String() string {
 }
 
 func (CgroupMountMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[5].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[6].Descriptor()
 }
 
 func (CgroupMountMode) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[5]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[6]
 }
 
 func (x CgroupMountMode) Number() protoreflect.EnumNumber {
@@ -383,7 +451,7 @@ func (x CgroupMountMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CgroupMountMode.Descriptor instead.
 func (CgroupMountMode) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{5}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{6}
 }
 
 type Signal int32
@@ -608,11 +676,11 @@ func (x Signal) String() string {
 }
 
 func (Signal) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[6].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[7].Descriptor()
 }
 
 func (Signal) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[6]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[7]
 }
 
 func (x Signal) Number() protoreflect.EnumNumber {
@@ -621,7 +689,7 @@ func (x Signal) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Signal.Descriptor instead.
 func (Signal) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{6}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{7}
 }
 
 type ContainerState int32
@@ -660,11 +728,11 @@ func (x ContainerState) String() string {
 }
 
 func (ContainerState) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[7].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[8].Descriptor()
 }
 
 func (ContainerState) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[7]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[8]
 }
 
 func (x ContainerState) Number() protoreflect.EnumNumber {
@@ -673,7 +741,7 @@ func (x ContainerState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ContainerState.Descriptor instead.
 func (ContainerState) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{7}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{8}
 }
 
 // SecurityProfileKind identifies the security mechanism of a profile pulled
@@ -710,11 +778,11 @@ func (x SecurityProfileKind) String() string {
 }
 
 func (SecurityProfileKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[8].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[9].Descriptor()
 }
 
 func (SecurityProfileKind) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[8]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[9]
 }
 
 func (x SecurityProfileKind) Number() protoreflect.EnumNumber {
@@ -723,7 +791,7 @@ func (x SecurityProfileKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SecurityProfileKind.Descriptor instead.
 func (SecurityProfileKind) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{8}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{9}
 }
 
 type ContainerEventType int32
@@ -766,11 +834,11 @@ func (x ContainerEventType) String() string {
 }
 
 func (ContainerEventType) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[9].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[10].Descriptor()
 }
 
 func (ContainerEventType) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[9]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[10]
 }
 
 func (x ContainerEventType) Number() protoreflect.EnumNumber {
@@ -779,7 +847,7 @@ func (x ContainerEventType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ContainerEventType.Descriptor instead.
 func (ContainerEventType) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{9}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{10}
 }
 
 type MetricType int32
@@ -812,11 +880,11 @@ func (x MetricType) String() string {
 }
 
 func (MetricType) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[10].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[11].Descriptor()
 }
 
 func (MetricType) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[10]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[11]
 }
 
 func (x MetricType) Number() protoreflect.EnumNumber {
@@ -825,7 +893,7 @@ func (x MetricType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use MetricType.Descriptor instead.
 func (MetricType) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{10}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{11}
 }
 
 type CgroupDriver int32
@@ -858,11 +926,11 @@ func (x CgroupDriver) String() string {
 }
 
 func (CgroupDriver) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[11].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[12].Descriptor()
 }
 
 func (CgroupDriver) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[11]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[12]
 }
 
 func (x CgroupDriver) Number() protoreflect.EnumNumber {
@@ -871,7 +939,7 @@ func (x CgroupDriver) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CgroupDriver.Descriptor instead.
 func (CgroupDriver) EnumDescriptor() ([]byte, []int) {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{11}
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP(), []int{12}
 }
 
 // Available profile types.
@@ -921,11 +989,11 @@ func (x SecurityProfile_ProfileType) String() string {
 }
 
 func (SecurityProfile_ProfileType) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[12].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[13].Descriptor()
 }
 
 func (SecurityProfile_ProfileType) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[12]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[13]
 }
 
 func (x SecurityProfile_ProfileType) Number() protoreflect.EnumNumber {
@@ -970,11 +1038,11 @@ func (x SecurityProfileBase_BaseType) String() string {
 }
 
 func (SecurityProfileBase_BaseType) Descriptor() protoreflect.EnumDescriptor {
-	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[13].Descriptor()
+	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[14].Descriptor()
 }
 
 func (SecurityProfileBase_BaseType) Type() protoreflect.EnumType {
-	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[13]
+	return &file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes[14]
 }
 
 func (x SecurityProfileBase_BaseType) Number() protoreflect.EnumNumber {
@@ -2198,7 +2266,15 @@ type PodSandboxConfig struct {
 	// Optional configurations specific to Linux hosts.
 	Linux *LinuxPodSandboxConfig `protobuf:"bytes,8,opt,name=linux,proto3" json:"linux,omitempty"`
 	// Optional configurations specific to Windows hosts.
-	Windows       *WindowsPodSandboxConfig `protobuf:"bytes,9,opt,name=windows,proto3" json:"windows,omitempty"`
+	Windows *WindowsPodSandboxConfig `protobuf:"bytes,9,opt,name=windows,proto3" json:"windows,omitempty"`
+	// pod_network selects whether the sandbox network namespace is attached
+	// to the pod network. It only applies when NamespaceOption.network is
+	// POD; for NODE (host network) sandboxes there is no sandbox network
+	// namespace and runtimes MUST ignore this field. Kubelets that predate
+	// the field leave it unset (POD_NETWORK_DEFAULT).
+	// Feature gate: NetworkIsolatedPods
+	// See https://kep.k8s.io/6313 for more details.
+	PodNetwork    PodNetwork `protobuf:"varint,10,opt,name=pod_network,json=podNetwork,proto3,enum=runtime.v1.PodNetwork" json:"pod_network,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2294,6 +2370,13 @@ func (x *PodSandboxConfig) GetWindows() *WindowsPodSandboxConfig {
 		return x.Windows
 	}
 	return nil
+}
+
+func (x *PodSandboxConfig) GetPodNetwork() PodNetwork {
+	if x != nil {
+		return x.PodNetwork
+	}
+	return PodNetwork_POD_NETWORK_DEFAULT
 }
 
 type RunPodSandboxRequest struct {
@@ -9551,8 +9634,15 @@ type RuntimeFeatures struct {
 	// Feature gate: SecurityProfileOCI
 	// See https://kep.k8s.io/6061 for more details.
 	SeccompProfileOci bool `protobuf:"varint,5,opt,name=seccomp_profile_oci,json=seccompProfileOci,proto3" json:"seccomp_profile_oci,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// pod_network_none is set to true if the runtime supports creating
+	// sandboxes with PodNetwork POD_NETWORK_NONE for every
+	// runtime handler it serves. The capability is runtime-wide because the
+	// default pod network plumbing it skips is done by the runtime, not by
+	// the handler.
+	// See https://kep.k8s.io/6313 for more details.
+	PodNetworkNone bool `protobuf:"varint,6,opt,name=pod_network_none,json=podNetworkNone,proto3" json:"pod_network_none,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RuntimeFeatures) Reset() {
@@ -9616,6 +9706,13 @@ func (x *RuntimeFeatures) GetCgroupMountMode() bool {
 func (x *RuntimeFeatures) GetSeccompProfileOci() bool {
 	if x != nil {
 		return x.SeccompProfileOci
+	}
+	return false
+}
+
+func (x *RuntimeFeatures) GetPodNetworkNone() bool {
+	if x != nil {
+		return x.PodNetworkNone
 	}
 	return false
 }
@@ -12656,7 +12753,7 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\tR\x03uid\x12\x1c\n" +
 	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x18\n" +
-	"\aattempt\x18\x04 \x01(\rR\aattempt\"\x89\x05\n" +
+	"\aattempt\x18\x04 \x01(\rR\aattempt\"\xc2\x05\n" +
 	"\x10PodSandboxConfig\x12:\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1e.runtime.v1.PodSandboxMetadataR\bmetadata\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12#\n" +
@@ -12667,7 +12764,10 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x06labels\x18\x06 \x03(\v2(.runtime.v1.PodSandboxConfig.LabelsEntryR\x06labels\x12O\n" +
 	"\vannotations\x18\a \x03(\v2-.runtime.v1.PodSandboxConfig.AnnotationsEntryR\vannotations\x127\n" +
 	"\x05linux\x18\b \x01(\v2!.runtime.v1.LinuxPodSandboxConfigR\x05linux\x12=\n" +
-	"\awindows\x18\t \x01(\v2#.runtime.v1.WindowsPodSandboxConfigR\awindows\x1a9\n" +
+	"\awindows\x18\t \x01(\v2#.runtime.v1.WindowsPodSandboxConfigR\awindows\x127\n" +
+	"\vpod_network\x18\n" +
+	" \x01(\x0e2\x16.runtime.v1.PodNetworkR\n" +
+	"podNetwork\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +
@@ -13207,13 +13307,14 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x0fuser_namespaces\x18\x02 \x01(\bR\x0euserNamespaces\"d\n" +
 	"\x0eRuntimeHandler\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12>\n" +
-	"\bfeatures\x18\x02 \x01(\v2\".runtime.v1.RuntimeHandlerFeaturesR\bfeatures\"\x91\x02\n" +
+	"\bfeatures\x18\x02 \x01(\v2\".runtime.v1.RuntimeHandlerFeaturesR\bfeatures\"\xbb\x02\n" +
 	"\x0fRuntimeFeatures\x12<\n" +
 	"\x1asupplemental_groups_policy\x18\x01 \x01(\bR\x18supplementalGroupsPolicy\x12?\n" +
 	"\x1cuser_namespaces_host_network\x18\x02 \x01(\bR\x19userNamespacesHostNetwork\x12#\n" +
 	"\rmount_options\x18\x03 \x01(\bR\fmountOptions\x12*\n" +
 	"\x11cgroup_mount_mode\x18\x04 \x01(\bR\x0fcgroupMountMode\x12.\n" +
-	"\x13seccomp_profile_oci\x18\x05 \x01(\bR\x11seccompProfileOci\"\xb6\x02\n" +
+	"\x13seccomp_profile_oci\x18\x05 \x01(\bR\x11seccompProfileOci\x12(\n" +
+	"\x10pod_network_none\x18\x06 \x01(\bR\x0epodNetworkNone\"\xb6\x02\n" +
 	"\x0eStatusResponse\x121\n" +
 	"\x06status\x18\x01 \x01(\v2\x19.runtime.v1.RuntimeStatusR\x06status\x128\n" +
 	"\x04info\x18\x02 \x03(\v2$.runtime.v1.StatusResponse.InfoEntryR\x04info\x12E\n" +
@@ -13429,7 +13530,11 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x18SupplementalGroupsPolicy\x12\t\n" +
 	"\x05Merge\x10\x00\x12\n" +
 	"\n" +
-	"\x06Strict\x10\x01*:\n" +
+	"\x06Strict\x10\x01*;\n" +
+	"\n" +
+	"PodNetwork\x12\x17\n" +
+	"\x13POD_NETWORK_DEFAULT\x10\x00\x12\x14\n" +
+	"\x10POD_NETWORK_NONE\x10\x01*:\n" +
 	"\x0fPodSandboxState\x12\x11\n" +
 	"\rSANDBOX_READY\x10\x00\x12\x14\n" +
 	"\x10SANDBOX_NOTREADY\x10\x01*w\n" +
@@ -13588,585 +13693,587 @@ func file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescGZIP()
 	return file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDescData
 }
 
-var file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 14)
+var file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_enumTypes = make([]protoimpl.EnumInfo, 15)
 var file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 213)
 var file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_goTypes = []any{
 	(Protocol)(0),                             // 0: runtime.v1.Protocol
 	(MountPropagation)(0),                     // 1: runtime.v1.MountPropagation
 	(NamespaceMode)(0),                        // 2: runtime.v1.NamespaceMode
 	(SupplementalGroupsPolicy)(0),             // 3: runtime.v1.SupplementalGroupsPolicy
-	(PodSandboxState)(0),                      // 4: runtime.v1.PodSandboxState
-	(CgroupMountMode)(0),                      // 5: runtime.v1.CgroupMountMode
-	(Signal)(0),                               // 6: runtime.v1.Signal
-	(ContainerState)(0),                       // 7: runtime.v1.ContainerState
-	(SecurityProfileKind)(0),                  // 8: runtime.v1.SecurityProfileKind
-	(ContainerEventType)(0),                   // 9: runtime.v1.ContainerEventType
-	(MetricType)(0),                           // 10: runtime.v1.MetricType
-	(CgroupDriver)(0),                         // 11: runtime.v1.CgroupDriver
-	(SecurityProfile_ProfileType)(0),          // 12: runtime.v1.SecurityProfile.ProfileType
-	(SecurityProfileBase_BaseType)(0),         // 13: runtime.v1.SecurityProfileBase.BaseType
-	(*VersionRequest)(nil),                    // 14: runtime.v1.VersionRequest
-	(*VersionResponse)(nil),                   // 15: runtime.v1.VersionResponse
-	(*DNSConfig)(nil),                         // 16: runtime.v1.DNSConfig
-	(*PortMapping)(nil),                       // 17: runtime.v1.PortMapping
-	(*Mount)(nil),                             // 18: runtime.v1.Mount
-	(*IDMapping)(nil),                         // 19: runtime.v1.IDMapping
-	(*UserNamespace)(nil),                     // 20: runtime.v1.UserNamespace
-	(*NamespaceOption)(nil),                   // 21: runtime.v1.NamespaceOption
-	(*Int64Value)(nil),                        // 22: runtime.v1.Int64Value
-	(*LinuxSandboxSecurityContext)(nil),       // 23: runtime.v1.LinuxSandboxSecurityContext
-	(*SecurityProfile)(nil),                   // 24: runtime.v1.SecurityProfile
-	(*SecurityProfileBase)(nil),               // 25: runtime.v1.SecurityProfileBase
-	(*LinuxPodSandboxConfig)(nil),             // 26: runtime.v1.LinuxPodSandboxConfig
-	(*PodSandboxMetadata)(nil),                // 27: runtime.v1.PodSandboxMetadata
-	(*PodSandboxConfig)(nil),                  // 28: runtime.v1.PodSandboxConfig
-	(*RunPodSandboxRequest)(nil),              // 29: runtime.v1.RunPodSandboxRequest
-	(*RunPodSandboxResponse)(nil),             // 30: runtime.v1.RunPodSandboxResponse
-	(*StopPodSandboxRequest)(nil),             // 31: runtime.v1.StopPodSandboxRequest
-	(*StopPodSandboxResponse)(nil),            // 32: runtime.v1.StopPodSandboxResponse
-	(*RemovePodSandboxRequest)(nil),           // 33: runtime.v1.RemovePodSandboxRequest
-	(*RemovePodSandboxResponse)(nil),          // 34: runtime.v1.RemovePodSandboxResponse
-	(*PodSandboxStatusRequest)(nil),           // 35: runtime.v1.PodSandboxStatusRequest
-	(*PodIP)(nil),                             // 36: runtime.v1.PodIP
-	(*PodSandboxNetworkStatus)(nil),           // 37: runtime.v1.PodSandboxNetworkStatus
-	(*Namespace)(nil),                         // 38: runtime.v1.Namespace
-	(*LinuxPodSandboxStatus)(nil),             // 39: runtime.v1.LinuxPodSandboxStatus
-	(*PodSandboxStatus)(nil),                  // 40: runtime.v1.PodSandboxStatus
-	(*PodSandboxStatusResponse)(nil),          // 41: runtime.v1.PodSandboxStatusResponse
-	(*PodSandboxStateValue)(nil),              // 42: runtime.v1.PodSandboxStateValue
-	(*PodSandboxFilter)(nil),                  // 43: runtime.v1.PodSandboxFilter
-	(*ListPodSandboxRequest)(nil),             // 44: runtime.v1.ListPodSandboxRequest
-	(*PodSandbox)(nil),                        // 45: runtime.v1.PodSandbox
-	(*ListPodSandboxResponse)(nil),            // 46: runtime.v1.ListPodSandboxResponse
-	(*StreamPodSandboxesRequest)(nil),         // 47: runtime.v1.StreamPodSandboxesRequest
-	(*StreamPodSandboxesResponse)(nil),        // 48: runtime.v1.StreamPodSandboxesResponse
-	(*PodSandboxStatsRequest)(nil),            // 49: runtime.v1.PodSandboxStatsRequest
-	(*PodSandboxStatsResponse)(nil),           // 50: runtime.v1.PodSandboxStatsResponse
-	(*PodSandboxStatsFilter)(nil),             // 51: runtime.v1.PodSandboxStatsFilter
-	(*ListPodSandboxStatsRequest)(nil),        // 52: runtime.v1.ListPodSandboxStatsRequest
-	(*ListPodSandboxStatsResponse)(nil),       // 53: runtime.v1.ListPodSandboxStatsResponse
-	(*StreamPodSandboxStatsRequest)(nil),      // 54: runtime.v1.StreamPodSandboxStatsRequest
-	(*StreamPodSandboxStatsResponse)(nil),     // 55: runtime.v1.StreamPodSandboxStatsResponse
-	(*PodSandboxAttributes)(nil),              // 56: runtime.v1.PodSandboxAttributes
-	(*PodSandboxStats)(nil),                   // 57: runtime.v1.PodSandboxStats
-	(*LinuxPodSandboxStats)(nil),              // 58: runtime.v1.LinuxPodSandboxStats
-	(*WindowsPodSandboxStats)(nil),            // 59: runtime.v1.WindowsPodSandboxStats
-	(*NetworkUsage)(nil),                      // 60: runtime.v1.NetworkUsage
-	(*WindowsNetworkUsage)(nil),               // 61: runtime.v1.WindowsNetworkUsage
-	(*NetworkInterfaceUsage)(nil),             // 62: runtime.v1.NetworkInterfaceUsage
-	(*WindowsNetworkInterfaceUsage)(nil),      // 63: runtime.v1.WindowsNetworkInterfaceUsage
-	(*ProcessUsage)(nil),                      // 64: runtime.v1.ProcessUsage
-	(*WindowsProcessUsage)(nil),               // 65: runtime.v1.WindowsProcessUsage
-	(*ImageSpec)(nil),                         // 66: runtime.v1.ImageSpec
-	(*KeyValue)(nil),                          // 67: runtime.v1.KeyValue
-	(*LinuxContainerResources)(nil),           // 68: runtime.v1.LinuxContainerResources
-	(*HugepageLimit)(nil),                     // 69: runtime.v1.HugepageLimit
-	(*SELinuxOption)(nil),                     // 70: runtime.v1.SELinuxOption
-	(*Capability)(nil),                        // 71: runtime.v1.Capability
-	(*LinuxContainerSecurityContext)(nil),     // 72: runtime.v1.LinuxContainerSecurityContext
-	(*LinuxContainerConfig)(nil),              // 73: runtime.v1.LinuxContainerConfig
-	(*LinuxContainerUser)(nil),                // 74: runtime.v1.LinuxContainerUser
-	(*WindowsNamespaceOption)(nil),            // 75: runtime.v1.WindowsNamespaceOption
-	(*WindowsSandboxSecurityContext)(nil),     // 76: runtime.v1.WindowsSandboxSecurityContext
-	(*WindowsPodSandboxConfig)(nil),           // 77: runtime.v1.WindowsPodSandboxConfig
-	(*WindowsContainerSecurityContext)(nil),   // 78: runtime.v1.WindowsContainerSecurityContext
-	(*WindowsContainerConfig)(nil),            // 79: runtime.v1.WindowsContainerConfig
-	(*WindowsContainerResources)(nil),         // 80: runtime.v1.WindowsContainerResources
-	(*WindowsCpuGroupAffinity)(nil),           // 81: runtime.v1.WindowsCpuGroupAffinity
-	(*ContainerMetadata)(nil),                 // 82: runtime.v1.ContainerMetadata
-	(*Device)(nil),                            // 83: runtime.v1.Device
-	(*CDIDevice)(nil),                         // 84: runtime.v1.CDIDevice
-	(*ContainerConfig)(nil),                   // 85: runtime.v1.ContainerConfig
-	(*CreateContainerRequest)(nil),            // 86: runtime.v1.CreateContainerRequest
-	(*CreateContainerResponse)(nil),           // 87: runtime.v1.CreateContainerResponse
-	(*StartContainerRequest)(nil),             // 88: runtime.v1.StartContainerRequest
-	(*StartContainerResponse)(nil),            // 89: runtime.v1.StartContainerResponse
-	(*StopContainerRequest)(nil),              // 90: runtime.v1.StopContainerRequest
-	(*StopContainerResponse)(nil),             // 91: runtime.v1.StopContainerResponse
-	(*RemoveContainerRequest)(nil),            // 92: runtime.v1.RemoveContainerRequest
-	(*RemoveContainerResponse)(nil),           // 93: runtime.v1.RemoveContainerResponse
-	(*ContainerStateValue)(nil),               // 94: runtime.v1.ContainerStateValue
-	(*ContainerFilter)(nil),                   // 95: runtime.v1.ContainerFilter
-	(*ListContainersRequest)(nil),             // 96: runtime.v1.ListContainersRequest
-	(*Container)(nil),                         // 97: runtime.v1.Container
-	(*ListContainersResponse)(nil),            // 98: runtime.v1.ListContainersResponse
-	(*StreamContainersRequest)(nil),           // 99: runtime.v1.StreamContainersRequest
-	(*StreamContainersResponse)(nil),          // 100: runtime.v1.StreamContainersResponse
-	(*ContainerStatusRequest)(nil),            // 101: runtime.v1.ContainerStatusRequest
-	(*ContainerStatus)(nil),                   // 102: runtime.v1.ContainerStatus
-	(*ContainerStatusResponse)(nil),           // 103: runtime.v1.ContainerStatusResponse
-	(*ContainerResources)(nil),                // 104: runtime.v1.ContainerResources
-	(*ContainerUser)(nil),                     // 105: runtime.v1.ContainerUser
-	(*UpdateContainerResourcesRequest)(nil),   // 106: runtime.v1.UpdateContainerResourcesRequest
-	(*UpdateContainerResourcesResponse)(nil),  // 107: runtime.v1.UpdateContainerResourcesResponse
-	(*ExecSyncRequest)(nil),                   // 108: runtime.v1.ExecSyncRequest
-	(*ExecSyncResponse)(nil),                  // 109: runtime.v1.ExecSyncResponse
-	(*ExecRequest)(nil),                       // 110: runtime.v1.ExecRequest
-	(*ExecResponse)(nil),                      // 111: runtime.v1.ExecResponse
-	(*AttachRequest)(nil),                     // 112: runtime.v1.AttachRequest
-	(*AttachResponse)(nil),                    // 113: runtime.v1.AttachResponse
-	(*PortForwardRequest)(nil),                // 114: runtime.v1.PortForwardRequest
-	(*PortForwardResponse)(nil),               // 115: runtime.v1.PortForwardResponse
-	(*ImageFilter)(nil),                       // 116: runtime.v1.ImageFilter
-	(*ListImagesRequest)(nil),                 // 117: runtime.v1.ListImagesRequest
-	(*Image)(nil),                             // 118: runtime.v1.Image
-	(*ListImagesResponse)(nil),                // 119: runtime.v1.ListImagesResponse
-	(*StreamImagesRequest)(nil),               // 120: runtime.v1.StreamImagesRequest
-	(*StreamImagesResponse)(nil),              // 121: runtime.v1.StreamImagesResponse
-	(*ImageStatusRequest)(nil),                // 122: runtime.v1.ImageStatusRequest
-	(*ImageStatusResponse)(nil),               // 123: runtime.v1.ImageStatusResponse
-	(*AuthConfig)(nil),                        // 124: runtime.v1.AuthConfig
-	(*PullImageRequest)(nil),                  // 125: runtime.v1.PullImageRequest
-	(*PullImageResponse)(nil),                 // 126: runtime.v1.PullImageResponse
-	(*PullSecurityProfileRequest)(nil),        // 127: runtime.v1.PullSecurityProfileRequest
-	(*PullSecurityProfileResponse)(nil),       // 128: runtime.v1.PullSecurityProfileResponse
-	(*ListSecurityProfilesRequest)(nil),       // 129: runtime.v1.ListSecurityProfilesRequest
-	(*SecurityProfileInfo)(nil),               // 130: runtime.v1.SecurityProfileInfo
-	(*ListSecurityProfilesResponse)(nil),      // 131: runtime.v1.ListSecurityProfilesResponse
-	(*RemoveSecurityProfileRequest)(nil),      // 132: runtime.v1.RemoveSecurityProfileRequest
-	(*RemoveSecurityProfileResponse)(nil),     // 133: runtime.v1.RemoveSecurityProfileResponse
-	(*RemoveImageRequest)(nil),                // 134: runtime.v1.RemoveImageRequest
-	(*RemoveImageResponse)(nil),               // 135: runtime.v1.RemoveImageResponse
-	(*NetworkConfig)(nil),                     // 136: runtime.v1.NetworkConfig
-	(*RuntimeConfig)(nil),                     // 137: runtime.v1.RuntimeConfig
-	(*UpdateRuntimeConfigRequest)(nil),        // 138: runtime.v1.UpdateRuntimeConfigRequest
-	(*UpdateRuntimeConfigResponse)(nil),       // 139: runtime.v1.UpdateRuntimeConfigResponse
-	(*RuntimeCondition)(nil),                  // 140: runtime.v1.RuntimeCondition
-	(*RuntimeStatus)(nil),                     // 141: runtime.v1.RuntimeStatus
-	(*StatusRequest)(nil),                     // 142: runtime.v1.StatusRequest
-	(*RuntimeHandlerFeatures)(nil),            // 143: runtime.v1.RuntimeHandlerFeatures
-	(*RuntimeHandler)(nil),                    // 144: runtime.v1.RuntimeHandler
-	(*RuntimeFeatures)(nil),                   // 145: runtime.v1.RuntimeFeatures
-	(*StatusResponse)(nil),                    // 146: runtime.v1.StatusResponse
-	(*ImageFsInfoRequest)(nil),                // 147: runtime.v1.ImageFsInfoRequest
-	(*UInt64Value)(nil),                       // 148: runtime.v1.UInt64Value
-	(*FilesystemIdentifier)(nil),              // 149: runtime.v1.FilesystemIdentifier
-	(*FilesystemUsage)(nil),                   // 150: runtime.v1.FilesystemUsage
-	(*WindowsFilesystemUsage)(nil),            // 151: runtime.v1.WindowsFilesystemUsage
-	(*ImageFsInfoResponse)(nil),               // 152: runtime.v1.ImageFsInfoResponse
-	(*ContainerStatsRequest)(nil),             // 153: runtime.v1.ContainerStatsRequest
-	(*ContainerStatsResponse)(nil),            // 154: runtime.v1.ContainerStatsResponse
-	(*ListContainerStatsRequest)(nil),         // 155: runtime.v1.ListContainerStatsRequest
-	(*ContainerStatsFilter)(nil),              // 156: runtime.v1.ContainerStatsFilter
-	(*ListContainerStatsResponse)(nil),        // 157: runtime.v1.ListContainerStatsResponse
-	(*StreamContainerStatsRequest)(nil),       // 158: runtime.v1.StreamContainerStatsRequest
-	(*StreamContainerStatsResponse)(nil),      // 159: runtime.v1.StreamContainerStatsResponse
-	(*ContainerAttributes)(nil),               // 160: runtime.v1.ContainerAttributes
-	(*ContainerStats)(nil),                    // 161: runtime.v1.ContainerStats
-	(*WindowsContainerStats)(nil),             // 162: runtime.v1.WindowsContainerStats
-	(*PsiStats)(nil),                          // 163: runtime.v1.PsiStats
-	(*PsiData)(nil),                           // 164: runtime.v1.PsiData
-	(*CpuUsage)(nil),                          // 165: runtime.v1.CpuUsage
-	(*WindowsCpuUsage)(nil),                   // 166: runtime.v1.WindowsCpuUsage
-	(*MemoryUsage)(nil),                       // 167: runtime.v1.MemoryUsage
-	(*IoUsage)(nil),                           // 168: runtime.v1.IoUsage
-	(*SwapUsage)(nil),                         // 169: runtime.v1.SwapUsage
-	(*WindowsMemoryUsage)(nil),                // 170: runtime.v1.WindowsMemoryUsage
-	(*ReopenContainerLogRequest)(nil),         // 171: runtime.v1.ReopenContainerLogRequest
-	(*ReopenContainerLogResponse)(nil),        // 172: runtime.v1.ReopenContainerLogResponse
-	(*CheckpointContainerRequest)(nil),        // 173: runtime.v1.CheckpointContainerRequest
-	(*CheckpointContainerResponse)(nil),       // 174: runtime.v1.CheckpointContainerResponse
-	(*CheckpointPodRequest)(nil),              // 175: runtime.v1.CheckpointPodRequest
-	(*CheckpointPodResponse)(nil),             // 176: runtime.v1.CheckpointPodResponse
-	(*RestorePodRequest)(nil),                 // 177: runtime.v1.RestorePodRequest
-	(*RestoredContainer)(nil),                 // 178: runtime.v1.RestoredContainer
-	(*RestorePodResponse)(nil),                // 179: runtime.v1.RestorePodResponse
-	(*GetEventsRequest)(nil),                  // 180: runtime.v1.GetEventsRequest
-	(*ContainerEventResponse)(nil),            // 181: runtime.v1.ContainerEventResponse
-	(*ListMetricDescriptorsRequest)(nil),      // 182: runtime.v1.ListMetricDescriptorsRequest
-	(*ListMetricDescriptorsResponse)(nil),     // 183: runtime.v1.ListMetricDescriptorsResponse
-	(*MetricDescriptor)(nil),                  // 184: runtime.v1.MetricDescriptor
-	(*ListPodSandboxMetricsRequest)(nil),      // 185: runtime.v1.ListPodSandboxMetricsRequest
-	(*ListPodSandboxMetricsResponse)(nil),     // 186: runtime.v1.ListPodSandboxMetricsResponse
-	(*StreamPodSandboxMetricsRequest)(nil),    // 187: runtime.v1.StreamPodSandboxMetricsRequest
-	(*StreamPodSandboxMetricsResponse)(nil),   // 188: runtime.v1.StreamPodSandboxMetricsResponse
-	(*PodSandboxMetrics)(nil),                 // 189: runtime.v1.PodSandboxMetrics
-	(*ContainerMetrics)(nil),                  // 190: runtime.v1.ContainerMetrics
-	(*Metric)(nil),                            // 191: runtime.v1.Metric
-	(*RuntimeConfigRequest)(nil),              // 192: runtime.v1.RuntimeConfigRequest
-	(*RuntimeConfigResponse)(nil),             // 193: runtime.v1.RuntimeConfigResponse
-	(*LinuxRuntimeConfiguration)(nil),         // 194: runtime.v1.LinuxRuntimeConfiguration
-	(*UpdatePodSandboxResourcesRequest)(nil),  // 195: runtime.v1.UpdatePodSandboxResourcesRequest
-	(*UpdatePodSandboxResourcesResponse)(nil), // 196: runtime.v1.UpdatePodSandboxResourcesResponse
-	nil, // 197: runtime.v1.LinuxPodSandboxConfig.SysctlsEntry
-	nil, // 198: runtime.v1.PodSandboxConfig.LabelsEntry
-	nil, // 199: runtime.v1.PodSandboxConfig.AnnotationsEntry
-	nil, // 200: runtime.v1.PodSandboxStatus.LabelsEntry
-	nil, // 201: runtime.v1.PodSandboxStatus.AnnotationsEntry
-	nil, // 202: runtime.v1.PodSandboxStatusResponse.InfoEntry
-	nil, // 203: runtime.v1.PodSandboxFilter.LabelSelectorEntry
-	nil, // 204: runtime.v1.PodSandbox.LabelsEntry
-	nil, // 205: runtime.v1.PodSandbox.AnnotationsEntry
-	nil, // 206: runtime.v1.PodSandboxStatsFilter.LabelSelectorEntry
-	nil, // 207: runtime.v1.PodSandboxAttributes.LabelsEntry
-	nil, // 208: runtime.v1.PodSandboxAttributes.AnnotationsEntry
-	nil, // 209: runtime.v1.ImageSpec.AnnotationsEntry
-	nil, // 210: runtime.v1.LinuxContainerResources.UnifiedEntry
-	nil, // 211: runtime.v1.ContainerConfig.LabelsEntry
-	nil, // 212: runtime.v1.ContainerConfig.AnnotationsEntry
-	nil, // 213: runtime.v1.ContainerFilter.LabelSelectorEntry
-	nil, // 214: runtime.v1.Container.LabelsEntry
-	nil, // 215: runtime.v1.Container.AnnotationsEntry
-	nil, // 216: runtime.v1.ContainerStatus.LabelsEntry
-	nil, // 217: runtime.v1.ContainerStatus.AnnotationsEntry
-	nil, // 218: runtime.v1.ContainerStatusResponse.InfoEntry
-	nil, // 219: runtime.v1.UpdateContainerResourcesRequest.AnnotationsEntry
-	nil, // 220: runtime.v1.ImageStatusResponse.InfoEntry
-	nil, // 221: runtime.v1.StatusResponse.InfoEntry
-	nil, // 222: runtime.v1.ContainerStatsFilter.LabelSelectorEntry
-	nil, // 223: runtime.v1.ContainerAttributes.LabelsEntry
-	nil, // 224: runtime.v1.ContainerAttributes.AnnotationsEntry
-	nil, // 225: runtime.v1.CheckpointPodRequest.OptionsEntry
-	nil, // 226: runtime.v1.RestorePodRequest.OptionsEntry
+	(PodNetwork)(0),                           // 4: runtime.v1.PodNetwork
+	(PodSandboxState)(0),                      // 5: runtime.v1.PodSandboxState
+	(CgroupMountMode)(0),                      // 6: runtime.v1.CgroupMountMode
+	(Signal)(0),                               // 7: runtime.v1.Signal
+	(ContainerState)(0),                       // 8: runtime.v1.ContainerState
+	(SecurityProfileKind)(0),                  // 9: runtime.v1.SecurityProfileKind
+	(ContainerEventType)(0),                   // 10: runtime.v1.ContainerEventType
+	(MetricType)(0),                           // 11: runtime.v1.MetricType
+	(CgroupDriver)(0),                         // 12: runtime.v1.CgroupDriver
+	(SecurityProfile_ProfileType)(0),          // 13: runtime.v1.SecurityProfile.ProfileType
+	(SecurityProfileBase_BaseType)(0),         // 14: runtime.v1.SecurityProfileBase.BaseType
+	(*VersionRequest)(nil),                    // 15: runtime.v1.VersionRequest
+	(*VersionResponse)(nil),                   // 16: runtime.v1.VersionResponse
+	(*DNSConfig)(nil),                         // 17: runtime.v1.DNSConfig
+	(*PortMapping)(nil),                       // 18: runtime.v1.PortMapping
+	(*Mount)(nil),                             // 19: runtime.v1.Mount
+	(*IDMapping)(nil),                         // 20: runtime.v1.IDMapping
+	(*UserNamespace)(nil),                     // 21: runtime.v1.UserNamespace
+	(*NamespaceOption)(nil),                   // 22: runtime.v1.NamespaceOption
+	(*Int64Value)(nil),                        // 23: runtime.v1.Int64Value
+	(*LinuxSandboxSecurityContext)(nil),       // 24: runtime.v1.LinuxSandboxSecurityContext
+	(*SecurityProfile)(nil),                   // 25: runtime.v1.SecurityProfile
+	(*SecurityProfileBase)(nil),               // 26: runtime.v1.SecurityProfileBase
+	(*LinuxPodSandboxConfig)(nil),             // 27: runtime.v1.LinuxPodSandboxConfig
+	(*PodSandboxMetadata)(nil),                // 28: runtime.v1.PodSandboxMetadata
+	(*PodSandboxConfig)(nil),                  // 29: runtime.v1.PodSandboxConfig
+	(*RunPodSandboxRequest)(nil),              // 30: runtime.v1.RunPodSandboxRequest
+	(*RunPodSandboxResponse)(nil),             // 31: runtime.v1.RunPodSandboxResponse
+	(*StopPodSandboxRequest)(nil),             // 32: runtime.v1.StopPodSandboxRequest
+	(*StopPodSandboxResponse)(nil),            // 33: runtime.v1.StopPodSandboxResponse
+	(*RemovePodSandboxRequest)(nil),           // 34: runtime.v1.RemovePodSandboxRequest
+	(*RemovePodSandboxResponse)(nil),          // 35: runtime.v1.RemovePodSandboxResponse
+	(*PodSandboxStatusRequest)(nil),           // 36: runtime.v1.PodSandboxStatusRequest
+	(*PodIP)(nil),                             // 37: runtime.v1.PodIP
+	(*PodSandboxNetworkStatus)(nil),           // 38: runtime.v1.PodSandboxNetworkStatus
+	(*Namespace)(nil),                         // 39: runtime.v1.Namespace
+	(*LinuxPodSandboxStatus)(nil),             // 40: runtime.v1.LinuxPodSandboxStatus
+	(*PodSandboxStatus)(nil),                  // 41: runtime.v1.PodSandboxStatus
+	(*PodSandboxStatusResponse)(nil),          // 42: runtime.v1.PodSandboxStatusResponse
+	(*PodSandboxStateValue)(nil),              // 43: runtime.v1.PodSandboxStateValue
+	(*PodSandboxFilter)(nil),                  // 44: runtime.v1.PodSandboxFilter
+	(*ListPodSandboxRequest)(nil),             // 45: runtime.v1.ListPodSandboxRequest
+	(*PodSandbox)(nil),                        // 46: runtime.v1.PodSandbox
+	(*ListPodSandboxResponse)(nil),            // 47: runtime.v1.ListPodSandboxResponse
+	(*StreamPodSandboxesRequest)(nil),         // 48: runtime.v1.StreamPodSandboxesRequest
+	(*StreamPodSandboxesResponse)(nil),        // 49: runtime.v1.StreamPodSandboxesResponse
+	(*PodSandboxStatsRequest)(nil),            // 50: runtime.v1.PodSandboxStatsRequest
+	(*PodSandboxStatsResponse)(nil),           // 51: runtime.v1.PodSandboxStatsResponse
+	(*PodSandboxStatsFilter)(nil),             // 52: runtime.v1.PodSandboxStatsFilter
+	(*ListPodSandboxStatsRequest)(nil),        // 53: runtime.v1.ListPodSandboxStatsRequest
+	(*ListPodSandboxStatsResponse)(nil),       // 54: runtime.v1.ListPodSandboxStatsResponse
+	(*StreamPodSandboxStatsRequest)(nil),      // 55: runtime.v1.StreamPodSandboxStatsRequest
+	(*StreamPodSandboxStatsResponse)(nil),     // 56: runtime.v1.StreamPodSandboxStatsResponse
+	(*PodSandboxAttributes)(nil),              // 57: runtime.v1.PodSandboxAttributes
+	(*PodSandboxStats)(nil),                   // 58: runtime.v1.PodSandboxStats
+	(*LinuxPodSandboxStats)(nil),              // 59: runtime.v1.LinuxPodSandboxStats
+	(*WindowsPodSandboxStats)(nil),            // 60: runtime.v1.WindowsPodSandboxStats
+	(*NetworkUsage)(nil),                      // 61: runtime.v1.NetworkUsage
+	(*WindowsNetworkUsage)(nil),               // 62: runtime.v1.WindowsNetworkUsage
+	(*NetworkInterfaceUsage)(nil),             // 63: runtime.v1.NetworkInterfaceUsage
+	(*WindowsNetworkInterfaceUsage)(nil),      // 64: runtime.v1.WindowsNetworkInterfaceUsage
+	(*ProcessUsage)(nil),                      // 65: runtime.v1.ProcessUsage
+	(*WindowsProcessUsage)(nil),               // 66: runtime.v1.WindowsProcessUsage
+	(*ImageSpec)(nil),                         // 67: runtime.v1.ImageSpec
+	(*KeyValue)(nil),                          // 68: runtime.v1.KeyValue
+	(*LinuxContainerResources)(nil),           // 69: runtime.v1.LinuxContainerResources
+	(*HugepageLimit)(nil),                     // 70: runtime.v1.HugepageLimit
+	(*SELinuxOption)(nil),                     // 71: runtime.v1.SELinuxOption
+	(*Capability)(nil),                        // 72: runtime.v1.Capability
+	(*LinuxContainerSecurityContext)(nil),     // 73: runtime.v1.LinuxContainerSecurityContext
+	(*LinuxContainerConfig)(nil),              // 74: runtime.v1.LinuxContainerConfig
+	(*LinuxContainerUser)(nil),                // 75: runtime.v1.LinuxContainerUser
+	(*WindowsNamespaceOption)(nil),            // 76: runtime.v1.WindowsNamespaceOption
+	(*WindowsSandboxSecurityContext)(nil),     // 77: runtime.v1.WindowsSandboxSecurityContext
+	(*WindowsPodSandboxConfig)(nil),           // 78: runtime.v1.WindowsPodSandboxConfig
+	(*WindowsContainerSecurityContext)(nil),   // 79: runtime.v1.WindowsContainerSecurityContext
+	(*WindowsContainerConfig)(nil),            // 80: runtime.v1.WindowsContainerConfig
+	(*WindowsContainerResources)(nil),         // 81: runtime.v1.WindowsContainerResources
+	(*WindowsCpuGroupAffinity)(nil),           // 82: runtime.v1.WindowsCpuGroupAffinity
+	(*ContainerMetadata)(nil),                 // 83: runtime.v1.ContainerMetadata
+	(*Device)(nil),                            // 84: runtime.v1.Device
+	(*CDIDevice)(nil),                         // 85: runtime.v1.CDIDevice
+	(*ContainerConfig)(nil),                   // 86: runtime.v1.ContainerConfig
+	(*CreateContainerRequest)(nil),            // 87: runtime.v1.CreateContainerRequest
+	(*CreateContainerResponse)(nil),           // 88: runtime.v1.CreateContainerResponse
+	(*StartContainerRequest)(nil),             // 89: runtime.v1.StartContainerRequest
+	(*StartContainerResponse)(nil),            // 90: runtime.v1.StartContainerResponse
+	(*StopContainerRequest)(nil),              // 91: runtime.v1.StopContainerRequest
+	(*StopContainerResponse)(nil),             // 92: runtime.v1.StopContainerResponse
+	(*RemoveContainerRequest)(nil),            // 93: runtime.v1.RemoveContainerRequest
+	(*RemoveContainerResponse)(nil),           // 94: runtime.v1.RemoveContainerResponse
+	(*ContainerStateValue)(nil),               // 95: runtime.v1.ContainerStateValue
+	(*ContainerFilter)(nil),                   // 96: runtime.v1.ContainerFilter
+	(*ListContainersRequest)(nil),             // 97: runtime.v1.ListContainersRequest
+	(*Container)(nil),                         // 98: runtime.v1.Container
+	(*ListContainersResponse)(nil),            // 99: runtime.v1.ListContainersResponse
+	(*StreamContainersRequest)(nil),           // 100: runtime.v1.StreamContainersRequest
+	(*StreamContainersResponse)(nil),          // 101: runtime.v1.StreamContainersResponse
+	(*ContainerStatusRequest)(nil),            // 102: runtime.v1.ContainerStatusRequest
+	(*ContainerStatus)(nil),                   // 103: runtime.v1.ContainerStatus
+	(*ContainerStatusResponse)(nil),           // 104: runtime.v1.ContainerStatusResponse
+	(*ContainerResources)(nil),                // 105: runtime.v1.ContainerResources
+	(*ContainerUser)(nil),                     // 106: runtime.v1.ContainerUser
+	(*UpdateContainerResourcesRequest)(nil),   // 107: runtime.v1.UpdateContainerResourcesRequest
+	(*UpdateContainerResourcesResponse)(nil),  // 108: runtime.v1.UpdateContainerResourcesResponse
+	(*ExecSyncRequest)(nil),                   // 109: runtime.v1.ExecSyncRequest
+	(*ExecSyncResponse)(nil),                  // 110: runtime.v1.ExecSyncResponse
+	(*ExecRequest)(nil),                       // 111: runtime.v1.ExecRequest
+	(*ExecResponse)(nil),                      // 112: runtime.v1.ExecResponse
+	(*AttachRequest)(nil),                     // 113: runtime.v1.AttachRequest
+	(*AttachResponse)(nil),                    // 114: runtime.v1.AttachResponse
+	(*PortForwardRequest)(nil),                // 115: runtime.v1.PortForwardRequest
+	(*PortForwardResponse)(nil),               // 116: runtime.v1.PortForwardResponse
+	(*ImageFilter)(nil),                       // 117: runtime.v1.ImageFilter
+	(*ListImagesRequest)(nil),                 // 118: runtime.v1.ListImagesRequest
+	(*Image)(nil),                             // 119: runtime.v1.Image
+	(*ListImagesResponse)(nil),                // 120: runtime.v1.ListImagesResponse
+	(*StreamImagesRequest)(nil),               // 121: runtime.v1.StreamImagesRequest
+	(*StreamImagesResponse)(nil),              // 122: runtime.v1.StreamImagesResponse
+	(*ImageStatusRequest)(nil),                // 123: runtime.v1.ImageStatusRequest
+	(*ImageStatusResponse)(nil),               // 124: runtime.v1.ImageStatusResponse
+	(*AuthConfig)(nil),                        // 125: runtime.v1.AuthConfig
+	(*PullImageRequest)(nil),                  // 126: runtime.v1.PullImageRequest
+	(*PullImageResponse)(nil),                 // 127: runtime.v1.PullImageResponse
+	(*PullSecurityProfileRequest)(nil),        // 128: runtime.v1.PullSecurityProfileRequest
+	(*PullSecurityProfileResponse)(nil),       // 129: runtime.v1.PullSecurityProfileResponse
+	(*ListSecurityProfilesRequest)(nil),       // 130: runtime.v1.ListSecurityProfilesRequest
+	(*SecurityProfileInfo)(nil),               // 131: runtime.v1.SecurityProfileInfo
+	(*ListSecurityProfilesResponse)(nil),      // 132: runtime.v1.ListSecurityProfilesResponse
+	(*RemoveSecurityProfileRequest)(nil),      // 133: runtime.v1.RemoveSecurityProfileRequest
+	(*RemoveSecurityProfileResponse)(nil),     // 134: runtime.v1.RemoveSecurityProfileResponse
+	(*RemoveImageRequest)(nil),                // 135: runtime.v1.RemoveImageRequest
+	(*RemoveImageResponse)(nil),               // 136: runtime.v1.RemoveImageResponse
+	(*NetworkConfig)(nil),                     // 137: runtime.v1.NetworkConfig
+	(*RuntimeConfig)(nil),                     // 138: runtime.v1.RuntimeConfig
+	(*UpdateRuntimeConfigRequest)(nil),        // 139: runtime.v1.UpdateRuntimeConfigRequest
+	(*UpdateRuntimeConfigResponse)(nil),       // 140: runtime.v1.UpdateRuntimeConfigResponse
+	(*RuntimeCondition)(nil),                  // 141: runtime.v1.RuntimeCondition
+	(*RuntimeStatus)(nil),                     // 142: runtime.v1.RuntimeStatus
+	(*StatusRequest)(nil),                     // 143: runtime.v1.StatusRequest
+	(*RuntimeHandlerFeatures)(nil),            // 144: runtime.v1.RuntimeHandlerFeatures
+	(*RuntimeHandler)(nil),                    // 145: runtime.v1.RuntimeHandler
+	(*RuntimeFeatures)(nil),                   // 146: runtime.v1.RuntimeFeatures
+	(*StatusResponse)(nil),                    // 147: runtime.v1.StatusResponse
+	(*ImageFsInfoRequest)(nil),                // 148: runtime.v1.ImageFsInfoRequest
+	(*UInt64Value)(nil),                       // 149: runtime.v1.UInt64Value
+	(*FilesystemIdentifier)(nil),              // 150: runtime.v1.FilesystemIdentifier
+	(*FilesystemUsage)(nil),                   // 151: runtime.v1.FilesystemUsage
+	(*WindowsFilesystemUsage)(nil),            // 152: runtime.v1.WindowsFilesystemUsage
+	(*ImageFsInfoResponse)(nil),               // 153: runtime.v1.ImageFsInfoResponse
+	(*ContainerStatsRequest)(nil),             // 154: runtime.v1.ContainerStatsRequest
+	(*ContainerStatsResponse)(nil),            // 155: runtime.v1.ContainerStatsResponse
+	(*ListContainerStatsRequest)(nil),         // 156: runtime.v1.ListContainerStatsRequest
+	(*ContainerStatsFilter)(nil),              // 157: runtime.v1.ContainerStatsFilter
+	(*ListContainerStatsResponse)(nil),        // 158: runtime.v1.ListContainerStatsResponse
+	(*StreamContainerStatsRequest)(nil),       // 159: runtime.v1.StreamContainerStatsRequest
+	(*StreamContainerStatsResponse)(nil),      // 160: runtime.v1.StreamContainerStatsResponse
+	(*ContainerAttributes)(nil),               // 161: runtime.v1.ContainerAttributes
+	(*ContainerStats)(nil),                    // 162: runtime.v1.ContainerStats
+	(*WindowsContainerStats)(nil),             // 163: runtime.v1.WindowsContainerStats
+	(*PsiStats)(nil),                          // 164: runtime.v1.PsiStats
+	(*PsiData)(nil),                           // 165: runtime.v1.PsiData
+	(*CpuUsage)(nil),                          // 166: runtime.v1.CpuUsage
+	(*WindowsCpuUsage)(nil),                   // 167: runtime.v1.WindowsCpuUsage
+	(*MemoryUsage)(nil),                       // 168: runtime.v1.MemoryUsage
+	(*IoUsage)(nil),                           // 169: runtime.v1.IoUsage
+	(*SwapUsage)(nil),                         // 170: runtime.v1.SwapUsage
+	(*WindowsMemoryUsage)(nil),                // 171: runtime.v1.WindowsMemoryUsage
+	(*ReopenContainerLogRequest)(nil),         // 172: runtime.v1.ReopenContainerLogRequest
+	(*ReopenContainerLogResponse)(nil),        // 173: runtime.v1.ReopenContainerLogResponse
+	(*CheckpointContainerRequest)(nil),        // 174: runtime.v1.CheckpointContainerRequest
+	(*CheckpointContainerResponse)(nil),       // 175: runtime.v1.CheckpointContainerResponse
+	(*CheckpointPodRequest)(nil),              // 176: runtime.v1.CheckpointPodRequest
+	(*CheckpointPodResponse)(nil),             // 177: runtime.v1.CheckpointPodResponse
+	(*RestorePodRequest)(nil),                 // 178: runtime.v1.RestorePodRequest
+	(*RestoredContainer)(nil),                 // 179: runtime.v1.RestoredContainer
+	(*RestorePodResponse)(nil),                // 180: runtime.v1.RestorePodResponse
+	(*GetEventsRequest)(nil),                  // 181: runtime.v1.GetEventsRequest
+	(*ContainerEventResponse)(nil),            // 182: runtime.v1.ContainerEventResponse
+	(*ListMetricDescriptorsRequest)(nil),      // 183: runtime.v1.ListMetricDescriptorsRequest
+	(*ListMetricDescriptorsResponse)(nil),     // 184: runtime.v1.ListMetricDescriptorsResponse
+	(*MetricDescriptor)(nil),                  // 185: runtime.v1.MetricDescriptor
+	(*ListPodSandboxMetricsRequest)(nil),      // 186: runtime.v1.ListPodSandboxMetricsRequest
+	(*ListPodSandboxMetricsResponse)(nil),     // 187: runtime.v1.ListPodSandboxMetricsResponse
+	(*StreamPodSandboxMetricsRequest)(nil),    // 188: runtime.v1.StreamPodSandboxMetricsRequest
+	(*StreamPodSandboxMetricsResponse)(nil),   // 189: runtime.v1.StreamPodSandboxMetricsResponse
+	(*PodSandboxMetrics)(nil),                 // 190: runtime.v1.PodSandboxMetrics
+	(*ContainerMetrics)(nil),                  // 191: runtime.v1.ContainerMetrics
+	(*Metric)(nil),                            // 192: runtime.v1.Metric
+	(*RuntimeConfigRequest)(nil),              // 193: runtime.v1.RuntimeConfigRequest
+	(*RuntimeConfigResponse)(nil),             // 194: runtime.v1.RuntimeConfigResponse
+	(*LinuxRuntimeConfiguration)(nil),         // 195: runtime.v1.LinuxRuntimeConfiguration
+	(*UpdatePodSandboxResourcesRequest)(nil),  // 196: runtime.v1.UpdatePodSandboxResourcesRequest
+	(*UpdatePodSandboxResourcesResponse)(nil), // 197: runtime.v1.UpdatePodSandboxResourcesResponse
+	nil, // 198: runtime.v1.LinuxPodSandboxConfig.SysctlsEntry
+	nil, // 199: runtime.v1.PodSandboxConfig.LabelsEntry
+	nil, // 200: runtime.v1.PodSandboxConfig.AnnotationsEntry
+	nil, // 201: runtime.v1.PodSandboxStatus.LabelsEntry
+	nil, // 202: runtime.v1.PodSandboxStatus.AnnotationsEntry
+	nil, // 203: runtime.v1.PodSandboxStatusResponse.InfoEntry
+	nil, // 204: runtime.v1.PodSandboxFilter.LabelSelectorEntry
+	nil, // 205: runtime.v1.PodSandbox.LabelsEntry
+	nil, // 206: runtime.v1.PodSandbox.AnnotationsEntry
+	nil, // 207: runtime.v1.PodSandboxStatsFilter.LabelSelectorEntry
+	nil, // 208: runtime.v1.PodSandboxAttributes.LabelsEntry
+	nil, // 209: runtime.v1.PodSandboxAttributes.AnnotationsEntry
+	nil, // 210: runtime.v1.ImageSpec.AnnotationsEntry
+	nil, // 211: runtime.v1.LinuxContainerResources.UnifiedEntry
+	nil, // 212: runtime.v1.ContainerConfig.LabelsEntry
+	nil, // 213: runtime.v1.ContainerConfig.AnnotationsEntry
+	nil, // 214: runtime.v1.ContainerFilter.LabelSelectorEntry
+	nil, // 215: runtime.v1.Container.LabelsEntry
+	nil, // 216: runtime.v1.Container.AnnotationsEntry
+	nil, // 217: runtime.v1.ContainerStatus.LabelsEntry
+	nil, // 218: runtime.v1.ContainerStatus.AnnotationsEntry
+	nil, // 219: runtime.v1.ContainerStatusResponse.InfoEntry
+	nil, // 220: runtime.v1.UpdateContainerResourcesRequest.AnnotationsEntry
+	nil, // 221: runtime.v1.ImageStatusResponse.InfoEntry
+	nil, // 222: runtime.v1.StatusResponse.InfoEntry
+	nil, // 223: runtime.v1.ContainerStatsFilter.LabelSelectorEntry
+	nil, // 224: runtime.v1.ContainerAttributes.LabelsEntry
+	nil, // 225: runtime.v1.ContainerAttributes.AnnotationsEntry
+	nil, // 226: runtime.v1.CheckpointPodRequest.OptionsEntry
+	nil, // 227: runtime.v1.RestorePodRequest.OptionsEntry
 }
 var file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_depIdxs = []int32{
 	0,   // 0: runtime.v1.PortMapping.protocol:type_name -> runtime.v1.Protocol
 	1,   // 1: runtime.v1.Mount.propagation:type_name -> runtime.v1.MountPropagation
-	19,  // 2: runtime.v1.Mount.uidMappings:type_name -> runtime.v1.IDMapping
-	19,  // 3: runtime.v1.Mount.gidMappings:type_name -> runtime.v1.IDMapping
-	66,  // 4: runtime.v1.Mount.image:type_name -> runtime.v1.ImageSpec
+	20,  // 2: runtime.v1.Mount.uidMappings:type_name -> runtime.v1.IDMapping
+	20,  // 3: runtime.v1.Mount.gidMappings:type_name -> runtime.v1.IDMapping
+	67,  // 4: runtime.v1.Mount.image:type_name -> runtime.v1.ImageSpec
 	2,   // 5: runtime.v1.UserNamespace.mode:type_name -> runtime.v1.NamespaceMode
-	19,  // 6: runtime.v1.UserNamespace.uids:type_name -> runtime.v1.IDMapping
-	19,  // 7: runtime.v1.UserNamespace.gids:type_name -> runtime.v1.IDMapping
+	20,  // 6: runtime.v1.UserNamespace.uids:type_name -> runtime.v1.IDMapping
+	20,  // 7: runtime.v1.UserNamespace.gids:type_name -> runtime.v1.IDMapping
 	2,   // 8: runtime.v1.NamespaceOption.network:type_name -> runtime.v1.NamespaceMode
 	2,   // 9: runtime.v1.NamespaceOption.pid:type_name -> runtime.v1.NamespaceMode
 	2,   // 10: runtime.v1.NamespaceOption.ipc:type_name -> runtime.v1.NamespaceMode
-	20,  // 11: runtime.v1.NamespaceOption.userns_options:type_name -> runtime.v1.UserNamespace
-	21,  // 12: runtime.v1.LinuxSandboxSecurityContext.namespace_options:type_name -> runtime.v1.NamespaceOption
-	70,  // 13: runtime.v1.LinuxSandboxSecurityContext.selinux_options:type_name -> runtime.v1.SELinuxOption
-	22,  // 14: runtime.v1.LinuxSandboxSecurityContext.run_as_user:type_name -> runtime.v1.Int64Value
-	22,  // 15: runtime.v1.LinuxSandboxSecurityContext.run_as_group:type_name -> runtime.v1.Int64Value
+	21,  // 11: runtime.v1.NamespaceOption.userns_options:type_name -> runtime.v1.UserNamespace
+	22,  // 12: runtime.v1.LinuxSandboxSecurityContext.namespace_options:type_name -> runtime.v1.NamespaceOption
+	71,  // 13: runtime.v1.LinuxSandboxSecurityContext.selinux_options:type_name -> runtime.v1.SELinuxOption
+	23,  // 14: runtime.v1.LinuxSandboxSecurityContext.run_as_user:type_name -> runtime.v1.Int64Value
+	23,  // 15: runtime.v1.LinuxSandboxSecurityContext.run_as_group:type_name -> runtime.v1.Int64Value
 	3,   // 16: runtime.v1.LinuxSandboxSecurityContext.supplemental_groups_policy:type_name -> runtime.v1.SupplementalGroupsPolicy
-	24,  // 17: runtime.v1.LinuxSandboxSecurityContext.seccomp:type_name -> runtime.v1.SecurityProfile
-	24,  // 18: runtime.v1.LinuxSandboxSecurityContext.apparmor:type_name -> runtime.v1.SecurityProfile
-	12,  // 19: runtime.v1.SecurityProfile.profile_type:type_name -> runtime.v1.SecurityProfile.ProfileType
-	25,  // 20: runtime.v1.SecurityProfile.base_profile:type_name -> runtime.v1.SecurityProfileBase
-	13,  // 21: runtime.v1.SecurityProfileBase.type:type_name -> runtime.v1.SecurityProfileBase.BaseType
-	23,  // 22: runtime.v1.LinuxPodSandboxConfig.security_context:type_name -> runtime.v1.LinuxSandboxSecurityContext
-	197, // 23: runtime.v1.LinuxPodSandboxConfig.sysctls:type_name -> runtime.v1.LinuxPodSandboxConfig.SysctlsEntry
-	68,  // 24: runtime.v1.LinuxPodSandboxConfig.overhead:type_name -> runtime.v1.LinuxContainerResources
-	68,  // 25: runtime.v1.LinuxPodSandboxConfig.resources:type_name -> runtime.v1.LinuxContainerResources
-	27,  // 26: runtime.v1.PodSandboxConfig.metadata:type_name -> runtime.v1.PodSandboxMetadata
-	16,  // 27: runtime.v1.PodSandboxConfig.dns_config:type_name -> runtime.v1.DNSConfig
-	17,  // 28: runtime.v1.PodSandboxConfig.port_mappings:type_name -> runtime.v1.PortMapping
-	198, // 29: runtime.v1.PodSandboxConfig.labels:type_name -> runtime.v1.PodSandboxConfig.LabelsEntry
-	199, // 30: runtime.v1.PodSandboxConfig.annotations:type_name -> runtime.v1.PodSandboxConfig.AnnotationsEntry
-	26,  // 31: runtime.v1.PodSandboxConfig.linux:type_name -> runtime.v1.LinuxPodSandboxConfig
-	77,  // 32: runtime.v1.PodSandboxConfig.windows:type_name -> runtime.v1.WindowsPodSandboxConfig
-	28,  // 33: runtime.v1.RunPodSandboxRequest.config:type_name -> runtime.v1.PodSandboxConfig
-	36,  // 34: runtime.v1.PodSandboxNetworkStatus.additional_ips:type_name -> runtime.v1.PodIP
-	21,  // 35: runtime.v1.Namespace.options:type_name -> runtime.v1.NamespaceOption
-	38,  // 36: runtime.v1.LinuxPodSandboxStatus.namespaces:type_name -> runtime.v1.Namespace
-	27,  // 37: runtime.v1.PodSandboxStatus.metadata:type_name -> runtime.v1.PodSandboxMetadata
-	4,   // 38: runtime.v1.PodSandboxStatus.state:type_name -> runtime.v1.PodSandboxState
-	37,  // 39: runtime.v1.PodSandboxStatus.network:type_name -> runtime.v1.PodSandboxNetworkStatus
-	39,  // 40: runtime.v1.PodSandboxStatus.linux:type_name -> runtime.v1.LinuxPodSandboxStatus
-	200, // 41: runtime.v1.PodSandboxStatus.labels:type_name -> runtime.v1.PodSandboxStatus.LabelsEntry
-	201, // 42: runtime.v1.PodSandboxStatus.annotations:type_name -> runtime.v1.PodSandboxStatus.AnnotationsEntry
-	40,  // 43: runtime.v1.PodSandboxStatusResponse.status:type_name -> runtime.v1.PodSandboxStatus
-	202, // 44: runtime.v1.PodSandboxStatusResponse.info:type_name -> runtime.v1.PodSandboxStatusResponse.InfoEntry
-	102, // 45: runtime.v1.PodSandboxStatusResponse.containers_statuses:type_name -> runtime.v1.ContainerStatus
-	4,   // 46: runtime.v1.PodSandboxStateValue.state:type_name -> runtime.v1.PodSandboxState
-	42,  // 47: runtime.v1.PodSandboxFilter.state:type_name -> runtime.v1.PodSandboxStateValue
-	203, // 48: runtime.v1.PodSandboxFilter.label_selector:type_name -> runtime.v1.PodSandboxFilter.LabelSelectorEntry
-	43,  // 49: runtime.v1.ListPodSandboxRequest.filter:type_name -> runtime.v1.PodSandboxFilter
-	27,  // 50: runtime.v1.PodSandbox.metadata:type_name -> runtime.v1.PodSandboxMetadata
-	4,   // 51: runtime.v1.PodSandbox.state:type_name -> runtime.v1.PodSandboxState
-	204, // 52: runtime.v1.PodSandbox.labels:type_name -> runtime.v1.PodSandbox.LabelsEntry
-	205, // 53: runtime.v1.PodSandbox.annotations:type_name -> runtime.v1.PodSandbox.AnnotationsEntry
-	45,  // 54: runtime.v1.ListPodSandboxResponse.items:type_name -> runtime.v1.PodSandbox
-	43,  // 55: runtime.v1.StreamPodSandboxesRequest.filter:type_name -> runtime.v1.PodSandboxFilter
-	45,  // 56: runtime.v1.StreamPodSandboxesResponse.pod_sandboxes:type_name -> runtime.v1.PodSandbox
-	57,  // 57: runtime.v1.PodSandboxStatsResponse.stats:type_name -> runtime.v1.PodSandboxStats
-	206, // 58: runtime.v1.PodSandboxStatsFilter.label_selector:type_name -> runtime.v1.PodSandboxStatsFilter.LabelSelectorEntry
-	51,  // 59: runtime.v1.ListPodSandboxStatsRequest.filter:type_name -> runtime.v1.PodSandboxStatsFilter
-	57,  // 60: runtime.v1.ListPodSandboxStatsResponse.stats:type_name -> runtime.v1.PodSandboxStats
-	51,  // 61: runtime.v1.StreamPodSandboxStatsRequest.filter:type_name -> runtime.v1.PodSandboxStatsFilter
-	57,  // 62: runtime.v1.StreamPodSandboxStatsResponse.pod_sandbox_stats:type_name -> runtime.v1.PodSandboxStats
-	27,  // 63: runtime.v1.PodSandboxAttributes.metadata:type_name -> runtime.v1.PodSandboxMetadata
-	207, // 64: runtime.v1.PodSandboxAttributes.labels:type_name -> runtime.v1.PodSandboxAttributes.LabelsEntry
-	208, // 65: runtime.v1.PodSandboxAttributes.annotations:type_name -> runtime.v1.PodSandboxAttributes.AnnotationsEntry
-	56,  // 66: runtime.v1.PodSandboxStats.attributes:type_name -> runtime.v1.PodSandboxAttributes
-	58,  // 67: runtime.v1.PodSandboxStats.linux:type_name -> runtime.v1.LinuxPodSandboxStats
-	59,  // 68: runtime.v1.PodSandboxStats.windows:type_name -> runtime.v1.WindowsPodSandboxStats
-	165, // 69: runtime.v1.LinuxPodSandboxStats.cpu:type_name -> runtime.v1.CpuUsage
-	167, // 70: runtime.v1.LinuxPodSandboxStats.memory:type_name -> runtime.v1.MemoryUsage
-	60,  // 71: runtime.v1.LinuxPodSandboxStats.network:type_name -> runtime.v1.NetworkUsage
-	64,  // 72: runtime.v1.LinuxPodSandboxStats.process:type_name -> runtime.v1.ProcessUsage
-	161, // 73: runtime.v1.LinuxPodSandboxStats.containers:type_name -> runtime.v1.ContainerStats
-	168, // 74: runtime.v1.LinuxPodSandboxStats.io:type_name -> runtime.v1.IoUsage
-	166, // 75: runtime.v1.WindowsPodSandboxStats.cpu:type_name -> runtime.v1.WindowsCpuUsage
-	170, // 76: runtime.v1.WindowsPodSandboxStats.memory:type_name -> runtime.v1.WindowsMemoryUsage
-	61,  // 77: runtime.v1.WindowsPodSandboxStats.network:type_name -> runtime.v1.WindowsNetworkUsage
-	65,  // 78: runtime.v1.WindowsPodSandboxStats.process:type_name -> runtime.v1.WindowsProcessUsage
-	162, // 79: runtime.v1.WindowsPodSandboxStats.containers:type_name -> runtime.v1.WindowsContainerStats
-	62,  // 80: runtime.v1.NetworkUsage.default_interface:type_name -> runtime.v1.NetworkInterfaceUsage
-	62,  // 81: runtime.v1.NetworkUsage.interfaces:type_name -> runtime.v1.NetworkInterfaceUsage
-	63,  // 82: runtime.v1.WindowsNetworkUsage.default_interface:type_name -> runtime.v1.WindowsNetworkInterfaceUsage
-	63,  // 83: runtime.v1.WindowsNetworkUsage.interfaces:type_name -> runtime.v1.WindowsNetworkInterfaceUsage
-	148, // 84: runtime.v1.NetworkInterfaceUsage.rx_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 85: runtime.v1.NetworkInterfaceUsage.rx_errors:type_name -> runtime.v1.UInt64Value
-	148, // 86: runtime.v1.NetworkInterfaceUsage.tx_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 87: runtime.v1.NetworkInterfaceUsage.tx_errors:type_name -> runtime.v1.UInt64Value
-	148, // 88: runtime.v1.WindowsNetworkInterfaceUsage.rx_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 89: runtime.v1.WindowsNetworkInterfaceUsage.rx_packets_dropped:type_name -> runtime.v1.UInt64Value
-	148, // 90: runtime.v1.WindowsNetworkInterfaceUsage.tx_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 91: runtime.v1.WindowsNetworkInterfaceUsage.tx_packets_dropped:type_name -> runtime.v1.UInt64Value
-	148, // 92: runtime.v1.ProcessUsage.process_count:type_name -> runtime.v1.UInt64Value
-	148, // 93: runtime.v1.WindowsProcessUsage.process_count:type_name -> runtime.v1.UInt64Value
-	209, // 94: runtime.v1.ImageSpec.annotations:type_name -> runtime.v1.ImageSpec.AnnotationsEntry
-	69,  // 95: runtime.v1.LinuxContainerResources.hugepage_limits:type_name -> runtime.v1.HugepageLimit
-	210, // 96: runtime.v1.LinuxContainerResources.unified:type_name -> runtime.v1.LinuxContainerResources.UnifiedEntry
-	71,  // 97: runtime.v1.LinuxContainerSecurityContext.capabilities:type_name -> runtime.v1.Capability
-	21,  // 98: runtime.v1.LinuxContainerSecurityContext.namespace_options:type_name -> runtime.v1.NamespaceOption
-	70,  // 99: runtime.v1.LinuxContainerSecurityContext.selinux_options:type_name -> runtime.v1.SELinuxOption
-	22,  // 100: runtime.v1.LinuxContainerSecurityContext.run_as_user:type_name -> runtime.v1.Int64Value
-	22,  // 101: runtime.v1.LinuxContainerSecurityContext.run_as_group:type_name -> runtime.v1.Int64Value
-	3,   // 102: runtime.v1.LinuxContainerSecurityContext.supplemental_groups_policy:type_name -> runtime.v1.SupplementalGroupsPolicy
-	24,  // 103: runtime.v1.LinuxContainerSecurityContext.seccomp:type_name -> runtime.v1.SecurityProfile
-	24,  // 104: runtime.v1.LinuxContainerSecurityContext.apparmor:type_name -> runtime.v1.SecurityProfile
-	5,   // 105: runtime.v1.LinuxContainerSecurityContext.cgroup_mount_mode:type_name -> runtime.v1.CgroupMountMode
-	68,  // 106: runtime.v1.LinuxContainerConfig.resources:type_name -> runtime.v1.LinuxContainerResources
-	72,  // 107: runtime.v1.LinuxContainerConfig.security_context:type_name -> runtime.v1.LinuxContainerSecurityContext
-	2,   // 108: runtime.v1.WindowsNamespaceOption.network:type_name -> runtime.v1.NamespaceMode
-	75,  // 109: runtime.v1.WindowsSandboxSecurityContext.namespace_options:type_name -> runtime.v1.WindowsNamespaceOption
-	76,  // 110: runtime.v1.WindowsPodSandboxConfig.security_context:type_name -> runtime.v1.WindowsSandboxSecurityContext
-	80,  // 111: runtime.v1.WindowsContainerConfig.resources:type_name -> runtime.v1.WindowsContainerResources
-	78,  // 112: runtime.v1.WindowsContainerConfig.security_context:type_name -> runtime.v1.WindowsContainerSecurityContext
-	81,  // 113: runtime.v1.WindowsContainerResources.affinity_cpus:type_name -> runtime.v1.WindowsCpuGroupAffinity
-	82,  // 114: runtime.v1.ContainerConfig.metadata:type_name -> runtime.v1.ContainerMetadata
-	66,  // 115: runtime.v1.ContainerConfig.image:type_name -> runtime.v1.ImageSpec
-	67,  // 116: runtime.v1.ContainerConfig.envs:type_name -> runtime.v1.KeyValue
-	18,  // 117: runtime.v1.ContainerConfig.mounts:type_name -> runtime.v1.Mount
-	83,  // 118: runtime.v1.ContainerConfig.devices:type_name -> runtime.v1.Device
-	211, // 119: runtime.v1.ContainerConfig.labels:type_name -> runtime.v1.ContainerConfig.LabelsEntry
-	212, // 120: runtime.v1.ContainerConfig.annotations:type_name -> runtime.v1.ContainerConfig.AnnotationsEntry
-	73,  // 121: runtime.v1.ContainerConfig.linux:type_name -> runtime.v1.LinuxContainerConfig
-	79,  // 122: runtime.v1.ContainerConfig.windows:type_name -> runtime.v1.WindowsContainerConfig
-	84,  // 123: runtime.v1.ContainerConfig.CDI_devices:type_name -> runtime.v1.CDIDevice
-	6,   // 124: runtime.v1.ContainerConfig.stop_signal:type_name -> runtime.v1.Signal
-	85,  // 125: runtime.v1.CreateContainerRequest.config:type_name -> runtime.v1.ContainerConfig
-	28,  // 126: runtime.v1.CreateContainerRequest.sandbox_config:type_name -> runtime.v1.PodSandboxConfig
-	7,   // 127: runtime.v1.ContainerStateValue.state:type_name -> runtime.v1.ContainerState
-	94,  // 128: runtime.v1.ContainerFilter.state:type_name -> runtime.v1.ContainerStateValue
-	213, // 129: runtime.v1.ContainerFilter.label_selector:type_name -> runtime.v1.ContainerFilter.LabelSelectorEntry
-	95,  // 130: runtime.v1.ListContainersRequest.filter:type_name -> runtime.v1.ContainerFilter
-	82,  // 131: runtime.v1.Container.metadata:type_name -> runtime.v1.ContainerMetadata
-	66,  // 132: runtime.v1.Container.image:type_name -> runtime.v1.ImageSpec
-	7,   // 133: runtime.v1.Container.state:type_name -> runtime.v1.ContainerState
-	214, // 134: runtime.v1.Container.labels:type_name -> runtime.v1.Container.LabelsEntry
-	215, // 135: runtime.v1.Container.annotations:type_name -> runtime.v1.Container.AnnotationsEntry
-	97,  // 136: runtime.v1.ListContainersResponse.containers:type_name -> runtime.v1.Container
-	95,  // 137: runtime.v1.StreamContainersRequest.filter:type_name -> runtime.v1.ContainerFilter
-	97,  // 138: runtime.v1.StreamContainersResponse.containers:type_name -> runtime.v1.Container
-	82,  // 139: runtime.v1.ContainerStatus.metadata:type_name -> runtime.v1.ContainerMetadata
-	7,   // 140: runtime.v1.ContainerStatus.state:type_name -> runtime.v1.ContainerState
-	66,  // 141: runtime.v1.ContainerStatus.image:type_name -> runtime.v1.ImageSpec
-	216, // 142: runtime.v1.ContainerStatus.labels:type_name -> runtime.v1.ContainerStatus.LabelsEntry
-	217, // 143: runtime.v1.ContainerStatus.annotations:type_name -> runtime.v1.ContainerStatus.AnnotationsEntry
-	18,  // 144: runtime.v1.ContainerStatus.mounts:type_name -> runtime.v1.Mount
-	104, // 145: runtime.v1.ContainerStatus.resources:type_name -> runtime.v1.ContainerResources
-	105, // 146: runtime.v1.ContainerStatus.user:type_name -> runtime.v1.ContainerUser
-	6,   // 147: runtime.v1.ContainerStatus.stop_signal:type_name -> runtime.v1.Signal
-	102, // 148: runtime.v1.ContainerStatusResponse.status:type_name -> runtime.v1.ContainerStatus
-	218, // 149: runtime.v1.ContainerStatusResponse.info:type_name -> runtime.v1.ContainerStatusResponse.InfoEntry
-	68,  // 150: runtime.v1.ContainerResources.linux:type_name -> runtime.v1.LinuxContainerResources
-	80,  // 151: runtime.v1.ContainerResources.windows:type_name -> runtime.v1.WindowsContainerResources
-	74,  // 152: runtime.v1.ContainerUser.linux:type_name -> runtime.v1.LinuxContainerUser
-	68,  // 153: runtime.v1.UpdateContainerResourcesRequest.linux:type_name -> runtime.v1.LinuxContainerResources
-	80,  // 154: runtime.v1.UpdateContainerResourcesRequest.windows:type_name -> runtime.v1.WindowsContainerResources
-	219, // 155: runtime.v1.UpdateContainerResourcesRequest.annotations:type_name -> runtime.v1.UpdateContainerResourcesRequest.AnnotationsEntry
-	66,  // 156: runtime.v1.ImageFilter.image:type_name -> runtime.v1.ImageSpec
-	116, // 157: runtime.v1.ListImagesRequest.filter:type_name -> runtime.v1.ImageFilter
-	22,  // 158: runtime.v1.Image.uid:type_name -> runtime.v1.Int64Value
-	66,  // 159: runtime.v1.Image.spec:type_name -> runtime.v1.ImageSpec
-	118, // 160: runtime.v1.ListImagesResponse.images:type_name -> runtime.v1.Image
-	116, // 161: runtime.v1.StreamImagesRequest.filter:type_name -> runtime.v1.ImageFilter
-	118, // 162: runtime.v1.StreamImagesResponse.images:type_name -> runtime.v1.Image
-	66,  // 163: runtime.v1.ImageStatusRequest.image:type_name -> runtime.v1.ImageSpec
-	118, // 164: runtime.v1.ImageStatusResponse.image:type_name -> runtime.v1.Image
-	220, // 165: runtime.v1.ImageStatusResponse.info:type_name -> runtime.v1.ImageStatusResponse.InfoEntry
-	66,  // 166: runtime.v1.PullImageRequest.image:type_name -> runtime.v1.ImageSpec
-	124, // 167: runtime.v1.PullImageRequest.auth:type_name -> runtime.v1.AuthConfig
-	28,  // 168: runtime.v1.PullImageRequest.sandbox_config:type_name -> runtime.v1.PodSandboxConfig
-	66,  // 169: runtime.v1.PullSecurityProfileRequest.image:type_name -> runtime.v1.ImageSpec
-	124, // 170: runtime.v1.PullSecurityProfileRequest.auth:type_name -> runtime.v1.AuthConfig
-	28,  // 171: runtime.v1.PullSecurityProfileRequest.sandbox_config:type_name -> runtime.v1.PodSandboxConfig
-	8,   // 172: runtime.v1.PullSecurityProfileRequest.profile_kind:type_name -> runtime.v1.SecurityProfileKind
-	130, // 173: runtime.v1.ListSecurityProfilesResponse.profiles:type_name -> runtime.v1.SecurityProfileInfo
-	66,  // 174: runtime.v1.RemoveImageRequest.image:type_name -> runtime.v1.ImageSpec
-	136, // 175: runtime.v1.RuntimeConfig.network_config:type_name -> runtime.v1.NetworkConfig
-	137, // 176: runtime.v1.UpdateRuntimeConfigRequest.runtime_config:type_name -> runtime.v1.RuntimeConfig
-	140, // 177: runtime.v1.RuntimeStatus.conditions:type_name -> runtime.v1.RuntimeCondition
-	143, // 178: runtime.v1.RuntimeHandler.features:type_name -> runtime.v1.RuntimeHandlerFeatures
-	141, // 179: runtime.v1.StatusResponse.status:type_name -> runtime.v1.RuntimeStatus
-	221, // 180: runtime.v1.StatusResponse.info:type_name -> runtime.v1.StatusResponse.InfoEntry
-	144, // 181: runtime.v1.StatusResponse.runtime_handlers:type_name -> runtime.v1.RuntimeHandler
-	145, // 182: runtime.v1.StatusResponse.features:type_name -> runtime.v1.RuntimeFeatures
-	149, // 183: runtime.v1.FilesystemUsage.fs_id:type_name -> runtime.v1.FilesystemIdentifier
-	148, // 184: runtime.v1.FilesystemUsage.used_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 185: runtime.v1.FilesystemUsage.inodes_used:type_name -> runtime.v1.UInt64Value
-	149, // 186: runtime.v1.WindowsFilesystemUsage.fs_id:type_name -> runtime.v1.FilesystemIdentifier
-	148, // 187: runtime.v1.WindowsFilesystemUsage.used_bytes:type_name -> runtime.v1.UInt64Value
-	150, // 188: runtime.v1.ImageFsInfoResponse.image_filesystems:type_name -> runtime.v1.FilesystemUsage
-	150, // 189: runtime.v1.ImageFsInfoResponse.container_filesystems:type_name -> runtime.v1.FilesystemUsage
-	161, // 190: runtime.v1.ContainerStatsResponse.stats:type_name -> runtime.v1.ContainerStats
-	156, // 191: runtime.v1.ListContainerStatsRequest.filter:type_name -> runtime.v1.ContainerStatsFilter
-	222, // 192: runtime.v1.ContainerStatsFilter.label_selector:type_name -> runtime.v1.ContainerStatsFilter.LabelSelectorEntry
-	161, // 193: runtime.v1.ListContainerStatsResponse.stats:type_name -> runtime.v1.ContainerStats
-	156, // 194: runtime.v1.StreamContainerStatsRequest.filter:type_name -> runtime.v1.ContainerStatsFilter
-	161, // 195: runtime.v1.StreamContainerStatsResponse.container_stats:type_name -> runtime.v1.ContainerStats
-	82,  // 196: runtime.v1.ContainerAttributes.metadata:type_name -> runtime.v1.ContainerMetadata
-	223, // 197: runtime.v1.ContainerAttributes.labels:type_name -> runtime.v1.ContainerAttributes.LabelsEntry
-	224, // 198: runtime.v1.ContainerAttributes.annotations:type_name -> runtime.v1.ContainerAttributes.AnnotationsEntry
-	160, // 199: runtime.v1.ContainerStats.attributes:type_name -> runtime.v1.ContainerAttributes
-	165, // 200: runtime.v1.ContainerStats.cpu:type_name -> runtime.v1.CpuUsage
-	167, // 201: runtime.v1.ContainerStats.memory:type_name -> runtime.v1.MemoryUsage
-	150, // 202: runtime.v1.ContainerStats.writable_layer:type_name -> runtime.v1.FilesystemUsage
-	169, // 203: runtime.v1.ContainerStats.swap:type_name -> runtime.v1.SwapUsage
-	168, // 204: runtime.v1.ContainerStats.io:type_name -> runtime.v1.IoUsage
-	160, // 205: runtime.v1.WindowsContainerStats.attributes:type_name -> runtime.v1.ContainerAttributes
-	166, // 206: runtime.v1.WindowsContainerStats.cpu:type_name -> runtime.v1.WindowsCpuUsage
-	170, // 207: runtime.v1.WindowsContainerStats.memory:type_name -> runtime.v1.WindowsMemoryUsage
-	151, // 208: runtime.v1.WindowsContainerStats.writable_layer:type_name -> runtime.v1.WindowsFilesystemUsage
-	164, // 209: runtime.v1.PsiStats.Full:type_name -> runtime.v1.PsiData
-	164, // 210: runtime.v1.PsiStats.Some:type_name -> runtime.v1.PsiData
-	148, // 211: runtime.v1.CpuUsage.usage_core_nano_seconds:type_name -> runtime.v1.UInt64Value
-	148, // 212: runtime.v1.CpuUsage.usage_nano_cores:type_name -> runtime.v1.UInt64Value
-	163, // 213: runtime.v1.CpuUsage.psi:type_name -> runtime.v1.PsiStats
-	148, // 214: runtime.v1.WindowsCpuUsage.usage_core_nano_seconds:type_name -> runtime.v1.UInt64Value
-	148, // 215: runtime.v1.WindowsCpuUsage.usage_nano_cores:type_name -> runtime.v1.UInt64Value
-	148, // 216: runtime.v1.MemoryUsage.working_set_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 217: runtime.v1.MemoryUsage.available_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 218: runtime.v1.MemoryUsage.usage_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 219: runtime.v1.MemoryUsage.rss_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 220: runtime.v1.MemoryUsage.page_faults:type_name -> runtime.v1.UInt64Value
-	148, // 221: runtime.v1.MemoryUsage.major_page_faults:type_name -> runtime.v1.UInt64Value
-	163, // 222: runtime.v1.MemoryUsage.psi:type_name -> runtime.v1.PsiStats
-	163, // 223: runtime.v1.IoUsage.psi:type_name -> runtime.v1.PsiStats
-	148, // 224: runtime.v1.SwapUsage.swap_available_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 225: runtime.v1.SwapUsage.swap_usage_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 226: runtime.v1.WindowsMemoryUsage.working_set_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 227: runtime.v1.WindowsMemoryUsage.available_bytes:type_name -> runtime.v1.UInt64Value
-	148, // 228: runtime.v1.WindowsMemoryUsage.page_faults:type_name -> runtime.v1.UInt64Value
-	148, // 229: runtime.v1.WindowsMemoryUsage.commit_memory_bytes:type_name -> runtime.v1.UInt64Value
-	225, // 230: runtime.v1.CheckpointPodRequest.options:type_name -> runtime.v1.CheckpointPodRequest.OptionsEntry
-	28,  // 231: runtime.v1.RestorePodRequest.config:type_name -> runtime.v1.PodSandboxConfig
-	226, // 232: runtime.v1.RestorePodRequest.options:type_name -> runtime.v1.RestorePodRequest.OptionsEntry
-	85,  // 233: runtime.v1.RestorePodRequest.container_configs:type_name -> runtime.v1.ContainerConfig
-	178, // 234: runtime.v1.RestorePodResponse.restored_containers:type_name -> runtime.v1.RestoredContainer
-	9,   // 235: runtime.v1.ContainerEventResponse.container_event_type:type_name -> runtime.v1.ContainerEventType
-	40,  // 236: runtime.v1.ContainerEventResponse.pod_sandbox_status:type_name -> runtime.v1.PodSandboxStatus
-	102, // 237: runtime.v1.ContainerEventResponse.containers_statuses:type_name -> runtime.v1.ContainerStatus
-	184, // 238: runtime.v1.ListMetricDescriptorsResponse.descriptors:type_name -> runtime.v1.MetricDescriptor
-	189, // 239: runtime.v1.ListPodSandboxMetricsResponse.pod_metrics:type_name -> runtime.v1.PodSandboxMetrics
-	189, // 240: runtime.v1.StreamPodSandboxMetricsResponse.pod_sandbox_metrics:type_name -> runtime.v1.PodSandboxMetrics
-	191, // 241: runtime.v1.PodSandboxMetrics.metrics:type_name -> runtime.v1.Metric
-	190, // 242: runtime.v1.PodSandboxMetrics.container_metrics:type_name -> runtime.v1.ContainerMetrics
-	191, // 243: runtime.v1.ContainerMetrics.metrics:type_name -> runtime.v1.Metric
-	10,  // 244: runtime.v1.Metric.metric_type:type_name -> runtime.v1.MetricType
-	148, // 245: runtime.v1.Metric.value:type_name -> runtime.v1.UInt64Value
-	194, // 246: runtime.v1.RuntimeConfigResponse.linux:type_name -> runtime.v1.LinuxRuntimeConfiguration
-	11,  // 247: runtime.v1.LinuxRuntimeConfiguration.cgroup_driver:type_name -> runtime.v1.CgroupDriver
-	68,  // 248: runtime.v1.UpdatePodSandboxResourcesRequest.overhead:type_name -> runtime.v1.LinuxContainerResources
-	68,  // 249: runtime.v1.UpdatePodSandboxResourcesRequest.resources:type_name -> runtime.v1.LinuxContainerResources
-	14,  // 250: runtime.v1.RuntimeService.Version:input_type -> runtime.v1.VersionRequest
-	29,  // 251: runtime.v1.RuntimeService.RunPodSandbox:input_type -> runtime.v1.RunPodSandboxRequest
-	31,  // 252: runtime.v1.RuntimeService.StopPodSandbox:input_type -> runtime.v1.StopPodSandboxRequest
-	33,  // 253: runtime.v1.RuntimeService.RemovePodSandbox:input_type -> runtime.v1.RemovePodSandboxRequest
-	35,  // 254: runtime.v1.RuntimeService.PodSandboxStatus:input_type -> runtime.v1.PodSandboxStatusRequest
-	44,  // 255: runtime.v1.RuntimeService.ListPodSandbox:input_type -> runtime.v1.ListPodSandboxRequest
-	47,  // 256: runtime.v1.RuntimeService.StreamPodSandboxes:input_type -> runtime.v1.StreamPodSandboxesRequest
-	86,  // 257: runtime.v1.RuntimeService.CreateContainer:input_type -> runtime.v1.CreateContainerRequest
-	88,  // 258: runtime.v1.RuntimeService.StartContainer:input_type -> runtime.v1.StartContainerRequest
-	90,  // 259: runtime.v1.RuntimeService.StopContainer:input_type -> runtime.v1.StopContainerRequest
-	92,  // 260: runtime.v1.RuntimeService.RemoveContainer:input_type -> runtime.v1.RemoveContainerRequest
-	96,  // 261: runtime.v1.RuntimeService.ListContainers:input_type -> runtime.v1.ListContainersRequest
-	99,  // 262: runtime.v1.RuntimeService.StreamContainers:input_type -> runtime.v1.StreamContainersRequest
-	101, // 263: runtime.v1.RuntimeService.ContainerStatus:input_type -> runtime.v1.ContainerStatusRequest
-	106, // 264: runtime.v1.RuntimeService.UpdateContainerResources:input_type -> runtime.v1.UpdateContainerResourcesRequest
-	171, // 265: runtime.v1.RuntimeService.ReopenContainerLog:input_type -> runtime.v1.ReopenContainerLogRequest
-	108, // 266: runtime.v1.RuntimeService.ExecSync:input_type -> runtime.v1.ExecSyncRequest
-	110, // 267: runtime.v1.RuntimeService.Exec:input_type -> runtime.v1.ExecRequest
-	112, // 268: runtime.v1.RuntimeService.Attach:input_type -> runtime.v1.AttachRequest
-	114, // 269: runtime.v1.RuntimeService.PortForward:input_type -> runtime.v1.PortForwardRequest
-	153, // 270: runtime.v1.RuntimeService.ContainerStats:input_type -> runtime.v1.ContainerStatsRequest
-	155, // 271: runtime.v1.RuntimeService.ListContainerStats:input_type -> runtime.v1.ListContainerStatsRequest
-	158, // 272: runtime.v1.RuntimeService.StreamContainerStats:input_type -> runtime.v1.StreamContainerStatsRequest
-	49,  // 273: runtime.v1.RuntimeService.PodSandboxStats:input_type -> runtime.v1.PodSandboxStatsRequest
-	52,  // 274: runtime.v1.RuntimeService.ListPodSandboxStats:input_type -> runtime.v1.ListPodSandboxStatsRequest
-	54,  // 275: runtime.v1.RuntimeService.StreamPodSandboxStats:input_type -> runtime.v1.StreamPodSandboxStatsRequest
-	138, // 276: runtime.v1.RuntimeService.UpdateRuntimeConfig:input_type -> runtime.v1.UpdateRuntimeConfigRequest
-	142, // 277: runtime.v1.RuntimeService.Status:input_type -> runtime.v1.StatusRequest
-	173, // 278: runtime.v1.RuntimeService.CheckpointContainer:input_type -> runtime.v1.CheckpointContainerRequest
-	175, // 279: runtime.v1.RuntimeService.CheckpointPod:input_type -> runtime.v1.CheckpointPodRequest
-	177, // 280: runtime.v1.RuntimeService.RestorePod:input_type -> runtime.v1.RestorePodRequest
-	180, // 281: runtime.v1.RuntimeService.GetContainerEvents:input_type -> runtime.v1.GetEventsRequest
-	182, // 282: runtime.v1.RuntimeService.ListMetricDescriptors:input_type -> runtime.v1.ListMetricDescriptorsRequest
-	185, // 283: runtime.v1.RuntimeService.ListPodSandboxMetrics:input_type -> runtime.v1.ListPodSandboxMetricsRequest
-	187, // 284: runtime.v1.RuntimeService.StreamPodSandboxMetrics:input_type -> runtime.v1.StreamPodSandboxMetricsRequest
-	192, // 285: runtime.v1.RuntimeService.RuntimeConfig:input_type -> runtime.v1.RuntimeConfigRequest
-	195, // 286: runtime.v1.RuntimeService.UpdatePodSandboxResources:input_type -> runtime.v1.UpdatePodSandboxResourcesRequest
-	117, // 287: runtime.v1.ImageService.ListImages:input_type -> runtime.v1.ListImagesRequest
-	120, // 288: runtime.v1.ImageService.StreamImages:input_type -> runtime.v1.StreamImagesRequest
-	122, // 289: runtime.v1.ImageService.ImageStatus:input_type -> runtime.v1.ImageStatusRequest
-	125, // 290: runtime.v1.ImageService.PullImage:input_type -> runtime.v1.PullImageRequest
-	127, // 291: runtime.v1.ImageService.PullSecurityProfile:input_type -> runtime.v1.PullSecurityProfileRequest
-	129, // 292: runtime.v1.ImageService.ListSecurityProfiles:input_type -> runtime.v1.ListSecurityProfilesRequest
-	132, // 293: runtime.v1.ImageService.RemoveSecurityProfile:input_type -> runtime.v1.RemoveSecurityProfileRequest
-	134, // 294: runtime.v1.ImageService.RemoveImage:input_type -> runtime.v1.RemoveImageRequest
-	147, // 295: runtime.v1.ImageService.ImageFsInfo:input_type -> runtime.v1.ImageFsInfoRequest
-	15,  // 296: runtime.v1.RuntimeService.Version:output_type -> runtime.v1.VersionResponse
-	30,  // 297: runtime.v1.RuntimeService.RunPodSandbox:output_type -> runtime.v1.RunPodSandboxResponse
-	32,  // 298: runtime.v1.RuntimeService.StopPodSandbox:output_type -> runtime.v1.StopPodSandboxResponse
-	34,  // 299: runtime.v1.RuntimeService.RemovePodSandbox:output_type -> runtime.v1.RemovePodSandboxResponse
-	41,  // 300: runtime.v1.RuntimeService.PodSandboxStatus:output_type -> runtime.v1.PodSandboxStatusResponse
-	46,  // 301: runtime.v1.RuntimeService.ListPodSandbox:output_type -> runtime.v1.ListPodSandboxResponse
-	48,  // 302: runtime.v1.RuntimeService.StreamPodSandboxes:output_type -> runtime.v1.StreamPodSandboxesResponse
-	87,  // 303: runtime.v1.RuntimeService.CreateContainer:output_type -> runtime.v1.CreateContainerResponse
-	89,  // 304: runtime.v1.RuntimeService.StartContainer:output_type -> runtime.v1.StartContainerResponse
-	91,  // 305: runtime.v1.RuntimeService.StopContainer:output_type -> runtime.v1.StopContainerResponse
-	93,  // 306: runtime.v1.RuntimeService.RemoveContainer:output_type -> runtime.v1.RemoveContainerResponse
-	98,  // 307: runtime.v1.RuntimeService.ListContainers:output_type -> runtime.v1.ListContainersResponse
-	100, // 308: runtime.v1.RuntimeService.StreamContainers:output_type -> runtime.v1.StreamContainersResponse
-	103, // 309: runtime.v1.RuntimeService.ContainerStatus:output_type -> runtime.v1.ContainerStatusResponse
-	107, // 310: runtime.v1.RuntimeService.UpdateContainerResources:output_type -> runtime.v1.UpdateContainerResourcesResponse
-	172, // 311: runtime.v1.RuntimeService.ReopenContainerLog:output_type -> runtime.v1.ReopenContainerLogResponse
-	109, // 312: runtime.v1.RuntimeService.ExecSync:output_type -> runtime.v1.ExecSyncResponse
-	111, // 313: runtime.v1.RuntimeService.Exec:output_type -> runtime.v1.ExecResponse
-	113, // 314: runtime.v1.RuntimeService.Attach:output_type -> runtime.v1.AttachResponse
-	115, // 315: runtime.v1.RuntimeService.PortForward:output_type -> runtime.v1.PortForwardResponse
-	154, // 316: runtime.v1.RuntimeService.ContainerStats:output_type -> runtime.v1.ContainerStatsResponse
-	157, // 317: runtime.v1.RuntimeService.ListContainerStats:output_type -> runtime.v1.ListContainerStatsResponse
-	159, // 318: runtime.v1.RuntimeService.StreamContainerStats:output_type -> runtime.v1.StreamContainerStatsResponse
-	50,  // 319: runtime.v1.RuntimeService.PodSandboxStats:output_type -> runtime.v1.PodSandboxStatsResponse
-	53,  // 320: runtime.v1.RuntimeService.ListPodSandboxStats:output_type -> runtime.v1.ListPodSandboxStatsResponse
-	55,  // 321: runtime.v1.RuntimeService.StreamPodSandboxStats:output_type -> runtime.v1.StreamPodSandboxStatsResponse
-	139, // 322: runtime.v1.RuntimeService.UpdateRuntimeConfig:output_type -> runtime.v1.UpdateRuntimeConfigResponse
-	146, // 323: runtime.v1.RuntimeService.Status:output_type -> runtime.v1.StatusResponse
-	174, // 324: runtime.v1.RuntimeService.CheckpointContainer:output_type -> runtime.v1.CheckpointContainerResponse
-	176, // 325: runtime.v1.RuntimeService.CheckpointPod:output_type -> runtime.v1.CheckpointPodResponse
-	179, // 326: runtime.v1.RuntimeService.RestorePod:output_type -> runtime.v1.RestorePodResponse
-	181, // 327: runtime.v1.RuntimeService.GetContainerEvents:output_type -> runtime.v1.ContainerEventResponse
-	183, // 328: runtime.v1.RuntimeService.ListMetricDescriptors:output_type -> runtime.v1.ListMetricDescriptorsResponse
-	186, // 329: runtime.v1.RuntimeService.ListPodSandboxMetrics:output_type -> runtime.v1.ListPodSandboxMetricsResponse
-	188, // 330: runtime.v1.RuntimeService.StreamPodSandboxMetrics:output_type -> runtime.v1.StreamPodSandboxMetricsResponse
-	193, // 331: runtime.v1.RuntimeService.RuntimeConfig:output_type -> runtime.v1.RuntimeConfigResponse
-	196, // 332: runtime.v1.RuntimeService.UpdatePodSandboxResources:output_type -> runtime.v1.UpdatePodSandboxResourcesResponse
-	119, // 333: runtime.v1.ImageService.ListImages:output_type -> runtime.v1.ListImagesResponse
-	121, // 334: runtime.v1.ImageService.StreamImages:output_type -> runtime.v1.StreamImagesResponse
-	123, // 335: runtime.v1.ImageService.ImageStatus:output_type -> runtime.v1.ImageStatusResponse
-	126, // 336: runtime.v1.ImageService.PullImage:output_type -> runtime.v1.PullImageResponse
-	128, // 337: runtime.v1.ImageService.PullSecurityProfile:output_type -> runtime.v1.PullSecurityProfileResponse
-	131, // 338: runtime.v1.ImageService.ListSecurityProfiles:output_type -> runtime.v1.ListSecurityProfilesResponse
-	133, // 339: runtime.v1.ImageService.RemoveSecurityProfile:output_type -> runtime.v1.RemoveSecurityProfileResponse
-	135, // 340: runtime.v1.ImageService.RemoveImage:output_type -> runtime.v1.RemoveImageResponse
-	152, // 341: runtime.v1.ImageService.ImageFsInfo:output_type -> runtime.v1.ImageFsInfoResponse
-	296, // [296:342] is the sub-list for method output_type
-	250, // [250:296] is the sub-list for method input_type
-	250, // [250:250] is the sub-list for extension type_name
-	250, // [250:250] is the sub-list for extension extendee
-	0,   // [0:250] is the sub-list for field type_name
+	25,  // 17: runtime.v1.LinuxSandboxSecurityContext.seccomp:type_name -> runtime.v1.SecurityProfile
+	25,  // 18: runtime.v1.LinuxSandboxSecurityContext.apparmor:type_name -> runtime.v1.SecurityProfile
+	13,  // 19: runtime.v1.SecurityProfile.profile_type:type_name -> runtime.v1.SecurityProfile.ProfileType
+	26,  // 20: runtime.v1.SecurityProfile.base_profile:type_name -> runtime.v1.SecurityProfileBase
+	14,  // 21: runtime.v1.SecurityProfileBase.type:type_name -> runtime.v1.SecurityProfileBase.BaseType
+	24,  // 22: runtime.v1.LinuxPodSandboxConfig.security_context:type_name -> runtime.v1.LinuxSandboxSecurityContext
+	198, // 23: runtime.v1.LinuxPodSandboxConfig.sysctls:type_name -> runtime.v1.LinuxPodSandboxConfig.SysctlsEntry
+	69,  // 24: runtime.v1.LinuxPodSandboxConfig.overhead:type_name -> runtime.v1.LinuxContainerResources
+	69,  // 25: runtime.v1.LinuxPodSandboxConfig.resources:type_name -> runtime.v1.LinuxContainerResources
+	28,  // 26: runtime.v1.PodSandboxConfig.metadata:type_name -> runtime.v1.PodSandboxMetadata
+	17,  // 27: runtime.v1.PodSandboxConfig.dns_config:type_name -> runtime.v1.DNSConfig
+	18,  // 28: runtime.v1.PodSandboxConfig.port_mappings:type_name -> runtime.v1.PortMapping
+	199, // 29: runtime.v1.PodSandboxConfig.labels:type_name -> runtime.v1.PodSandboxConfig.LabelsEntry
+	200, // 30: runtime.v1.PodSandboxConfig.annotations:type_name -> runtime.v1.PodSandboxConfig.AnnotationsEntry
+	27,  // 31: runtime.v1.PodSandboxConfig.linux:type_name -> runtime.v1.LinuxPodSandboxConfig
+	78,  // 32: runtime.v1.PodSandboxConfig.windows:type_name -> runtime.v1.WindowsPodSandboxConfig
+	4,   // 33: runtime.v1.PodSandboxConfig.pod_network:type_name -> runtime.v1.PodNetwork
+	29,  // 34: runtime.v1.RunPodSandboxRequest.config:type_name -> runtime.v1.PodSandboxConfig
+	37,  // 35: runtime.v1.PodSandboxNetworkStatus.additional_ips:type_name -> runtime.v1.PodIP
+	22,  // 36: runtime.v1.Namespace.options:type_name -> runtime.v1.NamespaceOption
+	39,  // 37: runtime.v1.LinuxPodSandboxStatus.namespaces:type_name -> runtime.v1.Namespace
+	28,  // 38: runtime.v1.PodSandboxStatus.metadata:type_name -> runtime.v1.PodSandboxMetadata
+	5,   // 39: runtime.v1.PodSandboxStatus.state:type_name -> runtime.v1.PodSandboxState
+	38,  // 40: runtime.v1.PodSandboxStatus.network:type_name -> runtime.v1.PodSandboxNetworkStatus
+	40,  // 41: runtime.v1.PodSandboxStatus.linux:type_name -> runtime.v1.LinuxPodSandboxStatus
+	201, // 42: runtime.v1.PodSandboxStatus.labels:type_name -> runtime.v1.PodSandboxStatus.LabelsEntry
+	202, // 43: runtime.v1.PodSandboxStatus.annotations:type_name -> runtime.v1.PodSandboxStatus.AnnotationsEntry
+	41,  // 44: runtime.v1.PodSandboxStatusResponse.status:type_name -> runtime.v1.PodSandboxStatus
+	203, // 45: runtime.v1.PodSandboxStatusResponse.info:type_name -> runtime.v1.PodSandboxStatusResponse.InfoEntry
+	103, // 46: runtime.v1.PodSandboxStatusResponse.containers_statuses:type_name -> runtime.v1.ContainerStatus
+	5,   // 47: runtime.v1.PodSandboxStateValue.state:type_name -> runtime.v1.PodSandboxState
+	43,  // 48: runtime.v1.PodSandboxFilter.state:type_name -> runtime.v1.PodSandboxStateValue
+	204, // 49: runtime.v1.PodSandboxFilter.label_selector:type_name -> runtime.v1.PodSandboxFilter.LabelSelectorEntry
+	44,  // 50: runtime.v1.ListPodSandboxRequest.filter:type_name -> runtime.v1.PodSandboxFilter
+	28,  // 51: runtime.v1.PodSandbox.metadata:type_name -> runtime.v1.PodSandboxMetadata
+	5,   // 52: runtime.v1.PodSandbox.state:type_name -> runtime.v1.PodSandboxState
+	205, // 53: runtime.v1.PodSandbox.labels:type_name -> runtime.v1.PodSandbox.LabelsEntry
+	206, // 54: runtime.v1.PodSandbox.annotations:type_name -> runtime.v1.PodSandbox.AnnotationsEntry
+	46,  // 55: runtime.v1.ListPodSandboxResponse.items:type_name -> runtime.v1.PodSandbox
+	44,  // 56: runtime.v1.StreamPodSandboxesRequest.filter:type_name -> runtime.v1.PodSandboxFilter
+	46,  // 57: runtime.v1.StreamPodSandboxesResponse.pod_sandboxes:type_name -> runtime.v1.PodSandbox
+	58,  // 58: runtime.v1.PodSandboxStatsResponse.stats:type_name -> runtime.v1.PodSandboxStats
+	207, // 59: runtime.v1.PodSandboxStatsFilter.label_selector:type_name -> runtime.v1.PodSandboxStatsFilter.LabelSelectorEntry
+	52,  // 60: runtime.v1.ListPodSandboxStatsRequest.filter:type_name -> runtime.v1.PodSandboxStatsFilter
+	58,  // 61: runtime.v1.ListPodSandboxStatsResponse.stats:type_name -> runtime.v1.PodSandboxStats
+	52,  // 62: runtime.v1.StreamPodSandboxStatsRequest.filter:type_name -> runtime.v1.PodSandboxStatsFilter
+	58,  // 63: runtime.v1.StreamPodSandboxStatsResponse.pod_sandbox_stats:type_name -> runtime.v1.PodSandboxStats
+	28,  // 64: runtime.v1.PodSandboxAttributes.metadata:type_name -> runtime.v1.PodSandboxMetadata
+	208, // 65: runtime.v1.PodSandboxAttributes.labels:type_name -> runtime.v1.PodSandboxAttributes.LabelsEntry
+	209, // 66: runtime.v1.PodSandboxAttributes.annotations:type_name -> runtime.v1.PodSandboxAttributes.AnnotationsEntry
+	57,  // 67: runtime.v1.PodSandboxStats.attributes:type_name -> runtime.v1.PodSandboxAttributes
+	59,  // 68: runtime.v1.PodSandboxStats.linux:type_name -> runtime.v1.LinuxPodSandboxStats
+	60,  // 69: runtime.v1.PodSandboxStats.windows:type_name -> runtime.v1.WindowsPodSandboxStats
+	166, // 70: runtime.v1.LinuxPodSandboxStats.cpu:type_name -> runtime.v1.CpuUsage
+	168, // 71: runtime.v1.LinuxPodSandboxStats.memory:type_name -> runtime.v1.MemoryUsage
+	61,  // 72: runtime.v1.LinuxPodSandboxStats.network:type_name -> runtime.v1.NetworkUsage
+	65,  // 73: runtime.v1.LinuxPodSandboxStats.process:type_name -> runtime.v1.ProcessUsage
+	162, // 74: runtime.v1.LinuxPodSandboxStats.containers:type_name -> runtime.v1.ContainerStats
+	169, // 75: runtime.v1.LinuxPodSandboxStats.io:type_name -> runtime.v1.IoUsage
+	167, // 76: runtime.v1.WindowsPodSandboxStats.cpu:type_name -> runtime.v1.WindowsCpuUsage
+	171, // 77: runtime.v1.WindowsPodSandboxStats.memory:type_name -> runtime.v1.WindowsMemoryUsage
+	62,  // 78: runtime.v1.WindowsPodSandboxStats.network:type_name -> runtime.v1.WindowsNetworkUsage
+	66,  // 79: runtime.v1.WindowsPodSandboxStats.process:type_name -> runtime.v1.WindowsProcessUsage
+	163, // 80: runtime.v1.WindowsPodSandboxStats.containers:type_name -> runtime.v1.WindowsContainerStats
+	63,  // 81: runtime.v1.NetworkUsage.default_interface:type_name -> runtime.v1.NetworkInterfaceUsage
+	63,  // 82: runtime.v1.NetworkUsage.interfaces:type_name -> runtime.v1.NetworkInterfaceUsage
+	64,  // 83: runtime.v1.WindowsNetworkUsage.default_interface:type_name -> runtime.v1.WindowsNetworkInterfaceUsage
+	64,  // 84: runtime.v1.WindowsNetworkUsage.interfaces:type_name -> runtime.v1.WindowsNetworkInterfaceUsage
+	149, // 85: runtime.v1.NetworkInterfaceUsage.rx_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 86: runtime.v1.NetworkInterfaceUsage.rx_errors:type_name -> runtime.v1.UInt64Value
+	149, // 87: runtime.v1.NetworkInterfaceUsage.tx_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 88: runtime.v1.NetworkInterfaceUsage.tx_errors:type_name -> runtime.v1.UInt64Value
+	149, // 89: runtime.v1.WindowsNetworkInterfaceUsage.rx_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 90: runtime.v1.WindowsNetworkInterfaceUsage.rx_packets_dropped:type_name -> runtime.v1.UInt64Value
+	149, // 91: runtime.v1.WindowsNetworkInterfaceUsage.tx_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 92: runtime.v1.WindowsNetworkInterfaceUsage.tx_packets_dropped:type_name -> runtime.v1.UInt64Value
+	149, // 93: runtime.v1.ProcessUsage.process_count:type_name -> runtime.v1.UInt64Value
+	149, // 94: runtime.v1.WindowsProcessUsage.process_count:type_name -> runtime.v1.UInt64Value
+	210, // 95: runtime.v1.ImageSpec.annotations:type_name -> runtime.v1.ImageSpec.AnnotationsEntry
+	70,  // 96: runtime.v1.LinuxContainerResources.hugepage_limits:type_name -> runtime.v1.HugepageLimit
+	211, // 97: runtime.v1.LinuxContainerResources.unified:type_name -> runtime.v1.LinuxContainerResources.UnifiedEntry
+	72,  // 98: runtime.v1.LinuxContainerSecurityContext.capabilities:type_name -> runtime.v1.Capability
+	22,  // 99: runtime.v1.LinuxContainerSecurityContext.namespace_options:type_name -> runtime.v1.NamespaceOption
+	71,  // 100: runtime.v1.LinuxContainerSecurityContext.selinux_options:type_name -> runtime.v1.SELinuxOption
+	23,  // 101: runtime.v1.LinuxContainerSecurityContext.run_as_user:type_name -> runtime.v1.Int64Value
+	23,  // 102: runtime.v1.LinuxContainerSecurityContext.run_as_group:type_name -> runtime.v1.Int64Value
+	3,   // 103: runtime.v1.LinuxContainerSecurityContext.supplemental_groups_policy:type_name -> runtime.v1.SupplementalGroupsPolicy
+	25,  // 104: runtime.v1.LinuxContainerSecurityContext.seccomp:type_name -> runtime.v1.SecurityProfile
+	25,  // 105: runtime.v1.LinuxContainerSecurityContext.apparmor:type_name -> runtime.v1.SecurityProfile
+	6,   // 106: runtime.v1.LinuxContainerSecurityContext.cgroup_mount_mode:type_name -> runtime.v1.CgroupMountMode
+	69,  // 107: runtime.v1.LinuxContainerConfig.resources:type_name -> runtime.v1.LinuxContainerResources
+	73,  // 108: runtime.v1.LinuxContainerConfig.security_context:type_name -> runtime.v1.LinuxContainerSecurityContext
+	2,   // 109: runtime.v1.WindowsNamespaceOption.network:type_name -> runtime.v1.NamespaceMode
+	76,  // 110: runtime.v1.WindowsSandboxSecurityContext.namespace_options:type_name -> runtime.v1.WindowsNamespaceOption
+	77,  // 111: runtime.v1.WindowsPodSandboxConfig.security_context:type_name -> runtime.v1.WindowsSandboxSecurityContext
+	81,  // 112: runtime.v1.WindowsContainerConfig.resources:type_name -> runtime.v1.WindowsContainerResources
+	79,  // 113: runtime.v1.WindowsContainerConfig.security_context:type_name -> runtime.v1.WindowsContainerSecurityContext
+	82,  // 114: runtime.v1.WindowsContainerResources.affinity_cpus:type_name -> runtime.v1.WindowsCpuGroupAffinity
+	83,  // 115: runtime.v1.ContainerConfig.metadata:type_name -> runtime.v1.ContainerMetadata
+	67,  // 116: runtime.v1.ContainerConfig.image:type_name -> runtime.v1.ImageSpec
+	68,  // 117: runtime.v1.ContainerConfig.envs:type_name -> runtime.v1.KeyValue
+	19,  // 118: runtime.v1.ContainerConfig.mounts:type_name -> runtime.v1.Mount
+	84,  // 119: runtime.v1.ContainerConfig.devices:type_name -> runtime.v1.Device
+	212, // 120: runtime.v1.ContainerConfig.labels:type_name -> runtime.v1.ContainerConfig.LabelsEntry
+	213, // 121: runtime.v1.ContainerConfig.annotations:type_name -> runtime.v1.ContainerConfig.AnnotationsEntry
+	74,  // 122: runtime.v1.ContainerConfig.linux:type_name -> runtime.v1.LinuxContainerConfig
+	80,  // 123: runtime.v1.ContainerConfig.windows:type_name -> runtime.v1.WindowsContainerConfig
+	85,  // 124: runtime.v1.ContainerConfig.CDI_devices:type_name -> runtime.v1.CDIDevice
+	7,   // 125: runtime.v1.ContainerConfig.stop_signal:type_name -> runtime.v1.Signal
+	86,  // 126: runtime.v1.CreateContainerRequest.config:type_name -> runtime.v1.ContainerConfig
+	29,  // 127: runtime.v1.CreateContainerRequest.sandbox_config:type_name -> runtime.v1.PodSandboxConfig
+	8,   // 128: runtime.v1.ContainerStateValue.state:type_name -> runtime.v1.ContainerState
+	95,  // 129: runtime.v1.ContainerFilter.state:type_name -> runtime.v1.ContainerStateValue
+	214, // 130: runtime.v1.ContainerFilter.label_selector:type_name -> runtime.v1.ContainerFilter.LabelSelectorEntry
+	96,  // 131: runtime.v1.ListContainersRequest.filter:type_name -> runtime.v1.ContainerFilter
+	83,  // 132: runtime.v1.Container.metadata:type_name -> runtime.v1.ContainerMetadata
+	67,  // 133: runtime.v1.Container.image:type_name -> runtime.v1.ImageSpec
+	8,   // 134: runtime.v1.Container.state:type_name -> runtime.v1.ContainerState
+	215, // 135: runtime.v1.Container.labels:type_name -> runtime.v1.Container.LabelsEntry
+	216, // 136: runtime.v1.Container.annotations:type_name -> runtime.v1.Container.AnnotationsEntry
+	98,  // 137: runtime.v1.ListContainersResponse.containers:type_name -> runtime.v1.Container
+	96,  // 138: runtime.v1.StreamContainersRequest.filter:type_name -> runtime.v1.ContainerFilter
+	98,  // 139: runtime.v1.StreamContainersResponse.containers:type_name -> runtime.v1.Container
+	83,  // 140: runtime.v1.ContainerStatus.metadata:type_name -> runtime.v1.ContainerMetadata
+	8,   // 141: runtime.v1.ContainerStatus.state:type_name -> runtime.v1.ContainerState
+	67,  // 142: runtime.v1.ContainerStatus.image:type_name -> runtime.v1.ImageSpec
+	217, // 143: runtime.v1.ContainerStatus.labels:type_name -> runtime.v1.ContainerStatus.LabelsEntry
+	218, // 144: runtime.v1.ContainerStatus.annotations:type_name -> runtime.v1.ContainerStatus.AnnotationsEntry
+	19,  // 145: runtime.v1.ContainerStatus.mounts:type_name -> runtime.v1.Mount
+	105, // 146: runtime.v1.ContainerStatus.resources:type_name -> runtime.v1.ContainerResources
+	106, // 147: runtime.v1.ContainerStatus.user:type_name -> runtime.v1.ContainerUser
+	7,   // 148: runtime.v1.ContainerStatus.stop_signal:type_name -> runtime.v1.Signal
+	103, // 149: runtime.v1.ContainerStatusResponse.status:type_name -> runtime.v1.ContainerStatus
+	219, // 150: runtime.v1.ContainerStatusResponse.info:type_name -> runtime.v1.ContainerStatusResponse.InfoEntry
+	69,  // 151: runtime.v1.ContainerResources.linux:type_name -> runtime.v1.LinuxContainerResources
+	81,  // 152: runtime.v1.ContainerResources.windows:type_name -> runtime.v1.WindowsContainerResources
+	75,  // 153: runtime.v1.ContainerUser.linux:type_name -> runtime.v1.LinuxContainerUser
+	69,  // 154: runtime.v1.UpdateContainerResourcesRequest.linux:type_name -> runtime.v1.LinuxContainerResources
+	81,  // 155: runtime.v1.UpdateContainerResourcesRequest.windows:type_name -> runtime.v1.WindowsContainerResources
+	220, // 156: runtime.v1.UpdateContainerResourcesRequest.annotations:type_name -> runtime.v1.UpdateContainerResourcesRequest.AnnotationsEntry
+	67,  // 157: runtime.v1.ImageFilter.image:type_name -> runtime.v1.ImageSpec
+	117, // 158: runtime.v1.ListImagesRequest.filter:type_name -> runtime.v1.ImageFilter
+	23,  // 159: runtime.v1.Image.uid:type_name -> runtime.v1.Int64Value
+	67,  // 160: runtime.v1.Image.spec:type_name -> runtime.v1.ImageSpec
+	119, // 161: runtime.v1.ListImagesResponse.images:type_name -> runtime.v1.Image
+	117, // 162: runtime.v1.StreamImagesRequest.filter:type_name -> runtime.v1.ImageFilter
+	119, // 163: runtime.v1.StreamImagesResponse.images:type_name -> runtime.v1.Image
+	67,  // 164: runtime.v1.ImageStatusRequest.image:type_name -> runtime.v1.ImageSpec
+	119, // 165: runtime.v1.ImageStatusResponse.image:type_name -> runtime.v1.Image
+	221, // 166: runtime.v1.ImageStatusResponse.info:type_name -> runtime.v1.ImageStatusResponse.InfoEntry
+	67,  // 167: runtime.v1.PullImageRequest.image:type_name -> runtime.v1.ImageSpec
+	125, // 168: runtime.v1.PullImageRequest.auth:type_name -> runtime.v1.AuthConfig
+	29,  // 169: runtime.v1.PullImageRequest.sandbox_config:type_name -> runtime.v1.PodSandboxConfig
+	67,  // 170: runtime.v1.PullSecurityProfileRequest.image:type_name -> runtime.v1.ImageSpec
+	125, // 171: runtime.v1.PullSecurityProfileRequest.auth:type_name -> runtime.v1.AuthConfig
+	29,  // 172: runtime.v1.PullSecurityProfileRequest.sandbox_config:type_name -> runtime.v1.PodSandboxConfig
+	9,   // 173: runtime.v1.PullSecurityProfileRequest.profile_kind:type_name -> runtime.v1.SecurityProfileKind
+	131, // 174: runtime.v1.ListSecurityProfilesResponse.profiles:type_name -> runtime.v1.SecurityProfileInfo
+	67,  // 175: runtime.v1.RemoveImageRequest.image:type_name -> runtime.v1.ImageSpec
+	137, // 176: runtime.v1.RuntimeConfig.network_config:type_name -> runtime.v1.NetworkConfig
+	138, // 177: runtime.v1.UpdateRuntimeConfigRequest.runtime_config:type_name -> runtime.v1.RuntimeConfig
+	141, // 178: runtime.v1.RuntimeStatus.conditions:type_name -> runtime.v1.RuntimeCondition
+	144, // 179: runtime.v1.RuntimeHandler.features:type_name -> runtime.v1.RuntimeHandlerFeatures
+	142, // 180: runtime.v1.StatusResponse.status:type_name -> runtime.v1.RuntimeStatus
+	222, // 181: runtime.v1.StatusResponse.info:type_name -> runtime.v1.StatusResponse.InfoEntry
+	145, // 182: runtime.v1.StatusResponse.runtime_handlers:type_name -> runtime.v1.RuntimeHandler
+	146, // 183: runtime.v1.StatusResponse.features:type_name -> runtime.v1.RuntimeFeatures
+	150, // 184: runtime.v1.FilesystemUsage.fs_id:type_name -> runtime.v1.FilesystemIdentifier
+	149, // 185: runtime.v1.FilesystemUsage.used_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 186: runtime.v1.FilesystemUsage.inodes_used:type_name -> runtime.v1.UInt64Value
+	150, // 187: runtime.v1.WindowsFilesystemUsage.fs_id:type_name -> runtime.v1.FilesystemIdentifier
+	149, // 188: runtime.v1.WindowsFilesystemUsage.used_bytes:type_name -> runtime.v1.UInt64Value
+	151, // 189: runtime.v1.ImageFsInfoResponse.image_filesystems:type_name -> runtime.v1.FilesystemUsage
+	151, // 190: runtime.v1.ImageFsInfoResponse.container_filesystems:type_name -> runtime.v1.FilesystemUsage
+	162, // 191: runtime.v1.ContainerStatsResponse.stats:type_name -> runtime.v1.ContainerStats
+	157, // 192: runtime.v1.ListContainerStatsRequest.filter:type_name -> runtime.v1.ContainerStatsFilter
+	223, // 193: runtime.v1.ContainerStatsFilter.label_selector:type_name -> runtime.v1.ContainerStatsFilter.LabelSelectorEntry
+	162, // 194: runtime.v1.ListContainerStatsResponse.stats:type_name -> runtime.v1.ContainerStats
+	157, // 195: runtime.v1.StreamContainerStatsRequest.filter:type_name -> runtime.v1.ContainerStatsFilter
+	162, // 196: runtime.v1.StreamContainerStatsResponse.container_stats:type_name -> runtime.v1.ContainerStats
+	83,  // 197: runtime.v1.ContainerAttributes.metadata:type_name -> runtime.v1.ContainerMetadata
+	224, // 198: runtime.v1.ContainerAttributes.labels:type_name -> runtime.v1.ContainerAttributes.LabelsEntry
+	225, // 199: runtime.v1.ContainerAttributes.annotations:type_name -> runtime.v1.ContainerAttributes.AnnotationsEntry
+	161, // 200: runtime.v1.ContainerStats.attributes:type_name -> runtime.v1.ContainerAttributes
+	166, // 201: runtime.v1.ContainerStats.cpu:type_name -> runtime.v1.CpuUsage
+	168, // 202: runtime.v1.ContainerStats.memory:type_name -> runtime.v1.MemoryUsage
+	151, // 203: runtime.v1.ContainerStats.writable_layer:type_name -> runtime.v1.FilesystemUsage
+	170, // 204: runtime.v1.ContainerStats.swap:type_name -> runtime.v1.SwapUsage
+	169, // 205: runtime.v1.ContainerStats.io:type_name -> runtime.v1.IoUsage
+	161, // 206: runtime.v1.WindowsContainerStats.attributes:type_name -> runtime.v1.ContainerAttributes
+	167, // 207: runtime.v1.WindowsContainerStats.cpu:type_name -> runtime.v1.WindowsCpuUsage
+	171, // 208: runtime.v1.WindowsContainerStats.memory:type_name -> runtime.v1.WindowsMemoryUsage
+	152, // 209: runtime.v1.WindowsContainerStats.writable_layer:type_name -> runtime.v1.WindowsFilesystemUsage
+	165, // 210: runtime.v1.PsiStats.Full:type_name -> runtime.v1.PsiData
+	165, // 211: runtime.v1.PsiStats.Some:type_name -> runtime.v1.PsiData
+	149, // 212: runtime.v1.CpuUsage.usage_core_nano_seconds:type_name -> runtime.v1.UInt64Value
+	149, // 213: runtime.v1.CpuUsage.usage_nano_cores:type_name -> runtime.v1.UInt64Value
+	164, // 214: runtime.v1.CpuUsage.psi:type_name -> runtime.v1.PsiStats
+	149, // 215: runtime.v1.WindowsCpuUsage.usage_core_nano_seconds:type_name -> runtime.v1.UInt64Value
+	149, // 216: runtime.v1.WindowsCpuUsage.usage_nano_cores:type_name -> runtime.v1.UInt64Value
+	149, // 217: runtime.v1.MemoryUsage.working_set_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 218: runtime.v1.MemoryUsage.available_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 219: runtime.v1.MemoryUsage.usage_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 220: runtime.v1.MemoryUsage.rss_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 221: runtime.v1.MemoryUsage.page_faults:type_name -> runtime.v1.UInt64Value
+	149, // 222: runtime.v1.MemoryUsage.major_page_faults:type_name -> runtime.v1.UInt64Value
+	164, // 223: runtime.v1.MemoryUsage.psi:type_name -> runtime.v1.PsiStats
+	164, // 224: runtime.v1.IoUsage.psi:type_name -> runtime.v1.PsiStats
+	149, // 225: runtime.v1.SwapUsage.swap_available_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 226: runtime.v1.SwapUsage.swap_usage_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 227: runtime.v1.WindowsMemoryUsage.working_set_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 228: runtime.v1.WindowsMemoryUsage.available_bytes:type_name -> runtime.v1.UInt64Value
+	149, // 229: runtime.v1.WindowsMemoryUsage.page_faults:type_name -> runtime.v1.UInt64Value
+	149, // 230: runtime.v1.WindowsMemoryUsage.commit_memory_bytes:type_name -> runtime.v1.UInt64Value
+	226, // 231: runtime.v1.CheckpointPodRequest.options:type_name -> runtime.v1.CheckpointPodRequest.OptionsEntry
+	29,  // 232: runtime.v1.RestorePodRequest.config:type_name -> runtime.v1.PodSandboxConfig
+	227, // 233: runtime.v1.RestorePodRequest.options:type_name -> runtime.v1.RestorePodRequest.OptionsEntry
+	86,  // 234: runtime.v1.RestorePodRequest.container_configs:type_name -> runtime.v1.ContainerConfig
+	179, // 235: runtime.v1.RestorePodResponse.restored_containers:type_name -> runtime.v1.RestoredContainer
+	10,  // 236: runtime.v1.ContainerEventResponse.container_event_type:type_name -> runtime.v1.ContainerEventType
+	41,  // 237: runtime.v1.ContainerEventResponse.pod_sandbox_status:type_name -> runtime.v1.PodSandboxStatus
+	103, // 238: runtime.v1.ContainerEventResponse.containers_statuses:type_name -> runtime.v1.ContainerStatus
+	185, // 239: runtime.v1.ListMetricDescriptorsResponse.descriptors:type_name -> runtime.v1.MetricDescriptor
+	190, // 240: runtime.v1.ListPodSandboxMetricsResponse.pod_metrics:type_name -> runtime.v1.PodSandboxMetrics
+	190, // 241: runtime.v1.StreamPodSandboxMetricsResponse.pod_sandbox_metrics:type_name -> runtime.v1.PodSandboxMetrics
+	192, // 242: runtime.v1.PodSandboxMetrics.metrics:type_name -> runtime.v1.Metric
+	191, // 243: runtime.v1.PodSandboxMetrics.container_metrics:type_name -> runtime.v1.ContainerMetrics
+	192, // 244: runtime.v1.ContainerMetrics.metrics:type_name -> runtime.v1.Metric
+	11,  // 245: runtime.v1.Metric.metric_type:type_name -> runtime.v1.MetricType
+	149, // 246: runtime.v1.Metric.value:type_name -> runtime.v1.UInt64Value
+	195, // 247: runtime.v1.RuntimeConfigResponse.linux:type_name -> runtime.v1.LinuxRuntimeConfiguration
+	12,  // 248: runtime.v1.LinuxRuntimeConfiguration.cgroup_driver:type_name -> runtime.v1.CgroupDriver
+	69,  // 249: runtime.v1.UpdatePodSandboxResourcesRequest.overhead:type_name -> runtime.v1.LinuxContainerResources
+	69,  // 250: runtime.v1.UpdatePodSandboxResourcesRequest.resources:type_name -> runtime.v1.LinuxContainerResources
+	15,  // 251: runtime.v1.RuntimeService.Version:input_type -> runtime.v1.VersionRequest
+	30,  // 252: runtime.v1.RuntimeService.RunPodSandbox:input_type -> runtime.v1.RunPodSandboxRequest
+	32,  // 253: runtime.v1.RuntimeService.StopPodSandbox:input_type -> runtime.v1.StopPodSandboxRequest
+	34,  // 254: runtime.v1.RuntimeService.RemovePodSandbox:input_type -> runtime.v1.RemovePodSandboxRequest
+	36,  // 255: runtime.v1.RuntimeService.PodSandboxStatus:input_type -> runtime.v1.PodSandboxStatusRequest
+	45,  // 256: runtime.v1.RuntimeService.ListPodSandbox:input_type -> runtime.v1.ListPodSandboxRequest
+	48,  // 257: runtime.v1.RuntimeService.StreamPodSandboxes:input_type -> runtime.v1.StreamPodSandboxesRequest
+	87,  // 258: runtime.v1.RuntimeService.CreateContainer:input_type -> runtime.v1.CreateContainerRequest
+	89,  // 259: runtime.v1.RuntimeService.StartContainer:input_type -> runtime.v1.StartContainerRequest
+	91,  // 260: runtime.v1.RuntimeService.StopContainer:input_type -> runtime.v1.StopContainerRequest
+	93,  // 261: runtime.v1.RuntimeService.RemoveContainer:input_type -> runtime.v1.RemoveContainerRequest
+	97,  // 262: runtime.v1.RuntimeService.ListContainers:input_type -> runtime.v1.ListContainersRequest
+	100, // 263: runtime.v1.RuntimeService.StreamContainers:input_type -> runtime.v1.StreamContainersRequest
+	102, // 264: runtime.v1.RuntimeService.ContainerStatus:input_type -> runtime.v1.ContainerStatusRequest
+	107, // 265: runtime.v1.RuntimeService.UpdateContainerResources:input_type -> runtime.v1.UpdateContainerResourcesRequest
+	172, // 266: runtime.v1.RuntimeService.ReopenContainerLog:input_type -> runtime.v1.ReopenContainerLogRequest
+	109, // 267: runtime.v1.RuntimeService.ExecSync:input_type -> runtime.v1.ExecSyncRequest
+	111, // 268: runtime.v1.RuntimeService.Exec:input_type -> runtime.v1.ExecRequest
+	113, // 269: runtime.v1.RuntimeService.Attach:input_type -> runtime.v1.AttachRequest
+	115, // 270: runtime.v1.RuntimeService.PortForward:input_type -> runtime.v1.PortForwardRequest
+	154, // 271: runtime.v1.RuntimeService.ContainerStats:input_type -> runtime.v1.ContainerStatsRequest
+	156, // 272: runtime.v1.RuntimeService.ListContainerStats:input_type -> runtime.v1.ListContainerStatsRequest
+	159, // 273: runtime.v1.RuntimeService.StreamContainerStats:input_type -> runtime.v1.StreamContainerStatsRequest
+	50,  // 274: runtime.v1.RuntimeService.PodSandboxStats:input_type -> runtime.v1.PodSandboxStatsRequest
+	53,  // 275: runtime.v1.RuntimeService.ListPodSandboxStats:input_type -> runtime.v1.ListPodSandboxStatsRequest
+	55,  // 276: runtime.v1.RuntimeService.StreamPodSandboxStats:input_type -> runtime.v1.StreamPodSandboxStatsRequest
+	139, // 277: runtime.v1.RuntimeService.UpdateRuntimeConfig:input_type -> runtime.v1.UpdateRuntimeConfigRequest
+	143, // 278: runtime.v1.RuntimeService.Status:input_type -> runtime.v1.StatusRequest
+	174, // 279: runtime.v1.RuntimeService.CheckpointContainer:input_type -> runtime.v1.CheckpointContainerRequest
+	176, // 280: runtime.v1.RuntimeService.CheckpointPod:input_type -> runtime.v1.CheckpointPodRequest
+	178, // 281: runtime.v1.RuntimeService.RestorePod:input_type -> runtime.v1.RestorePodRequest
+	181, // 282: runtime.v1.RuntimeService.GetContainerEvents:input_type -> runtime.v1.GetEventsRequest
+	183, // 283: runtime.v1.RuntimeService.ListMetricDescriptors:input_type -> runtime.v1.ListMetricDescriptorsRequest
+	186, // 284: runtime.v1.RuntimeService.ListPodSandboxMetrics:input_type -> runtime.v1.ListPodSandboxMetricsRequest
+	188, // 285: runtime.v1.RuntimeService.StreamPodSandboxMetrics:input_type -> runtime.v1.StreamPodSandboxMetricsRequest
+	193, // 286: runtime.v1.RuntimeService.RuntimeConfig:input_type -> runtime.v1.RuntimeConfigRequest
+	196, // 287: runtime.v1.RuntimeService.UpdatePodSandboxResources:input_type -> runtime.v1.UpdatePodSandboxResourcesRequest
+	118, // 288: runtime.v1.ImageService.ListImages:input_type -> runtime.v1.ListImagesRequest
+	121, // 289: runtime.v1.ImageService.StreamImages:input_type -> runtime.v1.StreamImagesRequest
+	123, // 290: runtime.v1.ImageService.ImageStatus:input_type -> runtime.v1.ImageStatusRequest
+	126, // 291: runtime.v1.ImageService.PullImage:input_type -> runtime.v1.PullImageRequest
+	128, // 292: runtime.v1.ImageService.PullSecurityProfile:input_type -> runtime.v1.PullSecurityProfileRequest
+	130, // 293: runtime.v1.ImageService.ListSecurityProfiles:input_type -> runtime.v1.ListSecurityProfilesRequest
+	133, // 294: runtime.v1.ImageService.RemoveSecurityProfile:input_type -> runtime.v1.RemoveSecurityProfileRequest
+	135, // 295: runtime.v1.ImageService.RemoveImage:input_type -> runtime.v1.RemoveImageRequest
+	148, // 296: runtime.v1.ImageService.ImageFsInfo:input_type -> runtime.v1.ImageFsInfoRequest
+	16,  // 297: runtime.v1.RuntimeService.Version:output_type -> runtime.v1.VersionResponse
+	31,  // 298: runtime.v1.RuntimeService.RunPodSandbox:output_type -> runtime.v1.RunPodSandboxResponse
+	33,  // 299: runtime.v1.RuntimeService.StopPodSandbox:output_type -> runtime.v1.StopPodSandboxResponse
+	35,  // 300: runtime.v1.RuntimeService.RemovePodSandbox:output_type -> runtime.v1.RemovePodSandboxResponse
+	42,  // 301: runtime.v1.RuntimeService.PodSandboxStatus:output_type -> runtime.v1.PodSandboxStatusResponse
+	47,  // 302: runtime.v1.RuntimeService.ListPodSandbox:output_type -> runtime.v1.ListPodSandboxResponse
+	49,  // 303: runtime.v1.RuntimeService.StreamPodSandboxes:output_type -> runtime.v1.StreamPodSandboxesResponse
+	88,  // 304: runtime.v1.RuntimeService.CreateContainer:output_type -> runtime.v1.CreateContainerResponse
+	90,  // 305: runtime.v1.RuntimeService.StartContainer:output_type -> runtime.v1.StartContainerResponse
+	92,  // 306: runtime.v1.RuntimeService.StopContainer:output_type -> runtime.v1.StopContainerResponse
+	94,  // 307: runtime.v1.RuntimeService.RemoveContainer:output_type -> runtime.v1.RemoveContainerResponse
+	99,  // 308: runtime.v1.RuntimeService.ListContainers:output_type -> runtime.v1.ListContainersResponse
+	101, // 309: runtime.v1.RuntimeService.StreamContainers:output_type -> runtime.v1.StreamContainersResponse
+	104, // 310: runtime.v1.RuntimeService.ContainerStatus:output_type -> runtime.v1.ContainerStatusResponse
+	108, // 311: runtime.v1.RuntimeService.UpdateContainerResources:output_type -> runtime.v1.UpdateContainerResourcesResponse
+	173, // 312: runtime.v1.RuntimeService.ReopenContainerLog:output_type -> runtime.v1.ReopenContainerLogResponse
+	110, // 313: runtime.v1.RuntimeService.ExecSync:output_type -> runtime.v1.ExecSyncResponse
+	112, // 314: runtime.v1.RuntimeService.Exec:output_type -> runtime.v1.ExecResponse
+	114, // 315: runtime.v1.RuntimeService.Attach:output_type -> runtime.v1.AttachResponse
+	116, // 316: runtime.v1.RuntimeService.PortForward:output_type -> runtime.v1.PortForwardResponse
+	155, // 317: runtime.v1.RuntimeService.ContainerStats:output_type -> runtime.v1.ContainerStatsResponse
+	158, // 318: runtime.v1.RuntimeService.ListContainerStats:output_type -> runtime.v1.ListContainerStatsResponse
+	160, // 319: runtime.v1.RuntimeService.StreamContainerStats:output_type -> runtime.v1.StreamContainerStatsResponse
+	51,  // 320: runtime.v1.RuntimeService.PodSandboxStats:output_type -> runtime.v1.PodSandboxStatsResponse
+	54,  // 321: runtime.v1.RuntimeService.ListPodSandboxStats:output_type -> runtime.v1.ListPodSandboxStatsResponse
+	56,  // 322: runtime.v1.RuntimeService.StreamPodSandboxStats:output_type -> runtime.v1.StreamPodSandboxStatsResponse
+	140, // 323: runtime.v1.RuntimeService.UpdateRuntimeConfig:output_type -> runtime.v1.UpdateRuntimeConfigResponse
+	147, // 324: runtime.v1.RuntimeService.Status:output_type -> runtime.v1.StatusResponse
+	175, // 325: runtime.v1.RuntimeService.CheckpointContainer:output_type -> runtime.v1.CheckpointContainerResponse
+	177, // 326: runtime.v1.RuntimeService.CheckpointPod:output_type -> runtime.v1.CheckpointPodResponse
+	180, // 327: runtime.v1.RuntimeService.RestorePod:output_type -> runtime.v1.RestorePodResponse
+	182, // 328: runtime.v1.RuntimeService.GetContainerEvents:output_type -> runtime.v1.ContainerEventResponse
+	184, // 329: runtime.v1.RuntimeService.ListMetricDescriptors:output_type -> runtime.v1.ListMetricDescriptorsResponse
+	187, // 330: runtime.v1.RuntimeService.ListPodSandboxMetrics:output_type -> runtime.v1.ListPodSandboxMetricsResponse
+	189, // 331: runtime.v1.RuntimeService.StreamPodSandboxMetrics:output_type -> runtime.v1.StreamPodSandboxMetricsResponse
+	194, // 332: runtime.v1.RuntimeService.RuntimeConfig:output_type -> runtime.v1.RuntimeConfigResponse
+	197, // 333: runtime.v1.RuntimeService.UpdatePodSandboxResources:output_type -> runtime.v1.UpdatePodSandboxResourcesResponse
+	120, // 334: runtime.v1.ImageService.ListImages:output_type -> runtime.v1.ListImagesResponse
+	122, // 335: runtime.v1.ImageService.StreamImages:output_type -> runtime.v1.StreamImagesResponse
+	124, // 336: runtime.v1.ImageService.ImageStatus:output_type -> runtime.v1.ImageStatusResponse
+	127, // 337: runtime.v1.ImageService.PullImage:output_type -> runtime.v1.PullImageResponse
+	129, // 338: runtime.v1.ImageService.PullSecurityProfile:output_type -> runtime.v1.PullSecurityProfileResponse
+	132, // 339: runtime.v1.ImageService.ListSecurityProfiles:output_type -> runtime.v1.ListSecurityProfilesResponse
+	134, // 340: runtime.v1.ImageService.RemoveSecurityProfile:output_type -> runtime.v1.RemoveSecurityProfileResponse
+	136, // 341: runtime.v1.ImageService.RemoveImage:output_type -> runtime.v1.RemoveImageResponse
+	153, // 342: runtime.v1.ImageService.ImageFsInfo:output_type -> runtime.v1.ImageFsInfoResponse
+	297, // [297:343] is the sub-list for method output_type
+	251, // [251:297] is the sub-list for method input_type
+	251, // [251:251] is the sub-list for extension type_name
+	251, // [251:251] is the sub-list for extension extendee
+	0,   // [0:251] is the sub-list for field type_name
 }
 
 func init() { file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_init() }
@@ -14179,7 +14286,7 @@ func file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc), len(file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc)),
-			NumEnums:      14,
+			NumEnums:      15,
 			NumMessages:   213,
 			NumExtensions: 0,
 			NumServices:   2,

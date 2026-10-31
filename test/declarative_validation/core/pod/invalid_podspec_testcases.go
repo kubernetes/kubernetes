@@ -19,6 +19,7 @@ package pod
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodSpecTestcase holds a declarative validation testcase for podspec validation
@@ -38,6 +39,13 @@ func InvalidPodSpecTestcases(fldPath *field.Path) []PodSpecTestcase {
 			Tweaks: []podtest.Tweak{podtest.SetContainers()},
 			ExpectedErrs: field.ErrorList{
 				field.Required(fldPath.Child("containers"), "").MarkAlpha(),
+			},
+		},
+		{
+			ID:     "podNetwork_unsupported_value",
+			Tweaks: []podtest.Tweak{podtest.SetPodNetwork(api.PodNetwork("Bridge"))},
+			ExpectedErrs: field.ErrorList{
+				field.NotSupported(fldPath.Child("podNetwork"), api.PodNetwork("Bridge"), []api.PodNetwork{}).MarkAlpha(),
 			},
 		},
 	}

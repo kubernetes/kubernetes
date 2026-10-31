@@ -207,8 +207,12 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	}
 
 	if obj.Spec.EnableServiceLinks == nil {
-		enableServiceLinks := v1.DefaultEnableServiceLinks
-		obj.Spec.EnableServiceLinks = &enableServiceLinks
+		// Pods off the pod network have no route to any Service by default.
+		if isPodNetworkNone(&obj.Spec) {
+			obj.Spec.EnableServiceLinks = new(false)
+		} else {
+			obj.Spec.EnableServiceLinks = new(v1.DefaultEnableServiceLinks)
+		}
 	}
 
 	if obj.Spec.HostNetwork {
@@ -254,8 +258,13 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 		obj.ServiceAccountName = obj.DeprecatedServiceAccount
 	}
 	obj.DeprecatedServiceAccount = obj.ServiceAccountName
+
 	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = v1.DNSClusterFirst
+		if isPodNetworkNone(obj) {
+			obj.DNSPolicy = v1.DNSNone
+		} else {
+			obj.DNSPolicy = v1.DNSClusterFirst
+		}
 	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways
@@ -445,6 +454,11 @@ func defaultHostNetworkPorts(containers *[]v1.Container) {
 			}
 		}
 	}
+}
+
+// isPodNetworkNone reports whether the spec opts out of the pod network.
+func isPodNetworkNone(spec *v1.PodSpec) bool {
+	return spec.PodNetwork != nil && *spec.PodNetwork == v1.PodNetworkNone
 }
 
 func defaultHTTPGetProtocol(action *v1.HTTPGetAction) {

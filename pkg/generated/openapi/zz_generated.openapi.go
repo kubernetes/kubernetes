@@ -29118,7 +29118,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"dnsPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "dnsPolicy sets the DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.\n\nPossible enum values:\n - `\"ClusterFirst\"` indicates that the pod should use cluster DNS first unless hostNetwork is true, if it is available, then fall back on the default (as determined by kubelet) DNS settings.\n - `\"ClusterFirstWithHostNet\"` indicates that the pod should use cluster DNS first, if it is available, then fall back on the default (as determined by kubelet) DNS settings.\n - `\"Default\"` indicates that the pod should use the default (as determined by kubelet) DNS settings.\n - `\"None\"` indicates that the pod should use empty DNS settings. DNS parameters such as nameservers and search paths should be defined via DNSConfig.",
+							Description: "dnsPolicy sets the DNS policy for the pod. Defaults to \"ClusterFirst\", or to \"None\" when podNetwork is \"None\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'. 'None' requires dnsConfig with at least one nameserver, except when podNetwork is \"None\", where it may be left out to get an empty resolver configuration.\n\nPossible enum values:\n - `\"ClusterFirst\"` indicates that the pod should use cluster DNS first unless hostNetwork is true, if it is available, then fall back on the default (as determined by kubelet) DNS settings.\n - `\"ClusterFirstWithHostNet\"` indicates that the pod should use cluster DNS first, if it is available, then fall back on the default (as determined by kubelet) DNS settings.\n - `\"Default\"` indicates that the pod should use the default (as determined by kubelet) DNS settings.\n - `\"None\"` indicates that the pod should use empty DNS settings. DNS parameters such as nameservers and search paths should be defined via DNSConfig.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"ClusterFirst", "ClusterFirstWithHostNet", "Default", "None"},
@@ -29174,7 +29174,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"hostNetwork": {
 						SchemaProps: spec.SchemaProps{
-							Description: "hostNetwork indicates that the pod should use the host's network namespace. When using hostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
+							Description: "hostNetwork indicates that the pod should use the host's network namespace. When using hostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false. When true, podNetwork may not be set: the pod has no network namespace of its own.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -29344,7 +29344,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"enableServiceLinks": {
 						SchemaProps: spec.SchemaProps{
-							Description: "enableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links. Optional: Defaults to true.",
+							Description: "enableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links. Optional: Defaults to true, or to false when podNetwork is \"None\". For pods with podNetwork \"None\", false also leaves out the KUBERNETES_* variables of the kubernetes service.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -29501,6 +29501,14 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 									},
 								},
 							},
+						},
+					},
+					"podNetwork": {
+						SchemaProps: spec.SchemaProps{
+							Description: "podNetwork selects whether the pod is attached to the pod network. \"Default\" attaches the pod to the pod network, as always. \"None\" gives the pod an isolated network namespace with only the loopback interface configured, not attached to the pod network and with no automatic network plumbing. When unset, the pod is attached to the pod network. This field is about the pod's own network namespace and may not be set when hostNetwork is true. When \"None\" is selected, dnsPolicy defaults to \"None\" and enableServiceLinks defaults to false (both can be overridden), and features that need to reach the pod from the node (hostPort, and httpGet, tcpSocket and grpc probes and lifecycle handlers) are forbidden. To attach a workload template that is set to \"None\" to the pod network again, set this field to \"Default\"; an update that leaves the field out keeps the stored value. This field is immutable on Pods.\n\nPossible enum values:\n - `\"Default\"` attaches the pod to the pod network (the network that Kubernetes connects every pod to unless the pod opts out). The container runtime performs its configured network plumbing and the pod is assigned pod IPs. This is the historical behavior.\n - `\"None\"` does not attach the pod to the pod network. The pod gets an isolated network namespace with only the loopback interface configured. The pod's podIPs are left unset. The pod is never selected into Services and, by default, receives no cluster DNS configuration or service environment variables.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Default", "None"},
 						},
 					},
 				},

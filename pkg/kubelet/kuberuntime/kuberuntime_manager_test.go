@@ -700,6 +700,60 @@ func TestSyncPod(t *testing.T) {
 	}
 }
 
+// TestSyncPodNetworkIsolated covers sandbox creation for a pod with
+// podNetwork "None": a runtime that honors the field yields a sandbox
+// without IPs and the containers start; a runtime that attaches the sandbox
+// to the pod network anyway gets the sandbox stopped and no container started.
+func TestSyncPodNetworkIsolated(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "12345678", Name: "foo", Namespace: "new"},
+		Spec: v1.PodSpec{
+			PodNetwork: new(v1.PodNetworkNone),
+			Containers: []v1.Container{{Name: "foo1", Image: "busybox", ImagePullPolicy: v1.PullIfNotPresent}},
+		},
+	}
+
+	t.Run("runtime honors pod_network", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
+		result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, flowcontrol.NewBackOff(time.Second, time.Minute), false)
+		require.NoError(t, result.Error())
+		assert.Len(t, fakeRuntime.Containers, 1)
+		require.Len(t, fakeRuntime.Sandboxes, 1)
+		for _, sandbox := range fakeRuntime.Sandboxes {
+			assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
+			assert.Empty(t, sandbox.Network.Ip)
+		}
+
+		runtimePod, err := m.GetPod(tCtx, pod.UID)
+		require.NoError(t, err)
+		podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+		require.NoError(t, err)
+		assert.Empty(t, podStatus.IPs)
+		// The sandbox must not be recreated because it has no IP.
+		changes := m.computePodActions(tCtx, pod, podStatus, false)
+		assert.False(t, changes.CreateSandbox, "sandbox without IPs must be kept for a network isolated pod")
+	})
+
+	t.Run("runtime ignores pod_network", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+		fakeRuntime.IgnorePodNetwork = true
+
+		result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, flowcontrol.NewBackOff(time.Second, time.Minute), false)
+		require.ErrorIs(t, result.Error(), kubecontainer.ErrCreatePodSandbox)
+		assert.Empty(t, fakeRuntime.Containers, "no container may start in a sandbox attached to the pod network")
+		require.Len(t, fakeRuntime.Sandboxes, 1)
+		for _, sandbox := range fakeRuntime.Sandboxes {
+			assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.State, "sandbox with unexpected IPs must be stopped")
+		}
+		assert.Contains(t, fakeRuntime.Called, "StopPodSandbox")
+	})
+}
+
 func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)

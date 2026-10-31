@@ -645,6 +645,33 @@ message PodSandboxMetadata {
     uint32 attempt = 4;
 }
 
+// PodNetwork selects whether a sandbox network namespace is attached to the
+// pod network.
+// See https://kep.k8s.io/6313 for more details.
+enum PodNetwork {
+    // POD_NETWORK_DEFAULT attaches the sandbox network namespace to the pod
+    // network. The runtime performs its configured network plumbing (e.g.,
+    // invokes CNI plugins on Linux). This is the default and matches
+    // historical behavior.
+    POD_NETWORK_DEFAULT = 0;
+    // POD_NETWORK_NONE creates the sandbox network namespace with only the
+    // loopback interface configured (up) and does not attach it to the pod
+    // network:
+    // - The runtime MUST NOT perform its pod network plumbing when the
+    //   sandbox is created or torn down (e.g., MUST NOT invoke CNI ADD or
+    //   DEL on Linux).
+    // - PodSandboxStatus.network MUST NOT report any IP: the field MAY be
+    //   omitted, or set with an empty ip and no additional_ips.
+    // - The sandbox resolver configuration (/etc/resolv.conf) MUST be
+    //   generated from PodSandboxConfig.dns_config exactly as given, even
+    //   when it is empty. The runtime MUST NOT fall back to the host's
+    //   configuration.
+    // Sandboxes with this value only run on nodes whose runtime reports
+    // RuntimeFeatures.pod_network_none; a runtime that does not support it
+    // never receives it from a kubelet.
+    POD_NETWORK_NONE = 1;
+}
+
 // PodSandboxConfig holds all the required and optional fields for creating a
 // sandbox.
 message PodSandboxConfig {
@@ -694,6 +721,14 @@ message PodSandboxConfig {
     LinuxPodSandboxConfig linux = 8;
     // Optional configurations specific to Windows hosts.
     WindowsPodSandboxConfig windows = 9;
+    // pod_network selects whether the sandbox network namespace is attached
+    // to the pod network. It only applies when NamespaceOption.network is
+    // POD; for NODE (host network) sandboxes there is no sandbox network
+    // namespace and runtimes MUST ignore this field. Kubelets that predate
+    // the field leave it unset (POD_NETWORK_DEFAULT).
+    // Feature gate: NetworkIsolatedPods
+    // See https://kep.k8s.io/6313 for more details.
+    PodNetwork pod_network = 10;
 }
 
 message RunPodSandboxRequest {
@@ -2071,6 +2106,13 @@ message RuntimeFeatures {
     // Feature gate: SecurityProfileOCI
     // See https://kep.k8s.io/6061 for more details.
     bool seccomp_profile_oci = 5;
+    // pod_network_none is set to true if the runtime supports creating
+    // sandboxes with PodNetwork POD_NETWORK_NONE for every
+    // runtime handler it serves. The capability is runtime-wide because the
+    // default pod network plumbing it skips is done by the runtime, not by
+    // the handler.
+    // See https://kep.k8s.io/6313 for more details.
+    bool pod_network_none = 6;
 }
 
 message StatusResponse {

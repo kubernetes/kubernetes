@@ -4115,6 +4115,26 @@ const (
 	DNSNone DNSPolicy = "None"
 )
 
+// PodNetwork selects whether a pod is attached to the pod network.
+// +enum
+// +k8s:alpha(since: "1.38")=+k8s:enum
+type PodNetwork string
+
+const (
+	// PodNetworkDefault attaches the pod to the pod network (the network that
+	// Kubernetes connects every pod to unless the pod opts out). The container
+	// runtime performs its configured network plumbing and the pod is assigned
+	// pod IPs. This is the historical behavior.
+	PodNetworkDefault PodNetwork = "Default"
+
+	// PodNetworkNone does not attach the pod to the pod network. The pod gets
+	// an isolated network namespace with only the loopback interface
+	// configured. The pod's podIPs are left unset. The pod is never selected
+	// into Services and, by default, receives no cluster DNS configuration or
+	// service environment variables.
+	PodNetworkNone PodNetwork = "None"
+)
+
 const (
 	// DefaultTerminationGracePeriodSeconds indicates the default duration in
 	// seconds a pod needs to terminate gracefully.
@@ -4567,11 +4587,14 @@ type PodSpec struct {
 	// +k8s:alpha(since: "1.38")=+k8s:maximum=2147483647
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// dnsPolicy sets the DNS policy for the pod.
-	// Defaults to "ClusterFirst".
+	// Defaults to "ClusterFirst", or to "None" when podNetwork is "None".
 	// Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'.
 	// DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy.
 	// To have DNS options set along with hostNetwork, you have to specify DNS policy
 	// explicitly to 'ClusterFirstWithHostNet'.
+	// 'None' requires dnsConfig with at least one nameserver, except when
+	// podNetwork is "None", where it may be left out to get an empty
+	// resolver configuration.
 	// +optional
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// nodeSelector is a selector which must be true for the pod to fit on a node.
@@ -4606,6 +4629,8 @@ type PodSpec struct {
 	// When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
 	// and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
 	// Default to false.
+	// When true, podNetwork may not be set: the pod has no network namespace
+	// of its own.
 	// +optional
 	HostNetwork bool `json:"hostNetwork,omitempty" protobuf:"varint,11,opt,name=hostNetwork"`
 	// hostPID uses the host's pid namespace.
@@ -4701,7 +4726,9 @@ type PodSpec struct {
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// enableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
-	// Optional: Defaults to true.
+	// Optional: Defaults to true, or to false when podNetwork is "None".
+	// For pods with podNetwork "None", false also leaves out the
+	// KUBERNETES_* variables of the kubernetes service.
 	// +optional
 	EnableServiceLinks *bool `json:"enableServiceLinks,omitempty" protobuf:"varint,30,opt,name=enableServiceLinks"`
 	// preemptionPolicy is the Policy for preempting pods with lower priority.
@@ -4889,6 +4916,27 @@ type PodSpec struct {
 	// +k8s:maxItems=10
 	// +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
 	EvictionResponders []EvictionResponder `json:"evictionResponders,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,44,rep,name=evictionResponders"`
+
+	// podNetwork selects whether the pod is attached to the pod network.
+	// "Default" attaches the pod to the pod network, as always. "None" gives
+	// the pod an isolated network namespace with only the loopback interface
+	// configured, not attached to the pod network and with no automatic
+	// network plumbing.
+	// When unset, the pod is attached to the pod network.
+	// This field is about the pod's own network namespace and may not be set
+	// when hostNetwork is true. When "None" is selected, dnsPolicy defaults
+	// to "None" and enableServiceLinks defaults to false (both can be
+	// overridden), and features that need to reach the pod from the node
+	// (hostPort, and httpGet, tcpSocket and grpc probes and lifecycle
+	// handlers) are forbidden.
+	// To attach a workload template that is set to "None" to the pod network
+	// again, set this field to "Default"; an update that leaves the field
+	// out keeps the stored value.
+	// This field is immutable on Pods.
+	// +featureGate=NetworkIsolatedPods
+	// +optional
+	// +k8s:optional
+	PodNetwork *PodNetwork `json:"podNetwork,omitempty" protobuf:"bytes,45,opt,name=podNetwork,casttype=PodNetwork"`
 }
 
 // PodResourceClaim references exactly one ResourceClaim, either directly

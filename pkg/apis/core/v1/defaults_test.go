@@ -3363,6 +3363,100 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	}
 }
 
+func TestSetDefaultPodNetwork(t *testing.T) {
+	testCases := []struct {
+		name             string
+		spec             v1.PodSpec
+		wantPodNetwork   *v1.PodNetwork
+		wantDNSPolicy    v1.DNSPolicy
+		wantServiceLinks bool
+	}{
+		{
+			name:             "unset stays unset",
+			spec:             v1.PodSpec{},
+			wantDNSPolicy:    v1.DNSClusterFirst,
+			wantServiceLinks: true,
+		},
+		{
+			name:             "unset with hostNetwork stays unset",
+			spec:             v1.PodSpec{HostNetwork: true},
+			wantDNSPolicy:    v1.DNSClusterFirst,
+			wantServiceLinks: true,
+		},
+		{
+			name:             "Default stays Default",
+			spec:             v1.PodSpec{PodNetwork: new(v1.PodNetworkDefault)},
+			wantPodNetwork:   new(v1.PodNetworkDefault),
+			wantDNSPolicy:    v1.DNSClusterFirst,
+			wantServiceLinks: true,
+		},
+		{
+			name:             "None defaults dnsPolicy and enableServiceLinks",
+			spec:             v1.PodSpec{PodNetwork: new(v1.PodNetworkNone)},
+			wantPodNetwork:   new(v1.PodNetworkNone),
+			wantDNSPolicy:    v1.DNSNone,
+			wantServiceLinks: false,
+		},
+		{
+			name: "None keeps explicit dnsPolicy and enableServiceLinks",
+			spec: v1.PodSpec{
+				PodNetwork:         new(v1.PodNetworkNone),
+				DNSPolicy:          v1.DNSClusterFirst,
+				EnableServiceLinks: new(true),
+			},
+			wantPodNetwork:   new(v1.PodNetworkNone),
+			wantDNSPolicy:    v1.DNSClusterFirst,
+			wantServiceLinks: true,
+		},
+		{
+			// Invalid combination: validation rejects it and defaulting must not change it.
+			name:             "None with hostNetwork is left for validation",
+			spec:             v1.PodSpec{PodNetwork: new(v1.PodNetworkNone), HostNetwork: true},
+			wantPodNetwork:   new(v1.PodNetworkNone),
+			wantDNSPolicy:    v1.DNSNone,
+			wantServiceLinks: false,
+		},
+	}
+	// Defaulting follows the field whenever it is present; the gate only
+	// controls whether new objects may set it (validation).
+	for _, gateEnabled := range []bool{true, false} {
+		for _, tc := range testCases {
+			t.Run(fmt.Sprintf("gate=%v/%s", gateEnabled, tc.name), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkIsolatedPods, gateEnabled)
+
+				pod := &v1.Pod{Spec: *tc.spec.DeepCopy()}
+				got := roundTrip(t, runtime.Object(pod)).(*v1.Pod).Spec
+				if !reflect.DeepEqual(got.PodNetwork, tc.wantPodNetwork) {
+					t.Errorf("pod: podNetwork = %v, want %v", ptr.Deref(got.PodNetwork, "<nil>"), ptr.Deref(tc.wantPodNetwork, "<nil>"))
+				}
+				if got.HostNetwork != tc.spec.HostNetwork {
+					t.Errorf("pod: hostNetwork = %v, want %v", got.HostNetwork, tc.spec.HostNetwork)
+				}
+				if got.DNSPolicy != tc.wantDNSPolicy {
+					t.Errorf("pod: dnsPolicy = %q, want %q", got.DNSPolicy, tc.wantDNSPolicy)
+				}
+				if got.EnableServiceLinks == nil || *got.EnableServiceLinks != tc.wantServiceLinks {
+					t.Errorf("pod: enableServiceLinks = %v, want %v", ptr.Deref(got.EnableServiceLinks, false), tc.wantServiceLinks)
+				}
+
+				// Templates get the dnsPolicy default, but enableServiceLinks
+				// is only defaulted on Pods.
+				template := &v1.PodTemplate{Template: v1.PodTemplateSpec{Spec: *tc.spec.DeepCopy()}}
+				gotTemplate := roundTrip(t, runtime.Object(template)).(*v1.PodTemplate).Template.Spec
+				if !reflect.DeepEqual(gotTemplate.PodNetwork, tc.wantPodNetwork) {
+					t.Errorf("template: podNetwork = %v, want %v", ptr.Deref(gotTemplate.PodNetwork, "<nil>"), ptr.Deref(tc.wantPodNetwork, "<nil>"))
+				}
+				if gotTemplate.DNSPolicy != tc.wantDNSPolicy {
+					t.Errorf("template: dnsPolicy = %q, want %q", gotTemplate.DNSPolicy, tc.wantDNSPolicy)
+				}
+				if !reflect.DeepEqual(gotTemplate.EnableServiceLinks, tc.spec.EnableServiceLinks) {
+					t.Errorf("template: enableServiceLinks = %v, want %v", gotTemplate.EnableServiceLinks, tc.spec.EnableServiceLinks)
+				}
+			})
+		}
+	}
+}
+
 func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 	cluster := v1.ServiceInternalTrafficPolicyCluster
 	local := v1.ServiceInternalTrafficPolicyLocal

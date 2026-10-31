@@ -1699,6 +1699,15 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	if isTerminal {
 		t.Fatalf("pod should not be terminal: %#v", pod)
 	}
+
+	// A pod that is not attached to the pod network does not depend on it.
+	pod.Spec.HostNetwork = false
+	pod.Spec.PodNetwork = new(v1.PodNetworkNone)
+	isTerminal, _, err = kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.NoError(t, err, "expected pod with podNetwork=None to succeed when network in error")
+	if isTerminal {
+		t.Fatalf("pod should not be terminal: %#v", pod)
+	}
 }
 
 func TestFilterOutInactivePods(t *testing.T) {

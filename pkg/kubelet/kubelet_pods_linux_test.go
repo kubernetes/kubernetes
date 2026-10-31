@@ -20,6 +20,8 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -510,16 +512,26 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 		podVolumes  kubecontainer.VolumeMap
 		podIPs      []string
 		want        bool // check if mounts the /etc/host file
+		wantEntries []string
 		wantErr     bool
 	}{
 		{
-			name:   "pod with network",
-			podIPs: []string{"192.168.0.1"},
-			want:   true,
+			name:        "pod with network",
+			podIPs:      []string{"192.168.0.1"},
+			want:        true,
+			wantEntries: []string{"192.168.0.1\tfakepodname.fakedomain\tfakepodname"},
 		},
 		{
 			name: "pod with network but no IPs",
 			want: false,
+		},
+		{
+			name: "network isolated pod resolves its hostname to loopback",
+			podFn: func(pod *v1.Pod) {
+				pod.Spec.PodNetwork = new(v1.PodNetworkNone)
+			},
+			want:        true,
+			wantEntries: []string{"127.0.0.1\tfakepodname.fakedomain\tfakepodname", "::1\tfakepodname.fakedomain\tfakepodname"},
 		},
 		{
 			name: "pod with host network",
@@ -575,6 +587,15 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 			for _, mount := range mounts {
 				if mount.Name == "k8s-managed-etc-hosts" {
 					got = true
+					content, err := os.ReadFile(mount.HostPath)
+					if err != nil {
+						t.Fatalf("failed to read %s: %v", mount.HostPath, err)
+					}
+					for _, entry := range tt.wantEntries {
+						if !strings.Contains(string(content), entry+"\n") {
+							t.Errorf("/etc/hosts is missing %q:\n%s", entry, content)
+						}
+					}
 					break
 				}
 			}
