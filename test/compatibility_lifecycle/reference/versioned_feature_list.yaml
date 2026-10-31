@@ -1834,6 +1834,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.38"
+- name: SidecarsRestartableDuringPodTermination
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: SizeBasedListCostEstimate
   versionedSpecs:
   - default: true
