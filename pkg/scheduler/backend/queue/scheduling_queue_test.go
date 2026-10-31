@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -6347,19 +6348,6 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 	}
 }
 
-func makeQueuedPodGroup(namespace, pgName string, podInfos ...*framework.QueuedPodInfo) *framework.QueuedPodGroupInfo {
-	pg := st.MakePodGroup().Namespace(namespace).Name(pgName).Obj()
-	pgqi := &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericPodGroup(pg),
-		},
-	}
-	for _, pInfo := range podInfos {
-		pgqi.AddPod(pInfo)
-	}
-	return pgqi
-}
-
 func Test_isEntityWorthRequeuing(t *testing.T) {
 	var evaluatedPods []string
 	queueHintReturnQueue := func(_ klog.Logger, pod *v1.Pod, _, _ any) (fwk.QueueingHint, error) {
@@ -6461,7 +6449,7 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 					},
 				},
 			},
-			entity: makeQueuedPodGroup("ns1", "pg1",
+			entity: tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 				&framework.QueuedPodInfo{
 					PodInfo:              mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
 					UnschedulablePlugins: sets.New("pluginA"),
@@ -6486,7 +6474,7 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 					},
 				},
 			},
-			entity: makeQueuedPodGroup("ns1", "pg1",
+			entity: tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 				&framework.QueuedPodInfo{
 					PodInfo:              mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
 					UnschedulablePlugins: sets.New("pluginSkip"),
@@ -6514,7 +6502,7 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 					},
 				},
 			},
-			entity: makeQueuedPodGroup("ns1", "pg1",
+			entity: tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 				&framework.QueuedPodInfo{
 					PodInfo:              mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
 					UnschedulablePlugins: sets.New("pluginSkip"),
@@ -6539,7 +6527,7 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 					},
 				},
 			},
-			entity: makeQueuedPodGroup("ns1", "pg1",
+			entity: tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 				&framework.QueuedPodInfo{
 					PodInfo:              mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
 					UnschedulablePlugins: sets.New("pluginUnsched"),
@@ -6564,7 +6552,7 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 					},
 				},
 			},
-			entity: makeQueuedPodGroup("ns1", "pg1",
+			entity: tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 				&framework.QueuedPodInfo{
 					PodInfo:              mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
 					UnschedulablePlugins: sets.New("pluginUnsched"),
@@ -6588,7 +6576,7 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 					},
 				},
 			},
-			entity: makeQueuedPodGroup("ns1", "pg1",
+			entity: tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 				&framework.QueuedPodInfo{
 					PodInfo:        mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
 					PendingPlugins: sets.New("pluginPending"),
@@ -6612,7 +6600,7 @@ func Test_isEntityWorthRequeuing(t *testing.T) {
 					},
 				},
 			},
-			entity: makeQueuedPodGroup("ns1", "pg1",
+			entity: tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
 				&framework.QueuedPodInfo{
 					PodInfo:        mustNewPodInfo(st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()),
 					PendingPlugins: sets.New("pluginSkip"),
@@ -10311,24 +10299,15 @@ func newQueuedPodGroupInfoForLookup(namespace, name string, entityType fwk.Entit
 }
 
 func newSingleLevelPodGroupInfo(podInfo *framework.QueuedPodInfo, podGroup *schedulingv1beta1.PodGroup) *framework.QueuedPodGroupInfo {
-	pgName := *podInfo.Pod.Spec.SchedulingGroup.PodGroupName
 	pgObj := podGroup
 	if pgObj == nil {
-		pgObj = &schedulingv1beta1.PodGroup{
-			Namespace: podInfo.Pod.Namespace,
-			Name:      pgName,
-		}
+		pgObj = st.MakePodGroup().Namespace(podInfo.Pod.Namespace).Name(*podInfo.Pod.Spec.SchedulingGroup.PodGroupName).Obj()
 	}
-	pgqi := &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericPodGroup(pgObj),
-		},
-		QueueingParams: framework.QueueingParams{
-			Timestamp:               podInfo.Timestamp,
-			InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
-		},
+	pgqi := tf.MakeQueuedPodGroupInfo(tf.MakePodGroupInfo(pgObj), podInfo)
+	pgqi.QueueingParams = framework.QueueingParams{
+		Timestamp:               podInfo.Timestamp,
+		InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
 	}
-	pgqi.AddPod(podInfo)
 	return pgqi
 }
 

@@ -24,10 +24,10 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 var _ metrics.MetricRecorder = &mockMetricRecorder{}
@@ -244,14 +244,12 @@ func TestUnschedulablePodGroups_Unified(t *testing.T) {
 	gatedRecorder := &mockMetricRecorder{}
 	ue := newUnschedulableEntities(unschedulableRecorder, gatedRecorder)
 
-	pgInfo := &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
+	pgInfo := tf.MakeQueuedPodGroupInfo(
+		tf.MakePodGroupInfo(st.MakePodGroup().Name("pg1").Namespace("ns1").Obj()),
+		&framework.QueuedPodInfo{
+			PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()},
 		},
-	}
-	pgInfo.AddPod(&framework.QueuedPodInfo{
-		PodInfo: &framework.PodInfo{Pod: st.MakePod().Name("p1").Namespace("ns1").PodGroupName("pg1").Obj()},
-	})
+	)
 
 	ue.addOrUpdate(pgInfo, false, "test", nil)
 	if ue.get(pgInfo) == nil {

@@ -2265,10 +2265,9 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 			}
 			pods = append(pods, p.Obj())
 		}
-		return newTestPodGroupInfo(
+		return tf.MakePodGroupInfo(
 			st.MakePodGroup().Name("preemptor-pg").Namespace("default").Priority(priority).Obj(),
-			nil,
-			pods,
+			pods...,
 		)
 	}
 

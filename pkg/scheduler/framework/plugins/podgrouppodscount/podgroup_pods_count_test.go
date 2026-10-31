@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -40,6 +39,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 func init() {
@@ -102,7 +102,7 @@ func TestScorePlacement(t *testing.T) {
 	}{
 		{
 			name:         "existing assigned and assumed pods",
-			podGroupInfo: makePodGroup(),
+			podGroupInfo: tf.MakePodGroupInfo("root"),
 			assignedPods: []scheduledPod{
 				{assignedNode: "node2"},
 				{assignedNode: "node3"},
@@ -117,7 +117,7 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name:         "no assumed pods",
-			podGroupInfo: makePodGroup(),
+			podGroupInfo: tf.MakePodGroupInfo("root"),
 			assignedPods: []scheduledPod{
 				{assignedNode: "node1"},
 			},
@@ -128,7 +128,7 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name:         "no assigned pods",
-			podGroupInfo: makePodGroup(),
+			podGroupInfo: tf.MakePodGroupInfo("root"),
 			assumedPods: []scheduledPod{
 				{assignedNode: "node1"},
 			},
@@ -139,7 +139,7 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name:         "no assigned pods, no assumed pods",
-			podGroupInfo: makePodGroup(),
+			podGroupInfo: tf.MakePodGroupInfo("root"),
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: proposedAssignments,
 			},
@@ -147,7 +147,7 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name:         "for cpg existing assigned and assumed pods across multi-level hierarchies",
-			podGroupInfo: makeCompositePodGroup(),
+			podGroupInfo: tf.MakeCompositePodGroupInfo("root"),
 			assignedPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -171,7 +171,7 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name:         "for cpg with no assumed pods",
-			podGroupInfo: makeCompositePodGroup(),
+			podGroupInfo: tf.MakeCompositePodGroupInfo("root"),
 			assignedPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -185,7 +185,7 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name:         "for cpg with no assigned pods",
-			podGroupInfo: makeCompositePodGroup(),
+			podGroupInfo: tf.MakeCompositePodGroupInfo("root"),
 			assumedPods: []scheduledPod{
 				{
 					pathToRoot:   []string{"pg1", "cpg1"},
@@ -199,7 +199,7 @@ func TestScorePlacement(t *testing.T) {
 		},
 		{
 			name:         "for cpg with no assigned pods, no assumed pods",
-			podGroupInfo: makeCompositePodGroup(),
+			podGroupInfo: tf.MakeCompositePodGroupInfo("root"),
 			placement: &fwk.PodGroupAssignments{
 				ProposedAssignments: proposedAssignments,
 			},
@@ -380,13 +380,7 @@ func TestNormalizePlacementScore(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pl := &PodGroupPodsCount{}
-			pgInfo := &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericPodGroup(&schedulingv1beta1.PodGroup{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pg1",
-					},
-				}),
-			}
+			pgInfo := tf.MakePodGroupInfo("pg1")
 			status := pl.NormalizePlacementScore(context.Background(), nil, pgInfo, tt.scores)
 			if tt.expectedError != "" {
 				if status.IsSuccess() {
@@ -407,34 +401,4 @@ func TestNormalizePlacementScore(t *testing.T) {
 			}
 		})
 	}
-}
-
-func makePodGroupInfoFromPG(pg *schedulingv1beta1.PodGroup) fwk.PodGroupInfo {
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericPodGroup(pg),
-	}
-}
-
-func makePodGroupInfoFromCPG(cpg *schedulingv1beta1.CompositePodGroup) fwk.PodGroupInfo {
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
-	}
-}
-
-func makePodGroup() fwk.PodGroupInfo {
-	return makePodGroupInfoFromPG(&schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "root",
-			Namespace: "default",
-		},
-	})
-}
-
-func makeCompositePodGroup() fwk.PodGroupInfo {
-	return makePodGroupInfoFromCPG(&schedulingv1beta1.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "root",
-			Namespace: "default",
-		},
-	})
 }
