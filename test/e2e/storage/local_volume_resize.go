@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -63,7 +64,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-expansion", func() {
 			// Choose a random node
 			randomNode := &nodes.Items[rand.Intn(len(nodes.Items))]
 
-			hostExec := utils.NewHostExec(f)
+			hostExec := e2ehostexec.New(f)
 			ltrMgr := utils.NewLocalResourceManager("local-volume-test", hostExec, hostBase)
 			config = &localTestConfig{
 				ns:           f.Namespace.Name,

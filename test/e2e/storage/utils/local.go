@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ehostexec "k8s.io/kubernetes/test/e2e/framework/hostexec"
 )
 
 // LocalVolumeType represents type of local volume, e.g. tmpfs, directory,
@@ -79,14 +80,14 @@ type LocalTestResourceManager interface {
 // ltrMgr implements LocalTestResourceManager
 type ltrMgr struct {
 	prefix   string
-	hostExec HostExec
+	hostExec e2ehostexec.HostExec
 	// hostBase represents a writable directory on the host under which we
 	// create test directories
 	hostBase string
 }
 
 // NewLocalResourceManager returns a instance of LocalTestResourceManager
-func NewLocalResourceManager(prefix string, hostExec HostExec, hostBase string) LocalTestResourceManager {
+func NewLocalResourceManager(prefix string, hostExec e2ehostexec.HostExec, hostBase string) LocalTestResourceManager {
 	return &ltrMgr{
 		prefix:   prefix,
 		hostExec: hostExec,
