@@ -18,6 +18,7 @@ package fuzzer
 
 import (
 	"math"
+	"strconv"
 
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -81,6 +82,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					j.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
 						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: &minCount},
 					}
+				}
+			}
+			if j.PodFailurePolicy != nil {
+				for i, rule := range j.PodFailurePolicy.Rules {
+					name := strconv.Itoa(i)
+					rule.Name = &name
 				}
 			}
 		},

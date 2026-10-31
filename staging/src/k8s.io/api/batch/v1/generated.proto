@@ -284,6 +284,7 @@ message JobSpec {
   // with restartPolicy=OnFailure.
   //
   // +optional
+  // +k8s:optional
   optional PodFailurePolicy podFailurePolicy = 11;
 
   // successPolicy specifies the policy when the Job can be declared as succeeded.
@@ -575,6 +576,8 @@ message PodFailurePolicy {
   // the backoffLimit. At most 20 elements are allowed.
   // +listType=atomic
   // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:customValidation
   repeated PodFailurePolicyRule rules = 1;
 }
 
@@ -661,6 +664,21 @@ message PodFailurePolicyRule {
   // +listType=atomic
   // +optional
   repeated PodFailurePolicyOnPodConditionsPattern onPodConditions = 3;
+
+  // name of the pod failure policy rule. When a rule with the FailJob action
+  // fails the Job, the Job Failed condition reason is set to
+  // `PodFailurePolicy_<name>`, or to `PodFailurePolicy_<index>` when the name
+  // is unset, where <index> is the zero-based index of the rule.
+  // The name must be non-empty, unique within the Job, must not equal the index
+  // of another rule, and the generated reason must be a valid condition reason
+  // of at most 128 characters.
+  // This field is alpha-level and is only honored by servers that enable the
+  // PodFailurePolicyName feature gate.
+  // +featureGate=PodFailurePolicyName
+  // +optional
+  // +k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:maxBytes=111
+  optional string name = 4;
 }
 
 // SuccessPolicy describes when a Job can be declared as succeeded based on the success of some indexes.

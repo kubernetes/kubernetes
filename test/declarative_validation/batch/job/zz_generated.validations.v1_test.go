@@ -85,6 +85,9 @@ func init() {
 			"spec.parallelism": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"spec.podFailurePolicy.rules[*].name": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"spec.scheduling": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "update"},
