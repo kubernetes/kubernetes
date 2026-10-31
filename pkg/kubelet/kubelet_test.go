@@ -447,6 +447,8 @@ func newTestKubeletWithImageList(
 		kubelet.nodeName,
 		kubelet.podManager,
 		kubelet.podWorkers,
+		kubelet.secretManager,
+		kubelet.configMapManager,
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
 		kubelet.mounter,
