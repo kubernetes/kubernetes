@@ -547,7 +547,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// - having it large enough to ensure that watchers that need to process
 	//   a bunch of changes have enough buffer to avoid from blocking other
 	//   watchers on our watcher having a processing hiccup
-	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, selector.indexValue != nil)
+	chanSize := c.watchCache.suggestedWatchChannelSize(len(selector.scope.name) > 0 || selector.indexValue != nil)
 
 	// client-go is going to fall back to a standard LIST on any error
 	// returned for watch-list requests

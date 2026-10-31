@@ -3831,3 +3831,76 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 		})
 	}
 }
+
+func TestCacherWatchChannelSize(t *testing.T) {
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	require.NoError(t, err)
+	defer cacher.Stop()
+
+	cacher.watchCache.Lock()
+	cacher.watchCache.history.doCacheResizeLocked(75000)
+	cacher.watchCache.Unlock()
+
+	nodeNameTrigger := &indexedTriggerFunc{
+		indexName:   "spec.nodeName",
+		indexerFunc: func(obj runtime.Object) string { return obj.(*example.Pod).Spec.NodeName },
+	}
+	testCases := []struct {
+		name           string
+		indexedTrigger *indexedTriggerFunc
+		predicate      storage.SelectionPredicate
+		expectedSize   int
+	}{
+		{
+			name:         "unscoped watch without custom indexed trigger",
+			predicate:    storage.Everything,
+			expectedSize: 1000,
+		},
+		{
+			name: "metadata.name watch without custom indexed trigger",
+			predicate: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.OneTermEqualSelector("metadata.name", "pod-1"),
+			},
+			expectedSize: 10,
+		},
+		{
+			name:           "metadata.name watch with custom indexed trigger",
+			indexedTrigger: nodeNameTrigger,
+			predicate: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.OneTermEqualSelector("metadata.name", "pod-1"),
+				IndexFields: []string{"spec.nodeName"},
+			},
+			expectedSize: 10,
+		},
+		{
+			name:           "indexed-field watch with custom indexed trigger",
+			indexedTrigger: nodeNameTrigger,
+			predicate: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.OneTermEqualSelector("spec.nodeName", "node-1"),
+				IndexFields: []string{"spec.nodeName"},
+			},
+			expectedSize: 10,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			cacher.indexedTrigger = testCase.indexedTrigger
+			watcher, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{
+				ResourceVersion: "0",
+				Predicate:       testCase.predicate,
+				Recursive:       true,
+			})
+			require.NoError(t, err)
+			defer watcher.Stop()
+
+			cachedWatcher := watcher.(*cacheWatcher)
+			require.Equal(t, testCase.expectedSize, cap(cachedWatcher.input))
+			require.Equal(t, testCase.expectedSize, cap(cachedWatcher.result))
+		})
+	}
+}
