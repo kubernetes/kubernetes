@@ -650,11 +650,12 @@ type lowHighOOMScoreAdjTest struct {
 	highOOMScoreAdj int
 }
 type oomTest struct {
-	pod                               *v1.Pod
-	memoryCapacity                    int64
-	lowHighOOMScoreAdj                map[string]lowHighOOMScoreAdjTest // [container-name] : min and max oom_score_adj score the container should be assigned.
-	podLevelResourcesFeatureEnabled   bool
-	enableDRANodeAllocatableResources bool
+	pod                                *v1.Pod
+	memoryCapacity                     int64
+	lowHighOOMScoreAdj                 map[string]lowHighOOMScoreAdjTest // [container-name] : min and max oom_score_adj score the container should be assigned.
+	podLevelResourcesFeatureEnabled    bool
+	enableDRANodeAllocatableResources  bool
+	kubeletLogarithmicOOMScoreAdj      bool
 }
 
 type draMemAllocation struct {
@@ -1083,6 +1084,7 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesFeatureEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, test.enableDRANodeAllocatableResources)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletLogarithmicOOMScoreAdj, test.kubeletLogarithmicOOMScoreAdj)
 			listContainers := test.pod.Spec.InitContainers
 			listContainers = append(listContainers, test.pod.Spec.Containers...)
 			for _, container := range listContainers {
@@ -1093,5 +1095,289 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func burstableMemoryPod(name, request, limit string) *v1.Pod {
+	resources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse(request),
+			v1.ResourceCPU:    resource.MustParse("1m"),
+		},
+	}
+	if limit != "" {
+		resources.Limits = v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse(limit),
+		}
+	}
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:      name,
+					Resources: resources,
+				},
+			},
+		},
+	}
+}
+
+func TestLogarithmicBurstableOOMScoreAdjust(t *testing.T) {
+	oneTi := resource.MustParse("1Ti").Value()
+	sixteenGi := resource.MustParse("16Gi").Value()
+
+	tests := []struct {
+		name     string
+		request  int64
+		limit    int64
+		capacity int64
+		want     int64
+	}{
+		{
+			name:     "1Ti small memory-guaranteed orchestrator",
+			request:  resource.MustParse("50Mi").Value(),
+			limit:    resource.MustParse("50Mi").Value(),
+			capacity: oneTi,
+			want:     176,
+		},
+		{
+			name:     "1Ti standard memory-guaranteed orchestrator",
+			request:  resource.MustParse("500Mi").Value(),
+			limit:    resource.MustParse("500Mi").Value(),
+			capacity: oneTi,
+			want:     147,
+		},
+		{
+			name:     "1Ti spiky executor",
+			request:  resource.MustParse("500Mi").Value(),
+			limit:    resource.MustParse("32Gi").Value(),
+			capacity: oneTi,
+			want:     540,
+		},
+		{
+			name:     "1Ti unbounded worker",
+			request:  resource.MustParse("500Mi").Value(),
+			limit:    0,
+			capacity: oneTi,
+			want:     546,
+		},
+		{
+			name:     "1Ti medium service",
+			request:  resource.MustParse("4Gi").Value(),
+			limit:    resource.MustParse("8Gi").Value(),
+			capacity: oneTi,
+			want:     320,
+		},
+		{
+			name:     "1Ti large database",
+			request:  resource.MustParse("64Gi").Value(),
+			limit:    resource.MustParse("64Gi").Value(),
+			capacity: oneTi,
+			want:     85,
+		},
+		{
+			name:     "1Ti huge database",
+			request:  resource.MustParse("500Gi").Value(),
+			limit:    resource.MustParse("500Gi").Value(),
+			capacity: oneTi,
+			want:     59,
+		},
+		{
+			name:     "16Gi small memory-guaranteed",
+			request:  resource.MustParse("50Mi").Value(),
+			limit:    resource.MustParse("50Mi").Value(),
+			capacity: sixteenGi,
+			want:     136,
+		},
+		{
+			name:     "16Gi standard memory-guaranteed",
+			request:  resource.MustParse("500Mi").Value(),
+			limit:    resource.MustParse("500Mi").Value(),
+			capacity: sixteenGi,
+			want:     102,
+		},
+		{
+			name:     "16Gi bursty",
+			request:  resource.MustParse("500Mi").Value(),
+			limit:    resource.MustParse("4Gi").Value(),
+			capacity: sixteenGi,
+			want:     453,
+		},
+		{
+			name:     "16Gi 2Gi guaranteed",
+			request:  resource.MustParse("2Gi").Value(),
+			limit:    resource.MustParse("2Gi").Value(),
+			capacity: sixteenGi,
+			want:     81,
+		},
+		{
+			name:     "16Gi 12Gi guaranteed",
+			request:  resource.MustParse("12Gi").Value(),
+			limit:    resource.MustParse("12Gi").Value(),
+			capacity: sixteenGi,
+			want:     54,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := logarithmicBurstableOOMScoreAdjust(tc.request, tc.limit, tc.capacity)
+			if got != tc.want {
+				t.Errorf("logarithmicBurstableOOMScoreAdjust() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGetContainerOOMScoreAdjustLogarithmic(t *testing.T) {
+	oneTi := resource.MustParse("1Ti").Value()
+	orchestratorAndExecutor := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "orchestrator",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("500Mi"),
+							v1.ResourceCPU:    resource.MustParse("1m"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("500Mi"),
+						},
+					},
+				},
+				{
+					Name: "executor",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("500Mi"),
+							v1.ResourceCPU:    resource.MustParse("1m"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("32Gi"),
+						},
+					},
+				},
+			},
+		},
+	}
+	sidecarWithSmallerRequest := &v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name:          "sidecar",
+					RestartPolicy: &restartPolicyAlways,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("50Mi"),
+							v1.ResourceCPU:    resource.MustParse("1m"),
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "main",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("500Mi"),
+							v1.ResourceCPU:    resource.MustParse("1m"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("32Gi"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := map[string]oomTest{
+		"legacy-1ti-small-collapses-to-999": {
+			pod:            burstableMemoryPod("small", "50Mi", "50Mi"),
+			memoryCapacity: oneTi,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"small": {lowOOMScoreAdj: 999, highOOMScoreAdj: 999},
+			},
+		},
+		"log-1ti-small-orchestrator": {
+			pod:                           burstableMemoryPod("small", "50Mi", "50Mi"),
+			memoryCapacity:                oneTi,
+			kubeletLogarithmicOOMScoreAdj: true,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"small": {lowOOMScoreAdj: 176, highOOMScoreAdj: 176},
+			},
+		},
+		"log-1ti-orchestrator-vs-executor": {
+			pod:                           orchestratorAndExecutor,
+			memoryCapacity:                oneTi,
+			kubeletLogarithmicOOMScoreAdj: true,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"orchestrator": {lowOOMScoreAdj: 147, highOOMScoreAdj: 147},
+				"executor":     {lowOOMScoreAdj: 540, highOOMScoreAdj: 540},
+			},
+		},
+		"log-1ti-unbounded-worker": {
+			pod:                           burstableMemoryPod("worker", "500Mi", ""),
+			memoryCapacity:                oneTi,
+			kubeletLogarithmicOOMScoreAdj: true,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"worker": {lowOOMScoreAdj: 546, highOOMScoreAdj: 546},
+			},
+		},
+		"log-besteffort-unchanged": {
+			pod:                           &noRequestLimit,
+			memoryCapacity:                oneTi,
+			kubeletLogarithmicOOMScoreAdj: true,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"no-request-limit": {lowOOMScoreAdj: 1000, highOOMScoreAdj: 1000},
+			},
+		},
+		"log-guaranteed-unchanged": {
+			pod:                           &equalRequestLimitCPUMemory,
+			memoryCapacity:                oneTi,
+			kubeletLogarithmicOOMScoreAdj: true,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"equal-request-limit-cpu-memory": {lowOOMScoreAdj: -997, highOOMScoreAdj: -997},
+			},
+		},
+		"log-sidecar-clamped-to-regular-container": {
+			pod:                           sidecarWithSmallerRequest,
+			memoryCapacity:                oneTi,
+			kubeletLogarithmicOOMScoreAdj: true,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				// main 500Mi/32Gi = 540. Unbounded 50Mi sidecar would be 576;
+				// clamp so it is not killed before the worst regular container.
+				"main":    {lowOOMScoreAdj: 540, highOOMScoreAdj: 540},
+				"sidecar": {lowOOMScoreAdj: 540, highOOMScoreAdj: 540},
+			},
+		},
+		"log-node-critical-unchanged": {
+			pod:                           &nodeCritical,
+			memoryCapacity:                oneTi,
+			kubeletLogarithmicOOMScoreAdj: true,
+			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
+				"node-critical": {lowOOMScoreAdj: -997, highOOMScoreAdj: -997},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletLogarithmicOOMScoreAdj, test.kubeletLogarithmicOOMScoreAdj)
+			listContainers := test.pod.Spec.InitContainers
+			listContainers = append(listContainers, test.pod.Spec.Containers...)
+			for _, container := range listContainers {
+				oomScoreAdj := GetContainerOOMScoreAdjust(test.pod, &container, test.memoryCapacity)
+				want, ok := test.lowHighOOMScoreAdj[container.Name]
+				if !ok {
+					t.Errorf("missing expected oom_score_adj for container %s", container.Name)
+					continue
+				}
+				if oomScoreAdj < want.lowOOMScoreAdj || oomScoreAdj > want.highOOMScoreAdj {
+					t.Errorf("oom_score_adj %s should be between %d and %d, but was %d", container.Name, want.lowOOMScoreAdj, want.highOOMScoreAdj, oomScoreAdj)
+				}
+			}
+		})
 	}
 }
