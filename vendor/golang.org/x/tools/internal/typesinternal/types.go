@@ -247,7 +247,7 @@ func ObjectKind(obj types.Object) string {
 // ImplicitFieldSelections returns the sequence of implicit embedded fields
 // traversed by the given selection. It skips the final leaf field or method.
 // The boolean component indicates whether the traversal traversed a pointer.
-func ImplicitFieldSelections(seln types.Selection) iter.Seq2[*types.Var, bool] {
+func ImplicitFieldSelections(seln *types.Selection) iter.Seq2[*types.Var, bool] {
 	return func(yield func(*types.Var, bool) bool) {
 		var (
 			t       = seln.Recv()
