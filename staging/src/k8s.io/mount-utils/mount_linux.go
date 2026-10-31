@@ -678,6 +678,17 @@ func getDiskFormat(exec utilexec.Interface, disk string) (string, error) {
 				// For `blkid`, if the specified token (TYPE/PTTYPE, etc) was
 				// not found, or no (specified) devices could be identified, an
 				// exit code of 2 is returned.
+				//
+				// We must verify the device exists and is a block device to avoid
+				// running mkfs on temporarily unavailable disks (e.g. during attach delays).
+				info, statErr := os.Stat(disk)
+				if statErr != nil {
+					return "", fmt.Errorf("failed to stat disk %q after blkid exit 2: %w", disk, statErr)
+				}
+				// Verify path is a device or regular file (loop device / image backing)
+				if info.Mode()&(os.ModeDevice|os.ModeCharDevice) == 0 && !info.Mode().IsRegular() {
+					return "", fmt.Errorf("disk %q is not a valid device or image file", disk)
+				}
 				return "", nil
 			}
 		}
