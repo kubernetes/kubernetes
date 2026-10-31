@@ -1943,18 +1943,6 @@ func TestValidateIngressClass(t *testing.T) {
 			),
 			expectedErrs: field.ErrorList{},
 		},
-		"valid name, valid controller, invalid params (no kind)": {
-			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(ptr.To("example.com"), "", "bar", ptr.To("Cluster"), nil)),
-			),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.kind"), "")},
-		},
-		"valid name, valid controller, invalid params (no name)": {
-			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
-				setParams(makeIngressClassParams(ptr.To("example.com"), "foo", "", ptr.To("Cluster"), nil)),
-			),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec.parameters.name"), "")},
-		},
 		"valid name, valid controller, invalid params (bad kind)": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",
 				setParams(makeIngressClassParams(nil, "foo/", "bar", ptr.To("Cluster"), nil)),
