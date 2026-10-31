@@ -2812,6 +2812,67 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
 			},
 		},
+		"Ephemeral container exited and removed from runtime; do not restart": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Status.EphemeralContainerStatuses = []v1.ContainerStatus{
+					{
+						Name:        "debug",
+						ContainerID: "docker://debug1",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: 0,
+								Reason:   "Completed",
+							},
+						},
+					},
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:4]
+			},
+			actions: noAction,
+		},
+		"Ephemeral container in waiting state with no container ID; start it": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Status.EphemeralContainerStatuses = []v1.ContainerStatus{
+					{
+						Name: "debug",
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{
+								Reason: "ContainerCreating",
+							},
+						},
+					},
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:4]
+			},
+			actions: podActions{
+				SandboxID:                  baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart:          []int{},
+				ContainersToKill:           map[kubecontainer.ContainerID]containerToKillInfo{},
+				EphemeralContainersToStart: []int{0},
+			},
+		},
+		"Ephemeral container previously had LastTerminationState; do not restart": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Status.EphemeralContainerStatuses = []v1.ContainerStatus{
+					{
+						Name: "debug",
+						LastTerminationState: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: 1,
+							},
+						},
+					},
+				}
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:4]
+			},
+			actions: noAction,
+		},
 		"initialization in progress; start ephemeral container": {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				status.ContainerStatuses[3].State = kubecontainer.ContainerStateRunning
