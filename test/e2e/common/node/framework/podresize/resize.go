@@ -354,11 +354,14 @@ func verifyOomScoreAdj(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 	}
 
 	nodeMemoryCapacity := node.Status.Capacity[v1.ResourceMemory]
-	oomScoreAdj := kubeqos.GetContainerOOMScoreAdjust(pod, container, int64(nodeMemoryCapacity.Value()))
-	expectedOomScoreAdj := strconv.FormatInt(int64(oomScoreAdj), 10)
+	// The node may run with KubeletOOMScoreAdjTieBreak on or off.
+	var expectedOomScoreAdj []string
+	for _, adj := range kubeqos.PossibleContainerOOMScoreAdjusts(pod, container, int64(nodeMemoryCapacity.Value())) {
+		expectedOomScoreAdj = append(expectedOomScoreAdj, strconv.Itoa(adj))
+	}
 
 	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
-		return cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj), nil
+		return cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj...), nil
 	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
 }
 
