@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -279,6 +280,7 @@ func TestCleanupUnusedLog(t *testing.T) {
 		"test-log-1.tmp", // temporary log
 		"test-log-2",     // unused log
 		"test-log-2.gz",  // compressed log
+		"test-log-3.tmp", // recoverable temporary log
 	}
 
 	for i := range testLogs {
@@ -293,14 +295,15 @@ func TestCleanupUnusedLog(t *testing.T) {
 	}
 	got, err := c.cleanupUnusedLogs(testLogs)
 	require.NoError(t, err)
-	assert.Len(t, got, 2)
-	assert.Equal(t, []string{testLogs[0], testLogs[3]}, got)
+	assert.Len(t, got, 3)
+	assert.Equal(t, []string{testLogs[0], testLogs[3], strings.TrimSuffix(testLogs[4], tmpSuffix)}, got)
 
 	logs, err := os.ReadDir(dir)
 	require.NoError(t, err)
-	assert.Len(t, logs, 2)
+	assert.Len(t, logs, 3)
 	assert.Equal(t, testLogs[0], filepath.Join(dir, logs[0].Name()))
 	assert.Equal(t, testLogs[3], filepath.Join(dir, logs[1].Name()))
+	assert.Equal(t, strings.TrimSuffix(testLogs[4], tmpSuffix), filepath.Join(dir, logs[2].Name()))
 }
 
 func TestRemoveExcessLog(t *testing.T) {
@@ -435,16 +438,32 @@ func TestRotateLatestLog(t *testing.T) {
 		}
 		testFile, err := os.CreateTemp(dir, "test-rotate-latest-log")
 		require.NoError(t, err)
+		testContent := []byte("test log content")
+		_, err = testFile.Write(testContent)
+		require.NoError(t, err)
 		testFile.Close()
 		defer testFile.Close()
 		testLog := testFile.Name()
 		rotatedLog := fmt.Sprintf("%s.%s", testLog, now.Format(timestampFormat))
+		tmpLog := rotatedLog + tmpSuffix
 		err = c.rotateLatestLog(tCtx, "test-id", testLog)
 		assert.Equal(t, test.expectError, err != nil)
 		_, err = os.Stat(testLog)
 		assert.Equal(t, test.expectOriginal, err == nil)
 		_, err = os.Stat(rotatedLog)
 		assert.Equal(t, test.expectRotated, err == nil)
+		if test.expectOriginal {
+			got, err := os.ReadFile(testLog)
+			require.NoError(t, err)
+			assert.Equal(t, testContent, got)
+		}
+		if test.expectRotated {
+			got, err := os.ReadFile(rotatedLog)
+			require.NoError(t, err)
+			assert.Equal(t, testContent, got)
+		}
+		_, err = os.Stat(tmpLog)
+		assert.Error(t, err, "temporary log should be renamed")
 		assert.NoError(t, f.AssertCalls([]string{"ReopenContainerLog"}))
 	}
 }
