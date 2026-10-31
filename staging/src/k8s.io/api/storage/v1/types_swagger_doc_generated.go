@@ -89,6 +89,16 @@ func (CSINodeDriver) SwaggerDoc() map[string]string {
 	return map_CSINodeDriver
 }
 
+var map_CSINodeDriverRegistration = map[string]string{
+	"":       "CSINodeDriverRegistration holds the node ID of a CSI driver whose topology and volume attachment limit are reported by the CSI controller.",
+	"name":   "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
+	"nodeID": "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call.",
+}
+
+func (CSINodeDriverRegistration) SwaggerDoc() map[string]string {
+	return map_CSINodeDriverRegistration
+}
+
 var map_CSINodeList = map[string]string{
 	"":         "CSINodeList is a collection of CSINode objects.",
 	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -100,8 +110,9 @@ func (CSINodeList) SwaggerDoc() map[string]string {
 }
 
 var map_CSINodeSpec = map[string]string{
-	"":        "CSINodeSpec holds information about the specification of all CSI drivers installed on a node",
-	"drivers": "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty.",
+	"":                    "CSINodeSpec holds information about the specification of all CSI drivers installed on a node",
+	"drivers":             "drivers is a list of information of all CSI Drivers existing on a node. If all drivers in the list are uninstalled, this can become empty.",
+	"driverRegistrations": "driverRegistrations lists CSI drivers on this node whose topology and volume attachment limit are reported by the CSI controller instead of the node. kubelet adds an entry with the node ID returned by the driver's NodeGetInfo call, and external-attacher then adds the driver to drivers using ControllerGetNodeInfo. An entry's nodeID must match the nodeID of the drivers entry with the same name, if one exists. This is an alpha field and requires enabling the CSIControllerGetNodeInfo feature gate.",
 }
 
 func (CSINodeSpec) SwaggerDoc() map[string]string {
