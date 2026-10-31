@@ -100,9 +100,10 @@ var _ = SIGDescribe("CRIContainerMetrics", "[LinuxOnly]", framework.WithNodeConf
 				"container_fs_limit_bytes": boundedSample(100*e2evolume.Mb, 10*e2evolume.Tb),
 				// CRI reports filesystem/partition usage, not per-container usage like cAdvisor.
 				"container_fs_usage_bytes": boundedSample(0, 1*e2evolume.Gb),
-				// CRI reports filesystem-level inode counts (whole partition), not per-container.
-				"container_fs_inodes_free":  boundedSample(0, 10*e2evolume.Mb),
-				"container_fs_inodes_total": boundedSample(0, 10*e2evolume.Mb),
+				// CRI reports inode counts for the whole partition, so the values
+				// scale with the node's disk size and can be tens of millions.
+				"container_fs_inodes_free":  boundedSample(0, 1e8),
+				"container_fs_inodes_total": boundedSample(0, 1e8),
 				// hugetlb metrics not implemented by all runtimes
 				"container_hugetlb_max_usage_bytes": boundedSample(0, 10*e2evolume.Mb),
 				"container_hugetlb_usage_bytes":     boundedSample(0, 10*e2evolume.Mb),
