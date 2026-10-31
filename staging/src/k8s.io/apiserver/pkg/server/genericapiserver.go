@@ -100,7 +100,11 @@ type APIGroupInfo struct {
 }
 
 func (a *APIGroupInfo) destroyStorage() {
-	for _, stores := range a.VersionedResourcesStorageMap {
+	destroyStorageMap(a.VersionedResourcesStorageMap)
+}
+
+func destroyStorageMap(versionedResourcesStorageMap map[string]map[string]rest.Storage) {
+	for _, stores := range versionedResourcesStorageMap {
 		for _, store := range stores {
 			store.Destroy()
 		}
@@ -852,7 +856,10 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 
 	}
 
-	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)
+	storageMap := apiGroupInfo.VersionedResourcesStorageMap
+	s.RegisterDestroyFunc(func() {
+		destroyStorageMap(storageMap)
+	})
 
 	if s.FeatureGate.Enabled(features.StorageVersionAPI) &&
 		s.FeatureGate.Enabled(features.APIServerIdentity) {
@@ -1026,18 +1033,30 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	}
 }
 
+type defaultAPIGroupCodecCacheKey struct {
+	scheme      *runtime.Scheme
+	cborEnabled bool
+}
+
+var defaultAPIGroupCodecCache sync.Map
+
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
 // exposed for easier composition from other packages
 func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec runtime.ParameterCodec, codecs serializer.CodecFactory) APIGroupInfo {
-	opts := []serializer.CodecFactoryOptionsMutator{
-		serializer.WithStreamingCollectionEncodingToJSON(),
-		serializer.WithStreamingCollectionEncodingToProtobuf(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
-		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
-	}
-	if len(opts) != 0 {
+	cborEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage)
+	key := defaultAPIGroupCodecCacheKey{scheme: scheme, cborEnabled: cborEnabled}
+	if cachedCodecs, ok := defaultAPIGroupCodecCache.Load(key); ok {
+		codecs = cachedCodecs.(serializer.CodecFactory)
+	} else {
+		opts := []serializer.CodecFactoryOptionsMutator{
+			serializer.WithStreamingCollectionEncodingToJSON(),
+			serializer.WithStreamingCollectionEncodingToProtobuf(),
+		}
+		if cborEnabled {
+			opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
+		}
 		codecs = serializer.NewCodecFactory(scheme, opts...)
+		defaultAPIGroupCodecCache.Store(key, codecs)
 	}
 	return APIGroupInfo{
 		PrioritizedVersions:          scheme.PrioritizedVersionsForGroup(group),
