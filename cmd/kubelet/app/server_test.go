@@ -31,13 +31,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	yaml "go.yaml.in/yaml/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/utils/cpuset"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -694,6 +700,159 @@ func TestInitializeTLSSelfSignedKeyAlgorithm(t *testing.T) {
 		}
 		t.Run(string(algorithm), func(t *testing.T) {
 			verifySelfSignedKey(t, &algorithm, wantKey)
+		})
+	}
+}
+
+func TestParseSystemPartition(t *testing.T) {
+	gib := int64(1 << 30)
+
+	testCases := []struct {
+		name        string
+		input       *kubeletconfiginternal.SystemPartitionConfiguration
+		machineInfo *cadvisorapi.MachineInfo
+		want        *cm.SystemPartitionConfig
+		wantErr     string
+	}{
+		{
+			name:  "not configured",
+			input: nil,
+			want:  nil,
+		},
+		{
+			name: "namespaces only",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				Namespaces: []string{"kube-system"},
+			},
+			want: &cm.SystemPartitionConfig{
+				Namespaces: sets.New("kube-system"),
+			},
+		},
+		{
+			name: "all fields",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit: "1Gi",
+				CPUSet:      "0-1",
+				Namespaces:  []string{"kube-system", "monitoring"},
+			},
+			want: &cm.SystemPartitionConfig{
+				MemoryLimit: &gib,
+				CPUSet:      cpuset.New(0, 1),
+				Namespaces:  sets.New("kube-system", "monitoring"),
+			},
+		},
+		{
+			name: "memory eviction threshold",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "5%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			want: &cm.SystemPartitionConfig{
+				MemoryLimit: &gib,
+				Namespaces:  sets.New("kube-system"),
+				EvictionThresholds: []evictionapi.Threshold{{
+					Signal:   evictionapi.SignalSystemPartitionMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value:    evictionapi.ThresholdValue{Percentage: 0.05},
+				}},
+			},
+		},
+		{
+			name: "unparsable memory eviction threshold",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "5x%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `failed to parse evictionHard map["memory.available":"5x%"]: `,
+		},
+		{
+			name: "memory eviction threshold without memory limit",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				EvictionHard: map[string]string{"memory.available": "200Mi"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `evictionHard requires memoryLimit to be set`,
+		},
+		{
+			name: "memory eviction threshold not below memory limit",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "1Gi"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `evictionHard memory.available "1Gi" must be less than memoryLimit "1Gi"`,
+		},
+		{
+			name: "percentage eviction threshold not below memory limit",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				MemoryLimit:  "1Gi",
+				EvictionHard: map[string]string{"memory.available": "100.0%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `evictionHard memory.available "100.0%" must be less than memoryLimit "1Gi"`,
+		},
+		{
+			name: "disabled eviction threshold without memory limit",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				EvictionHard: map[string]string{"memory.available": "0%"},
+				Namespaces:   []string{"kube-system"},
+			},
+			wantErr: `evictionHard requires memoryLimit to be set`,
+		},
+		{
+			name: "cpuset naming offline CPUs",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				CPUSet:     "2-5",
+				Namespaces: []string{"kube-system"},
+			},
+			wantErr: `cpuSet "2-5" is not a subset of online CPUs "0-3", CPUs 4-5 are not online`,
+		},
+		{
+			name: "topology discovery failure",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				CPUSet:     "0-1",
+				Namespaces: []string{"kube-system"},
+			},
+			machineInfo: &cadvisorapi.MachineInfo{},
+			wantErr:     "unable to discover CPU topology info: could not detect number of cpus",
+		},
+		{
+			name: "topology is not discovered without a cpuset",
+			input: &kubeletconfiginternal.SystemPartitionConfiguration{
+				Namespaces: []string{"kube-system"},
+			},
+			// Discovery fails on this machine, so it must not be tried.
+			machineInfo: &cadvisorapi.MachineInfo{},
+			want: &cm.SystemPartitionConfig{
+				Namespaces: sets.New("kube-system"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			machineInfo := tc.machineInfo
+			if machineInfo == nil {
+				// CPUs 0-3: one socket of two cores with two threads each.
+				machineInfo = &cadvisorapi.MachineInfo{
+					NumCores: 4,
+					Topology: []cadvisorapi.Node{{Cores: []cadvisorapi.Core{
+						{Id: 0, Threads: []int{0, 1}},
+						{Id: 1, Threads: []int{2, 3}},
+					}}},
+				}
+			}
+			logger, _ := ktesting.NewTestContext(t)
+			got, err := parseSystemPartition(logger, machineInfo, tc.input)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				require.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
 		})
 	}
 }

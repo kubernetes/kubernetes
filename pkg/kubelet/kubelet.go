@@ -574,6 +574,14 @@ func NewMainKubelet(ctx context.Context,
 		KernelMemcgNotification:  kernelMemcgNotification,
 		PodCgroupRoot:            kubeDeps.ContainerManager.GetPodCgroupRoot(),
 	}
+	// The root is empty unless the container manager actually runs a system
+	// partition, e.g. not on cgroup v1 even with one configured.
+	if kubeDeps.ContainerManager.GetSystemPartitionCgroupRoot() != "" {
+		if sp := kubeDeps.ContainerManager.GetNodeConfig().SystemPartition; sp != nil {
+			evictionConfig.Thresholds = append(evictionConfig.Thresholds, sp.EvictionThresholds...)
+			evictionConfig.SystemPartitionHasPod = sp.HasPod
+		}
+	}
 
 	var serviceLister corelisters.ServiceLister
 	var serviceHasSynced cache.InformerSynced
@@ -1788,6 +1796,11 @@ func (kl *Kubelet) initializeModules(ctx context.Context) error {
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
 	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSystemPartition) {
+		metrics.RegisterCollectors(collectors.NewPartitionMetricsCollector(func() map[string]cm.PartitionStats {
+			return kl.containerManager.PartitionStats(logger)
+		}))
+	}
 	metrics.SetNodeName(kl.nodeName)
 	servermetrics.Register()
 
