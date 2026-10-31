@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -193,8 +194,21 @@ func (c *CRDFinalizer) deleteInstances(ctx context.Context, crd *apiextensionsv1
 		}, err
 	}
 
-	allResources, err := crClient.List(ctx, nil)
-	if err != nil {
+	// The watch cache may be temporarily unavailable while reinitializing (e.g. after a CRD spec
+	// change). Rather than propagating a 429 to the work queue — which applies exponential backoff
+	// and can delay cleanup by tens of seconds — retry here until the cache is ready.
+	var allResources runtime.Object
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		list, listErr := crClient.List(ctx, nil)
+		if apierrors.IsTooManyRequests(listErr) {
+			return false, nil
+		}
+		if listErr != nil {
+			return false, listErr
+		}
+		allResources = list
+		return true, nil
+	}); err != nil {
 		return apiextensionsv1.CustomResourceDefinitionCondition{
 			Type:    apiextensionsv1.Terminating,
 			Status:  apiextensionsv1.ConditionTrue,
@@ -236,6 +250,10 @@ func (c *CRDFinalizer) deleteInstances(ctx context.Context, crd *apiextensionsv1
 	// Once we have a mechanism for servers to indicate their states, we should check that for concurrence.
 	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		listObj, err := crClient.List(ctx, nil)
+		if apierrors.IsTooManyRequests(err) {
+			// Watch cache reinitializing; treat as "not yet empty" and continue polling.
+			return false, nil
+		}
 		if err != nil {
 			return false, err
 		}
