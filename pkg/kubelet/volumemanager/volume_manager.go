@@ -81,6 +81,19 @@ const (
 	// call waits before retrying
 	podAttachAndMountRetryInterval = 300 * time.Millisecond
 
+	// podAttachAndMountFastRetryInterval is the retry interval used during the
+	// first podAttachAndMountFastPeriod of a wait. Local volumes (secret,
+	// configMap, projected, emptyDir, downwardAPI) are usually set up within
+	// tens of milliseconds, so checking only every
+	// podAttachAndMountRetryInterval delays the start of the pod sandbox by up
+	// to that interval after the volumes are ready.
+	podAttachAndMountFastRetryInterval = 10 * time.Millisecond
+
+	// podAttachAndMountFastPeriod is how long a wait polls at
+	// podAttachAndMountFastRetryInterval before falling back to
+	// podAttachAndMountRetryInterval.
+	podAttachAndMountFastPeriod = 1 * time.Second
+
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
 	// Set to 10 minutes because we've seen attach operations take several
@@ -439,12 +452,7 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 	// like Downward API, depend on this to update the contents of the volume).
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 
-	err := wait.PollUntilContextTimeout(
-		ctx,
-		podAttachAndMountRetryInterval,
-		podAttachAndMountTimeout,
-		true,
-		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
+	err := pollVolumes(ctx, vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
 
 	if err != nil {
 		unmountedVolumes :=
@@ -507,12 +515,7 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 
-	err := wait.PollUntilContextTimeout(
-		ctx,
-		podAttachAndMountRetryInterval,
-		podAttachAndMountTimeout,
-		true,
-		vm.verifyVolumesUnmountedFunc(uniquePodName))
+	err := pollVolumes(ctx, vm.verifyVolumesUnmountedFunc(uniquePodName))
 
 	if err != nil {
 		var mountedVolumes []v1.UniqueVolumeName
@@ -573,6 +576,21 @@ func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName)
 		}
 	}
 	return unattachedVolumes
+}
+
+// pollVolumes calls condition until it returns true or an error, or until
+// podAttachAndMountTimeout passes. It polls every
+// podAttachAndMountFastRetryInterval for the first podAttachAndMountFastPeriod
+// and every podAttachAndMountRetryInterval after that.
+func pollVolumes(ctx context.Context, condition wait.ConditionWithContextFunc) error {
+	ctx, cancel := context.WithTimeout(ctx, podAttachAndMountTimeout)
+	defer cancel()
+
+	err := wait.PollUntilContextTimeout(ctx, podAttachAndMountFastRetryInterval, podAttachAndMountFastPeriod, true, condition)
+	if err == nil || ctx.Err() != nil || !wait.Interrupted(err) {
+		return err
+	}
+	return wait.PollUntilContextCancel(ctx, podAttachAndMountRetryInterval, false, condition)
 }
 
 // verifyVolumesMountedFunc returns a method that returns true when all expected
