@@ -872,6 +872,89 @@ func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(c1.IO)
 }
 
+func TestCRIPodCPUAndMemoryStatsSwapFallback(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, true)
+
+	const (
+		podName      = "test-pod"
+		podNamespace = "test-ns"
+		podUID       = types.UID(podName + "-uid")
+	)
+	var (
+		sandbox0        = makeFakePodSandbox(podName, string(podUID), podNamespace, false)
+		container0      = makeFakeContainer(sandbox0, cName0, 0, false)
+		containerStats0 = makeFakeContainerStatsStrictlyFromCRI(seedContainer0, container0, "")
+		swapUsage       = uint64(64 * 1024 * 1024)
+	)
+	// Simulate a CRI runtime (such as containerd) that omits Swap from ContainerStats.
+	containerStats0.Swap = nil
+
+	var (
+		mockCadvisor       = cadvisortest.NewMockInterface(t)
+		mockPodManager     = new(kubepodtest.MockManager)
+		resourceAnalyzer   = new(fakeResourceAnalyzer)
+		fakeRuntimeService = critest.NewFakeRuntimeService()
+		fallbackProvider   = fakeContainerStatsProvider{
+			podStats: &statsapi.PodStats{
+				Swap: &statsapi.SwapStats{SwapUsageBytes: &swapUsage},
+				Containers: []statsapi.ContainerStats{
+					{
+						Name: cName0,
+						Swap: &statsapi.SwapStats{SwapUsageBytes: &swapUsage},
+					},
+				},
+			},
+		}
+	)
+
+	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{sandbox0})
+	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{container0})
+	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{containerStats0})
+	fakeRuntimeService.SetFakePodSandboxStats([]*runtimeapi.PodSandboxStats{
+		makeFakePodSandboxStatsStrictlyFromCRI(seedSandbox0, sandbox0),
+	})
+
+	provider := NewCRIStatsProvider(
+		mockCadvisor,
+		resourceAnalyzer,
+		mockPodManager,
+		fakeRuntimeService,
+		nil,
+		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
+		true, // useCRIPodSandboxStats (PodAndContainerStatsFromCRI enabled)
+		false,
+		fallbackProvider,
+	)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: podNamespace,
+			UID:       podUID,
+		},
+	}
+	podStatus := &kubecontainer.PodStatus{
+		ID:              podUID,
+		Name:            podName,
+		Namespace:       podNamespace,
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{&sandbox0.PodSandboxStatus},
+		ContainerStatuses: []*kubecontainer.Status{
+			{Name: cName0, CreatedAt: time.Unix(0, container0.CreatedAt)},
+		},
+	}
+
+	stats, err := provider.PodCPUAndMemoryStats(tCtx, pod, podStatus)
+	require.NoError(t, err)
+	require.NotNil(t, stats.Swap)
+	require.NotNil(t, stats.Swap.SwapUsageBytes)
+	assert.Equal(t, swapUsage, *stats.Swap.SwapUsageBytes)
+	require.Len(t, stats.Containers, 1)
+	require.NotNil(t, stats.Containers[0].Swap)
+	require.NotNil(t, stats.Containers[0].Swap.SwapUsageBytes)
+	assert.Equal(t, swapUsage, *stats.Containers[0].Swap.SwapUsageBytes)
+}
+
 func TestCRIImagesFsStats(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	var (
