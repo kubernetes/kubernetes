@@ -237,6 +237,18 @@ func TestPodGroupTemplateName(t *testing.T) {
 			jobName: "test-job",
 			want:    "test-job-pgt-0",
 		},
+		"dots are replaced with hyphens": {
+			jobName: "backup.daily",
+			want:    "backup-daily-pgt-0",
+		},
+		"multiple dots are replaced with hyphens": {
+			jobName: "db-migrate-v1.4.0",
+			want:    "db-migrate-v1-4-0-pgt-0",
+		},
+		"dot at truncation boundary is replaced with a hyphen": {
+			jobName: strings.Repeat("a", 56) + ".daily",
+			want:    strings.Repeat("a", 56) + "--pgt-0",
+		},
 		"name and suffix exactly fit the limit": {
 			jobName: strings.Repeat("a", 57),
 			want:    strings.Repeat("a", 57) + "-pgt-0",
@@ -347,6 +359,10 @@ func TestGenerateWorkload(t *testing.T) {
 		},
 		"long job name yields a valid template name": {
 			job:       newJob(strings.Repeat("a", 58), 4, nil),
+			wantBasic: true,
+		},
+		"job name with dots yields a valid template name": {
+			job:       newJob("backup.daily", 4, nil),
 			wantBasic: true,
 		},
 	}
