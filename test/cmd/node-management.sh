@@ -160,6 +160,24 @@ run_cluster_management_tests() {
   # Post-condition: node is still schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
 
+  ### kubectl drain reports lifecycle conditions without replacing unrelated status
+  kubectl patch node "127.0.0.1" --subresource=status --type=strategic \
+    -p '{"status":{"conditions":[{"type":"DrainConditionTest","status":"True","reason":"TestCondition"}]}}'
+  KUBECTL_DRAIN_NODE_CONDITIONS=true kubectl drain "127.0.0.1" --pod-selector 'lifecycle-condition-test=none' --force
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .status.conditions}}{{if eq .type "DrainInProgress"}}{{.status}}:{{.reason}}{{end}}{{end}}' 'False:KubectlDrainCompleted'
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .status.conditions}}{{if eq .type "Drained"}}{{.status}}:{{.reason}}{{end}}{{end}}' 'True:KubectlDrainCompleted'
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .status.conditions}}{{if eq .type "DrainConditionTest"}}{{.status}}:{{.reason}}{{end}}{{end}}' 'True:TestCondition'
+
+  KUBECTL_DRAIN_NODE_CONDITIONS=true kubectl uncordon "127.0.0.1"
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .status.conditions}}{{if eq .type "DrainInProgress"}}{{.status}}:{{.reason}}{{end}}{{end}}' 'False:KubectlUncordoned'
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .status.conditions}}{{if eq .type "Drained"}}{{.status}}:{{.reason}}{{end}}{{end}}' 'False:KubectlUncordoned'
+
+  KUBECTL_DRAIN_NODE_CONDITIONS=true kubectl drain "127.0.0.1" --pod-selector 'lifecycle-condition-test=none' --force --dry-run=server
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .status.conditions}}{{if eq .type "DrainInProgress"}}{{.status}}:{{.reason}}{{end}}{{end}}' 'False:KubectlUncordoned'
+  kube::test::get_object_assert "nodes 127.0.0.1" '{{range .status.conditions}}{{if eq .type "Drained"}}{{.status}}:{{.reason}}{{end}}{{end}}' 'False:KubectlUncordoned'
+  kubectl patch node "127.0.0.1" --subresource=status --type=strategic \
+    -p "{\"status\":{\"conditions\":[{\"type\":\"DrainConditionTest\",\"\$patch\":\"delete\"},{\"type\":\"DrainInProgress\",\"\$patch\":\"delete\"},{\"type\":\"Drained\",\"\$patch\":\"delete\"}]}}"
+
   ### kubectl drain command fails when both --selector and a node argument are given
   # Pre-condition: node exists and contains label test=label
   kubectl label node "127.0.0.1" "test=label"

@@ -17,8 +17,11 @@ limitations under the License.
 package drain
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,6 +41,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -52,9 +56,17 @@ type DrainCmdOptions struct {
 
 	genericiooptions.IOStreams
 	WarningPrinter *printers.WarningPrinter
+
+	newSignalHandler func(func(os.Signal)) *interrupt.Handler
+	exit             func(int)
+	warningLock      sync.Mutex
 }
 
+const conditionReportTimeout = 5 * time.Second
+
 var (
+	errDrainInterrupted = errors.New("drain interrupted")
+
 	cordonLong = templates.LongDesc(i18n.T(`
 		Mark node as unschedulable.`))
 
@@ -85,7 +97,10 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobr
 
 var (
 	uncordonLong = templates.LongDesc(i18n.T(`
-		Mark node as schedulable.`))
+		Mark node as schedulable.`) + "\n\n" + i18n.T(`
+		When the alpha KUBECTL_DRAIN_NODE_CONDITIONS environment variable is set to true,
+		kubectl also makes a best-effort update of the drain lifecycle conditions through
+		the Node status subresource. This requires patch permission on nodes/status.`))
 
 	uncordonExample = templates.Examples(i18n.T(`
 		# Mark node "foo" as schedulable
@@ -135,6 +150,11 @@ var (
 
 		When you are ready to put the node back into service, use kubectl uncordon, which
 		will make the node schedulable again.
+
+		When the alpha KUBECTL_DRAIN_NODE_CONDITIONS environment variable is set to true,
+		kubectl makes best-effort updates of the drain lifecycle conditions through the
+		Node status subresource. This requires patch permission on nodes/status. A failure
+		to update the conditions is reported as a warning and does not change the drain result.
 
 		![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)`))
 
@@ -254,6 +274,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
+	o.drainer.Ctx = cmd.Context()
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -287,6 +308,9 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	// Set default WarningPrinter if not already set.
 	if o.WarningPrinter == nil {
 		o.WarningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: printers.AllowsColorOutput(o.ErrOut)})
+	}
+	if cmdutil.DrainNodeConditions.IsEnabled() && o.drainer.ConditionReporter == nil {
+		o.drainer.ConditionReporter = drain.NewNodeConditionReporter(o.drainer.Client, o.drainer.DryRunStrategy)
 	}
 
 	builder := f.NewBuilder().
@@ -332,7 +356,11 @@ func (o *DrainCmdOptions) RunDrain() error {
 
 	remainingNodes := []string{}
 	for _, info := range o.nodeInfos {
-		if err := o.deleteOrEvictPodsSimple(info); err == nil {
+		drainErr := o.deleteOrEvictPodsSimple(info)
+		if errors.Is(drainErr, errDrainInterrupted) {
+			break
+		}
+		if drainErr == nil {
 			drainedNodes.Insert(info.Name)
 
 			printObj, err := o.ToPrinter("drained")
@@ -342,10 +370,10 @@ func (o *DrainCmdOptions) RunDrain() error {
 
 			printObj(info.Object, o.Out)
 		} else {
-			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error: %s, continuing command...\n", info.Name, err)
+			_, _ = fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error: %s, continuing command...\n", info.Name, drainErr)
 
 			if !drainedNodes.Has(info.Name) {
-				fatal = append(fatal, err)
+				fatal = append(fatal, drainErr)
 				remainingNodes = append(remainingNodes, info.Name)
 			}
 
@@ -364,12 +392,21 @@ func (o *DrainCmdOptions) RunDrain() error {
 }
 
 func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error {
+	if o.drainer.ConditionReporter == nil {
+		return o.runDrainWithoutSignalHandler(nodeInfo)
+	}
+	return o.runDrainWithSignalHandler(nodeInfo.Name, func() error {
+		return o.runDrainWithoutSignalHandler(nodeInfo)
+	})
+}
+
+func (o *DrainCmdOptions) runDrainWithoutSignalHandler(nodeInfo *resource.Info) error {
 	list, errs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
 	if errs != nil {
 		return utilerrors.NewAggregate(errs)
 	}
 	if warnings := list.Warnings(); warnings != "" {
-		o.WarningPrinter.Print(warnings)
+		o.printWarning(warnings)
 	}
 	if o.drainer.DryRunStrategy == cmdutil.DryRunClient {
 		for _, pod := range list.Pods() {
@@ -397,6 +434,69 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 	return nil
 }
 
+func (o *DrainCmdOptions) runDrainWithSignalHandler(nodeName string, operation func() error) error {
+	parentCtx := o.drainer.Ctx
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	drainCtx, cancelDrain := context.WithCancel(parentCtx)
+	defer cancelDrain()
+	o.drainer.Ctx = drainCtx
+	defer func() {
+		o.drainer.Ctx = parentCtx
+	}()
+
+	interrupted := make(chan struct{})
+	wasInterrupted := func() bool {
+		select {
+		case <-interrupted:
+			return true
+		default:
+			return false
+		}
+	}
+	exit := o.exit
+	if exit == nil {
+		exit = os.Exit
+	}
+	firstSignal := func(_ os.Signal) {
+		close(interrupted)
+		cancelDrain()
+		o.printWarning("drain was interrupted; updating Node drain conditions before exiting")
+		cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), conditionReportTimeout)
+		o.reportConditionWithContext(cleanupCtx, nodeName, drain.NodeConditionDrainInterrupted)
+		cancelCleanup()
+		exit(1)
+	}
+	newHandler := o.newSignalHandler
+	if newHandler == nil {
+		newHandler = func(first func(os.Signal)) *interrupt.Handler {
+			return interrupt.New(first)
+		}
+	}
+
+	return newHandler(firstSignal).Run(func() error {
+		o.reportCondition(nodeName, drain.NodeConditionDrainStarted)
+		if wasInterrupted() {
+			return errDrainInterrupted
+		}
+
+		drainErr := operation()
+		if wasInterrupted() {
+			return errDrainInterrupted
+		}
+		if drainErr == nil {
+			o.reportCondition(nodeName, drain.NodeConditionDrainCompleted)
+		} else {
+			o.reportCondition(nodeName, drain.NodeConditionDrainFailed)
+		}
+		if wasInterrupted() {
+			return errDrainInterrupted
+		}
+		return drainErr
+	})
+}
+
 // RunCordonOrUncordon runs either Cordon or Uncordon.  The desired value for
 // "Unschedulable" is passed as the first arg.
 func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
@@ -406,7 +506,6 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 	}
 
 	for _, nodeInfo := range o.nodeInfos {
-
 		printError := func(err error) {
 			fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
 		}
@@ -420,6 +519,9 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 			}
 
 			if updateRequired := c.UpdateIfRequired(desired); !updateRequired {
+				if !desired {
+					o.reportCondition(nodeInfo.Name, drain.NodeConditionUncordoned)
+				}
 				printObj, err := o.ToPrinter(already(desired))
 				if err != nil {
 					fmt.Fprintf(o.ErrOut, "error: %v\n", err)
@@ -428,7 +530,11 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 				printObj(nodeInfo.Object, o.Out)
 			} else {
 				if o.drainer.DryRunStrategy != cmdutil.DryRunClient {
-					err, patchErr := c.PatchOrReplace(o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
+					ctx := o.drainer.Ctx
+					if ctx == nil {
+						ctx = context.Background()
+					}
+					err, patchErr := c.PatchOrReplaceWithContext(ctx, o.drainer.Client, o.drainer.DryRunStrategy == cmdutil.DryRunServer)
 					if patchErr != nil {
 						printError(patchErr)
 					}
@@ -436,6 +542,9 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 						printError(err)
 						continue
 					}
+				}
+				if !desired {
+					o.reportCondition(nodeInfo.Name, drain.NodeConditionUncordoned)
 				}
 				printObj, err := o.ToPrinter(changed(desired))
 				if err != nil {
@@ -455,6 +564,31 @@ func (o *DrainCmdOptions) RunCordonOrUncordon(desired bool) error {
 	}
 
 	return nil
+}
+
+func (o *DrainCmdOptions) reportCondition(nodeName string, event drain.NodeConditionEvent) {
+	ctx := o.drainer.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	reportCtx, cancel := context.WithTimeout(ctx, conditionReportTimeout)
+	defer cancel()
+	o.reportConditionWithContext(reportCtx, nodeName, event)
+}
+
+func (o *DrainCmdOptions) reportConditionWithContext(ctx context.Context, nodeName string, event drain.NodeConditionEvent) {
+	if o.drainer.ConditionReporter == nil {
+		return
+	}
+	if err := o.drainer.ConditionReporter.Report(ctx, nodeName, event); err != nil {
+		o.printWarning(fmt.Sprintf("failed to update drain conditions on node %q: %v", nodeName, err))
+	}
+}
+
+func (o *DrainCmdOptions) printWarning(message string) {
+	o.warningLock.Lock()
+	defer o.warningLock.Unlock()
+	o.WarningPrinter.Print(message)
 }
 
 // already() and changed() return suitable strings for {un,}cordoning
