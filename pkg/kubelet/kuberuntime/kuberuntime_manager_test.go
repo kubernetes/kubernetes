@@ -63,6 +63,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/volume"
@@ -611,6 +612,10 @@ func TestKillPod(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
+	fakeRunner := &containertest.FakeContainerCommandRunner{}
+	m.runner = lifecycle.NewHandlerRunner(&fakeHTTP{}, fakeRunner, nil, nil)
+
+	gracePeriod := int64(30)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -618,6 +623,7 @@ func TestKillPod(t *testing.T) {
 			Namespace: "new",
 		},
 		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers: []v1.Container{
 				{
 					Name:  "foo1",
@@ -626,6 +632,13 @@ func TestKillPod(t *testing.T) {
 				{
 					Name:  "foo2",
 					Image: "busybox",
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.LifecycleHandler{
+							Exec: &v1.ExecAction{
+								Command: []string{"prestop-foo2"},
+							},
+						},
+					},
 				},
 			},
 			EphemeralContainers: []v1.EphemeralContainer{
@@ -674,6 +687,9 @@ func TestKillPod(t *testing.T) {
 		},
 	}
 
+	// Simulate foo2 having been removed from pod.Spec while still running in the pod.
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+
 	err = m.KillPod(tCtx, pod, runningPod, nil)
 	assert.NoError(t, err)
 	assert.Len(t, fakeRuntime.Containers, 3)
@@ -684,6 +700,7 @@ func TestKillPod(t *testing.T) {
 	for _, c := range fakeRuntime.Containers {
 		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_EXITED, c.State)
 	}
+	assert.Equal(t, []string{"prestop-foo2"}, fakeRunner.Cmd)
 }
 
 func TestSyncPod(t *testing.T) {
@@ -726,6 +743,74 @@ func TestSyncPod(t *testing.T) {
 	for _, c := range fakeRuntime.Containers {
 		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
 	}
+}
+
+func TestSyncPodKillRemovedContainer(t *testing.T) {
+	setDynamicContainersGate(t, true)
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	fakeRunner := &containertest.FakeContainerCommandRunner{}
+	m.runner = lifecycle.NewHandlerRunner(&fakeHTTP{}, fakeRunner, nil, nil)
+
+	gracePeriod := int64(30)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			TerminationGracePeriodSeconds: &gracePeriod,
+			Containers: []v1.Container{
+				{
+					Name:            "foo1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+				{
+					Name:                   "foo2",
+					Image:                  "alpine",
+					ImagePullPolicy:        v1.PullIfNotPresent,
+					TerminationMessagePath: "/dev/termination-log-custom",
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.LifecycleHandler{
+							Exec: &v1.ExecAction{
+								Command: []string{"prestop-foo2"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+
+	expected := []*cRecord{
+		{name: "foo1", attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		{name: "foo2", attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "all containers should be running")
+
+	runtimePod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+	require.NoError(t, err)
+
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+	result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+	require.NoError(t, result.Error())
+
+	expected = []*cRecord{
+		{name: "foo1", attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+		{name: "foo2", attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+	}
+	verifyContainerStatuses(t, fakeRuntime, expected, "removed container foo2 should be stopped")
+	assert.Equal(t, []string{"prestop-foo2"}, fakeRunner.Cmd)
 }
 
 func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
@@ -1525,6 +1610,119 @@ func TestComputePodActions(t *testing.T) {
 			test.resetStatusFn(status)
 		}
 	}
+}
+
+// TestComputePodActionsRemovedContainers checks that running containers removed from the pod spec
+// are killed, and only with DynamicContainers.
+func TestComputePodActionsRemovedContainers(t *testing.T) {
+	removeLast := func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[:len(pod.Spec.Containers)-1] }
+	tests := []struct {
+		name string
+		// withInitAndEphemeral uses a pod with a running sidecar and ephemeral container too.
+		withInitAndEphemeral bool
+		disabled             bool
+		state                kubecontainer.State
+		expectKill           bool
+	}{
+		{name: "running", state: kubecontainer.ContainerStateRunning, expectKill: true},
+		{name: "unknown state", state: kubecontainer.ContainerStateUnknown, expectKill: true},
+		{name: "exited", state: kubecontainer.ContainerStateExited},
+		{name: "running, with the gate disabled", disabled: true, state: kubecontainer.ContainerStateRunning, expectKill: true},
+		{name: "running, with running init and ephemeral containers", withInitAndEphemeral: true, state: kubecontainer.ContainerStateRunning, expectKill: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setDynamicContainersGate(t, !test.disabled)
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod, status := makeBasePodAndStatus()
+			if test.withInitAndEphemeral {
+				pod, status = makeBasePodAndStatusWithInitAndEphemeralContainers()
+				pod.Spec.InitContainers[0].RestartPolicy = &containerRestartPolicyAlways
+				status.ContainerStatuses[3].State = kubecontainer.ContainerStateRunning
+			}
+			removed := status.FindContainerStatusByName(pod.Spec.Containers[len(pod.Spec.Containers)-1].Name)
+			removed.State = test.state
+			removeLast(pod)
+
+			expected := podActions{
+				SandboxID:         status.SandboxStatuses[0].Id,
+				ContainersToStart: []int{},
+				ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+			}
+			if test.expectKill {
+				expected.ContainersToKill[removed.ID] = containerToKillInfo{name: removed.Name}
+			}
+			actions := m.computePodActions(tCtx, pod, status, false)
+			verifyActions(t, &expected, &actions, test.name)
+		})
+	}
+}
+
+// TestComputePodActionsReplacedContainers checks that replacing every regular container doesn't run
+// the init containers again, even after their runtime containers were removed.
+func TestComputePodActionsReplacedContainers(t *testing.T) {
+	setDynamicContainersGate(t, true)
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, status := makeBasePodAndStatus()
+	pod.Spec.InitContainers = []v1.Container{{Name: "init", Image: "busybox"}}
+	pod.Spec.Containers = []v1.Container{{Name: "new", Image: "busybox"}}
+	status.ActiveContainerStatuses = status.ContainerStatuses
+
+	expected := podActions{
+		SandboxID:         status.SandboxStatuses[0].Id,
+		ContainersToStart: []int{0},
+		ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+	}
+	for _, removed := range status.ContainerStatuses {
+		expected.ContainersToKill[removed.ID] = containerToKillInfo{name: removed.Name}
+	}
+	actions := m.computePodActions(tCtx, pod, status, false)
+	verifyActions(t, &expected, &actions, "replaced containers")
+}
+
+// TestComputePodActionsRestartAllRemovedContainers checks that restarting all containers also kills
+// the running containers that were removed from the pod spec, without restarting them.
+func TestComputePodActionsRestartAllRemovedContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ContainerRestartRules:                true,
+		features.RestartAllContainersOnContainerExits: true,
+	})
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("DynamicContainers=%t", enabled), func(t *testing.T) {
+			setDynamicContainersGate(t, enabled)
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod, status := makeBasePodAndStatus()
+			removed := status.FindContainerStatusByName(pod.Spec.Containers[2].Name)
+			pod.Spec.Containers = pod.Spec.Containers[:2]
+
+			actions := m.computePodActions(tCtx, pod, status, true)
+			var reset []string
+			for _, c := range actions.ContainersToReset {
+				reset = append(reset, c.container.Name)
+			}
+			assert.ElementsMatch(t, []string{"foo1", "foo2"}, reset, "only containers in the spec are reset")
+			assert.Equal(t, map[kubecontainer.ContainerID]containerToKillInfo{
+				removed.ID: {name: removed.Name, message: "Container foo3 removed from pod spec"},
+			}, actions.ContainersToKill)
+		})
+	}
+}
+
+// setDynamicContainersGate sets the DynamicContainers feature gate, and the gates it depends on.
+func setDynamicContainersGate(t *testing.T, enabled bool) {
+	if enabled {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, enabled)
 }
 
 func TestComputePodActionsForRestartAllContainers(t *testing.T) {
@@ -6257,6 +6455,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		nonSidecarInit, sidecar bool
 		isRunning               bool
 		unstarted               bool // Whether the container is missing from the pod status
+		removed                 bool // Whether the container was removed from the pod spec
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
@@ -6520,6 +6719,52 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		}},
 		expectHasResize:              false,
 		inplacePodLevelResizeEnabled: true,
+	}, {
+		name: "removed running container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+		}, {
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+			removed:   true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "removed exited container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+		}, {
+			actuated: &testResources{100, 100, 100, 100},
+			removed:  true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "removed running container without actuated record",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+		}, {
+			isRunning: true,
+			removed:   true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "removed running container without resources",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+		}, {
+			actuated:  &testResources{},
+			isRunning: true,
+			removed:   true,
+		}},
+		expectHasResize: false,
 	}}
 
 	mkRequirements := func(r testResources) v1.ResourceRequirements {
@@ -6572,7 +6817,9 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			for i, c := range test.containers {
 				// Add the container to the pod
 				container := mkContainer(i, c)
-				if c.nonSidecarInit || c.sidecar {
+				if c.removed {
+					// Removed containers are in the pod status and the actuated state only.
+				} else if c.nonSidecarInit || c.sidecar {
 					pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
 				} else {
 					pod.Spec.Containers = append(pod.Spec.Containers, container)

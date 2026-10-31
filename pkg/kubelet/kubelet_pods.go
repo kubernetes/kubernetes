@@ -3001,13 +3001,33 @@ func (kl *Kubelet) GetAttach(ctx context.Context, podFullName string, podUID typ
 	if !found || (string(podUID) != "" && pod.UID != podUID) {
 		return nil, fmt.Errorf("pod %s not found", podFullName)
 	}
-	containerSpec := kubecontainer.GetContainerSpec(pod, containerName)
+	containerSpec := kl.getAttachContainerSpec(pod, containerName)
 	if containerSpec == nil {
 		return nil, fmt.Errorf("container %s not found in pod %s", containerName, podFullName)
 	}
 	tty := containerSpec.TTY
 
 	return kl.streamingRuntime.GetAttach(ctx, container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
+}
+
+// getAttachContainerSpec returns the spec a container was started with, including containers
+// that were removed from the pod spec but are still running.
+func (kl *Kubelet) getAttachContainerSpec(pod *v1.Pod, containerName string) *v1.Container {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return kubecontainer.GetContainerSpec(pod, containerName)
+	}
+	allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+	if containerSpec := kubecontainer.GetContainerSpec(allocatedPod, containerName); containerSpec != nil {
+		return containerSpec
+	}
+	if kl.actuatedState == nil {
+		return nil
+	}
+	// An empty image means the full spec wasn't recorded, so the TTY setting is unknown.
+	if actuated, ok := kl.actuatedState.GetContainer(pod.UID, containerName, podutil.Containers); ok && actuated.Image != "" {
+		return actuated
+	}
+	return nil
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.

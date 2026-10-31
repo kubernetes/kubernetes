@@ -1124,6 +1124,31 @@ func TestHasAnyActiveRegularContainerStarted(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			desc: "regular containers replaced",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{Name: "init"}},
+				Containers:     []v1.Container{{Name: "new"}},
+			},
+			podStatus: &PodStatus{
+				SandboxStatuses:         []*runtimeapi.PodSandboxStatus{{Id: "current", State: runtimeapi.PodSandboxState_SANDBOX_READY}},
+				ActiveContainerStatuses: []*Status{{Name: "removed", State: ContainerStateRunning}},
+			},
+			expected: true,
+		},
+		{
+			desc: "only an ephemeral container started",
+			spec: &v1.PodSpec{
+				InitContainers:      []v1.Container{{Name: "init"}},
+				Containers:          []v1.Container{{Name: "regular"}},
+				EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}}},
+			},
+			podStatus: &PodStatus{
+				SandboxStatuses:         []*runtimeapi.PodSandboxStatus{{Id: "current", State: runtimeapi.PodSandboxState_SANDBOX_READY}},
+				ActiveContainerStatuses: []*Status{{Name: "init", State: ContainerStateExited}, {Name: "debug", State: ContainerStateRunning}},
+			},
+			expected: false,
+		},
 	}
 
 	for _, tc := range testCases {

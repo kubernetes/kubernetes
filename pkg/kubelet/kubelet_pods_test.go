@@ -6753,6 +6753,83 @@ func TestGetExec(t *testing.T) {
 	}
 }
 
+func TestGetAttachDynamicContainers(t *testing.T) {
+	const (
+		podName      = "podFoo"
+		podNamespace = "nsFoo"
+		podUID       = types.UID("12345678")
+	)
+	testcases := []struct {
+		description string
+		disableGate bool
+		container   string
+		actuated    *v1.Container
+		expectError bool
+	}{{
+		description: "spec container",
+		container:   "spec",
+	}, {
+		description: "removed container with recorded spec",
+		container:   "removed",
+		actuated:    &v1.Container{Name: "removed", Image: "image", TTY: true},
+	}, {
+		description: "removed container without recorded spec",
+		container:   "removed",
+		actuated:    &v1.Container{Name: "removed"},
+		expectError: true,
+	}, {
+		description: "removed container without record",
+		container:   "removed",
+		expectError: true,
+	}, {
+		description: "removed container with gate disabled",
+		disableGate: true,
+		container:   "removed",
+		actuated:    &v1.Container{Name: "removed", Image: "image", TTY: true},
+		expectError: true,
+	}}
+
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, !tc.disableGate)
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
+			pod := podWithUIDNameNs(podUID, podName, podNamespace)
+			pod.Spec.Containers = []v1.Container{{Name: "spec", Image: "image", TTY: true}}
+			kubelet.podManager.SetPods([]*v1.Pod{pod})
+			require.NoError(t, kubelet.allocationManager.SetAllocatedPod(tCtx.Logger(), pod))
+			if tc.actuated != nil {
+				require.NoError(t, kubelet.actuatedState.SetContainer(tCtx.Logger(), podUID, podutil.Containers, *tc.actuated))
+			}
+			testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{Pod: &kubecontainer.Pod{
+				ID:        podUID,
+				Name:      podName,
+				Namespace: podNamespace,
+				Containers: []*kubecontainer.Container{
+					{Name: "spec", ID: kubecontainer.ContainerID{Type: "test", ID: "spec"}},
+					{Name: "removed", ID: kubecontainer.ContainerID{Type: "test", ID: "removed"}},
+				},
+			}}}
+			fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+			kubelet.containerRuntime = fakeRuntime
+			kubelet.streamingRuntime = fakeRuntime
+
+			_, err := kubelet.GetAttach(tCtx, kubecontainer.GetPodFullName(pod), podUID, tc.container, remotecommand.Options{})
+			if tc.expectError {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			containerSpec := kubelet.getAttachContainerSpec(pod, tc.container)
+			require.NotNil(t, containerSpec)
+			assert.True(t, containerSpec.TTY, "TTY should come from the spec the container was started with")
+		})
+	}
+}
+
 func TestGetPortForward(t *testing.T) {
 	const (
 		podName                = "podFoo"
