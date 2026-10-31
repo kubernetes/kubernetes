@@ -148,15 +148,15 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(newCtx)
 	if err != nil {
-		if unregErr := unregisterDriver(pluginName); unregErr != nil {
+		if unregErr := unregisterDriver(ctx, pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
 		}
 		return err
 	}
 
-	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+	err = nim.InstallCSIDriver(ctx, pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
-		if unregErr := unregisterDriver(pluginName); unregErr != nil {
+		if unregErr := unregisterDriver(ctx, pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
 		}
 		return err
@@ -183,7 +183,7 @@ func updateCSIDriver(pluginName string) error {
 		return fmt.Errorf("failed to get NodeGetInfo from driver %q: %w", pluginName, err)
 	}
 
-	if err := nim.UpdateCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology); err != nil {
+	if err := nim.UpdateCSIDriver(ctx, pluginName, driverNodeID, maxVolumePerNode, accessibleTopology); err != nil {
 		return fmt.Errorf("failed to update driver %q: %w", pluginName, err)
 	}
 	return nil
@@ -269,7 +269,7 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 // it is no longer available
 func (h *RegistrationHandler) DeRegisterPlugin(ctx context.Context, pluginName, endpoint string) {
 	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s, endpoint %s", pluginName, endpoint))
-	if err := unregisterDriver(pluginName); err != nil {
+	if err := unregisterDriver(ctx, pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
 	}
 
@@ -393,7 +393,7 @@ func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedInd
 		}
 		err = wait.ExponentialBackoff(initBackoff, func() (bool, error) {
 			klog.V(4).Infof("Initializing migrated drivers on CSINode")
-			err := nim.InitializeCSINodeWithAnnotation()
+			err := nim.InitializeCSINodeWithAnnotation(context.Background())
 			if err != nil {
 				kvh.SetKubeletError(fmt.Errorf("failed to initialize CSINode: %v", err))
 				klog.Errorf("Failed to initialize CSINode: %v", err)
@@ -959,10 +959,10 @@ func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
 	return true, nil
 }
 
-func unregisterDriver(driverName string) error {
+func unregisterDriver(ctx context.Context, driverName string) error {
 	csiDrivers.Delete(driverName)
 
-	if err := nim.UninstallCSIDriver(driverName); err != nil {
+	if err := nim.UninstallCSIDriver(ctx, driverName); err != nil {
 		return errors.New(log("Error uninstalling CSI driver: %v", err))
 	}
 
