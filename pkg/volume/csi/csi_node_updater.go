@@ -101,7 +101,14 @@ func (u *csiNodeUpdater) onDriverUpdate(oldObj, newObj interface{}) {
 func (u *csiNodeUpdater) onDriverDelete(obj interface{}) {
 	driver, ok := obj.(*v1.CSIDriver)
 	if !ok {
-		return
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			return
+		}
+		driver, ok = tombstone.Obj.(*v1.CSIDriver)
+		if !ok {
+			return
+		}
 	}
 	klog.V(7).InfoS("onDriverDelete event", "driver", driver.Name)
 	u.syncDriverUpdater(driver.Name)
