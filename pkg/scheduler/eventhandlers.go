@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/resource"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
@@ -352,9 +351,6 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
 	if hasNominatedNodeNameChanged(oldPod, newPod) {
 		sched.removeNomination(klog.NewContext(context.Background(), logger), oldPod, oldPod.Status.NominatedNodeName)
-		// Nominated node changed in pod, so we need to treat it as if the pod was deleted from the old nominated node,
-		// because the scheduler treats such a pod as if it was already assigned when scheduling lower or equal priority pods.
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
 	}
 }
 
@@ -376,7 +372,8 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	if inBinding {
 		// In the case of a binding, the rest can be skipped because it is not really a pod removal operation, but a binding.
 		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
-		// In that case, we need to notify about the release of resources that were held by different assume/nomination
+		// In that case, SchedulingQueue.Delete already let pods retry which the nomination of the pod blocked,
+		// but we still need to notify about the release of resources that were held by a different assume
 		// once the https://github.com/kubernetes/kubernetes/issues/134859 is fixed.
 		return
 	}
@@ -395,13 +392,8 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 	if sched.podGroupHierarchyTracker != nil {
 		sched.podGroupHierarchyTracker.DeletePod(logger, pod)
 	}
-	if pod.Status.NominatedNodeName != "" {
-		// When a pod that had nominated node is deleted, it can unblock scheduling of other pods,
-		// because the lower or equal priority pods treat such a pod as if it was assigned.
-		// Note that a nominated pod can fall into `handleAssumedPodDeletion` case as well,
-		// but in that case the `MoveAllToActiveOrBackoffQueue` already covered lower priority pods.
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(pod)))
-	}
+	// Pods which the nomination of the deleted pod blocked got moved by
+	// SchedulingQueue.Delete, which removed the nomination.
 }
 
 // getLEPriorityPreCheck is a PreEnqueueCheck function that selects only lower or equal priority entities.

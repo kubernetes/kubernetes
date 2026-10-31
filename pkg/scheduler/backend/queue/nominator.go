@@ -28,6 +28,16 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 )
 
+// nominationChange is a change of the node that a pod is nominated to.
+// An empty node name means that the pod is not nominated.
+type nominationChange struct {
+	// pod is the pod object passed to the nominator with the change. For a
+	// pod which got assumed, Spec.NodeName is set.
+	pod         *v1.Pod
+	oldNodeName string
+	newNodeName string
+}
+
 // nominator is a structure that stores pods nominated to run on nodes.
 // It exists because nominatedNodeName of pod objects stored in the structure
 // may be different than what scheduler has here. We should be able to find pods
@@ -50,6 +60,13 @@ type nominator struct {
 	// nominatedPodToNode is map keyed by a Pod UID to the node name where it is
 	// nominated.
 	nominatedPodToNode map[types.UID]string
+
+	// changes are the changes of nominated nodes which the PriorityQueue has
+	// not processed yet. They are recorded under nLock and processed by
+	// PriorityQueue.processNominationChangesAndUnlock, because processing
+	// needs the activeQ and backoffQ locks, which must not be taken while
+	// nLock is held.
+	changes []nominationChange
 }
 
 func newPodNominator(podLister listersv1.PodLister) *nominator {
@@ -60,13 +77,33 @@ func newPodNominator(podLister listersv1.PodLister) *nominator {
 	}
 }
 
+// recordChangeUnlocked records a change if the pod is not nominated to
+// oldNodeName anymore. Removing and re-adding the same nomination, which the
+// nominator does for every update of a pod, is not a change.
+func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string) {
+	if newNodeName := npm.nominatedPodToNode[pod.UID]; newNodeName != oldNodeName {
+		npm.changes = append(npm.changes, nominationChange{pod: pod, oldNodeName: oldNodeName, newNodeName: newNodeName})
+	}
+}
+
+// takeChanges returns the recorded changes and forgets them.
+func (npm *nominator) takeChanges() []nominationChange {
+	npm.nLock.Lock()
+	defer npm.nLock.Unlock()
+	changes := npm.changes
+	npm.changes = nil
+	return changes
+}
+
 // addNominatedPod adds a pod to the nominated pods of the given node.
 // This is called during the preemption process when a node is nominated to run
 // the pod. We update the nominator's structure before sending an API request to update the pod
 // object, to avoid races with the following scheduling cycles.
 func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
 	npm.nLock.Lock()
+	oldNodeName := npm.nominatedPodToNode[pi.GetPod().UID]
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
+	npm.recordChangeUnlocked(pi.GetPod(), oldNodeName)
 	npm.nLock.Unlock()
 }
 
@@ -133,14 +170,18 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	}
 	// We update irrespective of the nominatedNodeName changed or not, to ensure
 	// that pod pointer is updated.
+	oldNodeName := npm.nominatedPodToNode[oldPod.UID]
 	npm.deleteUnlocked(oldPod)
 	npm.addNominatedPodUnlocked(logger, newPodInfo, nominatingInfo)
+	npm.recordChangeUnlocked(newPodInfo.GetPod(), oldNodeName)
 }
 
 // DeleteNominatedPodIfExists deletes <pod> from nominatedPods.
 func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
 	npm.nLock.Lock()
+	oldNodeName := npm.nominatedPodToNode[pod.UID]
 	npm.deleteUnlocked(pod)
+	npm.recordChangeUnlocked(pod, oldNodeName)
 	npm.nLock.Unlock()
 }
 

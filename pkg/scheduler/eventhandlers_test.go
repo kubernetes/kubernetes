@@ -118,7 +118,8 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			// The pod itself does not retry because its nomination changed.
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
 		},
 		{
 			name: "Removal of a nominated node name should trigger rescheduling of lower priority pods",
@@ -128,7 +129,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
 		},
 		{
 			name: "Removal of a pod that had nominated node name should trigger rescheduling of lower priority pods",
@@ -161,6 +162,12 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 			}
 			client := fake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			// The nominator only accepts pods which the lister knows.
+			for _, pod := range unschedulablePods {
+				if err := informerFactory.Core().V1().Pods().Informer().GetStore().Add(pod); err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			// apiDispatcher is unused in the test, but intializing it anyway.
 			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
