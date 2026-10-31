@@ -104,5 +104,6 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-edit")
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &o.ApplyAnnotation)
 	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, edit will operate on the subresource of the requested object.")
+	cmdutil.AddServerSideApplyFlags(cmd)
 	return cmd
 }
