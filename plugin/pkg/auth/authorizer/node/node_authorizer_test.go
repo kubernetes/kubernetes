@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -29,6 +30,8 @@ import (
 
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1944,4 +1947,117 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 	}
 
 	return pod, pvs, pcrs
+}
+
+func TestNodeAuthorizerPodCheckpoints(t *testing.T) {
+	graph := NewGraph()
+	graph.AddPodCheckpoint(&nodev1alpha1.PodCheckpoint{
+		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns"},
+		Status:     nodev1alpha1.PodCheckpointStatus{NodeName: new("node0")},
+	})
+	graph.AddPodCheckpoint(&nodev1alpha1.PodCheckpoint{
+		ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "other-ns"},
+		Status:     nodev1alpha1.PodCheckpointStatus{NodeName: new("node1")},
+	})
+	graph.AddPodCheckpoint(&nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "unassigned", Namespace: "ns"}})
+	// Checkpoint access must not fall through to a broad static node rule.
+	rules := append(bootstrappolicy.NodeRules(), rbacv1.PolicyRule{
+		Verbs: []string{"*"}, APIGroups: []string{"node.k8s.io"}, Resources: []string{"*"},
+	})
+	authz := NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), rules)
+	node0 := &user.DefaultInfo{Name: "system:node:node0", Groups: []string{"system:nodes"}}
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("feature enabled=%v", enabled), func(t *testing.T) {
+			featuresForTest := utilfeature.DefaultFeatureGate.DeepCopy()
+			featuregatetesting.SetFeatureGateDuringTest(t, featuresForTest, features.PodLevelCheckpointRestore, enabled)
+			authz.features = featuresForTest
+			for _, tc := range []struct {
+				name, verb, namespace, object, subresource, selector string
+				selectorError                                        bool
+				allow                                                bool
+			}{
+				{name: "get assigned", verb: "get", namespace: "ns", object: "checkpoint", allow: true},
+				{name: "get foreign", verb: "get", namespace: "other-ns", object: "checkpoint"},
+				{name: "get unassigned", verb: "get", namespace: "ns", object: "unassigned"},
+				{name: "get unknown", verb: "get", namespace: "ns", object: "unknown"},
+				{name: "get without name", verb: "get", namespace: "ns"},
+				{name: "get status", verb: "get", namespace: "ns", object: "checkpoint", subresource: "status"},
+				{name: "list assigned", verb: "list", selector: "status.nodeName=node0", allow: true},
+				{name: "watch assigned", verb: "watch", selector: "status.nodeName==node0", allow: true},
+				{name: "list namespace assigned", verb: "list", namespace: "ns", selector: "status.nodeName=node0", allow: true},
+				{name: "list unrestricted", verb: "list"},
+				{name: "watch unrestricted", verb: "watch"},
+				{name: "list foreign", verb: "list", selector: "status.nodeName=node1"},
+				{name: "watch foreign", verb: "watch", selector: "status.nodeName=node1"},
+				{name: "watch inequality", verb: "watch", selector: "status.nodeName!=node1"},
+				{name: "watch malformed selector", verb: "watch", selector: "status.nodeName=node0", selectorError: true},
+				{name: "list with extra restriction", verb: "list", selector: "status.nodeName=node0,metadata.name=checkpoint", allow: true},
+				{name: "get without namespace", verb: "get", object: "checkpoint"},
+				{name: "watch source name", verb: "watch", namespace: "ns", selector: "spec.sourcePod.name=source"},
+				{name: "list status subresource", verb: "list", selector: "status.nodeName=node0", subresource: "status"},
+				{name: "update own status", verb: "update", namespace: "ns", object: "checkpoint", subresource: "status", allow: true},
+				{name: "patch own status", verb: "patch", namespace: "ns", object: "checkpoint", subresource: "status", allow: true},
+				{name: "patch foreign status", verb: "patch", namespace: "other-ns", object: "checkpoint", subresource: "status"},
+				{name: "update unassigned status", verb: "update", namespace: "ns", object: "unassigned", subresource: "status"},
+				{name: "update spec", verb: "update", namespace: "ns", object: "checkpoint"},
+				{name: "create", verb: "create", namespace: "ns", object: "checkpoint"},
+				{name: "delete", verb: "delete", namespace: "ns", object: "checkpoint"},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					attrs := authorizer.AttributesRecord{User: node0, ResourceRequest: true, APIGroup: "node.k8s.io", Resource: "podcheckpoints",
+						Verb: tc.verb, Namespace: tc.namespace, Name: tc.object, Subresource: tc.subresource, FieldSelectorRequirements: mustParseFields(tc.selector)}
+					if tc.selectorError {
+						attrs.FieldSelectorParsingErr = errors.New("invalid field selector")
+					}
+					decision, reason, err := authz.Authorize(context.Background(), attrs)
+					if err != nil {
+						t.Fatal(err)
+					}
+					want := authorizer.DecisionNoOpinion
+					if tc.allow && enabled {
+						want = authorizer.DecisionAllow
+					}
+					if decision != want {
+						t.Fatalf("Authorize() = %v (%s), want %v", decision, reason, want)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestPodCheckpointGraphAssignment(t *testing.T) {
+	featuresForTest := utilfeature.DefaultFeatureGate.DeepCopy()
+	featuregatetesting.SetFeatureGateDuringTest(t, featuresForTest, features.PodLevelCheckpointRestore, true)
+	graph := NewGraph()
+	authz := NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
+	authz.features = featuresForTest
+	attrs := authorizer.AttributesRecord{ResourceRequest: true, Verb: "get", APIGroup: "node.k8s.io", Resource: "podcheckpoints", Namespace: "ns", Name: "checkpoint"}
+	assertAccess := func(nodeName string, allow bool) {
+		t.Helper()
+		attrs.User = &user.DefaultInfo{Name: "system:node:" + nodeName, Groups: []string{"system:nodes"}}
+		decision, reason, err := authz.Authorize(context.Background(), attrs)
+		if err != nil || (decision == authorizer.DecisionAllow) != allow {
+			t.Fatalf("node %s decision = %v (%s), error = %v, want allowed=%v", nodeName, decision, reason, err, allow)
+		}
+	}
+	checkpoint := &nodev1alpha1.PodCheckpoint{ObjectMeta: metav1.ObjectMeta{Name: "checkpoint", Namespace: "ns"},
+		Status: nodev1alpha1.PodCheckpointStatus{NodeName: new("node0")}}
+	graph.AddPod(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "source", Namespace: "ns"}, Spec: corev1.PodSpec{NodeName: "node0"}})
+	graph.AddPodCheckpoint(checkpoint)
+	assertAccess("node0", true)
+	graph.DeletePod("source", "ns")
+	assertAccess("node0", true)
+
+	checkpoint.Status.NodeName = new("node1")
+	graph.AddPodCheckpoint(checkpoint)
+	assertAccess("node0", false)
+	assertAccess("node1", true)
+	checkpoint.Status.NodeName = nil
+	graph.AddPodCheckpoint(checkpoint)
+	assertAccess("node1", false)
+	checkpoint.Status.NodeName = new("node1")
+	graph.AddPodCheckpoint(checkpoint)
+	graph.DeletePodCheckpoint("ns", "checkpoint")
+	assertAccess("node1", false)
 }

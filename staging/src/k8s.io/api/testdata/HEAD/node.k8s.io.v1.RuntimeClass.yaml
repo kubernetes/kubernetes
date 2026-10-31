@@ -36,6 +36,9 @@ metadata:
 overhead:
   podFixed:
     podFixedKey: "0"
+podCheckpointOptions:
+  allowedCheckpointOptions:
+  - allowedCheckpointOptionsValue
 scheduling:
   nodeSelector:
     nodeSelectorKey: nodeSelectorValue

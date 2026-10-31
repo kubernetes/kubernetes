@@ -17,8 +17,11 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	node "k8s.io/kubernetes/pkg/apis/node"
 )
 
@@ -27,6 +30,8 @@ import (
 func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Spec.RuntimeHandler
+	// This version predates the v1-only checkpoint option policy.
+	out.PodCheckpointOptions = nil
 
 	if in.Spec.Overhead != nil {
 		out.Overhead = &node.Overhead{}
@@ -62,4 +67,23 @@ func Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClass, o
 		}
 	}
 	return nil
+}
+
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	// Add field label conversions for the PodCheckpoint kind so that field
+	// selectors are validated: only the labels below are accepted, and any
+	// other field label is rejected.
+	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("PodCheckpoint"),
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name",
+				"metadata.namespace",
+				"spec.sourcePod.name",
+				"status.nodeName":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
 }

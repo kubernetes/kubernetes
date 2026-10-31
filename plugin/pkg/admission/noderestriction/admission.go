@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -49,11 +50,13 @@ import (
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	checkpoint "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // PluginName is a string with the name of the plugin
@@ -95,6 +98,7 @@ type Plugin struct {
 	serviceAccountNodeAudienceRestriction          bool
 	podCertificateRequestsEnabled                  bool
 	csiVolumeHealthEnabled                         bool
+	podLevelCheckpointRestoreEnabled               bool
 }
 
 var (
@@ -111,6 +115,7 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
 	p.podCertificateRequestsEnabled = featureGates.Enabled(features.PodCertificateRequest)
 	p.csiVolumeHealthEnabled = featureGates.Enabled(features.CSIVolumeHealth)
+	p.podLevelCheckpointRestoreEnabled = featureGates.Enabled(features.PodLevelCheckpointRestore)
 	p.inspectedFeatureGates = true
 }
 
@@ -183,6 +188,7 @@ var (
 	resourceSliceResource         = resource.Resource("resourceslices")
 	csrResource                   = certapi.Resource("certificatesigningrequests")
 	podCertificateRequestResource = certapi.Resource("podcertificaterequests")
+	podCheckpointResource         = checkpoint.Resource("podcheckpoints")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
@@ -248,9 +254,101 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 			return nil
 		}
 		return p.admitCSR(nodeName, a)
+
+	case podCheckpointResource:
+		if !p.podLevelCheckpointRestoreEnabled {
+			return nil
+		}
+		switch a.GetSubresource() {
+		case "status":
+			return p.admitPodCheckpointStatus(nodeName, a)
+		default:
+			return admission.NewForbidden(a, fmt.Errorf("node %q may only update the status subresource of podcheckpoints", nodeName))
+		}
+
 	default:
 		return nil
 	}
+}
+
+// admitPodCheckpointStatus preserves the controller's node and source-UID
+// assignment while the kubelet writes checkpoint execution status. Once assigned,
+// only that node may update the checkpoint, even after its source Pod disappears.
+// For an unassigned object, the source must still be bound to the node and the
+// first write must identify its live UID. A mismatch with spec.sourcePod.uid can
+// only report SourcePodReplaced without checkpoint data. Later writes preserve
+// that UID and cannot promote the rejection to a successful checkpoint.
+func (p *Plugin) admitPodCheckpointStatus(nodeName string, a admission.Attributes) error {
+	if a.GetOperation() != admission.Update {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %q on podcheckpoints/status", a.GetOperation()))
+	}
+	oldPC, ok := a.GetOldObject().(*checkpoint.PodCheckpoint)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
+	}
+	newPC, ok := a.GetObject().(*checkpoint.PodCheckpoint)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+	if ptr.Deref(newPC.Status.NodeName, "") != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q must set status.nodeName to %q on PodCheckpoint %q", nodeName, nodeName, oldPC.Name))
+	}
+
+	// Subsequent writes: a node already owns this checkpoint's status.
+	if recordedNode := ptr.Deref(oldPC.Status.NodeName, ""); recordedNode != "" {
+		if recordedNode != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status recorded on node %q", nodeName, oldPC.Name, recordedNode))
+		}
+		if oldPC.Status.SourcePodUID == nil || !apiequality.Semantic.DeepEqual(oldPC.Status.SourcePodUID, newPC.Status.SourcePodUID) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q must preserve status.sourcePodUID", nodeName))
+		}
+		if condition := meta.FindStatusCondition(oldPC.Status.Conditions, checkpoint.PodCheckpointConditionReady); condition != nil && condition.Reason == checkpoint.PodCheckpointReasonSourcePodReplaced {
+			oldStatus := oldPC.Status.DeepCopy()
+			newStatus := newPC.Status.DeepCopy()
+			oldStatus.Conditions = nil
+			newStatus.Conditions = nil
+			if !podCheckpointReplacementRejected(newPC) || !apiequality.Semantic.DeepEqual(oldStatus, newStatus) {
+				return admission.NewForbidden(a, fmt.Errorf("node %q cannot change a checkpoint rejected as SourcePodReplaced", nodeName))
+			}
+		}
+		return nil
+	}
+
+	// First write: only the node running the source pod may claim it.
+	podName := ""
+	if oldPC.Spec.SourcePod != nil {
+		podName = oldPC.Spec.SourcePod.Name
+	}
+	if podName == "" {
+		return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status: no source pod recorded", nodeName, oldPC.Name))
+	}
+	pod, err := p.podsGetter.Pods(a.GetNamespace()).Get(podName)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status: %w", nodeName, oldPC.Name, err))
+	}
+	if pod.Spec.NodeName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q cannot update PodCheckpoint %q status: source pod %q is assigned to node %q", nodeName, oldPC.Name, podName, pod.Spec.NodeName))
+	}
+	if newPC.Status.SourcePodUID == nil || *newPC.Status.SourcePodUID != pod.UID {
+		return admission.NewForbidden(a, fmt.Errorf("node %q must set status.sourcePodUID to the live source Pod UID", nodeName))
+	}
+	if uid := oldPC.Spec.SourcePod.UID; uid != nil && *uid != pod.UID {
+		hasCheckpointData := newPC.Status.CheckpointLocation != nil || newPC.Status.CheckpointedPodTemplate != nil ||
+			len(newPC.Status.CheckpointedContainers) != 0 || newPC.Status.CompletionTime != nil
+		if !podCheckpointReplacementRejected(newPC) || hasCheckpointData {
+			return admission.NewForbidden(a, fmt.Errorf("node %q may only report SourcePodReplaced without checkpoint data when the source Pod UID differs from spec.sourcePod.uid", nodeName))
+		}
+	}
+	return nil
+}
+
+func podCheckpointReplacementRejected(pc *checkpoint.PodCheckpoint) bool {
+	if len(pc.Status.Conditions) != 1 {
+		return false
+	}
+	condition := pc.Status.Conditions[0]
+	return condition.Type == checkpoint.PodCheckpointConditionReady && condition.Status == metav1.ConditionFalse &&
+		condition.Reason == checkpoint.PodCheckpointReasonSourcePodReplaced
 }
 
 // admitPod allows creating or deleting a pod if it is assigned to the

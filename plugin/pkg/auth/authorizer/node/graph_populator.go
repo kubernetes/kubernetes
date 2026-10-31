@@ -23,6 +23,7 @@ import (
 
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -33,10 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certsv1informers "k8s.io/client-go/informers/certificates/v1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	nodeinformers "k8s.io/client-go/informers/node/v1alpha1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	certsv1listers "k8s.io/client-go/listers/certificates/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	nodelisters "k8s.io/client-go/listers/node/v1alpha1"
 	resourcev1listers "k8s.io/client-go/listers/resource/v1"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
@@ -54,12 +57,14 @@ type graphPopulator struct {
 	attachmentQueue workqueue.TypedRateLimitingInterface[types.NamespacedName]
 	sliceQueue      workqueue.TypedRateLimitingInterface[types.NamespacedName]
 	pcrQueue        workqueue.TypedRateLimitingInterface[types.NamespacedName]
+	checkpointQueue workqueue.TypedRateLimitingInterface[types.NamespacedName]
 
 	podLister        corev1listers.PodLister
 	pvLister         corev1listers.PersistentVolumeLister
 	attachmentLister storagev1listers.VolumeAttachmentLister
 	sliceLister      resourcev1listers.ResourceSliceLister
 	pcrLister        certsv1listers.PodCertificateRequestLister
+	checkpointLister nodelisters.PodCheckpointLister
 }
 
 func newRateLimitingQueue(name string) workqueue.TypedRateLimitingInterface[types.NamespacedName] {
@@ -80,6 +85,7 @@ func AddGraphEventHandlers(
 	attachments storageinformers.VolumeAttachmentInformer,
 	slices resourceinformers.ResourceSliceInformer,
 	pcrs certsv1informers.PodCertificateRequestInformer,
+	checkpoints nodeinformers.PodCheckpointInformer,
 ) {
 	g := &graphPopulator{
 		graph:            graph,
@@ -139,6 +145,19 @@ func AddGraphEventHandlers(
 			DeleteFunc: g.deletePCR,
 		})
 		synced = append(synced, pcrHandler.HasSynced)
+	}
+
+	if checkpoints != nil {
+		g.checkpointQueue = newRateLimitingQueue("node_authorizer_podcheckpoints")
+		g.checkpointLister = checkpoints.Lister()
+		queues = append(queues, g.checkpointQueue)
+		workers = append(workers, g.runCheckpointWorker)
+		checkpointHandler, _ := checkpoints.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    g.addCheckpoint,
+			UpdateFunc: g.updateCheckpoint,
+			DeleteFunc: g.deleteCheckpoint,
+		})
+		synced = append(synced, checkpointHandler.HasSynced)
 	}
 
 	go func() {
@@ -476,4 +495,50 @@ func (g *graphPopulator) processDeletePCR(name, namespace string) {
 
 func (g *graphPopulator) processAddPCR(pcr *certsv1.PodCertificateRequest) {
 	g.graph.AddPodCertificateRequest(pcr)
+}
+
+func (g *graphPopulator) addCheckpoint(obj interface{}) {
+	g.updateCheckpoint(nil, obj)
+}
+
+func (g *graphPopulator) updateCheckpoint(oldObj, obj interface{}) {
+	checkpoint, ok := obj.(*nodev1alpha1.PodCheckpoint)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	if old, ok := oldObj.(*nodev1alpha1.PodCheckpoint); ok && old != nil &&
+		old.UID == checkpoint.UID && ptr.Deref(old.Status.NodeName, "") == ptr.Deref(checkpoint.Status.NodeName, "") {
+		return
+	}
+	g.checkpointQueue.Add(types.NamespacedName{Namespace: checkpoint.Namespace, Name: checkpoint.Name})
+}
+
+func (g *graphPopulator) deleteCheckpoint(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	checkpoint, ok := obj.(*nodev1alpha1.PodCheckpoint)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.checkpointQueue.Add(types.NamespacedName{Namespace: checkpoint.Namespace, Name: checkpoint.Name})
+}
+
+func (g *graphPopulator) runCheckpointWorker() {
+	runWorker(g.checkpointQueue, g.processCheckpointKey)
+}
+
+func (g *graphPopulator) processCheckpointKey(key types.NamespacedName) error {
+	checkpoint, err := g.checkpointLister.PodCheckpoints(key.Namespace).Get(key.Name)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			g.graph.DeletePodCheckpoint(key.Namespace, key.Name)
+			return nil
+		}
+		return err
+	}
+	g.graph.AddPodCheckpoint(checkpoint)
+	return nil
 }

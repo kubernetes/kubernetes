@@ -21,6 +21,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -57,4 +60,17 @@ func TestLookupRuntimeHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetRuntimeClass(t *testing.T) {
+	manager := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	_, err := manager.GetRuntimeClass(rctest.SandboxRuntimeClass)
+	require.ErrorIs(t, err, runtimeclass.ErrNotSynced, "an unsynced cache must not report an existing RuntimeClass as missing")
+
+	defer rctest.StartManagerSync(manager)()
+	rc, err := manager.GetRuntimeClass(rctest.SandboxRuntimeClass)
+	require.NoError(t, err)
+	assert.Equal(t, rctest.SandboxRuntimeHandler, rc.Handler)
+	_, err = manager.GetRuntimeClass("phantom")
+	assert.True(t, apierrors.IsNotFound(err), "unexpected error: %v", err)
 }

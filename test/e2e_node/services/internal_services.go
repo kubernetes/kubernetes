@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"k8s.io/klog/v2"
@@ -33,10 +34,11 @@ import (
 type e2eServices struct {
 	rmDirs []string
 	// statically linked e2e services
-	etcdServer   *etcd3testing.EtcdTestServer
-	etcdStorage  *storagebackend.Config
-	apiServer    *APIServer
-	nsController *NamespaceController
+	etcdServer           *etcd3testing.EtcdTestServer
+	etcdStorage          *storagebackend.Config
+	apiServer            *APIServer
+	nsController         *NamespaceController
+	checkpointController *PodCheckpointController
 }
 
 func newE2EServices() *e2eServices {
@@ -71,6 +73,13 @@ func (es *e2eServices) start(t ktesting.TB) error {
 	if err != nil {
 		return nil
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		klog.Info("Starting PodCheckpoint controller")
+		es.checkpointController = NewPodCheckpointController(framework.TestContext.Host)
+		if err := es.checkpointController.Start(tCtx); err != nil {
+			return err
+		}
+	}
 	klog.Info("E2E services started.")
 	return nil
 }
@@ -80,6 +89,12 @@ func (es *e2eServices) stop(t ktesting.TB) {
 	klog.Info("Stopping e2e services...")
 	// TODO(random-liu): Use a loop to stop all services after introducing
 	// service interface.
+	if es.checkpointController != nil {
+		klog.Info("Stopping PodCheckpoint controller")
+		if err := es.checkpointController.Stop(); err != nil {
+			klog.Errorf("Failed to stop %q: %v", es.checkpointController.Name(), err)
+		}
+	}
 	klog.Info("Stopping namespace controller")
 	if es.nsController != nil {
 		if err := es.nsController.Stop(); err != nil {

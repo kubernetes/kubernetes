@@ -100,6 +100,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.SELinuxWarningController,
 		names.EvictionRequestController,
 		names.ImperativeEvictionResponderController,
+		names.PodCheckpointController,
 	)
 
 	for _, name := range KnownControllers() {

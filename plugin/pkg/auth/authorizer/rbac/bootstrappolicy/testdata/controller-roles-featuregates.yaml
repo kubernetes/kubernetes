@@ -1285,6 +1285,47 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:podcheckpoint-controller
+  rules:
+  - apiGroups:
+    - node.k8s.io
+    resources:
+    - podcheckpoints
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - node.k8s.io
+    resources:
+    - podcheckpoints/status
+    verbs:
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:podgroup-protection-controller
   rules:
   - apiGroups:
