@@ -216,6 +216,78 @@ func TestEqualIgnoreHash(t *testing.T) {
 	}
 }
 
+func TestEqualIgnoreHashAndDroppedFields(t *testing.T) {
+	deployment := generateDeployment("nginx")
+	deployment.Spec.Template.Spec.Containers[0].RestartPolicy = ptr.To(v1.ContainerRestartPolicyNever)
+	podTemplateHash := controller.ComputeHash(&deployment.Spec.Template, deployment.Status.CollisionCount)
+
+	// rsTemplate returns the template of a ReplicaSet labelled with podTemplateHash, as stored by the
+	// API server after mutate.
+	rsTemplate := func(podTemplateHash string, mutate func(*v1.PodTemplateSpec)) v1.PodTemplateSpec {
+		template := deployment.Spec.Template.DeepCopy()
+		template.Labels[apps.DefaultDeploymentUniqueLabelKey] = podTemplateHash
+		if mutate != nil {
+			mutate(template)
+		}
+		return *template
+	}
+	dropRestartPolicy := func(template *v1.PodTemplateSpec) {
+		template.Spec.Containers[0].RestartPolicy = nil
+	}
+
+	tests := []struct {
+		name       string
+		rsTemplate v1.PodTemplateSpec
+		expected   bool
+	}{
+		{
+			name:       "equal ignoring pod-template-hash",
+			rsTemplate: rsTemplate("unrelated-hash", nil),
+			expected:   true,
+		},
+		{
+			name:       "field dropped from a ReplicaSet created from the template",
+			rsTemplate: rsTemplate(podTemplateHash, dropRestartPolicy),
+			expected:   true,
+		},
+		{
+			name:       "ReplicaSet created before the Deployment set the field",
+			rsTemplate: rsTemplate("unrelated-hash", dropRestartPolicy),
+			expected:   false,
+		},
+		{
+			name: "pod-template-hash collides with a template using a different value",
+			rsTemplate: rsTemplate(podTemplateHash, func(template *v1.PodTemplateSpec) {
+				template.Spec.Containers[0].Image = "other"
+			}),
+			expected: false,
+		},
+		{
+			name: "pod-template-hash collides with a template setting a field the Deployment does not",
+			rsTemplate: rsTemplate(podTemplateHash, func(template *v1.PodTemplateSpec) {
+				template.Spec.ActiveDeadlineSeconds = ptr.To[int64](10)
+			}),
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wantHash := test.rsTemplate.Labels[apps.DefaultDeploymentUniqueLabelKey]
+			template := deployment.Spec.Template.DeepCopy()
+			if got := EqualIgnoreHashAndDroppedFields(&test.rsTemplate, template, podTemplateHash); got != test.expected {
+				t.Errorf("expected %v, got %v", test.expected, got)
+			}
+			if got := test.rsTemplate.Labels[apps.DefaultDeploymentUniqueLabelKey]; got != wantHash {
+				t.Errorf("ReplicaSet template pod-template-hash label mutated: expected %q, got %q", wantHash, got)
+			}
+			if !reflect.DeepEqual(template, &deployment.Spec.Template) {
+				t.Errorf("Deployment template mutated")
+			}
+		})
+	}
+}
+
 func TestFindNewReplicaSet(t *testing.T) {
 	now := metav1.Now()
 	later := metav1.Time{Time: now.Add(time.Minute)}
@@ -234,12 +306,37 @@ func TestFindNewReplicaSet(t *testing.T) {
 	oldRS := generateRS(oldDeployment)
 	oldRS.Status.FullyLabeledReplicas = *(oldRS.Spec.Replicas)
 
+	// gatedDeployment still sets a field whose feature gate was disabled, which the API server
+	// dropped from droppedFieldsRS when creating it.
+	gatedDeployment := generateDeployment("nginx")
+	gatedDeployment.Spec.Template.Spec.Containers[0].RestartPolicy = ptr.To(v1.ContainerRestartPolicyNever)
+	droppedFieldsRS := generateRS(gatedDeployment)
+	droppedFieldsRS.Spec.Template.Labels[apps.DefaultDeploymentUniqueLabelKey] = controller.ComputeHash(&gatedDeployment.Spec.Template, gatedDeployment.Status.CollisionCount)
+	droppedFieldsRS.Spec.Template.Spec.Containers[0].RestartPolicy = nil
+	droppedFieldsRS.CreationTimestamp = now
+
+	exactRS := generateRS(gatedDeployment)
+	exactRS.Spec.Template.Labels[apps.DefaultDeploymentUniqueLabelKey] = "exact-hash"
+	exactRS.CreationTimestamp = later
+
 	tests := []struct {
 		Name       string
 		deployment apps.Deployment
 		rsList     []*apps.ReplicaSet
 		expected   *apps.ReplicaSet
 	}{
+		{
+			Name:       "Get new ReplicaSet with fields dropped by the API server",
+			deployment: gatedDeployment,
+			rsList:     []*apps.ReplicaSet{&newRS, &droppedFieldsRS},
+			expected:   &droppedFieldsRS,
+		},
+		{
+			Name:       "Prefer a ReplicaSet with the same template over one with dropped fields",
+			deployment: gatedDeployment,
+			rsList:     []*apps.ReplicaSet{&droppedFieldsRS, &exactRS},
+			expected:   &exactRS,
+		},
 		{
 			Name:       "Get new ReplicaSet with the same template as Deployment spec but different pod-template-hash value",
 			deployment: deployment,

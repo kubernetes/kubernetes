@@ -241,12 +241,14 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 			return nil, rsErr
 		}
 
-		// If the Deployment owns the ReplicaSet and the ReplicaSet's PodTemplateSpec is semantically
-		// deep equal to the PodTemplateSpec of the Deployment, it's the Deployment's new ReplicaSet.
+		// If the Deployment owns the ReplicaSet and the ReplicaSet's PodTemplateSpec matches the
+		// PodTemplateSpec of the Deployment, it's the Deployment's new ReplicaSet. That includes a
+		// ReplicaSet the API server dropped disabled fields from, which is not a collision: treating
+		// it as one would create another ReplicaSet with the same fields dropped, indefinitely.
 		// Otherwise, this is a hash collision and we need to increment the collisionCount field in
 		// the status of the Deployment and requeue to try the creation in the next sync.
 		controllerRef := metav1.GetControllerOf(rs)
-		if controllerRef != nil && controllerRef.UID == d.UID && deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template) {
+		if controllerRef != nil && controllerRef.UID == d.UID && deploymentutil.EqualIgnoreHashAndDroppedFields(&rs.Spec.Template, &d.Spec.Template, podTemplateSpecHash) {
 			createdRS = rs
 			err = nil
 			break
