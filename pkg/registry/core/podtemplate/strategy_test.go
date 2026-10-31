@@ -18,8 +18,10 @@ package podtemplate
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
@@ -86,5 +88,29 @@ func TestStrategy(t *testing.T) {
 	errs = Strategy.ValidateUpdate(ctx, invalidUpdatedTemplate, podTemplate)
 	if len(errs) == 0 {
 		t.Errorf("expected error validating, got none")
+	}
+}
+
+// TestValidateUpdateStoredQuantities checks the stored quantities the strategy passes come from the
+// old template: an unchanged invalid value passes, and a value changed to it is rejected.
+func TestValidateUpdateStoredQuantities(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	template := func(limit string) *api.PodTemplate {
+		return &api.PodTemplate{
+			ObjectMeta: metav1.ObjectMeta{Name: "mytemplate", Namespace: metav1.NamespaceDefault, ResourceVersion: "1"},
+			Template: api.PodTemplateSpec{
+				Spec: podtest.MakePod("", podtest.SetContainers(podtest.MakeContainer("ctr",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Limits: api.ResourceList{"example.com/gpu": resource.MustParse(limit)},
+					})))).Spec,
+			},
+		}
+	}
+	if errs := Strategy.ValidateUpdate(ctx, template("18446744073709551616m"), template("18446744073709551616m")); len(errs) != 0 {
+		t.Errorf("unchanged stored value: unexpected errors %v", errs)
+	}
+	errs := Strategy.ValidateUpdate(ctx, template("18446744073709551616m"), template("1"))
+	if len(errs) == 0 || !strings.Contains(errs.ToAggregate().Error(), "limits[example.com/gpu]") {
+		t.Errorf("value changed to an invalid one: expected an error at limits[example.com/gpu], got %v", errs)
 	}
 }
