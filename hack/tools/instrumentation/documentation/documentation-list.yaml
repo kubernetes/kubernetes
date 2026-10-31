@@ -843,20 +843,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: key_id_hash_last_timestamp_seconds
-  subsystem: envelope_encryption
-  namespace: apiserver
-  help: The last time in seconds when a keyID was used.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - apiserver_id_hash
-  - key_id_hash
-  - provider_name
-  - transformation_type
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: key_id_hash_status_last_timestamp_seconds
   subsystem: envelope_encryption
   namespace: apiserver
@@ -867,21 +853,6 @@
   - apiserver_id_hash
   - key_id_hash
   - provider_name
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: key_id_hash_total
-  subsystem: envelope_encryption
-  namespace: apiserver
-  help: Number of times a keyID is used split by transformation type, provider, and
-    apiserver identity.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - apiserver_id_hash
-  - key_id_hash
-  - provider_name
-  - transformation_type
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
