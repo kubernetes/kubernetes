@@ -44,13 +44,6 @@ import (
 // post-GC retained heap/runtime memory for kube-apiserver operations using the
 // 10KB exemplar pod across request methods, options, and wire formats.
 func BenchmarkRequestCost(b *testing.B) {
-	framework.FixBenchmarkJSONOutput(b)
-	featuregatetesting.SetFeatureGatesDuringTest(b, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.CBORServingAndStorage:    true,
-		features.DetectCacheInconsistency: false,
-		features.WatchList:                true,
-	})
-
 	const (
 		podPath  = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods/pod-000"
 		podsPath = "/api/v1/namespaces/" + metav1.NamespaceDefault + "/pods"
@@ -533,6 +526,19 @@ func BenchmarkRequestCost(b *testing.B) {
 		},
 	}
 
+	benchmarkRequestScenarios(b, scenarios)
+}
+
+// benchmarkRequestScenarios runs every scenario as a sub-benchmark and writes
+// the results to $ARTIFACTS in the perf-dash GenericPrometheusQuery format.
+func benchmarkRequestScenarios(b *testing.B, scenarios []requestScenario) {
+	framework.FixBenchmarkJSONOutput(b)
+	featuregatetesting.SetFeatureGatesDuringTest(b, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CBORServingAndStorage:    true,
+		features.DetectCacheInconsistency: false,
+		features.WatchList:                true,
+	})
+
 	report := perfData{Version: "v1"}
 	for _, sc := range scenarios {
 		b.Run(fmt.Sprintf("Method=%s/Options=%s", sc.method, sc.options), func(b *testing.B) {
@@ -556,6 +562,15 @@ type requestScenario struct {
 	requestContentType string
 	acceptContentTypes []contentType
 	body               func(mediaType string, pod *v1.Pod) []byte
+	// setup, if set, runs against the freshly started apiserver after pods
+	// are seeded and before measurement starts, e.g. to install admission
+	// policies and wait until they are enforced.
+	setup func(tCtx ktesting.TContext, server http.Handler)
+	// requestsPerOp is the number of requests sent per benchmark iteration.
+	// Metrics are always reported per request. Repeatable (e.g. dry-run)
+	// requests can raise it so that background apiserver allocations do not
+	// dominate the result under the default -benchtime=1x. Defaults to 1.
+	requestsPerOp int
 }
 
 // perfData and dataItem match k8s.io/kubernetes/test/e2e/perftype (duplicated
@@ -606,6 +621,10 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 				}
 				payload = sc.body(wf.accept, pod)
 			}
+			if sc.setup != nil {
+				sc.setup(tCtx, server)
+			}
+			requestsPerOp := max(sc.requestsPerOp, 1)
 
 			// Warm lazy schema, converter, and per-namespace admission caches
 			// before measurements; dryRun=All prevents mutating seeded state so
@@ -622,7 +641,9 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 				if i == 0 {
 					runtime.ReadMemStats(&startMem)
 				}
-				responseBytes = runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
+				for range requestsPerOp {
+					responseBytes = runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
+				}
 			}
 			runtime.ReadMemStats(&endMem)
 			debug.FreeOSMemory()
@@ -644,9 +665,10 @@ func benchmarkScenario(b *testing.B, sc requestScenario) []dataItem {
 			b.ReportMetric(heapFragBytes, "heap-frag-B")
 
 			if b.N > 0 {
-				allocBytes := float64(endMem.TotalAlloc-startMem.TotalAlloc) / float64(b.N)
-				allocs := float64(endMem.Mallocs-startMem.Mallocs) / float64(b.N)
-				durationNs := float64(b.Elapsed().Nanoseconds()) / float64(b.N)
+				requests := float64(b.N * requestsPerOp)
+				allocBytes := float64(endMem.TotalAlloc-startMem.TotalAlloc) / requests
+				allocs := float64(endMem.Mallocs-startMem.Mallocs) / requests
+				durationNs := float64(b.Elapsed().Nanoseconds()) / requests
 				items = append(items,
 					dataItem{
 						Labels: map[string]string{"Request": requestLabel, "Format": wf.name, "Metric": "Allocated bytes per operation"},
@@ -742,6 +764,9 @@ func buildRequestPath(sc requestScenario, pods []*v1.Pod) string {
 }
 
 func withDryRun(path string) string {
+	if strings.Contains(path, "dryRun=") {
+		return path
+	}
 	if strings.Contains(path, "?") {
 		return path + "&dryRun=All"
 	}
