@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 const defaultReplicas = 100
@@ -77,7 +78,7 @@ func validNewReplicaSet() *apps.ReplicaSet {
 				},
 				Spec: podtest.MakePodSpec(),
 			},
-			Replicas: 7,
+			Replicas: new(int32(7)),
 		},
 		Status: apps.ReplicaSetStatus{
 			Replicas: 5,
@@ -100,7 +101,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&apps.ReplicaSet{
 			Spec: apps.ReplicaSetSpec{
-				Replicas: 2,
+				Replicas: new(int32(2)),
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{}},
 				Template: validReplicaSet.Spec.Template,
 			},
@@ -119,7 +120,7 @@ func TestUpdate(t *testing.T) {
 		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*apps.ReplicaSet)
-			object.Spec.Replicas = object.Spec.Replicas + 1
+			object.Spec.Replicas = new(*object.Spec.Replicas + 1)
 			return object
 		},
 		// invalid updateFunc
@@ -168,7 +169,7 @@ func TestGenerationNumber(t *testing.T) {
 	}
 
 	// Updates to spec should increment the generation number
-	storedRS.Spec.Replicas++
+	*storedRS.Spec.Replicas++
 	if _, _, err := storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -274,7 +275,7 @@ func TestScaleGet(t *testing.T) {
 			CreationTimestamp: rs.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: validReplicaSet.Spec.Replicas,
+			Replicas: *validReplicaSet.Spec.Replicas,
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: validReplicaSet.Status.Replicas,
@@ -351,7 +352,7 @@ func TestStatusUpdate(t *testing.T) {
 	update := apps.ReplicaSet{
 		ObjectMeta: validReplicaSet.ObjectMeta,
 		Spec: apps.ReplicaSetSpec{
-			Replicas: defaultReplicas,
+			Replicas: new(int32(defaultReplicas)),
 		},
 		Status: apps.ReplicaSetStatus{
 			Replicas: defaultReplicas,
@@ -367,8 +368,8 @@ func TestStatusUpdate(t *testing.T) {
 	}
 
 	rs := obj.(*apps.ReplicaSet)
-	if rs.Spec.Replicas != 7 {
-		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", rs.Spec.Replicas)
+	if ptr.Deref(rs.Spec.Replicas, 0) != 7 {
+		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", ptr.Deref(rs.Spec.Replicas, 0))
 	}
 	if rs.Status.Replicas != defaultReplicas {
 		t.Errorf("we expected .status.replicas to be updated to %d but it was %v", defaultReplicas, rs.Status.Replicas)

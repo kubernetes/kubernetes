@@ -120,7 +120,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 	oldRS := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: 3,
+			Replicas: new(int32(3)),
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
@@ -132,7 +132,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 	newRS := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: 1,
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 			Template: validPodTemplate.Template,
 		},
@@ -145,7 +145,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 	if newRS.Status.Replicas != 3 {
 		t.Errorf("ReplicaSet status updates should allow change of replicas: %v", newRS.Status.Replicas)
 	}
-	if newRS.Spec.Replicas != 3 {
+	if ptr.Deref(newRS.Spec.Replicas, 0) != 3 {
 		t.Errorf("PrepareForUpdate should have preferred spec")
 	}
 	errs := StatusStrategy.ValidateUpdate(ctx, newRS, oldRS)
@@ -192,12 +192,12 @@ func TestReplicaSetStatusStrategyWithDeploymentReplicaSetTerminatingReplicas(t *
 			ctx := genericapirequest.NewDefaultContext()
 			validSelector := map[string]string{"a": "b"}
 			oldRS := newReplicaSetWithSelectorLabels(validSelector)
-			oldRS.Spec.Replicas = 3
+			oldRS.Spec.Replicas = new(int32(3))
 			oldRS.Status.Replicas = 3
 			oldRS.Status.TerminatingReplicas = tc.terminatingReplicas
 
 			newRS := newReplicaSetWithSelectorLabels(validSelector)
-			newRS.Spec.Replicas = 3
+			newRS.Spec.Replicas = new(int32(3))
 			newRS.Status.Replicas = 2
 			newRS.Status.TerminatingReplicas = tc.terminatingReplicasUpdate
 

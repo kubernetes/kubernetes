@@ -27,11 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/ptr"
 )
 
 func TestV12StatefulSetSpecConversion(t *testing.T) {
-	replicas := ptr.To(int32(2))
+	replicas := new(int32(2))
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
 	appsv1Template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -53,7 +52,7 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 	}{
 		"StatefulSetSpec Conversion 1": {
 			stsSpec1: &apps.StatefulSetSpec{
-				Replicas: *replicas,
+				Replicas: replicas,
 				Template: apiTemplate,
 			},
 			stsSepc2: &appsv1.StatefulSetSpec{
@@ -63,7 +62,7 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 		},
 		"StatefulSetSpec Conversion 2": {
 			stsSpec1: &apps.StatefulSetSpec{
-				Replicas:            *replicas,
+				Replicas:            replicas,
 				Selector:            selector,
 				Template:            apiTemplate,
 				ServiceName:         "foo",
@@ -102,10 +101,8 @@ func TestV12StatefulSetSpecConversion(t *testing.T) {
 }
 
 func TestV1StatefulSetStatusConversion(t *testing.T) {
-	observedGeneration := new(int64)
-	*observedGeneration = 2
-	collisionCount := new(int32)
-	*collisionCount = 1
+	observedGeneration := int64(2)
+	collisionCount := new(int32(1))
 	testcases := map[string]struct {
 		stsStatus1 *apps.StatefulSetStatus
 		stsStatus2 *appsv1.StatefulSetStatus
@@ -127,7 +124,7 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 				UpdatedReplicas:    int32(3),
 				CurrentRevision:    "12345",
 				UpdateRevision:     "23456",
-				ObservedGeneration: *observedGeneration,
+				ObservedGeneration: observedGeneration,
 			},
 		},
 		"StatefulSetStatus Conversion 2": {
@@ -142,7 +139,7 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 				CollisionCount:     collisionCount,
 			},
 			stsStatus2: &appsv1.StatefulSetStatus{
-				ObservedGeneration: *observedGeneration,
+				ObservedGeneration: observedGeneration,
 				Replicas:           int32(3),
 				ReadyReplicas:      int32(1),
 				CurrentReplicas:    int32(3),
@@ -177,11 +174,11 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 }
 
 func TestV1StatefulSetUpdateStrategyConversion(t *testing.T) {
-	partition := ptr.To(int32(2))
+	partition := new(int32(2))
 	appsv1rollingUpdate := new(appsv1.RollingUpdateStatefulSetStrategy)
 	appsv1rollingUpdate.Partition = partition
 	appsrollingUpdate := new(apps.RollingUpdateStatefulSetStrategy)
-	appsrollingUpdate.Partition = *partition
+	appsrollingUpdate.Partition = partition
 	testcases := map[string]struct {
 		stsUpdateStrategy1 *apps.StatefulSetUpdateStrategy
 		stsUpdateStrategy2 *appsv1.StatefulSetUpdateStrategy
@@ -232,7 +229,7 @@ func TestV1RollingUpdateDaemonSetConversion(t *testing.T) {
 		rollingUpdateDs2 *appsv1.RollingUpdateDaemonSet
 	}{
 		"RollingUpdateDaemonSet Conversion 2": {
-			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: intorstr, MaxSurge: maxSurge},
+			rollingUpdateDs1: &apps.RollingUpdateDaemonSet{MaxUnavailable: &intorstr, MaxSurge: &maxSurge},
 			rollingUpdateDs2: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &intorstr, MaxSurge: &maxSurge},
 		},
 	}
@@ -259,18 +256,18 @@ func TestV1RollingUpdateDaemonSetConversion(t *testing.T) {
 }
 
 func TestV1DeploymentConversion(t *testing.T) {
-	replica := ptr.To(int32(2))
-	rollbackTo := new(apps.RollbackConfig)
-	rollbackTo.Revision = int64(2)
+	replica := new(int32(2))
 	testcases := map[string]struct {
 		deployment1 *apps.Deployment
 		deployment2 *appsv1.Deployment
 	}{
 		"Deployment Conversion 1": {
 			deployment1: &apps.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{apps.DeprecatedRollbackTo: "2"},
+				},
 				Spec: apps.DeploymentSpec{
-					Replicas:   *replica,
-					RollbackTo: rollbackTo,
+					Replicas: replica,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							SecurityContext: new(api.PodSecurityContext),
@@ -295,7 +292,7 @@ func TestV1DeploymentConversion(t *testing.T) {
 		"Deployment Conversion 2": {
 			deployment1: &apps.Deployment{
 				Spec: apps.DeploymentSpec{
-					Replicas: *replica,
+					Replicas: replica,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							SecurityContext: new(api.PodSecurityContext),
@@ -338,9 +335,9 @@ func TestV1DeploymentConversion(t *testing.T) {
 }
 
 func TestV1DeploymentSpecConversion(t *testing.T) {
-	replica := ptr.To(int32(2))
-	revisionHistoryLimit := ptr.To(int32(2))
-	progressDeadlineSeconds := ptr.To(int32(2))
+	replica := new(int32(2))
+	revisionHistoryLimit := new(int32(2))
+	progressDeadlineSeconds := new(int32(2))
 
 	testcases := map[string]struct {
 		deploymentSpec1 *apps.DeploymentSpec
@@ -348,7 +345,7 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 	}{
 		"DeploymentSpec Conversion 1": {
 			deploymentSpec1: &apps.DeploymentSpec{
-				Replicas: *replica,
+				Replicas: replica,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
 						SecurityContext: new(api.PodSecurityContext),
@@ -366,7 +363,7 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 		},
 		"DeploymentSpec Conversion 2": {
 			deploymentSpec1: &apps.DeploymentSpec{
-				Replicas:             *replica,
+				Replicas:             replica,
 				RevisionHistoryLimit: revisionHistoryLimit,
 				MinReadySeconds:      2,
 				Paused:               true,
@@ -390,7 +387,7 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 		},
 		"DeploymentSpec Conversion 3": {
 			deploymentSpec1: &apps.DeploymentSpec{
-				Replicas:                *replica,
+				Replicas:                replica,
 				ProgressDeadlineSeconds: progressDeadlineSeconds,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -438,7 +435,7 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 func TestV1DeploymentStrategyConversion(t *testing.T) {
 	maxUnavailable := intstr.FromInt32(2)
 	maxSurge := intstr.FromInt32(2)
-	appsRollingUpdate := apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge}
+	appsRollingUpdate := apps.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge}
 	appsv1RollingUpdate := appsv1.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge}
 	testcases := map[string]struct {
 		deploymentStrategy1 *apps.DeploymentStrategy
@@ -476,7 +473,6 @@ func TestV1DeploymentStrategyConversion(t *testing.T) {
 }
 
 func TestV1RollingUpdateDeploymentConversion(t *testing.T) {
-	nilIntStr := intstr.IntOrString{}
 	maxUnavailable := intstr.FromInt32(2)
 	maxSurge := intstr.FromInt32(2)
 	testcases := map[string]struct {
@@ -485,18 +481,18 @@ func TestV1RollingUpdateDeploymentConversion(t *testing.T) {
 	}{
 		"RollingUpdateDeployment Conversion 1": {
 			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{},
-			rollingUpdateDeployment2: &appsv1.RollingUpdateDeployment{MaxUnavailable: &nilIntStr, MaxSurge: &nilIntStr},
+			rollingUpdateDeployment2: &appsv1.RollingUpdateDeployment{},
 		},
 		"RollingUpdateDeployment Conversion 2": {
-			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable},
-			rollingUpdateDeployment2: &appsv1.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &nilIntStr},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable},
+			rollingUpdateDeployment2: &appsv1.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable},
 		},
 		"RollingUpdateDeployment Conversion 3": {
-			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxSurge: maxSurge},
-			rollingUpdateDeployment2: &appsv1.RollingUpdateDeployment{MaxSurge: &maxSurge, MaxUnavailable: &nilIntStr},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxSurge: &maxSurge},
+			rollingUpdateDeployment2: &appsv1.RollingUpdateDeployment{MaxSurge: &maxSurge},
 		},
 		"RollingUpdateDeployment Conversion 4": {
-			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge},
+			rollingUpdateDeployment1: &apps.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge},
 			rollingUpdateDeployment2: &appsv1.RollingUpdateDeployment{MaxUnavailable: &maxUnavailable, MaxSurge: &maxSurge},
 		},
 	}
@@ -523,8 +519,7 @@ func TestV1RollingUpdateDeploymentConversion(t *testing.T) {
 }
 
 func TestV1ReplicaSetSpecConversion(t *testing.T) {
-	replicas := new(int32)
-	*replicas = 2
+	replicas := new(int32(2))
 	matchExpressions := []metav1.LabelSelectorRequirement{
 		{Key: "foo", Operator: metav1.LabelSelectorOpIn, Values: []string{"foo"}},
 	}
@@ -537,7 +532,7 @@ func TestV1ReplicaSetSpecConversion(t *testing.T) {
 	}{
 		"ReplicaSetSpec Conversion 1": {
 			replicaset1: &apps.ReplicaSetSpec{
-				Replicas:        *replicas,
+				Replicas:        replicas,
 				MinReadySeconds: 2,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
@@ -557,7 +552,7 @@ func TestV1ReplicaSetSpecConversion(t *testing.T) {
 		},
 		"ReplicaSetSpec Conversion 2": {
 			replicaset1: &apps.ReplicaSetSpec{
-				Replicas: *replicas,
+				Replicas: replicas,
 				Selector: selector,
 				Template: api.PodTemplateSpec{
 					Spec: api.PodSpec{
