@@ -1145,12 +1145,6 @@ const (
 	// - will never graduate to stable.
 	TopologyManagerPolicyBetaOptions featuregate.Feature = "TopologyManagerPolicyBetaOptions"
 
-	// owner: @PiotrProkop
-	// kep: https://kep.k8s.io/3545
-	//
-	// Allow the usage of options to fine-tune the topology manager policies.
-	TopologyManagerPolicyOptions featuregate.Feature = "TopologyManagerPolicyOptions"
-
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	//
@@ -2043,12 +2037,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	TopologyManagerPolicyOptions: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
 	TranslateStreamCloseWebsocketRequests: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
@@ -2672,8 +2660,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	TopologyManagerPolicyAlphaOptions: {},
 
 	TopologyManagerPolicyBetaOptions: {},
-
-	TopologyManagerPolicyOptions: {},
 
 	TranslateStreamCloseWebsocketRequests: {},
 
