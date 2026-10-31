@@ -117,7 +117,6 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -912,9 +911,9 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
+			if !kubeletutil.IsCgroup2UnifiedMode() && cm.IsSwapBehaviorEnabled(s.MemorySwap.SwapBehavior) {
 				// This feature is not supported for cgroupv1 so we are failing early.
-				return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
+				return fmt.Errorf("swap feature is enabled and %s but it is only supported with cgroupv2", s.MemorySwap.SwapBehavior)
 			}
 			if !s.FailSwapOn && s.MemorySwap.SwapBehavior == "" {
 				// This is just a log because we are using a default of NoSwap.
@@ -960,6 +959,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				TopologyManagerPolicy:        s.TopologyManagerPolicy,
 				TopologyManagerScope:         s.TopologyManagerScope,
 				TopologyManagerPolicyOptions: topologyManagerPolicyOptions,
+				MemorySwapBehavior:           s.MemorySwap.SwapBehavior,
 			},
 			s.FailSwapOn,
 			kubeDeps.Recorder,

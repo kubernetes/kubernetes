@@ -173,10 +173,13 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	for i := range obj.Spec.Containers {
 		// set requests to limits if requests are not specified, but limits are
 		if obj.Spec.Containers[i].Resources.Limits != nil {
-			if obj.Spec.Containers[i].Resources.Requests == nil {
-				obj.Spec.Containers[i].Resources.Requests = make(v1.ResourceList)
-			}
 			for key, value := range obj.Spec.Containers[i].Resources.Limits {
+				if resourcehelper.IsLimitOnlyResource(key) {
+					continue
+				}
+				if obj.Spec.Containers[i].Resources.Requests == nil {
+					obj.Spec.Containers[i].Resources.Requests = make(v1.ResourceList)
+				}
 				if _, exists := obj.Spec.Containers[i].Resources.Requests[key]; !exists {
 					obj.Spec.Containers[i].Resources.Requests[key] = value.DeepCopy()
 				}
@@ -185,10 +188,13 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	}
 	for i := range obj.Spec.InitContainers {
 		if obj.Spec.InitContainers[i].Resources.Limits != nil {
-			if obj.Spec.InitContainers[i].Resources.Requests == nil {
-				obj.Spec.InitContainers[i].Resources.Requests = make(v1.ResourceList)
-			}
 			for key, value := range obj.Spec.InitContainers[i].Resources.Limits {
+				if resourcehelper.IsLimitOnlyResource(key) {
+					continue
+				}
+				if obj.Spec.InitContainers[i].Resources.Requests == nil {
+					obj.Spec.InitContainers[i].Resources.Requests = make(v1.ResourceList)
+				}
 				if _, exists := obj.Spec.InitContainers[i].Resources.Requests[key]; !exists {
 					obj.Spec.InitContainers[i].Resources.Requests[key] = value.DeepCopy()
 				}
@@ -526,11 +532,7 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 // TODO(ndixita): Remove defaultPodRequests once PodLevelResourcesFixDefaulting feature gate is GA.
 func defaultPodRequests(obj *v1.Pod) {
 	// We only populate defaults when the pod-level resources are partly specified already.
-	if obj.Spec.Resources == nil {
-		return
-	}
-
-	if len(obj.Spec.Resources.Limits) == 0 {
+	if !resourcehelper.IsPodLevelLimitsSet(obj) {
 		return
 	}
 
@@ -580,11 +582,7 @@ func defaultPodRequests(obj *v1.Pod) {
 // TODO(ndixita): Remove defaultHugePagePodLimits once PodLevelResourcesFixDefaulting feature gate is GA.
 func defaultHugePagePodLimits(pod *v1.Pod) {
 	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
-	if pod.Spec.Resources == nil {
-		return
-	}
-
-	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
+	if !resourcehelper.IsPodLevelResourcesSet(pod) {
 		return
 	}
 

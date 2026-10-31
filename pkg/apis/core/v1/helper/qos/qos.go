@@ -42,8 +42,7 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 // A pod is Burstable if cpu & memory limits and requests do not match across all containers.
 func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 	// When pod-level resources are specified, we use them to determine QoS class.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || resourcehelper.IsPodLevelResourcesSet(pod))) {
+	if usePodLevelResourcesForQOS(pod) {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 
@@ -120,4 +119,29 @@ func resourceQOS(resources *v1.ResourceRequirements, res v1.ResourceName) v1.Pod
 		// req == lim != 0
 		return v1.PodQOSGuaranteed
 	}
+}
+
+func usePodLevelResourcesForQOS(pod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) || pod.Spec.Resources == nil {
+		return false
+	}
+	if hasOnlyLimitOnlyResources(pod.Spec.Resources) {
+		return false
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) {
+		return resourcehelper.IsPodLevelResourcesSet(pod)
+	}
+	return true
+}
+
+func hasOnlyLimitOnlyResources(resources *v1.ResourceRequirements) bool {
+	if resources == nil || len(resources.Requests) > 0 || len(resources.Limits) == 0 {
+		return false
+	}
+	for name := range resources.Limits {
+		if !resourcehelper.IsLimitOnlyResource(name) {
+			return false
+		}
+	}
+	return true
 }

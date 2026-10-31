@@ -10263,3 +10263,121 @@ func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateAPIPodStatusSwapEnforcement(t *testing.T) {
+	swap1Gi := resource.MustParse("1Gi")
+	swap2Gi := resource.MustParse("2Gi")
+	swap512Mi := resource.MustParse("512Mi")
+
+	for _, tc := range []struct {
+		name              string
+		gateEnabled       bool
+		nodeSwapBehavior  kubetypes.SwapBehavior
+		actuatedSwap      *resource.Quantity
+		wantContainerSwap *resource.Quantity
+		wantPodStatusSwap *resource.Quantity
+	}{
+		{
+			name:              "WorkloadControlledSwap disabled omits swap from container and pod status",
+			gateEnabled:       false,
+			nodeSwapBehavior:  kubetypes.WorkloadControlledSwap,
+			actuatedSwap:      &swap512Mi,
+			wantContainerSwap: nil,
+			wantPodStatusSwap: nil,
+		},
+		{
+			name:              "NoSwap node omits un-enforced swap from container and pod status",
+			gateEnabled:       true,
+			nodeSwapBehavior:  kubetypes.NoSwap,
+			actuatedSwap:      nil,
+			wantContainerSwap: nil,
+			wantPodStatusSwap: nil,
+		},
+		{
+			name:              "WorkloadControlledSwap node reports actuated swap in container and pod status",
+			gateEnabled:       true,
+			nodeSwapBehavior:  kubetypes.WorkloadControlledSwap,
+			actuatedSwap:      &swap512Mi,
+			wantContainerSwap: &swap512Mi,
+			wantPodStatusSwap: &swap2Gi,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, tc.gateEnabled)
+
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			testKubelet.fakeRuntime.SwapBehavior = map[string]kubetypes.SwapBehavior{
+				"":   tc.nodeSwapBehavior,
+				"c1": tc.nodeSwapBehavior,
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "swap-status-pod",
+					Name:      "swap-status-pod",
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("4Gi"),
+							v1.ResourceSwap:   swap2Gi,
+						},
+					},
+					Containers: []v1.Container{{
+						Name:  "c1",
+						Image: "img",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("2Gi"),
+								v1.ResourceSwap:   swap1Gi,
+							},
+						},
+					}},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+				},
+			}
+			criStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					ID:    kubecontainer.ContainerID{Type: "fake", ID: "c1-id"},
+					Name:  "c1",
+					State: kubecontainer.ContainerStateRunning,
+					Resources: &kubecontainer.ContainerResources{
+						SwapLimit: tc.actuatedSwap,
+					},
+				}},
+			}
+
+			apiStatus := kl.generateAPIPodStatus(tCtx, pod, criStatus, SyncPod)
+			require.Len(t, apiStatus.ContainerStatuses, 1)
+			require.NotNil(t, apiStatus.ContainerStatuses[0].Resources)
+			gotContainerSwap, hasContainerSwap := apiStatus.ContainerStatuses[0].Resources.Limits[v1.ResourceSwap]
+			if tc.wantContainerSwap == nil {
+				assert.False(t, hasContainerSwap, "expected container status limits.swap to be omitted")
+			} else {
+				require.True(t, hasContainerSwap, "expected container status limits.swap to be present")
+				assert.True(t, tc.wantContainerSwap.Equal(gotContainerSwap), "got %v, want %v", gotContainerSwap, *tc.wantContainerSwap)
+			}
+
+			require.NotNil(t, apiStatus.Resources)
+			gotPodSwap, hasPodSwap := apiStatus.Resources.Limits[v1.ResourceSwap]
+			if tc.wantPodStatusSwap == nil {
+				assert.False(t, hasPodSwap, "expected pod status limits.swap to be omitted")
+			} else {
+				require.True(t, hasPodSwap, "expected pod status limits.swap to be present")
+				assert.True(t, tc.wantPodStatusSwap.Equal(gotPodSwap), "got %v, want %v", gotPodSwap, *tc.wantPodStatusSwap)
+			}
+		})
+	}
+}

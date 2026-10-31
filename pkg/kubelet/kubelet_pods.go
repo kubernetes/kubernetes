@@ -2229,7 +2229,13 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	return &apiPodStatus
 }
 
-func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
+func (kl *Kubelet) isSwapLimitEnforced(pod *v1.Pod) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) &&
+		kl.containerRuntime != nil &&
+		kl.containerRuntime.GetContainerSwapBehavior(pod, nil) != kubetypes.NoSwap
+}
+
+func (kl *Kubelet) getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
 	allocatedResources := allocatedPod.Spec.Resources.DeepCopy()
 	if allocatedResources == nil {
 		allocatedResources = &v1.ResourceRequirements{}
@@ -2240,12 +2246,20 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 	}
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
 	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
+	if kl.isSwapLimitEnforced(allocatedPod) && allocatedPod.Spec.Resources != nil {
+		if swapLimit, ok := allocatedPod.Spec.Resources.Limits[v1.ResourceSwap]; ok {
+			if allocatedResources.Limits == nil {
+				allocatedResources.Limits = make(v1.ResourceList)
+			}
+			allocatedResources.Limits[v1.ResourceSwap] = swapLimit
+		}
+	}
 	return allocatedResources
 }
 
 func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, allocatedPod *v1.Pod, oldPodStatus v1.PodStatus) *v1.ResourceRequirements {
 	if allocatedPod.Status.Phase != v1.PodRunning {
-		return getEffectiveAllocatedResources(allocatedPod)
+		return kl.getEffectiveAllocatedResources(allocatedPod)
 	}
 
 	// TODO(ndixita): Revisit the decision to output cgroup values in Pod Status.
@@ -2345,6 +2359,21 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
 	} else {
 		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
+	}
+
+	// KEP-5359: pod-level swap limit, read back from the pod cgroup's
+	// memory.swap.max when the pod declared one and swap is enforced on the node.
+	if _, declared := resources.Limits[v1.ResourceSwap]; declared {
+		if !kl.isSwapLimitEnforced(allocatedPod) {
+			delete(resources.Limits, v1.ResourceSwap)
+		} else if swapConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceSwap); err != nil {
+			logger.V(4).Info("failed to read swap cgroup config for the pod", "podName", allocatedPod.Name, "err", err)
+			preserveOldResourcesValue(v1.ResourceSwap, oldPodStatus.Resources.Limits, resources.Limits)
+		} else if swapLimit, ok := cm.SwapLimitFromConfig(swapConfig); ok {
+			resources.Limits[v1.ResourceSwap] = *apiresource.NewQuantity(swapLimit, apiresource.BinarySI)
+		} else {
+			preserveOldResourcesValue(v1.ResourceSwap, oldPodStatus.Resources.Limits, resources.Limits)
+		}
 	}
 
 	return resources
@@ -2499,7 +2528,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 		if cStatus.State != kubecontainer.ContainerStateRunning {
 			// If the container isn't running, just use the allocated resources.
-			return allocatedContainer.Resources.DeepCopy()
+			resources := allocatedContainer.Resources.DeepCopy()
+			if !kl.isSwapLimitEnforced(pod) {
+				delete(resources.Limits, v1.ResourceSwap)
+			}
+			return resources
 		}
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}
@@ -2547,6 +2580,19 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 			} else {
 				preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
+			}
+			// KEP-5359: report the actuated swap limit only for containers that
+			// declared one and when swap is enforced on the node. Kubelet-derived
+			// values (pod-level inheritance, LimitedSwap) stay out of status until
+			// the API shape is settled.
+			if _, declared := resources.Limits[v1.ResourceSwap]; declared {
+				if !kl.isSwapLimitEnforced(pod) {
+					delete(resources.Limits, v1.ResourceSwap)
+				} else if cStatus.Resources != nil && cStatus.Resources.SwapLimit != nil {
+					resources.Limits[v1.ResourceSwap] = *cStatus.Resources.SwapLimit
+				} else {
+					preserveOldResourcesValue(v1.ResourceSwap, oldStatus.Resources.Limits, resources.Limits)
+				}
 			}
 		}
 
