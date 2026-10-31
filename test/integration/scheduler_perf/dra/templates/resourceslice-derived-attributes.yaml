@@ -1,0 +1,24 @@
+{{$numDevices := or .numDevices 8}}
+{{$numNuma := or .numNuma 2}}
+
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1
+metadata:
+  name: resourceslice-derived-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-derived-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeName: scheduler-perf-dra-{{.Index}}
+  devices:{{range ($numDevices | Int)}}
+  - name: device-{{.}}
+    attributes:
+      driver:
+        string: test
+      dra.example.com/topology:
+        string: "pci-locality=numa-{{Mod . $numNuma}}"
+      # NUMA id cycles so the two requests have to skip non-matching devices.
+      dra.example.com/numa:
+        string: "numa-{{Mod . $numNuma}}"{{end}}

@@ -5381,11 +5381,12 @@ func TestAllocatorSelection(t *testing.T) {
 			expectImplementation: "stable",
 		},
 
-		// The default implementation, potentially with some beta features enabled.
+		// DRADerivedAttributes is beta and on by default. The stable allocator
+		// does not implement it, so the default selection is incubating.
 		"default": {
 			features:             "",
 			usingFeatureGroup:    true,
-			expectImplementation: "stable",
+			expectImplementation: "incubating",
 		},
 
 		// Alpha features may need the experimental implementation, if there are any

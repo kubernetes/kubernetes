@@ -167,7 +167,7 @@ type DeviceRequestApplyConfiguration struct {
 	//
 	// The maximum number of derived attributes is 32.
 	//
-	// This is an alpha field and requires enabling the DRADerivedAttributes
+	// This is a beta field and requires enabling the DRADerivedAttributes
 	// feature gate.
 	DerivedAttributes []DeviceDerivedAttributeApplyConfiguration `json:"derivedAttributes,omitempty"`
 }
