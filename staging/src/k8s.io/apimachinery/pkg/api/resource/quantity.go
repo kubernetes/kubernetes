@@ -69,8 +69,13 @@ import (
 // Parsing keeps at most 29 significant digits, enough for any int64 value at
 // nano precision, and rounds any precision beyond this away from zero.
 // Parsing also preserves a value only down to nano, rounding a finer non-zero
-// value away from zero, so "0.9n" becomes "1n". The int64 accessors round and
-// may overflow on top of that: see Value, MilliValue and ScaledValue.
+// value away from zero, so "0.9n" becomes "1n". Parsing reduces the exponent to
+// account for digits after the decimal point, and raises it to account for
+// digits dropped by rounding. If the result is below -2147483647 or above
+// 2147483647, it saturates at the edge of that range. A value too large keeps
+// its digits at exponent 2147483647, so "1e4294967297" parses as 1e2147483647,
+// and a value too small rounds away from zero to 1n or -1n. The int64 accessors
+// round and may overflow on top of that: see Value, MilliValue and ScaledValue.
 //
 // When a Quantity is parsed from a string, it will remember the type of suffix
 // it had, and will use the same type again when it is serialized.
@@ -378,29 +383,32 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{}, err
 	}
 
-	base, exponent, format, ok := quantitySuffixer.interpret(suffix(suf))
+	suffix, ok := parseSuffix(suf)
 	if !ok {
 		return Quantity{}, ErrSuffix
 	}
+	format := suffix.format
 
 	precision := int32(0)
-	scale := int32(0)
+	scale := widenedScale(0)
 	mantissa := int64(1)
 	forceRecanonicalize := false
 	switch format {
 	case DecimalExponent, DecimalSI:
-		scale = exponent
+		scale = suffix.decimalScale
 		precision = maxInt64Factors - int32(len(num)+len(denom))
 		// preserves compatibility with recanonicalizing integers >18 digits long, even if they are in int64 range
 		forceRecanonicalize = precision <= 0
 	case BinarySI:
 		scale = 0
 		switch {
-		case exponent >= 0 && len(denom) == 0:
+		// binaryExponent is always positive because only Ki through Ei parse as
+		// BinarySI, but we check it here as a defensive measure.
+		case suffix.binaryExponent >= 0 && len(denom) == 0:
 			// only handle positive binary numbers with the fast path
-			mantissa = int64(int64(mantissa) << uint64(exponent))
-			// 1Mi (2^20) has ~6 digits of decimal precision, so exponent*3/10 -1 is roughly the precision
-			precision = 15 - int32(len(num)) - int32(float32(exponent)*3/10) - 1
+			mantissa = int64(int64(mantissa) << uint64(10*suffix.binaryExponent))
+			// 1Mi (1024^2) has ~6 digits of decimal precision, so 3*exponent - 1 is roughly the precision
+			precision = 15 - int32(len(num)) - 3*suffix.binaryExponent - 1
 		default:
 			precision = -1
 		}
@@ -409,8 +417,11 @@ func ParseQuantity(str string) (Quantity, error) {
 	if precision >= 0 {
 		// if we have a denominator, shift the entire value to the left by the number of places in the
 		// denominator
-		scale -= int32(len(denom))
-		if scale >= int32(Nano) {
+		scale -= widenedScale(len(denom))
+		// Only a scale that fits takes the int64 path. The inf.Dec path below
+		// saturates any other scale. It also rejects a number with no digits,
+		// like "e4294967297", the way it rejects "e-10".
+		if fastScale, fits := narrowScale(scale); fits && fastScale >= Nano {
 			shifted := num + denom
 
 			uvalue, err := strconv.ParseUint(shifted, 10, 64)
@@ -436,15 +447,15 @@ func ParseQuantity(str string) (Quantity, error) {
 						// if the number is in canonical form, reuse the string
 						switch format {
 						case BinarySI:
-							if !forceRecanonicalize && exponent%10 == 0 && (value&0x07 != 0) {
-								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: newCachedString(str, format)}, nil
+							if !forceRecanonicalize && (value&0x07 != 0) {
+								return Quantity{i: int64Amount{value: result, scale: fastScale}, Format: format, s: newCachedString(str, format)}, nil
 							}
 						default:
-							if !forceRecanonicalize && scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-								return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: newCachedString(str, format)}, nil
+							if !forceRecanonicalize && fastScale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
+								return Quantity{i: int64Amount{value: result, scale: fastScale}, Format: format, s: newCachedString(str, format)}, nil
 							}
 						}
-						q := Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}
+						q := Quantity{i: int64Amount{value: result, scale: fastScale}, Format: format}
 						q.CacheString()
 						return q, nil
 					}
@@ -459,7 +470,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	maxDigits := maxSignificantDigits
-	if base == 2 {
+	if format == BinarySI {
 		maxDigits = maxBinarySISignificantDigits
 	}
 	amount, ok := decFromDigits(positive, num, denom, maxDigits)
@@ -468,22 +479,15 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	// So that no one but us has to think about suffixes, remove it.
-	if base == 10 {
-		if !Scale(exponent).canInfScale() {
-			// Return an error if the exponent is math.MinInt32 rather than
-			// rounding it to 1n.
-			return Quantity{}, ErrSuffix
-		}
-		// This is guaranteed to fit within inf.Scale because of the above check.
-		widenedExponentScale := widenScale(Scale(exponent))
-
+	switch format {
+	case DecimalExponent, DecimalSI:
 		// amount only contains the whole number part+fractional part at this point (with no exponent / suffix).
 		// Values that kept fractional digits have scale < 0.
 		// Values whose rounding dropped integer digits have scale > 0.
 		// All other values have scale 0, including values whose rounding dropped all fractional digits.
 		widenedAmountScale := widenInfScale(amount.Scale())
 
-		effectiveScale, _ := narrowScale(widenedAmountScale + widenedExponentScale)
+		effectiveScale, _ := narrowScale(widenedAmountScale + suffix.decimalScale)
 		// We ignore the fits return value and saturate to scale to math.MinInt32 or math.MaxInt32.
 		effectiveInfScale, canInfScale := effectiveScale.infScale()
 		if canInfScale {
@@ -494,9 +498,8 @@ func ParseQuantity(str string) (Quantity, error) {
 			// yet, we figure out the scale we need to round to, so that when the
 			// exponent is later set, we end with nano scale precision.
 
-			// The exponent is negative here, so the result (-9 minus a negative exponent)
-			// always fits.
-			scaleBeforeExponent, fits := narrowScale(widenScale(Nano) - widenedExponentScale)
+			// parseSuffix clamped the exponent, so the subtraction below fits.
+			scaleBeforeExponent, fits := narrowScale(widenScale(Nano) - suffix.decimalScale)
 			if !fits {
 				assertUnreachable("scaleBeforeExponent did not fit")
 			}
@@ -507,9 +510,9 @@ func ParseQuantity(str string) (Quantity, error) {
 			// we apply the exponent by setting nano as the scale.
 			amount.SetScale(nanoInfScale)
 		}
-	} else if base == 2 {
-		// numericSuffix = 2 ** exponent
-		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(exponent))
+	case BinarySI:
+		// numericSuffix = 1024 ** exponent
+		numericSuffix := big.NewInt(1).Lsh(bigOne, uint(10*suffix.binaryExponent))
 		ub := amount.UnscaledBig()
 		amount.SetUnscaledBig(ub.Mul(ub, numericSuffix))
 	}
@@ -681,37 +684,31 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	switch format {
 	case DecimalExponent, DecimalSI:
 		number, exponent := q.AsCanonicalBytes(out)
-		suffix, ok := quantitySuffixer.constructBytes(10, exponent, format)
-		if !ok {
+		if format == DecimalSI {
+			if suffix, ok := decimalSISuffix(Scale(exponent)); ok {
+				return number, suffix
+			}
 			// DecimalSI only defines suffixes up to "E" (10^18). For a larger
 			// exponent there is no suffix, so fall back to decimal exponent
 			// notation ("e") instead of dropping the exponent, which would
 			// silently corrupt the value (e.g. "1000E" serializing to "1").
-			if suffix, ok = quantitySuffixer.constructBytes(10, exponent, DecimalExponent); !ok {
-				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
-			}
 		}
-		return number, suffix
+		return number, decimalExponentSuffix(Scale(exponent))
 	default:
 		// format must be BinarySI
 		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
-		suffix, ok := quantitySuffixer.constructBytes(2, exponent*10, format)
-		if !ok && exponent != 0 {
-			// BinarySI only defines suffixes up to "Ei" (2^60). For a larger
-			// exponent there is no suffix, so fall back to decimal exponent
-			// notation ("e") instead of dropping the suffix, which would
-			// silently corrupt the value (e.g. 2^70 serializing to "1").
-			// The base-1024 mantissa/exponent cannot be reused for "e"
-			// notation, so recompute the canonical mantissa and exponent in
-			// base 10.
-			number, exponent := rounded.AsCanonicalBytes(out)
-			suffix, ok := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
-			if !ok {
-				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
-			}
+		if suffix, ok := binarySISuffix(exponent); ok {
 			return number, suffix
 		}
-		return number, suffix
+		// BinarySI only defines suffixes up to "Ei" (2^60). For a larger
+		// exponent there is no suffix, so fall back to decimal exponent
+		// notation ("e") instead of dropping the suffix, which would
+		// silently corrupt the value (e.g. 2^70 serializing to "1").
+		// The base-1024 mantissa/exponent cannot be reused for "e"
+		// notation, so recompute the canonical mantissa and exponent in
+		// base 10.
+		number, exponent = rounded.AsCanonicalBytes(out)
+		return number, decimalExponentSuffix(Scale(exponent))
 	}
 }
 
