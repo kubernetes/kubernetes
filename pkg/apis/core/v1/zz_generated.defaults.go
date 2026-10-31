@@ -118,6 +118,7 @@ func SetObjectDefaults_NamespaceList(in *corev1.NamespaceList) {
 }
 
 func SetObjectDefaults_Node(in *corev1.Node) {
+	SetDefaults_NodeSpec(&in.Spec)
 	SetDefaults_NodeStatus(&in.Status)
 	SetDefaults_ResourceList(&in.Status.Capacity)
 	SetDefaults_ResourceList(&in.Status.Allocatable)
