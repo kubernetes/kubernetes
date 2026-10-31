@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -139,9 +141,19 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		go dynamicCertDialer.run(ctx.Done())
 	}
 
-	proxy := http.ProxyFromEnvironment
-	if config.Proxy != nil {
-		proxy = config.Proxy
+	proxy := func(req *http.Request) (*url.URL, error) {
+		u, err := http.ProxyFromEnvironment(req)
+		klog.Infof("DEBUG proxy decision: url=%s host=%s NO_PROXY=%q no_proxy=%q HTTPS_PROXY=%q https_proxy=%q proxy=%v err=%v",
+			req.URL.String(),
+			req.URL.Host,
+			os.Getenv("NO_PROXY"),
+			os.Getenv("no_proxy"),
+			os.Getenv("HTTPS_PROXY"),
+			os.Getenv("https_proxy"),
+			u,
+			err,
+		)
+		return u, err
 	}
 
 	httpTransport := utilnet.SetTransportDefaults(&http.Transport{
@@ -260,6 +272,10 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		// cannot determine equality for functions
 		return tlsCacheKey{}, false, nil
 	}
+
+	// Env-based proxy behavior also affects transport behavior, but it is not
+	// represented in the cache key. Treat this path as uncacheable.
+	return tlsCacheKey{}, false, nil
 
 	k := tlsCacheKey{
 		insecure:           c.TLS.Insecure,
