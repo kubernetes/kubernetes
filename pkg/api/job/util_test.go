@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -33,7 +33,7 @@ import (
 
 func TestDropDisabledFieldsScheduling(t *testing.T) {
 	schedulingConfig := func() *batch.JobSchedulingConfiguration {
-		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}}
 	}
 
 	cases := map[string]struct {
@@ -106,24 +106,24 @@ func TestDropDisabledFieldsScheduling(t *testing.T) {
 }
 
 func TestWorkloadInput(t *testing.T) {
-	policy := &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-		Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](3)},
+	policy := &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+		Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](3)},
 	}
-	constraints := &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-		Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
+	constraints := &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+		Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "topology.kubernetes.io/rack"}},
 	}
-	disruption := &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-		All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+	disruption := &schedulingv1.WorkloadPodGroupDisruptionMode{
+		All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 	}
-	claims := []schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+	claims := []schedulingv1.WorkloadPodGroupResourceClaim{
 		{Name: "c1", ResourceClaimName: new("rc1")},
 	}
 
 	cases := map[string]struct {
-		policy         *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
-		constraints    *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
-		disruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
-		resourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim
+		policy         *schedulingv1.WorkloadPodGroupSchedulingPolicy
+		constraints    *schedulingv1.WorkloadPodGroupSchedulingConstraints
+		disruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode
+		resourceClaims []schedulingv1.WorkloadPodGroupResourceClaim
 		want           workloadbuilder.WorkloadInput
 	}{
 		"nil blocks still carry path elements": {
