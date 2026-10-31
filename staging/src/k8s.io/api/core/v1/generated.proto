@@ -490,7 +490,7 @@ message ClusterTrustBundleProjection {
 
   // user is Optional: The owner UID of the created file.
   // If specified, the item-level user field takes precedence over defaultUser.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 user = 6;
@@ -708,7 +708,7 @@ message ConfigMapVolumeSource {
 
   // defaultUser is Optional: The owner UID of the created files by default.
   // The defaultUser field is only used as a fallback when the item-level user field is unset.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 defaultUser = 5;
@@ -1257,7 +1257,7 @@ message DownwardAPIVolumeFile {
 
   // user is Optional: The owner UID of the created file.
   // If specified, the item-level user field takes precedence over defaultUser.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 user = 5;
@@ -1284,7 +1284,7 @@ message DownwardAPIVolumeSource {
 
   // defaultUser is Optional: The owner UID of the created files by default.
   // The defaultUser field is only used as a fallback when the item-level user field is unset.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 defaultUser = 3;
@@ -2433,7 +2433,7 @@ message KeyToPath {
 
   // user is Optional: The owner UID of the created file.
   // If specified, the item-level user field takes precedence over defaultUser.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 user = 4;
@@ -4216,7 +4216,7 @@ message PodCertificateProjection {
 
   // user is Optional: The owner UID of the created file.
   // If specified, the item-level user field takes precedence over defaultUser.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 user = 8;
@@ -5558,7 +5558,7 @@ message ProjectedVolumeSource {
 
   // defaultUser is Optional: The owner UID of the created files by default.
   // The defaultUser field is only used as a fallback when the item-level user field is unset.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 defaultUser = 3;
@@ -6353,7 +6353,7 @@ message SecretVolumeSource {
 
   // defaultUser is Optional: The owner UID of the created files by default.
   // The defaultUser field is only used as a fallback when the item-level user field is unset.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 defaultUser = 5;
@@ -6562,7 +6562,7 @@ message ServiceAccountTokenProjection {
 
   // user is Optional: The owner UID of the created file.
   // If specified, the item-level user field takes precedence over defaultUser.
-  // (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+  // (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
   // +featureGate=AtomicWriteVolumeUserFields
   // +optional
   optional int64 user = 4;

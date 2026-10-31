@@ -1636,7 +1636,7 @@ type SecretVolumeSource struct {
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,5,opt,name=defaultUser"`
@@ -2120,7 +2120,7 @@ type ConfigMapVolumeSource struct {
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,5,opt,name=defaultUser"`
@@ -2179,7 +2179,7 @@ type ServiceAccountTokenProjection struct {
 	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,4,opt,name=user"`
@@ -2221,7 +2221,7 @@ type ClusterTrustBundleProjection struct {
 
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,6,opt,name=user"`
@@ -2319,7 +2319,7 @@ type PodCertificateProjection struct {
 
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,8,opt,name=user"`
@@ -2342,7 +2342,7 @@ type ProjectedVolumeSource struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,3,opt,name=defaultUser"`
@@ -2448,7 +2448,7 @@ type KeyToPath struct {
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,4,opt,name=user"`
@@ -8729,7 +8729,7 @@ type DownwardAPIVolumeSource struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 	// defaultUser is Optional: The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64 `json:"defaultUser,omitempty" protobuf:"varint,3,opt,name=defaultUser"`
@@ -8761,7 +8761,7 @@ type DownwardAPIVolumeFile struct {
 	Mode *int32 `json:"mode,omitempty" protobuf:"varint,4,opt,name=mode"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64 `json:"user,omitempty" protobuf:"varint,5,opt,name=user"`
