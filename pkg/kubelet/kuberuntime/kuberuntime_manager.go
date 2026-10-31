@@ -1271,27 +1271,25 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 
 	for _, cInfo := range containersToUpdate {
 		container := cInfo.container.DeepCopy()
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = make(v1.ResourceList)
+		}
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = make(v1.ResourceList)
+		}
 		// If updating memory limit, use most recently configured CPU request and limit values.
 		// If updating CPU request and limit, use most recently configured memory request and limit values.
 		switch resourceName {
 		case v1.ResourceMemory:
-			container.Resources.Limits = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.desiredContainerResources.memoryLimit, resource.BinarySI),
-			}
-			container.Resources.Requests = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.desiredContainerResources.memoryRequest, resource.BinarySI),
-			}
+			container.Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuLimit, resource.DecimalSI)
+			container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(cInfo.desiredContainerResources.memoryLimit, resource.BinarySI)
+			container.Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.currentContainerResources.cpuRequest, resource.DecimalSI)
+			container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(cInfo.desiredContainerResources.memoryRequest, resource.BinarySI)
 		case v1.ResourceCPU:
-			container.Resources.Limits = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuLimit, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI),
-			}
-			container.Resources.Requests = v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuRequest, resource.DecimalSI),
-				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
-			}
+			container.Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuLimit, resource.DecimalSI)
+			container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(cInfo.currentContainerResources.memoryLimit, resource.BinarySI)
+			container.Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(cInfo.desiredContainerResources.cpuRequest, resource.DecimalSI)
+			container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI)
 		}
 		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID, cInfo.containerType); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
