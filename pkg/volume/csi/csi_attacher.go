@@ -342,8 +342,10 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 	dataDir := filepath.Dir(deviceMountPath)
 	data := map[string]string{
-		volDataKey.volHandle:  csiSource.VolumeHandle,
-		volDataKey.driverName: csiSource.Driver,
+		volDataKey.volHandle:           csiSource.VolumeHandle,
+		volDataKey.driverName:          csiSource.Driver,
+		volDataKey.specVolID:           spec.Name(),
+		volDataKey.volumeLifecycleMode: string(storage.VolumeLifecyclePersistent),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && seLinuxSupported {
@@ -617,9 +619,15 @@ func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
 		return "", errors.New("makeDeviceMountPath failed, CSIPersistentVolumeSource volume handle is empty")
 	}
 
-	result := sha256.Sum256([]byte(fmt.Sprintf("%s", csiSource.VolumeHandle)))
-	volSha := fmt.Sprintf("%x", result)
-	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), driver, volSha, globalMountInGlobalPath), nil
+	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), driver, globalVolumeDirName(csiSource.VolumeHandle), globalMountInGlobalPath), nil
+}
+
+// globalVolumeDirName is the name of the directory MountDevice stages a volume
+// under, below the driver's directory. The fallback that finds a global mount
+// through a pod's mount reference checks a directory against it as well, so
+// both have to compute it the same way.
+func globalVolumeDirName(volumeHandle string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(volumeHandle)))
 }
 
 func verifyAttachmentStatus(attachment *storage.VolumeAttachment, volumeHandle string) (bool, error) {
