@@ -25,6 +25,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
@@ -48,6 +49,12 @@ import (
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
 
+// AllocationReader provides the pod resource allocation persisted by the kubelet.
+type AllocationReader interface {
+	GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
+	GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool)
+}
+
 type runtimeService interface {
 	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
 }
@@ -62,7 +69,7 @@ type Manager interface {
 	// Start is called during Kubelet initialization.
 	// Start takes a `Context` because it may possibly spin the reconcileState helper, which in turn
 	// needs to update container state, which takes a context.
-	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, allocationReader AllocationReader, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
@@ -162,6 +169,19 @@ type manager struct {
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
 
+	// allocationReader reads the pod allocation persisted by the kubelet. It is
+	// set once on Start, before the reconcile loop starts, and only read later;
+	// the allocation manager behind it is safe for concurrent use, so no lock
+	// is needed.
+	allocationReader AllocationReader
+
+	// pendingResize is the resize admission in progress, if any. One is enough:
+	// the allocation manager admits one pod at a time and completes each
+	// admission before it starts the next one. The pending resize in the state
+	// always belongs to it, except for one left by a kubelet restart, which
+	// Start resolves before any admission.
+	pendingResize *resizeTransaction
+
 	// allCPUs is the set of online CPUs as reported by the system
 	allCPUs cpuset.CPUSet
 
@@ -239,13 +259,17 @@ func NewManager(logger klog.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 	return manager, nil
 }
 
-func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, allocationReader AllocationReader, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "policy", m.policy.Name())
 	logger.Info("Reconciling", "reconcilePeriod", m.reconcilePeriod)
+	if allocationReader == nil {
+		return fmt.Errorf("the CPU manager needs a reader of the pod allocation to start")
+	}
 	m.sourcesReady = sourcesReady
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
+	m.allocationReader = allocationReader
 	m.containerRuntime = containerRuntime
 	m.containerMap = initialContainers
 
@@ -255,6 +279,10 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 		return err
 	}
 	m.state = stateImpl
+
+	// Resolve a resize interrupted by a kubelet restart before the policy
+	// validates the state, so that the validation covers its outcome.
+	m.resolvePendingResize(logger)
 
 	err = m.policy.Start(logger, m.state)
 	if err != nil {
@@ -285,10 +313,13 @@ func (m *manager) Allocate(ctx context.Context, p *v1.Pod, c *v1.Container, oper
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(logger, m.state, p, c, operation)
+	err := m.policy.Allocate(logger, m.admissionStateLocked(logger, p, operation), p, c, operation)
 	if err != nil {
 		logger.Error(err, "policy error")
 		return err
+	}
+	if operation == lifecycle.ResizeOperation {
+		m.recordPendingResizeLocked(p)
 	}
 
 	return nil
@@ -302,9 +333,12 @@ func (m *manager) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecyc
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	if err := m.policy.AllocatePod(logger, m.state, pod, operation); err != nil {
+	if err := m.policy.AllocatePod(logger, m.admissionStateLocked(logger, pod, operation), pod, operation); err != nil {
 		logger.Error(err, "AllocatePod error", "pod", klog.KObj(pod))
 		return err
+	}
+	if operation == lifecycle.ResizeOperation {
+		m.recordPendingResizeLocked(pod)
 	}
 	return nil
 }
@@ -364,15 +398,21 @@ func (m *manager) State() state.Reader {
 func (m *manager) GetTopologyHints(logger klog.Logger, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
+	m.Lock()
+	s := m.admissionStateLocked(logger, pod, operation)
+	m.Unlock()
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(logger, m.state, pod, container, operation)
+	return m.policy.GetTopologyHints(logger, s, pod, container, operation)
 }
 
 func (m *manager) GetPodTopologyHints(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
+	m.Lock()
+	s := m.admissionStateLocked(logger, pod, operation)
+	m.Unlock()
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(logger, m.state, pod, operation)
+	return m.policy.GetPodTopologyHints(logger, s, pod, operation)
 }
 
 func (m *manager) GetAllocatableCPUs() cpuset.CPUSet {

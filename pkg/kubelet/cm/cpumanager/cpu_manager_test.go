@@ -56,6 +56,7 @@ type mockState struct {
 	baselines      state.ContainerCPUBaselines
 	podAssignments state.PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
+	pendingResize  *state.PendingResize
 }
 
 func (s *mockState) GetBaselineCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -163,8 +164,41 @@ func (s *mockState) GetCPUBaselines() state.ContainerCPUBaselines {
 	return s.baselines.Clone()
 }
 
+func (s *mockState) GetPendingResize() (state.PendingResize, bool) {
+	if s.pendingResize == nil {
+		return state.PendingResize{}, false
+	}
+	return s.pendingResize.Clone(), true
+}
+
+func (s *mockState) SetPendingResize(pending state.PendingResize) {
+	s.pendingResize = new(pending.Clone())
+}
+
+func (s *mockState) CommitPendingResize() {
+	if s.pendingResize == nil {
+		return
+	}
+	pending := *s.pendingResize
+	taken, released := state.PendingResizeDelta(s.assignments, s.podAssignments, pending)
+	for containerName, target := range pending.ContainerCPUSets {
+		s.SetCPUSet(pending.PodUID, containerName, target)
+	}
+	if pending.PodCPUSet != nil {
+		s.SetPodCPUSet(pending.PodUID, *pending.PodCPUSet)
+	}
+	s.defaultCPUSet = s.defaultCPUSet.Difference(taken).Union(released)
+	s.pendingResize = nil
+}
+
+func (s *mockState) DeletePendingResize() {
+	s.pendingResize = nil
+}
+
 type mockPolicy struct {
 	err error
+	// verifyPendingResizeErr is returned by VerifyPendingResize.
+	verifyPendingResizeErr error
 }
 
 func (p *mockPolicy) Name() string {
@@ -199,6 +233,10 @@ func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
 }
 
+func (p *mockPolicy) VerifyPendingResize(_ state.PendingResize, _ AllocationReader) error {
+	return p.verifyPendingResizeErr
+}
+
 func (p *mockPolicy) CanAllocateExclusively() bool {
 	return false
 }
@@ -218,6 +256,23 @@ type mockPodStatusProvider struct {
 
 func (psp mockPodStatusProvider) GetPodStatus(_ types.UID) (v1.PodStatus, bool) {
 	return psp.podStatus, psp.found
+}
+
+// mockAllocationReader returns the allocated resources it holds, by pod UID
+// and container name.
+type mockAllocationReader struct {
+	containers map[types.UID]map[string]v1.ResourceRequirements
+	pods       map[types.UID]*v1.ResourceRequirements
+}
+
+func (r mockAllocationReader) GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
+	resources, ok := r.containers[podUID][containerName]
+	return resources, ok
+}
+
+func (r mockAllocationReader) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool) {
+	resources, ok := r.pods[podUID]
+	return resources, ok
 }
 
 func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
@@ -1971,4 +2026,36 @@ func TestCPUManagerAddResize(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestStartRequiresAllocationReader(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
+	t.Run("without a reader", func(t *testing.T) {
+		sDir := t.TempDir()
+		logger, tCtx := ktesting.NewTestContext(t)
+		mgr, err := newRestoreTestManager(logger, 4, sDir)
+		require.NoError(t, err)
+
+		err = mgr.Start(tCtx, func() []*v1.Pod { return nil }, &sourcesReadyStub{}, mockPodStatusProvider{}, nil, mockRuntimeService{}, containermap.NewContainerMap())
+		require.Error(t, err)
+		require.Nil(t, mgr.(*manager).state, "the state must not be loaded")
+		entries, err := os.ReadDir(sDir)
+		require.NoError(t, err)
+		require.Empty(t, entries, "no checkpoint must be written")
+	})
+
+	t.Run("with a reader", func(t *testing.T) {
+		sDir := t.TempDir()
+		logger, tCtx := ktesting.NewTestContext(t)
+		mgr, err := newRestoreTestManager(logger, 4, sDir)
+		require.NoError(t, err)
+
+		reader := &mockAllocationReader{}
+		err = mgr.Start(tCtx, func() []*v1.Pod { return nil }, &sourcesReadyStub{}, mockPodStatusProvider{}, reader, mockRuntimeService{}, containermap.NewContainerMap())
+		require.NoError(t, err)
+		require.Same(t, reader, mgr.(*manager).allocationReader)
+	})
 }

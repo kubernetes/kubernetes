@@ -33,6 +33,7 @@ type stateMemory struct {
 	baselines      ContainerCPUBaselines
 	podAssignments PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
+	pendingResize  *PendingResize
 }
 
 var _ State = &stateMemory{}
@@ -112,6 +113,11 @@ func (s *stateMemory) GetCPUBaselines() ContainerCPUBaselines {
 func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
+	s.setCPUSetLocked(podUID, containerName, cset)
+}
+
+// setCPUSetLocked sets the CPU set of a container. The caller must hold the lock.
+func (s *stateMemory) setCPUSetLocked(podUID string, containerName string, cset cpuset.CPUSet) {
 	if _, ok := s.assignments[podUID]; !ok {
 		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
 	}
@@ -214,5 +220,62 @@ func (s *stateMemory) ClearState() {
 	s.assignments = make(ContainerCPUAssignments)
 	s.baselines = make(ContainerCPUBaselines)
 	s.podAssignments = make(PodCPUAssignments)
+	s.pendingResize = nil
 	s.logger.V(2).Info("Cleared state")
+}
+
+func (s *stateMemory) GetPendingResize() (PendingResize, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	if s.pendingResize == nil {
+		return PendingResize{}, false
+	}
+	return s.pendingResize.Clone(), true
+}
+
+func (s *stateMemory) SetPendingResize(pending PendingResize) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.pendingResize = new(pending.Clone())
+	// A nil pointer would be logged through the value method String of CPUSet.
+	podCPUSet := "unchanged"
+	if pending.PodCPUSet != nil {
+		podCPUSet = pending.PodCPUSet.String()
+	}
+	s.logger.Info("Updated pending resize", "podUID", pending.PodUID, "containerCPUSets", pending.ContainerCPUSets, "podCPUSet", podCPUSet)
+}
+
+func (s *stateMemory) CommitPendingResize() {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.pendingResize == nil {
+		return
+	}
+	pending := *s.pendingResize
+	taken, released := PendingResizeDelta(s.assignments, s.podAssignments, pending)
+	for containerName, target := range pending.ContainerCPUSets {
+		s.setCPUSetLocked(pending.PodUID, containerName, target)
+	}
+	if pending.PodCPUSet != nil {
+		podEntry := s.podAssignments[pending.PodUID]
+		podEntry.CPUSet = *pending.PodCPUSet
+		s.podAssignments[pending.PodUID] = podEntry
+	}
+	s.defaultCPUSet = s.defaultCPUSet.Difference(taken).Union(released)
+	s.pendingResize = nil
+	s.logger.Info("Committed pending resize", "podUID", pending.PodUID, "defaultCPUSet", s.defaultCPUSet, "taken", taken, "released", released)
+}
+
+func (s *stateMemory) DeletePendingResize() {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.pendingResize == nil {
+		return
+	}
+	s.logger.V(2).Info("Deleted pending resize", "podUID", s.pendingResize.PodUID)
+	s.pendingResize = nil
 }

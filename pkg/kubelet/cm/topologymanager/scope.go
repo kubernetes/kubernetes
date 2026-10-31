@@ -53,6 +53,9 @@ type Scope interface {
 	RemoveContainer(logger klog.Logger, containerID string) error
 	// Store is the interface for storing pod topology hints
 	Store
+	// Scope forwards the admission transaction to the hint providers, so it has
+	// the methods of AdmitTransactionalHintProvider.
+	AdmitTransactionalHintProvider
 }
 
 type scope struct {
@@ -167,4 +170,17 @@ func (s *scope) allocatePodAlignedResources(logger klog.Logger, pod *v1.Pod, ope
 		}
 	}
 	return nil
+}
+
+// CompleteAdmit completes the admission of the pod in every hint provider that
+// implements AdmitTransactionalHintProvider.
+// Hints written by an admission that failed are not restored: they
+// are only read by Allocate and AllocatePod, after the next admission of the
+// pod has rewritten them.
+func (s *scope) CompleteAdmit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, result lifecycle.AdmitResult) {
+	for _, provider := range s.hintProviders {
+		if tx, ok := provider.(AdmitTransactionalHintProvider); ok {
+			tx.CompleteAdmit(ctx, pod, operation, result)
+		}
+	}
 }

@@ -43,6 +43,19 @@ const (
 	ResizeOperation Operation = "resize"
 )
 
+// AdmitResult is the final outcome of an admission, given to
+// PodAdmitTransactionalHandler.CompleteAdmit.
+type AdmitResult string
+
+const (
+	// AdmitSuccess indicates that every handler admitted the pod and the pod
+	// allocation has been persisted.
+	AdmitSuccess AdmitResult = "success"
+	// AdmitFailure indicates that the pod was rejected, or that the admission
+	// failed before the pod allocation was persisted.
+	AdmitFailure AdmitResult = "failure"
+)
+
 // PodAdmitResult provides the result of a pod admission decision.
 type PodAdmitResult struct {
 	// if true, the pod should be admitted.
@@ -57,6 +70,27 @@ type PodAdmitResult struct {
 type PodAdmitHandler interface {
 	// Admit evaluates if a pod can be admitted.
 	Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult
+}
+
+// PodAdmitTransactionalHandler is an optional extension of PodAdmitHandler for handlers
+// that prepare a resource assignment in Admit. Such an assignment must not
+// become effective before every handler has admitted the pod and the pod
+// allocation has been persisted, because a rejected resize leaves the pod
+// running and nothing else would clean the assignment up.
+//
+// Admit prepares the assignment and durably records what the handler needs to
+// complete or discard it after a kubelet restart, without making it effective.
+// Once the outcome of the admission is final, the caller invokes CompleteAdmit
+// exactly once: with AdmitSuccess after the pod allocation has been persisted,
+// and with AdmitFailure on a rejection or any failure before that.
+type PodAdmitTransactionalHandler interface {
+	// CompleteAdmit makes the assignment prepared in Admit effective on
+	// AdmitSuccess, and discards it on AdmitFailure. It cannot fail: Admit
+	// checks everything that could prevent the commit, and the persisted pod
+	// allocation is not rolled back, so an inconsistency found here is an
+	// implementation bug, which the handler logs. On AdmitFailure it must be
+	// safe to call when Admit did not prepare anything.
+	CompleteAdmit(ctx context.Context, attrs *PodAdmitAttributes, result AdmitResult)
 }
 
 // PodAdmitTarget maintains a list of handlers to invoke.

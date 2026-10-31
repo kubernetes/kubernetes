@@ -17,12 +17,14 @@ limitations under the License.
 package cpumanager
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
@@ -1576,4 +1578,39 @@ func updateAllocationPerNUMAMetric(logger klog.Logger, topo *topology.CPUTopolog
 
 func (p *staticPolicy) CanAllocateExclusively() bool {
 	return true
+}
+
+// VerifyPendingResize checks the pending resize against the persisted pod
+// allocation.
+//
+// The static policy assigns a container as many exclusive CPUs as its integral
+// CPU request, and a resize changes them only together with the request. So the
+// size of a target CPU set tells whether the persisted allocation includes the
+// resize. The same holds for the pod-level assignment and the pod CPU request.
+func (p *staticPolicy) VerifyPendingResize(pending state.PendingResize, allocationReader AllocationReader) error {
+	podUID := types.UID(pending.PodUID)
+	for containerName, target := range pending.ContainerCPUSets {
+		resources, ok := allocationReader.GetContainerResourceAllocation(podUID, containerName)
+		if !ok {
+			return fmt.Errorf("container %q has no allocation", containerName)
+		}
+		if request := resources.Requests[v1.ResourceCPU]; !requestsCPUs(request, target) {
+			return fmt.Errorf("container %q is allocated %s CPUs, the resize assigns it %d", containerName, request.String(), target.Size())
+		}
+	}
+	if pending.PodCPUSet != nil {
+		resources, ok := allocationReader.GetPodLevelResourceAllocation(podUID)
+		if !ok || resources == nil {
+			return errors.New("the pod has no pod-level allocation")
+		}
+		if request := resources.Requests[v1.ResourceCPU]; !requestsCPUs(request, *pending.PodCPUSet) {
+			return fmt.Errorf("the pod is allocated %s CPUs, the resize assigns it %d", request.String(), pending.PodCPUSet.Size())
+		}
+	}
+	return nil
+}
+
+// requestsCPUs returns whether the CPU request is as many whole CPUs as the CPU set has.
+func requestsCPUs(request resource.Quantity, cset cpuset.CPUSet) bool {
+	return request.MilliValue() == int64(cset.Size())*1000
 }

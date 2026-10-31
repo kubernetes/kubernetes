@@ -1622,16 +1622,16 @@ func (_c *MockContainerManager_ShouldResetExtendedResourceCapacity_Call) RunAndR
 }
 
 // Start provides a mock function for the type MockContainerManager
-func (_mock *MockContainerManager) Start(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, b bool) error {
-	ret := _mock.Called(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, b)
+func (_mock *MockContainerManager) Start(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, allocationReader cm.AllocationReader, runtimeService cri.RuntimeService, b bool) error {
+	ret := _mock.Called(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, allocationReader, runtimeService, b)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Start")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Node, cm.ActivePodsFunc, cm.GetNodeFunc, config.SourcesReady, status.PodStatusProvider, cri.RuntimeService, bool) error); ok {
-		r0 = returnFunc(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, b)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.Node, cm.ActivePodsFunc, cm.GetNodeFunc, config.SourcesReady, status.PodStatusProvider, cm.AllocationReader, cri.RuntimeService, bool) error); ok {
+		r0 = returnFunc(context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, allocationReader, runtimeService, b)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1650,13 +1650,14 @@ type MockContainerManager_Start_Call struct {
 //   - getNodeFunc cm.GetNodeFunc
 //   - sourcesReady config.SourcesReady
 //   - podStatusProvider status.PodStatusProvider
+//   - allocationReader cm.AllocationReader
 //   - runtimeService cri.RuntimeService
 //   - b bool
-func (_e *MockContainerManager_Expecter) Start(context1 any, node any, activePodsFunc any, getNodeFunc any, sourcesReady any, podStatusProvider any, runtimeService any, b any) *MockContainerManager_Start_Call {
-	return &MockContainerManager_Start_Call{Call: _e.mock.On("Start", context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, runtimeService, b)}
+func (_e *MockContainerManager_Expecter) Start(context1 any, node any, activePodsFunc any, getNodeFunc any, sourcesReady any, podStatusProvider any, allocationReader any, runtimeService any, b any) *MockContainerManager_Start_Call {
+	return &MockContainerManager_Start_Call{Call: _e.mock.On("Start", context1, node, activePodsFunc, getNodeFunc, sourcesReady, podStatusProvider, allocationReader, runtimeService, b)}
 }
 
-func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, b bool)) *MockContainerManager_Start_Call {
+func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, allocationReader cm.AllocationReader, runtimeService cri.RuntimeService, b bool)) *MockContainerManager_Start_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1682,13 +1683,17 @@ func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context
 		if args[5] != nil {
 			arg5 = args[5].(status.PodStatusProvider)
 		}
-		var arg6 cri.RuntimeService
+		var arg6 cm.AllocationReader
 		if args[6] != nil {
-			arg6 = args[6].(cri.RuntimeService)
+			arg6 = args[6].(cm.AllocationReader)
 		}
-		var arg7 bool
+		var arg7 cri.RuntimeService
 		if args[7] != nil {
-			arg7 = args[7].(bool)
+			arg7 = args[7].(cri.RuntimeService)
+		}
+		var arg8 bool
+		if args[8] != nil {
+			arg8 = args[8].(bool)
 		}
 		run(
 			arg0,
@@ -1699,6 +1704,7 @@ func (_c *MockContainerManager_Start_Call) Run(run func(context1 context.Context
 			arg5,
 			arg6,
 			arg7,
+			arg8,
 		)
 	})
 	return _c
@@ -1709,7 +1715,7 @@ func (_c *MockContainerManager_Start_Call) Return(err error) *MockContainerManag
 	return _c
 }
 
-func (_c *MockContainerManager_Start_Call) RunAndReturn(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, runtimeService cri.RuntimeService, b bool) error) *MockContainerManager_Start_Call {
+func (_c *MockContainerManager_Start_Call) RunAndReturn(run func(context1 context.Context, node *v1.Node, activePodsFunc cm.ActivePodsFunc, getNodeFunc cm.GetNodeFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, allocationReader cm.AllocationReader, runtimeService cri.RuntimeService, b bool) error) *MockContainerManager_Start_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -60,6 +60,12 @@ const (
 
 type ActivePodsFunc func() []*v1.Pod
 
+// AllocationReader provides the pod resource allocation persisted by the kubelet.
+type AllocationReader interface {
+	GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
+	GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceRequirements, bool)
+}
+
 type GetNodeFunc func(context.Context) (*v1.Node, error)
 
 // Manages the containers running on a machine.
@@ -67,7 +73,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(context.Context, *v1.Node, ActivePodsFunc, GetNodeFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
+	Start(context.Context, *v1.Node, ActivePodsFunc, GetNodeFunc, config.SourcesReady, status.PodStatusProvider, AllocationReader, internalapi.RuntimeService, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
