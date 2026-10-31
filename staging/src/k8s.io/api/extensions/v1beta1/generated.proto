@@ -42,7 +42,7 @@ message DaemonSet {
 
   // spec is the desired behavior of this daemon set.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional DaemonSetSpec spec = 2;
 
   // status is the current status of this daemon set. This data may be
@@ -50,7 +50,7 @@ message DaemonSet {
   // Populated by the system.
   // Read-only.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional DaemonSetStatus status = 3;
 }
 
@@ -100,6 +100,7 @@ message DaemonSetSpec {
   // that matches the template's node selector (or on every node if no node
   // selector is specified).
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+  // +required
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 2;
 
   // updateStrategy is an update strategy to replace existing DaemonSet pods with new pods.
@@ -130,20 +131,24 @@ message DaemonSetStatus {
   // The number of nodes that are running at least 1
   // daemon pod and are supposed to run the daemon pod.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+  // +required
   optional int32 currentNumberScheduled = 1;
 
   // The number of nodes that are running the daemon pod, but are
   // not supposed to run the daemon pod.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+  // +required
   optional int32 numberMisscheduled = 2;
 
   // The total number of nodes that should be running the daemon
   // pod (including nodes correctly running the daemon pod).
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+  // +required
   optional int32 desiredNumberScheduled = 3;
 
   // The number of nodes that should be running the daemon pod and have one
   // or more of the daemon pod running and ready.
+  // +required
   optional int32 numberReady = 4;
 
   // The most recent generation observed by the daemon set controller.
@@ -245,6 +250,7 @@ message DeploymentList {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of Deployments.
+  // + required
   repeated Deployment items = 2;
 }
 
@@ -354,6 +360,7 @@ message DeploymentStatus {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=type
+  // +required
   repeated DeploymentCondition conditions = 6;
 
   // Count of hash collisions for the Deployment. The Deployment controller uses this
@@ -403,10 +410,12 @@ message HTTPIngressPath {
   //   or treat it identically to Prefix or Exact path types.
   // Implementations are required to support all path types.
   // Defaults to ImplementationSpecific.
+  // +optional
   optional string pathType = 3;
 
   // backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
+  // +optional
   optional IngressBackend backend = 2;
 }
 
@@ -418,6 +427,7 @@ message HTTPIngressPath {
 message HTTPIngressRuleValue {
   // paths is a collection of paths that map requests to backends.
   // +listType=atomic
+  // +required
   repeated HTTPIngressPath paths = 1;
 }
 
@@ -454,7 +464,7 @@ message Ingress {
 
   // spec is the desired state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional IngressSpec spec = 2;
 
   // status is the current state of the Ingress.
@@ -522,6 +532,7 @@ message IngressPortStatus {
 
   // protocol is the protocol of the ingress port.
   // The supported values are: "TCP", "UDP", "SCTP"
+  // +required
   optional string protocol = 2;
 
   // error is to record the problem with the service port
@@ -588,6 +599,7 @@ message IngressRuleValue {
   // as defined by RFC 3986. Paths must begin with a '/'.
   // A backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
+  // +optional
   optional HTTPIngressRuleValue http = 1;
 }
 
@@ -603,14 +615,14 @@ message IngressSpec {
   // specified. An IngressClass resource may be marked as default, which can
   // be used to set a default value for this field. For more information,
   // refer to the IngressClass documentation.
-  // +optional
+  // +required
   optional string ingressClassName = 4;
 
   // backend is a default backend capable of servicing requests that don't match any
   // rule. At least one of 'backend' or 'rules' must be specified. This field
   // is optional to allow the loadbalancer controller or defaulting logic to
   // specify a global default.
-  // +optional
+  // +required
   optional IngressBackend backend = 1;
 
   // tls is TLS configuration. Currently the Ingress only supports a single TLS
@@ -784,6 +796,7 @@ message NetworkPolicySpec {
   // same set of pods.  In this case, the ingress rules for each are combined additively.
   // This field is NOT optional and follows standard label selector semantics.
   // An empty podSelector matches all pods in this namespace.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector podSelector = 1;
 
   // ingress is the list of ingress rules to be applied to the selected pods.
@@ -847,7 +860,7 @@ message ReplicaSet {
   // Populated by the system.
   // Read-only.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-  // +optional
+  // +required
   optional ReplicaSetStatus status = 3;
 }
 
@@ -917,6 +930,7 @@ message ReplicaSetSpec {
 message ReplicaSetStatus {
   // Replicas is the most recently observed number of non-terminating pods.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
+  // +required
   optional int32 replicas = 1;
 
   // The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
