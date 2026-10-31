@@ -28,6 +28,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -118,6 +119,10 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--storage-media-type %q invalid, allowed values: %s", s.DefaultStorageMediaType, strings.Join(sets.List(storageMediaTypes), ", ")))
 	}
 
+	if s.StorageConfig.WatchCacheMaxAverageObjectSize < 0 {
+		allErrors = append(allErrors, fmt.Errorf("--watch-cache-max-average-object-size must not be negative"))
+	}
+
 	return allErrors
 }
 
@@ -155,14 +160,26 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"Watch caches are sized automatically. This flag is no-op and it will be removed in a future version.")
 
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
-		"Watch cache size settings for some resources (pods, nodes, etc.), comma separated. "+
+		"Watch cache settings for individual resources (pods, nodes, etc.), comma separated. "+
 		"The individual setting format: resource[.group]#size, where resource is lowercase plural (no version), "+
 		"group is omitted for resources of apiVersion v1 (the legacy core API) and included for others, "+
-		"and size is a number. This option is only meaningful for resources built into the apiserver, "+
-		"not ones defined by CRDs or aggregated from external servers, and is only consulted if the "+
-		"watch-cache is enabled. The only meaningful size setting to supply here is zero, which means to "+
-		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
-		"to not disable watch caching for that resource")
+		"and size is a number. This option is only consulted if the watch-cache is enabled. It applies to "+
+		"every resource stored by this apiserver, including custom resources defined by CRDs, but not to "+
+		"resources served by aggregated API servers. Watch caches are sized dynamically, so the size itself "+
+		"is ignored and only whether it is zero matters. Zero disables watch caching for the resource. "+
+		"A non-zero size keeps watch caching enabled for the resource, even where the apiserver disables it "+
+		"by default (kube-apiserver does so for events), and exempts the resource from "+
+		"--watch-cache-max-average-object-size. This option cannot set the size or limit the memory of a "+
+		"watch cache.")
+
+	fs.Var(byteQuantityValue{&s.StorageConfig.WatchCacheMaxAverageObjectSize}, "watch-cache-max-average-object-size", ""+
+		"If greater than zero, resources whose objects average more than this many bytes in storage are served "+
+		"without a watch cache, as if they had been given size zero in --watch-cache-sizes. The average is checked "+
+		"before a resource's watch cache is first populated, and periodically afterwards. Once a resource has been "+
+		"taken out of the watch cache it stays out until the apiserver restarts. Resources given a non-zero size in "+
+		"--watch-cache-sizes are exempt, custom resources included. The value is a quantity, e.g. 100k or 100Ki. "+
+		"etcd rejects objects larger than 1.5 MiB by default, so useful values are well below that. "+
+		"Zero, the default, disables this.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
@@ -512,6 +529,14 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		size, ok := sizes[resource]
 		if ok && size > 0 {
 			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
+			// The size itself is ignored, but a non-zero size exempts the
+			// resource from the object size budget. This reaches custom
+			// resources too: NewCRDRESTOptionsGetter builds its getter from
+			// these options, WatchCacheSizes included.
+			if storageConfig.WatchCacheMaxAverageObjectSize > 0 {
+				klog.V(3).InfoS("Exempting resource from --watch-cache-max-average-object-size", "resource", resource)
+				storageConfig.WatchCacheMaxAverageObjectSize = 0
+			}
 		}
 		if ok && size <= 0 {
 			klog.V(3).InfoS("Not using watch cache", "resource", resource)
@@ -523,6 +548,36 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 	}
 
 	return ret, nil
+}
+
+// byteQuantityValue is a pflag.Value that parses a quantity, such as 100k or
+// 100Ki, into a whole number of bytes.
+type byteQuantityValue struct {
+	bytes *int64
+}
+
+func (v byteQuantityValue) String() string {
+	if v.bytes == nil {
+		return "0"
+	}
+	return resource.NewQuantity(*v.bytes, resource.DecimalSI).String()
+}
+
+func (v byteQuantityValue) Set(s string) error {
+	q, err := resource.ParseQuantity(s)
+	if err != nil {
+		return err
+	}
+	bytes, ok := q.AsInt64()
+	if !ok {
+		return fmt.Errorf("%q is not a whole number of bytes", s)
+	}
+	*v.bytes = bytes
+	return nil
+}
+
+func (v byteQuantityValue) Type() string {
+	return "quantity"
 }
 
 // ParseWatchCacheSizes turns a list of cache size values into a map of group resources
