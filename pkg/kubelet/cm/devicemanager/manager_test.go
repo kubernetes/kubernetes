@@ -1739,8 +1739,8 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
 }
 
-func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
+func TestAllocatePodInitContainerDeviceReuse(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// Requesting to create a pod that requests resourceName1 in restartable
 	// init containers and normal containers should succeed with devices
 	// allocated to init containers not reallocated to normal containers.
@@ -1826,12 +1826,7 @@ func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
 		},
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInRestartableInitContainers})
-	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &container, lifecycle.AddOperation)
-	}
-	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.Containers {
-		err = testManager.Allocate(tCtx, podWithPluginResourcesInRestartableInitContainers, &container, lifecycle.AddOperation)
-	}
+	err = testManager.AllocatePod(logger, podWithPluginResourcesInRestartableInitContainers, lifecycle.AddOperation)
 	as.NoError(err)
 	podUID := string(podWithPluginResourcesInRestartableInitContainers.UID)
 	regularInitCont1 := podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers[0].Name
@@ -2795,9 +2790,9 @@ func TestLifecycleAllocatePod(t *testing.T) {
 		skipped     bool
 	}{
 		{
-			description: "DeviceManager skips all pod-level operations including AddOperation",
+			description: "DeviceManager processes pod-level AddOperation",
 			operation:   lifecycle.AddOperation,
-			skipped:     true,
+			skipped:     false,
 		},
 		{
 			description: "DeviceManager skips all pod-level operations including ResizeOperation",
@@ -2849,7 +2844,7 @@ func TestLifecycleAllocatePod(t *testing.T) {
 				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
 			}
 			logs := underlier.GetBuffer().String()
-			expectedLog := "Device Manager does not support pod level resource allocation"
+			expectedLog := "Device Manager support only Allocate(add)"
 			if testCase.skipped {
 				if !strings.Contains(logs, expectedLog) {
 					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
@@ -2858,6 +2853,8 @@ func TestLifecycleAllocatePod(t *testing.T) {
 				if strings.Contains(logs, expectedLog) {
 					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
 				}
+				devices := testManager.podDevices.containerDevices(string(pod.UID), pod.Spec.Containers[0].Name, res.resourceName)
+				require.Len(t, devices, 2)
 			}
 		})
 	}
@@ -3356,4 +3353,69 @@ func TestPluginConnectedDuplicateRejectionIsDetectable(t *testing.T) {
 		"the detection log must report whether the incumbent endpoint is already draining")
 	require.Contains(t, logs, "incumbentStopped=false",
 		"a live incumbent (the stuck-takeover shape) must be reported as not stopped")
+}
+
+// TestAllocatePodCachesDevicesBeforeContainerStart verifies that pod-level admission caches
+// device allocations so concurrent container starts do not trigger fallback re-allocation.
+func TestAllocatePodCachesDevicesBeforeContainerStart(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	const podCount = 4
+
+	devs := make([]string, podCount)
+	for i := range devs {
+		devs[i] = fmt.Sprintf("dev%d", i)
+	}
+	res := TestResource{
+		resourceName:     "domain1.com/resource1",
+		resourceQuantity: *resource.NewQuantity(1, resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: devs},
+		topology:         true,
+	}
+
+	podsStub := activePodsStub{}
+	tmpDir := t.TempDir()
+	testManager, err := getTestManager(logger, tmpDir, podsStub.getActivePods, []TestResource{res})
+	require.NoError(t, err)
+
+	// Count Allocate RPCs to distinguish admission-time allocation from the
+	// fallback re-allocation in GetDeviceRunContainerOptions.
+	var allocateCalls atomic.Int32
+	allocate := allocateStubFunc()
+	testManager.endpoints[res.resourceName] = endpointInfo{
+		e: &MockEndpoint{allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+			allocateCalls.Add(1)
+			return allocate(devs)
+		}},
+	}
+
+	pods := make([]*v1.Pod, 0, podCount)
+	for range podCount {
+		pod := makePod(v1.ResourceList{v1.ResourceName(res.resourceName): res.resourceQuantity})
+		pods = append(pods, pod)
+		// HandlePodAdditions adds each pod to podManager before admitting it.
+		podsStub.updateActivePods(pods)
+		require.NoError(t, testManager.AllocatePod(logger, pod, lifecycle.AddOperation))
+	}
+	require.Equal(t, int32(podCount), allocateCalls.Load())
+
+	// Pod workers can start containers concurrently. Each start should use the
+	// allocation cached during admission instead of issuing another Allocate RPC.
+	errCh := make(chan error, podCount)
+	var wg sync.WaitGroup
+	for _, pod := range pods {
+		wg.Go(func() {
+			options, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
+			if err == nil && options == nil {
+				err = fmt.Errorf("device run container options are nil for pod %s", pod.UID)
+			}
+			errCh <- err
+		})
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, int32(podCount), allocateCalls.Load(), "container start should use the cached device allocation")
 }

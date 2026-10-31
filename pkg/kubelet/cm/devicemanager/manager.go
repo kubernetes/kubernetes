@@ -1254,9 +1254,23 @@ func (m *ManagerImpl) GetAllocatableDevices(logger klog.Logger) ResourceDeviceIn
 }
 
 // AllocatePod is called to trigger the allocation of resources to a pod.
-func (m *ManagerImpl) AllocatePod(logger klog.Logger, _ *v1.Pod, _ lifecycle.Operation) error {
-	// Device Manager does not support pod level resource allocation.
-	logger.V(2).Info("Device Manager does not support pod level resource allocation")
+func (m *ManagerImpl) AllocatePod(logger klog.Logger, pod *v1.Pod, operation lifecycle.Operation) error {
+	if operation != lifecycle.AddOperation {
+		logger.V(2).Info("Device Manager support only Allocate(add)")
+		return nil
+	}
+
+	ctx := klog.NewContext(context.Background(), logger)
+	for i := range pod.Spec.InitContainers {
+		if err := m.Allocate(ctx, pod, &pod.Spec.InitContainers[i], operation); err != nil {
+			return err
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if err := m.Allocate(ctx, pod, &pod.Spec.Containers[i], operation); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
