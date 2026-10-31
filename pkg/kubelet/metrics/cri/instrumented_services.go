@@ -60,6 +60,22 @@ func recordError(operation string, err error) {
 	}
 }
 
+// streamingStatusProvider is an optional interface that CRI client
+// implementations may satisfy to report whether streaming RPCs are active.
+type streamingStatusProvider interface {
+	StreamingEnabled() bool
+}
+
+func updateStreamingMetric(service interface{}, label string) {
+	if p, ok := service.(streamingStatusProvider); ok {
+		if p.StreamingEnabled() {
+			metrics.CRIListStreamingEnabled.WithLabelValues(label).Set(1)
+		} else {
+			metrics.CRIListStreamingEnabled.WithLabelValues(label).Set(0)
+		}
+	}
+}
+
 func (in instrumentedRuntimeService) Version(ctx context.Context, apiVersion string) (*runtimeapi.VersionResponse, error) {
 	const operation = "version"
 	defer recordOperation(operation, time.Now())
@@ -120,6 +136,7 @@ func (in instrumentedRuntimeService) ListContainers(ctx context.Context, filter 
 
 	out, err := in.service.ListContainers(ctx, filter)
 	recordError(operation, err)
+	updateStreamingMetric(in.service, "runtime")
 	return out, err
 }
 
@@ -224,6 +241,7 @@ func (in instrumentedRuntimeService) ListPodSandbox(ctx context.Context, filter 
 
 	out, err := in.service.ListPodSandbox(ctx, filter)
 	recordError(operation, err)
+	updateStreamingMetric(in.service, "runtime")
 	return out, err
 }
 
@@ -242,6 +260,7 @@ func (in instrumentedRuntimeService) ListContainerStats(ctx context.Context, fil
 
 	out, err := in.service.ListContainerStats(ctx, filter)
 	recordError(operation, err)
+	updateStreamingMetric(in.service, "runtime")
 	return out, err
 }
 
@@ -260,6 +279,7 @@ func (in instrumentedRuntimeService) ListPodSandboxStats(ctx context.Context, fi
 
 	out, err := in.service.ListPodSandboxStats(ctx, filter)
 	recordError(operation, err)
+	updateStreamingMetric(in.service, "runtime")
 	return out, err
 }
 
@@ -296,6 +316,7 @@ func (in instrumentedImageManagerService) ListImages(ctx context.Context, filter
 
 	out, err := in.service.ListImages(ctx, filter)
 	recordError(operation, err)
+	updateStreamingMetric(in.service, "image")
 	return out, err
 }
 
@@ -422,6 +443,7 @@ func (in instrumentedRuntimeService) ListPodSandboxMetrics(ctx context.Context) 
 
 	out, err := in.service.ListPodSandboxMetrics(ctx)
 	recordError(operation, err)
+	updateStreamingMetric(in.service, "runtime")
 	return out, err
 }
 
