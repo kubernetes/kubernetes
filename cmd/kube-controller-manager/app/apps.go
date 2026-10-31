@@ -24,12 +24,19 @@ import (
 	"fmt"
 	"time"
 
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newDaemonSetControllerDescriptor() *ControllerDescriptor {
@@ -105,13 +112,33 @@ func newReplicaSetController(ctx context.Context, controllerContext ControllerCo
 		return nil, err
 	}
 
-	rsc := replicaset.NewReplicaSetController(
+	var workloadInformer schedulinginformers.WorkloadInformer
+	var podGroupInformer schedulinginformers.PodGroupInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
+		served, err := schedulingWorkloadAPIServed(client)
+		if err != nil {
+			return nil, fmt.Errorf("discovery for %s: %w", schedulingv1beta1.SchemeGroupVersion, err)
+		}
+		if served {
+			workloadInformer = controllerContext.InformerFactory.Scheduling().V1beta1().Workloads()
+			podGroupInformer = controllerContext.InformerFactory.Scheduling().V1beta1().PodGroups()
+		} else {
+			klog.FromContext(ctx).Info("WorkloadWithDeployment is enabled but scheduling.k8s.io/v1beta1 is not served, running ReplicaSet controller without workload-aware scheduling")
+		}
+	}
+
+	rsc, err := replicaset.NewReplicaSetController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
+		workloadInformer,
+		podGroupInformer,
 		client,
 		replicaset.BurstReplicas,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating ReplicaSet controller: %w", err)
+	}
 	return newControllerLoop(func(ctx context.Context) {
 		rsc.Run(ctx, int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs))
 	}, controllerName), nil
@@ -131,11 +158,25 @@ func newDeploymentController(ctx context.Context, controllerContext ControllerCo
 		return nil, err
 	}
 
+	var workloadInformer schedulinginformers.WorkloadInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
+		served, err := schedulingWorkloadAPIServed(client)
+		if err != nil {
+			return nil, fmt.Errorf("discovery for %s: %w", schedulingv1beta1.SchemeGroupVersion, err)
+		}
+		if served {
+			workloadInformer = controllerContext.InformerFactory.Scheduling().V1beta1().Workloads()
+		} else {
+			klog.FromContext(ctx).Info("WorkloadWithDeployment is enabled but scheduling.k8s.io/v1beta1 is not served, running Deployment controller without workload-aware scheduling")
+		}
+	}
+
 	dc, err := deployment.NewDeploymentController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
+		workloadInformer,
 		client,
 	)
 	if err != nil {
@@ -145,4 +186,26 @@ func newDeploymentController(ctx context.Context, controllerContext ControllerCo
 	return newControllerLoop(func(ctx context.Context) {
 		dc.Run(ctx, int(controllerContext.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs))
 	}, controllerName), nil
+}
+
+// schedulingWorkloadAPIServed reports whether the apiserver serves the
+// scheduling.k8s.io/v1beta1 Workload and PodGroup resources.
+func schedulingWorkloadAPIServed(client kubernetes.Interface) (bool, error) {
+	resList, err := client.Discovery().ServerResourcesForGroupVersion(schedulingv1beta1.SchemeGroupVersion.String())
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	if resList != nil {
+		var hasWorkloads, hasPodGroups bool
+		for _, r := range resList.APIResources {
+			switch r.Name {
+			case "workloads":
+				hasWorkloads = true
+			case "podgroups":
+				hasPodGroups = true
+			}
+		}
+		return hasWorkloads && hasPodGroups, nil
+	}
+	return false, err
 }

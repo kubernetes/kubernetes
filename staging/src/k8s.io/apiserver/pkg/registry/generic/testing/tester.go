@@ -90,11 +90,20 @@ func priorityRequestInfo(store *genericregistry.Store) *genericapirequest.Reques
 	if err != nil || len(gvks) == 0 {
 		return nil
 	}
-	gvs := scheme.VersionsForGroupKind(gvks[0].GroupKind())
+	gr := store.DefaultQualifiedResource
+	// Cohabitating types list GVKs in an unstable order. Pick the one in the
+	// resource's group so APIGroup and APIVersion stay consistent.
+	gk := gvks[0].GroupKind()
+	for _, gvk := range gvks {
+		if gvk.Group == gr.Group {
+			gk = gvk.GroupKind()
+			break
+		}
+	}
+	gvs := scheme.VersionsForGroupKind(gk)
 	if len(gvs) == 0 {
 		return nil
 	}
-	gr := store.DefaultQualifiedResource
 	return &genericapirequest.RequestInfo{
 		APIGroup:   gr.Group,
 		APIVersion: gvs[0].Version,

@@ -121,7 +121,12 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 func setup(t *testing.T) (context.Context, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
 	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	flags := framework.DefaultTestServerFlags()
+	// Workload and PodGroup APIs require explicit runtime enablement.
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		flags = append(flags, "--runtime-config=scheduling.k8s.io/v1beta1=true")
+	}
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	clientSet, err := clientset.NewForConfig(config)
@@ -131,13 +136,18 @@ func setup(t *testing.T) (context.Context, *replicaset.ReplicaSetController, inf
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "rs-informers")), resyncPeriod)
 
-	rm := replicaset.NewReplicaSetController(
+	rm, err := replicaset.NewReplicaSetController(
 		tCtx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
+		informers.Scheduling().V1beta1().PodGroups(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
+	if err != nil {
+		t.Fatalf("error creating ReplicaSet controller: %v", err)
+	}
 
 	// The replicaset controller runs with tCtx, so tCtx must get canceled
 	// before the server shuts down, to avoid the controller logging errors

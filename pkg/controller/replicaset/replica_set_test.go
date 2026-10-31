@@ -68,13 +68,18 @@ func testNewReplicaSetControllerFromClient(tb testing.TB, client clientset.Inter
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	tCtx := ktesting.Init(tb)
-	ret := NewReplicaSetController(
+	ret, err := NewReplicaSetController(
 		tCtx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
+		informers.Scheduling().V1beta1().PodGroups(),
 		client,
 		burstReplicas,
 	)
+	if err != nil {
+		tb.Fatalf("error creating ReplicaSet controller: %v", err)
+	}
 
 	ret.podListerSynced = alwaysReady
 	ret.rsListerSynced = alwaysReady
@@ -629,17 +634,20 @@ func TestWatchControllers(t *testing.T) {
 	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 	client := fake.NewSimpleClientset()
 	client.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	tCtx := ktesting.Init(t)
-	manager := NewReplicaSetController(
+	manager, err := NewReplicaSetController(
 		tCtx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
+		informers.Scheduling().V1beta1().Workloads(),
+		informers.Scheduling().V1beta1().PodGroups(),
 		client,
 		BurstReplicas,
 	)
+	if err != nil {
+		t.Fatalf("error creating ReplicaSet controller: %v", err)
+	}
 	informers.StartWithContext(tCtx)
 	informers.WaitForCacheSyncWithContext(tCtx)
 
@@ -1197,19 +1205,22 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 
 func TestExpectationsOnRecreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 
 	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	tCtx := ktesting.Init(t)
 	logger := tCtx.Logger()
-	manager := NewReplicaSetController(
+	manager, err := NewReplicaSetController(
 		tCtx,
 		f.Apps().V1().ReplicaSets(),
 		f.Core().V1().Pods(),
+		f.Scheduling().V1beta1().Workloads(),
+		f.Scheduling().V1beta1().PodGroups(),
 		client,
 		100,
 	)
+	if err != nil {
+		t.Fatalf("error creating ReplicaSet controller: %v", err)
+	}
 	f.StartWithContext(tCtx)
 	f.WaitForCacheSyncWithContext(tCtx)
 	fakePodControl := controller.FakePodControl{}
@@ -1220,7 +1231,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	oldRS := newReplicaSet(1, map[string]string{"foo": "bar"})
-	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(tCtx, oldRS, metav1.CreateOptions{})
+	oldRS, err = client.AppsV1().ReplicaSets(oldRS.Namespace).Create(tCtx, oldRS, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

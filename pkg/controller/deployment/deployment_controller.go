@@ -35,19 +35,23 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -86,6 +90,11 @@ type DeploymentController struct {
 	// podIndexer allows looking up pods by ControllerRef UID
 	podIndexer cache.Indexer
 
+	// Workload lister and synced check for the workload API.
+	// These are nil when the feature gate is disabled.
+	workloadLister       schedulinglisters.WorkloadLister
+	workloadListerSynced cache.InformerSynced
+
 	// dListerSynced returns true if the Deployment store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	dListerSynced cache.InformerSynced
@@ -101,7 +110,9 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
-func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
+// workloadInformer may be nil when the WorkloadWithDeployment feature gate is
+// disabled. It is required when the gate is enabled.
+func NewDeploymentController(ctx context.Context, dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, workloadInformer schedulinginformers.WorkloadInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	logger := klog.FromContext(ctx)
 	dc := &DeploymentController{
@@ -165,6 +176,11 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 	}
 	dc.podIndexer = podInformer.Informer().GetIndexer()
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) && workloadInformer != nil {
+		dc.workloadLister = workloadInformer.Lister()
+		dc.workloadListerSynced = workloadInformer.Informer().HasSynced
+	}
+
 	return dc, nil
 }
 
@@ -187,7 +203,11 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	syncs := []cache.InformerSynced{dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced}
+	if dc.workloadListerSynced != nil {
+		syncs = append(syncs, dc.workloadListerSynced)
+	}
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, syncs...) {
 		return
 	}
 
@@ -624,6 +644,13 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	// resumes a Deployment with a set progressDeadlineSeconds.
 	if err = dc.checkPausedConditions(ctx, d); err != nil {
 		return err
+	}
+
+	// Reconcile once before rollout or scaling logic can mutate ReplicaSets.
+	if dc.workloadLister != nil && shouldManageWorkloadForDeployment(d) {
+		if _, err := dc.ensureWorkloadForDeployment(ctx, d); err != nil {
+			return fmt.Errorf("failed to ensure Workload for Deployment %s: %w", d.Name, err)
+		}
 	}
 
 	if d.Spec.Paused {

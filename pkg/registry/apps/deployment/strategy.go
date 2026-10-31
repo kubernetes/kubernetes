@@ -77,6 +77,7 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
+	dropDisabledSchedulingFields(&deployment.Spec, nil)
 	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
@@ -85,6 +86,20 @@ func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	deployment := obj.(*apps.Deployment)
 	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
 	return appsvalidation.ValidateDeployment(deployment, opts)
+}
+
+// DeclarativeValidationConfig declares the options referenced by this type's tags,
+// mapped to whether each is enabled.
+func (deploymentStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment)
+	if !enabled {
+		if old, ok := oldObj.(*apps.Deployment); ok && old != nil && old.Spec.Scheduling != nil {
+			enabled = true
+		}
+	}
+	return rest.DeclarativeValidationConfig{Options: map[string]bool{
+		string(features.WorkloadWithDeployment): enabled,
+	}}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -113,6 +128,7 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Status = oldDeployment.Status
 
+	dropDisabledSchedulingFields(&newDeployment.Spec, &oldDeployment.Spec)
 	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
 
 	// Spec updates bump the generation so that we can distinguish between
@@ -148,6 +164,47 @@ func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 
 func (deploymentStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
+}
+
+// dropDisabledSchedulingFields clears spec.scheduling when the
+// WorkloadWithDeployment gate is off (unless the old object already had it, so we
+// don't break round-trips for existing objects), and drops gated sub-fields when
+// their own gates are off.
+func dropDisabledSchedulingFields(spec *apps.DeploymentSpec, oldSpec *apps.DeploymentSpec) {
+	var oldScheduling *apps.DeploymentSchedulingConfiguration
+	if oldSpec != nil {
+		oldScheduling = oldSpec.Scheduling
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) && oldScheduling == nil {
+		spec.Scheduling = nil
+	}
+	if spec.Scheduling == nil {
+		return
+	}
+
+	dropDisabledSchedulingConstraints(spec.Scheduling, oldScheduling)
+	dropDisabledResourceClaims(spec.Scheduling, oldScheduling)
+}
+
+// dropDisabledSchedulingConstraints clears schedulingConstraints when the
+// TopologyAwareWorkloadScheduling gate is off, unless the old object already set it.
+func dropDisabledSchedulingConstraints(scheduling, oldScheduling *apps.DeploymentSchedulingConfiguration) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) ||
+		(oldScheduling != nil && oldScheduling.SchedulingConstraints != nil) {
+		return
+	}
+	scheduling.SchedulingConstraints = nil
+}
+
+// dropDisabledResourceClaims clears resourceClaims when the DRAWorkloadResourceClaims
+// gate is off, unless the old object already set them.
+func dropDisabledResourceClaims(scheduling, oldScheduling *apps.DeploymentSchedulingConfiguration) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) ||
+		(oldScheduling != nil && len(oldScheduling.ResourceClaims) > 0) {
+		return
+	}
+	scheduling.ResourceClaims = nil
 }
 
 type deploymentStatusStrategy struct {
