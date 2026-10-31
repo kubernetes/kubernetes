@@ -84,6 +84,10 @@ func TestAdmission(t *testing.T) {
 	podWithNoNode.Spec.NodeName = ""
 	podWithInvalidNode := oldPod.DeepCopy()
 	podWithInvalidNode.Spec.NodeName = "invalid-node"
+	// Bound to the node that declares no features, so an added ephemeral container that requires one
+	// must be rejected.
+	ephemeralContainersOldPod := oldPod.DeepCopy()
+	ephemeralContainersOldPod.Spec.NodeName = "test-node-no-feature"
 
 	createMockFeature := func(t *testing.T, name string, inferForUpdate bool, maxVersionStr string) *ndftesting.MockFeature {
 		m := ndftesting.NewMockFeature(t)
@@ -234,6 +238,28 @@ func TestAdmission(t *testing.T) {
 			},
 			subresource: "resize",
 			expectErr:   false,
+		},
+		{
+			// An ephemeralcontainers update differs from its old pod only in spec.ephemeralContainers
+			// (plus the generation bump the strategy applies), so model exactly that.
+			name: "DO not skip validation for `ephemeralcontainers` subresource",
+			pod: func() *core.Pod {
+				p := ephemeralContainersOldPod.DeepCopy()
+				p.Generation = ephemeralContainersOldPod.Generation + 1
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debugger", Image: "debug"},
+				}}
+				return p
+			}(),
+			oldPod:             ephemeralContainersOldPod,
+			featureGateEnabled: true,
+			componentVersion:   "1.34.0",
+			registeredFeatures: []ndf.Feature{
+				createMockFeature(t, "TestFeature", true, "1.35.0"),
+			},
+			subresource: "ephemeralcontainers",
+			expectErr:   true,
+			errContains: "pod update requires features TestFeature which are not available on node \"test-node-no-feature\"",
 		},
 	}
 
