@@ -34,8 +34,8 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx con
 }
 
 // generateContainerResources generates platform specific container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
-	return nil
+func (m *kubeGenericRuntimeManager) generateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*runtimeapi.ContainerResources, error) {
+	return nil, nil
 }
 
 // generateUpdatePodSandboxResourcesRequest generates platform specific podsandox resources config for runtime
