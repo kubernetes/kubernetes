@@ -654,7 +654,7 @@ func TestRuntimeStatusString(t *testing.T) {
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false SupportsCgroupNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true SupportsCgroupNamespaces: false, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -670,8 +670,9 @@ func TestRuntimeHandlerString(t *testing.T) {
 				Name:                            "test-handler",
 				SupportsRecursiveReadOnlyMounts: true,
 				SupportsUserNamespaces:          true,
+				SupportsCgroupNamespaces:        true,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: true SupportsCgroupNamespaces: true",
 		},
 		{
 			name: "handler with no features",
@@ -679,8 +680,9 @@ func TestRuntimeHandlerString(t *testing.T) {
 				Name:                            "test-handler",
 				SupportsRecursiveReadOnlyMounts: false,
 				SupportsUserNamespaces:          false,
+				SupportsCgroupNamespaces:        false,
 			},
-			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false",
+			expected: "Name=test-handler SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: false SupportsCgroupNamespaces: false",
 		},
 	}
 
