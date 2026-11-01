@@ -19,9 +19,11 @@ package nodemanager
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net"
 	"os"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -37,17 +39,19 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	netutils "k8s.io/utils/net"
 )
+
+// NodeTopologyHandler is an interface for things that watch for node topology changes.
+type NodeTopologyHandler interface {
+	OnTopologyChange(topologyLabels map[string]string)
+}
 
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs and PodCIDRs handles
 // node watch events and crashes kube-proxy if there are any changes in NodeIPs or PodCIDRs.
 // Note: It only crashes on change on PodCIDR when watchPodCIDRs is set to true.
 type NodeManager interface {
-	proxyconfig.NodeHandler
-
 	// Name returns the node's name
 	Name() string
 
@@ -67,6 +71,16 @@ type NodeManager interface {
 
 	// NodeInformer returns the NodeInformer.
 	NodeInformer() v1informers.NodeInformer
+
+	// RegisterTopologyHandler registers a handler which is called on node topology label changes.
+	// It immediately calls the handler with the current topology labels.
+	RegisterTopologyHandler(handler NodeTopologyHandler)
+
+	// OnNodeChange is a handler for Node creation and update.
+	OnNodeChange(node *v1.Node)
+
+	// OnNodeDelete is a handler for Node deletes.
+	OnNodeDelete(node *v1.Node)
 }
 
 type nodeManager struct {
@@ -82,8 +96,10 @@ type nodeManager struct {
 	nodeIPs         map[v1.IPFamily]net.IP
 	podCIDRs        []string
 
-	mu   sync.Mutex
-	node *v1.Node
+	mu               sync.Mutex
+	node             *v1.Node
+	topologyLabels   map[string]string
+	topologyHandlers []NodeTopologyHandler
 }
 
 var _ NodeManager = &nodeManager{}
@@ -169,7 +185,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 
 	primaryIPFamily, nodeIPs := detectNodeIPs(rawNodeIPs, nodeIPOverride)
 
-	return &nodeManager{
+	nm := &nodeManager{
 		nodeInformer:  nodeInformer,
 		nodeLister:    nodeLister,
 		exitFunc:      exitFunc,
@@ -181,7 +197,42 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		primaryIPFamily: primaryIPFamily,
 		nodeIPs:         nodeIPs,
 		podCIDRs:        podCIDRs,
-	}, nil
+		topologyLabels:  getTopologyLabels(node),
+	}
+
+	handlerRegistration, err := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				if node, ok := obj.(*v1.Node); ok {
+					nm.OnNodeChange(node)
+				}
+			},
+			UpdateFunc: func(_, newObj interface{}) {
+				if node, ok := newObj.(*v1.Node); ok {
+					nm.OnNodeChange(node)
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				if node, ok := obj.(*v1.Node); ok {
+					nm.OnNodeDelete(node)
+				} else if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+					if node, ok := tombstone.Obj.(*v1.Node); ok {
+						nm.OnNodeDelete(node)
+					}
+				}
+			},
+		},
+		resyncInterval,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, handlerRegistration.HasSynced) {
+		return nil, fmt.Errorf("can not sync node manager event handler")
+	}
+
+	return nm, nil
 }
 
 func getNodeInfo(nodeLister corelisters.NodeLister, nodeName string) (*v1.Node, []net.IP, []string) {
@@ -268,12 +319,48 @@ func (n *nodeManager) NodeInformer() v1informers.NodeInformer {
 	return n.nodeInformer
 }
 
+// RegisterTopologyHandler registers a handler which is called on node topology label changes.
+// It immediately calls the handler with the current topology labels.
+func (n *nodeManager) RegisterTopologyHandler(handler NodeTopologyHandler) {
+	if handler == nil {
+		return
+	}
+	n.mu.Lock()
+	n.topologyHandlers = append(n.topologyHandlers, handler)
+	topologyLabels := maps.Clone(n.topologyLabels)
+	n.mu.Unlock()
+
+	handler.OnTopologyChange(topologyLabels)
+}
+
+func getTopologyLabels(node *v1.Node) map[string]string {
+	topologyLabels := make(map[string]string)
+	if node != nil {
+		if zone, ok := node.Labels[v1.LabelTopologyZone]; ok {
+			topologyLabels[v1.LabelTopologyZone] = zone
+		}
+	}
+	return topologyLabels
+}
+
 // OnNodeChange is a handler for Node creation and update.
 func (n *nodeManager) OnNodeChange(node *v1.Node) {
 	// update the node object
 	n.mu.Lock()
 	n.node = node
+	topologyLabels := getTopologyLabels(node)
+	topologyChanged := !reflect.DeepEqual(n.topologyLabels, topologyLabels)
+	if topologyChanged {
+		n.topologyLabels = topologyLabels
+	}
+	handlers := slices.Clone(n.topologyHandlers)
 	n.mu.Unlock()
+
+	if topologyChanged {
+		for _, h := range handlers {
+			h.OnTopologyChange(topologyLabels)
+		}
+	}
 
 	// We exit whenever there is a change in PodCIDRs detected initially, and PodCIDRs received
 	// on node watch event if the node manager is configured with watchPodCIDRs.
@@ -304,6 +391,3 @@ func (n *nodeManager) OnNodeDelete(node *v1.Node) {
 	klog.Flush()
 	n.exitFunc(1)
 }
-
-// OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
-func (n *nodeManager) OnNodeSynced() {}
