@@ -369,6 +369,7 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 			t.Errorf("expected: %#v; got %#v", &expiredError, actualEvent.Object)
 		}
 	})
+	testCheckStop(t, tooOldWatcher)
 }
 
 func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -565,19 +566,13 @@ func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.
 	w, err := store.Watch(canceledCtx, "/pods/not-existing", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
+		Recursive:       true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	select {
-	case _, ok := <-w.ResultChan():
-		if ok {
-			t.Error("ResultChan() should be closed")
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
-	}
+	testCheckStop(t, w)
 }
 
 func RunTestWatcherTimeout(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -2490,6 +2485,8 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 	initialBookmarkWithPod2RV := watch.Event{Type: watch.Bookmark, Object: &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: pod2.ResourceVersion, Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}}}
 	initialBookmarkWithPod3RV := watch.Event{Type: watch.Bookmark, Object: &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: pod3.ResourceVersion, Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}}}
 	bookmarkWithPod3RV := watch.Event{Type: watch.Bookmark, Object: &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: pod3.ResourceVersion}}}
+	expiredEtcdError := watch.Event{Type: watch.Error, Object: &errors.NewResourceExpired("The resourceVersion for the provided watch is too old.").ErrStatus}
+	expiredCacherError := watch.Event{Type: watch.Error, Object: &metav1.Status{}}
 
 	tests := []struct {
 		name                string
@@ -2615,8 +2612,8 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			podsBeforeWatch:     []*example.Pod{pod1},
 			podsBeforeResync:    []*example.Pod{pod2},
 			podsAfterResync:     []*example.Pod{pod3},
-			expectEtcd:          []watch.Event{added(pod1), added(pod2), added(pod3)},
-			expectCacher:        []watch.Event{added(pod1), added(pod2), added(pod3), bookmarkWithPod3RV},
+			expectEtcd:          []watch.Event{expiredEtcdError},
+			expectCacher:        []watch.Event{expiredCacherError},
 		},
 		{
 			name:              "allowWatchBookmarks=false, sendInitialEvents=false, RV=1",
@@ -2625,7 +2622,8 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			podsBeforeWatch:   []*example.Pod{pod1},
 			podsBeforeResync:  []*example.Pod{pod2},
 			podsAfterResync:   []*example.Pod{pod3},
-			expect:            []watch.Event{added(pod1), added(pod2), added(pod3)},
+			expectEtcd:        []watch.Event{expiredEtcdError},
+			expectCacher:      []watch.Event{expiredCacherError},
 		},
 		{
 			name:              "allowWatchBookmarks=false, sendInitialEvents=true, RV=1",
@@ -2642,7 +2640,8 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			podsBeforeWatch:  []*example.Pod{pod1},
 			podsBeforeResync: []*example.Pod{pod2},
 			podsAfterResync:  []*example.Pod{pod3},
-			expect:           []watch.Event{added(pod1), added(pod2), added(pod3)},
+			expectEtcd:       []watch.Event{expiredEtcdError},
+			expectCacher:     []watch.Event{expiredCacherError},
 		},
 		{
 			name:                "allowWatchBookmarks=true, sendInitialEvents=true, RV=beforeTest",
@@ -2894,8 +2893,15 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 		}
 	}
 
+	pod0 := makePod("0")
+	pod0.Namespace = "other"
+	require.NoError(t, store.Create(ctx, computePodKey(pod0), pod0, pod0, 0))
+	require.NoError(t, store.Delete(ctx, computePodKey(pod0), pod0, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}))
+	compact(ctx, t, pod0.ResourceVersion)
+
 	beforeTestRV, err := store.GetCurrentResourceVersion(ctx)
 	require.NoError(t, err)
+	*expiredCacherError.Object.(*metav1.Status) = errors.NewResourceExpired(fmt.Sprintf("too old resource version: 1 (%d)", beforeTestRV)).ErrStatus
 
 	createPods([]*example.Pod{pod1})
 

@@ -589,7 +589,10 @@ func TestWatch(t *testing.T) {
 				// TODO(#109831): Enable use of this test and run it.
 			})
 			t.Run("WatchContextCancel", func(t *testing.T) {
-				// TODO(#109831): Enable use of this test and run it.
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatchContextCancel(ctx, t, cacher)
 			})
 			t.Run("WatcherTimeout", func(t *testing.T) {
 				ctx, cacher, terminate := testSetup(t)
