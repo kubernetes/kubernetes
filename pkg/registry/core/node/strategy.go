@@ -110,6 +110,8 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 		node.Status.RuntimeHandlers = nil
 	}
 
+	dropDisabledRuntimeHandlerFeatures(node, oldNode)
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
 		node.Status.DeclaredFeatures = nil
 	}
@@ -117,6 +119,29 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && !nodePodPreemptionPolicyInUse(oldNode) {
 		node.Spec.PodPreemptionPolicy = nil
 	}
+}
+
+func dropDisabledRuntimeHandlerFeatures(node *api.Node, oldNode *api.Node) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) && !nodeCgroupNamespacesInUse(oldNode) {
+		for i := range node.Status.RuntimeHandlers {
+			if node.Status.RuntimeHandlers[i].Features != nil {
+				node.Status.RuntimeHandlers[i].Features.CgroupNamespaces = nil
+			}
+		}
+	}
+}
+
+// nodeCgroupNamespacesInUse returns true if any of node's Status RuntimeHandlers has CgroupNamespaces set
+func nodeCgroupNamespacesInUse(node *api.Node) bool {
+	if node == nil {
+		return false
+	}
+	for _, h := range node.Status.RuntimeHandlers {
+		if h.Features != nil && h.Features.CgroupNamespaces != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
@@ -198,6 +223,8 @@ func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletInUserNamespace) && oldNode.Status.NodeInfo.RunningInUserNamespace == nil {
 		newNode.Status.NodeInfo.RunningInUserNamespace = nil
 	}
+
+	dropDisabledRuntimeHandlerFeatures(newNode, oldNode)
 }
 
 // nodeStatusConfigInUse returns true if node's Status Config is set(used)
