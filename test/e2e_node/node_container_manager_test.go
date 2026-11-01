@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
@@ -82,9 +83,15 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
 			framework.ExpectNoError(runTest(ctx, f))
 		})
-		ginkgo.It("should handle introducing hugepage reservation on a running node", func(ctx context.Context) {
-			framework.ExpectNoError(runHugepagesUpgradeTest(ctx, f))
-		})
+		ginkgo.DescribeTable("should handle introducing hugepage reservation when node is overcommitted",
+			func(ctx context.Context, mmPolicy, expectedRejectionReason, expectedRejectionMsg string) {
+				framework.ExpectNoError(runHugepagesUpgradeTest(ctx, f, mmPolicy, expectedRejectionReason, expectedRejectionMsg))
+			},
+			ginkgo.Entry("with memory manager Static policy",
+				"Static", "UnexpectedAdmissionError", "Allocate failed due to [memorymanager]"),
+			ginkgo.Entry("with memory manager None policy",
+				"None", "OutOfhugepages-2Mi", "Node didn't have enough resource: hugepages-2Mi"),
+		)
 	})
 	f.Describe("Validate 1Gi Hugepage Reservation", feature.HugePages, func() {
 		ginkgo.It("sets correct cgroup limits and allocatable for 1Gi hugepages", func(ctx context.Context) {
@@ -689,11 +696,22 @@ func run1GiHugepagesTest(ctx context.Context, f *framework.Framework) error {
 }
 
 // runHugepagesUpgradeTest verifies the upgrade behavior when hugepage
-// reservation is introduced on a node that was previously running without it.
-// Specifically: restart kubelet with --system-reserved including hugepages,
-// verify the Memory Manager rejects the checkpoint mismatch, delete the
-// checkpoint, restart again, and verify kubelet starts with reduced allocatable.
-func runHugepagesUpgradeTest(ctx context.Context, f *framework.Framework) error {
+// reservation is introduced on a node that is over-committed.
+//
+// mmPolicy selects the Memory Manager policy ("Static" or "None").
+// expectedRejectionReason and expectedRejectionMsg are matched against the
+// pod status after it is rejected.
+//
+// Flow:
+//  1. Start kubelet with the given mmPolicy, no hugepage reservation.
+//     Schedule a pod consuming ALL available 2Mi hugepages (8Mi).
+//  2. Restart kubelet with system-reserved hugepages-2Mi=2Mi.
+//     With Static policy the Memory Manager checkpoint mismatches and kubelet
+//     fails to start; the checkpoint is deleted before proceeding.
+//     With None policy kubelet restarts normally.
+//  3. Verify allocatable is reduced (6Mi) and the pod is rejected because its
+//     8Mi request exceeds the new allocatable.
+func runHugepagesUpgradeTest(ctx context.Context, f *framework.Framework, mmPolicy, expectedRejectionReason, expectedRejectionMsg string) error {
 	subsystems, err := cm.GetCgroupSubsystems()
 	if err != nil {
 		return err
@@ -707,13 +725,9 @@ func runHugepagesUpgradeTest(ctx context.Context, f *framework.Framework) error 
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		if oldCfg != nil {
 			ginkgo.By("Restoring the kubelet configuration")
-			// Delete the memory manager state file to avoid checkpoint mismatch on restore.
 			deleteStateFile(memoryManagerStateFile)
 
 			restartKubelet := mustStopKubelet(ctx, f)
-			gomega.Eventually(ctx, func() bool {
-				return e2enode.HealthCheck(kubeletHealthCheckURL)
-			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to fail"))
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 			restartKubelet(ctx)
 		}
@@ -725,82 +739,98 @@ func runHugepagesUpgradeTest(ctx context.Context, f *framework.Framework) error 
 	}
 	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
 
-	hugepages := map[string]int{hugepagesResourceName2Mi: 4}
-	// test will skip if hugepages are not available on the machine
+	hugepages := map[string]int{hugepagesResourceName2Mi: 4} // 4 × 2Mi = 8Mi
 	setHugepages(ctx, hugepages)
 	ginkgo.DeferCleanup(releaseHugepages, hugepages)
 
-	// Step 1: Start kubelet with Memory Manager Static and --reserved-memory
-	// but WITHOUT hugepages reservation. This creates a valid checkpoint.
-	ginkgo.By("Starting kubelet with Memory Manager Static, no hugepage reservation")
+	// Step 1: Start kubelet with the given memory manager policy but WITHOUT
+	// hugepages reservation. All 8Mi of hugepages are allocatable.
+	ginkgo.By(fmt.Sprintf("Starting kubelet with memory manager %s, no hugepage reservation (step 1)", mmPolicy))
 
 	step1Cfg := oldCfg.DeepCopy()
 	setDesiredConfiguration(step1Cfg, cgroupManager, nil, nil)
-	step1Cfg.MemoryManagerPolicy = "Static"
-	// reserved-memory must match system-reserved + kube-reserved for memory
-	// (200Mi total) + eviction threshold (100Mi) = 300Mi. No hugepages.
-	step1Cfg.ReservedMemory = []kubeletconfig.MemoryReservation{
-		{
-			NumaNode: 0,
-			Limits: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("300Mi"),
+	step1Cfg.MemoryManagerPolicy = mmPolicy
+	if mmPolicy == "Static" {
+		// reserved-memory must match system-reserved + kube-reserved for memory
+		// (200Mi total) + eviction threshold (100Mi) = 300Mi. No hugepages.
+		step1Cfg.ReservedMemory = []kubeletconfig.MemoryReservation{
+			{
+				NumaNode: 0,
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("300Mi"),
+				},
 			},
-		},
+		}
 	}
 
 	restartKubelet := mustStopKubelet(ctx, f)
-	// Delete existing checkpoint to start clean.
 	deleteStateFile(memoryManagerStateFile)
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(step1Cfg))
-	ginkgo.By("Starting kubelet (step 1: no hugepage reservation)")
 	restartKubelet(ctx)
-	waitForKubeletToStart(ctx, f)
 
-	// Step 2: Restart kubelet adding hugepages to system-reserved AND
-	// reserved-memory. The Memory Manager checkpoint from step 1 has a
-	// different allocatable, so the kubelet should fail to start.
-	ginkgo.By("Restarting kubelet with hugepage reservation (step 2: expect failure)")
+	// Schedule a pod that consumes all available hugepages.
+	ginkgo.By("Creating a pod consuming all 8Mi of hugepages")
+	pod := getHugepagesTestPod(f, nil,
+		v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("100m"),
+			v1.ResourceMemory: resource.MustParse("32Mi"),
+			v1.ResourceName(hugepagesResourceName2Mi): resource.MustParse("8Mi"),
+		},
+		[]v1.VolumeMount{{
+			Name:      "hugepages-2mi",
+			MountPath: "/hugepages-2Mi",
+		}},
+		[]v1.Volume{{
+			Name: "hugepages-2mi",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium: v1.StorageMediumHugePages,
+				},
+			},
+		}},
+	)
+	podClient := e2epod.NewPodClient(f)
+	pod = podClient.CreateSync(ctx, pod)
+	ginkgo.DeferCleanup(podClient.DeleteSync, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+
+	// Step 2: Restart kubelet adding hugepages to system-reserved.
+	ginkgo.By("Restarting kubelet with hugepage reservation (step 2)")
 
 	step2Cfg := step1Cfg.DeepCopy()
-	step2Cfg.SystemReserved["hugepages-2Mi"] = "2Mi"
-	step2Cfg.ReservedMemory = []kubeletconfig.MemoryReservation{
-		{
-			NumaNode: 0,
-			Limits: v1.ResourceList{
-				v1.ResourceMemory:                resource.MustParse("300Mi"),
-				v1.ResourceName("hugepages-2Mi"): resource.MustParse("2Mi"),
+	step2Cfg.SystemReserved[hugepagesResourceName2Mi] = "2Mi"
+	if mmPolicy == "Static" {
+		step2Cfg.ReservedMemory = []kubeletconfig.MemoryReservation{
+			{
+				NumaNode: 0,
+				Limits: v1.ResourceList{
+					v1.ResourceMemory:                         resource.MustParse("300Mi"),
+					v1.ResourceName(hugepagesResourceName2Mi): resource.MustParse("2Mi"),
+				},
 			},
-		},
+		}
 	}
 
 	kubeletServiceName := findKubeletServiceName(true)
-	ginkgo.By("Stopping the kubelet (step 2)")
 	restartKubelet = mustStopKubelet(ctx, f)
-
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(step2Cfg))
 
-	// Restart kubelet - it should fail because the Memory Manager checkpoint
-	// has a different allocatable than the new config expects.
-	// Use raw systemctl because mustStopKubelet's restart closure asserts
-	// success, which would fail the test.
-	exec.CommandContext(ctx, "sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput() //nolint:errcheck // intentional: we expect this restart to fail
+	if mmPolicy == "Static" {
+		// With Static policy the checkpoint from step 1 has a different
+		// allocatable, so kubelet should fail to start.
+		exec.CommandContext(ctx, "sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput() //nolint:errcheck // intentional: we expect this restart to fail
 
-	// Kubelet should NOT become healthy because of the checkpoint mismatch.
-	gomega.Consistently(ctx, func() bool {
-		return e2enode.HealthCheck(kubeletHealthCheckURL)
-	}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(gomega.BeFalseBecause(
-		"kubelet should fail to start due to memory manager checkpoint mismatch"))
+		gomega.Consistently(ctx, func() bool {
+			return e2enode.HealthCheck(kubeletHealthCheckURL)
+		}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(gomega.BeFalseBecause(
+			"kubelet should fail to start due to memory manager checkpoint mismatch"))
 
-	// Step 3: Delete the checkpoint file and restart. Kubelet should start
-	// successfully with reduced allocatable.
-	ginkgo.By("Deleting memory manager checkpoint and restarting (step 3)")
-	deleteStateFile(memoryManagerStateFile)
+		ginkgo.By("Deleting memory manager checkpoint and restarting (step 3)")
+		deleteStateFile(memoryManagerStateFile)
+	}
 
 	restartKubelet(ctx)
-	waitForKubeletToStart(ctx, f)
 
-	// Verify allocatable is reduced by the reserved amount.
-	// 2Mi: 4 pages × 2Mi = 8Mi capacity, step2 reserves 2Mi → allocatable = 6Mi.
+	// Verify allocatable is reduced: 4 pages × 2Mi = 8Mi capacity, 2Mi reserved, allocatable 6Mi.
 	hp2MiCapBytes := int64(hugepages[hugepagesResourceName2Mi]) * 2 * 1024 * 1024
 	expected2Mi := resource.NewQuantity(hp2MiCapBytes-2*1024*1024, resource.BinarySI)
 
@@ -812,12 +842,31 @@ func runHugepagesUpgradeTest(ctx context.Context, f *framework.Framework) error 
 		if len(nodeList.Items) != 1 {
 			return fmt.Errorf("expected 1 node, got %d", len(nodeList.Items))
 		}
-		allocHP2Mi, ok := nodeList.Items[0].Status.Allocatable[v1.ResourceName("hugepages-2Mi")]
+		allocHP2Mi, ok := nodeList.Items[0].Status.Allocatable[v1.ResourceName(hugepagesResourceName2Mi)]
 		if !ok {
-			return fmt.Errorf("hugepages-2Mi not found in node allocatable")
+			return fmt.Errorf("%s not found in node allocatable", hugepagesResourceName2Mi)
 		}
 		if allocHP2Mi.Cmp(*expected2Mi) != 0 {
-			return fmt.Errorf("expected allocatable hugepages-2Mi %s, got %s", expected2Mi.String(), allocHP2Mi.String())
+			return fmt.Errorf("expected allocatable %s %s, got %s", hugepagesResourceName2Mi, expected2Mi.String(), allocHP2Mi.String())
+		}
+		return nil
+	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
+
+	// Verify the pod is rejected: it requests 8Mi but only 6Mi is allocatable.
+	ginkgo.By("Verifying the pod is rejected due to insufficient hugepages")
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		p, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if p.Status.Phase != v1.PodFailed {
+			return fmt.Errorf("expected pod phase Failed, got %s", p.Status.Phase)
+		}
+		if p.Status.Reason != expectedRejectionReason {
+			return fmt.Errorf("expected reason %q, got %q", expectedRejectionReason, p.Status.Reason)
+		}
+		if !strings.Contains(p.Status.Message, expectedRejectionMsg) {
+			return fmt.Errorf("expected message to contain %q, got %q", expectedRejectionMsg, p.Status.Message)
 		}
 		return nil
 	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
