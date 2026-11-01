@@ -757,7 +757,7 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := reference.GetReference(scheme.Scheme, pod); err != nil {
-			klog.Errorf("Unable to construct reference to '%#v': %v", pod, err)
+			klog.ErrorS(err, "Unable to construct reference to pod", "pod", klog.KObj(pod))
 		} else {
 			ref.Kind = ""
 			if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
@@ -3464,7 +3464,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
 		if ref, err := reference.GetReference(scheme.Scheme, node); err != nil {
-			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+			klog.ErrorS(err, "Unable to construct reference to node", "node", klog.KObj(node))
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
 			// there are two UIDs for host events:
