@@ -151,6 +151,12 @@ const (
 	// Adds support for using ML-DSA signed certificate signing request data in the CertificateSigningRequest spec.request field.
 	CertificateSigningRequestMLDSA featuregate.Feature = "CertificateSigningRequestMLDSA"
 
+	// owner: @AkihiroSuda
+	// kep: https://kep.k8s.io/5714
+	//
+	// Enables specifying whether containers use the host cgroup namespace.
+	CgroupNamespacesSupport featuregate.Feature = "CgroupNamespacesSupport"
+
 	// owner: @Divya063 @chrishenzie
 	// kep: https://kep.k8s.io/5474
 	//
@@ -1398,6 +1404,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.38")},
 	},
 
+	CgroupNamespacesSupport: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	CgroupOptions: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2530,6 +2540,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	CSIVolumeHealth: {},
 
 	CertificateSigningRequestMLDSA: {},
+
+	CgroupNamespacesSupport: {},
 
 	CgroupOptions: {},
 
