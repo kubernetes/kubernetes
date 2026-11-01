@@ -662,6 +662,43 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	assert.GreaterOrEqual(t, destroyCount, 1, "Expect 1 or more destroys")
 }
 
+func TestSyncPodKillsPodWhenCgroupValidationFails(t *testing.T) {
+	running := &kubecontainer.PodStatus{
+		ID: "12345678",
+		ContainerStatuses: []*kubecontainer.Status{
+			{ID: kubecontainer.ContainerID{Type: "test", ID: "c1"}, Name: "bar", State: kubecontainer.ContainerStateRunning},
+		},
+	}
+	validationErr := errors.New("cgroup is missing controllers: cpuset")
+	testCases := []struct {
+		name        string
+		podStatus   *kubecontainer.PodStatus
+		validateErr error
+		wantKilled  []string
+	}{
+		{name: "first sync skips validation", podStatus: &kubecontainer.PodStatus{}, validateErr: validationErr},
+		{name: "valid cgroup keeps pod", podStatus: running},
+		{name: "invalid cgroup kills pod", podStatus: running, validateErr: validationErr, wantKilled: []string{"12345678"}},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+				Containers: []v1.Container{{Name: "bar", Image: "test:latest"}},
+			})
+			kubelet.podManager.SetPods([]*v1.Pod{pod})
+			testKubelet.fakeContainerManager.PodContainerManager.ValidateErr = tc.validateErr
+
+			_, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, tc.podStatus)
+			require.NoError(t, err)
+			require.True(t, testKubelet.fakeRuntime.AssertKilledPods(tc.wantKilled), "killed pods: %v", testKubelet.fakeRuntime.KilledPods)
+		})
+	}
+}
+
 func TestDispatchWorkOfCompletedPod(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)

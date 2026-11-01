@@ -2184,15 +2184,19 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// Don't kill containers in pod if pod's cgroups already
 		// exists or the pod is running for the first time
 		podKilled := false
-		if !pcm.Exists(pod) && !firstSync {
-			p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-			if err := kl.killPod(ctx, pod, p, nil); err == nil {
-				podKilled = true
-			} else {
-				if wait.Interrupted(err) {
-					return false, nil, nil
+		if !firstSync {
+			// Keep the validation error: it is the only record of why the pod is killed.
+			if validationErr := pcm.Validate(pod); validationErr != nil {
+				logger.V(2).Info("Pod cgroup validation failed, killing pod", "pod", klog.KObj(pod), "err", validationErr)
+				p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
+				if err := kl.killPod(ctx, pod, p, nil); err == nil {
+					podKilled = true
+				} else {
+					if wait.Interrupted(err) {
+						return false, nil, nil
+					}
+					logger.Error(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
 				}
-				logger.Error(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
 			}
 		}
 		// Create and Update pod's Cgroups
