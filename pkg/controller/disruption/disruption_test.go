@@ -18,6 +18,7 @@ package disruption
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"runtime/debug"
 	"strings"
@@ -635,7 +636,7 @@ func TestSyncReturnsErrorAfterFailSafe(t *testing.T) {
 				t.Fatal("expected sync to return an error so the key is requeued")
 			}
 			if tc.failSafeErr != nil {
-				if err != tc.failSafeErr {
+				if !stderrors.Is(err, tc.failSafeErr) {
 					t.Fatalf("got error %v, want failSafe error %v", err, tc.failSafeErr)
 				}
 				return
