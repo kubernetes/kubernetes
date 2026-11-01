@@ -28,11 +28,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -669,6 +671,70 @@ var _ = SIGDescribe("Security Context", func() {
 				framework.Failf("privileged container should be able to create dummy device")
 			}
 		})
+	})
+
+	ginkgo.Context("When creating a container with HostCgroupNamespace", framework.WithFeatureGate(features.CgroupNamespacesSupport), func() {
+		var nodeName string
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
+			nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+			framework.ExpectNoError(err)
+			for _, node := range nodes.Items {
+				for _, h := range node.Status.RuntimeHandlers {
+					// Pods without runtimeClassName use the default handler ("").
+					if h.Name == "" && h.Features != nil && ptr.Deref(h.Features.CgroupNamespaces, false) {
+						nodeName = node.Name
+						return
+					}
+				}
+			}
+			e2eskipper.Skipf("no node has a runtime that supports cgroup namespaces")
+		})
+
+		// readSelfCgroup returns the cgroup path in /proc/self/cgroup, as seen from the container.
+		readSelfCgroup := func(ctx context.Context, privileged, hostCgroupNamespace bool) string {
+			podName := "cgroupns-" + string(uuid.NewUUID())
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Name:                podName,
+							Image:               imageutils.GetE2EImage(imageutils.BusyBox),
+							Command:             []string{"cat", "/proc/self/cgroup"},
+							HostCgroupNamespace: &hostCgroupNamespace,
+							SecurityContext: &v1.SecurityContext{
+								Privileged: &privileged,
+							},
+						},
+					},
+				},
+			}
+			e2epod.SetNodeSelection(&pod.Spec, e2epod.NodeSelection{Name: nodeName})
+			podClient.Create(ctx, pod)
+			podClient.WaitForSuccess(ctx, podName, framework.PodStartTimeout)
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
+			framework.ExpectNoError(err, "GetPodLogs for pod %q", podName)
+			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			cgroupPath, ok := strings.CutPrefix(strings.TrimSpace(logs), "0::")
+			if !ok || strings.Contains(cgroupPath, "\n") {
+				e2eskipper.Skipf("cgroup v2 is required, got /proc/self/cgroup: %q", logs)
+			}
+			return cgroupPath
+		}
+
+		for _, privileged := range []bool{false, true} {
+			f.It(fmt.Sprintf("should unshare the cgroup namespace if set to false (privileged=%v) [LinuxOnly]", privileged), func(ctx context.Context) {
+				gomega.Expect(readSelfCgroup(ctx, privileged, false)).To(gomega.Equal("/"))
+			})
+
+			f.It(fmt.Sprintf("should use the host cgroup namespace if set to true (privileged=%v) [LinuxOnly]", privileged), func(ctx context.Context) {
+				gomega.Expect(readSelfCgroup(ctx, privileged, true)).NotTo(gomega.Equal("/"))
+			})
+		}
 	})
 
 	ginkgo.Context("when creating containers with AllowPrivilegeEscalation", func() {
