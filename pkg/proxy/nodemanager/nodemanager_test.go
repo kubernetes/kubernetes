@@ -18,6 +18,7 @@ package nodemanager
 
 import (
 	"context"
+	"maps"
 	"net"
 	"testing"
 	"time"
@@ -68,6 +69,15 @@ func tweakPodCIDRs(podCIDRs ...string) nodeTweak {
 func tweakResourceVersion(resourceVersion string) nodeTweak {
 	return func(n *v1.Node) {
 		n.ResourceVersion = resourceVersion
+	}
+}
+
+func tweakTopologyZone(zone string) nodeTweak {
+	return func(n *v1.Node) {
+		if n.Labels == nil {
+			n.Labels = make(map[string]string)
+		}
+		n.Labels[v1.LabelTopologyZone] = zone
 	}
 }
 
@@ -400,6 +410,43 @@ func TestNodeManagerNode(t *testing.T) {
 	nodeManager.OnNodeChange(makeNode(tweakResourceVersion("2")))
 	require.NoError(t, err)
 	require.Equal(t, "2", nodeManager.Node().ResourceVersion)
+}
+
+type mockTopologyHandler struct {
+	calls []map[string]string
+}
+
+func (m *mockTopologyHandler) OnTopologyChange(topologyLabels map[string]string) {
+	m.calls = append(m.calls, maps.Clone(topologyLabels))
+}
+
+func TestNodeManagerTopologyHandler(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	client := clientsetfake.NewClientset()
+	_, err := client.CoreV1().Nodes().Create(ctx, makeNode(
+		tweakNodeIPs("192.168.1.1"),
+		tweakTopologyZone("zone-a"),
+	), metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, "", false, func(i int) {}, time.Nanosecond, time.Nanosecond, time.Nanosecond)
+	require.NoError(t, err)
+
+	handler := &mockTopologyHandler{}
+	// Verify that registering immediately provides current topology labels
+	nodeManager.RegisterTopologyHandler(handler)
+	require.Len(t, handler.calls, 1)
+	require.Equal(t, map[string]string{v1.LabelTopologyZone: "zone-a"}, handler.calls[0])
+
+	// Verify that node change with same topology does not trigger handler
+	nodeManager.OnNodeChange(makeNode(tweakNodeIPs("192.168.1.1"), tweakTopologyZone("zone-a"), tweakResourceVersion("2")))
+	require.Len(t, handler.calls, 1)
+
+	// Verify that node change with updated topology triggers handler
+	nodeManager.OnNodeChange(makeNode(tweakNodeIPs("192.168.1.1"), tweakTopologyZone("zone-b"), tweakResourceVersion("3")))
+	require.Len(t, handler.calls, 2)
+	require.Equal(t, map[string]string{v1.LabelTopologyZone: "zone-b"}, handler.calls[1])
 }
 
 func Test_detectNodeIPs(t *testing.T) {
