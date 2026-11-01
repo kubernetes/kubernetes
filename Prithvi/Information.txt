@@ -1,0 +1,6 @@
+Hello Prithviraj...
+Welcome in Kubernet branch...
+you have created the Prithvi folder and Information file 
+that will push to your Kubernet repository
+and from their we will push the changes to the offical kubernet repository
+by creating the merge request
