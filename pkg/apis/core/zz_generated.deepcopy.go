@@ -904,6 +904,11 @@ func (in *Container) DeepCopyInto(out *Container) {
 		*out = new(SecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.HostCgroupNamespace != nil {
+		in, out := &in.HostCgroupNamespace, &out.HostCgroupNamespace
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -1665,6 +1670,11 @@ func (in *EphemeralContainerCommon) DeepCopyInto(out *EphemeralContainerCommon) 
 		in, out := &in.SecurityContext, &out.SecurityContext
 		*out = new(SecurityContext)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.HostCgroupNamespace != nil {
+		in, out := &in.HostCgroupNamespace, &out.HostCgroupNamespace
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }
@@ -3108,6 +3118,11 @@ func (in *NodeRuntimeHandlerFeatures) DeepCopyInto(out *NodeRuntimeHandlerFeatur
 	}
 	if in.UserNamespaces != nil {
 		in, out := &in.UserNamespaces, &out.UserNamespaces
+		*out = new(bool)
+		**out = **in
+	}
+	if in.CgroupNamespaces != nil {
+		in, out := &in.CgroupNamespaces, &out.CgroupNamespaces
 		*out = new(bool)
 		**out = **in
 	}
