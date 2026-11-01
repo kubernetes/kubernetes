@@ -935,6 +935,7 @@
                     "localhostProfile": "localhostProfileValue"
                   }
                 },
+                "hostCgroupNamespace": true,
                 "stdin": true,
                 "stdinOnce": true,
                 "tty": true
@@ -1267,6 +1268,7 @@
                     "localhostProfile": "localhostProfileValue"
                   }
                 },
+                "hostCgroupNamespace": true,
                 "stdin": true,
                 "stdinOnce": true,
                 "tty": true
@@ -1599,6 +1601,7 @@
                     "localhostProfile": "localhostProfileValue"
                   }
                 },
+                "hostCgroupNamespace": true,
                 "stdin": true,
                 "stdinOnce": true,
                 "tty": true,

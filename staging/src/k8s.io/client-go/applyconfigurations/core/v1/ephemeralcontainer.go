@@ -269,6 +269,14 @@ func (b *EphemeralContainerApplyConfiguration) WithSecurityContext(value *Securi
 	return b
 }
 
+// WithHostCgroupNamespace sets the HostCgroupNamespace field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostCgroupNamespace field is set to the value of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithHostCgroupNamespace(value bool) *EphemeralContainerApplyConfiguration {
+	b.EphemeralContainerCommonApplyConfiguration.HostCgroupNamespace = &value
+	return b
+}
+
 // WithStdin sets the Stdin field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Stdin field is set to the value of the last call.

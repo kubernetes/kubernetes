@@ -122,6 +122,8 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	// securityContext is optional: SecurityContext defines the security options the ephemeral container should be run with.
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	SecurityContext *SecurityContextApplyConfiguration `json:"securityContext,omitempty"`
+	// hostCgroupNamespace is not allowed for ephemeral containers.
+	HostCgroupNamespace *bool `json:"hostCgroupNamespace,omitempty"`
 	// stdin indicates whether this container should allocate a buffer for stdin in the container runtime. If this
 	// is not set, reads from stdin in the container will always result in EOF.
 	// Default is false.
@@ -357,6 +359,14 @@ func (b *EphemeralContainerCommonApplyConfiguration) WithImagePullPolicy(value c
 // If called multiple times, the SecurityContext field is set to the value of the last call.
 func (b *EphemeralContainerCommonApplyConfiguration) WithSecurityContext(value *SecurityContextApplyConfiguration) *EphemeralContainerCommonApplyConfiguration {
 	b.SecurityContext = value
+	return b
+}
+
+// WithHostCgroupNamespace sets the HostCgroupNamespace field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostCgroupNamespace field is set to the value of the last call.
+func (b *EphemeralContainerCommonApplyConfiguration) WithHostCgroupNamespace(value bool) *EphemeralContainerCommonApplyConfiguration {
+	b.HostCgroupNamespace = &value
 	return b
 }
 
