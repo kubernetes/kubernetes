@@ -17,9 +17,13 @@ limitations under the License.
 package cost
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
+	"runtime"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,11 +33,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/ktesting"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
+	largePodNamespace = "pods-45kb"
+
 	acceptJSON     = kruntime.ContentTypeJSON
 	acceptProtobuf = kruntime.ContentTypeProtobuf
 	acceptCBOR     = kruntime.ContentTypeCBOR
@@ -112,9 +119,15 @@ func encodeObject(tb testutils.TB, mediaType string, obj kruntime.Object) []byte
 	return data
 }
 
-func ensureDefaultServiceAccount(tCtx ktesting.TContext) {
+func ensureNamespace(tCtx ktesting.TContext, ns string) {
 	tCtx.Helper()
-	const ns = metav1.NamespaceDefault
+	if ns != metav1.NamespaceDefault {
+		if _, err := tCtx.Client().CoreV1().Namespaces().Create(tCtx, &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: ns},
+		}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+			tCtx.Fatalf("failed to create namespace %s: %v", ns, err)
+		}
+	}
 	if _, err := tCtx.Client().CoreV1().ServiceAccounts(ns).Create(tCtx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: "default", Namespace: ns},
 	}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
@@ -126,9 +139,7 @@ func ensureDefaultServiceAccount(tCtx ktesting.TContext) {
 // kube-apiserver's podStrategy.PrepareForCreate resets pod.Status on creation,
 // so a second write to /status is required to populate the exemplar's status
 // payload and kubelet managedFields entry (~10KB total stored size).
-func seedExemplarPod(tCtx ktesting.TContext, name, nodeName, deploymentLabel string, extraBytes int) *v1.Pod {
-	tCtx.Helper()
-	const ns = metav1.NamespaceDefault
+func seedExemplarPod(ctx context.Context, client clientset.Interface, ns, name, nodeName, deploymentLabel string, extraBytes int) (*v1.Pod, error) {
 	pod := exemplarPod.DeepCopy()
 	pod.Namespace = ns
 	pod.Name = name
@@ -140,34 +151,61 @@ func seedExemplarPod(tCtx ktesting.TContext, name, nodeName, deploymentLabel str
 		pod.Annotations["bench.k8s.io/payload"] = strings.Repeat("x", extraBytes)
 	}
 
-	created, err := tCtx.Client().CoreV1().Pods(ns).Create(tCtx, pod, metav1.CreateOptions{FieldManager: "seed-client"})
+	created, err := client.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{FieldManager: "seed-client"})
 	if err != nil {
-		tCtx.Fatalf("seed create %s/%s failed: %v", ns, name, err)
+		return nil, fmt.Errorf("seed create %s/%s failed: %w", ns, name, err)
 	}
 	created.Status = exemplarPod.Status
-	updated, err := tCtx.Client().CoreV1().Pods(ns).UpdateStatus(tCtx, created, metav1.UpdateOptions{FieldManager: "kubelet"})
+	updated, err := client.CoreV1().Pods(ns).UpdateStatus(ctx, created, metav1.UpdateOptions{FieldManager: "kubelet"})
 	if err != nil {
-		tCtx.Fatalf("seed status update %s/%s failed: %v", ns, name, err)
+		return nil, fmt.Errorf("seed status update %s/%s failed: %w", ns, name, err)
 	}
-	return updated
+	return updated, nil
 }
 
-func seedPods(tCtx ktesting.TContext, count, extraBytes int) []*v1.Pod {
+func seedPods(tCtx ktesting.TContext, ns string, count, extraBytes int) []*v1.Pod {
 	tCtx.Helper()
+	client := tCtx.Client()
 	pods := make([]*v1.Pod, count)
-	for i := range count {
+	seedAt := func(ctx context.Context, i int) error {
 		var nodeName, deploymentLabel string
 		if count > 1 {
-			nodeName = fmt.Sprintf("kind-worker%d", i%10)
+			// Leave the final pod unbound so dry-run POST /binding can target it.
+			if i < count-1 {
+				nodeName = fmt.Sprintf("kind-worker%d", i%10)
+			}
 			deploymentLabel = fmt.Sprintf("small-deployment-%02d", i%10)
 		}
 		extra := extraBytes
 		if extra > 0 {
 			extra += i
 		}
-		pods[i] = seedExemplarPod(tCtx, fmt.Sprintf("pod-%03d", i), nodeName, deploymentLabel, extra)
+		p, err := seedExemplarPod(ctx, client, ns, fmt.Sprintf("pod-%03d", i), nodeName, deploymentLabel, extra)
+		pods[i] = p
+		return err
 	}
-	if _, err := tCtx.Client().CoreV1().Pods(metav1.NamespaceDefault).List(tCtx, metav1.ListOptions{}); err != nil {
+
+	// Seed pod-000 first and the final pod last so pods[0] and pods[count-1]
+	// bracket the ResourceVersion range for FIRST_RV and LATEST_RV without sorting.
+	if count > 0 {
+		if err := seedAt(tCtx, 0); err != nil {
+			tCtx.Fatalf("%v", err)
+		}
+		g, ctx := errgroup.WithContext(tCtx)
+		g.SetLimit(runtime.GOMAXPROCS(0))
+		for i := 1; i < count-1; i++ {
+			g.Go(func() error { return seedAt(ctx, i) })
+		}
+		if err := g.Wait(); err != nil {
+			tCtx.Fatalf("%v", err)
+		}
+		if count > 1 {
+			if err := seedAt(tCtx, count-1); err != nil {
+				tCtx.Fatalf("%v", err)
+			}
+		}
+	}
+	if _, err := client.CoreV1().Pods(ns).List(tCtx, metav1.ListOptions{}); err != nil {
 		tCtx.Fatalf("waiting for watch cache sync failed: %v", err)
 	}
 	return pods
