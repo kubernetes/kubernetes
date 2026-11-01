@@ -34,12 +34,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
-	largePodNamespace = "pods-45kb"
+	// ephemeralNamespace holds per-scenario pods (committed writes and custom-sized
+	// fixtures) that are cleared after each scenario so default stays untouched.
+	ephemeralNamespace = "ephemeral"
 
 	acceptJSON     = kruntime.ContentTypeJSON
 	acceptProtobuf = kruntime.ContentTypeProtobuf
@@ -89,6 +92,8 @@ func mustLoadExemplarPod() *v1.Pod {
 	if err := yaml.Unmarshal(exemplarPodYAML, &pod); err != nil {
 		panic(fmt.Sprintf("failed to unmarshal exemplar_pod.yaml: %v", err))
 	}
+	pod.Namespace = ""
+	pod.Name = ""
 	pod.UID = ""
 	pod.ResourceVersion = ""
 	pod.CreationTimestamp = metav1.Time{}
@@ -163,19 +168,19 @@ func seedExemplarPod(ctx context.Context, client clientset.Interface, ns, name, 
 	return updated, nil
 }
 
-func seedPods(tCtx ktesting.TContext, ns string, count, extraBytes int) []*v1.Pod {
+func seedPods(tCtx ktesting.TContext, informer *informerWaiter, ns string, count, extraBytes int) []*v1.Pod {
 	tCtx.Helper()
+	informer.resetEvents()
 	client := tCtx.Client()
 	pods := make([]*v1.Pod, count)
 	seedAt := func(ctx context.Context, i int) error {
-		var nodeName, deploymentLabel string
-		if count > 1 {
-			// Leave the final pod unbound so dry-run POST /binding can target it.
-			if i < count-1 {
-				nodeName = fmt.Sprintf("kind-worker%d", i%10)
-			}
-			deploymentLabel = fmt.Sprintf("small-deployment-%02d", i%10)
+		var nodeName string
+		// Leave the final pod unbound when seeding multiple pods so dry-run
+		// POST /binding can target it.
+		if count == 1 || i < count-1 {
+			nodeName = fmt.Sprintf("kind-worker%d", i%10)
 		}
+		deploymentLabel := fmt.Sprintf("small-deployment-%02d", i%10)
 		extra := extraBytes
 		if extra > 0 {
 			extra += i
@@ -205,34 +210,58 @@ func seedPods(tCtx ktesting.TContext, ns string, count, extraBytes int) []*v1.Po
 			}
 		}
 	}
-	if _, err := client.CoreV1().Pods(ns).List(tCtx, metav1.ListOptions{}); err != nil {
-		tCtx.Fatalf("waiting for watch cache sync failed: %v", err)
-	}
+	// Each seedExemplarPod performs Create + UpdateStatus (2 informer events).
+	informer.wait(tCtx, tCtx, 2*int64(count))
+	informer.resetEvents()
 	return pods
 }
 
-func staticPodBody(tb testutils.TB, name string) func(mediaType string, _ *v1.Pod) []byte {
-	tb.Helper()
-	pod := exemplarPod.DeepCopy()
-	pod.Namespace = metav1.NamespaceDefault
-	pod.Name = name
-	return staticObjectBody(tb, pod)
+func clearNamespace(tCtx ktesting.TContext, informer *informerWaiter, ns string) {
+	tCtx.Helper()
+	items, err := informer.informer.GetIndexer().ByIndex(cache.NamespaceIndex, ns)
+	if err != nil {
+		tCtx.Fatalf("failed to query pod informer namespace index for %s: %v", ns, err)
+	}
+	if len(items) == 0 {
+		informer.resetEvents()
+		return
+	}
+	informer.resetEvents()
+	if err := tCtx.Client().CoreV1().Pods(ns).DeleteCollection(
+		tCtx,
+		*metav1.NewDeleteOptions(0),
+		metav1.ListOptions{},
+	); err != nil {
+		tCtx.Fatalf("failed to clear pods in %s: %v", ns, err)
+	}
+	informer.wait(tCtx, tCtx, int64(len(items)))
+	informer.resetEvents()
 }
 
-func staticObjectBody(tb testutils.TB, obj kruntime.Object) func(mediaType string, _ *v1.Pod) []byte {
+type bodyBuilder func(mediaType string, pod *v1.Pod, alt int) []byte
+
+func staticPodBody(tb testutils.TB) bodyBuilder {
+	tb.Helper()
+	return staticObjectBody(tb, exemplarPod.DeepCopy())
+}
+
+func staticObjectBody(tb testutils.TB, obj kruntime.Object) bodyBuilder {
 	tb.Helper()
 	encodedByType := make(map[string][]byte, len(writeFormats))
 	for _, wf := range writeFormats {
 		encodedByType[wf.accept] = encodeObject(tb, wf.accept, obj)
 	}
-	return func(mediaType string, _ *v1.Pod) []byte {
+	return func(mediaType string, _ *v1.Pod, _ int) []byte {
 		return encodedByType[mediaType]
 	}
 }
 
-func staticBytesBody(payload string) func(string, *v1.Pod) []byte {
-	b := []byte(payload)
-	return func(string, *v1.Pod) []byte {
-		return b
+func staticBytesBody(payloads ...string) bodyBuilder {
+	raw := make([][]byte, len(payloads))
+	for i, p := range payloads {
+		raw[i] = []byte(p)
+	}
+	return func(_ string, _ *v1.Pod, alt int) []byte {
+		return raw[alt%len(raw)]
 	}
 }
