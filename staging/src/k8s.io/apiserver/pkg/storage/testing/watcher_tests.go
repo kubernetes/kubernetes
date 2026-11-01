@@ -171,6 +171,7 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			watchKey := fmt.Sprintf("/pods/%s", tt.namespace)
 			key := watchKey + "/foo"
 			if !recursive {
@@ -2477,6 +2478,10 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 	)
 
 	pod1, pod2, pod3 := makePod("1"), makePod("2"), makePod("3")
+	pod1.Labels = map[string]string{"foo": "bar"}
+	pod1.Spec.NodeName = "node-1"
+	pod3.Labels = map[string]string{"foo": "bar"}
+	pod3.Spec.NodeName = "node-1"
 
 	added := func(pod *example.Pod) watch.Event {
 		return watch.Event{Type: watch.Added, Object: pod}
@@ -2491,6 +2496,7 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 		rv                  testRV
 		allowWatchBookmarks bool
 		sendInitialEvents   *bool
+		pred                storage.SelectionPredicate
 		podsBeforeWatch     []*example.Pod
 		podsBeforeResync    []*example.Pod
 		compactBeforeResync *example.Pod
@@ -2846,9 +2852,59 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			expectEtcd:          []watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod2), added(pod3)},
 			expectCacher:        []watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod2), added(pod3), bookmarkWithPod3RV},
 		},
+		{
+			name:                "label selector, allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			pred:                storage.SelectionPredicate{Label: labels.SelectorFromSet(labels.Set{"foo": "bar"})},
+			expectEtcd:          []watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod3)},
+			expectCacher:        []watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod3), bookmarkWithPod3RV},
+		},
+		{
+			name:                "indexed field selector, allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			pred:                storage.SelectionPredicate{Field: fields.ParseSelectorOrDie("spec.nodeName=node-1"), IndexFields: []string{"spec.nodeName"}},
+			expectEtcd:          []watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod3)},
+			expectCacher:        []watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod3), bookmarkWithPod3RV},
+		},
+		{
+			name:                "indexed field selector, allowWatchBookmarks=true, sendInitialEvents=true, RV=beforeResync",
+			rv:                  rvBeforeResync,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			pred:                storage.SelectionPredicate{Field: fields.ParseSelectorOrDie("spec.nodeName=node-1"), IndexFields: []string{"spec.nodeName"}},
+			expectCacher:        []watch.Event{added(pod1), initialBookmarkWithPod2RV, added(pod3), bookmarkWithPod3RV},
+		},
+		{
+			name:              "non-indexed field selector, allowWatchBookmarks=false, sendInitialEvents=false, RV=beforeTest",
+			rv:                rvBeforeTest,
+			sendInitialEvents: ptr.To(false),
+			pred:              storage.SelectionPredicate{Field: fields.ParseSelectorOrDie("metadata.name=pod-2")},
+			expect:            []watch.Event{added(pod2)},
+		},
 	}
 
-	for idx, tt := range tests {
+	ns := "ns"
+	createPods := func(pods []*example.Pod) {
+		for _, pod := range pods {
+			pod.Namespace = ns
+			pod.ResourceVersion = ""
+			require.NoError(t, store.Create(ctx, computePodKey(pod), pod, pod, 0))
+		}
+	}
+
+	beforeTestRV, err := store.GetCurrentResourceVersion(ctx)
+	require.NoError(t, err)
+
+	createPods([]*example.Pod{pod1})
+
+	beforeWatchRV, err := store.GetCurrentResourceVersion(ctx)
+	require.NoError(t, err)
+	beforeResyncRV := beforeWatchRV + 1
+	afterResyncRV := beforeResyncRV + 1
+
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			expectedOut := tt.expect
 			if isCacher && tt.expectCacher != nil {
@@ -2860,24 +2916,6 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			if expectedOut == nil {
 				t.Skip("scenario not supported")
 			}
-			ns := fmt.Sprintf("ns-%d", idx)
-			createPods := func(pods []*example.Pod) {
-				for _, pod := range pods {
-					pod.Namespace = ns
-					pod.ResourceVersion = ""
-					require.NoError(t, store.Create(ctx, computePodKey(pod), pod, pod, 0))
-				}
-			}
-
-			beforeTestRV, err := store.GetCurrentResourceVersion(ctx)
-			require.NoError(t, err)
-
-			createPods(tt.podsBeforeWatch)
-
-			beforeWatchRV, err := store.GetCurrentResourceVersion(ctx)
-			require.NoError(t, err)
-			beforeResyncRV := beforeWatchRV + uint64(len(tt.podsBeforeResync))
-			afterResyncRV := beforeResyncRV + uint64(len(tt.podsAfterResync))
 
 			var rv string
 			switch tt.rv {
@@ -2895,7 +2933,16 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 				t.Fatalf("unexpected rv: %q", tt.rv)
 			}
 
-			pred := storage.Everything
+			pred := tt.pred
+			if pred.Label == nil {
+				pred.Label = labels.Everything()
+			}
+			if pred.Field == nil {
+				pred.Field = fields.Everything()
+			}
+			if pred.GetAttrs == nil {
+				pred.GetAttrs = namespacedScopedNodeNameAttrFunc
+			}
 			pred.AllowWatchBookmarks = tt.allowWatchBookmarks
 			var (
 				w        watch.Interface
@@ -2911,35 +2958,34 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 					Recursive:         true,
 				})
 			}()
-			time.Sleep(100 * time.Millisecond)
-			if resync != nil {
-				resync()
-			}
-
-			createPods(tt.podsBeforeResync)
-			if tt.compactBeforeResync != nil {
-				compact(ctx, t, tt.compactBeforeResync.ResourceVersion)
-			}
-			if resync != nil {
-				resync()
-			}
-			createPods(tt.podsAfterResync)
-			if triggerBookmarks != nil {
-				triggerBookmarks()
-			}
+			t.Parallel()
 
 			<-watchOpened
 			require.NoError(t, watchErr)
 			defer w.Stop()
 
-			initialBookmarkWithPod1RV.Object.(*example.Pod).ResourceVersion = pod1.ResourceVersion
-			initialBookmarkWithPod2RV.Object.(*example.Pod).ResourceVersion = pod2.ResourceVersion
-			initialBookmarkWithPod3RV.Object.(*example.Pod).ResourceVersion = pod3.ResourceVersion
-			bookmarkWithPod3RV.Object.(*example.Pod).ResourceVersion = pod3.ResourceVersion
-
 			TestCheckResultsInStrictOrder(t, w, expectedOut)
 		})
 	}
+	time.Sleep(100 * time.Millisecond)
+	if resync != nil {
+		resync()
+	}
+
+	createPods([]*example.Pod{pod2})
+	compact(ctx, t, pod2.ResourceVersion)
+	if resync != nil {
+		resync()
+	}
+	createPods([]*example.Pod{pod3})
+	if triggerBookmarks != nil {
+		triggerBookmarks()
+	}
+
+	initialBookmarkWithPod1RV.Object.(*example.Pod).ResourceVersion = pod1.ResourceVersion
+	initialBookmarkWithPod2RV.Object.(*example.Pod).ResourceVersion = pod2.ResourceVersion
+	initialBookmarkWithPod3RV.Object.(*example.Pod).ResourceVersion = pod3.ResourceVersion
+	bookmarkWithPod3RV.Object.(*example.Pod).ResourceVersion = pod3.ResourceVersion
 }
 
 func makePod(namePrefix string) *example.Pod {

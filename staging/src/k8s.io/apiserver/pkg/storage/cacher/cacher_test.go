@@ -641,7 +641,7 @@ func TestWatch(t *testing.T) {
 			t.Run("WatchResync", func(t *testing.T) {
 				t.Parallel()
 				fakeClock := testingclock.NewFakeClock(time.Now())
-				ctx, cacher, server, terminate := testSetupWithEtcdServer(t, withClock(fakeClock))
+				ctx, cacher, server, terminate := testSetupWithEtcdServer(t, withClock(fakeClock), withNodeNameAndNamespaceIndex)
 				t.Cleanup(terminate)
 				store := &createWrapper{CacheDelegator: cacher}
 				resync := func() {
