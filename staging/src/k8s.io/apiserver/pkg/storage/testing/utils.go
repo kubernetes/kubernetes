@@ -455,7 +455,7 @@ func determinePodGetAttrFunc(namespaceScoped bool, indexField []string) storage.
 
 func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod := obj.(*example.Pod)
-	return nil, fields.Set{
+	return labels.Set(pod.Labels), fields.Set{
 		"spec.nodeName":      pod.Spec.NodeName,
 		"metadata.name":      pod.ObjectMeta.Name,
 		"metadata.namespace": pod.ObjectMeta.Namespace,
@@ -464,7 +464,7 @@ func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Se
 
 func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod := obj.(*example.Pod)
-	return nil, fields.Set{
+	return labels.Set(pod.Labels), fields.Set{
 		"spec.nodeName": pod.Spec.NodeName,
 		"metadata.name": pod.ObjectMeta.Name,
 	}, nil
