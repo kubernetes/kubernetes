@@ -1293,10 +1293,11 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name   string
-		pod    *v1.Pod
-		target *kubecontainer.ContainerID
-		want   *runtimeapi.NamespaceOption
+		name             string
+		pod              *v1.Pod
+		target           *kubecontainer.ContainerID
+		want             *runtimeapi.NamespaceOption
+		cgroupnsDisabled bool
 	}{
 		{
 			"Default namespaces",
@@ -1311,6 +1312,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 			&runtimeapi.NamespaceOption{
 				Pid: runtimeapi.NamespaceMode_CONTAINER,
 			},
+			false,
 		},
 		{
 			"PID Namespace POD",
@@ -1326,6 +1328,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 			&runtimeapi.NamespaceOption{
 				Pid: runtimeapi.NamespaceMode_POD,
 			},
+			false,
 		},
 		{
 			"PID Namespace TARGET",
@@ -1341,9 +1344,58 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 				Pid:      runtimeapi.NamespaceMode_TARGET,
 				TargetId: "really-long-id-string",
 			},
+			false,
+		},
+		{
+			"Cgroup Namespace NODE",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "test", HostCgroupNamespace: new(true)},
+					},
+				},
+			},
+			nil,
+			&runtimeapi.NamespaceOption{
+				Pid:             runtimeapi.NamespaceMode_CONTAINER,
+				CgroupnsOptions: &runtimeapi.CgroupNamespace{Mode: runtimeapi.NamespaceMode_NODE},
+			},
+			false,
+		},
+		{
+			"Cgroup Namespace CONTAINER",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "test", HostCgroupNamespace: new(false)},
+					},
+				},
+			},
+			nil,
+			&runtimeapi.NamespaceOption{
+				Pid:             runtimeapi.NamespaceMode_CONTAINER,
+				CgroupnsOptions: &runtimeapi.CgroupNamespace{Mode: runtimeapi.NamespaceMode_CONTAINER},
+			},
+			false,
+		},
+		{
+			"Cgroup Namespace with the feature gate disabled",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "test", HostCgroupNamespace: new(true)},
+					},
+				},
+			},
+			nil,
+			&runtimeapi.NamespaceOption{
+				Pid: runtimeapi.NamespaceMode_CONTAINER,
+			},
+			true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, !tc.cgroupnsDisabled)
 			got, err := m.generateLinuxContainerConfig(tCtx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
 			assert.NoError(t, err)
 			if !proto.Equal(tc.want, got.SecurityContext.NamespaceOptions) {
@@ -2968,4 +3020,38 @@ func TestContainerMemoryHighSkippedWithPodLevelResources(t *testing.T) {
 		_, ok := lcr.Unified[cm.Cgroup2MemoryHigh]
 		assert.False(t, ok, "memory.high should NOT be set when container memory req==limit, even if pod is Burstable")
 	})
+}
+
+func TestValidateCgroupNamespaceMountMode(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		mode        *runtimeapi.NamespaceMode
+		mountMode   runtimeapi.CgroupMountMode
+		privileged  bool
+		expectedErr bool
+	}{
+		{name: "default", mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE},
+		{name: "CONTAINER, READ_WRITE", mode: ptr.To(runtimeapi.NamespaceMode_CONTAINER), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE},
+		{name: "NODE, unspecified", mode: ptr.To(runtimeapi.NamespaceMode_NODE)},
+		{name: "NODE, READ_ONLY", mode: ptr.To(runtimeapi.NamespaceMode_NODE), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY},
+		{name: "NODE, READ_WRITE, privileged", mode: ptr.To(runtimeapi.NamespaceMode_NODE), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, privileged: true},
+		{name: "NODE, READ_WRITE, non-privileged", mode: ptr.To(runtimeapi.NamespaceMode_NODE), mountMode: runtimeapi.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, expectedErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sc := &runtimeapi.LinuxContainerSecurityContext{
+				NamespaceOptions: &runtimeapi.NamespaceOption{},
+				CgroupMountMode:  tc.mountMode,
+				Privileged:       tc.privileged,
+			}
+			if tc.mode != nil {
+				sc.NamespaceOptions.CgroupnsOptions = &runtimeapi.CgroupNamespace{Mode: *tc.mode}
+			}
+			err := validateCgroupNamespaceMountMode("test", sc)
+			if tc.expectedErr {
+				assert.EqualError(t, err, `container "test" must be privileged to use a read-write cgroup mount with the host cgroup namespace`)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

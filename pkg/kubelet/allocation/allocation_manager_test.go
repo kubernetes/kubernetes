@@ -334,7 +334,8 @@ func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
 			"Name", "Command", "Args", "WorkingDir", "Ports", "EnvFrom", "Env", "Resources",
 			"ResizePolicy", "RestartPolicy", "RestartPolicyRules", "VolumeMounts", "VolumeDevices",
 			"LivenessProbe", "ReadinessProbe", "StartupProbe", "Lifecycle", "TerminationMessagePath",
-			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "Stdin", "StdinOnce", "TTY",
+			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "HostCgroupNamespace", "Stdin",
+			"StdinOnce", "TTY",
 		},
 	}
 
