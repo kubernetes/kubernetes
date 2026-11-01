@@ -27,6 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -86,6 +87,36 @@ func TestRegisteredFeatureDiscovery(t *testing.T) {
 				t.Run("runtime features missing", func(t *testing.T) {
 					assert.NotContains(t, discover(t, allGatesOn, nil), feature.Name())
 				})
+			}
+		})
+	}
+}
+
+func TestCgroupNamespacesSupportFeatureDiscovery(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		gateEnabled bool
+		handlers    []kubecontainer.RuntimeHandler
+		expected    bool
+	}{
+		{name: "gate disabled", gateEnabled: false, handlers: []kubecontainer.RuntimeHandler{{Name: "", SupportsCgroupNamespaces: true}}, expected: false},
+		{name: "default handler supports cgroupns", gateEnabled: true, handlers: []kubecontainer.RuntimeHandler{{Name: "", SupportsCgroupNamespaces: true}}, expected: true},
+		{name: "only a non-default handler supports cgroupns", gateEnabled: true, handlers: []kubecontainer.RuntimeHandler{{Name: ""}, {Name: "other", SupportsCgroupNamespaces: true}}, expected: false},
+		{name: "runtime does not report handlers", gateEnabled: true, handlers: nil, expected: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, tc.gateEnabled)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.nodeDeclaredFeaturesFramework = ndf.New(ndffeatures.AllFeatures)
+			kubelet.runtimeState.setRuntimeHandlers(tc.handlers)
+
+			declared := kubelet.discoverNodeDeclaredFeatures()
+			if tc.expected {
+				assert.Contains(t, declared, "CgroupNamespacesSupport")
+			} else {
+				assert.NotContains(t, declared, "CgroupNamespacesSupport")
 			}
 		})
 	}

@@ -356,7 +356,8 @@ func testUpdatePodFromAllocationFieldClassification(t *testing.T, dynamicContain
 			"Name", "Command", "Args", "WorkingDir", "Ports", "EnvFrom", "Env", "Resources",
 			"ResizePolicy", "RestartPolicy", "RestartPolicyRules", "VolumeMounts", "VolumeDevices",
 			"LivenessProbe", "ReadinessProbe", "StartupProbe", "Lifecycle", "TerminationMessagePath",
-			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "Stdin", "StdinOnce", "TTY",
+			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "HostCgroupNamespace", "Stdin",
+			"StdinOnce", "TTY",
 		},
 	}
 	if dynamicContainers {

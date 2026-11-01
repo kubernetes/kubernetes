@@ -46,6 +46,9 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 		runtimeFeatures.CgroupMountMode = features.CgroupMountMode
 		runtimeFeatures.PodNetworkIsolated = features.PodNetworkIsolated
 	}
+	// Only the default runtime handler is considered, as declared features are per node.
+	// For other handlers, the kubelet fails container creation if they lack the support.
+	runtimeFeatures.CgroupNamespaces = runtimeHandlerSupportsCgroupNamespaces("", kl.runtimeState.runtimeHandlers())
 
 	cfg := &nodedeclaredfeatures.NodeConfiguration{
 		FeatureGates:    adaptedFG,
