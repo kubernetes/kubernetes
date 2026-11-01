@@ -17,6 +17,7 @@ limitations under the License.
 package tcp
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"time"
@@ -33,24 +34,26 @@ func New() Prober {
 
 // Prober is an interface that defines the Probe function for doing TCP readiness/liveness checks.
 type Prober interface {
-	Probe(host string, port int, timeout time.Duration) (probe.Result, string, error)
+	Probe(ctx context.Context, host string, port int, timeout time.Duration) (probe.Result, string, error)
 }
 
 type tcpProber struct{}
 
-// Probe checks that a TCP connection to the address can be opened.
-func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.Result, string, error) {
-	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
+// Probe checks that a TCP connection to the address can be opened. The dial is
+// aborted if ctx is canceled before it completes.
+func (pr tcpProber) Probe(ctx context.Context, host string, port int, timeout time.Duration) (probe.Result, string, error) {
+	return DoTCPProbe(ctx, net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }
 
 // DoTCPProbe checks that a TCP socket to the address can be opened.
 // If the socket can be opened, it returns Success
 // If the socket fails to open, it returns Failure.
+// The dial is aborted if ctx is canceled before it completes.
 // This is exported because some other packages may want to do direct TCP probes.
-func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, string, error) {
+func DoTCPProbe(ctx context.Context, addr string, timeout time.Duration) (probe.Result, string, error) {
 	d := probe.ProbeDialer()
 	d.Timeout = timeout
-	conn, err := d.Dial("tcp", addr)
+	conn, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		// Convert errors to failures to handle timeouts.
 		return probe.Failure, err.Error(), nil
