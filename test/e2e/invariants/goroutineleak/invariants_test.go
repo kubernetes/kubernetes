@@ -20,9 +20,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"runtime/pprof"
 	"slices"
 	"strings"
@@ -32,6 +34,10 @@ import (
 
 	"github.com/google/pprof/profile"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -163,13 +169,27 @@ func leakForTest() {
 	<-make(chan struct{})
 }
 
-func TestFailureIgnoresUnscrapedComponents(t *testing.T) {
+func TestFailureEmptyWithoutFindings(t *testing.T) {
 	results := []Result{
 		{Component: "kube-apiserver", Total: 0},
-		{Component: "kubelet/node-1", Err: errors.New("404 page not found")},
+		{Component: "kubelet/node-1", Total: 0},
 	}
 	if got := Failure(results); got != "" {
 		t.Errorf("expected no failure, got:\n%s", got)
+	}
+}
+
+// TestFailureReportsScrapeErrors ensures that the check cannot silently stop
+// working for a component.
+func TestFailureReportsScrapeErrors(t *testing.T) {
+	got := Failure([]Result{
+		{Component: "kube-apiserver", Total: 0},
+		{Component: "kubelet/node-1", Err: errors.New("404 page not found")},
+	})
+	for _, want := range []string{"1 component(s) not checked", "kubelet/node-1", "404 page not found"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("failure message missing %q:\n%s", want, got)
+		}
 	}
 }
 
@@ -199,8 +219,16 @@ func TestReportListsCheckedComponents(t *testing.T) {
 	if !strings.Contains(report, "kube-apiserver (ok)") {
 		t.Errorf("report should list checked components:\n%s", report)
 	}
-	if !strings.Contains(report, "not checked") {
-		t.Errorf("report should list skipped components:\n%s", report)
+	if !strings.Contains(report, "Failed: kube-system/kube-scheduler-node-1 (connection refused)") {
+		t.Errorf("report should list failed components:\n%s", report)
+	}
+}
+
+func TestCheckKubeletsNoMatchingNode(t *testing.T) {
+	client := fake.NewClientset(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}})
+	results := CheckKubelets(context.Background(), client, regexp.MustCompile("^other-node$"))
+	if len(results) != 1 || results[0].Component != ComponentKubelet || results[0].Err == nil {
+		t.Errorf("results = %+v, want one error for %s", results, ComponentKubelet)
 	}
 }
 
@@ -209,12 +237,12 @@ type fakeDialer struct {
 	addr string
 
 	mu    sync.Mutex
-	dials []ControlPlanePod
+	dials []string
 }
 
 func (d *fakeDialer) DialPod(ctx context.Context, namespace, podName string, port int) (net.Conn, error) {
 	d.mu.Lock()
-	d.dials = append(d.dials, ControlPlanePod{Namespace: namespace, Name: podName, Port: port})
+	d.dials = append(d.dials, fmt.Sprintf("%s/%s:%d", namespace, podName, port))
 	d.mu.Unlock()
 	if podName == "unreachable" {
 		return nil, errors.New("connection refused")
@@ -237,14 +265,16 @@ func TestCheckControlPlanePods(t *testing.T) {
 	defer server.Close()
 
 	pods := []ControlPlanePod{
-		{Namespace: "kube-system", Name: "kube-scheduler-node-1", Port: 10259},
-		{Namespace: "kube-system", Name: "unreachable", Port: 10257},
+		{Component: ComponentScheduler, Namespace: "kube-system", Name: "kube-scheduler-node-1", Port: 10259},
+		{Component: ComponentScheduler, Namespace: "kube-system", Name: "unreachable", Port: 10259},
+		{Component: "disabled", Namespace: "kube-system", Name: "disabled-node-1", Port: 1234},
 	}
 	dialer := &fakeDialer{addr: server.Listener.Addr().String()}
-	results := CheckControlPlanePods(context.Background(), &restclient.Config{}, dialer, pods)
+	components := sets.New(ComponentScheduler, ComponentControllerManager)
+	results := CheckControlPlanePods(context.Background(), &restclient.Config{}, dialer, components, pods)
 
-	if len(results) != len(pods) {
-		t.Fatalf("got %d results, want %d", len(results), len(pods))
+	if len(results) != 3 {
+		t.Fatalf("got %d results, want 3: %+v", len(results), results)
 	}
 	if r := results[0]; r.Err != nil || r.Component != "kube-system/kube-scheduler-node-1" || r.Total != 2 {
 		t.Errorf("results[0] = %+v, want 2 leaked goroutines in kube-system/kube-scheduler-node-1", r)
@@ -252,12 +282,13 @@ func TestCheckControlPlanePods(t *testing.T) {
 	if r := results[1]; r.Err == nil || r.Component != "kube-system/unreachable" {
 		t.Errorf("results[1] = %+v, want an error for kube-system/unreachable", r)
 	}
+	if r := results[2]; r.Err == nil || r.Component != ComponentControllerManager {
+		t.Errorf("results[2] = %+v, want an error for the component without pods", r)
+	}
 
 	dialer.mu.Lock()
 	defer dialer.mu.Unlock()
-	for _, pod := range pods {
-		if !slices.Contains(dialer.dials, pod) {
-			t.Errorf("pod %+v was not dialed, dials: %+v", pod, dialer.dials)
-		}
+	if want := []string{"kube-system/kube-scheduler-node-1:10259", "kube-system/unreachable:10259"}; !slices.Equal(dialer.dials, want) {
+		t.Errorf("dialed %v, want %v", dialer.dials, want)
 	}
 }

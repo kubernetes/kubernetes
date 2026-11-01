@@ -31,6 +31,7 @@ package goroutineleak
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -41,6 +42,7 @@ import (
 	"github.com/google/pprof/profile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 )
@@ -58,9 +60,18 @@ const (
 	scrapeTimeout = 30 * time.Second
 )
 
+// The components which can be checked.
+const (
+	ComponentAPIServer         = "kube-apiserver"
+	ComponentKubelet           = "kubelet"
+	ComponentControllerManager = "kube-controller-manager"
+	ComponentScheduler         = "kube-scheduler"
+)
+
 // ControlPlanePod identifies a control plane component pod and the port of its
 // secure status server.
 type ControlPlanePod struct {
+	Component string
 	Namespace string
 	Name      string
 	Port      int
@@ -95,9 +106,9 @@ type Result struct {
 	Total int
 	// Leaks are the distinct stacks, most frequent first.
 	Leaks []Leak
-	// Err is non-nil when the component could not be scraped. This is not a
-	// finding: profiling may be disabled, or the component may not be
-	// reachable in this cluster topology.
+	// Err is non-nil when the component could not be scraped. This is treated
+	// as a failure because otherwise the check could stop working for a
+	// component without anyone noticing.
 	Err error
 }
 
@@ -193,16 +204,16 @@ func CheckAPIServer(ctx context.Context, client clientset.Interface) Result {
 	body, err := client.Discovery().RESTClient().Get().
 		AbsPath(profilePath).
 		DoRaw(ctx)
-	return result("kube-apiserver", body, err)
+	return result(ComponentAPIServer, body, err)
 }
 
 // CheckKubelets collects the leak profile from every node matching nodes, via
 // the node proxy. This is the mechanism the e2e framework already uses to
-// fetch a heap profile from the kubelet.
+// fetch a heap profile from the kubelet. Not finding any such node is an error.
 func CheckKubelets(ctx context.Context, client clientset.Interface, nodes *regexp.Regexp) []Result {
 	nodeList, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return []Result{{Component: "kubelet", Err: fmt.Errorf("listing nodes: %w", err)}}
+		return []Result{{Component: ComponentKubelet, Err: fmt.Errorf("listing nodes: %w", err)}}
 	}
 
 	var results []Result
@@ -215,12 +226,15 @@ func CheckKubelets(ctx context.Context, client clientset.Interface, nodes *regex
 		port := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
 		if port <= 0 || port > 65535 {
 			results = append(results, Result{
-				Component: "kubelet/" + node.Name,
+				Component: ComponentKubelet + "/" + node.Name,
 				Err:       fmt.Errorf("invalid kubelet port %d", port),
 			})
 			continue
 		}
 		results = append(results, checkKubelet(ctx, client, node.Name, port))
+	}
+	if len(results) == 0 {
+		return []Result{{Component: ComponentKubelet, Err: errors.New("no matching node found")}}
 	}
 	return results
 }
@@ -235,21 +249,29 @@ func checkKubelet(ctx context.Context, client clientset.Interface, nodeName stri
 		Name(fmt.Sprintf("%v:%v", nodeName, port)).
 		Suffix(profilePath).
 		DoRaw(ctx)
-	return result("kubelet/"+nodeName, body, err)
+	return result(ComponentKubelet+"/"+nodeName, body, err)
 }
 
-// CheckControlPlanePods collects the leak profile from control plane component
-// pods such as kube-controller-manager and kube-scheduler.
+// CheckControlPlanePods collects the leak profile from those pods which belong
+// to one of the given components. A component without any pod is an error.
 //
 // Those components bind to localhost and authorize with a delegating
 // authorizer, so the API server's pod proxy can neither reach them nor present
 // an accepted identity. Connecting through the pod portforward subresource
 // while keeping the suite's own credentials solves both, which is how the
 // metrics grabber reaches their metrics endpoints.
-func CheckControlPlanePods(ctx context.Context, config *restclient.Config, dialer PodDialer, pods []ControlPlanePod) []Result {
+func CheckControlPlanePods(ctx context.Context, config *restclient.Config, dialer PodDialer, components sets.Set[string], pods []ControlPlanePod) []Result {
 	var results []Result
+	found := sets.New[string]()
 	for _, pod := range pods {
+		if !components.Has(pod.Component) {
+			continue
+		}
+		found.Insert(pod.Component)
 		results = append(results, checkControlPlanePod(ctx, config, dialer, pod))
+	}
+	for _, component := range sets.List(components.Difference(found)) {
+		results = append(results, Result{Component: component, Err: errors.New("no pod found")})
 	}
 	return results
 }
@@ -290,12 +312,12 @@ func checkControlPlanePod(ctx context.Context, config *restclient.Config, dialer
 // examined nothing is distinguishable from one which passed.
 func Report(results []Result) string {
 	var b strings.Builder
-	var checked, skipped []string
+	var checked, failed []string
 
 	for _, r := range results {
 		switch {
 		case r.Err != nil:
-			skipped = append(skipped, fmt.Sprintf("%s (not checked: %v)", r.Component, r.Err))
+			failed = append(failed, fmt.Sprintf("%s (%v)", r.Component, r.Err))
 		case r.Total == 0:
 			checked = append(checked, fmt.Sprintf("%s (ok)", r.Component))
 		default:
@@ -304,8 +326,8 @@ func Report(results []Result) string {
 	}
 
 	fmt.Fprintf(&b, "Checked: %s\n", strings.Join(checked, ", "))
-	if len(skipped) > 0 {
-		fmt.Fprintf(&b, "Skipped: %s\n", strings.Join(skipped, ", "))
+	if len(failed) > 0 {
+		fmt.Fprintf(&b, "Failed: %s\n", strings.Join(failed, ", "))
 	}
 
 	for _, r := range results {
@@ -324,25 +346,29 @@ func Report(results []Result) string {
 	return b.String()
 }
 
-// Failure returns a message describing the findings, or an empty string if
-// there are none. Components which could not be scraped are not findings.
+// Failure returns a message describing leaked goroutines and components which
+// could not be scraped, or an empty string if there are none.
 func Failure(results []Result) string {
-	var total int
+	var leaked, failed int
 	for _, r := range results {
-		if r.Err == nil {
-			total += r.Total
+		if r.Err != nil {
+			failed++
+			continue
 		}
+		leaked += r.Total
 	}
-	if total == 0 {
+	if leaked == 0 && failed == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`goroutine leak invariant failed: %d leaked goroutine(s)
+	return fmt.Sprintf(`goroutine leak invariant failed: %d leaked goroutine(s), %d component(s) not checked
 
 %s
 If this failed on a pull request, please check if the PR changes may be related to the failure.
 If not, you can also search for an existing GitHub issue before filing a new issue.
 
 If this failed in a periodic CI job, please file a bug against the SIG which owns
-the component named above. The invariant itself is owned by SIG Testing.`,
-		total, Report(results))
+the component named above. The invariant itself is owned by SIG Testing.
+
+If a component cannot be reached in a job, then that job must skip its sub-test.`,
+		leaked, failed, Report(results))
 }

@@ -24,8 +24,10 @@ import (
 	"fmt"
 	"net"
 	"regexp"
+	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,7 +41,7 @@ import (
 
 // checks for goroutines which the Go runtime has determined can never be
 // unblocked, in other words permanently leaked goroutines
-const invariantGoroutineLeaksLeafText = "should enable checking for goroutine leaks"
+const invariantGoroutineLeaksContainerText = "should enable checking for goroutine leaks"
 
 // defaultGoroutineLeakNodesRE is the default regular expression for which
 // nodes should have their kubelet checked.
@@ -104,12 +106,22 @@ func (d podDialer) DialPod(ctx context.Context, namespace, podName string, port 
 }
 
 var _ = framework.SIGDescribe("testing")("Invariant Goroutine Leaks", func() {
-	// this test is a sentinel for selecting the report after suite logic
+	// these tests are sentinels for selecting the report after suite logic,
+	// with one test per component
 	//
-	// this allows us to run it by default in most jobs, but it can be opted-out,
-	// does not run when selecting Conformance, and it can be tagged Flaky
-	// if we encounter issues with it
-	ginkgo.It(invariantGoroutineLeaksLeafText, func() {})
+	// this allows us to run them by default in most jobs, but each of them can
+	// be opted-out, they do not run when selecting Conformance, and they can be
+	// tagged Flaky if we encounter issues with them
+	ginkgo.Describe(invariantGoroutineLeaksContainerText, func() {
+		for _, component := range []string{
+			goroutineleak.ComponentAPIServer,
+			goroutineleak.ComponentKubelet,
+			goroutineleak.ComponentControllerManager,
+			goroutineleak.ComponentScheduler,
+		} {
+			ginkgo.It(component, func() {})
+		}
+	})
 })
 
 var _ = ginkgo.ReportAfterSuite("Invariant Goroutine Leaks", func(ctx ginkgo.SpecContext, report ginkgo.Report) {
@@ -117,23 +129,22 @@ var _ = ginkgo.ReportAfterSuite("Invariant Goroutine Leaks", func(ctx ginkgo.Spe
 	if report.SuiteConfig.DryRun {
 		return
 	}
-	// check if we ran the 'should enable checking for goroutine leaks' "test"
-	invariantsSelected := false
+	// check which 'should enable checking for goroutine leaks' "tests" we ran
+	components := sets.New[string]()
 	for _, spec := range report.SpecReports {
-		if spec.LeafNodeText == invariantGoroutineLeaksLeafText {
-			invariantsSelected = spec.State.Is(ginkgotypes.SpecStatePassed)
-			break
+		if slices.Contains(spec.ContainerHierarchyTexts, invariantGoroutineLeaksContainerText) && spec.State.Is(ginkgotypes.SpecStatePassed) {
+			components.Insert(spec.LeafNodeText)
 		}
 	}
-	// skip if the associated "test" was skipped
-	if !invariantsSelected {
+	// skip if all of the associated "tests" were skipped
+	if components.Len() == 0 {
 		return
 	}
 	// otherwise actually check invariants now
-	checkInvariantGoroutineLeaks(ctx)
+	checkInvariantGoroutineLeaks(ctx, components)
 })
 
-func checkInvariantGoroutineLeaks(ctx context.Context) {
+func checkInvariantGoroutineLeaks(ctx context.Context, components sets.Set[string]) {
 	config, err := framework.LoadConfig()
 	if err != nil {
 		framework.Failf("error loading client config: %v", err)
@@ -143,9 +154,16 @@ func checkInvariantGoroutineLeaks(ctx context.Context) {
 		framework.Failf("error loading client config: %v", err)
 	}
 
-	results := []goroutineleak.Result{goroutineleak.CheckAPIServer(ctx, c)}
-	results = append(results, goroutineleak.CheckKubelets(ctx, c, enabledGoroutineLeakCheck.nodes.re)...)
-	results = append(results, checkControlPlanePods(ctx, c, config)...)
+	var results []goroutineleak.Result
+	if components.Has(goroutineleak.ComponentAPIServer) {
+		results = append(results, goroutineleak.CheckAPIServer(ctx, c))
+	}
+	if components.Has(goroutineleak.ComponentKubelet) {
+		results = append(results, goroutineleak.CheckKubelets(ctx, c, enabledGoroutineLeakCheck.nodes.re)...)
+	}
+	if controlPlane := components.Intersection(sets.New(goroutineleak.ComponentControllerManager, goroutineleak.ComponentScheduler)); controlPlane.Len() > 0 {
+		results = append(results, checkControlPlanePods(ctx, c, config, controlPlane)...)
+	}
 
 	// Report what was checked, including components which reported no leaks,
 	// so that a check which examined nothing is distinguishable from one
@@ -157,7 +175,7 @@ func checkInvariantGoroutineLeaks(ctx context.Context) {
 	}
 }
 
-func checkControlPlanePods(ctx context.Context, c clientset.Interface, config *restclient.Config) []goroutineleak.Result {
+func checkControlPlanePods(ctx context.Context, c clientset.Interface, config *restclient.Config, components sets.Set[string]) []goroutineleak.Result {
 	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return []goroutineleak.Result{{Component: "control plane pods", Err: fmt.Errorf("listing pods in %s: %w", metav1.NamespaceSystem, err)}}
@@ -165,11 +183,11 @@ func checkControlPlanePods(ctx context.Context, c clientset.Interface, config *r
 
 	var targets []goroutineleak.ControlPlanePod
 	for _, pod := range pods.Items {
-		if _, port, ok := e2emetrics.MatchControlPlaneComponent(pod.Name); ok {
-			targets = append(targets, goroutineleak.ControlPlanePod{Namespace: pod.Namespace, Name: pod.Name, Port: port})
+		if component, port, ok := e2emetrics.MatchControlPlaneComponent(pod.Name); ok {
+			targets = append(targets, goroutineleak.ControlPlanePod{Component: component, Namespace: pod.Namespace, Name: pod.Name, Port: port})
 		}
 	}
 
 	dialer := podDialer{dialer: e2epod.NewDialer(c, config)}
-	return goroutineleak.CheckControlPlanePods(ctx, config, dialer, targets)
+	return goroutineleak.CheckControlPlanePods(ctx, config, dialer, components, targets)
 }
