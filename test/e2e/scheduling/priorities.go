@@ -125,6 +125,9 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 			Name:   "pod-with-label-security-s1",
 			Labels: map[string]string{"security": "S1"},
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 		nodeName := pod.Spec.NodeName
 
 		k := v1.LabelHostname
@@ -157,7 +160,7 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 		framework.ExpectNoError(err, "balance node resource usage before testing scheduling priorities")
 		ginkgo.By("Trying to launch the pod with podAntiAffinity.")
 		labelPodName := "pod-with-pod-antiaffinity"
-		pod = createPausePod(ctx, f, pausePodConfig{
+		antiAffinityPod := createPausePod(ctx, f, pausePodConfig{
 			Resources: podRequestedResource,
 			Name:      labelPodName,
 			Affinity: &v1.Affinity{
@@ -191,8 +194,11 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 				},
 			},
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, antiAffinityPod))
+		}()
 		ginkgo.By("Wait the pod becomes running")
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "wait for Pod %q in namespace %q to run", pod.Name, f.Namespace.Name)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, antiAffinityPod.Name, f.Namespace.Name), "wait for Pod %q in namespace %q to run", antiAffinityPod.Name, f.Namespace.Name)
 		labelPod, err := cs.CoreV1().Pods(ns).Get(ctx, labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "get Pod %q in namespace %q", labelPodName, ns)
 		ginkgo.By("Verify the pod was scheduled to the expected node.")
@@ -249,6 +255,9 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 			Name:        tolerationPodName,
 			Tolerations: tolerations,
 		})
+		defer func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, pod))
+		}()
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name), "wait for Pod %q in namespace %q to run", pod.Name, f.Namespace.Name)
 
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
@@ -302,7 +311,8 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 					NodeSelector: map[string]string{topologyKey: nodeNames[0]},
 				},
 			}
-			runPauseRS(ctx, f, rsConfig)
+			rs := runPauseRS(ctx, f, rsConfig)
+			defer deletePauseRS(ctx, f, rs)
 
 			// Run a Pod with WhenUnsatisfiable:ScheduleAnyway.
 			podCfg := pausePodConfig{
@@ -345,6 +355,9 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 				},
 			}
 			testPod := runPausePod(ctx, f, podCfg)
+			defer func() {
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, cs, testPod))
+			}()
 			ginkgo.By(fmt.Sprintf("Verifying if the test-pod lands on node %q", nodeNames[1]))
 			gomega.Expect(testPod.Spec.NodeName).To(gomega.Equal(nodeNames[1]))
 		})

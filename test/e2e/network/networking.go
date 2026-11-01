@@ -652,7 +652,7 @@ var _ = common.SIGDescribe("Networking", func() {
 		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
 		e2epod.NewPodClient(f).CreateSync(ctx, podSpec)
 		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, metav1.DeleteOptions{})
+			err := e2epod.DeletePodWithWaitByName(ctx, f.ClientSet, podName, f.Namespace.Name)
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		})
 		ginkgo.By("validating sctp module is still not loaded")
