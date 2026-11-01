@@ -6502,9 +6502,9 @@ func Test_generateAPIPodStatusOnKubeletRestart(t *testing.T) {
 			}
 
 			// On the first sync after a kubelet restart there is no readiness worker yet,
-			// because SyncPod calls generateAPIPodStatus before probeManager.SyncPod.
+			// because SyncPod calls generateAPIPodStatus before probeManager.SyncPod in the legacy manager.
 			if !tc.firstSyncAfterKubeletRestart {
-				kl.probeManager.SyncPod(tCtx, pod)
+				kl.probeManager.SyncPod(tCtx, pod, nil)
 				t.Cleanup(func() { kl.probeManager.RemovePod(pod) })
 			}
 
