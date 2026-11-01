@@ -528,6 +528,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		kubelet.livenessManager,
 		kubelet.readinessManager,
 		kubelet.startupManager,
+		kubelet.probeManager,
 		kubelet.rootDirectory,
 		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
@@ -2365,26 +2366,40 @@ func TestGenerateAPIPodStatusForStaticPodAfterKubeletRestart(t *testing.T) {
 
 						for sync := range 2 {
 							if sync == 1 {
-								// SyncPod caches the initial status before registering workers.
-								kl.probeManager.SyncPod(tCtx, pod)
+								// Make worker initialization publish a result even when restart
+								// preservation would otherwise leave its cache empty.
+								cachedStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+								require.True(t, found)
+								initialStatus := cachedStatus.DeepCopy()
+								initialContainers := initialStatus.ContainerStatuses
+								if sidecar {
+									initialContainers = initialStatus.InitContainerStatuses
+								}
+								initialContainers[0].State.Running.StartedAt = metav1.Now()
+								kl.statusManager.SetPodStatus(tCtx.Logger(), pod, *initialStatus)
+								kl.probeManager.SyncPod(tCtx, pod, runtimeStatus)
 								t.Cleanup(func() {
 									// Wait for worker cleanup before the subtest's logger and feature gates expire.
-									kl.readinessManager.Set(containerID, proberesults.Unknown, pod)
+									kl.readinessManager.Set(tCtx, containerID, proberesults.Unknown, pod)
 									kl.probeManager.RemovePod(pod)
 									require.NoError(t, wait.PollUntilContextTimeout(context.WithoutCancel(tCtx), 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
 										_, found := kl.readinessManager.Get(containerID)
 										return !found, nil
 									}), "readiness worker did not remove its result after stopping")
 								})
-								if featureEnabled {
-									// Let the worker seed Failure before installing the controlled result.
-									require.NoError(t, wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
-										_, found := kl.readinessManager.Get(containerID)
-										return found, nil
-									}), "readiness worker did not initialize its result")
+								// Wait until the worker owns the container ID so stopping it can
+								// remove the controlled result even with immediate cancellation.
+								require.NoError(t, wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(context.Context) (bool, error) {
+									_, found := kl.readinessManager.Get(containerID)
+									return found, nil
+								}), "readiness worker did not initialize its result")
+								kl.statusManager.SetPodStatus(tCtx.Logger(), pod, cachedStatus)
+								if !featureEnabled {
+									// Exercise mirror readiness preservation before a probe result exists.
+									kl.readinessManager.Remove(containerID)
 								}
 								if tc.probeResult != nil {
-									kl.readinessManager.Set(containerID, *tc.probeResult, pod)
+									kl.readinessManager.Set(tCtx, containerID, *tc.probeResult, pod)
 								}
 							}
 							expectedReady := tc.expectedReady

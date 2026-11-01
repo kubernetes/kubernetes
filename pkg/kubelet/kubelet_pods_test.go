@@ -6570,7 +6570,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			kl := testKubelet.kubelet
 			kl.statusManager.SetPodStatus(logger, test.pod, test.previousStatus)
 			for _, name := range test.unreadyContainer {
-				kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
+				kl.readinessManager.Set(t.Context(), kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 			}
 			expected := test.expected.DeepCopy()
 			podState := SyncPod
@@ -6697,9 +6697,9 @@ func Test_generateAPIPodStatusOnKubeletRestart(t *testing.T) {
 			}
 
 			// On the first sync after a kubelet restart there is no readiness worker yet,
-			// because SyncPod calls generateAPIPodStatus before probeManager.SyncPod.
+			// because SyncPod calls generateAPIPodStatus before probeManager.SyncPod in the legacy manager.
 			if !tc.firstSyncAfterKubeletRestart {
-				kl.probeManager.SyncPod(tCtx, pod)
+				kl.probeManager.SyncPod(tCtx, pod, nil)
 				t.Cleanup(func() { kl.probeManager.RemovePod(pod) })
 			}
 
