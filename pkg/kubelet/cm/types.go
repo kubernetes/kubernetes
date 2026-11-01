@@ -115,6 +115,9 @@ type PodContainerManager interface {
 	// If the pod cgroup doesn't already exist this method creates it.
 	EnsureExists(logger klog.Logger, pod *v1.Pod) error
 
+	// Validate checks whether the pod cgroup exists and matches the manager's expectations.
+	Validate(pod *v1.Pod) error
+
 	// Exists returns true if the pod cgroup exists.
 	Exists(*v1.Pod) bool
 
