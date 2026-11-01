@@ -4053,6 +4053,12 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path, opts PodValidati
 	if spec.HostIPC {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostIPC"), "when `hostUsers` is false"))
 	}
+	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, containerPath *field.Path) bool {
+		if c.HostCgroupNamespace != nil && *c.HostCgroupNamespace {
+			allErrs = append(allErrs, field.Forbidden(containerPath.Child("hostCgroupNamespace"), "when `hostUsers` is false"))
+		}
+		return true
+	})
 	if !opts.AllowUserNamespacesWithVolumeDevices {
 		// volumeDevices won't work, as they don't support idmap mounts nor we are chown-ing them.
 		// Let's return a clear error in this case.
@@ -5000,6 +5006,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "cannot be set for a windows pod"))
 	}
 	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		if c.HostCgroupNamespace != nil {
+			allErrs = append(allErrs, field.Forbidden(cFldPath.Child("hostCgroupNamespace"), "cannot be set for a windows pod"))
+		}
 		// validate container security context
 		sc := c.SecurityContext
 		// OS based podSecurityContext validation

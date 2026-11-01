@@ -387,6 +387,13 @@ func dropDisabledFields(
 		dropContainerRestartRules(podSpec)
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) && !hostCgroupNamespaceInUse(oldPodSpec) {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+			c.HostCgroupNamespace = nil
+			return true
+		})
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) && !emptyDirVolumeModeInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
@@ -957,6 +964,21 @@ func clusterTrustBundleProjectionInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return false
+}
+
+func hostCgroupNamespaceInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if c.HostCgroupNamespace != nil {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
 }
 
 func emptyDirVolumeModeInUse(podSpec *api.PodSpec) bool {
