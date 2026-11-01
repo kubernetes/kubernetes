@@ -69,13 +69,17 @@ var ProberDuration = metrics.NewHistogramVec(
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
-// probe (AddPod). The worker periodically probes its assigned container and caches the results. The
+// probe. The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 type Manager interface {
-	// AddPod creates new probe workers for every container probe. This should be called for every
-	// pod created.
-	AddPod(ctx context.Context, pod *v1.Pod)
+	// ContainerProbeLifecycle handles container lifecycle hooks from the runtime.
+	// Methods are no-ops when ContainerScopedProbes is disabled.
+	kubecontainer.ContainerProbeLifecycle
+
+	// EnsureProbes ensures probe workers match the runtime's observed containers.
+	// Called on every pod sync.
+	EnsureProbes(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
@@ -93,7 +97,14 @@ type Manager interface {
 	UpdatePodStatus(context.Context, *v1.Pod, *v1.PodStatus)
 }
 
+var (
+	_ Manager = &manager{}
+	_ Manager = &containerBoundManager{}
+)
+
 type manager struct {
+	kubecontainer.NoopContainerProbeLifecycle
+
 	// Map of active workers for probes
 	workers map[probeKey]*worker
 	// Lock for accessing & mutating workers
@@ -146,33 +157,21 @@ type probeKey struct {
 }
 
 // Type of probe (liveness, readiness or startup)
-type probeType int
+type probeType = kubecontainer.ProbeType
 
 const (
-	liveness probeType = iota
-	readiness
-	startup
+	liveness  = kubecontainer.LivenessProbe
+	readiness = kubecontainer.ReadinessProbe
+	startup   = kubecontainer.StartupProbe
 
 	probeResultSuccessful string = "successful"
 	probeResultFailed     string = "failed"
 	probeResultUnknown    string = "unknown"
 )
 
-// For debugging.
-func (t probeType) String() string {
-	switch t {
-	case readiness:
-		return "Readiness"
-	case liveness:
-		return "Liveness"
-	case startup:
-		return "Startup"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
+// EnsureProbes creates a probe worker for every container probe that does not
+// have one yet.
+func (m *manager) EnsureProbes(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
@@ -183,11 +182,8 @@ func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	// the pod NotReady during graceful termination. Workers are stopped
 	// explicitly via their stop channel (RemovePod/CleanupPods).
 	//
-	// TODO(#140977): This also means nothing cancels an in-flight probe. worker.stop()
-	// only signals stopCh, which is checked between probes, so an exec probe that is
-	// already running keeps executing in a container that is being killed until its
-	// own TimeoutSeconds elapses. The fix is a per-worker cancellable context
-	// cancelled by stop(), not the pod sync context, which cancels too early.
+	// In-flight probes are aborted by the worker's own derived context, which
+	// stop() cancels; see worker.run.
 	ctx = context.WithoutCancel(ctx)
 	key := probeKey{podUID: pod.UID}
 	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
