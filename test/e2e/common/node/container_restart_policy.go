@@ -170,7 +170,7 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 								ProbeHandler: v1.ProbeHandler{
 									Exec: &v1.ExecAction{
 										Command: []string{
-											"/bin/sh", "-c", "touch /state/probe; test -f /state/first-run",
+											"/bin/sh", "-c", "echo probe >> /state/probe-runs; exit 1",
 										},
 									},
 								},
@@ -178,13 +178,7 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 								PeriodSeconds:       2,
 								FailureThreshold:    10,
 							},
-
-							// each time the startup probe runs it creates /state/probe marker.
-							// each time the container runs it removes said /state/probe marker.
-							// this to ensure that existence of "/state/probe" at the end of the test case
-							// neccesarily means the startup probe has run after the pod started
-
-							Command:       []string{"/bin/sh", "-c", "if [ ! -f /state/first-run ]; then touch /state/first-run; rm -f /state/probe; exit 1; else touch /state/second-run; rm -f /state/probe; sleep 300; fi;"},
+							Command:       []string{"/bin/sh", "-c", "sleep 10; exit 1"},
 							RestartPolicy: &containerRestartPolicyNever,
 							RestartPolicyRules: []v1.ContainerRestartRule{
 								{
@@ -200,8 +194,8 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 							},
 						},
 						{
-							Name:  sidecarContainerName,
-							Image: imageutils.GetE2EImage(imageutils.BusyBox), // this container is used for 2 purposes:
+							Name:    sidecarContainerName,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox), // this container is used for 2 purposes:
 							// 1. to hold the pod, so when main container terminates, the pod stays, along with the volume
 							// 2. so that after the main container terminates, we can exec on it to access the volume, asserting marker files on the volume at the end of this test
 							Command: []string{"/bin/sh", "-c", "sleep 300"},
@@ -234,9 +228,13 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 				return false, nil
 			})
 			framework.ExpectNoError(err, "wait for container termination")
-			probeAfterTerminationRaw := e2epod.ExecShellInContainer(f, podName, sidecarContainerName, "sleep 5; test -f /state/probe # sleep to allow probe to run")
-			probeAfterTermination := probeAfterTerminationRaw == ""
-			framework.Gomega().Expect(probeAfterTermination).To(gomega.Equal(false))
+			ginkgo.By("Checking that the startup probe ran")
+			countAtTermination := e2epod.ExecShellInContainer(f, podName, sidecarContainerName, "test -s /state/probe-runs && wc -l < /state/probe-runs")
+
+			ginkgo.By("Checking that the startup probe stopped")
+			time.Sleep(5 * time.Second)
+			countAfterTermination := e2epod.ExecShellInContainer(f, podName, sidecarContainerName, "wc -l < /state/probe-runs")
+			gomega.Expect(countAfterTermination).To(gomega.Equal(countAtTermination))
 		})
 
 		ginkgo.It("should not restart container on rule mismatch, container restart policy Never", func(ctx context.Context) {
