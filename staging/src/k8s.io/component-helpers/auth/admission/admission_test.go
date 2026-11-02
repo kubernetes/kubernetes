@@ -73,9 +73,9 @@ const (
 
 // oidcTestServer serves discovery and signing keys for real RSA verification.
 type oidcTestServer struct {
-	server *httptest.Server
-	issuer string
-	signer jose.Signer
+	server  *httptest.Server
+	issuer  string
+	signer  jose.Signer
 	tempDir string
 }
 
