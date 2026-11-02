@@ -59,11 +59,11 @@ type HistogramOption func(*prometheus.HistogramOpts)
 
 type histogramOptions []HistogramOption
 
-func (ho histogramOptions) apply(o prometheus.HistogramOpts) prometheus.HistogramOpts {
+func (ho histogramOptions) apply(o *prometheus.HistogramOpts) prometheus.HistogramOpts {
 	for _, f := range ho {
-		f(&o)
+		f(o)
 	}
-	return o
+	return *o
 }
 
 // WithHistogramBuckets allows you to specify custom bucket ranges for histograms if EnableHandlingTimeHistogram is on.
