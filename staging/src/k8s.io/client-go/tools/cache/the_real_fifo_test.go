@@ -28,6 +28,7 @@ import (
 
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func (f *RealFIFO) getItems() []Delta {
@@ -1561,5 +1562,110 @@ func (f *RealFIFO) bookmarkTest(t *testing.T, bookmark string) {
 	err := f.Bookmark(bookmark)
 	if err != nil {
 		t.Fatalf("Test error on RealFIFO bookmark: %s", err)
+	}
+}
+
+type countingCounter struct{ count int }
+
+func (c *countingCounter) Inc() { c.count++ }
+
+type recordingHistogram struct{ observations []float64 }
+
+func (h *recordingHistogram) Observe(v float64) { h.observations = append(h.observations, v) }
+
+func TestRealFIFO_PopBatchTerminationReason(t *testing.T) {
+	obj1 := mkFifoObj("foo1", 1)
+	obj2 := mkFifoObj("foo2", 2)
+	obj3 := mkFifoObj("foo3", 3)
+
+	testCases := []struct {
+		name          string
+		atomic        bool
+		batchSize     int
+		setup         func(t *testing.T, f *RealFIFO)
+		wantReason    BatchTerminationReason
+		wantBatchSize int
+	}{
+		{
+			name:      "batch fills up",
+			batchSize: 2,
+			setup: func(t *testing.T, f *RealFIFO) {
+				for _, obj := range []testFifoObject{obj1, obj2, obj3} {
+					assert.NoError(t, f.Update(obj))
+				}
+			},
+			wantReason:    BatchFull,
+			wantBatchSize: 2,
+		},
+		{
+			name:      "queue drains before batch fills",
+			batchSize: 10,
+			setup: func(t *testing.T, f *RealFIFO) {
+				assert.NoError(t, f.Update(obj1))
+				assert.NoError(t, f.Update(obj2))
+			},
+			wantReason:    BatchQueueDrained,
+			wantBatchSize: 2,
+		},
+		{
+			name:      "initial list boundary",
+			batchSize: 10,
+			setup: func(t *testing.T, f *RealFIFO) {
+				assert.NoError(t, f.Replace([]interface{}{obj1, obj2}, "1"))
+				assert.NoError(t, f.Update(obj3))
+			},
+			wantReason:    BatchInitialPopulationBoundary,
+			wantBatchSize: 2,
+		},
+		{
+			name:      "unbatchable delta",
+			atomic:    true,
+			batchSize: 10,
+			setup: func(t *testing.T, f *RealFIFO) {
+				assert.NoError(t, f.Update(obj1))
+				assert.NoError(t, f.Bookmark("2"))
+				assert.NoError(t, f.Update(obj2))
+			},
+			wantReason:    BatchUnbatchableDelta,
+			wantBatchSize: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			opts := RealFIFOOptions{Logger: &logger, KeyFunction: testFifoObjectKeyFunc}
+			if tc.atomic {
+				opts.AtomicEvents = true
+				opts.EmitDeltaTypeBookmark = true
+			} else {
+				opts.KnownObjects = emptyKnownObjects()
+			}
+			f := NewRealFIFOWithOptions(opts)
+			f.batchSize = tc.batchSize
+
+			terminations := [numBatchTerminationReasons]*countingCounter{}
+			for _, reason := range AllBatchTerminationReasons() {
+				terminations[reason] = &countingCounter{}
+				f.metrics.batchTerminations[reason] = terminations[reason]
+			}
+			batchSize := &recordingHistogram{}
+			f.metrics.batchSize = batchSize
+
+			tc.setup(t, f)
+
+			noop := func([]Delta, bool) error { return nil }
+			noopSingle := func(interface{}, bool) error { return nil }
+			assert.NoError(t, f.PopBatch(noop, noopSingle))
+
+			for _, reason := range AllBatchTerminationReasons() {
+				want := 0
+				if reason == tc.wantReason {
+					want = 1
+				}
+				assert.Equal(t, want, terminations[reason].count, "terminations for reason %q", reason)
+			}
+			assert.Equal(t, []float64{float64(tc.wantBatchSize)}, batchSize.observations)
+		})
 	}
 }

@@ -55,6 +55,34 @@ var (
 		},
 		[]string{"name", "group", "version", "resource"},
 	)
+	fifoBatchSize = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Subsystem:      subsystem,
+			Name:           "batch_size",
+			Help:           "Number of deltas popped from the FIFO and processed together as a single batch.",
+			Buckets:        []float64{1, 2, 5, 10, 25, 50, 100, 250, 500, 1000},
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource"},
+	)
+	fifoBatchTerminations = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "batch_terminations_total",
+			Help:           "Number of FIFO batches closed, by the reason the batch stopped accumulating deltas.",
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource", "reason"},
+	)
+	fifoEventsEnqueued = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "events_enqueued_total",
+			Help:           "Number of deltas added to the FIFO.",
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource"},
+	)
 	registerOnce sync.Once
 )
 
@@ -81,6 +109,9 @@ func Register() {
 		legacyregistry.MustRegister(fifoQueuedItems)
 		legacyregistry.MustRegister(fifoProcessingLatency)
 		legacyregistry.MustRegister(storeResourceVersion)
+		legacyregistry.MustRegister(fifoBatchSize)
+		legacyregistry.MustRegister(fifoBatchTerminations)
+		legacyregistry.MustRegister(fifoEventsEnqueued)
 	})
 	cache.SetInformerMetricsProvider(informerMetricsProvider{})
 }
@@ -126,6 +157,46 @@ func (informerMetricsProvider) NewStoreResourceVersionMetric(id cache.InformerNa
 	}
 }
 
+func (informerMetricsProvider) NewBatchSizeMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
+	Register()
+	return &reservedHistogramMetric{
+		id: id,
+		histogram: fifoBatchSize.WithLabelValues(
+			id.Name(),
+			id.GroupVersionResource().Group,
+			id.GroupVersionResource().Version,
+			id.GroupVersionResource().Resource,
+		),
+	}
+}
+
+func (informerMetricsProvider) NewBatchTerminationMetric(id cache.InformerNameAndResource, reason cache.BatchTerminationReason) cache.CounterMetric {
+	Register()
+	return &reservedCounterMetric{
+		id: id,
+		counter: fifoBatchTerminations.WithLabelValues(
+			id.Name(),
+			id.GroupVersionResource().Group,
+			id.GroupVersionResource().Version,
+			id.GroupVersionResource().Resource,
+			reason.String(),
+		),
+	}
+}
+
+func (informerMetricsProvider) NewEventsEnqueuedMetric(id cache.InformerNameAndResource) cache.CounterMetric {
+	Register()
+	return &reservedCounterMetric{
+		id: id,
+		counter: fifoEventsEnqueued.WithLabelValues(
+			id.Name(),
+			id.GroupVersionResource().Group,
+			id.GroupVersionResource().Version,
+			id.GroupVersionResource().Resource,
+		),
+	}
+}
+
 // reservedGaugeMetric wraps a gauge and only updates it if the identifier
 // is still reserved. This supports dynamic informers (e.g., GC, ResourceQuota)
 // that may shut down while the process is still running.
@@ -151,5 +222,19 @@ type reservedHistogramMetric struct {
 func (r *reservedHistogramMetric) Observe(value float64) {
 	if r.id.Reserved() {
 		r.histogram.Observe(value)
+	}
+}
+
+// reservedCounterMetric wraps a counter and only updates it if the identifier
+// is still reserved. This supports dynamic informers (e.g., GC, ResourceQuota)
+// that may shut down while the process is still running.
+type reservedCounterMetric struct {
+	id      cache.InformerNameAndResource
+	counter cache.CounterMetric
+}
+
+func (r *reservedCounterMetric) Inc() {
+	if r.id.Reserved() {
+		r.counter.Inc()
 	}
 }
