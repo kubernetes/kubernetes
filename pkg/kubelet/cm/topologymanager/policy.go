@@ -336,16 +336,57 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 func (m HintMerger) Merge(logger klog.Logger) TopologyHint {
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
 
+	// Equivalent prefixes have the same possible continuations. Keep the first
+	// one in traversal order so equal final hints retain the same Score.
+	type mergeState struct {
+		affinity      string
+		preferred     bool
+		firstAffinity string
+	}
+	seen := make([]map[mergeState]bool, len(m.Hints)+1)
+	for i := range seen {
+		seen[i] = make(map[mergeState]bool)
+	}
+	permutation := make([]TopologyHint, len(m.Hints))
 	var bestHint *TopologyHint
-	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
-		// Get the NUMANodeAffinity from each hint in the permutation and see if any
-		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(logger, defaultAffinity, permutation)
+	var iterate func(int, bitmask.BitMask, bitmask.BitMask, bool)
+	iterate = func(dim int, affinity, firstAffinity bitmask.BitMask, preferred bool) {
+		// Intersections can only shrink, so an empty prefix cannot yield a candidate.
+		if affinity.IsEmpty() {
+			return
+		}
+		state := mergeState{affinity: affinity.String(), preferred: preferred}
+		if preferred && firstAffinity != nil {
+			// Preserve the original affinity for equality checks, before it was
+			// intersected with the machine's default mask. Nil means no constraint.
+			state.firstAffinity = firstAffinity.String()
+		}
+		if seen[dim][state] {
+			return
+		}
+		seen[dim][state] = true
 
-		// Compare the current bestHint with the candidate mergedHint and
-		// update bestHint if appropriate.
-		bestHint = m.compare(bestHint, &mergedHint)
-	})
+		if dim == len(m.Hints) {
+			mergedHint := mergePermutation(logger, defaultAffinity, permutation)
+			bestHint = m.compare(bestHint, &mergedHint)
+			return
+		}
+		for _, hint := range m.Hints[dim] {
+			nextAffinity, nextFirstAffinity := affinity, firstAffinity
+			nextPreferred := preferred && hint.Preferred
+			if hint.NUMANodeAffinity != nil {
+				nextAffinity = bitmask.And(affinity, hint.NUMANodeAffinity)
+				if firstAffinity == nil {
+					nextFirstAffinity = hint.NUMANodeAffinity
+				} else if !firstAffinity.IsEqual(hint.NUMANodeAffinity) {
+					nextPreferred = false
+				}
+			}
+			permutation[dim] = hint
+			iterate(dim+1, nextAffinity, nextFirstAffinity, nextPreferred)
+		}
+	}
+	iterate(0, defaultAffinity, nil, true)
 
 	if bestHint == nil {
 		bestHint = &TopologyHint{NUMANodeAffinity: defaultAffinity, Preferred: false}
