@@ -667,25 +667,17 @@ func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWa
 		return nil, err
 	}
 
-	var bookmarkAfterResourceVersion uint64
 	if isListWatchRequest(opts) {
 		bookmark, err := c.getInitialEventsEndBookmark(cacheInterval.resourceVersion)
 		if err != nil {
 			return nil, err
 		}
 		cacheInterval.initialEventsEndBookmark = bookmark
-		bookmarkAfterResourceVersion = getBookmarkAfterResourceVersion(watcher.requestedWatchRV, watcher.requiredResourceVersion, cacheInterval.resourceVersion, opts)
-	}
-	// Update the bookMarkAfterResourceVersion
-	switch {
-	case bookmarkAfterResourceVersion == 0:
-		watcher.state = cacheWatcherBookmarkSent // if no specific RV was requested we assume no-op
-	case cacheInterval != nil && cacheInterval.initialEventsEndBookmark != nil:
+		watcher.bookmarkAfterResourceVersion = getBookmarkAfterResourceVersion(watcher.requestedWatchRV, watcher.requiredResourceVersion, cacheInterval.resourceVersion, opts)
 		watcher.state = cacheWatcherBookmarkReceived
-	default:
-		watcher.state = cacheWatcherWaitingForBookmark
+	} else {
+		watcher.state = cacheWatcherBookmarkSent
 	}
-	watcher.bookmarkAfterResourceVersion = bookmarkAfterResourceVersion
 	return cacheInterval, nil
 }
 
