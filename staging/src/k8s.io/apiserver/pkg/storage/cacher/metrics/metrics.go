@@ -345,6 +345,28 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{1, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000},
 		}, []string{"group", "resource"})
+
+	WatcherSkippedEvents = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_skipped_events_total",
+			Help:           "Counter of events the live dispatch path skipped for a synced watcher because they were at or below its position, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	StalledWatchers = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "stalled_watchers",
+			Help:           "Number of unsynced watchers (served from the watch cache history until they catch up), broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -379,6 +401,8 @@ func Register() {
 			legacyregistry.MustRegister(WatcherStalls)
 			legacyregistry.MustRegister(WatcherDeferredEvents)
 			legacyregistry.MustRegister(WatcherCatchupEvents)
+			legacyregistry.MustRegister(WatcherSkippedEvents)
+			legacyregistry.MustRegister(StalledWatchers)
 		}
 	})
 }
@@ -479,6 +503,8 @@ type StallResumeObservers struct {
 	Stalls                   compbasemetrics.CounterMetric
 	DeferredEvents           compbasemetrics.CounterMetric
 	CatchupEvents            compbasemetrics.ObserverMetric
+	SkippedEvents            compbasemetrics.CounterMetric
+	StalledWatchers          compbasemetrics.GaugeMetric
 	TerminatedExpired        compbasemetrics.CounterMetric
 	TerminatedExpiredInitial compbasemetrics.CounterMetric
 }
@@ -490,6 +516,8 @@ func NewStallResumeObservers(groupResource schema.GroupResource) *StallResumeObs
 		Stalls:                   WatcherStalls.WithLabelValues(group, resource),
 		DeferredEvents:           WatcherDeferredEvents.WithLabelValues(group, resource),
 		CatchupEvents:            WatcherCatchupEvents.WithLabelValues(group, resource),
+		SkippedEvents:            WatcherSkippedEvents.WithLabelValues(group, resource),
+		StalledWatchers:          StalledWatchers.WithLabelValues(group, resource),
 		TerminatedExpired:        TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpired),
 		TerminatedExpiredInitial: TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpiredInitial),
 	}

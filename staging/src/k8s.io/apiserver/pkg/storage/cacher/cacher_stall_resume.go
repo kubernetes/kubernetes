@@ -96,6 +96,12 @@ func newCacherStall(groupResource schema.GroupResource, cache *watchCache) *cach
 	}
 }
 
+// dropUnsynced removes w from the unsynced set.
+func (s *cacherStall) dropUnsynced(w *cacheWatcher) {
+	delete(s.unsynced, w)
+	s.metrics.StalledWatchers.Dec()
+}
+
 // syncPassFunc runs one sync pass and reports how many members it served and
 // how many watchers it expired.
 type syncPassFunc func() (served, expired int)
@@ -162,7 +168,11 @@ func (c *Cacher) dispatchNonblocking(event *watchCacheEvent) {
 	setCachingObjects(&wcEvent, c.versioner)
 	wcEvent.timeline.MarkAt(metrics.PointWatcherEnqueued, c.clock.Now())
 	for _, watcher := range c.watchersBuffer {
-		if watcher.unsynced || wcEvent.ResourceVersion <= watcher.position {
+		if watcher.unsynced {
+			continue
+		}
+		if wcEvent.ResourceVersion <= watcher.position {
+			c.stall.metrics.SkippedEvents.Inc()
 			continue
 		}
 		if watcher.nonblockingAdd(&wcEvent) {
@@ -174,6 +184,7 @@ func (c *Cacher) dispatchNonblocking(event *watchCacheEvent) {
 		c.stall.unsynced[watcher] = struct{}{}
 		c.stall.stalled = true
 		c.stall.metrics.Stalls.Inc()
+		c.stall.metrics.StalledWatchers.Inc()
 	}
 }
 
@@ -261,7 +272,7 @@ func (c *Cacher) syncPass(now time.Time) (served, expired int) {
 			continue
 		}
 		m.w.unsynced = false
-		delete(s.unsynced, m.w)
+		s.dropUnsynced(m.w)
 		s.metrics.CatchupEvents.Observe(float64(m.w.catchupEvents))
 		m.w.catchupEvents = 0
 	}
@@ -300,7 +311,7 @@ func (c *Cacher) selectSyncCandidates(oldest uint64) int {
 	c.dispatching = true
 	for w := range s.unsynced {
 		if w.stopped {
-			delete(s.unsynced, w)
+			s.dropUnsynced(w)
 			continue
 		}
 		// The same boundary as GetIntervalLocked.
@@ -311,7 +322,7 @@ func (c *Cacher) selectSyncCandidates(oldest uint64) int {
 			} else {
 				w.expiredReason = metrics.TerminationReasonResourceExpiredInitial
 			}
-			delete(s.unsynced, w)
+			s.dropUnsynced(w)
 			expired = append(expired, w)
 			continue
 		}

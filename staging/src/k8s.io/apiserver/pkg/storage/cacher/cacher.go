@@ -979,6 +979,8 @@ func (c *Cacher) dispatchEvents() {
 		c.stall.passTimer = c.clock.NewTimer(syncPassPeriod)
 		c.stall.passTimer.Stop()
 		defer c.stall.passTimer.Stop()
+		// Cachers of one resource share the gauge series: withdraw only this count.
+		defer func() { c.stall.metrics.StalledWatchers.Add(-float64(len(c.stall.unsynced))) }()
 		dispatcherHook = c.stall.dispatcherHook
 	}
 	for {

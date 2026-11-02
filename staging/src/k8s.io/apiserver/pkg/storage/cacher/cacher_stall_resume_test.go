@@ -62,7 +62,8 @@ func ensureStallResumeMetrics() {
 		registry := compbasemetrics.NewKubeRegistry()
 		for _, m := range []compbasemetrics.Registerable{
 			metrics.WatcherStalls, metrics.WatcherDeferredEvents,
-			metrics.WatcherCatchupEvents, metrics.TerminatedWatchersCounter,
+			metrics.WatcherCatchupEvents, metrics.WatcherSkippedEvents, metrics.StalledWatchers,
+			metrics.TerminatedWatchersCounter,
 		} {
 			_ = registry.Register(m)
 		}
@@ -75,7 +76,7 @@ type stallResumeCounters struct {
 	roundSamples            uint64
 	roundSum                float64
 	expired, expiredInitial float64
-	unresponsive            float64
+	unresponsive, skipped   float64
 }
 
 func readStallResumeCounters(t testing.TB) stallResumeCounters {
@@ -105,6 +106,28 @@ func readStallResumeCounters(t testing.TB) stallResumeCounters {
 		expired:        read(metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonResourceExpired)),
 		expiredInitial: read(metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonResourceExpiredInitial)),
 		unresponsive:   read(metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonUnresponsive)),
+		skipped:        read(metrics.WatcherSkippedEvents.WithLabelValues("", "pods")),
+	}
+}
+
+func stalledWatchersGauge(t testing.TB) float64 {
+	t.Helper()
+	ensureStallResumeMetrics()
+	v, err := testutil.GetGaugeMetricValue(metrics.StalledWatchers.WithLabelValues("", "pods"))
+	if err != nil {
+		t.Fatalf("reading the stalled watchers gauge: %v", err)
+	}
+	return v
+}
+
+// waitStalledWatchersGauge polls because a stopped Cacher withdraws its count
+// when its dispatcher exits, after Stop returned.
+func waitStalledWatchersGauge(t testing.TB, what string, want float64) {
+	t.Helper()
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond, 10*time.Second, true, func(context.Context) (bool, error) {
+		return stalledWatchersGauge(t) == want, nil
+	}); err != nil {
+		t.Fatalf("%s: stalled watchers gauge %v, want %v", what, stalledWatchersGauge(t), want)
 	}
 }
 
@@ -1101,6 +1124,140 @@ func TestStallResumeTerminateAllWithUnsyncedMember(t *testing.T) {
 	}
 }
 
+// TestStallResumeStalledWatchersGauge: the gauge is the size of the unsynced
+// set. It rises on a stall and falls on a resync, on an expiry, when a pass
+// drops a stopped member, and when the Cacher stops.
+func TestStallResumeStalledWatchersGauge(t *testing.T) {
+	// wedged returns a Cacher with one watcher that has just gone unsynced.
+	wedged := func(t *testing.T) (c *Cacher, w *cacheWatcher, next uint64) {
+		waitStalledWatchersGauge(t, "before the stall", 0)
+		c, _ = newStallResumeCacher(t)
+		w = stallResumeWatch(t, c, "ns", 100)
+		add := func(rv uint64) { stallResumeAddPods(t, c, "ns", rv, rv) }
+		next = wedgeWatchers(t, c, []*cacheWatcher{w}, add, 101)
+		if got := stalledWatchersGauge(t); got != 1 {
+			t.Fatalf("after the stall: gauge %v, want 1", got)
+		}
+		return c, w, next
+	}
+
+	t.Run("resync", func(t *testing.T) {
+		c, w, next := wedged(t)
+		stallResumeAddPods(t, c, "ns", next, next+50)
+		resyncWhileReading(t, c, []*cacheWatcher{w}, next+50)
+		if got := stalledWatchersGauge(t); got != 0 {
+			t.Fatalf("after the resync: gauge %v, want 0", got)
+		}
+	})
+
+	t.Run("expiry", func(t *testing.T) {
+		c, w, next := wedged(t)
+		pinHistoryCapacity(t, c, 100)
+		stallResumeAddPods(t, c, "ns", next, next+199)
+		if _, expired := runSyncPass(t, c); expired != 1 {
+			t.Fatalf("expected the watcher to expire, got %d", expired)
+		}
+		if got := stalledWatchersGauge(t); got != 0 {
+			t.Fatalf("after the expiry: gauge %v, want 0", got)
+		}
+		expectExpiredThenClose(t, w)
+	})
+
+	t.Run("stopped member dropped", func(t *testing.T) {
+		c, w, _ := wedged(t)
+		w.Stop()
+		runSyncPass(t, c)
+		if got := stalledWatchersGauge(t); got != 0 {
+			t.Fatalf("after the pass: gauge %v, want 0", got)
+		}
+	})
+
+	t.Run("cacher stop", func(t *testing.T) {
+		c, _, _ := wedged(t)
+		c.Stop()
+		waitStalledWatchersGauge(t, "after the stop", 0)
+	})
+}
+
+// TestStallResumeStalledWatchersGaugeSharedSeries: two Cachers of one resource
+// (a CRD with two served versions) share a series. It reads the sum, and a
+// stopped Cacher withdraws only its own count.
+func TestStallResumeStalledWatchersGaugeSharedSeries(t *testing.T) {
+	waitStalledWatchersGauge(t, "before the test", 0)
+	wedge := func(c *Cacher, n int) {
+		t.Helper()
+		ws := make([]*cacheWatcher, n)
+		for i := range ws {
+			ws[i] = stallResumeWatch(t, c, "ns", 100)
+		}
+		add := func(rv uint64) { stallResumeAddPods(t, c, "ns", rv, rv) }
+		wedgeWatchers(t, c, ws, add, 101)
+	}
+	a, _ := newStallResumeCacher(t)
+	b, _ := newStallResumeCacher(t)
+	wedge(a, 2)
+	wedge(b, 3)
+	if got := stalledWatchersGauge(t); got != 5 {
+		t.Fatalf("gauge %v, want the sum 5", got)
+	}
+	b.Stop()
+	waitStalledWatchersGauge(t, "after one stop", 2)
+	a.Stop()
+	waitStalledWatchersGauge(t, "after both stops", 0)
+}
+
+// TestStallResumeSkippedEventsCounter: a watcher that resynced at the history
+// end while events were queued for the dispatcher has each of them skipped
+// once and delivered once. An unsynced watcher moves the counter by nothing.
+func TestStallResumeSkippedEventsCounter(t *testing.T) {
+	t.Run("events queued at the resync", func(t *testing.T) {
+		cacher, _ := newStallResumeCacher(t)
+		w := stallResumeWatch(t, cacher, "ns", 100)
+		add := func(rv uint64) { stallResumeAddPods(t, cacher, "ns", rv, rv) }
+		next := wedgeWatchers(t, cacher, []*cacheWatcher{w}, add, 101)
+		first := readAll(t, w, 100*time.Millisecond)
+		waitInputDrained(t, cacher, w)
+		before := readStallResumeCounters(t)
+		const queued = 5
+		last := next + queued - 1
+		dispatcherDo(t, cacher, func(runPass syncPassFunc) {
+			for rv := next; rv <= last; rv++ {
+				add(rv)
+			}
+			runPass()
+			if w.unsynced || w.position != last {
+				t.Errorf("expected a synced watcher at %d, got unsynced=%v position=%d", last, w.unsynced, w.position)
+			}
+		})
+		waitDispatched(t, cacher)
+		if got := readStallResumeCounters(t).skipped - before.skipped; got != queued {
+			t.Fatalf("skipped events +%v, want +%d", got, queued)
+		}
+		got := readUntil(t, w, last, 10*time.Second)
+		assertExactSequence(t, slices.Concat(first.rvs, got.rvs), 101, last)
+		if extra := readAll(t, w, 300*time.Millisecond); len(extra.rvs) != 0 {
+			t.Fatalf("duplicate delivery of %v", extra.rvs)
+		}
+	})
+
+	t.Run("events dispatched while unsynced", func(t *testing.T) {
+		cacher, _ := newStallResumeCacher(t)
+		w := stallResumeWatch(t, cacher, "ns", 100)
+		add := func(rv uint64) { stallResumeAddPods(t, cacher, "ns", rv, rv) }
+		next := wedgeWatchers(t, cacher, []*cacheWatcher{w}, add, 101)
+		before := readStallResumeCounters(t)
+		stallResumeAddPods(t, cacher, "ns", next, next+50)
+		waitDispatched(t, cacher)
+		resyncWhileReading(t, cacher, []*cacheWatcher{w}, next+50)
+		stallResumeAddPods(t, cacher, "ns", next+51, next+60)
+		got := readUntil(t, w, next+60, 10*time.Second)
+		assertExactSequence(t, got.rvs, next+51, next+60)
+		if after := readStallResumeCounters(t); after.skipped != before.skipped {
+			t.Fatalf("skipped events +%v, want +0", after.skipped-before.skipped)
+		}
+	})
+}
+
 // TestStallResumeCohortsUnderBudget: three watchers whose positions are
 // further apart than the scan budget, each scoped so that most of the
 // history holds nothing for it. The passes are deterministic: the low pair
@@ -1338,6 +1495,7 @@ func registerUnsynced(t testing.TB, c *Cacher, ws []*cacheWatcher, position func
 		for i, w := range ws {
 			w.position, w.unsynced = position(i), true
 			c.stall.unsynced[w] = struct{}{}
+			c.stall.metrics.StalledWatchers.Inc()
 		}
 	})
 }
