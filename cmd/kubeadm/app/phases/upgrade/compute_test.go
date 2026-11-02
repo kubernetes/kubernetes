@@ -1017,6 +1017,50 @@ func TestKubeletUpgrade(t *testing.T) {
 	}
 }
 
+func TestGetLatestClusterVersion(t *testing.T) {
+	testCases := []struct {
+		name            string
+		versions        map[string][]string
+		expectedVersion string
+		expectedErr     bool
+	}{
+		{
+			name:        "no kube-apiserver Pods",
+			versions:    map[string][]string{},
+			expectedErr: true,
+		},
+		{
+			name: "multiple versions",
+			versions: map[string][]string{
+				"v1.15.1": {"node1"},
+				"v1.15.3": {"node2"},
+				"v1.15.2": {"node3"},
+			},
+			expectedVersion: "1.15.3",
+		},
+		{
+			name:        "invalid version",
+			versions:    map[string][]string{"foo": {"node1"}},
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			v, err := getLatestClusterVersion(tc.versions)
+			if (err != nil) != tc.expectedErr {
+				t.Fatalf("expected error: %v, got: %v", tc.expectedErr, err)
+			}
+			if err != nil {
+				return
+			}
+			if v.String() != tc.expectedVersion {
+				t.Errorf("expected version %s, got %s", tc.expectedVersion, v)
+			}
+		})
+	}
+}
+
 func TestGetBranchFromVersion(t *testing.T) {
 	testCases := []struct {
 		version         string
