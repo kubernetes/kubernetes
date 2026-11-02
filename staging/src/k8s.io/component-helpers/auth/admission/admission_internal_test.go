@@ -151,9 +151,9 @@ func TestValidateInClusterAudience(t *testing.T) {
 
 func TestInClusterAudienceValidationPrecedesBootstrap(t *testing.T) {
 	const invalidAudience = "http://hook.webhooks.svc:443/validate"
-	v, err := NewVerifier(context.Background(), WithAudience(invalidAudience))
+	v, err := newVerifier(context.Background(), WithAudience(invalidAudience))
 	if v != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
-		t.Fatalf("NewVerifier invalid audience = (%v, %v), want an audience error", v, err)
+		t.Fatalf("newVerifier invalid audience = (%v, %v), want an audience error", v, err)
 	}
 	h, err := WithTokenVerification(context.Background(), func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		return &admissionv1.AdmissionResponse{Allowed: true}
@@ -223,7 +223,7 @@ func TestAdmissionRequestKindDiagnostics(t *testing.T) {
 		Object:  runtime.RawExtension{Raw: []byte(`{"apiVersion":"batch/v1","kind":"Job","spec":{"credential":"private-payload-credential"}}`)},
 		Options: runtime.RawExtension{Raw: []byte(`{"credential":"private-option-credential"}`)},
 	}
-	err := (&Verifier{}).checkDecodedRequest(ctx, req, []string{"apps"})
+	err := (&verifier{}).checkDecodedRequest(ctx, req, []string{"apps"})
 	//nolint:errorlint // Wrapped errors must fail this identity assertion.
 	if err != errVerificationFailed || err.Error() != genericDenyMessage {
 		t.Fatalf("caller error = %v, want generic verification failure", err)

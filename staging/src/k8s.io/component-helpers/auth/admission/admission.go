@@ -99,7 +99,7 @@ var (
 // AdmissionHandler decides an authenticated admission request.
 type AdmissionHandler func(ctx context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse
 
-// Option configures [WithTokenVerification] or [NewVerifier].
+// Option configures [WithTokenVerification].
 type Option func(*builder)
 
 type builder struct {
@@ -146,7 +146,7 @@ func WithAudience(audience string) Option {
 
 // Handler authenticates and serves v1 AdmissionReviews.
 type Handler struct {
-	verifier *Verifier
+	verifier *verifier
 	next     AdmissionHandler
 	maxBody  int64
 }
@@ -161,14 +161,14 @@ func WithTokenVerification(ctx context.Context, next AdmissionHandler, opts ...O
 	if next == nil {
 		return nil, errors.New("admission: next AdmissionHandler must not be nil")
 	}
-	v, err := NewVerifier(ctx, opts...)
+	v, err := newVerifier(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return newHandler(v, next, defaultMaxBodyBytes), nil
 }
 
-func (b *builder) buildVerifier(ctx context.Context) (*Verifier, error) {
+func (b *builder) buildVerifier(ctx context.Context) (*verifier, error) {
 	if b.remoteSet && b.explicitAudience {
 		return nil, errors.New("admission: WithAudience cannot be combined with WithIssuer")
 	}
@@ -236,7 +236,7 @@ func validateInClusterAudience(audience, namespaceFile string) error {
 	return nil
 }
 
-func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
+func (b *builder) remoteVerifier(ctx context.Context) (*verifier, error) {
 	issuerURL, err := url.Parse(b.issuer)
 	if err != nil || issuerURL.Scheme != "https" || issuerURL.Host == "" || issuerURL.User != nil || issuerURL.RawQuery != "" || issuerURL.Fragment != "" {
 		return nil, errors.New("admission: remote issuer must be an HTTPS URL without credentials, query, or fragment")
@@ -261,13 +261,13 @@ func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
 	if err != nil || jwksURL.Scheme != "https" || jwksURL.Host == "" || jwksURL.User != nil || jwksURL.Fragment != "" {
 		return nil, errors.New("admission: signing-key endpoint must be an HTTPS URL without credentials or fragment")
 	}
-	return &Verifier{verifier: provider.VerifierContext(ctx, &oidc.Config{
+	return &verifier{verifier: provider.VerifierContext(ctx, &oidc.Config{
 		ClientID:             b.audience,
 		SupportedSigningAlgs: supportedSigningAlgs,
 	})}, nil
 }
 
-func newLocalVerifier(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
+func newLocalVerifier(ctx context.Context, config *rest.Config, audience string) (*verifier, error) {
 	// Require BearerTokenFile rather than static in-memory BearerToken so local
 	// verification always uses rotatable projected ServiceAccount credentials.
 	if config.BearerTokenFile == "" {
@@ -300,12 +300,12 @@ func newLocalVerifier(ctx context.Context, config *rest.Config, audience string)
 		ClientID:             audience,
 		SupportedSigningAlgs: supportedSigningAlgs,
 	}
-	return &Verifier{
+	return &verifier{
 		verifier: oidc.NewVerifier(claims.Issuer, oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL), verifierConfig),
 	}, nil
 }
 
-func newHandler(v *Verifier, next AdmissionHandler, maxBody int64) *Handler {
+func newHandler(v *verifier, next AdmissionHandler, maxBody int64) *Handler {
 	return &Handler{verifier: v, next: next, maxBody: maxBody}
 }
 
@@ -499,15 +499,14 @@ func checkGVKMatchesAdmittedKind(name string, gvk schema.GroupVersionKind, admit
 	return nil
 }
 
-// Verifier authenticates tokens and authorizes already-decoded admission requests.
-type Verifier struct {
+// verifier is unexported so callers must enter through [WithTokenVerification],
+// which authenticates the Authorization header before reading or decoding the
+// HTTP request body.
+type verifier struct {
 	verifier *oidc.IDTokenVerifier
 }
 
-// NewVerifier constructs a verifier using [WithAudience] for local issuer/keys or
-// [WithIssuer] for explicit issuer discovery. Configuration and endpoint availability
-// are checked during construction; signing keys are loaded lazily by coreos.
-func NewVerifier(ctx context.Context, opts ...Option) (*Verifier, error) {
+func newVerifier(ctx context.Context, opts ...Option) (*verifier, error) {
 	b := newBuilder()
 	for _, opt := range opts {
 		opt(b)
@@ -515,9 +514,7 @@ func NewVerifier(ctx context.Context, opts ...Option) (*Verifier, error) {
 	return b.buildVerifier(ctx)
 }
 
-// Verify authenticates token and checks the request's API group, operation and object kinds.
-// Any denial, including a nil request, returns the same generic error.
-func (v *Verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
+func (v *verifier) verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
 	if req == nil {
 		return errVerificationFailed
 	}
@@ -525,11 +522,10 @@ func (v *Verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest
 	if err != nil {
 		return err
 	}
-
 	return v.checkDecodedRequest(ctx, req, groups)
 }
 
-func (v *Verifier) authenticateToken(ctx context.Context, rawToken string) ([]string, error) {
+func (v *verifier) authenticateToken(ctx context.Context, rawToken string) ([]string, error) {
 	if ctx.Err() != nil {
 		return nil, errVerificationFailed
 	}
@@ -551,7 +547,7 @@ func (v *Verifier) authenticateToken(ctx context.Context, rawToken string) ([]st
 	return groups, nil
 }
 
-func (v *Verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.AdmissionRequest, groups []string) error {
+func (v *verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.AdmissionRequest, groups []string) error {
 	if ctx.Err() != nil || req == nil {
 		return errVerificationFailed
 	}
