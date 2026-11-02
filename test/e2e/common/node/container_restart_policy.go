@@ -201,8 +201,9 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 						},
 						{
 							Name:  sidecarContainerName,
-							Image: imageutils.GetE2EImage(imageutils.BusyBox), // container is used just to hold the pod, so when main container terminates, the pod stays, along with the volume
-							// this to allow assert marker files on the volume at the end of this test
+							Image: imageutils.GetE2EImage(imageutils.BusyBox), // this container is used for 2 purposes:
+							// 1. to hold the pod, so when main container terminates, the pod stays, along with the volume
+							// 2. so that after the main container terminates, we can exec on it to access the volume, asserting marker files on the volume at the end of this test
 							Command: []string{"/bin/sh", "-c", "sleep 300"},
 							VolumeMounts: []v1.VolumeMount{
 								{Name: "state", MountPath: "/state"},
