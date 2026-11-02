@@ -796,10 +796,25 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 		return nil
 	}
 
+	transitionTimes := make(map[storageHealthIdentity]metav1.Time, len(existingDriverConds))
+	for _, condition := range existingDriverConds {
+		transitionTimes[storageHealthConditionIdentity(condition)] = condition.LastTransitionTime
+	}
+
 	combined := make([]storagev1.StorageHealth, 0, len(otherDriversHealth)+1)
 	combined = append(combined, otherDriversHealth...)
 	if len(conditions) > 0 {
-		combined = append(combined, storagev1.StorageHealth{Name: driverName, HealthConditions: conditions})
+		now := metav1.Now().Rfc3339Copy()
+		updatedConditions := make([]storagev1.StorageHealthCondition, len(conditions))
+		for i, condition := range conditions {
+			updatedConditions[i] = *condition.DeepCopy()
+			transitionTime, exists := transitionTimes[storageHealthConditionIdentity(condition)]
+			if !exists {
+				transitionTime = now
+			}
+			updatedConditions[i].LastTransitionTime = transitionTime
+		}
+		combined = append(combined, storagev1.StorageHealth{Name: driverName, HealthConditions: updatedConditions})
 	}
 	nodeInfo.Status.StorageHealth = combined
 	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
