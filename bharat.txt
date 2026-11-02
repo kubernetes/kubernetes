@@ -1,1 +1,2 @@
 this is text file
+This is a demo for git fork.
