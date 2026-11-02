@@ -333,7 +333,7 @@ func TestInstallCSIDriver(t *testing.T) {
 			},
 			expectedCSINode: func() *storage.CSINode {
 				csiNode := &storage.CSINode{
-					ObjectMeta: getCSINodeObjectMeta(),
+					ObjectMeta: getCSINodeObjectMetaWithUID("node1"),
 					Spec: storage.CSINodeSpec{
 						Drivers: []storage.CSINodeDriver{
 							{
@@ -373,7 +373,7 @@ func TestInstallCSIDriver(t *testing.T) {
 				},
 			},
 			expectedCSINode: &storage.CSINode{
-				ObjectMeta: getCSINodeObjectMeta(),
+				ObjectMeta: getCSINodeObjectMetaWithUID("node1"),
 				Spec: storage.CSINodeSpec{
 					Drivers: []storage.CSINodeDriver{
 						{
@@ -1232,6 +1232,12 @@ func getCSINodeObjectMeta() metav1.ObjectMeta {
 	}
 }
 
+func getCSINodeObjectMetaWithUID(uid types.UID) metav1.ObjectMeta {
+	meta := getCSINodeObjectMeta()
+	meta.OwnerReferences[0].UID = uid
+	return meta
+}
+
 func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error) {
 	original, err := json.Marshal(originalNode)
 	if err != nil {
@@ -1256,4 +1262,126 @@ func hasPatchAction(actions []clienttesting.Action) clienttesting.Action {
 		}
 	}
 	return nil
+}
+
+func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
+	const (
+		nodeName   = "node1"
+		oldNodeUID = types.UID("old-node-uid")
+		newNodeUID = types.UID("new-node-uid")
+		driverName = "com.example.csi.driver1"
+		driverID   = "com.example.csi/csi-node1"
+	)
+
+	testcases := []struct {
+		name            string
+		gcDeletedOldCSI bool
+		preCreateNewCSI bool
+		act             func(nim Interface) error
+		verify          func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action)
+	}{
+		{
+			name:            "InstallCSIDriver after GC deleted predecessor CSINode",
+			gcDeletedOldCSI: true,
+			act: func(nim Interface) error {
+				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+			},
+			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
+				assert.Len(t, csiNode.Spec.Drivers, 1)
+				assert.Equal(t, driverName, csiNode.Spec.Drivers[0].Name)
+			},
+		},
+		{
+			name:            "InstallCSIDriver before GC deleted predecessor CSINode",
+			gcDeletedOldCSI: false,
+			act: func(nim Interface) error {
+				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+			},
+			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
+				// Predecessor driver entry must be gone after replacing the old CSINode.
+				assert.Len(t, csiNode.Spec.Drivers, 1)
+				assert.Equal(t, driverName, csiNode.Spec.Drivers[0].Name)
+			},
+		},
+		{
+			name:            "UpdateCSIDriver after GC deleted predecessor CSINode",
+			gcDeletedOldCSI: true,
+			act: func(nim Interface) error {
+				return nim.UpdateCSIDriver(driverName, driverID, 16, nil)
+			},
+		},
+		{
+			name:            "UpdateCSIDriver does not delete valid CSINode",
+			gcDeletedOldCSI: true,
+			preCreateNewCSI: true,
+			act: func(nim Interface) error {
+				return nim.UpdateCSIDriver(driverName, driverID, 16, nil)
+			},
+			verify: func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action) {
+				for _, action := range actions {
+					if action.GetVerb() == "delete" && action.GetResource().Resource == "csinodes" {
+						t.Fatalf("unexpectedly deleted valid CSINode")
+					}
+				}
+				if assert.Len(t, csiNode.Spec.Drivers, 1) && assert.NotNil(t, csiNode.Spec.Drivers[0].Allocatable) {
+					assert.Equal(t, ptr.To(int32(16)), csiNode.Spec.Drivers[0].Allocatable.Count)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Early startup caches oldNodeUID while predecessor Node and CSINode still exist.
+			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName, UID: oldNodeUID}}
+			oldCSINode := generateCSINode(nodeIDMap{"com.example.csi.old": "old-id"}, nil, nil)
+			oldCSINode.OwnerReferences[0].UID = oldNodeUID
+
+			client := getClientSet(oldNode, oldCSINode)
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, nodeName, nil, nil)
+			nim := NewNodeInfoManager(nodeName, host, nil).(*nodeInfoManager)
+
+			if err := nim.InitializeCSINodeWithAnnotation(); err != nil {
+				t.Fatalf("InitializeCSINodeWithAnnotation failed: %v", err)
+			}
+			assert.Equal(t, oldNodeUID, nim.nodeID)
+
+			// 2. Predecessor Node is replaced by a new Node with the same name and newNodeUID.
+			if err := client.CoreV1().Nodes().Delete(context.TODO(), nodeName, metav1.DeleteOptions{}); err != nil {
+				t.Fatalf("deleting predecessor Node failed: %v", err)
+			}
+			if tc.gcDeletedOldCSI {
+				if err := client.StorageV1().CSINodes().Delete(context.TODO(), nodeName, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("deleting predecessor CSINode failed: %v", err)
+				}
+			}
+			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName, UID: newNodeUID}}
+			if _, err := client.CoreV1().Nodes().Create(context.TODO(), newNode, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("creating replacement Node failed: %v", err)
+			}
+			if tc.preCreateNewCSI {
+				validCSINode := generateCSINode(nodeIDMap{driverName: driverID}, nil, nil)
+				validCSINode.OwnerReferences[0].UID = newNodeUID
+				if _, err := client.StorageV1().CSINodes().Create(context.TODO(), validCSINode, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("creating replacement CSINode failed: %v", err)
+				}
+			}
+
+			// 3. Execute operation with stale nim.nodeID and verify resulting CSINode owns newNodeUID.
+			actionsBefore := len(client.Actions())
+			if err := tc.act(nim); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			csiNode, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("getting CSINode failed: %v", err)
+			}
+			assert.Equal(t, newNodeUID, csiNode.OwnerReferences[0].UID)
+			assert.Equal(t, newNodeUID, nim.nodeID)
+			if tc.verify != nil {
+				tc.verify(t, csiNode, client.Actions()[actionsBefore:])
+			}
+		})
+	}
 }
