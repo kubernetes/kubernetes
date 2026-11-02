@@ -47,12 +47,6 @@ const (
 	cgroupMountPath       string = "/sysfscgroup"
 )
 
-var (
-	// TODO: cgroup version shouldn't be cached as a global for a cluster where v1 and v2 are mixed.
-	podOnCgroupv2Node      *bool
-	podOnCgroupv2NodeMutex sync.Mutex
-)
-
 type ContainerResources struct {
 	CPUReq     string
 	CPULim     string
@@ -392,7 +386,10 @@ func verifyPodMemoryLimit(ctx context.Context, f *framework.Framework, pod *v1.P
 func VerifyPodCgroups(ctx context.Context, f *framework.Framework, pod *v1.Pod, info *ContainerResources) error {
 	ginkgo.GinkgoHelper()
 
-	onCgroupV2 := IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
+	onCgroupV2, err := IsPodOnCgroupv2Node(f, pod, pod.Spec.Containers[0].Name)
+	if err != nil {
+		return err
+	}
 
 	// Verify cgroup values
 	expectedResources := info.ResourceRequirements()
@@ -459,27 +456,44 @@ func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expected
 }
 
 // IsPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
+// Successful results are cached per node name because nodes in one cluster may
+// use different cgroup versions. Probe failures are returned as errors and are
+// never cached, so a transient exec failure cannot select cgroup paths for
+// later checks.
 // TODO: Deduplicate this function with NPD cluster e2e test:
 // https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
-func IsPodOnCgroupv2Node(f *framework.Framework, podName, containerName string) (result bool) {
-	podOnCgroupv2NodeMutex.Lock()
-	defer podOnCgroupv2NodeMutex.Unlock()
-	if podOnCgroupv2Node != nil {
-		return *podOnCgroupv2Node
-	}
-	defer func() {
-		podOnCgroupv2Node = &result
-	}()
-
-	cmd := "mount -t cgroup2"
-	out, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, "/bin/sh", "-c", cmd)
+func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod, containerName string) (bool, error) {
+	onCgroupV2, err := isPodOnCgroupv2Node(&cgroupv2ByNode, pod.Spec.NodeName, func() (string, string, error) {
+		return e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, containerName, "/bin/sh", "-c", "mount -t cgroup2")
+	})
 	if err != nil {
-		return false
+		return false, fmt.Errorf("detect cgroup version for pod %s/%s container %s: %w", pod.Namespace, pod.Name, containerName, err)
+	}
+	return onCgroupV2, nil
+}
+
+// cgroupv2ByNode maps a node name to the result of a successful cgroup probe.
+var cgroupv2ByNode sync.Map
+
+func isPodOnCgroupv2Node(cache *sync.Map, nodeName string, exec func() (string, string, error)) (bool, error) {
+	if nodeName != "" {
+		if cached, ok := cache.Load(nodeName); ok {
+			onCgroupV2, _ := cached.(bool)
+			return onCgroupV2, nil
+		}
+	}
+	out, stderr, err := exec()
+	if err != nil {
+		return false, fmt.Errorf("execute mount -t cgroup2 (stderr: %q): %w", stderr, err)
 	}
 	// Some tests mount host cgroup using HostPath for verifying pod cgroup values.
 	// In this case, "<mount path>/unified" is detected by "mount -t cgroup2" if cgroup hybrid mode is configured on the host.
 	// So, we need to see if "/sys/fs/cgroup" is contained in the output.
-	return strings.Contains(out, "/sys/fs/cgroup")
+	onCgroupV2 := strings.Contains(out, "/sys/fs/cgroup")
+	if nodeName != "" {
+		cache.Store(nodeName, onCgroupV2)
+	}
+	return onCgroupV2, nil
 }
 
 // VerifyPodHugepagesLimit verifies the pod-level hugepages limit.
