@@ -664,7 +664,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 		logger.Error(err, "Scheduler cache AssumePod failed")
 		return assumedPodInfo, fwk.AsStatus(err)
 	}
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+	endNominationUnlessOn(logger, schedFramework, assumedPodInfo.Pod, host)
 
 	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); !status.IsSuccess() {
 		if err := a.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
@@ -704,10 +704,10 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 		logger.Error(err, "Scheduler snapshot AssumePod failed")
 		return fwk.AsStatus(err), nil
 	}
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+	nominationEnded := endNominationUnlessOn(logger, schedFramework, assumedPodInfo.Pod, host)
 
 	revert := func() {
-		if err := a.unreserveAndForgetFromSnapshot(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
+		if err := a.unreserveAndForgetFromSnapshot(ctx, state, schedFramework, assumedPodInfo, host, nominationEnded); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
 	}
@@ -719,19 +719,19 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 }
 
 // unreserveAndForgetFromSnapshot runs Unreserve plugins, forgets the pod from the node snapshot,
-// and restores any existing pod nomination.
+// and restores the pod nomination if the assume ended it.
 //
 // This method mutates shared snapshot structures (nodeInfoSnapshot) without internal mutex locks.
 // It is not thread-safe; concurrent calls on the same snapshot are unsupported.
 func (a *SchedulingAlgorithm) unreserveAndForgetFromSnapshot(ctx context.Context, state fwk.CycleState,
-	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) error {
+	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string, nominationEnded bool) error {
 
 	logger := klog.FromContext(ctx)
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
 	if err := a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod); err != nil {
 		return err
 	}
-	if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
+	if nominationEnded && assumedPodInfo.Pod.Status.NominatedNodeName != "" {
 		// The assume removed the nomination; reverting a tentative assume restores it.
 		schedFramework.AddNominatedPod(logger, assumedPodInfo.PodInfo, &fwk.NominatingInfo{
 			NominatedNodeName: assumedPodInfo.Pod.Status.NominatedNodeName,
@@ -739,4 +739,20 @@ func (a *SchedulingAlgorithm) unreserveAndForgetFromSnapshot(ctx context.Context
 		})
 	}
 	return nil
+}
+
+// endNominationUnlessOn ends the nomination of an assumed pod, unless the pod
+// is nominated to the node it got assumed on. That nomination ends with the
+// binding cycle, like the nominatedNodeName which the binding cycle may set,
+// so that NominationExtensions learn about it after Reserve, Permit and
+// PreBind and can tell whether the pod took what was nominated for it.
+// Returns true if it ended the nomination.
+func endNominationUnlessOn(logger klog.Logger, nominator fwk.PodNominator, pod *v1.Pod, nodeName string) bool {
+	for _, pi := range nominator.NominatedPodsForNode(logger, nodeName) {
+		if pi.GetPod().UID == pod.UID {
+			return false
+		}
+	}
+	nominator.DeleteNominatedPodIfExists(pod)
+	return true
 }

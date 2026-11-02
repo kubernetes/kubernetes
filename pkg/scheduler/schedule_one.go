@@ -393,6 +393,9 @@ func (sched *Scheduler) bindingCycle(
 	if status := sched.bind(ctx, schedFramework, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() {
 		return status
 	}
+	// A nomination to the node, kept on assume, ends with the binding. On
+	// failure, handleBindingCycleError clears it.
+	schedFramework.DeleteNominatedPodIfExists(assumedPod)
 
 	// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 	logger.V(2).Info("Successfully bound pod to node", "pod", klog.KObj(assumedPod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
