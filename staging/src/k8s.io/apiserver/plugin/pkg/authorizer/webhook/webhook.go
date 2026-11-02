@@ -47,6 +47,7 @@ import (
 	authorizationvalidation "k8s.io/apiserver/pkg/apis/authorization/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -87,27 +88,28 @@ type Matcher interface {
 }
 
 type WebhookAuthorizer struct {
-	subjectAccessReview             subjectAccessReviewer
-	authorizationConditionsReviewer authorizationConditionsReviewer
-	responseCache                   *cache.LRUExpireCache
-	authorizedTTL                   time.Duration
-	unauthorizedTTL                 time.Duration
-	retryBackoff                    wait.Backoff
-	decisionOnError                 authorizer.Decision
-	metrics                         metrics.AuthorizerMetrics
-	matcher                         Matcher
-	name                            string
+	subjectAccessReview               subjectAccessReviewer
+	authorizationConditionsReviewer   authorizationConditionsReviewer
+	responseCache                     *cache.LRUExpireCache
+	authorizedTTL                     time.Duration
+	unauthorizedTTL                   time.Duration
+	retryBackoff                      wait.Backoff
+	decisionOnError                   authorizer.Decision
+	metrics                           metrics.AuthorizerMetrics
+	matcher                           Matcher
+	name                              string
+	builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client.
 // If conditionsWebhookConfig is non-nil, an AuthorizationConditionsReview client will be
 // built from it to support conditional authorization evaluation.
-func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics metrics.AuthorizerMetrics, authorizationV1Alpha1Interface authorizationv1alpha1client.AuthorizationV1alpha1Interface) (*WebhookAuthorizer, error) {
+func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, metrics metrics.AuthorizerMetrics, authorizationV1Alpha1Interface authorizationv1alpha1client.AuthorizationV1alpha1Interface, builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder) (*WebhookAuthorizer, error) {
 	var conditionsReviewer authorizationConditionsReviewer
 	if authorizationV1Alpha1Interface != nil {
 		conditionsReviewer = &authorizationConditionsReviewV1Alpha1Client{authorizationV1Alpha1Interface.RESTClient()}
 	}
-	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, "", conditionsReviewer)
+	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, nil, metrics, "", conditionsReviewer, builtinConditionsEvaluatorBuilder)
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -130,7 +132,7 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
-func New(sarConfig *rest.Config, sarVersion string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matcher Matcher, name string, metrics metrics.AuthorizerMetrics, conditionsReviewConfig *rest.Config, conditionsReviewVersion string) (*WebhookAuthorizer, error) {
+func New(sarConfig *rest.Config, sarVersion string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matcher Matcher, name string, metrics metrics.AuthorizerMetrics, conditionsReviewConfig *rest.Config, conditionsReviewVersion string, builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromConfig(sarConfig, sarVersion, retryBackoff)
 	if err != nil {
 		return nil, err
@@ -143,27 +145,28 @@ func New(sarConfig *rest.Config, sarVersion string, authorizedTTL, unauthorizedT
 		}
 	}
 
-	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matcher, metrics, name, conditionsReviewer)
+	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, decisionOnError, matcher, metrics, name, conditionsReviewer, builtinConditionsEvaluatorBuilder)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matcher Matcher, am metrics.AuthorizerMetrics, name string, acr authorizationConditionsReviewer) (*WebhookAuthorizer, error) {
+func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, decisionOnError authorizer.Decision, matcher Matcher, am metrics.AuthorizerMetrics, name string, acr authorizationConditionsReviewer, builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder) (*WebhookAuthorizer, error) {
 	// Only set the authorizationConditionsReviewer field if the feature gate is on.
 	var usedAuthorizationConditionsReviewer authorizationConditionsReviewer
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
 		usedAuthorizationConditionsReviewer = acr
 	}
 	return &WebhookAuthorizer{
-		subjectAccessReview:             subjectAccessReview,
-		authorizationConditionsReviewer: usedAuthorizationConditionsReviewer,
-		responseCache:                   cache.NewLRUExpireCache(8192),
-		authorizedTTL:                   authorizedTTL,
-		unauthorizedTTL:                 unauthorizedTTL,
-		retryBackoff:                    retryBackoff,
-		decisionOnError:                 decisionOnError,
-		metrics:                         am,
-		matcher:                         matcher,
-		name:                            name,
+		subjectAccessReview:               subjectAccessReview,
+		authorizationConditionsReviewer:   usedAuthorizationConditionsReviewer,
+		responseCache:                     cache.NewLRUExpireCache(8192),
+		authorizedTTL:                     authorizedTTL,
+		unauthorizedTTL:                   unauthorizedTTL,
+		retryBackoff:                      retryBackoff,
+		decisionOnError:                   decisionOnError,
+		metrics:                           am,
+		matcher:                           matcher,
+		name:                              name,
+		builtinConditionsEvaluatorBuilder: builtinConditionsEvaluatorBuilder,
 	}, nil
 }
 
@@ -418,6 +421,11 @@ func (w *WebhookAuthorizer) sendSARWebhook(ctx context.Context, r *authorization
 	}
 }
 
+// EvaluateConditions receives the decision that ConditionsAwareAuthorize authored, but first evaluates as many
+// conditions as possible in-process. If not all conditions could be evaluated, the webhook receives the refined
+// decision, where conditions that evaluated to false are removed. If all Deny conditions evaluated to false, the
+// FailureDecision of the refined decision drops from Deny to NoOpinion, which is fine, as NoOpinion is then the
+// worst possible outcome.
 func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEvaluate authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	if decisionToEvaluate.IsUnconditional() {
 		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("got unconditional decisionToEvaluate in EvaluateConditions")
@@ -430,12 +438,23 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEv
 		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("data must be non-nil in EvaluateConditions")
 	}
 
+	possiblyEvaluatedDecision := w.tryEvaluateUsingBuiltins(ctx, decisionToEvaluate, data)
+	// If we were successful in evaluating the conditions in-process to Allow/Deny/NoOpinion, return that
+	if possiblyEvaluatedDecision.IsUnconditional() {
+		return possiblyEvaluatedDecision.UnconditionalPartsOrError()
+	}
+	// Otherwise, webhook using the (possibly refined) ConditionsMap/Union decision
+	// Break this out into another function so there cannot be any confusion on whether
+	// to use the "original" or "possibly refined" decision, as we should always use the latter.
+	return w.webhookEvaluateConditions(ctx, possiblyEvaluatedDecision, data)
+}
+
+// webhookEvaluateConditions sends the conditional decisionToEvaluate to the webhook for evaluation.
+func (w *WebhookAuthorizer) webhookEvaluateConditions(ctx context.Context, decisionToEvaluate authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	// Fail closed when evaluation is not supported
 	if w.authorizationConditionsReviewer == nil {
 		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("no authorization conditions review client configured for the webhook authorizer, cannot evaluate conditions")
 	}
-
-	// TODO(luxas): Use builtin evaluators to resolve as much as possible of the ConditionsMap or Union
 
 	r := &authorizationv1alpha1.AuthorizationConditionsReview{
 		Request: &authorizationv1alpha1.AuthorizationConditionsRequest{
@@ -925,4 +944,30 @@ func v1ExtraToV1beta1Extra(in map[string]authorizationv1.ExtraValue) map[string]
 		ret[k] = authorizationv1beta1.ExtraValue(v)
 	}
 	return ret
+}
+
+// tryEvaluateUsingBuiltins evaluates as much as possible of the conditional decision in-process using builtinConditionsEvaluatorBuilder.
+// If the decision cannot be fully evaluated, a possibly refined decision is returned, to be evaluated by the webhook.
+func (w *WebhookAuthorizer) tryEvaluateUsingBuiltins(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) authorizer.ConditionsAwareDecision {
+	if w.builtinConditionsEvaluatorBuilder == nil {
+		return unevaluatedDecision // no simplification possible, perform webhook
+	}
+	// The API server's authorizer, as set by WithConditionsAwareAuthorization, not w itself.
+	authz, _, _ := request.ConditionallyAuthorizedDecisionFrom(ctx)
+	builtinConditionsEvaluator, err := w.builtinConditionsEvaluatorBuilder.EvaluatorForData(ctx, data, authz)
+	if err != nil {
+		klog.Warningf("unexpected error from builtinConditionsEvaluatorBuilder.EvaluatorForData: %v", err)
+		return unevaluatedDecision // no simplification possible, perform webhook
+	}
+
+	return authorizer.PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedDecision, data, func(ctx context.Context, cond authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+		res := builtinConditionsEvaluator.EvaluateCondition(ctx, cond)
+		// Builtin evaluation could fail e.g. due to version skew, when the authorizer e.g. uses a newer CEL environment with a function/variable
+		// that the builtin CEL evaluator wouldn't recognize. In that case, builtin evaluation would fail, even though evaluation would succeed
+		// if the webhook to the authorizer is performed. Thus, defer to the authorizer for webhook evaluation in case of any builtin errors.
+		if res.IsError() {
+			return authorizer.ConditionsEvaluationResultUnevaluatable()
+		}
+		return res // True/False/Unevaluatable
+	})
 }

@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -133,6 +134,7 @@ func newTestWebhookAuthorizer(
 		noopAuthorizerMetrics(),
 		"test",
 		acrReviewer,
+		nil, // builtinConditionsEvaluatorBuilder
 	)
 	if err != nil {
 		panic(fmt.Sprintf("newWithBackoff failed: %v", err))
@@ -1335,7 +1337,7 @@ func TestConditionalResponseCaching(t *testing.T) {
 		t.Helper()
 		wh, err := newWithBackoff(sarReviewer, time.Hour, 0, testRetryBackoff,
 			authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(),
-			"test", &fakeAuthorizationConditionsReviewer{})
+			"test", &fakeAuthorizationConditionsReviewer{}, nil)
 		if err != nil {
 			t.Fatalf("newWithBackoff failed: %v", err)
 		}
@@ -1396,4 +1398,153 @@ func TestConditionalResponseCaching(t *testing.T) {
 			t.Errorf("expected the entry to have expired and the webhook to be called again, got %d webhook calls", reviewer.calls)
 		}
 	})
+}
+
+// fakeBuiltinConditionsEvaluatorBuilder resolves conditions by ID; unknown IDs are Unevaluatable.
+type fakeBuiltinConditionsEvaluatorBuilder struct {
+	results map[string]authorizer.ConditionEvaluationResult
+	err     error
+	authz   authorizer.Authorizer
+}
+
+func (f *fakeBuiltinConditionsEvaluatorBuilder) EvaluatorForData(_ context.Context, _ authorizer.ConditionsData, authz authorizer.Authorizer) (authorizer.BuiltinConditionsEvaluator, error) {
+	f.authz = authz
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f, nil
+}
+
+func (f *fakeBuiltinConditionsEvaluatorBuilder) EvaluateCondition(_ context.Context, condition authorizer.Condition) authorizer.ConditionEvaluationResult {
+	if res, ok := f.results[condition.GetID()]; ok {
+		return res
+	}
+	return authorizer.ConditionsEvaluationResultUnevaluatable()
+}
+
+// fakeRootAuthorizer is comparable by pointer, unlike authorizer.AuthorizerFunc.
+type fakeRootAuthorizer struct{ authorizer.AuthorizerFunc }
+
+func TestEvaluateConditions_Builtins(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	denyCond := authorizer.GenericCondition{ID: "example.com/deny", Type: authorizer.ConditionTypeAuthorizationCEL, Condition: "false"}
+	allowCond := authorizer.GenericCondition{ID: "example.com/allow", Type: "example.com/opaque"}
+	decision := authorizer.ConditionsAwareDecisionConditionsMap([]authorizer.Condition{denyCond}, nil, []authorizer.Condition{allowCond})
+	webhookAllow := &authorizationv1alpha1.AuthorizationConditionsReview{
+		Response: &authorizationv1alpha1.AuthorizationConditionsResponse{
+			Decision: authorizationv1.ConditionsAwareDecision{
+				Type:  authorizationv1.ConditionsAwareDecisionTypeAllow,
+				Allow: &authorizationv1.UnconditionalDecision{Reason: "allowed by webhook"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		builder      *fakeBuiltinConditionsEvaluatorBuilder
+		wantDecision authorizer.Decision
+		wantWebhook  bool
+		// wantSentDenyIDs are the deny condition IDs that are left for the webhook to evaluate.
+		wantSentDenyIDs []string
+	}{
+		{
+			name: "fully evaluated in-process: webhook not called",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{results: map[string]authorizer.ConditionEvaluationResult{
+				denyCond.ID: authorizer.ConditionEvaluationResultBoolean(true),
+			}},
+			wantDecision: authorizer.DecisionDeny,
+		},
+		{
+			name: "partially evaluated in-process: webhook gets the refined decision",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{results: map[string]authorizer.ConditionEvaluationResult{
+				denyCond.ID: authorizer.ConditionEvaluationResultBoolean(false),
+			}},
+			wantDecision: authorizer.DecisionAllow,
+			wantWebhook:  true,
+		},
+		{
+			// An in-process error might be due to version skew, so the webhook gets the final say.
+			name: "in-process evaluation error: webhook gets the original decision",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{results: map[string]authorizer.ConditionEvaluationResult{
+				denyCond.ID: authorizer.ConditionEvaluationResultError(fmt.Errorf("undeclared reference")),
+			}},
+			wantDecision:    authorizer.DecisionAllow,
+			wantWebhook:     true,
+			wantSentDenyIDs: []string{denyCond.ID},
+		},
+		{
+			name:            "evaluator cannot be built: webhook gets the original decision",
+			builder:         &fakeBuiltinConditionsEvaluatorBuilder{err: fmt.Errorf("unsupported data")},
+			wantDecision:    authorizer.DecisionAllow,
+			wantWebhook:     true,
+			wantSentDenyIDs: []string{denyCond.ID},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			acr := &fakeAuthorizationConditionsReviewer{response: webhookAllow.DeepCopy()}
+			wh, err := newWithBackoff(&fakeSubjectAccessReviewer{}, 0, 0, testRetryBackoff,
+				authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(), "test", acr, tc.builder)
+			if err != nil {
+				t.Fatalf("newWithBackoff failed: %v", err)
+			}
+
+			rootAuthz := &fakeRootAuthorizer{}
+			ctx, err := genericapirequest.WithConditionallyAuthorizedDecision(testCtx, rootAuthz, decision)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d, _, err := wh.EvaluateConditions(ctx, decision, fakeConditionsData{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if d != tc.wantDecision {
+				t.Errorf("got decision %s, want %s", d, tc.wantDecision)
+			}
+			if tc.builder.authz != rootAuthz {
+				t.Errorf("expected the authorizer from the request context to be passed to the builder, got %v", tc.builder.authz)
+			}
+			if gotWebhook := acr.received != nil; gotWebhook != tc.wantWebhook {
+				t.Fatalf("webhook called: got %v, want %v", gotWebhook, tc.wantWebhook)
+			}
+			if !tc.wantWebhook {
+				return
+			}
+			cm := acr.received.Request.Decision.ConditionsMap
+			if cm == nil {
+				t.Fatalf("expected a ConditionsMap to be sent to the webhook, got %+v", acr.received.Request.Decision)
+			}
+			var gotDenyIDs []string
+			for _, c := range cm.DenyConditions {
+				gotDenyIDs = append(gotDenyIDs, c.ID)
+			}
+			if !slices.Equal(gotDenyIDs, tc.wantSentDenyIDs) {
+				t.Errorf("deny conditions sent to the webhook: got %v, want %v", gotDenyIDs, tc.wantSentDenyIDs)
+			}
+		})
+	}
+}
+
+func TestEvaluateConditions_BuiltinsWithoutContextAuthorizer(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+
+	// The builder resolves the condition, so the webhook is not called.
+	builder := &fakeBuiltinConditionsEvaluatorBuilder{
+		authz:   &fakeRootAuthorizer{},
+		results: map[string]authorizer.ConditionEvaluationResult{"example.com/allow": authorizer.ConditionEvaluationResultBoolean(true)},
+	}
+	wh, err := newWithBackoff(&fakeSubjectAccessReviewer{}, 0, 0, testRetryBackoff,
+		authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(), "test", nil, builder)
+	if err != nil {
+		t.Fatalf("newWithBackoff failed: %v", err)
+	}
+	decision := authorizer.ConditionsAwareDecisionConditionsMap(nil, nil, []authorizer.Condition{authorizer.GenericCondition{ID: "example.com/allow"}})
+	if d, _, err := wh.EvaluateConditions(testCtx, decision, fakeConditionsData{}); d != authorizer.DecisionAllow || err != nil {
+		t.Fatalf("got decision %s and err %v, want Allow and no error", d, err)
+	}
+	if builder.authz != nil {
+		t.Errorf("expected a nil authorizer when the request context has none, got %v", builder.authz)
+	}
 }

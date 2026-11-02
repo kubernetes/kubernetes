@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -59,6 +60,7 @@ type Config struct {
 	WebhookRetryBackoff *wait.Backoff
 
 	VersionedInformerFactory versionedinformers.SharedInformerFactory
+	KubeClient               kubernetes.Interface
 
 	// Optional field, custom dial function used to connect to webhook
 	CustomDial utilnet.DialFunc

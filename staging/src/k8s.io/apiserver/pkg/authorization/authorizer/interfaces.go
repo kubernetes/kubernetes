@@ -343,3 +343,33 @@ type ConditionsData interface {
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
 }
+
+// ConditionTypeAuthorizationCEL is a well-known conditions type for the CEL environment of the kube-apiserver,
+// for authorization conditions evaluation.
+// This CEL environment strives to be equal to the ValidationAdmissionPolicy CEL environment.
+const ConditionTypeAuthorizationCEL = "authorizer.kubernetes.io/cel"
+
+// BuiltinConditionsEvaluatorBuilder builds an in-process conditions evaluator for the given data.
+// This means authorizers (e.g. the webhook authorizer) may try cheaper ways of evaluating a condition
+// (e.g. in-process CEL evaluation) before more expensive ways (sending the webhook).
+//
+// TODO(luxas): Add a RecognizesCondition(Condition) bool method to the builder, and a function in this package
+// that walks a ConditionsAwareDecision and tells whether there is any point in trying in-process evaluation at all,
+// i.e. whether any condition is recognized. Then callers can skip EvaluatorForData, and thus e.g. the namespace
+// lookup and activation setup, when only opaque condition types are used.
+type BuiltinConditionsEvaluatorBuilder interface {
+	// EvaluatorForData returns a BuiltinConditionsEvaluator from the given ConditionsData,
+	// in order to initialize an evaluation environment only once.
+	// apiServerAuthorizer is the API server's authorizer (not the authorizer that authored the condition), which
+	// conditions may use for compound authorization, like in ValidatingAdmissionPolicy. It may be nil.
+	EvaluatorForData(ctx context.Context, data ConditionsData, apiServerAuthorizer Authorizer) (BuiltinConditionsEvaluator, error)
+}
+
+// BuiltinConditionsEvaluator might allow in-process evaluation of a condition of a
+// certain type, in the context of a given ConditionsData.
+// If the condition type is not handled, return ConditionsEvaluationResultUnevaluatable().
+type BuiltinConditionsEvaluator interface {
+	// EvaluateCondition evaluates a single condition in the current ConditionsData context
+	// into a ConditionEvaluationResult if possible, or returns ConditionsEvaluationResultUnevaluatable().
+	EvaluateCondition(ctx context.Context, condition Condition) ConditionEvaluationResult
+}
