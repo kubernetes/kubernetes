@@ -79,6 +79,142 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	}
 }
 
+func TestCacheWatcherStopsProcessingInitEventsAfterStop(t *testing.T) {
+	var lock sync.RWMutex
+	var w *cacheWatcher
+	count := 0
+
+	forget := func(drainWatcher bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		count++
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+
+	initEvents := []*watchCacheEvent{
+		makeWatchCacheEvent(1),
+		makeWatchCacheEvent(2),
+		makeWatchCacheEvent(3),
+	}
+
+	registry := compbasemetrics.NewKubeRegistry()
+	if err := registry.Register(metrics.InitCounter); err != nil {
+		t.Fatalf("unexpected error registering metric: %v", err)
+	}
+	metrics.InitCounter.WithLabelValues("", "cache-watcher-test").Add(0)
+	t.Cleanup(func() {
+		registry.Reset()
+	})
+
+	w = newCacheWatcher(
+		0,
+		filterAny,
+		forget,
+		storage.APIObjectVersioner{},
+		time.Now(),
+		false,
+		schema.GroupResource{Resource: "cache-watcher-test"},
+		metrics.NewNoopWatcherMetricsObservers(),
+		nil,
+		"",
+		watchSelector{},
+	)
+	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
+	go w.process(context.Background())
+
+	// Stop the watcher before process can deliver any event.
+	w.Stop()
+
+	// process must terminate after observing that the watcher
+	// has been stopped.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
+		lock.RLock()
+		defer lock.RUnlock()
+		return count == 2, nil
+	}); err != nil {
+		t.Fatalf("expected process to stop after watcher was stopped: %v", err)
+	}
+
+	expected := `
+# HELP apiserver_init_events_total [ALPHA] Counter of init events processed in watch cache broken by resource type.
+# TYPE apiserver_init_events_total counter
+apiserver_init_events_total{group="",resource="cache-watcher-test"} 0
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expected), "apiserver_init_events_total"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCacheWatcherCountsDeliveredInitEventsBeforeStop(t *testing.T) {
+	var lock sync.RWMutex
+	var w *cacheWatcher
+	forget := func(drainWatcher bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+
+	initEvents := []*watchCacheEvent{
+		makeWatchCacheEvent(1),
+		makeWatchCacheEvent(2),
+	}
+
+	registry := compbasemetrics.NewKubeRegistry()
+	if err := registry.Register(metrics.InitCounter); err != nil {
+		t.Fatalf("unexpected error registering metric: %v", err)
+	}
+	metrics.InitCounter.WithLabelValues("", "cache-watcher-partial-test").Add(0)
+	t.Cleanup(func() {
+		registry.Reset()
+	})
+
+	w = newCacheWatcher(
+		1,
+		filterAny,
+		forget,
+		storage.APIObjectVersioner{},
+		time.Now(),
+		false,
+		schema.GroupResource{Resource: "cache-watcher-partial-test"},
+		metrics.NewNoopWatcherMetricsObservers(),
+		nil,
+		"",
+		watchSelector{},
+	)
+	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
+	go w.process(context.Background())
+
+	// The first event fits in the result buffer. The second event blocks.
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
+		return len(w.result) == 1, nil
+	}); err != nil {
+		t.Fatalf("expected first initial event to be buffered: %v", err)
+	}
+
+	// Stop while process is blocked trying to deliver the second event.
+	w.Stop()
+
+	var events []watch.Event
+	for event := range w.ResultChan() {
+		events = append(events, event)
+	}
+
+	if len(events) != 1 {
+		t.Fatalf("expected 1 delivered initial event, got %d", len(events))
+	}
+
+	expected := `
+# HELP apiserver_init_events_total [ALPHA] Counter of init events processed in watch cache broken by resource type.
+# TYPE apiserver_init_events_total counter
+apiserver_init_events_total{group="",resource="cache-watcher-partial-test"} 1
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expected), "apiserver_init_events_total"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCacheWatcherHandlesFiltering(t *testing.T) {
 	filter := newWatchEventFilter("", storage.ListOptions{
 		Predicate: storage.SelectionPredicate{

@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -58,6 +59,8 @@ type watcherInput struct {
 	event    *watchCacheEvent
 	interval *watchCacheInterval
 }
+
+var errWatcherStopped = errors.New("watcher stopped")
 
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
@@ -444,7 +447,7 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
-func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time) {
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sentAt time.Time, stopped bool) {
 	// We need to ensure that if we put event X to the c.result, all
 	// previous events were already put into it before, no matter whether
 	// c.done is close or not.
@@ -459,14 +462,14 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	// events.
 	select {
 	case <-c.done:
-		return time.Time{}, time.Time{}
+		return time.Time{}, time.Time{}, true
 	default:
 	}
 
 	watchEvent := c.convertToWatchEvent(event)
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
-		return time.Time{}, time.Time{}
+		return time.Time{}, time.Time{}, false
 	}
 	builtAt = c.clock.Now()
 
@@ -475,8 +478,9 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 		c.markBookmarkAfterRvSent(event)
 		sentAt = c.clock.Now()
 	case <-c.done:
+		stopped = true
 	}
-	return builtAt, sentAt
+	return builtAt, sentAt, stopped
 }
 
 func (c *cacheWatcher) process(ctx context.Context) {
@@ -553,6 +557,12 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 	startTime := time.Now()
 
 	initEventCount := 0
+	recordInitEvents := func() {
+		if initEventCount > 0 {
+			metrics.InitCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(initEventCount))
+		}
+	}
+
 	for event, err := range cacheInterval.All() {
 		if err != nil {
 			// An error indicates that the cache interval
@@ -570,15 +580,20 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 			// custom clients, the cost of it is something that we
 			// are fully accepting.
 			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
+			recordInitEvents()
 			return err
 		}
-		c.sendWatchCacheEvent(event)
-		initEventCount++
+		_, sentAt, stopped := c.sendWatchCacheEvent(event)
+		if stopped {
+			recordInitEvents()
+			return errWatcherStopped
+		}
+		if !sentAt.IsZero() {
+			initEventCount++
+		}
 	}
 
-	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(initEventCount))
-	}
+	recordInitEvents()
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
@@ -586,7 +601,10 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 
 	// send bookmark after sending all events in cacheInterval for watchlist request
 	if cacheInterval.initialEventsEndBookmark != nil {
-		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+		_, _, stopped := c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+		if stopped {
+			return errWatcherStopped
+		}
 	}
 	return nil
 }
@@ -597,7 +615,7 @@ func (c *cacheWatcher) processEvent(event *watchCacheEvent, resourceVersion uint
 	// or a bookmark event with an RV equal to resourceVersion
 	// if we haven't sent one to the client
 	if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-		builtAt, sentAt := c.sendWatchCacheEvent(event)
+		builtAt, sentAt, _ := c.sendWatchCacheEvent(event)
 		c.observeDispatchMetrics(event, dequeuedAt, builtAt, sentAt)
 	}
 }
