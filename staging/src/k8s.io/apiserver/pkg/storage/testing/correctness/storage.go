@@ -155,10 +155,10 @@ func (s *ModelStorage) CompactRevision() int64 {
 	return int64(s.state.CompactResourceVersion)
 }
 
-func (s *ModelStorage) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) (bool, error) {
+func (s *ModelStorage) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
 	panic("not implemented")
 }
 
-func (s *ModelStorage) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
+func (s *ModelStorage) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, error) {
 	panic("not implemented")
 }

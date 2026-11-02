@@ -127,7 +127,7 @@ func TestGet(t *testing.T) {
 func TestDeleteOnce(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteOnce(ctx, t, cacher, examplev1ProtoCodec)
+	storagetesting.RunTestDeleteOnce(ctx, t, cacher, etcd3testing.PathPrefix(), examplev1ProtoCodec)
 }
 
 func TestUpdateOnce(t *testing.T) {

@@ -347,7 +347,7 @@ func TestOptimisticConcurrency(t *testing.T) {
 
 func TestDeleteOnce(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestDeleteOnce(ctx, t, store, store.codec)
+	storagetesting.RunTestDeleteOnce(ctx, t, store, "", store.codec)
 }
 
 func TestUpdateOnce(t *testing.T) {

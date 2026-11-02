@@ -94,8 +94,8 @@ func (d *MockStorage) Delete(ctx context.Context, key string, out runtime.Object
 	}
 	return fmt.Errorf("unimplemented")
 }
-func (d *MockStorage) DeleteOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object) (bool, error) {
-	return false, fmt.Errorf("unimplemented")
+func (d *MockStorage) DeleteOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object) error {
+	return fmt.Errorf("unimplemented")
 }
 func (d *MockStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	if d.WatchFn != nil {
@@ -130,8 +130,8 @@ func (d *MockStorage) GuaranteedUpdate(ctx context.Context, key string, destinat
 	}
 	return fmt.Errorf("unimplemented")
 }
-func (d *MockStorage) UpdateOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object, _ uint64, _ runtime.Object, _ bool) (*storage.ObjState, bool, error) {
-	return nil, false, fmt.Errorf("unimplemented")
+func (d *MockStorage) UpdateOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object, _ uint64, _ runtime.Object, _ bool) (*storage.ObjState, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 func (d *MockStorage) Stats(_ context.Context) (storage.Stats, error) {
 	return storage.Stats{}, fmt.Errorf("unimplemented")

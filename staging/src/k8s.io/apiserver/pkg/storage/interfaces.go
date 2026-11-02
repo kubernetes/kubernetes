@@ -192,7 +192,8 @@ type Interface interface {
 		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object, opts DeleteOptions) error
 
 	// DeleteOnce executes a single conditional delete attempt for key against origState.Rev.
-	DeleteOnce(ctx context.Context, key string, origState *ObjState, out runtime.Object) (bool, error)
+	// On a revision conflict, it returns a ResourceVersionConflicts StorageError carrying the current storage revision.
+	DeleteOnce(ctx context.Context, key string, origState *ObjState, out runtime.Object) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
@@ -255,7 +256,9 @@ type Interface interface {
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// UpdateOnce executes a single conditional update attempt for key against origState.Rev.
-	UpdateOnce(ctx context.Context, key string, origState *ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*ObjState, bool, error)
+	// On a revision conflict, it returns a ResourceVersionConflicts StorageError carrying the current storage revision
+	// (along with the refreshed state if it was already read during a no-op write check).
+	UpdateOnce(ctx context.Context, key string, origState *ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*ObjState, error)
 
 	// Stats returns storage stats.
 	Stats(ctx context.Context) (Stats, error)

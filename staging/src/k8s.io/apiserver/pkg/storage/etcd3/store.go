@@ -391,17 +391,17 @@ func (s *store) Delete(
 }
 
 // DeleteOnce implements storage.Interface.
-func (s *store) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) (bool, error) {
+func (s *store) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
 	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
-		return false, err
+		return err
 	}
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
-		return false, fmt.Errorf("unable to convert output object to pointer: %v", err)
+		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
-	_, success, err := s.deleteOnce(ctx, preparedKey, out, origState, v, false, false)
-	return success, err
+	_, _, err = s.deleteOnce(ctx, preparedKey, out, origState, v, false, false)
+	return err
 }
 
 func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, origState *storage.ObjState, v reflect.Value, getOnFailure, expectTransformOrDecodeError bool) (state *storage.ObjState, success bool, err error) {
@@ -417,7 +417,7 @@ func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, 
 	if !success {
 		klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
 		if !getOnFailure {
-			return nil, false, nil
+			return nil, false, storage.NewResourceVersionConflictsError(key, txnResp.Revision)
 		}
 		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
 		return origState, success, err
@@ -469,16 +469,17 @@ func (s *store) GuaranteedUpdate(
 }
 
 // UpdateOnce implements storage.Interface.
-func (s *store) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
+func (s *store) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, error) {
 	preparedKey, err := s.prepareKey(key, false)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	v, err := conversion.EnforcePtr(destination)
 	if err != nil {
-		return nil, false, fmt.Errorf("unable to convert output object to pointer: %v", err)
+		return nil, fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
-	return s.updateOnce(ctx, preparedKey, destination, origState, obj, ttl, v, ignoreNotFound, false)
+	state, _, err := s.updateOnce(ctx, preparedKey, destination, origState, obj, ttl, v, ignoreNotFound, false)
+	return state, err
 }
 
 func (s *store) updateOnce(ctx context.Context, preparedKey string, destination runtime.Object, origState *storage.ObjState, ret runtime.Object, ttl uint64, v reflect.Value, ignoreNotFound, getOnFailure bool) (state *storage.ObjState, success bool, err error) {
@@ -506,6 +507,9 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 			}
 			if !bytes.Equal(data, origState.Data) {
 				// original data changed, restart loop
+				if !getOnFailure {
+					return origState, false, storage.NewResourceVersionConflictsError(preparedKey, origState.Rev)
+				}
 				return origState, false, nil
 			}
 		}
@@ -553,7 +557,7 @@ func (s *store) updateOnce(ctx context.Context, preparedKey string, destination 
 	if !success {
 		klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
 		if !getOnFailure {
-			return nil, false, nil
+			return nil, false, storage.NewResourceVersionConflictsError(preparedKey, txnResp.Revision)
 		}
 		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
 		if err != nil {
