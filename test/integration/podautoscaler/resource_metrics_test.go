@@ -82,8 +82,21 @@ func TestHPAResourceMetricsAPIVersionSwitch(t *testing.T) {
 
 	waitForRequestCount(tCtx, &metricsServer.v1Requests, 1)
 
-	// Remove v1 and verify fallback to v1beta1.
+	v1Requests := metricsServer.v1Requests.Load()
 	v1beta1Requests := metricsServer.v1beta1Requests.Load()
+
+	waitForRequestCount(tCtx, &metricsServer.v1Requests, v1Requests+1)
+
+	if got := metricsServer.v1beta1Requests.Load(); got != v1beta1Requests {
+		t.Fatalf(
+			"got %d metrics.k8s.io/v1beta1 requests after switching to v1, want %d",
+			got,
+			v1beta1Requests,
+		)
+	}
+
+	// Remove v1 and verify fallback to v1beta1.
+	v1beta1Requests = metricsServer.v1beta1Requests.Load()
 
 	metricsServer.replaceVersions(
 		tCtx,
