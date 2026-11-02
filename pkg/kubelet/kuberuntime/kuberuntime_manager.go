@@ -38,6 +38,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -647,6 +648,9 @@ type podActions struct {
 	ContainersToReset []containerToRemoveInfo
 	// UpdatePodLevelResources is true if pod-level resources need to be updated
 	UpdatePodLevelResources bool
+	// TerminatedContainersToPrune is a list of exited runtime containers to remove, e.g. those of
+	// containers removed from the pod spec beyond maxRemovedContainers.
+	TerminatedContainersToPrune []kubecontainer.ContainerID
 }
 
 // resourceRequirements summarizes the set of resources applicable to the
@@ -659,8 +663,8 @@ type resourceRequirements struct {
 }
 
 func (p podActions) String() string {
-	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, UpdatePodLevelResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v, ContainersToUpdate: %v, VolumesToUpsize: %v, VolumesToDownsize: %v, ContainersToKill: %v, ContainersToRemove: %v",
-		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.UpdatePodLevelResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.VolumesToUpsize, p.VolumesToDownsize, p.ContainersToKill, p.ContainersToReset)
+	return fmt.Sprintf("KillPod: %t, CreateSandbox: %t, UpdatePodResources: %t, UpdatePodLevelResources: %t, Attempt: %d, InitContainersToStart: %v, ContainersToStart: %v, EphemeralContainersToStart: %v, ContainersToUpdate: %v, VolumesToUpsize: %v, VolumesToDownsize: %v, ContainersToKill: %v, ContainersToRemove: %v, TerminatedContainersToPrune: %v",
+		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.UpdatePodLevelResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.VolumesToUpsize, p.VolumesToDownsize, p.ContainersToKill, p.ContainersToReset, p.TerminatedContainersToPrune)
 }
 
 // containerChanged will determine whether the container has changed based on the fields that will affect the running of the container.
@@ -1509,6 +1513,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 		// TODO: Shrink the pod cgroup once a removed container stops, by tracking the actuated
 		// pod-level resources (including those aggregated from containers) and reconciling them.
+		changes.TerminatedContainersToPrune = removedContainersToPrune(pod, podStatus)
 		m.dropRemovedActuatedContainers(logger, pod, podStatus)
 	}
 
@@ -1552,6 +1557,63 @@ func (m *kubeGenericRuntimeManager) dropRemovedActuatedContainers(logger klog.Lo
 	if err := m.actuatedState.RemoveContainers(logger, pod.UID, podutil.Containers, forget...); err != nil {
 		logger.Error(err, "Failed to drop actuated records of containers removed from the pod spec", "pod", klog.KObj(pod), "containers", forget)
 	}
+}
+
+// maxRemovedContainers is the number of containers removed from the pod spec
+// whose runtime containers, and so statuses and logs, are kept. It bounds the
+// pod status size for pods that churn containers.
+const maxRemovedContainers = 10
+
+// removedContainersToPrune returns the runtime containers of the containers
+// removed from the pod spec that finished longest ago, beyond the newest
+// maxRemovedContainers removed containers. Removed containers that are still
+// running count toward the limit but are never pruned.
+//
+// The status of a removed container is generated from its runtime container,
+// so pruning the runtime container drops the status too. Keeping the two in
+// sync matters: the API allows a name to be reused once its status is gone,
+// and a leftover runtime container would be mistaken for the new container.
+func removedContainersToPrune(pod *v1.Pod, podStatus *kubecontainer.PodStatus) []kubecontainer.ContainerID {
+	// The most recent runtime container for each removed container name.
+	latest := map[string]*kubecontainer.Status{}
+	for _, s := range podStatus.ContainerStatuses {
+		if kubecontainer.GetContainerSpec(pod, s.Name) != nil {
+			continue
+		}
+		if l, ok := latest[s.Name]; !ok || s.CreatedAt.After(l.CreatedAt) {
+			latest[s.Name] = s
+		}
+	}
+	if len(latest) <= maxRemovedContainers {
+		return nil
+	}
+
+	var stopped []*kubecontainer.Status
+	for _, s := range latest {
+		if s.State != kubecontainer.ContainerStateRunning && s.State != kubecontainer.ContainerStateUnknown {
+			stopped = append(stopped, s)
+		}
+	}
+	// Oldest finished first; names break ties for determinism.
+	sort.Slice(stopped, func(i, j int) bool {
+		if !stopped[i].FinishedAt.Equal(stopped[j].FinishedAt) {
+			return stopped[i].FinishedAt.Before(stopped[j].FinishedAt)
+		}
+		return stopped[i].Name < stopped[j].Name
+	})
+	toPrune := min(len(latest)-maxRemovedContainers, len(stopped))
+	names := sets.New[string]()
+	for _, s := range stopped[:toPrune] {
+		names.Insert(s.Name)
+	}
+
+	var ids []kubecontainer.ContainerID
+	for _, s := range podStatus.ContainerStatuses {
+		if names.Has(s.Name) && kubecontainer.GetContainerSpec(pod, s.Name) == nil {
+			ids = append(ids, s.ID)
+		}
+	}
+	return ids
 }
 
 // startingResizedContainer reports whether any of the contaniersToStart have been resized.
@@ -1694,6 +1756,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		result.AddSyncResult(m.killContainers(ctx, pod, podContainerChanges.ContainersToKill, nil, nil)...)
 		if result.Error() != nil {
 			return
+		}
+
+		for _, containerID := range podContainerChanges.TerminatedContainersToPrune {
+			logger.V(3).Info("Removing container removed from pod spec", "containerID", containerID, "pod", klog.KObj(pod))
+			// Failures are retried on the next sync, and don't block the rest of it.
+			if err := m.removeContainer(ctx, containerID.ID, false); err != nil {
+				logger.Error(err, "Failed to remove container removed from pod spec", "containerID", containerID, "pod", klog.KObj(pod))
+			}
 		}
 
 		// Removes the containers if they are marked for removal (for in-place restart)

@@ -10480,3 +10480,53 @@ func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
 		})
 	}
 }
+
+// Statuses of containers removed from the spec follow their runtime
+// containers: once a runtime container is gone (garbage collected, or pruned
+// by kuberuntime beyond maxRemovedContainers), its status is gone too, even
+// though the old API status still has it.
+func TestConvertStatusToAPIStatusRemovedContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	now := time.Now()
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		Containers:    []v1.Container{{Name: "main"}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			Name:      "main",
+			ID:        kubecontainer.ContainerID{Type: "test", ID: "main"},
+			State:     kubecontainer.ContainerStateRunning,
+			CreatedAt: now.Add(-time.Hour),
+			StartedAt: now.Add(-time.Hour),
+		}, {
+			Name:       "removed",
+			ID:         kubecontainer.ContainerID{Type: "test", ID: "removed"},
+			State:      kubecontainer.ContainerStateExited,
+			CreatedAt:  now.Add(-time.Hour),
+			StartedAt:  now.Add(-time.Hour),
+			FinishedAt: now.Add(-time.Minute),
+		}},
+	}
+	terminated := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{FinishedAt: metav1.NewTime(now)}}
+	oldStatus := v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+		{Name: "removed", ContainerID: "test://removed", State: terminated},
+		// "gc" was removed and its runtime container has since been deleted.
+		{Name: "gc", ContainerID: "test://gc", State: terminated},
+	}}
+
+	status := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, podStatus, oldStatus)
+	var names []string
+	for _, s := range status.ContainerStatuses {
+		names = append(names, s.Name)
+	}
+	assert.Equal(t, []string{"main", "removed"}, names)
+}

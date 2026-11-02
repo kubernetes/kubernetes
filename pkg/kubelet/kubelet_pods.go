@@ -2818,7 +2818,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 		if containerSeen[cName] == 0 {
 			// This also creates the entry for a container removed from the spec.
-			// TODO(KEP-5972): revisit removed-container status GC and ContainerStateUnknown handling.
+			// It is never carried over from the old status, so it goes away with the
+			// runtime container, which kuberuntime prunes beyond maxRemovedContainers.
+			// TODO(KEP-5972): revisit ContainerStateUnknown handling for removed containers.
 			statuses[cName] = status
 		} else {
 			statuses[cName].LastTerminationState = status.State
