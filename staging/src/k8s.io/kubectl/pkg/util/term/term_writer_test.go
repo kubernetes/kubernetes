@@ -96,3 +96,45 @@ func TestMaxWidthWriter(t *testing.T) {
 		}
 	}
 }
+
+func TestMaxWidthWriterNewlineAccounting(t *testing.T) {
+	testcases := map[string]struct {
+		input    string
+		maxWidth uint
+		want     string
+	}{
+		"embedded newline resets the column": {
+			input:    "ab\ncdefg",
+			maxWidth: 5,
+			want:     "ab\ncdefg",
+		},
+		"newline after a full line does not add a blank line": {
+			input:    "12345\nabc",
+			maxWidth: 5,
+			want:     "12345\nabc",
+		},
+	}
+	for k, tc := range testcases {
+		b := bytes.NewBufferString("")
+		w := NewMaxWidthWriter(b, tc.maxWidth)
+		if _, err := w.Write([]byte(tc.input)); err != nil {
+			t.Errorf("%s: Unexpected error: %v", k, err)
+		}
+		if got := b.String(); got != tc.want {
+			t.Errorf("%s: got %q, want %q", k, got, tc.want)
+		}
+	}
+}
+
+func TestMaxWidthWriterAcrossWrites(t *testing.T) {
+	b := bytes.NewBufferString("")
+	w := NewMaxWidthWriter(b, 5)
+	for _, chunk := range []string{"abc", "defgh"} {
+		if _, err := w.Write([]byte(chunk)); err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+	}
+	if got, want := b.String(), "abcde\nfgh"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

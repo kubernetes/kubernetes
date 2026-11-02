@@ -111,7 +111,6 @@ func NewPunchCardWriter(w io.Writer) io.Writer {
 type maxWidthWriter struct {
 	maxWidth     uint
 	currentWidth uint
-	written      uint
 	writer       io.Writer
 }
 
@@ -124,21 +123,24 @@ func NewMaxWidthWriter(w io.Writer, maxWidth uint) io.Writer {
 	}
 }
 
-func (m maxWidthWriter) Write(p []byte) (nn int, err error) {
-	for _, b := range p {
-		if m.currentWidth == m.maxWidth {
-			m.writer.Write([]byte{'\n'})
-			m.currentWidth = 0
-		}
+func (m *maxWidthWriter) Write(p []byte) (nn int, err error) {
+	for i, b := range p {
 		if b == '\n' {
+			// The newline starts a new, empty line; it must not also count
+			// as a character on that line.
+			m.currentWidth = 0
+		} else if m.currentWidth == m.maxWidth {
+			if _, err := m.writer.Write([]byte{'\n'}); err != nil {
+				return i, err
+			}
 			m.currentWidth = 0
 		}
-		_, err := m.writer.Write([]byte{b})
-		if err != nil {
-			return int(m.written), err
+		if _, err := m.writer.Write([]byte{b}); err != nil {
+			return i, err
 		}
-		m.written++
-		m.currentWidth++
+		if b != '\n' {
+			m.currentWidth++
+		}
 	}
 	return len(p), nil
 }
