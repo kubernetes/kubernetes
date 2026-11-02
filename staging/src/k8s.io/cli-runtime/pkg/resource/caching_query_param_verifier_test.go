@@ -295,6 +295,30 @@ func TestCachingQueryParamVerifierSeparatesQueryParameters(t *testing.T) {
 	}
 }
 
+func TestCachingQueryParamVerifierSeparatesGVKs(t *testing.T) {
+	client := &cacheTestOpenAPIClient{hash: "schema-a"}
+	next := &cacheTestVerifier{}
+	verifier := NewCachingQueryParamVerifier(
+		next, client, QueryParamFieldValidation, NewVerifierCache(10),
+	)
+
+	otherGVK := cacheTestGVK
+	otherGVK.Kind = "Gadget"
+
+	for range 2 {
+		if err := verifier.HasSupport(cacheTestGVK); err != nil {
+			t.Fatalf("Widget verification returned an unexpected error: %v", err)
+		}
+		if err := verifier.HasSupport(otherGVK); err != nil {
+			t.Fatalf("Gadget verification returned an unexpected error: %v", err)
+		}
+	}
+
+	if got := next.callCount(); got != 2 {
+		t.Fatalf("underlying verifier called %d times, want 2 (once per GVK)", got)
+	}
+}
+
 func TestVerifierCacheEvictsLeastRecentlyUsedEntry(t *testing.T) {
 	cache := NewVerifierCache(2)
 
