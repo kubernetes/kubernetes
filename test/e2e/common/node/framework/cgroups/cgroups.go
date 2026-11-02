@@ -54,14 +54,12 @@ var (
 )
 
 type ContainerResources struct {
-	CPUReq              string
-	CPULim              string
-	MemReq              string
-	MemLim              string
-	EphStorReq          string
-	EphStorLim          string
-	ExtendedResourceReq string
-	ExtendedResourceLim string
+	CPUReq     string
+	CPULim     string
+	MemReq     string
+	MemLim     string
+	EphStorReq string
+	EphStorLim string
 }
 
 func (cr *ContainerResources) ResourceRequirements() *v1.ResourceRequirements {
