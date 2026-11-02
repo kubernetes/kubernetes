@@ -73,6 +73,9 @@ func init() {
 			"template.spec.containers": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"template.spec.containers[*].dynamicVolumeMountPolicy.restartPolicy": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
 			"template.spec.containers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
@@ -90,6 +93,9 @@ func init() {
 			},
 			"template.spec.containers[*].securityContext.seccompProfile.type": {
 				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.ephemeralContainers[*].dynamicVolumeMountPolicy.restartPolicy": {
+				{ErrorType: "FieldValueNotSupported"},
 			},
 			"template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
@@ -123,6 +129,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.initContainers[*].dynamicVolumeMountPolicy.restartPolicy": {
+				{ErrorType: "FieldValueNotSupported"},
 			},
 			"template.spec.initContainers[*].securityContext.seccompProfile.oci": {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},

@@ -169,6 +169,8 @@ spec:
     - argsValue
     command:
     - commandValue
+    dynamicVolumeMountPolicy:
+      restartPolicy: restartPolicyValue
     env:
     - name: nameValue
       value: valueValue
@@ -412,6 +414,8 @@ spec:
     - argsValue
     command:
     - commandValue
+    dynamicVolumeMountPolicy:
+      restartPolicy: restartPolicyValue
     env:
     - name: nameValue
       value: valueValue
@@ -661,6 +665,8 @@ spec:
     - argsValue
     command:
     - commandValue
+    dynamicVolumeMountPolicy:
+      restartPolicy: restartPolicyValue
     env:
     - name: nameValue
       value: valueValue
@@ -1555,4 +1561,5 @@ status:
         reason: reasonValue
         status: statusValue
       lastTransitionTime: "2002-01-01T01:01:01Z"
+    hostPhase: hostPhaseValue
     name: nameValue

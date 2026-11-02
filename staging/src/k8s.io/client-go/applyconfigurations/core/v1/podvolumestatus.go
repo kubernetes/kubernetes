@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1
 
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
 // PodVolumeStatusApplyConfiguration represents a declarative configuration of the PodVolumeStatus type for use
 // with apply.
 //
@@ -29,6 +33,12 @@ type PodVolumeStatusApplyConfiguration struct {
 	// on the pod's node. Populated by the kubelet.
 	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	HealthStatus *VolumeHealthStatusApplyConfiguration `json:"healthStatus,omitempty"`
+	// hostPhase represents the host-level preparation phase of the volume:
+	// Pending, HostMounted, Unmounting. Currently populated only for node-local
+	// ephemeral volume types supported for dynamic updates (configMap, secret,
+	// projected, emptyDir, and image).
+	// This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.
+	HostPhase *corev1.PodVolumeHostPhase `json:"hostPhase,omitempty"`
 }
 
 // PodVolumeStatusApplyConfiguration constructs a declarative configuration of the PodVolumeStatus type for use with
@@ -50,5 +60,13 @@ func (b *PodVolumeStatusApplyConfiguration) WithName(value string) *PodVolumeSta
 // If called multiple times, the HealthStatus field is set to the value of the last call.
 func (b *PodVolumeStatusApplyConfiguration) WithHealthStatus(value *VolumeHealthStatusApplyConfiguration) *PodVolumeStatusApplyConfiguration {
 	b.HealthStatus = value
+	return b
+}
+
+// WithHostPhase sets the HostPhase field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostPhase field is set to the value of the last call.
+func (b *PodVolumeStatusApplyConfiguration) WithHostPhase(value corev1.PodVolumeHostPhase) *PodVolumeStatusApplyConfiguration {
+	b.HostPhase = &value
 	return b
 }

@@ -4881,6 +4881,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: dynamicVolumeMountPolicy
+      type:
+        namedType: io.k8s.api.core.v1.ContainerDynamicVolumeMountPolicy
     - name: env
       type:
         list:
@@ -4980,6 +4983,12 @@ var schemaYAML = typed.YAMLObject(`types:
           keys:
           - mountPath
     - name: workingDir
+      type:
+        scalar: string
+- name: io.k8s.api.core.v1.ContainerDynamicVolumeMountPolicy
+  map:
+    fields:
+    - name: restartPolicy
       type:
         scalar: string
 - name: io.k8s.api.core.v1.ContainerExtendedResourceRequest
@@ -5380,6 +5389,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: dynamicVolumeMountPolicy
+      type:
+        namedType: io.k8s.api.core.v1.ContainerDynamicVolumeMountPolicy
     - name: env
       type:
         list:
@@ -7519,6 +7531,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: healthStatus
       type:
         namedType: io.k8s.api.core.v1.VolumeHealthStatus
+    - name: hostPhase
+      type:
+        scalar: string
     - name: name
       type:
         scalar: string

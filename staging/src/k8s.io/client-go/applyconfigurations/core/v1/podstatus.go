@@ -147,7 +147,7 @@ type PodStatusApplyConfiguration struct {
 	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatusApplyConfiguration `json:"nodeAllocatableResourceClaimStatuses,omitempty"`
 	// VolumeStatuses contains the status of individual volumes used by this pod.
-	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
+	// This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.
 	VolumeStatuses []PodVolumeStatusApplyConfiguration `json:"volumeStatuses,omitempty"`
 }
 

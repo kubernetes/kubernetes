@@ -322,6 +322,37 @@ func Validate_Container(
 	// field corev1.Container.Env has no validation
 	// field corev1.Container.Resources has no validation
 	// field corev1.Container.ResizePolicy has no validation
+
+	{ // field corev1.Container.DynamicVolumeMountPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.ContainerDynamicVolumeMountPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ContainerDynamicVolumeMountPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Container) *corev1.ContainerDynamicVolumeMountPolicy {
+				return oldObj.DynamicVolumeMountPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("dynamicVolumeMountPolicy"), obj.DynamicVolumeMountPolicy, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.Container.RestartPolicy has no validation
 	// field corev1.Container.RestartPolicyRules has no validation
 	// field corev1.Container.VolumeMounts has no validation
@@ -367,6 +398,60 @@ func Validate_Container(
 	// field corev1.Container.Stdin has no validation
 	// field corev1.Container.StdinOnce has no validation
 	// field corev1.Container.TTY has no validation
+	return errs
+}
+
+// Validate_ContainerDynamicVolumeMountPolicy validates an instance of ContainerDynamicVolumeMountPolicy according
+// to declarative validation rules in the API schema.
+func Validate_ContainerDynamicVolumeMountPolicy(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.ContainerDynamicVolumeMountPolicy) (errs field.ErrorList) {
+
+	{ // field corev1.ContainerDynamicVolumeMountPolicy.RestartPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.DynamicVolumeMountRestartPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DynamicVolumeMountRestartPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.ContainerDynamicVolumeMountPolicy) *corev1.DynamicVolumeMountRestartPolicy {
+				return &oldObj.RestartPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("restartPolicy"), &obj.RestartPolicy, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var symbolsForDynamicVolumeMountRestartPolicy = sets.New(corev1.DynamicVolumeMountRestartContainer)
+
+// Validate_DynamicVolumeMountRestartPolicy validates an instance of DynamicVolumeMountRestartPolicy according
+// to declarative validation rules in the API schema.
+func Validate_DynamicVolumeMountRestartPolicy(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.DynamicVolumeMountRestartPolicy) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDynamicVolumeMountRestartPolicy, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
 	return errs
 }
 
@@ -452,6 +537,37 @@ func Validate_EphemeralContainerCommon(
 	// field corev1.EphemeralContainerCommon.Env has no validation
 	// field corev1.EphemeralContainerCommon.Resources has no validation
 	// field corev1.EphemeralContainerCommon.ResizePolicy has no validation
+
+	{ // field corev1.EphemeralContainerCommon.DynamicVolumeMountPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.ContainerDynamicVolumeMountPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ContainerDynamicVolumeMountPolicy(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.EphemeralContainerCommon) *corev1.ContainerDynamicVolumeMountPolicy {
+				return oldObj.DynamicVolumeMountPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("dynamicVolumeMountPolicy"), obj.DynamicVolumeMountPolicy, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.EphemeralContainerCommon.RestartPolicy has no validation
 	// field corev1.EphemeralContainerCommon.RestartPolicyRules has no validation
 	// field corev1.EphemeralContainerCommon.VolumeMounts has no validation
@@ -2008,6 +2124,21 @@ func Validate_PodTemplateSpec(
 	return errs
 }
 
+var symbolsForPodVolumeHostPhase = sets.New(corev1.PodVolumeHostMounted, corev1.PodVolumeHostPending, corev1.PodVolumeHostUnmounting)
+
+// Validate_PodVolumeHostPhase validates an instance of PodVolumeHostPhase according
+// to declarative validation rules in the API schema.
+func Validate_PodVolumeHostPhase(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodVolumeHostPhase) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForPodVolumeHostPhase, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
 // Validate_PodVolumeStatus validates an instance of PodVolumeStatus according
 // to declarative validation rules in the API schema.
 func Validate_PodVolumeStatus(
@@ -2071,6 +2202,36 @@ func Validate_PodVolumeStatus(
 				return oldObj.HealthStatus
 			})
 		errs = append(errs, fn(fldPath.Child("healthStatus"), obj.HealthStatus, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.PodVolumeStatus.HostPhase
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodVolumeHostPhase,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodVolumeHostPhase(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodVolumeStatus) *corev1.PodVolumeHostPhase {
+				return &oldObj.HostPhase
+			})
+		errs = append(errs, fn(fldPath.Child("hostPhase"), &obj.HostPhase, oldVal, oldObj != nil)...)
 	}
 
 	return errs

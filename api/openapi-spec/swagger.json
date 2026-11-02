@@ -7073,6 +7073,10 @@
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
+        "dynamicVolumeMountPolicy": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ContainerDynamicVolumeMountPolicy",
+          "description": "dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container."
+        },
         "env": {
           "description": "env is the list of environment variables to set in the container. Cannot be updated.",
           "items": {
@@ -7218,6 +7222,16 @@
       "required": [
         "name"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.ContainerDynamicVolumeMountPolicy": {
+      "description": "ContainerDynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for a container.",
+      "properties": {
+        "restartPolicy": {
+          "description": "restartPolicy defines whether dynamic volume mount additions or removals require restarting the container. Supported values: RestartContainer, \"\". Defaults to \"\".",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.core.v1.ContainerExtendedResourceRequest": {
@@ -7872,6 +7886,10 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "dynamicVolumeMountPolicy": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ContainerDynamicVolumeMountPolicy",
+          "description": "dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container. This field cannot be set on ephemeral containers."
         },
         "env": {
           "description": "env is the list of environment variables to set in the container. Cannot be updated.",
@@ -11282,7 +11300,7 @@
           "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod."
         },
         "volumeStatuses": {
-          "description": "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
+          "description": "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.PodVolumeStatus"
           },
@@ -11381,6 +11399,10 @@
         "healthStatus": {
           "$ref": "#/definitions/io.k8s.api.core.v1.VolumeHealthStatus",
           "description": "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet. This is an alpha field and requires enabling the CSIVolumeHealth feature gate."
+        },
+        "hostPhase": {
+          "description": "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting. Currently populated only for node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image). This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.",
+          "type": "string"
         },
         "name": {
           "description": "name matches an entry in pod.spec.volumes.",

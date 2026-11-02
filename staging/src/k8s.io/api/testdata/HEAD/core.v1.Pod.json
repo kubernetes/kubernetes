@@ -551,6 +551,9 @@
             "restartPolicy": "restartPolicyValue"
           }
         ],
+        "dynamicVolumeMountPolicy": {
+          "restartPolicy": "restartPolicyValue"
+        },
         "restartPolicy": "restartPolicyValue",
         "restartPolicyRules": [
           {
@@ -883,6 +886,9 @@
             "restartPolicy": "restartPolicyValue"
           }
         ],
+        "dynamicVolumeMountPolicy": {
+          "restartPolicy": "restartPolicyValue"
+        },
         "restartPolicy": "restartPolicyValue",
         "restartPolicyRules": [
           {
@@ -1215,6 +1221,9 @@
             "restartPolicy": "restartPolicyValue"
           }
         ],
+        "dynamicVolumeMountPolicy": {
+          "restartPolicy": "restartPolicyValue"
+        },
         "restartPolicy": "restartPolicyValue",
         "restartPolicyRules": [
           {
@@ -2269,7 +2278,8 @@
             }
           ],
           "lastTransitionTime": "2002-01-01T01:01:01Z"
-        }
+        },
+        "hostPhase": "hostPhaseValue"
       }
     ]
   }

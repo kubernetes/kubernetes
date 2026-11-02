@@ -84,6 +84,8 @@ type ContainerApplyConfiguration struct {
 	// resizePolicy is the resize policy for the container.
 	// This field cannot be set on ephemeral containers.
 	ResizePolicy []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
+	// dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container.
+	DynamicVolumeMountPolicy *ContainerDynamicVolumeMountPolicyApplyConfiguration `json:"dynamicVolumeMountPolicy,omitempty"`
 	// restartPolicy defines the restart behavior of individual containers in a pod.
 	// This overrides the pod-level restart policy. When this field is not specified,
 	// the restart behavior is defined by the Pod's restart policy and the container type.
@@ -288,6 +290,14 @@ func (b *ContainerApplyConfiguration) WithResizePolicy(values ...*ContainerResiz
 		}
 		b.ResizePolicy = append(b.ResizePolicy, *values[i])
 	}
+	return b
+}
+
+// WithDynamicVolumeMountPolicy sets the DynamicVolumeMountPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DynamicVolumeMountPolicy field is set to the value of the last call.
+func (b *ContainerApplyConfiguration) WithDynamicVolumeMountPolicy(value *ContainerDynamicVolumeMountPolicyApplyConfiguration) *ContainerApplyConfiguration {
+	b.DynamicVolumeMountPolicy = value
 	return b
 }
 

@@ -19,6 +19,7 @@ package pod
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodSpecTestcase holds a declarative validation testcase for podspec validation
@@ -41,5 +42,53 @@ func InvalidPodSpecTestcases(fldPath *field.Path) []PodSpecTestcase {
 			},
 		},
 	}
-	return append(testcases, securityProfileOCITestcases(fldPath)...)
+	testcases = append(testcases, securityProfileOCITestcases(fldPath)...)
+	return append(testcases, dynamicVolumeMountPolicyTestcases(fldPath)...)
+}
+
+func dynamicVolumeMountPolicyTestcases(fldPath *field.Path) []PodSpecTestcase {
+	invalidPolicy := &api.ContainerDynamicVolumeMountPolicy{
+		RestartPolicy: api.DynamicVolumeMountRestartPolicy("Invalid"),
+	}
+	ctrWithInvalidPolicy := func(name string) api.Container {
+		c := podtest.MakeContainer(name)
+		c.DynamicVolumeMountPolicy = invalidPolicy
+		return c
+	}
+	enumErr := func(containerList string) *field.Error {
+		return field.NotSupported(
+			fldPath.Child(containerList).Index(0).Child("dynamicVolumeMountPolicy", "restartPolicy"),
+			api.DynamicVolumeMountRestartPolicy("Invalid"),
+			[]api.DynamicVolumeMountRestartPolicy(nil),
+		)
+	}
+
+	return []PodSpecTestcase{
+		{
+			ID:     "container_dynamic_volume_mount_policy_restart_policy_invalid",
+			Tweaks: []podtest.Tweak{podtest.SetContainers(ctrWithInvalidPolicy("ctr"))},
+			ExpectedErrs: field.ErrorList{
+				enumErr("containers"),
+			},
+		},
+		{
+			ID:     "init_container_dynamic_volume_mount_policy_restart_policy_invalid",
+			Tweaks: []podtest.Tweak{podtest.SetInitContainers(ctrWithInvalidPolicy("init"))},
+			ExpectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("initContainers").Index(0).Child("dynamicVolumeMountPolicy"), "").MarkFromImperative(),
+				enumErr("initContainers"),
+			},
+		},
+		{
+			ID: "ephemeral_container_dynamic_volume_mount_policy_restart_policy_invalid",
+			Tweaks: []podtest.Tweak{podtest.SetEphemeralContainers(api.EphemeralContainer{
+				EphemeralContainerCommon: api.EphemeralContainerCommon(ctrWithInvalidPolicy("debug")),
+			})},
+			ExpectedErrs: field.ErrorList{
+				field.Forbidden(fldPath.Child("ephemeralContainers"), "").MarkFromImperative(),
+				field.Forbidden(fldPath.Child("ephemeralContainers").Index(0).Child("dynamicVolumeMountPolicy"), "").MarkFromImperative(),
+				enumErr("ephemeralContainers"),
+			},
+		},
+	}
 }

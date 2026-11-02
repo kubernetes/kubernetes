@@ -167,6 +167,11 @@ func (in Container) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ContainerDynamicVolumeMountPolicy) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ContainerDynamicVolumeMountPolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ContainerExtendedResourceRequest) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.ContainerExtendedResourceRequest"
 }

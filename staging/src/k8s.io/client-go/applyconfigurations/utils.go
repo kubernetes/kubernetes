@@ -662,6 +662,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ConfigMapVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Container"):
 		return &applyconfigurationscorev1.ContainerApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ContainerDynamicVolumeMountPolicy"):
+		return &applyconfigurationscorev1.ContainerDynamicVolumeMountPolicyApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerExtendedResourceRequest"):
 		return &applyconfigurationscorev1.ContainerExtendedResourceRequestApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerImage"):
