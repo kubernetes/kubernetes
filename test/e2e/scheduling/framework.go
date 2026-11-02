@@ -203,9 +203,13 @@ func expectPodsScheduled(ctx context.Context, f *framework.Framework, pods []*v1
 }
 
 // expectPodsScheduledInOneDomain waits for the pods to be scheduled and checks whether they share a topology domain.
-func expectPodsScheduledInOneDomain(ctx context.Context, f *framework.Framework, pods []*v1.Pod) string {
+// It checks the topologyKey(f) domain by default, or customTopologyKey if provided.
+func expectPodsScheduledInOneDomain(ctx context.Context, f *framework.Framework, pods []*v1.Pod, customTopologyKey ...string) string {
 	expectPodsScheduled(ctx, f, pods)
 	cs, ns, key := f.ClientSet, f.Namespace.Name, topologyKey(f)
+	if len(customTopologyKey) > 0 {
+		key = customTopologyKey[0]
+	}
 	domains := sets.New[string]()
 	for _, p := range pods {
 		pod, err := cs.CoreV1().Pods(ns).Get(ctx, p.Name, metav1.GetOptions{})
