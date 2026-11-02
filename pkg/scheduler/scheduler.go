@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/informers/internalinterfaces"
@@ -606,17 +607,20 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration, informer
 		InformerName:     informerName,
 	})
 
-	// Dropping `.metadata.managedFields` to improve memory usage.
-	// The Extract workflow (i.e. `ExtractPod`) should be unused.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
+	// With ManagedFieldsOptOutClient, kube-scheduler's informer client drops managedFields instead.
+	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ManagedFieldsOptOutClient) {
+		// Dropping `.metadata.managedFields` to improve memory usage.
+		// The Extract workflow (i.e. `ExtractPod`) should be unused.
+		trim := func(obj interface{}) (interface{}, error) {
+			if accessor, err := meta.Accessor(obj); err == nil {
+				if accessor.GetManagedFields() != nil {
+					accessor.SetManagedFields(nil)
+				}
 			}
+			return obj, nil
 		}
-		return obj, nil
+		_ = informer.SetTransform(trim)
 	}
-	informer.SetTransform(trim)
 	return informer
 }
 

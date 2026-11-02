@@ -33,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	clientfeatures "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -316,7 +317,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	// Prepare kube clients.
-	client, eventClient, err := createClients(c.KubeConfig)
+	client, informerClient, eventClient, err := createClients(c.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -339,8 +340,11 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	c.Client = client
-	c.InformerFactory = scheduler.NewInformerFactory(client, 0, o.InformerName)
-	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
+	c.InformerFactory = scheduler.NewInformerFactory(informerClient, 0, o.InformerName)
+	// dynClient only serves the dynamic informers.
+	dynConfig := restclient.CopyConfig(c.KubeConfig)
+	dynConfig.DropManagedFields = true
+	dynClient := dynamic.NewForConfigOrDie(dynConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig
 	c.ComponentGlobalsRegistry = o.ComponentGlobalsRegistry
@@ -399,17 +403,29 @@ func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, 
 	return kubeConfig, nil
 }
 
-// createClients creates a kube client and an event client from the given kubeConfig
-func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, error) {
+// createClients creates a kube client, an informer client and an event client from the given kubeConfig
+func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, clientset.Interface, error) {
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	// Only the informers drop managedFields: plugins get client through handle.ClientSet().
+	// Without the gate, the informers keep sharing client, including its rate limiter.
+	informerClient := client
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.ManagedFieldsOptOutClient) {
+		informerConfig := restclient.CopyConfig(kubeConfig)
+		informerConfig.DropManagedFields = true
+		informerClient, err = clientset.NewForConfig(informerConfig)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	eventClient, err := clientset.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return client, eventClient, nil
+	return client, informerClient, eventClient, nil
 }
