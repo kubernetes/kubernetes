@@ -420,6 +420,8 @@ message CSIStorageCapacity {
   // immutable.
   //
   // +optional
+  // +k8s:alpha(since: "1.38")=+k8s:optional
+  // +k8s:alpha(since: "1.38")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector nodeTopology = 2;
 
   // storageClassName represents the name of the StorageClass that the reported capacity applies to.

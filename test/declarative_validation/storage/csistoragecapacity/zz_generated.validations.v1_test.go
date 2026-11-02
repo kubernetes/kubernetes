@@ -66,6 +66,9 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"nodeTopology": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 		},
 	)
 }
