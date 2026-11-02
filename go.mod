@@ -143,7 +143,7 @@ require (
 	github.com/containerd/log v0.2.0 // indirect
 	github.com/containerd/ttrpc v1.2.10 // indirect
 	github.com/coredns/caddy v1.1.4 // indirect
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
