@@ -112,6 +112,10 @@ type ConfigFlags struct {
 	clientConfig     clientcmd.ClientConfig
 	clientConfigLock sync.Mutex
 
+	restConfig     *rest.Config
+	restConfigErr  error
+	restConfigLock sync.Mutex
+
 	restMapper     meta.RESTMapper
 	restMapperLock sync.Mutex
 
@@ -138,7 +142,29 @@ type ConfigFlags struct {
 // to a .kubeconfig file, loading rules, and config flag overrides.
 // Expects the AddFlags method to have been called. If WrapConfigFn
 // is non-nil this function can transform config before return.
+// When usePersistentConfig is true, the resolved REST config is memoized
+// to avoid redundant file I/O from repeated validation and cert loading.(issue: #https://github.com/kubernetes/kubectl/issues/1880)
 func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
+	if f.usePersistentConfig {
+		return f.toPersistentRESTConfig()
+	}
+	return f.toRESTConfig()
+}
+
+func (f *ConfigFlags) toPersistentRESTConfig() (*rest.Config, error) {
+	f.restConfigLock.Lock()
+	defer f.restConfigLock.Unlock()
+
+	if f.restConfig == nil && f.restConfigErr == nil {
+		f.restConfig, f.restConfigErr = f.toRESTConfig()
+	}
+	if f.restConfig != nil {
+		return rest.CopyConfig(f.restConfig), f.restConfigErr
+	}
+	return nil, f.restConfigErr
+}
+
+func (f *ConfigFlags) toRESTConfig() (*rest.Config, error) {
 	c, err := f.ToRawKubeConfigLoader().ClientConfig()
 	if err != nil {
 		return nil, err

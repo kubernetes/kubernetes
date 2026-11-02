@@ -146,7 +146,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 
 	var dynamicCertLoader func() (*tls.Certificate, error)
 	if c.TLS.ReloadTLSFiles {
-		dynamicCertLoader = cachingCertificateLoader(c.TLS.CertFile, c.TLS.KeyFile)
+		dynamicCertLoader = cachingCertificateLoader(c.TLS.CertFile, c.TLS.KeyFile, c.TLS.CertData, c.TLS.KeyData)
 	}
 
 	if c.HasCertAuth() || c.HasCertCallback() {
@@ -390,10 +390,18 @@ func newCertificateCacheEntry(certFile, keyFile string) certificateCacheEntry {
 	return certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
 }
 
-// cachingCertificateLoader ensures that we don't hammer the filesystem when opening many connections
-// the underlying cert files are read at most once every second
-func cachingCertificateLoader(certFile, keyFile string) func() (*tls.Certificate, error) {
-	current := newCertificateCacheEntry(certFile, keyFile)
+// cachingCertificateLoader ensures that we don't hammer the filesystem when opening many connections.
+// The underlying cert files are read at most once every second.
+// If certData and keyData are provided, the initial cache entry is seeded from the in-memory data
+// to avoid a redundant disk read when the data has already been loaded by loadTLSFiles.
+func cachingCertificateLoader(certFile, keyFile string, certData, keyData []byte) func() (*tls.Certificate, error) {
+	var current certificateCacheEntry
+	if len(certData) > 0 && len(keyData) > 0 {
+		cert, err := tls.X509KeyPair(certData, keyData)
+		current = certificateCacheEntry{cert: &cert, err: err, birth: time.Now()}
+	} else {
+		current = newCertificateCacheEntry(certFile, keyFile)
+	}
 	var currentMtx sync.RWMutex
 
 	return func() (*tls.Certificate, error) {
