@@ -673,7 +673,7 @@ func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWa
 			return nil, err
 		}
 		cacheInterval.initialEventsEndBookmark = bookmark
-		watcher.bookmarkAfterResourceVersion = getBookmarkAfterResourceVersion(watcher.requestedWatchRV, watcher.requiredResourceVersion, cacheInterval.resourceVersion, opts)
+		watcher.bookmarkAfterResourceVersion = cacheInterval.resourceVersion
 		watcher.state = cacheWatcherBookmarkReceived
 	} else {
 		watcher.state = cacheWatcherBookmarkSent
@@ -1352,19 +1352,6 @@ func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
 	return c.versioner.ParseResourceVersion(resourceVersion)
-}
-
-// getBookmarkAfterResourceVersion returns a ResourceVersion after which
-// the bookmark event will be delivered.
-func getBookmarkAfterResourceVersion(parsedResourceVersion, requiredResourceVersion, watchCacheResourceVersion uint64, opts storage.ListOptions) uint64 {
-	switch {
-	case len(opts.ResourceVersion) == 0:
-		return requiredResourceVersion
-	case parsedResourceVersion == 0:
-		return watchCacheResourceVersion
-	default:
-		return parsedResourceVersion
-	}
 }
 
 // isListWatchRequest is mirrored in staging/src/k8s.io/apiserver/pkg/endpoints/handlers/get.go
