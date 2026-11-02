@@ -261,6 +261,9 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 func TestCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
 	for _, expectedEvent := range expectedEvents {
 		testCheckResult(t, w, &expectedEvent)
+		if expectedEvent.Type == watch.Error {
+			testCheckStop(t, w)
+		}
 	}
 }
 

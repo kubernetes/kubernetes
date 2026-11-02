@@ -901,6 +901,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 				Predicate:       storage.Everything,
 				Recursive:       true,
 			}
+			opts.Predicate.AllowWatchBookmarks = true
 			watcher, err := cacher.Watch(context.Background(), "/pods/test-ns", opts)
 			if err != nil {
 				t.Fatalf("Failed to create watch: %v", err)
@@ -918,6 +919,19 @@ func TestEmptyWatchEventCache(t *testing.T) {
 				if e, a := tt.expectedEvent.Object, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
 					t.Errorf("Expected: %#v, got: %#v", e, a)
 				}
+				select {
+				case event, ok := <-watcher.ResultChan():
+					if ok {
+						t.Errorf("Expected ResultChan() to be closed after error event, got: %#v", event)
+					}
+				case <-time.After(wait.ForeverTestTimeout):
+					t.Errorf("Timed out waiting for ResultChan() to close")
+				}
+				cacher.Lock()
+				if len(cacher.watchers.scopeWatchers) != 0 || len(cacher.watchers.indexWatchers) != 0 || len(cacher.bookmarkWatchers.watchersBuckets) != 0 {
+					t.Errorf("Expected no watchers registered in cacher, got: %#v, %#v", cacher.watchers, cacher.bookmarkWatchers)
+				}
+				cacher.Unlock()
 			case <-time.After(1 * time.Second):
 				// the watch was established otherwise
 				// we would be blocking on cache.Watch(...)
