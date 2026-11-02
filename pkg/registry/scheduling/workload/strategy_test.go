@@ -18,12 +18,14 @@ package workload
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -64,6 +66,7 @@ var (
 	forbiddenError          = "Forbidden"
 	fieldCannotBeUnsetError = "field cannot be cleared once set"
 	supportedPoliciesError  = `supported values: "Never", "PreemptLowerPriority"`
+	multiplePriorityError   = "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values"
 )
 
 func TestWorkloadStrategy(t *testing.T) {
@@ -93,7 +96,7 @@ func TestStrategyCreate(t *testing.T) {
 		enableTopologyAwareScheduling  bool
 		enableCompositePodGroup        bool
 		enablePodGroupPreemptionPolicy bool
-		expectValidationError          string
+		expectValidationErrors         []string
 	}{
 		"simple": {
 			obj:       workload,
@@ -105,7 +108,7 @@ func TestStrategyCreate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = -1
 				return w
 			}(),
-			expectValidationError: minCountError,
+			expectValidationErrors: []string{minCountError},
 		},
 		"drops field with SchedulingConstraints set and TAS disabled": {
 			obj: func() *scheduling.Workload {
@@ -146,7 +149,7 @@ func TestStrategyCreate(t *testing.T) {
 				return workload
 			}(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         tooManyItemsError,
+			expectValidationErrors:        []string{tooManyItemsError},
 		},
 		"invalid with invalid topology key": {
 			obj: func() *scheduling.Workload {
@@ -159,7 +162,7 @@ func TestStrategyCreate(t *testing.T) {
 				return workload
 			}(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         requiredError,
+			expectValidationErrors:        []string{requiredError},
 		},
 		"disruption mode single": {
 			obj: func() *scheduling.Workload {
@@ -194,7 +197,7 @@ func TestStrategyCreate(t *testing.T) {
 				}
 				return w
 			}(),
-			expectValidationError: "must specify exactly one of",
+			expectValidationErrors: []string{"must specify exactly one of"},
 		},
 		"priorityClassName set": {
 			obj: func() *scheduling.Workload {
@@ -214,7 +217,7 @@ func TestStrategyCreate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "invalid/priority/class/name"
 				return w
 			}(),
-			expectValidationError: subdomainNameError,
+			expectValidationErrors: []string{subdomainNameError},
 		},
 		"system-node-critical priority": {
 			obj: func() *scheduling.Workload {
@@ -284,7 +287,7 @@ func TestStrategyCreate(t *testing.T) {
 				return w
 			}(),
 			enablePodGroupPreemptionPolicy: true,
-			expectValidationError:          supportedPoliciesError,
+			expectValidationErrors:         []string{supportedPoliciesError},
 		},
 		"drop cpg preemptionPolicy with PodGroupPreemptionPolicy disabled": {
 			obj: func() *scheduling.Workload {
@@ -420,6 +423,7 @@ func TestStrategyCreate(t *testing.T) {
 										MinCount: 5,
 									},
 								},
+								PreemptionPolicy: &policy,
 							},
 						},
 					},
@@ -447,6 +451,7 @@ func TestStrategyCreate(t *testing.T) {
 										MinCount: 5,
 									},
 								},
+								PreemptionPolicy: &policy,
 							},
 						},
 					},
@@ -488,7 +493,7 @@ func TestStrategyCreate(t *testing.T) {
 			enableCompositePodGroup:        true,
 			enableTopologyAwareScheduling:  true,
 			enablePodGroupPreemptionPolicy: true,
-			expectValidationError:          supportedPoliciesError,
+			expectValidationErrors:         []string{multiplePriorityError, supportedPoliciesError},
 		},
 	}
 
@@ -507,15 +512,21 @@ func TestStrategyCreate(t *testing.T) {
 			errs := Strategy.Validate(ctx, workload)
 			errs = Strategy.ValidateDeclaratively(ctx, workload, nil, errs, operation.Create, Strategy.DeclarativeValidationConfig(ctx, workload, nil))
 			if len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				if len(errs) != 1 {
-					t.Fatalf("exactly one error expected")
+				if len(errs) != len(tc.expectValidationErrors) {
+					t.Fatalf("%d errors expected, got %d: %v", len(tc.expectValidationErrors), len(errs), errs)
 				}
-				if errMsg := errs[0].Error(); !strings.Contains(errMsg, tc.expectValidationError) {
-					t.Fatalf("error %#v does not contain the expected message %q", errMsg, tc.expectValidationError)
+				for _, expectedErr := range tc.expectValidationErrors {
+					if !slices.ContainsFunc(errs, func(err *field.Error) bool {
+						return strings.Contains(err.Error(), expectedErr)
+					}) {
+						t.Fatalf("errors %v do not contain the expected message %q", errs, expectedErr)
+					}
 				}
+			} else if len(tc.expectValidationErrors) != 0 {
+				t.Fatalf("expected errors %q, got none", tc.expectValidationErrors)
 			}
 			if tc.expectObj != nil {
 				if diff := cmp.Diff(tc.expectObj, workload); diff != "" {
@@ -1088,9 +1099,11 @@ func TestStrategyUpdate(t *testing.T) {
 				if len(errs) != len(tc.expectValidationErrors) {
 					t.Fatalf("%d errors expected", len(tc.expectValidationErrors))
 				}
-				for i, err := range errs {
-					if !strings.Contains(err.Error(), tc.expectValidationErrors[i]) {
-						t.Fatalf("error %#v does not contain the expected message %q", err.Error(), tc.expectValidationErrors[i])
+				for _, expectedErr := range tc.expectValidationErrors {
+					if !slices.ContainsFunc(errs, func(err *field.Error) bool {
+						return strings.Contains(err.Error(), expectedErr)
+					}) {
+						t.Fatalf("errors %v do not contain the expected message %q", errs, expectedErr)
 					}
 				}
 				return

@@ -28,6 +28,7 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+	"k8s.io/utils/ptr"
 )
 
 // validateWorkloadName can be used to check whether the given
@@ -89,17 +90,28 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 	return apivalidation.ValidateObjectMetaUpdate(&podGroup.ObjectMeta, &oldPodGroup.ObjectMeta, field.NewPath("metadata"))
 }
 
+// WorkloadValidationOptions is a struct that can be passed to ValidateWorkloadSpec to record the validate options.
+type WorkloadValidationOptions struct {
+	// Allow templates whose preemptionPolicy values differ.
+	AllowMismatchedPreemptionPolicy bool
+}
+
 // ValidateWorkload tests if all fields in a Workload are set correctly.
 func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateWorkloadSpec(&workload.Spec, field.NewPath("spec"), WorkloadValidationOptions{})...)
 	return allErrs
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.
 func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateWorkloadSpec(&workload.Spec, field.NewPath("spec"))...)
+	opts := WorkloadValidationOptions{
+		// Template preemptionPolicy is immutable and new templates cannot be added on update.
+		// Workloads stored before the consistency check may mix values. Tolerate them on update.
+		AllowMismatchedPreemptionPolicy: true,
+	}
+	allErrs = append(allErrs, ValidateWorkloadSpec(&workload.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
@@ -107,14 +119,15 @@ func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.Er
 // - All template names are unique.
 // - Depth of the CompositePodGroupTemplates tree is not higher than 4.
 // - All templates in the hierarchy share the same priority and PriorityClassName.
+// - All templates in the hierarchy share the same PreemptionPolicy unless opts.AllowMismatchedPreemptionPolicy is set.
 // - All composite pod group templates in the hierarchy have at least one child.
 // - CompositePodGroupTemplates with "gang" scheduling policy must have all their child templates with "gang" scheduling policy as well.
 // - CompositePodGroupTemplates with "all" disruption mode must have all their child templates with "all" disruption mode as well.
-func ValidateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+func ValidateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path, opts WorkloadValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateWorkloadTemplateNamesUniqueness(spec, fldPath)...)
 	allErrs = append(allErrs, validateWorkloadTemplatesDepth(spec, fldPath.Child("compositePodGroupTemplates"))...)
-	allErrs = append(allErrs, validateWorkloadPriority(spec, fldPath)...)
+	allErrs = append(allErrs, validateWorkloadPriority(spec, fldPath, opts)...)
 	for i, cpgt := range spec.CompositePodGroupTemplates {
 		allErrs = append(allErrs, validateCompositePodGroupTemplate(&cpgt, fldPath.Child("compositePodGroupTemplates").Index(i))...)
 	}
@@ -200,42 +213,44 @@ func validateWorkloadTemplatesDepth(spec *scheduling.WorkloadSpec, fldPath *fiel
 }
 
 // validateWorkloadPriority checks that all templates in the Workload hierarchy
-// share the same priorityClassName and priority values.
+// share the same priorityClassName, priority, and preemptionPolicy values.
 // Keep in sync with Builder.validatePriorityClassName in
 // k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder.
-func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
+func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path, opts WorkloadValidationOptions) field.ErrorList {
 	var firstClassName *string
 	var firstPriority *int32
+	var firstPreemptionPolicy *scheduling.PreemptionPolicy
 	var hasFirst bool
 
-	checkPriority := func(className string, priority *int32) bool {
+	checkPriority := func(className string, priority *int32, preemptionPolicy *scheduling.PreemptionPolicy) bool {
 		if !hasFirst {
 			firstClassName = &className
 			firstPriority = priority
+			firstPreemptionPolicy = preemptionPolicy
 			hasFirst = true
 			return true
 		}
 		if *firstClassName != className {
 			return false
 		}
-		if (firstPriority == nil) != (priority == nil) {
+		if !ptr.Equal(firstPriority, priority) {
 			return false
 		}
-		if firstPriority != nil && priority != nil && *firstPriority != *priority {
+		if !opts.AllowMismatchedPreemptionPolicy && !ptr.Equal(firstPreemptionPolicy, preemptionPolicy) {
 			return false
 		}
 		return true
 	}
 
 	for _, pg := range spec.PodGroupTemplates {
-		if !checkPriority(pg.PriorityClassName, pg.Priority) {
-			return field.ErrorList{field.Invalid(fldPath, nil, "detected multiple priority configurations")}
+		if !checkPriority(pg.PriorityClassName, pg.Priority, pg.PreemptionPolicy) {
+			return field.ErrorList{field.Invalid(fldPath, nil, "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values")}
 		}
 	}
 
 	var checkCpg func(cpg *scheduling.CompositePodGroupTemplate) bool
 	checkCpg = func(cpg *scheduling.CompositePodGroupTemplate) bool {
-		if !checkPriority(cpg.PriorityClassName, cpg.Priority) {
+		if !checkPriority(cpg.PriorityClassName, cpg.Priority, cpg.PreemptionPolicy) {
 			return false
 		}
 		for _, child := range cpg.CompositePodGroupTemplates {
@@ -244,7 +259,7 @@ func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path
 			}
 		}
 		for _, child := range cpg.PodGroupTemplates {
-			if !checkPriority(child.PriorityClassName, child.Priority) {
+			if !checkPriority(child.PriorityClassName, child.Priority, child.PreemptionPolicy) {
 				return false
 			}
 		}
@@ -253,7 +268,7 @@ func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path
 
 	for _, cpg := range spec.CompositePodGroupTemplates {
 		if !checkCpg(&cpg) {
-			return field.ErrorList{field.Invalid(fldPath, nil, "all priority and priorityClassName values must be identical, detected multiple values")}
+			return field.ErrorList{field.Invalid(fldPath, nil, "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values")}
 		}
 	}
 
