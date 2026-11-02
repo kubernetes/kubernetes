@@ -8,7 +8,7 @@ rest. Real admission policies should be less arbitrary.
 ## Example Webhook
 
 The helper adds one package import, one verification option and the
-`webhookAuth.WithTokenVerification` call. The rest below is the toy policy and
+`authadmission.WithTokenVerification` call. The rest below is the toy policy and
 ordinary HTTPS-server setup.
 
 Build this `main.go` as `/webhook` in your container image:
@@ -30,9 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	// Verification helper, distinct from the admission API types above.
-	webhookAuth "k8s.io/component-helpers/auth/admission"
+	authadmission "k8s.io/component-helpers/auth/admission"
 )
 
+// we are allowing also empty string for this toy example
 const resourceNameMustContainForAdmission = "love-kittens"
 
 func main() {
@@ -44,12 +45,13 @@ func main() {
 	// Both modes verify tokens before invoking policy.
 	expectedAudience := os.Getenv("WEBHOOK_LOVE_KITTENS_AUDIENCE")
 	expectedIssuer := os.Getenv("WEBHOOK_LOVE_KITTENS_ISSUER")
-	verificationOption := webhookAuth.WithAudience(expectedAudience)
+
+	verificationOption := authadmission.WithAudience(expectedAudience)
 	if expectedIssuer != "" {
-		verificationOption = webhookAuth.WithIssuer(expectedIssuer, expectedAudience, nil)
+		verificationOption = authadmission.WithIssuer(expectedIssuer, expectedAudience, nil) // nil is http.Client when needed
 	}
 	kittenPolicyHandlerFunc := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
-		if strings.Contains(req.Name, resourceNameMustContainForAdmission) {
+		if strings.Contains(req.Name, resourceNameMustContainForAdmission) || len(req.Name) == 0 {
 			return &admissionv1.AdmissionResponse{Allowed: true}
 		}
 		return &admissionv1.AdmissionResponse{
@@ -60,7 +62,8 @@ func main() {
 			},
 		}
 	}
-	handler, err := webhookAuth.WithTokenVerification(
+	handler, err := authadmission.WithTokenVerification(
+		// must be the root context of the webhook itself which usually is attached to the signal handler.
 		context.Background(),
 		kittenPolicyHandlerFunc,
 		verificationOption)
@@ -111,54 +114,39 @@ available so the helper can check the Service audience's namespace. The
 audience still comes from the webhook registration, not an incoming request.
 The ServiceAccount must be allowed to GET the JWKS.
 
-Create `kittens-tls` with a TLS certificate valid for `kittens.kittens-demo.svc`,
-signed by the CA you'll put in `caBundle` below:
-
-```sh
-kubectl create namespace kittens-demo
-kubectl -n kittens-demo create secret tls kittens-tls --cert=tls.crt --key=tls.key
-```
-
-Replace `YOUR_IMAGE` with the image containing the example:
+Set these fields on the webhook's Deployment and Service in `kittens-demo`
+(`# ...` marks omitted standard Pod/TLS boilerplate):
 
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: kittens, namespace: kittens-demo}
+metadata:
+  name: kittens
+  namespace: kittens-demo
 spec:
-  replicas: 1
-  selector:
-    matchLabels: {app: kittens}
   template:
-    metadata:
-      labels: {app: kittens}
     spec:
       automountServiceAccountToken: true
       containers:
       - name: webhook
-        image: YOUR_IMAGE
-        command: ["/webhook"]
-        args: ["-tls-cert=/tls/tls.crt", "-tls-key=/tls/tls.key"]
+        # ... image, command, TLS args (-tls-cert/-tls-key), port 8443 and TLS volumeMount ...
         env:
         - name: WEBHOOK_LOVE_KITTENS_AUDIENCE
           value: https://kittens.kittens-demo.svc:443/validate
         - name: WEBHOOK_LOVE_KITTENS_ISSUER
           value: ""
-        ports:
-        - {containerPort: 8443}
-        volumeMounts:
-        - {name: tls, mountPath: /tls, readOnly: true}
-      volumes:
-      - name: tls
-        secret: {secretName: kittens-tls}
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: kittens, namespace: kittens-demo}
+metadata:
+  name: kittens
+  namespace: kittens-demo
 spec:
-  selector: {app: kittens}
+  selector:
+    app: kittens
   ports:
-  - {port: 443, targetPort: 8443}
+  - port: 443
+    targetPort: 8443
 ```
 
 ### Register with the calling API server
@@ -279,7 +267,7 @@ webhooks:
 The issuer must match the calling cluster's token issuer. Discovery and JWKS
 must permit credential-free access. The example's nil HTTP client trusts system
 roots; for a private issuer CA, pass a credential-free client that trusts it to
-`webhookAuth.WithIssuer` instead. No ServiceAccount credential from the
+`WithIssuer` instead. No ServiceAccount credential from the
 hosting cluster is needed.
 
 ## Appendix: Audience inference and trust
@@ -347,9 +335,8 @@ exact mux route restricts the path, it does not identify the Service or port.
 registered URL or Service name, namespace, port and path? An installer can
 supply it; an authenticated API lookup would require RBAC plus an independently
 established, unambiguous mapping. Both must fail closed if identity is missing
-or ambiguous. `NewVerifier` for already-decoded requests has no HTTP path.
-Until such a source is demonstrated, `WithAudience` supplies the expected
-in-cluster audience independently of requests and tokens.
+or ambiguous. Until such a source is demonstrated, `WithAudience` supplies the
+expected in-cluster audience independently of requests and tokens.
 
 Sources: `pkg/kubelet/kubelet_pods.go` (`getServiceEnvVarMap`),
 `pkg/kubelet/envvars/envvars.go` (`FromServices`),
