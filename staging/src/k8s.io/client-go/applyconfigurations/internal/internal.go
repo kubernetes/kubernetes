@@ -4878,6 +4878,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: dynamicVolumePolicy
+      type:
+        namedType: io.k8s.api.core.v1.ContainerDynamicVolumePolicy
     - name: env
       type:
         list:
@@ -4977,6 +4980,12 @@ var schemaYAML = typed.YAMLObject(`types:
           keys:
           - mountPath
     - name: workingDir
+      type:
+        scalar: string
+- name: io.k8s.api.core.v1.ContainerDynamicVolumePolicy
+  map:
+    fields:
+    - name: restartPolicy
       type:
         scalar: string
 - name: io.k8s.api.core.v1.ContainerExtendedResourceRequest
@@ -5377,6 +5386,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: dynamicVolumePolicy
+      type:
+        namedType: io.k8s.api.core.v1.ContainerDynamicVolumePolicy
     - name: env
       type:
         list:
@@ -7482,6 +7494,14 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: volumeStatuses
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PodVolumeStatus
+          elementRelationship: associative
+          keys:
+          - name
 - name: io.k8s.api.core.v1.PodTemplate
   map:
     fields:
@@ -7525,6 +7545,16 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.core.v1.PodVolumeStatus
+  map:
+    fields:
+    - name: hostPhase
+      type:
+        scalar: string
     - name: name
       type:
         scalar: string

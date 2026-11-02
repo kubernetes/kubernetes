@@ -213,6 +213,16 @@ func init() {
 			"status.volumeHealth[*].name": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.volumeStatuses[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.volumeStatuses[*].hostPhase": {
+				{ErrorType: "FieldValueNotSupported"},
+			},
+			"status.volumeStatuses[*].name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }

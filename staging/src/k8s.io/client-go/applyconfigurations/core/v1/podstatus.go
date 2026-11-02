@@ -149,6 +149,11 @@ type PodStatusApplyConfiguration struct {
 	// volumeHealth contains node-reported health for each volume the pod is using.
 	// Populated by the kubelet on the pod's node.
 	VolumeHealth []PodVolumeHealthApplyConfiguration `json:"volumeHealth,omitempty"`
+	// volumeStatuses contains the status of volumes in the pod, tracking whether
+	// volumes are allocated and prepared on the host node. Currently, only
+	// node-local ephemeral volume types supported for dynamic updates (configMap,
+	// secret, projected, emptyDir, and image) are reported.
+	VolumeStatuses []PodVolumeStatusApplyConfiguration `json:"volumeStatuses,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -374,6 +379,19 @@ func (b *PodStatusApplyConfiguration) WithVolumeHealth(values ...*PodVolumeHealt
 			panic("nil value passed to WithVolumeHealth")
 		}
 		b.VolumeHealth = append(b.VolumeHealth, *values[i])
+	}
+	return b
+}
+
+// WithVolumeStatuses adds the given value to the VolumeStatuses field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the VolumeStatuses field.
+func (b *PodStatusApplyConfiguration) WithVolumeStatuses(values ...*PodVolumeStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVolumeStatuses")
+		}
+		b.VolumeStatuses = append(b.VolumeStatuses, *values[i])
 	}
 	return b
 }

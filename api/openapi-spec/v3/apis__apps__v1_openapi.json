@@ -1720,6 +1720,14 @@
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
+          "dynamicVolumePolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerDynamicVolumePolicy"
+              }
+            ],
+            "description": "dynamicVolumePolicy defines dynamic volume mutation behavior for this container."
+          },
           "env": {
             "description": "env is the list of environment variables to set in the container. Cannot be updated.",
             "items": {
@@ -1891,6 +1899,16 @@
         "required": [
           "name"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ContainerDynamicVolumePolicy": {
+        "description": "ContainerDynamicVolumePolicy defines dynamic volume mutation behavior for a container.",
+        "properties": {
+          "restartPolicy": {
+            "description": "restartPolicy defines whether dynamic volume mount additions or removals require restarting the container. Supported values: RestartContainer, \"\". Defaults to \"\".",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "io.k8s.api.core.v1.ContainerPort": {
@@ -2206,6 +2224,14 @@
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
+          },
+          "dynamicVolumePolicy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerDynamicVolumePolicy"
+              }
+            ],
+            "description": "dynamicVolumePolicy defines dynamic volume mutation behavior for this container. This field cannot be set on ephemeral containers."
           },
           "env": {
             "description": "env is the list of environment variables to set in the container. Cannot be updated.",

@@ -7070,6 +7070,10 @@
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
+        "dynamicVolumePolicy": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ContainerDynamicVolumePolicy",
+          "description": "dynamicVolumePolicy defines dynamic volume mutation behavior for this container."
+        },
         "env": {
           "description": "env is the list of environment variables to set in the container. Cannot be updated.",
           "items": {
@@ -7215,6 +7219,16 @@
       "required": [
         "name"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.ContainerDynamicVolumePolicy": {
+      "description": "ContainerDynamicVolumePolicy defines dynamic volume mutation behavior for a container.",
+      "properties": {
+        "restartPolicy": {
+          "description": "restartPolicy defines whether dynamic volume mount additions or removals require restarting the container. Supported values: RestartContainer, \"\". Defaults to \"\".",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.core.v1.ContainerExtendedResourceRequest": {
@@ -7869,6 +7883,10 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "dynamicVolumePolicy": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ContainerDynamicVolumePolicy",
+          "description": "dynamicVolumePolicy defines dynamic volume mutation behavior for this container. This field cannot be set on ephemeral containers."
         },
         "env": {
           "description": "env is the list of environment variables to set in the container. Cannot be updated.",
@@ -11288,6 +11306,19 @@
             "name"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "volumeStatuses": {
+          "description": "volumeStatuses contains the status of volumes in the pod, tracking whether volumes are allocated and prepared on the host node. Currently, only node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image) are reported.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.PodVolumeStatus"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
         }
       },
       "type": "object"
@@ -11393,6 +11424,23 @@
         },
         "name": {
           "description": "name matches an entry in pod.spec.volumes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.PodVolumeStatus": {
+      "description": "PodVolumeStatus represents the status of an individual volume in a pod.",
+      "properties": {
+        "hostPhase": {
+          "description": "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting.",
+          "type": "string"
+        },
+        "name": {
+          "description": "name is the name of the volume matching pod.Spec.Volumes.",
           "type": "string"
         }
       },

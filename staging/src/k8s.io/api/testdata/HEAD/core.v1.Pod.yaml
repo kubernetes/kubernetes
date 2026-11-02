@@ -169,6 +169,8 @@ spec:
     - argsValue
     command:
     - commandValue
+    dynamicVolumePolicy:
+      restartPolicy: restartPolicyValue
     env:
     - name: nameValue
       value: valueValue
@@ -412,6 +414,8 @@ spec:
     - argsValue
     command:
     - commandValue
+    dynamicVolumePolicy:
+      restartPolicy: restartPolicyValue
     env:
     - name: nameValue
       value: valueValue
@@ -661,6 +665,8 @@ spec:
     - argsValue
     command:
     - commandValue
+    dynamicVolumePolicy:
+      restartPolicy: restartPolicyValue
     env:
     - name: nameValue
       value: valueValue
@@ -1554,4 +1560,7 @@ status:
       reason: reasonValue
       status: statusValue
     lastTransitionTime: "2003-01-01T01:01:01Z"
+    name: nameValue
+  volumeStatuses:
+  - hostPhase: hostPhaseValue
     name: nameValue
