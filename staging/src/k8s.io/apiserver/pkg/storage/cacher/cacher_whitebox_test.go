@@ -1018,7 +1018,15 @@ func TestWatchCacheBypass(t *testing.T) {
 }
 
 func TestEmptyWatchEventCache(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testEmptyWatchEventCache(t)
+		})
+	}
+}
+
+func testEmptyWatchEventCache(t *testing.T) {
 	server, etcdStorage := cachertesting.NewEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 
@@ -1303,6 +1311,15 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 }
 
 func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testCacherDontMissEventsOnReinitialization(t)
+		})
+	}
+}
+
+func testCacherDontMissEventsOnReinitialization(t *testing.T) {
 	makePod := func(i int) *example.Pod {
 		return &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1581,6 +1598,15 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 }
 
 func TestInitialEventsEndBookmark(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testInitialEventsEndBookmark(t)
+		})
+	}
+}
+
+func testInitialEventsEndBookmark(t *testing.T) {
 	for _, listFromCacheSnapshot := range []bool{true, false} {
 		t.Run(fmt.Sprintf("ListFromCacheSnapshot=%v", listFromCacheSnapshot), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
@@ -1680,7 +1706,15 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 }
 
 func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testCacherSendsMultipleWatchBookmarks(t)
+		})
+	}
+}
+
+func testCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1751,6 +1785,15 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 }
 
 func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testDispatchingBookmarkEventsWithConcurrentStop(t)
+		})
+	}
+}
+
+func testDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1771,16 +1814,21 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to add a pod: %v", err)
 	}
+	readyGeneration, _, err := cacher.ready.checkAndReadGeneration()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i := 0; i < 1000; i++ {
 		pred := storage.Everything
 		pred.AllowWatchBookmarks = true
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
+		w, err := cacher.watch(ctx, "/pods/ns", 999, readyGeneration, storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
+		go w.process(ctx)
 		bookmark := &watchCacheEvent{
 			Type:            watch.Bookmark,
 			ResourceVersion: uint64(i),
@@ -1821,7 +1869,15 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 }
 
 func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testBookmarksOnResourceVersionUpdates(t)
+		})
+	}
+}
+
+func testBookmarksOnResourceVersionUpdates(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1974,7 +2030,15 @@ func TestStartingResourceVersion(t *testing.T) {
 }
 
 func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testDispatchEventWillNotBeBlockedByTimedOutWatcher(t)
+		})
+	}
+}
+
+func testDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2117,6 +2181,15 @@ func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictO
 }
 
 func TestCachingDeleteEvents(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testCachingDeleteEvents(t)
+		})
+	}
+}
+
+func testCachingDeleteEvents(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2286,8 +2359,13 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 }
 
 func TestCachingObjects(t *testing.T) {
-	t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
-	t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
+			t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+		})
+	}
 }
 
 func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {

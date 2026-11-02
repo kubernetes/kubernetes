@@ -638,8 +638,9 @@ func (c *cacheWatcher) processEvent(event *watchCacheEvent, resourceVersion uint
 	dequeuedAt := c.clock.Now()
 	// only send events newer than resourceVersion
 	// or a bookmark event with an RV equal to resourceVersion
-	// if we haven't sent one to the client
-	if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
+	// if resourceVersion has advanced past requiredResourceVersion (for non-WatchList watches)
+	// or we haven't sent the WatchList end bookmark yet
+	if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && ((c.bookmarkAfterResourceVersion == 0 && c.requiredResourceVersion > 0 && event.ResourceVersion > c.requiredResourceVersion) || !c.wasBookmarkAfterRvSent())) {
 		switch event.Type {
 		case watch.Bookmark:
 			if event.ResourceVersion < c.requiredResourceVersion {

@@ -574,11 +574,16 @@ func TestCorrectness(t *testing.T) {
 	for _, consistentGetFromCache := range []bool{true, false} {
 		t.Run(fmt.Sprintf("ConsistentGetFromCache=%v", consistentGetFromCache), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, consistentGetFromCache)
-			cachertesting.ForceRequestWatchProgressSupport(t)
-			ctx, cacher, server, terminate := setup.SetupWithEtcdServer(t)
-			t.Cleanup(terminate)
-			keyFunc := func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc("/pods/", obj) }
-			correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), keyFunc, setup.CompactStore(cacher, server.V3Client.Client))
+			for _, watchCacheStallResume := range []bool{true, false} {
+				t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+					cachertesting.ForceRequestWatchProgressSupport(t)
+					ctx, cacher, server, terminate := setup.SetupWithEtcdServer(t)
+					t.Cleanup(terminate)
+					keyFunc := func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc("/pods/", obj) }
+					correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), keyFunc, setup.CompactStore(cacher, server.V3Client.Client))
+				})
+			}
 		})
 	}
 }
