@@ -374,7 +374,7 @@ func (n *NodeInfo) AddPodInfo(podInfo fwk.PodInfo) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) && podWithRequiredNonHostScopedAntiAffinity(podInfo.GetPod()) {
 		n.PodsWithRequiredNonHostScopedAntiAffinity = append(n.PodsWithRequiredNonHostScopedAntiAffinity, podInfo)
 	}
-	n.update(podInfo, 1)
+	n.update(podInfo, true /* add */)
 }
 
 // AddPod is a wrapper around AddPodInfo.
@@ -451,58 +451,46 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 
 	var removedPod fwk.PodInfo
 	if n.Pods, removedPod = removeFromSlice(logger, n.Pods, k); removedPod != nil {
-		n.update(removedPod, -1)
+		n.update(removedPod, false /* add */)
 		return nil
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
-// update node info based on the pod, and sign.
-// The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
-func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
-	podResource := podInfo.CalculateResource()
-
-	switch {
-	case sign < 0:
-		// A saturated total can't be decremented exactly, so rebuild from the pods
-		// that remain (RemovePod already dropped this one); otherwise subtract exactly.
-		if n.requestedSaturated() {
-			n.recomputeRequested()
-		} else {
-			n.foldResource(podResource, -1)
-		}
-	case sign > 0:
-		// Requests are non-negative, so totals only grow; the add saturates rather than wrapping.
-		n.foldResource(podResource, 1)
-	}
-
-	// Consume ports when pod added or release ports when pod removed.
-	n.updateUsedPorts(podInfo.GetPod(), sign > 0)
-	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
-
+// update updates NodeInfo when AddPodInfo adds a pod or RemovePod removes a pod.
+func (n *NodeInfo) update(podInfo fwk.PodInfo, add bool) {
+	n.updateRequested(podInfo, add)
+	n.updateUsedPorts(podInfo.GetPod(), add)
+	n.updatePVCRefCounts(podInfo.GetPod(), add)
 	n.Generation = nextGeneration()
 }
 
-// foldResource adds one pod's resources to the requested totals when sign is
-// positive and subtracts them when negative. Only the add can saturate.
-func (n *NodeInfo) foldResource(podResource fwk.PodResource, sign int64) {
-	n.Requested.MilliCPU = addOrSub(n.Requested.MilliCPU, podResource.Resource.GetMilliCPU(), sign)
-	n.Requested.Memory = addOrSub(n.Requested.Memory, podResource.Resource.GetMemory(), sign)
-	n.Requested.EphemeralStorage = addOrSub(n.Requested.EphemeralStorage, podResource.Resource.GetEphemeralStorage(), sign)
+// updateRequested updates Requested and NonZeroRequested for a pod addition or removal.
+func (n *NodeInfo) updateRequested(podInfo fwk.PodInfo, add bool) {
+	if !add && n.requestedSaturated() {
+		// Saturation loses the exact sum, so rebuild from the remaining pods in n.Pods.
+		n.recomputeRequested()
+		return
+	}
+
+	podResource := podInfo.CalculateResource()
+	n.Requested.MilliCPU = addOrSub(n.Requested.MilliCPU, podResource.Resource.GetMilliCPU(), add)
+	n.Requested.Memory = addOrSub(n.Requested.Memory, podResource.Resource.GetMemory(), add)
+	n.Requested.EphemeralStorage = addOrSub(n.Requested.EphemeralStorage, podResource.Resource.GetEphemeralStorage(), add)
 	scalars := podResource.Resource.GetScalarResources()
 	if n.Requested.ScalarResources == nil && len(scalars) > 0 {
 		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
 	}
 	for rName, rQuant := range scalars {
-		n.Requested.ScalarResources[rName] = addOrSub(n.Requested.ScalarResources[rName], rQuant, sign)
+		n.Requested.ScalarResources[rName] = addOrSub(n.Requested.ScalarResources[rName], rQuant, add)
 	}
-	n.NonZeroRequested.MilliCPU = addOrSub(n.NonZeroRequested.MilliCPU, podResource.Non0CPU, sign)
-	n.NonZeroRequested.Memory = addOrSub(n.NonZeroRequested.Memory, podResource.Non0Mem, sign)
+	n.NonZeroRequested.MilliCPU = addOrSub(n.NonZeroRequested.MilliCPU, podResource.Non0CPU, add)
+	n.NonZeroRequested.Memory = addOrSub(n.NonZeroRequested.Memory, podResource.Non0Mem, add)
 }
 
 // requestedSaturated reports whether any requested total sits at the int64 ceiling.
 // A removal then rebuilds from Pods, since a capped total is no longer their exact sum.
-// The fields checked here must match those folded by foldResource.
+// The fields checked here must match those updated by updateRequested.
 func (n *NodeInfo) requestedSaturated() bool {
 	if n.Requested.MilliCPU == math.MaxInt64 ||
 		n.Requested.Memory == math.MaxInt64 ||
@@ -530,7 +518,7 @@ func (n *NodeInfo) recomputeRequested() {
 	n.NonZeroRequested.MilliCPU = 0
 	n.NonZeroRequested.Memory = 0
 	for _, p := range n.Pods {
-		n.foldResource(p.CalculateResource(), 1)
+		n.updateRequested(p, true /* add */)
 	}
 }
 
@@ -1570,13 +1558,13 @@ func SaturatingAdd(a, b int64) int64 {
 	return sum
 }
 
-// addOrSub does a saturating add when sign is positive and a plain subtract when
-// negative. The subtract runs only on an unsaturated total, so it can't underflow.
-func addOrSub(a, b, sign int64) int64 {
-	if sign < 0 {
-		return a - b
+// addOrSub does a saturating add when add is true and a plain subtract otherwise.
+// The subtract runs only on an unsaturated total, so it can't underflow.
+func addOrSub(a, b int64, add bool) int64 {
+	if add {
+		return SaturatingAdd(a, b)
 	}
-	return SaturatingAdd(a, b)
+	return a - b
 }
 
 // Add adds ResourceList into Resource.

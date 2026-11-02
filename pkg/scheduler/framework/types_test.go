@@ -294,7 +294,7 @@ func TestNodeInfoStaysFailClosedUnderRandomOps(t *testing.T) {
 		}
 		var fold int64
 		for _, p := range ni.Pods {
-			fold = addOrSub(fold, p.CalculateResource().Resource.GetMemory(), 1)
+			fold = SaturatingAdd(fold, p.CalculateResource().Resource.GetMemory())
 		}
 		if fold != ni.Requested.Memory {
 			t.Fatalf("op %d: running Requested.Memory=%d != fold of pods=%d", i, ni.Requested.Memory, fold)
