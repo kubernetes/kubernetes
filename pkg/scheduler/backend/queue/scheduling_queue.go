@@ -739,7 +739,7 @@ func (p *PriorityQueue) runPreEnqueuePluginsForPod(ctx context.Context, pInfo *f
 	gatingPlugin := pInfo.GatingPlugin
 	if gatingPlugin != "" {
 		// Run the gating plugin first
-		s := p.runPreEnqueuePlugin(ctx, p.preEnqueuePluginMap[pod.Spec.SchedulerName][gatingPlugin], pInfo, shouldRecordMetric)
+		s = p.runPreEnqueuePlugin(ctx, p.preEnqueuePluginMap[pod.Spec.SchedulerName][gatingPlugin], pInfo, shouldRecordMetric)
 		if !s.IsSuccess() {
 			// No need to iterate other plugins
 			return
@@ -751,7 +751,7 @@ func (p *PriorityQueue) runPreEnqueuePluginsForPod(ctx context.Context, pInfo *f
 			// should be run already above.
 			continue
 		}
-		s := p.runPreEnqueuePlugin(ctx, pl, pInfo, shouldRecordMetric)
+		s = p.runPreEnqueuePlugin(ctx, pl, pInfo, shouldRecordMetric)
 		if !s.IsSuccess() {
 			// No need to iterate other plugins
 			return

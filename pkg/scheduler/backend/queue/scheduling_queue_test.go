@@ -2374,6 +2374,70 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 	}
 }
 
+func TestPriorityQueue_PreEnqueueExtensionPointMetricStatus(t *testing.T) {
+	metrics.Register()
+
+	tests := []struct {
+		name         string
+		plugins      []fwk.PreEnqueuePlugin
+		gatingPlugin string
+		pod          *v1.Pod
+		wantStatus   fwk.Code
+	}{
+		{
+			name:       "all plugins pass",
+			plugins:    []fwk.PreEnqueuePlugin{&preEnqueuePlugin{name: "allow", allowlists: []string{"foo"}}},
+			pod:        st.MakePod().Name("p").Label("foo", "").Obj(),
+			wantStatus: fwk.Success,
+		},
+		{
+			name:       "a plugin gates the pod",
+			plugins:    []fwk.PreEnqueuePlugin{&preEnqueuePlugin{name: "deny"}},
+			pod:        st.MakePod().Name("p").Label("foo", "").Obj(),
+			wantStatus: fwk.UnschedulableAndUnresolvable,
+		},
+		{
+			name:         "the previously gating plugin gates the pod again",
+			plugins:      []fwk.PreEnqueuePlugin{&preEnqueuePlugin{name: "deny"}},
+			gatingPlugin: "deny",
+			pod:          st.MakePod().Name("p").Label("foo", "").Obj(),
+			wantStatus:   fwk.UnschedulableAndUnresolvable,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			m := map[string]map[string]fwk.PreEnqueuePlugin{"": make(map[string]fwk.PreEnqueuePlugin, len(tt.plugins))}
+			for _, plugin := range tt.plugins {
+				m[""][plugin.Name()] = plugin
+			}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m))
+			pInfo := q.newQueuedPodInfo(ctx, tt.pod)
+			pInfo.GatingPlugin = tt.gatingPlugin
+			metrics.FrameworkExtensionPointDuration.Reset()
+			q.runPreEnqueuePluginsForPod(ctx, pInfo)
+
+			for _, code := range []fwk.Code{fwk.Success, fwk.UnschedulableAndUnresolvable} {
+				count, err := testutil.GetHistogramMetricCount(metrics.FrameworkExtensionPointDuration.WithLabelValues(preEnqueue, code.String(), tt.pod.Spec.SchedulerName))
+				if err != nil {
+					t.Fatalf("Failed to get %s sample count: %v", metrics.FrameworkExtensionPointDuration.Name, err)
+				}
+				var want uint64
+				if code == tt.wantStatus {
+					want = 1
+				}
+				if count != want {
+					t.Errorf("Unexpected %s sample count for status %s: want %d, got %d", metrics.FrameworkExtensionPointDuration.Name, code, want, count)
+				}
+			}
+		})
+	}
+}
+
 func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 	tests := []struct {
 		name                   string
