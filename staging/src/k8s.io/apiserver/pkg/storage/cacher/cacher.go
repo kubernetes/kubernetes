@@ -1446,28 +1446,31 @@ type errWatcher struct {
 }
 
 func newErrWatcher(err error) *errWatcher {
-	// Create an error event
-	errEvent := watch.Event{Type: watch.Error}
-	switch err := err.(type) {
-	case runtime.Object:
-		errEvent.Object = err
-	case *errors.StatusError:
-		errEvent.Object = &err.ErrStatus
-	default:
-		errEvent.Object = &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Message: err.Error(),
-			Reason:  metav1.StatusReasonInternalError,
-			Code:    http.StatusInternalServerError,
-		}
-	}
-
 	// Create a watcher with room for a single event, populate it, and close the channel
 	watcher := &errWatcher{result: make(chan watch.Event, 1)}
-	watcher.result <- errEvent
+	watcher.result <- newWatchErrorEvent(err)
 	close(watcher.result)
 
 	return watcher
+}
+
+func newWatchErrorEvent(err error) watch.Event {
+	switch err := err.(type) {
+	case runtime.Object:
+		return watch.Event{Type: watch.Error, Object: err}
+	case *errors.StatusError:
+		return watch.Event{Type: watch.Error, Object: &err.ErrStatus}
+	default:
+		return watch.Event{
+			Type: watch.Error,
+			Object: &metav1.Status{
+				Status:  metav1.StatusFailure,
+				Message: err.Error(),
+				Reason:  metav1.StatusReasonInternalError,
+				Code:    http.StatusInternalServerError,
+			},
+		}
+	}
 }
 
 func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (delegator.Result, error) {
