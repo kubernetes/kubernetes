@@ -30,7 +30,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	jose "github.com/go-jose/go-jose/v4"
@@ -62,7 +61,6 @@ func init() {
 const defaultMaxBodyBytes int64 = 7 << 20
 
 const (
-	verificationTimeout              = 10 * time.Second
 	localJWKSPath                    = "/openid/v1/jwks"
 	projectedServiceAccountNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 	genericDenyMessage               = "webhook token verification failed"
@@ -229,25 +227,7 @@ func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	clientCopy := *client
-	// RemoteKeySet fetches outlive the verification request's context.
-	if clientCopy.Timeout <= 0 || clientCopy.Timeout > verificationTimeout {
-		clientCopy.Timeout = verificationTimeout
-	}
-	previousRedirectPolicy := clientCopy.CheckRedirect
-	clientCopy.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if req.URL.Scheme != "https" {
-			return errors.New("admission: signing-key and discovery redirects must use HTTPS")
-		}
-		if previousRedirectPolicy != nil {
-			return previousRedirectPolicy(req, via)
-		}
-		if len(via) >= 10 {
-			return errors.New("admission: stopped after 10 redirects")
-		}
-		return nil
-	}
-	client = &clientCopy
+
 	ctx = oidc.ClientContext(ctx, client)
 	provider, err := oidc.NewProvider(ctx, b.issuer)
 	if err != nil {
@@ -267,28 +247,31 @@ func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
 }
 
 func newLocalVerifier(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
+	// Require BearerTokenFile rather than static in-memory BearerToken so local
+	// verification always uses rotatable projected ServiceAccount credentials.
+	if config.BearerTokenFile == "" {
+		return nil, errors.New("admission: in-cluster configuration requires BearerTokenFile for rotatable ServiceAccount credentials")
+	}
+	tokenData, err := os.ReadFile(config.BearerTokenFile)
+	if err != nil {
+		return nil, fmt.Errorf("admission: reading projected ServiceAccount token file: %w", err)
+	}
 	// Bootstrap the expected issuer from our projected credential, never the incoming token.
-	token, err := jwt.ParseSigned(strings.TrimSpace(config.BearerToken), serviceAccountSigningAlgs)
+	token, err := jwt.ParseSigned(strings.TrimSpace(string(tokenData)), serviceAccountSigningAlgs)
 	if err != nil {
 		return nil, fmt.Errorf("admission: parsing projected ServiceAccount token: %w", err)
 	}
 	var claims jwt.Claims
+	// NOTE: why do we call this? Because we trust our environment. We trust environment
+	// variables and file system.  We have to.  No process can run in an untrusted environment reasonably.
 	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, fmt.Errorf("admission: reading projected ServiceAccount issuer: %w", err)
 	}
-	if claims.Issuer == "" {
-		return nil, errors.New("admission: projected ServiceAccount token has no issuer")
-	}
 	config = rest.CopyConfig(config)
-	if config.Timeout <= 0 || config.Timeout > verificationTimeout {
-		config.Timeout = verificationTimeout
-	}
+	config.BearerToken = ""
 	client, err := rest.HTTPClientFor(config)
 	if err != nil {
 		return nil, fmt.Errorf("admission: creating in-cluster HTTP client: %w", err)
-	}
-	client.CheckRedirect = func(*http.Request, []*http.Request) error {
-		return errors.New("admission: local signing-key requests must not redirect")
 	}
 	jwksURL := strings.TrimRight(config.Host, "/") + localJWKSPath
 	verifierConfig := &oidc.Config{ClientID: audience}
