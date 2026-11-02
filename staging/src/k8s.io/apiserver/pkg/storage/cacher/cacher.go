@@ -178,9 +178,8 @@ func (i *indexedWatchers) deleteWatcher(w *cacheWatcher, number int) {
 }
 
 func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done func(*cacheWatcher)) {
-	// note that we don't have to call setDrainInputBufferLocked method on the watchers
-	// because we take advantage of the default value - stop immediately
-	// also watchers that have had already its draining strategy set
+	// note that done stops each watcher immediately, without draining it.
+	// watchers that have had already its draining strategy set
 	// are no longer available (they were removed from the scopeWatchers and the indexWatchers maps)
 	if len(i.scopeWatchers) > 0 || len(i.indexWatchers) > 0 {
 		klog.Warningf("Terminating all watchers from cacher %v", groupResource)
@@ -339,7 +338,7 @@ type Cacher struct {
 	// watchersToStop is a list of watchers that were supposed to be stopped
 	// during current dispatching, but stopping was deferred to the end of
 	// dispatching that event to avoid race with closing channels in watchers.
-	watchersToStop []*cacheWatcher
+	watchersToStop []watcherToStop
 	// Maintain a timeout queue to send the bookmark event before the watcher times out.
 	// Note that this field when accessed MUST be protected by the Cacher.lock.
 	bookmarkWatchers *watcherBookmarkTimeBuckets
@@ -1216,8 +1215,9 @@ func (c *Cacher) finishDispatching() {
 	c.Lock()
 	defer c.Unlock()
 	c.dispatching = false
-	for _, watcher := range c.watchersToStop {
-		watcher.stopLocked()
+	for _, toStop := range c.watchersToStop {
+		toStop.watcher.setDrainInputBufferLocked(toStop.drain)
+		toStop.watcher.stopLocked()
 	}
 	c.watchersToStop = c.watchersToStop[:0]
 
@@ -1234,15 +1234,26 @@ func (c *Cacher) finishDispatching() {
 func (c *Cacher) terminateAllWatchers() {
 	c.Lock()
 	defer c.Unlock()
-	c.watchers.terminateAll(c.groupResource, c.stopWatcherLocked)
+	c.watchers.terminateAll(c.groupResource, func(watcher *cacheWatcher) {
+		c.stopWatcherLocked(watcher, false)
+	})
 }
 
-func (c *Cacher) stopWatcherLocked(watcher *cacheWatcher) {
+// watcherToStop is a stop deferred to the end of a dispatch. It keeps its own
+// drain mode: a later stop of the same watcher in that dispatch must not change
+// how this one runs.
+type watcherToStop struct {
+	watcher *cacheWatcher
+	drain   bool
+}
+
+func (c *Cacher) stopWatcherLocked(watcher *cacheWatcher, drain bool) {
 	if c.dispatching {
-		c.watchersToStop = append(c.watchersToStop, watcher)
-	} else {
-		watcher.stopLocked()
+		c.watchersToStop = append(c.watchersToStop, watcherToStop{watcher: watcher, drain: drain})
+		return
 	}
+	watcher.setDrainInputBufferLocked(drain)
+	watcher.stopLocked()
 }
 
 func (c *Cacher) isStopped() bool {
@@ -1288,13 +1299,11 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int) func(bool) {
 		c.Lock()
 		defer c.Unlock()
 
-		w.setDrainInputBufferLocked(drainWatcher)
-
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
 		c.watchers.deleteWatcher(w, index)
-		c.stopWatcherLocked(w)
+		c.stopWatcherLocked(w, drainWatcher)
 	}
 }
 
