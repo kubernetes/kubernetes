@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -113,5 +114,12 @@ func CustomRelTime(a, b time.Time, albl, blbl string, magnitudes []RelTimeMagnit
 			escaped = ch == '%'
 		}
 	}
-	return fmt.Sprintf(mag.Format, args...)
+	s := fmt.Sprintf(mag.Format, args...)
+	if lbl == "" {
+		// When the label is empty, trim the whitespace its "%s"
+		// placeholder would otherwise leave behind (e.g. a trailing
+		// space in "3 weeks %s").
+		s = strings.TrimRight(s, " ")
+	}
+	return s
 }

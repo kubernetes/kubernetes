@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/api/v3/version"
@@ -132,12 +132,12 @@ func reportCriticalError(err error, errc chan<- error) {
 // their major and minor version. The result will be 0 if a==b, -1 if a < b,
 // and 1 if a > b.
 func compareMajorMinorVersion(a, b *semver.Version) int {
-	na := &semver.Version{Major: a.Major, Minor: a.Minor}
-	nb := &semver.Version{Major: b.Major, Minor: b.Minor}
+	na := semver.New(a.Major(), a.Minor(), 0, "", "")
+	nb := semver.New(b.Major(), b.Minor(), 0, "", "")
 	switch {
-	case na.LessThan(*nb):
+	case na.LessThan(nb):
 		return -1
-	case nb.LessThan(*na):
+	case nb.LessThan(na):
 		return 1
 	default:
 		return 0
@@ -151,7 +151,7 @@ func serverVersion(h http.Header) *semver.Version {
 	if verStr == "" {
 		verStr = "2.0.0"
 	}
-	return semver.Must(semver.NewVersion(verStr))
+	return semver.MustParse(verStr)
 }
 
 // serverVersion returns the min cluster version from the given header.
@@ -161,7 +161,7 @@ func minClusterVersion(h http.Header) *semver.Version {
 	if verStr == "" {
 		verStr = "2.0.0"
 	}
-	return semver.Must(semver.NewVersion(verStr))
+	return semver.MustParse(verStr)
 }
 
 // checkVersionCompatibility checks whether the given version is compatible
@@ -171,8 +171,8 @@ func checkVersionCompatibility(name string, server, minCluster *semver.Version) 
 	localMinCluster *semver.Version,
 	err error,
 ) {
-	localServer = semver.Must(semver.NewVersion(version.Version))
-	localMinCluster = semver.Must(semver.NewVersion(version.MinClusterVersion))
+	localServer = semver.MustParse(version.Version)
+	localMinCluster = semver.MustParse(version.MinClusterVersion)
 	if compareMajorMinorVersion(server, localMinCluster) == -1 {
 		return localServer, localMinCluster, fmt.Errorf("remote version is too low: remote[%s]=%s, local=%s", name, server, localServer)
 	}

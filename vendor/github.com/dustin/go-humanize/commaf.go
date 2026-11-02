@@ -12,6 +12,13 @@ import (
 // BigCommaf produces a string form of the given big.Float in base 10
 // with commas after every three orders of magnitude.
 func BigCommaf(v *big.Float) string {
+	if v.IsInf() {
+		if v.Sign() < 0 {
+			return "-Inf"
+		}
+		return "+Inf"
+	}
+
 	buf := &bytes.Buffer{}
 	if v.Sign() < 0 {
 		buf.Write([]byte{'-'})

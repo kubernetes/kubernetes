@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 )
 
 var (
 	// MinClusterVersion is the min cluster version this etcd binary is compatible with.
 	MinClusterVersion = "3.0.0"
-	Version           = "3.7.3"
+	Version           = "3.8.0-alpha.0"
 	APIVersion        = "unknown"
 
 	// Git SHA Value will be set during build
@@ -35,25 +35,26 @@ var (
 
 // Get all constant versions defined in a centralized place.
 var (
-	V3_0 = semver.Version{Major: 3, Minor: 0}
-	V3_1 = semver.Version{Major: 3, Minor: 1}
-	V3_2 = semver.Version{Major: 3, Minor: 2}
-	V3_3 = semver.Version{Major: 3, Minor: 3}
-	V3_4 = semver.Version{Major: 3, Minor: 4}
-	V3_5 = semver.Version{Major: 3, Minor: 5}
-	V3_6 = semver.Version{Major: 3, Minor: 6}
-	V3_7 = semver.Version{Major: 3, Minor: 7}
-	V3_8 = semver.Version{Major: 3, Minor: 8}
-	V4_0 = semver.Version{Major: 4, Minor: 0}
+	V3_0 = *semver.New(3, 0, 0, "", "")
+	V3_1 = *semver.New(3, 1, 0, "", "")
+	V3_2 = *semver.New(3, 2, 0, "", "")
+	V3_3 = *semver.New(3, 3, 0, "", "")
+	V3_4 = *semver.New(3, 4, 0, "", "")
+	V3_5 = *semver.New(3, 5, 0, "", "")
+	V3_6 = *semver.New(3, 6, 0, "", "")
+	V3_7 = *semver.New(3, 7, 0, "", "")
+	V3_8 = *semver.New(3, 8, 0, "", "")
+	V3_9 = *semver.New(3, 9, 0, "", "")
+	V4_0 = *semver.New(4, 0, 0, "", "")
 
 	// AllVersions keeps all the versions in ascending order.
-	AllVersions = []semver.Version{V3_0, V3_1, V3_2, V3_3, V3_4, V3_5, V3_6, V3_7, V4_0}
+	AllVersions = []semver.Version{V3_0, V3_1, V3_2, V3_3, V3_4, V3_5, V3_6, V3_7, V3_8, V4_0}
 )
 
 func init() {
 	ver, err := semver.NewVersion(Version)
 	if err == nil {
-		APIVersion = fmt.Sprintf("%d.%d", ver.Major, ver.Minor)
+		APIVersion = fmt.Sprintf("%d.%d", ver.Major(), ver.Minor())
 	}
 }
 
@@ -66,6 +67,9 @@ type Versions struct {
 
 // Cluster only keeps the major.minor.
 func Cluster(v string) string {
+	if ver, err := semver.NewVersion(v); err == nil {
+		return fmt.Sprintf("%d.%d", ver.Major(), ver.Minor())
+	}
 	vs := strings.Split(v, ".")
 	if len(vs) <= 2 {
 		return v
@@ -74,13 +78,13 @@ func Cluster(v string) string {
 }
 
 func Compare(ver1, ver2 semver.Version) int {
-	return ver1.Compare(ver2)
+	return ver1.Compare(&ver2)
 }
 
 func LessThan(ver1, ver2 semver.Version) bool {
-	return ver1.LessThan(ver2)
+	return ver1.LessThan(&ver2)
 }
 
 func Equal(ver1, ver2 semver.Version) bool {
-	return ver1.Equal(ver2)
+	return ver1.Equal(&ver2)
 }

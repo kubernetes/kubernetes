@@ -81,7 +81,7 @@ func (as ActionList) unsafeExecute(lg *zap.Logger, tx backend.UnsafeReadWriter) 
 	return nil
 }
 
-// unsafeExecuteInReversedOrder executes actions in revered order. Will panic on
+// unsafeExecuteInReversedOrder executes actions in reversed order. Will panic on
 // action error. Should be used when reverting.
 func (as ActionList) unsafeExecuteInReversedOrder(lg *zap.Logger, tx backend.UnsafeReadWriter) {
 	for j := len(as) - 1; j >= 0; j-- {

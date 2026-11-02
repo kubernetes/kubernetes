@@ -126,7 +126,12 @@ func (ms *maintenanceServer) Defragment(ctx context.Context, sr *pb.DefragmentRe
 		return nil, togRPCError(err)
 	}
 	ms.lg.Info("finished defragment")
-	return &pb.DefragmentResponse{}, nil
+	// fill the header after the defrag returns: a defrag can take long enough
+	// for leadership to move, and callers read header.leader_id to decide
+	// whether they still need to transfer leadership before restarting a member.
+	resp := &pb.DefragmentResponse{Header: &pb.ResponseHeader{}}
+	ms.hdr.fill(resp.Header)
+	return resp, nil
 }
 
 // big enough size to hold >1 OS pages in the buffer
@@ -188,10 +193,13 @@ func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance
 		// No, the client will still receive non-nil response
 		// until server closes the stream with EOF
 		resp := &pb.SnapshotResponse{
+			Header:         &pb.ResponseHeader{},
 			RemainingBytes: uint64(total - sent),
 			Blob:           buf[:n],
 			Version:        storageVersion,
 		}
+		// The live store revision may differ from the snapshot's revision.
+		ms.hdr.fillWithoutRevision(resp.Header)
 		if err = srv.Send(resp); err != nil {
 			return togRPCError(err)
 		}
@@ -206,7 +214,8 @@ func (ms *maintenanceServer) Snapshot(sr *pb.SnapshotRequest, srv pb.Maintenance
 		zap.Int64("total-bytes", total),
 		zap.Int("checksum-size", len(sha)),
 	)
-	hresp := &pb.SnapshotResponse{RemainingBytes: 0, Blob: sha, Version: storageVersion}
+	hresp := &pb.SnapshotResponse{Header: &pb.ResponseHeader{}, RemainingBytes: 0, Blob: sha, Version: storageVersion}
+	ms.hdr.fillWithoutRevision(hresp.Header)
 	if err := srv.Send(hresp); err != nil {
 		return togRPCError(err)
 	}
@@ -303,7 +312,9 @@ func (ms *maintenanceServer) MoveLeader(ctx context.Context, tr *pb.MoveLeaderRe
 	if err := ms.lt.MoveLeader(ctx, uint64(ms.rg.Leader()), tr.TargetID); err != nil {
 		return nil, togRPCError(err)
 	}
-	return &pb.MoveLeaderResponse{}, nil
+	resp := &pb.MoveLeaderResponse{Header: &pb.ResponseHeader{}}
+	ms.hdr.fill(resp.Header)
+	return resp, nil
 }
 
 func (ms *maintenanceServer) Downgrade(ctx context.Context, r *pb.DowngradeRequest) (*pb.DowngradeResponse, error) {

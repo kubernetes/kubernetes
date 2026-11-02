@@ -15,7 +15,7 @@
 package schema
 
 import (
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 
 	"go.etcd.io/bbolt"
 	"go.etcd.io/etcd/server/v3/storage/backend"
@@ -57,7 +57,7 @@ func ReadStorageVersionFromSnapshot(tx *bbolt.Tx) *semver.Version {
 // UnsafeSetStorageVersion updates etcd storage version in backend.
 // Populated since v3.6
 func UnsafeSetStorageVersion(tx backend.UnsafeWriter, v *semver.Version) {
-	sv := semver.Version{Major: v.Major, Minor: v.Minor}
+	sv := *semver.New(v.Major(), v.Minor(), 0, "", "")
 	tx.UnsafePut(Meta, MetaStorageVersionName, []byte(sv.String()))
 }
 

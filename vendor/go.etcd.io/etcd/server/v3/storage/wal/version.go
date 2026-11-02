@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/golang/protobuf/proto" //nolint:staticcheck // TODO: remove for a supported version
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -244,7 +244,7 @@ func visitDescriptor(md protoreflect.Descriptor, visitor Visitor) error {
 }
 
 func maxVersion(a *semver.Version, b *semver.Version) *semver.Version {
-	if a != nil && (b == nil || b.LessThan(*a)) {
+	if a != nil && (b == nil || b.LessThan(a)) {
 		return a
 	}
 	return b

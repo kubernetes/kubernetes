@@ -26,6 +26,11 @@ import (
 )
 
 func (s *store) scheduleCompaction(compactMainRev, prevCompactRev int64) (KeyValueHash, error) {
+	// Held for the whole compaction pass (all batches), so it can't interleave with a
+	// non-blocking Defrag(); see Backend.LockForSafeRangeDelete for why that matters.
+	s.b.LockForSafeRangeDelete()
+	defer s.b.UnlockForSafeRangeDelete()
+
 	totalStart := time.Now()
 	keep := s.kvindex.Compact(compactMainRev)
 	indexCompactionPauseMs.Observe(float64(time.Since(totalStart) / time.Millisecond))

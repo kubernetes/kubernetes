@@ -132,6 +132,13 @@ type Lease interface {
 	// alive stream is interrupted in some way the client cannot handle itself;
 	// given context "ctx" is canceled or timed out.
 	//
+	// Responses buffered on the channel before the lease is revoked (via Revoke)
+	// may still be delivered after Revoke returns; such a response can carry a
+	// Header.Revision below the revoke response's revision. The channel is closed
+	// once those buffered responses drain, so a caller should read until the
+	// channel closes rather than treat any single post-Revoke response as
+	// evidence the lease is still alive.
+	//
 	// TODO(v4.0): post errors to last keep alive message before closing
 	// (see https://github.com/etcd-io/etcd/pull/7866)
 	KeepAlive(ctx context.Context, id LeaseID) (<-chan *LeaseKeepAliveResponse, error)

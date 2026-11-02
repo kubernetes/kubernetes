@@ -31,8 +31,6 @@ import (
 // as ReadCloser.
 func (s *EtcdServer) createMergedSnapshotMessage(m *raftpb.Message, snapt, snapi uint64, confState *raftpb.ConfState) *snap.Message {
 	lg := s.Logger()
-	// get a snapshot of v2 store as []byte
-	d := GetMembershipInfoInV2Format(lg, s.cluster)
 
 	// commit kv to write metadata(for example: consistent index).
 	s.KV().Commit()
@@ -49,11 +47,8 @@ func (s *EtcdServer) createMergedSnapshotMessage(m *raftpb.Message, snapt, snapi
 			// Defensive copy as sending snapshot is async
 			ConfState: proto.Clone(confState).(*raftpb.ConfState),
 		},
-		Data: d,
 	}
 	m.Snapshot = snapshot
-
-	verifySnapshotIndex(snapshot, s.consistIndex.ConsistentIndex())
 
 	return snap.NewMessage(m, rc, dbsnap.Size())
 }

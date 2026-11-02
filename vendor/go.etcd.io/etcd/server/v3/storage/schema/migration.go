@@ -17,7 +17,7 @@ package schema
 import (
 	"fmt"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/api/v3/version"
@@ -29,15 +29,15 @@ type migrationPlan []migrationStep
 func newPlan(lg *zap.Logger, current semver.Version, target semver.Version) (plan migrationPlan, err error) {
 	current = trimToMinor(current)
 	target = trimToMinor(target)
-	if current.Major != target.Major {
+	if current.Major() != target.Major() {
 		lg.Error("Changing major storage version is not supported",
 			zap.String("storage-version", current.String()),
 			zap.String("target-storage-version", target.String()),
 		)
 		return plan, fmt.Errorf("changing major storage version is not supported")
 	}
-	for !current.Equal(target) {
-		isUpgrade := current.Minor < target.Minor
+	for !current.Equal(&target) {
+		isUpgrade := current.Minor() < target.Minor()
 
 		changes, err := schemaChangesForVersion(current, isUpgrade)
 		if err != nil {
@@ -83,9 +83,9 @@ func newMigrationStep(v semver.Version, isUpgrade bool, changes []schemaChange) 
 		}
 	}
 	if isUpgrade {
-		step.target = semver.Version{Major: v.Major, Minor: v.Minor + 1}
+		step.target = *semver.New(v.Major(), v.Minor()+1, 0, "", "")
 	} else {
-		step.target = semver.Version{Major: v.Major, Minor: v.Minor - 1}
+		step.target = *semver.New(v.Major(), v.Minor()-1, 0, "", "")
 	}
 	return step
 }
@@ -97,12 +97,12 @@ func (s migrationStep) unsafeExecute(lg *zap.Logger, tx backend.UnsafeReadWriter
 		return err
 	}
 	// Storage version is available since v3.6, downgrading target v3.5 should clean this field.
-	if !s.target.LessThan(version.V3_6) {
+	if !s.target.LessThan(&version.V3_6) {
 		UnsafeSetStorageVersion(tx, &s.target)
 	}
 	return nil
 }
 
 func trimToMinor(ver semver.Version) semver.Version {
-	return semver.Version{Major: ver.Major, Minor: ver.Minor}
+	return *semver.New(ver.Major(), ver.Minor(), 0, "", "")
 }

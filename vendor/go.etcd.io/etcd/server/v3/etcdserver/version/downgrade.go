@@ -15,7 +15,7 @@
 package version
 
 import (
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/api/v3/version"
@@ -30,22 +30,22 @@ type DowngradeInfo struct {
 }
 
 func (d *DowngradeInfo) GetTargetVersion() *semver.Version {
-	return semver.Must(semver.NewVersion(d.TargetVersion))
+	return semver.MustParse(d.TargetVersion)
 }
 
 // isValidDowngrade verifies whether the cluster can be downgraded from verFrom to verTo
 func isValidDowngrade(verFrom *semver.Version, verTo *semver.Version) bool {
-	return verTo.Equal(*allowedDowngradeVersion(verFrom))
+	return verTo.Equal(allowedDowngradeVersion(verFrom))
 }
 
 // MustDetectDowngrade will detect local server joining cluster that doesn't support it's version.
 func MustDetectDowngrade(lg *zap.Logger, sv, cv *semver.Version) {
 	// only keep major.minor version for comparison against cluster version
-	sv = &semver.Version{Major: sv.Major, Minor: sv.Minor}
+	sv = semver.New(sv.Major(), sv.Minor(), 0, "", "")
 
 	// if the cluster disables downgrade, check local version against determined cluster version.
 	// the validation passes when local version is not less than cluster version
-	if cv != nil && sv.LessThan(*cv) {
+	if cv != nil && sv.LessThan(cv) {
 		lg.Panic(
 			"invalid downgrade; server version is lower than determined cluster version",
 			zap.String("current-server-version", sv.String()),
@@ -56,7 +56,7 @@ func MustDetectDowngrade(lg *zap.Logger, sv, cv *semver.Version) {
 
 func allowedDowngradeVersion(ver *semver.Version) *semver.Version {
 	// Todo: handle the case that downgrading from higher major version(e.g. downgrade from v4.0 to v3.x)
-	return &semver.Version{Major: ver.Major, Minor: ver.Minor - 1}
+	return semver.New(ver.Major(), ver.Minor()-1, 0, "", "")
 }
 
 // IsValidClusterVersionChange checks the two scenario when version is valid to change:
@@ -66,10 +66,10 @@ func allowedDowngradeVersion(ver *semver.Version) *semver.Version {
 // is set to MinVersion(3.0), when all members are at higher version, cluster version
 // is lower than minimal server version, cluster version should change
 func IsValidClusterVersionChange(verFrom *semver.Version, verTo *semver.Version) bool {
-	verFrom = &semver.Version{Major: verFrom.Major, Minor: verFrom.Minor}
-	verTo = &semver.Version{Major: verTo.Major, Minor: verTo.Minor}
+	verFrom = semver.New(verFrom.Major(), verFrom.Minor(), 0, "", "")
+	verTo = semver.New(verTo.Major(), verTo.Minor(), 0, "", "")
 
-	if isValidDowngrade(verFrom, verTo) || (verFrom.Major == verTo.Major && verFrom.LessThan(*verTo)) {
+	if isValidDowngrade(verFrom, verTo) || (verFrom.Major() == verTo.Major() && verFrom.LessThan(verTo)) {
 		return true
 	}
 	return false
