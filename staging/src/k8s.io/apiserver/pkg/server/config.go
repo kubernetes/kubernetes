@@ -416,10 +416,9 @@ func init() {
 // bytes, retained by the process-wide protobuf serialization pool
 // (runtime.AllocatorPool) when the AllocatorPoolBufferCap feature gate is
 // enabled: large enough to keep pooling typical single-object and
-// streamed-list item responses, small enough that a burst of near-limit
-// objects (the etcd object limit is 1.5MiB) cannot pin many megabytes of
-// encode buffers for the life of the process.
-const DefaultMaxPooledEncodeBufferSize = 256 * 1024
+// streamed-list item responses, small enough that larger objects cannot pin
+// many megabytes of encode buffers for the life of the process.
+const DefaultMaxPooledEncodeBufferSize = 32 * 1024
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
