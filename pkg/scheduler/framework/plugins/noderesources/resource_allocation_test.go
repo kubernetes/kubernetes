@@ -968,8 +968,8 @@ func BenchmarkNodeMatchCaching(b *testing.B) {
 }
 
 func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
-	// A node total already saturated at MaxInt64 (e.g. many spec.nodeName-pinned pods)
-	// must not wrap negative when the scorer folds in the scored pod: it reads as free space.
+	// Adding the scored pod to a node total already at MaxInt64 must not wrap it
+	// negative, which would read as free capacity.
 	tCtx := ktesting.Init(t)
 
 	node := st.MakeNode().Name("saturated-node").Capacity(map[v1.ResourceName]string{
@@ -977,7 +977,7 @@ func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
 		v1.ResourceMemory: "16Gi",
 	}).Obj()
 
-	// A pod whose cpu/memory requests project to MaxInt64 saturates the node's Requested totals (#141305).
+	// Both requests project to MaxInt64, so the node totals saturate.
 	hugePod := st.MakePod().Name("huge").Namespace("ns").UID("huge").
 		Req(map[v1.ResourceName]string{
 			v1.ResourceCPU:    "9223372036854775807",

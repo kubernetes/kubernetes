@@ -488,9 +488,7 @@ func (n *NodeInfo) updateRequested(podInfo fwk.PodInfo, add bool) {
 	n.NonZeroRequested.Memory = addOrSub(n.NonZeroRequested.Memory, podResource.Non0Mem, add)
 }
 
-// requestedSaturated reports whether any requested total sits at the int64 ceiling.
-// A removal then rebuilds from Pods, since a capped total is no longer their exact sum.
-// The fields checked here must match those updated by updateRequested.
+// requestedSaturated reports whether any total kept by updateRequested is at math.MaxInt64.
 func (n *NodeInfo) requestedSaturated() bool {
 	if n.Requested.MilliCPU == math.MaxInt64 ||
 		n.Requested.Memory == math.MaxInt64 ||
@@ -507,9 +505,7 @@ func (n *NodeInfo) requestedSaturated() bool {
 	return false
 }
 
-// recomputeRequested rebuilds the requested totals from the pods on the node.
-// It runs when a pod is removed from a node whose totals had saturated, since
-// subtracting from a saturated total would misreport what remains.
+// recomputeRequested rebuilds Requested and NonZeroRequested from the pods in n.Pods.
 func (n *NodeInfo) recomputeRequested() {
 	n.Requested.MilliCPU = 0
 	n.Requested.Memory = 0
@@ -1558,8 +1554,8 @@ func SaturatingAdd(a, b int64) int64 {
 	return sum
 }
 
-// addOrSub does a saturating add when add is true and a plain subtract otherwise.
-// The subtract runs only on an unsaturated total, so it can't underflow.
+// addOrSub adds b to a with SaturatingAdd, or subtracts it when add is false.
+// The subtract stays exact because updateRequested rebuilds a saturated total instead.
 func addOrSub(a, b int64, add bool) int64 {
 	if add {
 		return SaturatingAdd(a, b)

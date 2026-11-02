@@ -109,11 +109,8 @@ func TestSaturatingAdd(t *testing.T) {
 }
 
 func TestNodeInfoSaturatesAndRecomputesEveryRequestedField(t *testing.T) {
-	// Two pods each project a field to math.MaxInt64; that field's total must
-	// saturate, not wrap negative, and removing one of them must rebuild from the
-	// other instead of subtracting. Every accumulated field is covered, built
-	// directly so the table does not depend on the projection that #141305 flips.
-	const max = int64(math.MaxInt64)
+	// Two MaxInt64 pods must saturate each accumulated field, and removing one
+	// must rebuild that field from the other.
 	dev := v1.ResourceName("example.com/dev")
 	cases := []struct {
 		name             string
@@ -121,12 +118,12 @@ func TestNodeInfoSaturatesAndRecomputesEveryRequestedField(t *testing.T) {
 		non0CPU, non0Mem int64
 		got              func(*NodeInfo) int64
 	}{
-		{"MilliCPU", Resource{MilliCPU: max}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.MilliCPU }},
-		{"Memory", Resource{Memory: max}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.Memory }},
-		{"EphemeralStorage", Resource{EphemeralStorage: max}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.EphemeralStorage }},
-		{"ScalarResources", Resource{ScalarResources: map[v1.ResourceName]int64{dev: max}}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.ScalarResources[dev] }},
-		{"NonZeroCPU", Resource{}, max, 0, func(n *NodeInfo) int64 { return n.NonZeroRequested.MilliCPU }},
-		{"NonZeroMemory", Resource{}, 0, max, func(n *NodeInfo) int64 { return n.NonZeroRequested.Memory }},
+		{"MilliCPU", Resource{MilliCPU: math.MaxInt64}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.MilliCPU }},
+		{"Memory", Resource{Memory: math.MaxInt64}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.Memory }},
+		{"EphemeralStorage", Resource{EphemeralStorage: math.MaxInt64}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.EphemeralStorage }},
+		{"ScalarResources", Resource{ScalarResources: map[v1.ResourceName]int64{dev: math.MaxInt64}}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.ScalarResources[dev] }},
+		{"NonZeroCPU", Resource{}, math.MaxInt64, 0, func(n *NodeInfo) int64 { return n.NonZeroRequested.MilliCPU }},
+		{"NonZeroMemory", Resource{}, 0, math.MaxInt64, func(n *NodeInfo) int64 { return n.NonZeroRequested.Memory }},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -134,15 +131,13 @@ func TestNodeInfoSaturatesAndRecomputesEveryRequestedField(t *testing.T) {
 			r1, r2 := c.res, c.res
 			p1 := addCachedResource(ni, "p1", &r1, c.non0CPU, c.non0Mem)
 			p2 := addCachedResource(ni, "p2", &r2, c.non0CPU, c.non0Mem)
-			if got := c.got(ni); got != max {
+			if got := c.got(ni); got != math.MaxInt64 {
 				t.Errorf("%s = %d after two MaxInt64 adds, want MaxInt64 (wrapped instead of saturating)", c.name, got)
 			}
-			// Removing one pod must rebuild from the other, which still projects to MaxInt64;
-			// a plain subtract would drop the field to 0.
 			if err := ni.RemovePod(klog.Background(), p1); err != nil {
 				t.Fatal(err)
 			}
-			if got := c.got(ni); got != max {
+			if got := c.got(ni); got != math.MaxInt64 {
 				t.Errorf("%s = %d after removing one of two MaxInt64 pods, want MaxInt64 (subtracted instead of rebuilding)", c.name, got)
 			}
 			if err := ni.RemovePod(klog.Background(), p2); err != nil {
@@ -156,9 +151,8 @@ func TestNodeInfoSaturatesAndRecomputesEveryRequestedField(t *testing.T) {
 }
 
 func TestNodeInfoRemovePodRecomputesAfterSaturation(t *testing.T) {
-	// Saturation is not reversible: once two huge pods drive the node total to
-	// math.MaxInt64, subtracting one of them would wrap the total down and lose
-	// the other. Removal instead recomputes from the pods that remain.
+	// The MilliCPU case of the table above, but through the Quantity projection
+	// and with a 100m pod that must survive the rebuild.
 	logger := klog.Background()
 	huge := map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"} // MilliValue is math.MaxInt64
 	small := map[v1.ResourceName]string{v1.ResourceCPU: "100m"}
@@ -174,7 +168,6 @@ func TestNodeInfoRemovePodRecomputesAfterSaturation(t *testing.T) {
 		t.Fatalf("after adds, Requested.MilliCPU = %d, want %d", got, int64(math.MaxInt64))
 	}
 
-	// b still needs MaxInt64, so the node stays saturated rather than dropping to 0.
 	if err := ni.RemovePod(logger, a); err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +175,6 @@ func TestNodeInfoRemovePodRecomputesAfterSaturation(t *testing.T) {
 		t.Errorf("after removing a, Requested.MilliCPU = %d, want %d (b still present)", got, int64(math.MaxInt64))
 	}
 
-	// With both huge pods gone, only the 100m base remains.
 	if err := ni.RemovePod(logger, b); err != nil {
 		t.Fatal(err)
 	}
@@ -194,9 +186,7 @@ func TestNodeInfoRemovePodRecomputesAfterSaturation(t *testing.T) {
 	}
 }
 
-// addCachedResource adds a pod to ni with a directly-constructed PodResource, so
-// the arithmetic tests do not depend on the Quantity int64 projection that
-// #141305 changes. It returns the pod, for a later RemovePod.
+// addCachedResource adds a pod with a prebuilt PodResource, so a test can set exact int64 totals.
 func addCachedResource(ni *NodeInfo, name string, res *Resource, non0CPU, non0Mem int64) *v1.Pod {
 	pod := st.MakePod().Name(name).UID(name).Obj()
 	ni.AddPodInfo(&PodInfo{Pod: pod, cachedResource: &fwk.PodResource{Resource: res, Non0CPU: non0CPU, Non0Mem: non0Mem}})
@@ -204,15 +194,10 @@ func addCachedResource(ni *NodeInfo, name string, res *Resource, non0CPU, non0Me
 }
 
 func TestNodeInfoRecomputeIsOrderIndependent(t *testing.T) {
-	// recomputeRequested folds the pods in slice order. Requests are non-negative,
-	// so once a partial sum saturates it stays MaxInt64, and every order that sums
-	// past int64 rebuilds to the same rail.
+	// A saturated non-negative sum stays at MaxInt64, so the rebuild must not
+	// depend on the order of n.Pods.
 	build := func(order []int) *NodeInfo {
-		res := map[int]*Resource{
-			0: {Memory: math.MaxInt64},
-			1: {Memory: math.MaxInt64},
-			2: {Memory: math.MaxInt64 / 2},
-		}
+		res := []*Resource{{Memory: math.MaxInt64}, {Memory: math.MaxInt64}, {Memory: math.MaxInt64 / 2}}
 		ni := NewNodeInfo()
 		for _, i := range order {
 			addCachedResource(ni, fmt.Sprintf("p%d", i), res[i], 0, res[i].Memory)
@@ -228,9 +213,8 @@ func TestNodeInfoRecomputeIsOrderIndependent(t *testing.T) {
 }
 
 func TestNodeInfoSnapshotStaysSaturatedAfterRemoval(t *testing.T) {
-	// A snapshot copies the totals, so a removal on the snapshot (as preemption
-	// simulation does) re-derives saturation from them and rebuilds from the pods
-	// that remain, leaving the source node untouched.
+	// A removal on a snapshot, as preemption does, rebuilds the snapshot's totals
+	// and leaves the source node alone.
 	logger := klog.Background()
 	huge := map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"}
 
@@ -242,11 +226,9 @@ func TestNodeInfoSnapshotStaysSaturatedAfterRemoval(t *testing.T) {
 	if err := clone.RemovePod(logger, st.MakePod().Name("a").UID("a").Req(huge).Obj()); err != nil {
 		t.Fatal(err)
 	}
-	// b alone still projects to MaxInt64, so the rebuilt clone stays at the rail.
 	if got := clone.Requested.MilliCPU; got != math.MaxInt64 {
 		t.Errorf("after removing a from the snapshot, Requested.MilliCPU = %d, want %d", got, int64(math.MaxInt64))
 	}
-	// The removal on the snapshot must not touch the source node.
 	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
 		t.Errorf("source Requested.MilliCPU = %d after a removal on its snapshot, want %d", got, int64(math.MaxInt64))
 	}
@@ -256,9 +238,8 @@ func TestNodeInfoSnapshotStaysSaturatedAfterRemoval(t *testing.T) {
 }
 
 func TestNodeInfoStaysFailClosedUnderRandomOps(t *testing.T) {
-	// Random add/remove sequences whose pod memory includes math.MaxInt64 must
-	// never drive a total negative, and the running total must match a saturating
-	// fold of the live pods.
+	// Random adds and removes, some at MaxInt64, must keep Memory non-negative and
+	// equal to a saturating fold of the live pods.
 	logger := klog.Background()
 	r := rand.New(rand.NewSource(1)) // deterministic
 	pickMem := func() int64 {
@@ -312,11 +293,8 @@ func TestNodeInfoStaysFailClosedUnderRandomOps(t *testing.T) {
 }
 
 func BenchmarkNodeInfoRemovePods(b *testing.B) {
-	// Compare removals on a saturated node (each removal rebuilds from the
-	// remaining pods) against an unsaturated node (a plain decrement), so the
-	// rebuild's incremental cost is isolated rather than folded in with the
-	// linear pod-slice scan RemovePod already does. The scalar variant exercises
-	// the map that recomputeRequested clears and refills.
+	// On a saturated node each removal rebuilds the totals; on an unsaturated node
+	// it subtracts. The scalar variant also clears and refills the scalar map.
 	logger := klog.Background()
 	variants := []struct {
 		name       string
