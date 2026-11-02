@@ -29,6 +29,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
 
 var alwaysRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool {
@@ -397,4 +400,62 @@ func TestWrapPreviousError(t *testing.T) {
 			t.Errorf("Expected previous error: %v, but got: %v", io.EOF, retry.previousErr)
 		}
 	})
+}
+
+func TestBeforeJittersRetryAfter(t *testing.T) {
+	const retryAfter = 4 * time.Second
+	tests := []struct {
+		name     string
+		enabled  bool
+		backoff  time.Duration
+		minSleep time.Duration
+		maxSleep time.Duration
+	}{
+		{
+			name:     "gate off keeps the exact Retry-After",
+			minSleep: retryAfter,
+			maxSleep: retryAfter,
+		},
+		{
+			name:     "gate on adds up to the jitter fraction",
+			enabled:  true,
+			minSleep: retryAfter,
+			maxSleep: retryAfter + time.Duration(retryAfterJitterFactor*float64(retryAfter)),
+		},
+		{
+			name:     "gate off keeps the exact larger backoff delay",
+			backoff:  10 * time.Second,
+			minSleep: 10 * time.Second,
+			maxSleep: 10 * time.Second,
+		},
+		{
+			name:     "gate on jitters the larger backoff delay",
+			enabled:  true,
+			backoff:  10 * time.Second,
+			minSleep: 10 * time.Second,
+			maxSleep: 10*time.Second + time.Duration(retryAfterJitterFactor*float64(10*time.Second)),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientRetryAfterJitter, test.enabled)
+			backoff := &testBackoffManager{delay: test.backoff}
+			req := &Request{c: &RESTClient{}, backoff: backoff}
+			r := &withRetry{maxRetries: 1, retryAfter: &RetryAfter{Wait: retryAfter, Attempt: 1}}
+			jittered := false
+			for i := range 1000 {
+				if err := r.Before(context.Background(), req); err != nil {
+					t.Fatalf("Before returned an unexpected error: %v", err)
+				}
+				got := backoff.sleeps[i]
+				if got < test.minSleep || got > test.maxSleep {
+					t.Fatalf("sleep %v outside [%v, %v]", got, test.minSleep, test.maxSleep)
+				}
+				jittered = jittered || got > test.minSleep
+			}
+			if test.minSleep != test.maxSleep && !jittered {
+				t.Errorf("no sleep exceeded the minimum of %v in 1000 attempts", test.minSleep)
+			}
+		})
+	}
 }
