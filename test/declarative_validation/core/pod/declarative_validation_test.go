@@ -485,9 +485,11 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			Verb:              "update",
 		})
 		conditionPath := field.NewPath("status", "volumeHealth").Index(0).Child("healthConditions")
+		volumeStatusPath := field.NewPath("status", "volumeStatuses")
 		tests := map[string]struct {
-			volumeHealth []api.PodVolumeHealth
-			expectedErrs field.ErrorList
+			volumeHealth   []api.PodVolumeHealth
+			volumeStatuses []api.PodVolumeStatus
+			expectedErrs   field.ErrorList
 		}{
 			"valid": {
 				volumeHealth: []api.PodVolumeHealth{{
@@ -555,6 +557,36 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					field.TooMany(conditionPath, 17, 16).WithOrigin("maxItems"),
 				},
 			},
+			"volumeStatuses valid": {
+				volumeStatuses: []api.PodVolumeStatus{{
+					Name:      "vol",
+					HostPhase: api.PodVolumeHostMounted,
+				}},
+			},
+			"volumeStatuses name required": {
+				volumeStatuses: []api.PodVolumeStatus{{}},
+				expectedErrs: field.ErrorList{
+					field.Required(volumeStatusPath.Index(0).Child("name"), ""),
+				},
+			},
+			"volumeStatuses invalid name": {
+				volumeStatuses: []api.PodVolumeStatus{{Name: "Invalid_Name"}},
+				expectedErrs: field.ErrorList{
+					field.Invalid(volumeStatusPath.Index(0).Child("name"), "Invalid_Name", "").WithOrigin("format=k8s-short-name"),
+				},
+			},
+			"volumeStatuses duplicate volumes": {
+				volumeStatuses: []api.PodVolumeStatus{{Name: "vol"}, {Name: "vol"}},
+				expectedErrs: field.ErrorList{
+					field.Duplicate(volumeStatusPath.Index(1), nil),
+				},
+			},
+			"volumeStatuses hostPhase enum": {
+				volumeStatuses: []api.PodVolumeStatus{{Name: "vol", HostPhase: "Invalid"}},
+				expectedErrs: field.ErrorList{
+					field.NotSupported(volumeStatusPath.Index(0).Child("hostPhase"), api.PodVolumeHostPhase("Invalid"), []api.PodVolumeHostPhase(nil)),
+				},
+			},
 		}
 
 		for name, tc := range tests {
@@ -563,6 +595,7 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 				oldObj.ResourceVersion = "1"
 				updateObj := oldObj.DeepCopy()
 				updateObj.Status.VolumeHealth = tc.volumeHealth
+				updateObj.Status.VolumeStatuses = tc.volumeStatuses
 				apitesting.VerifyUpdateValidationEquivalence(t, ctx, updateObj, oldObj, registry.StatusStrategy, tc.expectedErrs, apitesting.WithSubResources("status"))
 			})
 		}

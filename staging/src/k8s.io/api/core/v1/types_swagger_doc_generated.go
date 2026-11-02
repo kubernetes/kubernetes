@@ -362,6 +362,7 @@ var map_Container = map[string]string{
 	"env":                      "env is the list of environment variables to set in the container. Cannot be updated.",
 	"resources":                "resources is the compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 	"resizePolicy":             "resizePolicy is the resize policy for the container. This field cannot be set on ephemeral containers.",
+	"dynamicVolumePolicy":      "dynamicVolumePolicy defines dynamic volume mutation behavior for this container.",
 	"restartPolicy":            "restartPolicy defines the restart behavior of individual containers in a pod. This overrides the pod-level restart policy. When this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Additionally, setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
 	"restartPolicyRules":       "restartPolicyRules represents a list of rules to be checked to determine if the container should be restarted on exit. The rules are evaluated in order. Once a rule matches a container exit condition, the remaining rules are ignored. If no rule matches the container exit condition, the Container-level restart policy determines the whether the container is restarted or not. Constraints on the rules: - At most 20 rules are allowed. - Rules can have the same action. - Identical rules are not forbidden in validations. When rules are specified, container MUST set RestartPolicy explicitly even it if matches the Pod's RestartPolicy.",
 	"volumeMounts":             "volumeMounts are the pod volumes to mount into the container's filesystem. Cannot be updated.",
@@ -381,6 +382,15 @@ var map_Container = map[string]string{
 
 func (Container) SwaggerDoc() map[string]string {
 	return map_Container
+}
+
+var map_ContainerDynamicVolumePolicy = map[string]string{
+	"":              "ContainerDynamicVolumePolicy defines dynamic volume mutation behavior for a container.",
+	"restartPolicy": "restartPolicy defines whether dynamic volume mount additions or removals require restarting the container. Supported values: RestartContainer, \"\". Defaults to \"\".",
+}
+
+func (ContainerDynamicVolumePolicy) SwaggerDoc() map[string]string {
+	return map_ContainerDynamicVolumePolicy
 }
 
 var map_ContainerExtendedResourceRequest = map[string]string{
@@ -688,6 +698,7 @@ var map_EphemeralContainerCommon = map[string]string{
 	"env":                      "env is the list of environment variables to set in the container. Cannot be updated.",
 	"resources":                "resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
 	"resizePolicy":             "resizePolicy is the resources resize policy for the container.",
+	"dynamicVolumePolicy":      "dynamicVolumePolicy defines dynamic volume mutation behavior for this container. This field cannot be set on ephemeral containers.",
 	"restartPolicy":            "restartPolicy is the restart policy for the container to manage the restart behavior of each container within a pod. You cannot set this field on ephemeral containers.",
 	"restartPolicyRules":       "restartPolicyRules represents a list of rules to be checked to determine if the container should be restarted on exit. You cannot set this field on ephemeral containers.",
 	"volumeMounts":             "volumeMounts are the pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers. Cannot be updated.",
@@ -2038,6 +2049,7 @@ var map_PodStatus = map[string]string{
 	"resources":                            "Resources represents the compute resource requests and limits that have been applied at the pod level if pod-level requests or limits are set in PodSpec.Resources",
 	"nodeAllocatableResourceClaimStatuses": "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
 	"volumeHealth":                         "volumeHealth contains node-reported health for each volume the pod is using. Populated by the kubelet on the pod's node.",
+	"volumeStatuses":                       "volumeStatuses contains the status of volumes in the pod, tracking whether volumes are allocated and prepared on the host node. Currently, only node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image) are reported.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {
@@ -2083,6 +2095,16 @@ var map_PodVolumeHealth = map[string]string{
 
 func (PodVolumeHealth) SwaggerDoc() map[string]string {
 	return map_PodVolumeHealth
+}
+
+var map_PodVolumeStatus = map[string]string{
+	"":          "PodVolumeStatus represents the status of an individual volume in a pod.",
+	"name":      "name is the name of the volume matching pod.Spec.Volumes.",
+	"hostPhase": "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting.",
+}
+
+func (PodVolumeStatus) SwaggerDoc() map[string]string {
+	return map_PodVolumeStatus
 }
 
 var map_PortStatus = map[string]string{

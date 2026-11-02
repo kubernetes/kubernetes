@@ -94,6 +94,8 @@ func (m *ConfigMapVolumeSource) Reset() { *m = ConfigMapVolumeSource{} }
 
 func (m *Container) Reset() { *m = Container{} }
 
+func (m *ContainerDynamicVolumePolicy) Reset() { *m = ContainerDynamicVolumePolicy{} }
+
 func (m *ContainerExtendedResourceRequest) Reset() { *m = ContainerExtendedResourceRequest{} }
 
 func (m *ContainerImage) Reset() { *m = ContainerImage{} }
@@ -375,6 +377,8 @@ func (m *PodTemplateList) Reset() { *m = PodTemplateList{} }
 func (m *PodTemplateSpec) Reset() { *m = PodTemplateSpec{} }
 
 func (m *PodVolumeHealth) Reset() { *m = PodVolumeHealth{} }
+
+func (m *PodVolumeStatus) Reset() { *m = PodVolumeStatus{} }
 
 func (m *PortStatus) Reset() { *m = PortStatus{} }
 
@@ -2087,6 +2091,20 @@ func (m *Container) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DynamicVolumePolicy != nil {
+		{
+			size, err := m.DynamicVolumePolicy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd2
+	}
 	if len(m.RestartPolicyRules) > 0 {
 		for iNdEx := len(m.RestartPolicyRules) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -2352,6 +2370,34 @@ func (m *Container) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= len(m.Name)
 	copy(dAtA[i:], m.Name)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ContainerDynamicVolumePolicy) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerDynamicVolumePolicy) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ContainerDynamicVolumePolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.RestartPolicy)
+	copy(dAtA[i:], m.RestartPolicy)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RestartPolicy)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -3687,6 +3733,20 @@ func (m *EphemeralContainerCommon) MarshalToSizedBuffer(dAtA []byte) (int, error
 	_ = i
 	var l int
 	_ = l
+	if m.DynamicVolumePolicy != nil {
+		{
+			size, err := m.DynamicVolumePolicy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd2
+	}
 	if len(m.RestartPolicyRules) > 0 {
 		for iNdEx := len(m.RestartPolicyRules) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -10551,6 +10611,22 @@ func (m *PodStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.VolumeStatuses) > 0 {
+		for iNdEx := len(m.VolumeStatuses) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.VolumeStatuses[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0xba
+		}
+	}
 	if len(m.VolumeHealth) > 0 {
 		for iNdEx := len(m.VolumeHealth) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -10979,6 +11055,39 @@ func (m *PodVolumeHealth) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			dAtA[i] = 0x12
 		}
 	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *PodVolumeStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodVolumeStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PodVolumeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.HostPhase)
+	copy(dAtA[i:], m.HostPhase)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.HostPhase)))
+	i--
+	dAtA[i] = 0x12
 	i -= len(m.Name)
 	copy(dAtA[i:], m.Name)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
@@ -16311,6 +16420,21 @@ func (m *Container) Size() (n int) {
 			n += 2 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.DynamicVolumePolicy != nil {
+		l = m.DynamicVolumePolicy.Size()
+		n += 2 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *ContainerDynamicVolumePolicy) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.RestartPolicy)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -16911,6 +17035,10 @@ func (m *EphemeralContainerCommon) Size() (n int) {
 			l = e.Size()
 			n += 2 + l + sovGenerated(uint64(l))
 		}
+	}
+	if m.DynamicVolumePolicy != nil {
+		l = m.DynamicVolumePolicy.Size()
+		n += 2 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -19456,6 +19584,12 @@ func (m *PodStatus) Size() (n int) {
 			n += 2 + l + sovGenerated(uint64(l))
 		}
 	}
+	if len(m.VolumeStatuses) > 0 {
+		for _, e := range m.VolumeStatuses {
+			l = e.Size()
+			n += 2 + l + sovGenerated(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -19517,6 +19651,19 @@ func (m *PodVolumeHealth) Size() (n int) {
 		}
 	}
 	l = m.LastTransitionTime.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *PodVolumeStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.HostPhase)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -21731,6 +21878,17 @@ func (this *Container) String() string {
 		`ResizePolicy:` + repeatedStringForResizePolicy + `,`,
 		`RestartPolicy:` + valueToStringGenerated(this.RestartPolicy) + `,`,
 		`RestartPolicyRules:` + repeatedStringForRestartPolicyRules + `,`,
+		`DynamicVolumePolicy:` + strings.Replace(this.DynamicVolumePolicy.String(), "ContainerDynamicVolumePolicy", "ContainerDynamicVolumePolicy", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerDynamicVolumePolicy) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerDynamicVolumePolicy{`,
+		`RestartPolicy:` + fmt.Sprintf("%v", this.RestartPolicy) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -22175,6 +22333,7 @@ func (this *EphemeralContainerCommon) String() string {
 		`ResizePolicy:` + repeatedStringForResizePolicy + `,`,
 		`RestartPolicy:` + valueToStringGenerated(this.RestartPolicy) + `,`,
 		`RestartPolicyRules:` + repeatedStringForRestartPolicyRules + `,`,
+		`DynamicVolumePolicy:` + strings.Replace(this.DynamicVolumePolicy.String(), "ContainerDynamicVolumePolicy", "ContainerDynamicVolumePolicy", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24038,6 +24197,11 @@ func (this *PodStatus) String() string {
 		repeatedStringForVolumeHealth += strings.Replace(strings.Replace(f.String(), "PodVolumeHealth", "PodVolumeHealth", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForVolumeHealth += "}"
+	repeatedStringForVolumeStatuses := "[]PodVolumeStatus{"
+	for _, f := range this.VolumeStatuses {
+		repeatedStringForVolumeStatuses += strings.Replace(strings.Replace(f.String(), "PodVolumeStatus", "PodVolumeStatus", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForVolumeStatuses += "}"
 	keysForAllocatedResources := make([]string, 0, len(this.AllocatedResources))
 	for k := range this.AllocatedResources {
 		keysForAllocatedResources = append(keysForAllocatedResources, string(k))
@@ -24071,6 +24235,7 @@ func (this *PodStatus) String() string {
 		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
 		`NodeAllocatableResourceClaimStatuses:` + repeatedStringForNodeAllocatableResourceClaimStatuses + `,`,
 		`VolumeHealth:` + repeatedStringForVolumeHealth + `,`,
+		`VolumeStatuses:` + repeatedStringForVolumeStatuses + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24126,6 +24291,17 @@ func (this *PodVolumeHealth) String() string {
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`HealthConditions:` + repeatedStringForHealthConditions + `,`,
 		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodVolumeStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodVolumeStatus{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`HostPhase:` + fmt.Sprintf("%v", this.HostPhase) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -31120,6 +31296,124 @@ func (m *Container) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 26:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DynamicVolumePolicy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DynamicVolumePolicy == nil {
+				m.DynamicVolumePolicy = &ContainerDynamicVolumePolicy{}
+			}
+			if err := m.DynamicVolumePolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerDynamicVolumePolicy) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerDynamicVolumePolicy: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerDynamicVolumePolicy: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RestartPolicy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RestartPolicy = DynamicVolumeRestartPolicy(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -36078,6 +36372,42 @@ func (m *EphemeralContainerCommon) Unmarshal(dAtA []byte) error {
 			}
 			m.RestartPolicyRules = append(m.RestartPolicyRules, ContainerRestartRule{})
 			if err := m.RestartPolicyRules[len(m.RestartPolicyRules)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 26:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DynamicVolumePolicy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DynamicVolumePolicy == nil {
+				m.DynamicVolumePolicy = &ContainerDynamicVolumePolicy{}
+			}
+			if err := m.DynamicVolumePolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -57940,6 +58270,40 @@ func (m *PodStatus) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 23:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VolumeStatuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.VolumeStatuses = append(m.VolumeStatuses, PodVolumeStatus{})
+			if err := m.VolumeStatuses[len(m.VolumeStatuses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -58437,6 +58801,120 @@ func (m *PodVolumeHealth) Unmarshal(dAtA []byte) error {
 			if err := m.LastTransitionTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PodVolumeStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodVolumeStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodVolumeStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HostPhase", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HostPhase = PodVolumeHostPhase(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

@@ -158,6 +158,14 @@ func (b *EphemeralContainerApplyConfiguration) WithResizePolicy(values ...*Conta
 	return b
 }
 
+// WithDynamicVolumePolicy sets the DynamicVolumePolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DynamicVolumePolicy field is set to the value of the last call.
+func (b *EphemeralContainerApplyConfiguration) WithDynamicVolumePolicy(value *ContainerDynamicVolumePolicyApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	b.EphemeralContainerCommonApplyConfiguration.DynamicVolumePolicy = value
+	return b
+}
+
 // WithRestartPolicy sets the RestartPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RestartPolicy field is set to the value of the last call.

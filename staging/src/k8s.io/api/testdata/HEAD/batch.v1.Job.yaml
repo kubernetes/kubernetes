@@ -252,6 +252,8 @@ spec:
         - argsValue
         command:
         - commandValue
+        dynamicVolumePolicy:
+          restartPolicy: restartPolicyValue
         env:
         - name: nameValue
           value: valueValue
@@ -495,6 +497,8 @@ spec:
         - argsValue
         command:
         - commandValue
+        dynamicVolumePolicy:
+          restartPolicy: restartPolicyValue
         env:
         - name: nameValue
           value: valueValue
@@ -744,6 +748,8 @@ spec:
         - argsValue
         command:
         - commandValue
+        dynamicVolumePolicy:
+          restartPolicy: restartPolicyValue
         env:
         - name: nameValue
           value: valueValue
