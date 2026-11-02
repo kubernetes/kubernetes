@@ -288,7 +288,7 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 				t.Fatalf("issue %s token with audience %q: %v", tc.kind, tc.audience, err)
 			}
 
-			verifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithRemoteIssuer(issuer, tc.audience, client))
+			verifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithIssuer(issuer, tc.audience, client))
 			if err != nil {
 				t.Fatalf("construct consumer verifier: %v", err)
 			}
@@ -333,7 +333,7 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 					t.Fatalf("verify mismatched %s: got %v, want generic denial", mismatch.name, err)
 				}
 			}
-			wrongAudienceVerifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithRemoteIssuer(issuer, tc.audience+"-other", client))
+			wrongAudienceVerifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithIssuer(issuer, tc.audience+"-other", client))
 			if err != nil {
 				t.Fatalf("construct wrong-audience verifier: %v", err)
 			}
@@ -345,7 +345,7 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 			handler, err := admissionauth.WithTokenVerification(ctx, func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 				admissions.Add(1)
 				return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
-			}, admissionauth.WithRemoteIssuer(issuer, tc.audience, client))
+			}, admissionauth.WithIssuer(issuer, tc.audience, client))
 			if err != nil {
 				t.Fatalf("construct admission HTTP handler: %v", err)
 			}
@@ -526,7 +526,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 			lastAdmittedRequest.Store(req.DeepCopy())
 			return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 		},
-		admissionauth.WithRemoteIssuer(issuer, webhookURL, discoveryClient),
+		admissionauth.WithIssuer(issuer, webhookURL, discoveryClient),
 	)
 	if err != nil {
 		t.Fatalf("construct admission.WithTokenVerification handler: %v", err)
@@ -819,7 +819,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("issue discovery test token: %v", err)
 		}
-		verifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithRemoteIssuer(issuer, webhookURL, discoveryClient))
+		verifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithIssuer(issuer, webhookURL, discoveryClient))
 		if err != nil {
 			t.Fatal(err)
 		}

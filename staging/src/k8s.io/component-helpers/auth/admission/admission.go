@@ -100,12 +100,12 @@ func newBuilder() *builder {
 	return &builder{}
 }
 
-// WithRemoteIssuer uses the issuer URL for OIDC discovery and as the expected
+// WithIssuer uses the issuer URL for OIDC discovery and as the expected
 // token issuer. issuer and audience are required. client is used for discovery
 // and signing-key requests and must not carry credentials: the discovered
 // signing-key endpoint may be on another host. A nil client uses the default
 // HTTP transport.
-func WithRemoteIssuer(issuer, audience string, client *http.Client) Option {
+func WithIssuer(issuer, audience string, client *http.Client) Option {
 	return func(b *builder) {
 		b.remoteSet = true
 		b.issuer = issuer
@@ -119,7 +119,7 @@ func WithRemoteIssuer(issuer, audience string, client *http.Client) Option {
 // spelling out port 443 and path "/" when the registration omits them. The
 // namespace must match this Pod's projected namespace. This checks format and
 // namespace, not whether the Service or port matches the registration. Use
-// [WithRemoteIssuer] for URL-backed registrations; it cannot be combined with
+// [WithIssuer] for URL-backed registrations; it cannot be combined with
 // WithAudience. Never derive the audience from a request or token.
 func WithAudience(audience string) Option {
 	return func(b *builder) {
@@ -137,7 +137,7 @@ type Handler struct {
 
 // WithTokenVerification authenticates requests before decoding their bodies and
 // calling next. Register admissionReviewVersions as ["v1"]. Use [WithAudience]
-// in-cluster or [WithRemoteIssuer] for another issuer. Failed authentication
+// in-cluster or [WithIssuer] for explicit issuer discovery. Failed authentication
 // returns HTTP 401; authenticated admission-policy denials return an AdmissionReview
 // with Allowed:false. Use failurePolicy: Fail when authentication or transport
 // failures must block admission. A nil next returns an error.
@@ -154,7 +154,7 @@ func WithTokenVerification(ctx context.Context, next AdmissionHandler, opts ...O
 
 func (b *builder) buildVerifier(ctx context.Context) (*Verifier, error) {
 	if b.remoteSet && b.explicitAudience {
-		return nil, errors.New("admission: WithAudience cannot be combined with WithRemoteIssuer")
+		return nil, errors.New("admission: WithAudience cannot be combined with WithIssuer")
 	}
 	if b.remoteSet {
 		if b.issuer == "" || b.audience == "" {
@@ -185,7 +185,7 @@ func parseServiceAudience(audience string) (string, error) {
 	}
 	labels := strings.Split(u.Hostname(), ".")
 	if len(labels) != 3 || labels[2] != "svc" || len(validation.IsDNS1123Label(labels[0])) != 0 || len(validation.IsDNS1123Label(labels[1])) != 0 {
-		return "", errors.New("admission: WithAudience requires a Service host <name>.<namespace>.svc; use WithRemoteIssuer for URL-backed webhooks")
+		return "", errors.New("admission: WithAudience requires a Service host <name>.<namespace>.svc; use WithIssuer for URL-backed webhooks")
 	}
 	port := u.Port()
 	portNumber, err := strconv.Atoi(port)
@@ -548,7 +548,7 @@ type Verifier struct {
 }
 
 // NewVerifier constructs a verifier using [WithAudience] for local issuer/keys or
-// [WithRemoteIssuer] for remote discovery. Configuration and endpoint availability
+// [WithIssuer] for explicit issuer discovery. Configuration and endpoint availability
 // are checked during construction; signing keys are loaded lazily by coreos.
 func NewVerifier(ctx context.Context, opts ...Option) (*Verifier, error) {
 	b := newBuilder()
