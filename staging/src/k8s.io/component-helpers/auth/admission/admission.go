@@ -26,7 +26,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-helpers/auth/admission/internal/verify"
 	"k8s.io/klog/v2"
@@ -59,9 +62,10 @@ func init() {
 const defaultMaxBodyBytes int64 = 7 << 20
 
 const (
-	verificationTimeout = 10 * time.Second
-	localJWKSPath       = "/openid/v1/jwks"
-	genericDenyMessage  = "webhook token verification failed"
+	verificationTimeout              = 10 * time.Second
+	localJWKSPath                    = "/openid/v1/jwks"
+	projectedServiceAccountNamespace = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	genericDenyMessage               = "webhook token verification failed"
 )
 
 var (
@@ -110,10 +114,13 @@ func WithRemoteIssuer(issuer, audience string, client *http.Client) Option {
 	}
 }
 
-// WithAudience sets the in-cluster webhook's expected audience. Use its configured
-// URL verbatim, or https://<name>.<namespace>.svc:<port><path> for a Service
-// reference, with default port 443 and path "/". It cannot be combined with
-// [WithRemoteIssuer]. The audience must come from trusted webhook configuration.
+// WithAudience sets the expected audience of a Service-backed in-cluster webhook.
+// Supply the registered Service's https://<name>.<namespace>.svc:<port><path>,
+// spelling out port 443 and path "/" when the registration omits them. The
+// namespace must match this Pod's projected namespace. This checks format and
+// namespace, not whether the Service or port matches the registration. Use
+// [WithRemoteIssuer] for URL-backed registrations; it cannot be combined with
+// WithAudience. Never derive the audience from a request or token.
 func WithAudience(audience string) Option {
 	return func(b *builder) {
 		b.explicitAudience = true
@@ -156,13 +163,61 @@ func (b *builder) buildVerifier(ctx context.Context) (*Verifier, error) {
 		return b.remoteVerifier(ctx)
 	}
 	if !b.explicitAudience || b.audience == "" {
-		return nil, errors.New("admission: in-cluster verification requires WithAudience set to the webhook's configured URL or Service audience")
+		return nil, errors.New("admission: in-cluster verification requires WithAudience set to the webhook's configured Service audience")
+	}
+	if err := validateInClusterAudience(b.audience, projectedServiceAccountNamespace); err != nil {
+		return nil, err
 	}
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("admission: loading in-cluster configuration: %w", err)
 	}
 	return newLocalVerifier(ctx, config, b.audience)
+}
+
+func parseServiceAudience(audience string) (string, error) {
+	u, err := url.Parse(audience)
+	if err != nil {
+		return "", fmt.Errorf("admission: WithAudience requires a full HTTPS Service URL: %w", err)
+	}
+	if u.Scheme != "https" || u.Opaque != "" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(audience, "#") {
+		return "", errors.New("admission: WithAudience requires https://<name>.<namespace>.svc:<port><path> without credentials, query, or fragment")
+	}
+	labels := strings.Split(u.Hostname(), ".")
+	if len(labels) != 3 || labels[2] != "svc" || len(validation.IsDNS1123Label(labels[0])) != 0 || len(validation.IsDNS1123Label(labels[1])) != 0 {
+		return "", errors.New("admission: WithAudience requires a Service host <name>.<namespace>.svc; use WithRemoteIssuer for URL-backed webhooks")
+	}
+	port := u.Port()
+	portNumber, err := strconv.Atoi(port)
+	if err != nil || len(validation.IsValidPortNum(portNumber)) != 0 || strconv.Itoa(portNumber) != port {
+		return "", errors.New("admission: WithAudience requires an explicit canonical Service port between 1 and 65535")
+	}
+	if !strings.HasPrefix(u.EscapedPath(), "/") {
+		return "", errors.New("admission: WithAudience requires a Service path (use / if omitted in the registration)")
+	}
+	return labels[1], nil
+}
+
+func validateInClusterAudience(audience, namespaceFile string) error {
+	serviceNamespace, err := parseServiceAudience(audience)
+	if err != nil {
+		return err
+	}
+	// clientcmd falls back to "default" when the projected namespace is missing;
+	// audience binding must fail closed instead.
+	// https://github.com/kubernetes/kubernetes/blob/9b965ac43f05d304180c7b8b9611264530788948/staging/src/k8s.io/client-go/tools/clientcmd/client_config.go#L646-L661
+	data, err := os.ReadFile(namespaceFile)
+	if err != nil {
+		return fmt.Errorf("admission: reading projected Pod namespace for WithAudience: %w", err)
+	}
+	podNamespace := strings.TrimSpace(string(data))
+	if len(validation.IsDNS1123Label(podNamespace)) != 0 {
+		return errors.New("admission: projected Pod namespace for WithAudience is empty or invalid")
+	}
+	if serviceNamespace != podNamespace {
+		return fmt.Errorf("admission: WithAudience Service namespace %q differs from Pod namespace %q", serviceNamespace, podNamespace)
+	}
+	return nil
 }
 
 func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
@@ -208,12 +263,7 @@ func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
 	if err != nil || jwksURL.Scheme != "https" || jwksURL.Host == "" || jwksURL.User != nil || jwksURL.Fragment != "" {
 		return nil, errors.New("admission: signing-key endpoint must be an HTTPS URL without credentials or fragment")
 	}
-	v := &Verifier{
-		verifier: provider.VerifierContext(ctx, &oidc.Config{ClientID: b.audience}),
-		client:   client,
-		jwksURL:  metadata.JWKSURI,
-	}
-	return v, nil
+	return &Verifier{verifier: provider.VerifierContext(ctx, &oidc.Config{ClientID: b.audience})}, nil
 }
 
 func newLocalVerifier(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
@@ -245,12 +295,9 @@ func newLocalVerifier(ctx context.Context, config *rest.Config, audience string)
 	for _, algorithm := range serviceAccountSigningAlgs {
 		verifierConfig.SupportedSigningAlgs = append(verifierConfig.SupportedSigningAlgs, string(algorithm))
 	}
-	v := &Verifier{
+	return &Verifier{
 		verifier: oidc.NewVerifier(claims.Issuer, oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL), verifierConfig),
-		client:   client,
-		jwksURL:  jwksURL,
-	}
-	return v, nil
+	}, nil
 }
 
 func newHandler(v *Verifier, next AdmissionHandler, maxBody int64) *Handler {
@@ -498,8 +545,6 @@ func checkGVKMatchesAdmittedKind(name string, gvk schema.GroupVersionKind, admit
 // Verifier authenticates tokens and authorizes already-decoded admission requests.
 type Verifier struct {
 	verifier *oidc.IDTokenVerifier
-	client   *http.Client
-	jwksURL  string
 }
 
 // NewVerifier constructs a verifier using [WithAudience] for local issuer/keys or
