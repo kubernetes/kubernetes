@@ -253,8 +253,10 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 		}
 
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
+		allocatedPod, _ := m.UpdatePodFromAllocation(pod)
+		resizeRequested := isResizeRequested(pod, allocatedPod)
 
-		resizeAllocated, err := m.handlePodResourcesResize(ctx, pod)
+		allocated, err := m.handlePodResourcesResize(ctx, pod)
 		switch {
 		case err != nil:
 			logger.Error(err, "Failed to handle pod resources resize", "pod", klog.KObj(pod))
@@ -264,17 +266,23 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 			newPendingResizes = append(newPendingResizes, uid)
 		case m.statusManager.IsPodResizeInfeasible(uid):
 			logger.V(4).Info("Pod resize is infeasible", "pod", klog.KObj(pod))
-		default:
-			logger.V(4).Info("Pod resize successfully allocated", "pod", klog.KObj(pod))
-			successfulResizes = append(successfulResizes, pod)
-			if isDeferred {
-				metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+		case allocated:
+			logger.V(4).Info("Pod dynamic update successfully allocated", "pod", klog.KObj(pod))
+			if resizeRequested {
+				logger.V(4).Info("Pod resize successfully allocated", "pod", klog.KObj(pod))
+				successfulResizes = append(successfulResizes, pod)
+				if isDeferred {
+					metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+				}
 			}
+		default:
+			// Either desired pod already matched allocated pod (!updated), or a non-resize
+			// dynamic update was rejected by an admit handler (already logged in handlePodResourcesResize).
 		}
 
 		// If the pod resize status has changed, we need to update the pod status.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
-		if resizeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
+		if allocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
 			m.podProvider.SyncPodNow(ctx, pod)
 		}
 	}
@@ -582,14 +590,22 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		return true, nil
 	}
 
-	if reason != "" && resizeRequested {
-		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
-			eventType := events.ResizeDeferred
-			if reason == v1.PodReasonInfeasible {
-				eventType = events.ResizeInfeasible
+	if reason != "" {
+		if resizeRequested {
+			if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
+				eventType := events.ResizeDeferred
+				if reason == v1.PodReasonInfeasible {
+					eventType = events.ResizeInfeasible
+				}
+				msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
+				m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
 			}
-			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+		} else {
+			// A non-resize dynamic update can be rejected by node-level admit handlers
+			// (e.g., evictionAdmitHandler under memory/disk pressure, shutdownManagerAdmitHandler
+			// during node shutdown, or declaredFeaturesAdmitHandler).
+			// TODO: For beta, introduce a mechanism to retry dynamic volume changes similar to resizes.
+			logger.Info("Pod dynamic update could not be allocated", "pod", klog.KObj(pod), "reason", reason, "message", message)
 		}
 	}
 

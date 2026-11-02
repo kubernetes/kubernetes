@@ -61,6 +61,9 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 	logger := klog.FromContext(ctx)
 	pod := attrs.Pod
 	allocatedPod, _ := h.allocationManager.UpdatePodFromAllocation(pod)
+	if !isResizeRequested(pod, allocatedPod) {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
 		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()

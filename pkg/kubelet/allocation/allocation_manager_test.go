@@ -335,8 +335,9 @@ func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
 		gated: {
 			"Name", "Command", "Args", "WorkingDir", "Ports", "EnvFrom", "Env", "Resources",
 			"ResizePolicy", "RestartPolicy", "RestartPolicyRules", "VolumeMounts", "VolumeDevices",
-			"LivenessProbe", "ReadinessProbe", "StartupProbe", "Lifecycle", "TerminationMessagePath",
-			"TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext", "Stdin", "StdinOnce", "TTY",
+			"DynamicVolumePolicy", "LivenessProbe", "ReadinessProbe", "StartupProbe", "Lifecycle",
+			"TerminationMessagePath", "TerminationMessagePolicy", "ImagePullPolicy", "SecurityContext",
+			"Stdin", "StdinOnce", "TTY",
 		},
 	}
 
@@ -4371,6 +4372,137 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.expectSyncTriggered, resizedPod.Annotations["pod-sync-triggered"] == "true")
+		})
+	}
+}
+
+func TestDynamicVolumeUpdateAllocation(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	cpu100m := resource.MustParse("100m")
+	mem100Mi := resource.MustParse("100Mi")
+
+	tests := []struct {
+		name                 string
+		admitResult          lifecycle.PodAdmitResult
+		expectVolumesUpdated bool
+		expectSyncTriggered  bool
+	}{
+		{
+			name:                 "dynamic volume update admitted without setting resize conditions",
+			admitResult:          lifecycle.PodAdmitResult{Admit: true},
+			expectVolumesUpdated: true,
+			expectSyncTriggered:  true,
+		},
+		{
+			name: "dynamic volume update denied by admit handler does not set resize conditions or re-queue",
+			admitResult: lifecycle.PodAdmitResult{
+				Admit:   false,
+				Reason:  "Evicted",
+				Message: "The node had condition: [DiskPressure].",
+			},
+			expectVolumesUpdated: false,
+			expectSyncTriggered:  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+
+			allocatedPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "pod-dyn-vol",
+					Name:       "pod-dyn-vol",
+					Namespace:  "default",
+					Generation: 1,
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name:         "vol-1",
+						VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+					}},
+					Containers: []v1.Container{{
+						Name:  "c1",
+						Image: "test-image",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100Mi},
+						},
+						DynamicVolumePolicy: &v1.ContainerDynamicVolumePolicy{
+							RestartPolicy: v1.DynamicVolumeRestartContainer,
+						},
+						VolumeMounts: []v1.VolumeMount{{
+							Name:      "vol-1",
+							MountPath: "/mnt/vol-1",
+						}},
+					}},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+				},
+			}
+
+			podStatus := kubecontainer.PodStatus{
+				ID:        allocatedPod.UID,
+				Name:      allocatedPod.Name,
+				Namespace: allocatedPod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "c1",
+					State: kubecontainer.ContainerStateRunning,
+					Resources: &kubecontainer.ContainerResources{
+						CPURequest:    &cpu100m,
+						MemoryRequest: &mem100Mi,
+					},
+				}},
+			}
+
+			updatedPod := allocatedPod.DeepCopy()
+			updatedPod.Generation = 2
+			updatedPod.Spec.Volumes = append(updatedPod.Spec.Volumes, v1.Volume{
+				Name:         "vol-2",
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+			})
+			updatedPod.Spec.Containers[0].VolumeMounts = append(updatedPod.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+				Name:      "vol-2",
+				MountPath: "/mnt/vol-2",
+			})
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: podStatus}, []*v1.Pod{updatedPod}, nil)
+			allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{
+				&testPodAdmitHandler{
+					admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+						return tc.admitResult
+					},
+				},
+			})
+			require.NoError(t, allocationManager.SetAllocatedResources(logger, allocatedPod))
+			t.Cleanup(func() {
+				allocationManager.RemovePod(logger, allocatedPod.UID)
+			})
+
+			am := allocationManager.(*manager)
+			allocationManager.PushPendingResize(logger, updatedPod.UID)
+			require.True(t, allocationManager.HasPendingResizes())
+
+			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+
+			assert.False(t, allocationManager.HasPendingResizes(), "pending resize queue should be drained")
+			assert.Empty(t, am.statusManager.GetPodResizeConditions(updatedPod.UID), "resize conditions must not be set for pure dynamic volume updates")
+
+			resultingPod, pending := allocationManager.UpdatePodFromAllocation(updatedPod)
+			if tc.expectVolumesUpdated {
+				assert.False(t, pending)
+				assert.Len(t, resultingPod.Spec.Volumes, 2)
+			} else {
+				assert.True(t, pending)
+				assert.Len(t, resultingPod.Spec.Volumes, 1)
+			}
+			assert.Equal(t, tc.expectSyncTriggered, updatedPod.Annotations["pod-sync-triggered"] == "true")
 		})
 	}
 }
