@@ -25,9 +25,10 @@ import (
 )
 
 func TestRecordGeneratedPlacements(t *testing.T) {
-	InitMetrics()
+	Register()
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(GeneratedPlacementsTotal)
+	GeneratedPlacementsTotal.Reset()
 
 	RecordGeneratedPlacements("test-profile", PodGroup, 3)
 	RecordGeneratedPlacements("test-profile", PodGroup, 2)
@@ -47,10 +48,12 @@ func TestRecordGeneratedPlacements(t *testing.T) {
 }
 
 func TestObservePlacementEvaluation(t *testing.T) {
-	InitMetrics()
+	Register()
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(PlacementEvaluations)
 	registry.MustRegister(PlacementEvaluationDuration)
+	PlacementEvaluations.Reset()
+	PlacementEvaluationDuration.Reset()
 
 	ObservePlacementEvaluation(FeasibleResult, "test-profile", PodGroup, 0.5)
 	ObservePlacementEvaluation(FeasibleResult, "test-profile", PodGroup, 0.5)
@@ -101,9 +104,11 @@ func TestObservePlacementEvaluation(t *testing.T) {
 }
 
 func TestObservePodGroupScheduleAttemptAndLatency(t *testing.T) {
-	InitMetrics()
+	Register()
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(PodGroupScheduleAttempts, PodGroupSchedulingLatency)
+	PodGroupScheduleAttempts.Reset()
+	PodGroupSchedulingLatency.Reset()
 
 	PodGroupScheduled("test-profile", PodGroup, 0.5)
 	PodGroupScheduled("test-profile", CompositePodGroup, 0.6)
@@ -157,9 +162,10 @@ func TestObservePodGroupScheduleAttemptAndLatency(t *testing.T) {
 }
 
 func TestPodGroupAlgorithmLatency(t *testing.T) {
-	InitMetrics()
+	Register()
 	registry := metrics.NewKubeRegistry()
 	registry.MustRegister(PodGroupSchedulingAlgorithmLatency)
+	PodGroupSchedulingAlgorithmLatency.Reset()
 
 	PodGroupAlgorithmLatency("test-profile", PodGroup, 0.1)
 	PodGroupAlgorithmLatency("test-profile", CompositePodGroup, 0.2)
