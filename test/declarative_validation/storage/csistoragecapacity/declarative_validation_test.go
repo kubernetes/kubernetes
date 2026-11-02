@@ -17,10 +17,14 @@ limitations under the License.
 package csistoragecapacity
 
 import (
+	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	registry "k8s.io/kubernetes/pkg/registry/storage/csistoragecapacity"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
@@ -52,6 +56,104 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Verb:              "create",
 	}), metav1.NamespaceDefault)
 
+	testCases := map[string]struct {
+		input        storage.CSIStorageCapacity
+		expectedErrs field.ErrorList
+	}{
+		"valid": {
+			input: mkCSIStorageCapacity(),
+		},
+		"storageClassName missing": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("storageClassName"), "").MarkAlpha(),
+			},
+		},
+		"storageClassName label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this-is-a-label"
+			}),
+		},
+		"storageClassName subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this.is.a.subdomain"
+			}),
+		},
+		"storageClassName invalid label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "-this-is-not-a-label"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName invalid subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = ".this.is.not.a.subdomain"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName label format with trailing dash": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this-is-a-label-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName subdomain format with trailing dash": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "this.is.a.subdomain-"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName uppercase": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "Foo"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName long label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x", 253)
+			}),
+		},
+		"storageClassName long subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x.", 126) + "x"
+			}),
+		},
+		"storageClassName too long label format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x", 254)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+		"storageClassName too long subdomain format": {
+			input: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = strings.Repeat("x.", 126) + "xx"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("format=k8s-long-name").MarkAlpha(),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	obj := mkCSIStorageCapacity()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
@@ -67,6 +169,47 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		Verb:              "update",
 	}), metav1.NamespaceDefault)
 
+	testCases := map[string]struct {
+		oldObj       storage.CSIStorageCapacity
+		updateObj    storage.CSIStorageCapacity
+		expectedErrs field.ErrorList
+	}{
+		"unchanged storageClassName": {
+			oldObj:    mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(),
+		},
+		"mutable field changed, storageClassName unchanged": {
+			oldObj: mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.Capacity = resource.NewQuantity(1024, resource.BinarySI)
+			}),
+		},
+		"storageClassName changed": {
+			oldObj: mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = "bar"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"storageClassName cleared": {
+			oldObj: mkCSIStorageCapacity(),
+			updateObj: mkCSIStorageCapacity(func(obj *storage.CSIStorageCapacity) {
+				obj.StorageClassName = ""
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("storageClassName"), "").MarkAlpha(),
+				field.Invalid(field.NewPath("storageClassName"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
+		})
+	}
+
 	updateObj := mkCSIStorageCapacity()
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
@@ -74,8 +217,9 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 func mkCSIStorageCapacity(tweaks ...func(capacity *storage.CSIStorageCapacity)) storage.CSIStorageCapacity {
 	capacity := storage.CSIStorageCapacity{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "valid-obj",
-			Namespace: metav1.NamespaceDefault,
+			Name:            "valid-obj",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "1",
 		},
 		StorageClassName: "foo",
 	}
