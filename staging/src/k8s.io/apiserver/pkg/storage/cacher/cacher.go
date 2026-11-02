@@ -632,6 +632,13 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		span.AddEvent("watchCache fresh enough")
 	}
 
+	// requiredResourceVersion = 0 means that we don't require any specific starting point
+	// and we would like to start watching from ~now.
+	if requiredResourceVersion == 0 && opts.SendInitialEvents != nil && !*opts.SendInitialEvents {
+		requiredResourceVersion = c.watchCache.resourceVersion
+		watcher.requiredResourceVersion = requiredResourceVersion
+	}
+
 	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher)
 	if err != nil {
 		return nil, err
