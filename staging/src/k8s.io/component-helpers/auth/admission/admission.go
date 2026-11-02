@@ -71,10 +71,30 @@ var (
 	errInvalidReview      = errors.New("request body is not a decodable AdmissionReview")
 	errBodyTooLarge       = errors.New("request body exceeds the configured limit")
 
-	// Keep in sync with pkg/serviceaccount; staging cannot import k8s.io/kubernetes.
-	// https://github.com/kubernetes/kubernetes/blob/9b965ac43f05d304180c7b8b9611264530788948/pkg/serviceaccount/jwt.go#L340-L351
-	serviceAccountSigningAlgs = []jose.SignatureAlgorithm{
-		jose.ES256, jose.ES384, jose.ES512, jose.RS256,
+	// Keep in sync with allowedSigningAlgs in k8s.io/apiserver's OIDC JWT authenticator;
+	// component-helpers cannot import k8s.io/apiserver.
+	// https://github.com/kubernetes/kubernetes/blob/51072aa8e1954f42274dd7b76213f58f7ad7c87d/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc.go#L257-L268
+	allowedSigningAlgs = []jose.SignatureAlgorithm{
+		jose.RS256,
+		jose.RS384,
+		jose.RS512,
+		jose.ES256,
+		jose.ES384,
+		jose.ES512,
+		jose.PS256,
+		jose.PS384,
+		jose.PS512,
+	}
+	supportedSigningAlgs = []string{
+		oidc.RS256,
+		oidc.RS384,
+		oidc.RS512,
+		oidc.ES256,
+		oidc.ES384,
+		oidc.ES512,
+		oidc.PS256,
+		oidc.PS384,
+		oidc.PS512,
 	}
 )
 
@@ -243,7 +263,10 @@ func (b *builder) remoteVerifier(ctx context.Context) (*Verifier, error) {
 	if err != nil || jwksURL.Scheme != "https" || jwksURL.Host == "" || jwksURL.User != nil || jwksURL.Fragment != "" {
 		return nil, errors.New("admission: signing-key endpoint must be an HTTPS URL without credentials or fragment")
 	}
-	return &Verifier{verifier: provider.VerifierContext(ctx, &oidc.Config{ClientID: b.audience})}, nil
+	return &Verifier{verifier: provider.VerifierContext(ctx, &oidc.Config{
+		ClientID:             b.audience,
+		SupportedSigningAlgs: supportedSigningAlgs,
+	})}, nil
 }
 
 func newLocalVerifier(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
@@ -257,7 +280,7 @@ func newLocalVerifier(ctx context.Context, config *rest.Config, audience string)
 		return nil, fmt.Errorf("admission: reading projected ServiceAccount token file: %w", err)
 	}
 	// Bootstrap the expected issuer from our projected credential, never the incoming token.
-	token, err := jwt.ParseSigned(strings.TrimSpace(string(tokenData)), serviceAccountSigningAlgs)
+	token, err := jwt.ParseSigned(strings.TrimSpace(string(tokenData)), allowedSigningAlgs)
 	if err != nil {
 		return nil, fmt.Errorf("admission: parsing projected ServiceAccount token: %w", err)
 	}
@@ -274,9 +297,9 @@ func newLocalVerifier(ctx context.Context, config *rest.Config, audience string)
 		return nil, fmt.Errorf("admission: creating in-cluster HTTP client: %w", err)
 	}
 	jwksURL := strings.TrimRight(config.Host, "/") + localJWKSPath
-	verifierConfig := &oidc.Config{ClientID: audience}
-	for _, algorithm := range serviceAccountSigningAlgs {
-		verifierConfig.SupportedSigningAlgs = append(verifierConfig.SupportedSigningAlgs, string(algorithm))
+	verifierConfig := &oidc.Config{
+		ClientID:             audience,
+		SupportedSigningAlgs: supportedSigningAlgs,
 	}
 	return &Verifier{
 		verifier: oidc.NewVerifier(claims.Issuer, oidc.NewRemoteKeySet(oidc.ClientContext(ctx, client), jwksURL), verifierConfig),
