@@ -1464,8 +1464,10 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	sort.Sort(kubetypes.SortedContainerStatuses(status.EphemeralContainerStatuses))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
-		for i := range status.VolumeHealth {
-			normalizeTimeStamp(&status.VolumeHealth[i].LastTransitionTime)
+		for i := range status.VolumeStatuses {
+			if health := status.VolumeStatuses[i].HealthStatus; health != nil {
+				normalizeTimeStamp(&health.LastTransitionTime)
+			}
 		}
 	}
 

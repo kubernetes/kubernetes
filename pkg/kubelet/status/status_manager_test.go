@@ -1927,7 +1927,7 @@ func TestVolumeHealthMergesByName(t *testing.T) {
 }
 
 func TestNormalizeStatusVolumeHealth(t *testing.T) {
-	now := metav1.Now()
+	now := metav1.NewTime(time.Date(2026, time.November, 2, 12, 0, 0, 123456789, time.UTC))
 	expectedTime := now.DeepCopy().Rfc3339Copy()
 
 	tests := []struct {
@@ -1953,20 +1953,31 @@ func TestNormalizeStatusVolumeHealth(t *testing.T) {
 
 			pod := getTestPod()
 			status := v1.PodStatus{
-				VolumeHealth: []v1.PodVolumeHealth{
+				VolumeStatuses: []v1.PodVolumeStatus{
+					{Name: "without-health"},
+					{Name: "empty-health", HealthStatus: &v1.VolumeHealthStatus{}},
 					{
-						Name:               "vol1",
-						LastTransitionTime: now,
+						Name: "vol1",
+						HealthStatus: &v1.VolumeHealthStatus{
+							LastTransitionTime: now,
+						},
+					},
+					{
+						Name: "vol2",
+						HealthStatus: &v1.VolumeHealthStatus{
+							LastTransitionTime: now,
+						},
 					},
 				},
 			}
 
 			normalized := normalizeStatus(pod, &status)
-			if len(normalized.VolumeHealth) != 1 {
-				t.Fatalf("expected 1 VolumeHealth, got %d", len(normalized.VolumeHealth))
-			}
-			if normalized.VolumeHealth[0].LastTransitionTime != tc.expectedTime {
-				t.Errorf("expected LastTransitionTime %v, got %v", tc.expectedTime, normalized.VolumeHealth[0].LastTransitionTime)
+			require.Len(t, normalized.VolumeStatuses, 4)
+			assert.Nil(t, normalized.VolumeStatuses[0].HealthStatus)
+			assert.Equal(t, &v1.VolumeHealthStatus{}, normalized.VolumeStatuses[1].HealthStatus)
+			for _, volumeStatus := range normalized.VolumeStatuses[2:] {
+				require.NotNil(t, volumeStatus.HealthStatus)
+				assert.Equal(t, tc.expectedTime, volumeStatus.HealthStatus.LastTransitionTime, "volume %s", volumeStatus.Name)
 			}
 		})
 	}
