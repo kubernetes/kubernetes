@@ -2884,7 +2884,7 @@ func (VolumeHealthCondition) SwaggerDoc() map[string]string {
 
 var map_VolumeHealthStatus = map[string]string{
 	"":                   "VolumeHealthStatus contains health information for a volume reported by a CSI controller or node plugin.",
-	"healthConditions":   "healthConditions is the set of adverse conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+	"healthConditions":   "healthConditions is the set of health conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
 	"lastTransitionTime": "lastTransitionTime is when the current set of (status, reason) pairs first appeared. Changes to condition messages do not affect this field.",
 }
 

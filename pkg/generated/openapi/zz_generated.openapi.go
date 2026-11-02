@@ -33666,7 +33666,7 @@ func schema_k8sio_api_core_v1_VolumeHealthStatus(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "healthConditions is the set of adverse conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+							Description: "healthConditions is the set of health conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
