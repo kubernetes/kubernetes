@@ -791,6 +791,49 @@ aliases:
 				},
 			},
 		},
+		{
+			name:           "invalid alias name with hyphen",
+			existingKuberc: "",
+			options: SetOptions{
+				Section:     sectionAliases,
+				AliasName:   "get-pods",
+				Command:     "get",
+				PrependArgs: []string{"pods"},
+			},
+			expectError:   true,
+			errorContains: "invalid alias name, can only include alphabetical characters",
+		},
+		{
+			name: "invalid alias name with underscore does not modify existing file",
+			existingKuberc: `apiVersion: kubectl.config.k8s.io/v1
+kind: Preference
+aliases:
+- name: getn
+  command: get
+  prependArgs:
+  - nodes
+`,
+			options: SetOptions{
+				Section:     sectionAliases,
+				AliasName:   "get_pods",
+				Command:     "get",
+				PrependArgs: []string{"pods"},
+			},
+			expectError:   true,
+			errorContains: "invalid alias name, can only include alphabetical characters",
+		},
+		{
+			name:           "invalid alias name with digits",
+			existingKuberc: "",
+			options: SetOptions{
+				Section:     sectionAliases,
+				AliasName:   "get1",
+				Command:     "get",
+				PrependArgs: []string{"pods"},
+			},
+			expectError:   true,
+			errorContains: "invalid alias name, can only include alphabetical characters",
+		},
 	}
 
 	for _, tt := range tests {
@@ -814,7 +857,10 @@ aliases:
 			tt.options.KubeRCFile = kubercPath
 			tt.options.IOStreams = streams
 
-			err = tt.options.Run()
+			err = tt.options.Validate()
+			if err == nil {
+				err = tt.options.Run()
+			}
 
 			if tt.expectError {
 				if err == nil {
@@ -822,6 +868,19 @@ aliases:
 				}
 				if !strings.Contains(err.Error(), tt.errorContains) {
 					t.Errorf("expected error to contain %q, got: %v", tt.errorContains, err)
+				}
+				data, readErr := os.ReadFile(kubercPath)
+				if tt.existingKuberc == "" {
+					if !os.IsNotExist(readErr) {
+						t.Fatalf("expected kuberc file not to be created, got: %v", readErr)
+					}
+					return
+				}
+				if readErr != nil {
+					t.Fatalf("failed to read existing kuberc file: %v", readErr)
+				}
+				if string(data) != tt.existingKuberc {
+					t.Errorf("existing kuberc file was modified:\n%s", data)
 				}
 				return
 			}
