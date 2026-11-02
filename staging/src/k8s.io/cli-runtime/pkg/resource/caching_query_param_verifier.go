@@ -116,8 +116,11 @@ type cachingQueryParamVerifier struct {
 
 // NewCachingQueryParamVerifier wraps next with a hash-keyed cache.
 //
-// The queryParam must match the parameter checked by next. The cache can
-// be shared by verifier instances checking the same query parameter.
+// The client must be the same stable OpenAPI client used to construct next.
+// When next is created with NewQueryParamVerifierV3, pass the same client
+// (typically a cached.NewClient) to both constructors. The queryParam must
+// match the parameter checked by next. The cache can be shared by verifier
+// instances checking the same query parameter.
 //
 // Results are cached only when next returns nil or a ParamUnsupportedError.
 // Transient errors and OpenAPI URLs without a non-empty hash are not cached.
