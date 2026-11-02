@@ -194,8 +194,8 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 							},
 						},
 						{
-							Name:    sidecarContainerName,
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox), // this container is used for 2 purposes:
+							Name:  sidecarContainerName,
+							Image: imageutils.GetE2EImage(imageutils.BusyBox), // this container is used for 2 purposes:
 							// 1. to hold the pod, so when main container terminates, the pod stays, along with the volume
 							// 2. so that after the main container terminates, we can exec on it to access the volume, asserting marker files on the volume at the end of this test
 							Command: []string{"/bin/sh", "-c", "sleep 300"},
@@ -229,12 +229,12 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 			})
 			framework.ExpectNoError(err, "wait for container termination")
 			ginkgo.By("Checking that the startup probe ran")
-			countAtTermination := e2epod.ExecShellInContainer(f, podName, sidecarContainerName, "test -s /state/probe-runs && wc -l < /state/probe-runs")
+			probeCountAtTermination := e2epod.ExecShellInContainer(f, podName, sidecarContainerName, "test -s /state/probe-runs && wc -l < /state/probe-runs")
 
 			ginkgo.By("Checking that the startup probe stopped")
 			time.Sleep(5 * time.Second)
-			countAfterTermination := e2epod.ExecShellInContainer(f, podName, sidecarContainerName, "wc -l < /state/probe-runs")
-			gomega.Expect(countAfterTermination).To(gomega.Equal(countAtTermination))
+			probeCountAfterTermination := e2epod.ExecShellInContainer(f, podName, sidecarContainerName, "wc -l < /state/probe-runs")
+			gomega.Expect(probeCountAfterTermination).To(gomega.Equal(probeCountAtTermination))
 		})
 
 		ginkgo.It("should not restart container on rule mismatch, container restart policy Never", func(ctx context.Context) {
