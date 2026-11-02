@@ -19,10 +19,21 @@ package admission
 import (
 	"context"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/client-go/rest"
 )
 
-func NewHandlerForTest(v *Verifier, next AdmissionHandler, opts ...func(*Handler)) *Handler {
+type VerifierForTest = verifier
+
+func NewVerifierForTest(ctx context.Context, opts ...Option) (*VerifierForTest, error) {
+	return newVerifier(ctx, opts...)
+}
+
+func (v *verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
+	return v.verify(ctx, req, token)
+}
+
+func NewHandlerForTest(v *VerifierForTest, next AdmissionHandler, opts ...func(*Handler)) *Handler {
 	h := newHandler(v, next, defaultMaxBodyBytes)
 	for _, opt := range opts {
 		opt(h)
@@ -30,7 +41,7 @@ func NewHandlerForTest(v *Verifier, next AdmissionHandler, opts ...func(*Handler
 	return h
 }
 
-func NewLocalVerifierForTest(ctx context.Context, config *rest.Config, audience string) (*Verifier, error) {
+func NewLocalVerifierForTest(ctx context.Context, config *rest.Config, audience string) (*VerifierForTest, error) {
 	return newLocalVerifier(ctx, config, audience)
 }
 

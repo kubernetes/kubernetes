@@ -142,16 +142,16 @@ func (ts *oidcTestServer) close()               { ts.server.Close() }
 func (ts *oidcTestServer) client() *http.Client { return ts.server.Client() }
 
 // verifier builds a fixed-audience Verifier via full OIDC discovery over TLS.
-func (ts *oidcTestServer) verifier(t *testing.T) *admission.Verifier {
+func (ts *oidcTestServer) verifier(t *testing.T) *admission.VerifierForTest {
 	t.Helper()
-	v, err := admission.NewVerifier(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	v, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
 	return v
 }
 
-func (ts *oidcTestServer) localVerifier(audience string) (*admission.Verifier, error) {
+func (ts *oidcTestServer) localVerifier(audience string) (*admission.VerifierForTest, error) {
 	claims := ts.baseClaims()
 	claims["sub"] = "system:serviceaccount:webhooks:receiver"
 	claims["aud"] = []string{"https://kubernetes.default.svc"}
@@ -736,8 +736,6 @@ func TestVerifierVerify(t *testing.T) {
 var (
 	_ http.Handler                                                                                       = (*admission.Handler)(nil)
 	_ func(context.Context, admission.AdmissionHandler, ...admission.Option) (*admission.Handler, error) = admission.WithTokenVerification
-	_ func(context.Context, ...admission.Option) (*admission.Verifier, error)                            = admission.NewVerifier
-	_ func(*admission.Verifier, context.Context, *admissionv1.AdmissionRequest, string) error            = (*admission.Verifier).Verify
 	_ func(string) admission.Option                                                                      = admission.WithAudience
 	_ func(string, string, *http.Client) admission.Option                                                = admission.WithIssuer
 )
@@ -945,8 +943,8 @@ func TestLibraryKeyRotationAndAvailability(t *testing.T) {
 		_, _ = w.Write(keys.Load().([]byte))
 	}))
 	defer server.Close()
-	newVerifier := func() (*admission.Verifier, error) {
-		return admission.NewVerifier(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client()))
+	newVerifier := func() (*admission.VerifierForTest, error) {
+		return admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client()))
 	}
 	v, err := newVerifier()
 	if err != nil {
@@ -1103,7 +1101,7 @@ func TestRemoteIssuerConfiguration(t *testing.T) {
 		"http://issuer.example", "https://user:password@issuer.example", "https://issuer.example?query=value", "https://issuer.example#fragment",
 	} {
 		t.Run(issuer, func(t *testing.T) {
-			if verifier, err := admission.NewVerifier(context.Background(), admission.WithIssuer(issuer, testAudience, nil)); err == nil || verifier != nil {
+			if verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(issuer, testAudience, nil)); err == nil || verifier != nil {
 				t.Fatalf("invalid remote issuer = (%v, %v)", verifier, err)
 			}
 		})
@@ -1120,7 +1118,7 @@ func TestRemoteIssuerConfiguration(t *testing.T) {
 		_, _ = w.Write([]byte(`{"keys":[]}`))
 	}))
 	defer server.Close()
-	if verifier, err := admission.NewVerifier(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client())); err == nil || verifier != nil {
+	if verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client())); err == nil || verifier != nil {
 		t.Fatalf("mismatched discovery issuer = (%v, %v)", verifier, err)
 	}
 	if keysRequested.Load() != 0 {
@@ -1152,7 +1150,7 @@ func TestRemoteVerificationBoundsBackgroundFetch(t *testing.T) {
 	defer server.Close()
 	client := server.Client()
 	client.Timeout = 200 * time.Millisecond
-	v, err := admission.NewVerifier(context.Background(), admission.WithIssuer(server.URL, testAudience, client))
+	v, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, client))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1446,35 +1444,6 @@ func Example_inClusterWebhook() {
 	mux := http.NewServeMux()
 	mux.Handle("/validate", handler)
 	_ = mux // Serve using your webhook's existing HTTP server.
-}
-
-// Example_controllerRuntimeStyle verifies an already-decoded review. The HTTP
-// layer must pass the bearer token separately from the AdmissionReview.
-func Example_controllerRuntimeStyle() {
-	issuer, err := startOIDCServer()
-	if err != nil {
-		panic(err)
-	}
-	defer issuer.close()
-
-	v, err := admission.NewVerifier(context.Background(),
-		admission.WithIssuer(issuer.issuer, exampleAudience, issuer.client()))
-	if err != nil {
-		panic(err)
-	}
-
-	// A framework supplies the decoded review; HTTP middleware supplies the token.
-	ctx := context.Background()
-	review := exampleReview(exampleAPIGroup)
-	token := exampleSignedToken(issuer, exampleAPIGroup)
-
-	// Treat any verification error as a deny; details remain internal.
-	if err := v.Verify(ctx, review.Request, token); err != nil {
-		fmt.Println("denied") // return a 401 / deny AdmissionResponse here
-		return
-	}
-	fmt.Println("admitted") // proceed to your real admission decision
-	// Output: admitted
 }
 
 // TestExampleEndToEnd_MinimalWebhook checks that a signed request reaches
@@ -1991,7 +1960,7 @@ func TestNewVerifier_InClusterExplicitAudience(t *testing.T) {
 func TestWithAudience_ConflictsWithIssuer(t *testing.T) {
 	ts := newOIDCTestServer(t)
 
-	v, err := admission.NewVerifier(context.Background(),
+	v, err := admission.NewVerifierForTest(context.Background(),
 		admission.WithIssuer(ts.issuer, testAudience, ts.client()),
 		admission.WithAudience(testAudience))
 	if err == nil {
@@ -2008,7 +1977,7 @@ func TestWithAudience_ConflictsWithIssuer(t *testing.T) {
 // TestWithAudience_EmptyIsError proves an explicit but empty audience is a hard
 // construction error, never a verifier built with an audience-skipping audience.
 func TestWithAudience_EmptyIsError(t *testing.T) {
-	v, err := admission.NewVerifier(context.Background(), admission.WithAudience(""))
+	v, err := admission.NewVerifierForTest(context.Background(), admission.WithAudience(""))
 	if err == nil || v != nil {
 		t.Fatalf("NewVerifier with empty audience = (%v, %v), want (nil, error)", v, err)
 	}
@@ -2030,7 +1999,7 @@ func TestInClusterRequiresTrustedAudienceBeforeBootstrap(t *testing.T) {
 			if h != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
 				t.Fatalf("WithTokenVerification = (%v, %v), want audience error", h, err)
 			}
-			v, err := admission.NewVerifier(context.Background(), tc.opts...)
+			v, err := admission.NewVerifierForTest(context.Background(), tc.opts...)
 			if v != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
 				t.Fatalf("NewVerifier = (%v, %v), want audience error", v, err)
 			}
@@ -2177,11 +2146,11 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 
 	modes := []struct {
 		name        string
-		newVerifier func(string) (*admission.Verifier, error)
+		newVerifier func(string) (*admission.VerifierForTest, error)
 	}{
 		{
 			name: "in-cluster",
-			newVerifier: func(audience string) (*admission.Verifier, error) {
+			newVerifier: func(audience string) (*admission.VerifierForTest, error) {
 				projected := issuer.sign(t, map[string]any{
 					"iss": issuer.issuer,
 					"sub": "system:serviceaccount:webhook-system:receiver",
@@ -2204,8 +2173,8 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 		},
 		{
 			name: "remote-issuer",
-			newVerifier: func(audience string) (*admission.Verifier, error) {
-				return admission.NewVerifier(context.Background(), admission.WithIssuer(issuer.issuer, audience, issuer.server.Client()))
+			newVerifier: func(audience string) (*admission.VerifierForTest, error) {
+				return admission.NewVerifierForTest(context.Background(), admission.WithIssuer(issuer.issuer, audience, issuer.server.Client()))
 			},
 		},
 	}
@@ -2937,7 +2906,7 @@ func TestTokenReuseDoesNotSkipRequestChecks(t *testing.T) {
 
 func TestVerifier_SubresourceKindAndObjectGroups(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifier(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}
@@ -3015,7 +2984,7 @@ func TestVerifier_SubresourceKindAndObjectGroups(t *testing.T) {
 
 func TestVerifier_DecodedObjectsMatchAdmittedKind(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifier(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}
@@ -3062,7 +3031,7 @@ func TestVerifier_DecodedObjectsMatchAdmittedKind(t *testing.T) {
 
 func TestVerifier_CoreCrossGroupSubresources(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifier(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}
@@ -3113,7 +3082,7 @@ func TestVerifier_CoreCrossGroupSubresources(t *testing.T) {
 
 func TestVerifier_RejectsMissingObjectTypeMetaForCoreGroup(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifier(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}

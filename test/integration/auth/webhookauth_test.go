@@ -22,6 +22,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -90,7 +91,43 @@ func webhookAuthRequest(t *testing.T, kind metav1.GroupVersionKind, resource met
 	return req
 }
 
-func verifyDiscoveredWebhookKinds(ctx context.Context, t *testing.T, cs clientset.Interface, verifier *admissionauth.Verifier, token, namespace string) {
+func serveAdmissionRequest(ctx context.Context, t *testing.T, handler http.Handler, req *admissionv1.AdmissionRequest, token string) error {
+	t.Helper()
+	review := &admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
+		Request:  req,
+	}
+	body, err := json.Marshal(review)
+	if err != nil {
+		t.Fatalf("marshal AdmissionReview: %v", err)
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://webhook.example/admit", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("create webhook request: %v", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httpReq)
+	if rec.Code != http.StatusOK {
+		return errors.New(strings.TrimSpace(rec.Body.String()))
+	}
+	var decoded admissionv1.AdmissionReview
+	if err := json.Unmarshal(rec.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("decode webhook response: %v", err)
+	}
+	if decoded.Response == nil || !decoded.Response.Allowed {
+		if decoded.Response != nil && decoded.Response.Result != nil {
+			return errors.New(decoded.Response.Result.Message)
+		}
+		return errors.New("webhook token verification failed")
+	}
+	return nil
+}
+
+func verifyDiscoveredWebhookKinds(ctx context.Context, t *testing.T, cs clientset.Interface, handler http.Handler, token, namespace string) {
 	t.Helper()
 	_, resources, err := cs.Discovery().ServerGroupsAndResources()
 	if err != nil {
@@ -132,13 +169,13 @@ func verifyDiscoveredWebhookKinds(ctx context.Context, t *testing.T, cs clientse
 				if resource.Namespaced {
 					req.Namespace = namespace
 				}
-				if err := verifier.Verify(ctx, req, token); err != nil {
+				if err := serveAdmissionRequest(ctx, t, handler, req, token); err != nil {
 					t.Fatalf("discovered %s/%s with admitted kind %+v is unhandled: %v", list.GroupVersion, resource.Name, kind, err)
 				}
 				badKind := metav1.GroupVersionKind{Group: "unexpected.example.com", Version: "v1", Kind: "Thing"}
 				invalid := webhookAuthRequest(t, badKind, gvr, subresource, operation)
 				invalid.Namespace = req.Namespace
-				if err := verifier.Verify(ctx, invalid, token); err == nil || err.Error() != "webhook token verification failed" {
+				if err := serveAdmissionRequest(ctx, t, handler, invalid, token); err == nil || err.Error() != "webhook token verification failed" {
 					t.Fatalf("arbitrary cross-group kind accepted: %v", err)
 				}
 			})
@@ -288,16 +325,20 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 				t.Fatalf("issue %s token with audience %q: %v", tc.kind, tc.audience, err)
 			}
 
-			verifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithIssuer(issuer, tc.audience, client))
+			var admissions atomic.Int32
+			handler, err := admissionauth.WithTokenVerification(ctx, func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+				admissions.Add(1)
+				return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
+			}, admissionauth.WithIssuer(issuer, tc.audience, client))
 			if err != nil {
-				t.Fatalf("construct consumer verifier: %v", err)
+				t.Fatalf("construct admission HTTP handler: %v", err)
 			}
 			request := webhookAuthRequest(t,
 				metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 				metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 				"", admissionv1.Create,
 			)
-			if err := verifier.Verify(ctx, request, token.Status.Token); err != nil {
+			if err := serveAdmissionRequest(ctx, t, handler, request, token.Status.Token); err != nil {
 				t.Fatalf("verify issued %s token with audience %q: %v", tc.kind, tc.audience, err)
 			}
 			// The signed attestation covers the resource group, while a /scale
@@ -306,7 +347,7 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 				metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"},
 				request.Resource, "scale", admissionv1.Update,
 			)
-			if err := verifier.Verify(ctx, scale, token.Status.Token); err != nil {
+			if err := serveAdmissionRequest(ctx, t, handler, scale, token.Status.Token); err != nil {
 				t.Fatalf("verify issued token for legitimate /scale subresource: %v", err)
 			}
 
@@ -315,7 +356,7 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 				metav1.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
 				"", admissionv1.Create,
 			)
-			if err := verifier.Verify(ctx, wrongGroup, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
+			if err := serveAdmissionRequest(ctx, t, handler, wrongGroup, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
 				t.Fatalf("verify token for unauthorized group: got %v, want generic denial", err)
 			}
 			objectMismatch := request.DeepCopy()
@@ -329,26 +370,21 @@ func TestWebhookAuthIssuedToken(t *testing.T) {
 				{name: "object group", req: objectMismatch},
 				{name: "old object group", req: oldObjectMismatch},
 			} {
-				if err := verifier.Verify(ctx, mismatch.req, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
+				if err := serveAdmissionRequest(ctx, t, handler, mismatch.req, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
 					t.Fatalf("verify mismatched %s: got %v, want generic denial", mismatch.name, err)
 				}
 			}
-			wrongAudienceVerifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithIssuer(issuer, tc.audience+"-other", client))
+			wrongAudienceHandler, err := admissionauth.WithTokenVerification(ctx, func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+				return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
+			}, admissionauth.WithIssuer(issuer, tc.audience+"-other", client))
 			if err != nil {
-				t.Fatalf("construct wrong-audience verifier: %v", err)
+				t.Fatalf("construct wrong-audience handler: %v", err)
 			}
-			if err := wrongAudienceVerifier.Verify(ctx, request, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
+			if err := serveAdmissionRequest(ctx, t, wrongAudienceHandler, request, token.Status.Token); err == nil || err.Error() != "webhook token verification failed" {
 				t.Fatalf("verify token for wrong audience: got %v, want generic denial", err)
 			}
 
-			var admissions atomic.Int32
-			handler, err := admissionauth.WithTokenVerification(ctx, func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
-				admissions.Add(1)
-				return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
-			}, admissionauth.WithIssuer(issuer, tc.audience, client))
-			if err != nil {
-				t.Fatalf("construct admission HTTP handler: %v", err)
-			}
+			admissions.Store(0)
 			webhook := httptest.NewServer(handler)
 			defer webhook.Close()
 			postReview := func(review *admissionv1.AdmissionReview, bearer string) (*admissionv1.AdmissionReview, int) {
@@ -819,11 +855,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("issue discovery test token: %v", err)
 		}
-		verifier, err := admissionauth.NewVerifier(ctx, admissionauth.WithIssuer(issuer, webhookURL, discoveryClient))
-		if err != nil {
-			t.Fatal(err)
-		}
-		verifyDiscoveredWebhookKinds(ctx, t, cs, verifier, wildcardToken.Status.Token, ns.Name)
+		verifyDiscoveredWebhookKinds(ctx, t, cs, verifiedHandler, wildcardToken.Status.Token, ns.Name)
 	})
 
 	t.Run("Ignore skips early authentication failure", func(t *testing.T) {
