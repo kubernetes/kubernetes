@@ -22,6 +22,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -71,6 +73,94 @@ func TestBearerToken_Table(t *testing.T) {
 				t.Errorf("token = %q, want %q", token, tc.wantToken)
 			}
 		})
+	}
+}
+
+func TestValidateInClusterAudience(t *testing.T) {
+	namespaceFile := filepath.Join(t.TempDir(), "namespace")
+	if err := os.WriteFile(namespaceFile, []byte("webhooks\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name     string
+		audience string
+		wantErr  bool
+	}{
+		{name: "default Service port and path written explicitly", audience: "https://hook.webhooks.svc:443/"},
+		{name: "explicit Service port and path", audience: "https://hook.webhooks.svc:9443/validate"},
+		{name: "trailing slash retained", audience: "https://hook.webhooks.svc:443/validate/"},
+		{name: "other Service in same namespace is syntactically valid", audience: "https://dinner.webhooks.svc:8443/validate"},
+		{name: "other Pod namespace", audience: "https://hook.elsewhere.svc:443/validate", wantErr: true},
+		{name: "non-Service URL-backed webhook", audience: "https://validate.example.com/hook", wantErr: true},
+		{name: "not HTTPS", audience: "http://hook.webhooks.svc:443/validate", wantErr: true},
+		{name: "no scheme", audience: "hook.webhooks.svc:443/validate", wantErr: true},
+		{name: "no Service name", audience: "https://.webhooks.svc:443/validate", wantErr: true},
+		{name: "invalid Service name", audience: "https://bad_name.webhooks.svc:443/validate", wantErr: true},
+		{name: "invalid namespace label", audience: "https://hook.bad_namespace.svc:443/validate", wantErr: true},
+		{name: "lookalike suffix", audience: "https://hook.webhooks.svc.evil:443/validate", wantErr: true},
+		{name: "cluster domain suffix", audience: "https://hook.webhooks.svc.cluster.local:443/validate", wantErr: true},
+		{name: "no Service port", audience: "https://hook.webhooks.svc/validate", wantErr: true},
+		{name: "empty Service port", audience: "https://hook.webhooks.svc:/validate", wantErr: true},
+		{name: "port zero", audience: "https://hook.webhooks.svc:0/validate", wantErr: true},
+		{name: "port too large", audience: "https://hook.webhooks.svc:65536/validate", wantErr: true},
+		{name: "noncanonical port", audience: "https://hook.webhooks.svc:0443/validate", wantErr: true},
+		{name: "nonnumeric port", audience: "https://hook.webhooks.svc:port/validate", wantErr: true},
+		{name: "missing path", audience: "https://hook.webhooks.svc:443", wantErr: true},
+		{name: "credentials", audience: "https://user@hook.webhooks.svc:443/validate", wantErr: true},
+		{name: "query", audience: "https://hook.webhooks.svc:443/validate?probe=true", wantErr: true},
+		{name: "empty query", audience: "https://hook.webhooks.svc:443/validate?", wantErr: true},
+		{name: "fragment", audience: "https://hook.webhooks.svc:443/validate#probe", wantErr: true},
+		{name: "empty fragment", audience: "https://hook.webhooks.svc:443/validate#", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateInClusterAudience(tc.audience, namespaceFile)
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "WithAudience") {
+					t.Fatalf("validation = %v, want a helpful WithAudience error", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("valid Service audience %q rejected: %v", tc.audience, err)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name    string
+		content *string
+	}{
+		{name: "missing namespace file"},
+		{name: "empty projected namespace", content: new("")},
+		{name: "invalid projected namespace", content: new("bad_namespace")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "namespace")
+			if tc.content != nil {
+				if err := os.WriteFile(path, []byte(*tc.content), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// A missing projection must not silently become the default namespace.
+			if err := validateInClusterAudience("https://hook.default.svc:443/validate", path); err == nil || !strings.Contains(err.Error(), "projected Pod namespace") {
+				t.Fatalf("namespace validation = %v, want projected namespace error", err)
+			}
+		})
+	}
+}
+
+func TestInClusterAudienceValidationPrecedesBootstrap(t *testing.T) {
+	const invalidAudience = "http://hook.webhooks.svc:443/validate"
+	v, err := NewVerifier(context.Background(), WithAudience(invalidAudience))
+	if v != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
+		t.Fatalf("NewVerifier invalid audience = (%v, %v), want an audience error", v, err)
+	}
+	h, err := WithTokenVerification(context.Background(), func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+		return &admissionv1.AdmissionResponse{Allowed: true}
+	}, WithAudience(invalidAudience))
+	if h != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
+		t.Fatalf("WithTokenVerification invalid audience = (%v, %v), want an audience error", h, err)
 	}
 }
 
