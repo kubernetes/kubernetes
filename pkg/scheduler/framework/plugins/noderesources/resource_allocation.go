@@ -503,6 +503,7 @@ func (r *resourceAllocationScorer) deviceMatchesClass(ctx context.Context, devic
 	return true, nil
 }
 
+// TODO(#141166): use framework.SaturatingAdd for pod and node placement sums
 func (r *resourceAllocationScorer) scorePlacement(
 	ctx context.Context,
 	podGroupInfo fwk.PodGroupInfo,
