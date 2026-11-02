@@ -6432,11 +6432,9 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 	kubelet.podWorkers = &fakePodWorkers{
 		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
 			callCount++
-			if callCount > 1 {
-				// In the second call the SyncResult will not include the RemoveContainer.
-				// This ensures no infinite loop.
-				testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{}
-			}
+			// The requeued sync removes nothing, since all containers were removed already.
+			// Any successful removal requeues the pod, so this ensures no infinite loop.
+			testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{}
 			return kubelet.SyncPod(ctx, updateType, pod, mirrorPod, podStatus)
 		},
 		cache: kubelet.podCache,
@@ -6458,6 +6456,60 @@ func TestSyncPodRestartAllContainersRequeue(t *testing.T) {
 	// We expect SyncPod to be called once by us, and once recursively via UpdatePod -> fakePodWorkers.syncPodFn
 	// because the SyncResults contained a successful RemoveContainer action.
 	require.Equal(t, 1, callCount)
+}
+
+// TestSyncPodPrunedContainersRequeue checks that removing containers, e.g. those removed from the
+// pod spec beyond the limit, requeues the pod so that its status drops them, also without
+// RestartAllContainers.
+func TestSyncPodPrunedContainersRequeue(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		removeErr error
+	}{
+		{name: "removed"},
+		{name: "removal failed", removeErr: kubecontainer.ErrRemoveContainer},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+
+			pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+				Containers: []v1.Container{{Name: "bar"}},
+			})
+			kubelet.podManager.SetPods([]*v1.Pod{pod})
+			testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{{
+					Action: kubecontainer.RemoveContainer,
+					Target: "removed-container-id",
+					Error:  tc.removeErr,
+				}},
+			}
+
+			requeued := 0
+			kubelet.podWorkers = &fakePodWorkers{
+				syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, func(), error) {
+					requeued++
+					// Nothing is left to prune in the requeued sync.
+					testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{}
+					return kubelet.SyncPod(ctx, updateType, pod, mirrorPod, podStatus)
+				},
+				cache: kubelet.podCache,
+				t:     t,
+			}
+
+			podStatus := &kubecontainer.PodStatus{ContainerStatuses: []*kubecontainer.Status{{Name: "bar"}}}
+			_, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, podStatus)
+			if tc.removeErr != nil {
+				require.Error(t, err)
+				assert.Equal(t, 0, requeued, "a failed removal is retried with backoff instead")
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, 1, requeued, "the pod should be synced again exactly once")
+			}
+		})
+	}
 }
 
 func cleanUpTempDir(t *testing.T, tempDir, originalLogsDir string) {

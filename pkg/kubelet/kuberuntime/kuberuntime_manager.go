@@ -38,6 +38,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -1653,6 +1654,103 @@ func (m *kubeGenericRuntimeManager) dropRemovedActuatedContainers(logger klog.Lo
 	}
 }
 
+// pruneRemovedContainers removes the runtime containers of containers removed from the pod spec
+// beyond the newest maxRemovedContainers (see removedContainersToPrune), and returns a result for
+// each. Once all the runtime containers of a removed container are removed, its actuated record is
+// dropped too, so that a container added later under the same name doesn't find it.
+func (m *kubeGenericRuntimeManager) pruneRemovedContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) []*kubecontainer.SyncResult {
+	containerIDs := removedContainersToPrune(pod, podStatus)
+	if len(containerIDs) == 0 {
+		return nil
+	}
+	logger := klog.FromContext(ctx)
+	var results []*kubecontainer.SyncResult
+	removed := sets.New[kubecontainer.ContainerID]()
+	for _, containerID := range containerIDs {
+		logger.V(3).Info("Removing container removed from pod spec", "containerID", containerID, "pod", klog.KObj(pod))
+		result := kubecontainer.NewSyncResult(kubecontainer.RemoveContainer, containerID.ID)
+		results = append(results, result)
+		if err := m.removeContainer(ctx, containerID.ID, false); err != nil {
+			result.Fail(kubecontainer.ErrRemoveContainer, err.Error())
+			logger.Error(err, "Failed to remove container removed from pod spec", "containerID", containerID, "pod", klog.KObj(pod))
+			continue
+		}
+		removed.Insert(containerID)
+	}
+	gone := sets.New[string]()
+	remaining := sets.New[string]()
+	for _, s := range podStatus.ContainerStatuses {
+		if removed.Has(s.ID) {
+			gone.Insert(s.Name)
+		} else {
+			remaining.Insert(s.Name)
+		}
+	}
+	if names := sets.List(gone.Difference(remaining)); len(names) > 0 {
+		if err := m.actuatedState.RemoveContainers(logger, pod.UID, podutil.Containers, names...); err != nil {
+			logger.Error(err, "Failed to drop actuated records of pruned containers", "pod", klog.KObj(pod), "containers", names)
+		}
+	}
+	return results
+}
+
+// maxRemovedContainers is the number of containers removed from the pod spec
+// whose runtime containers, and so statuses and logs, are kept. It bounds the
+// pod status size for pods that churn containers.
+const maxRemovedContainers = 10
+
+// removedContainersToPrune returns the runtime containers of the containers
+// removed from the pod spec that finished longest ago, beyond the newest
+// maxRemovedContainers removed containers. Removed containers that are still
+// running count toward the limit but are never pruned.
+//
+// The status of a removed container is generated from its runtime container,
+// so pruning the runtime container drops the status too. Keeping the two in
+// sync matters: the API allows a name to be reused once its status is gone,
+// and a leftover runtime container would be mistaken for the new container.
+func removedContainersToPrune(pod *v1.Pod, podStatus *kubecontainer.PodStatus) []kubecontainer.ContainerID {
+	// The most recent runtime container for each removed container name.
+	latest := map[string]*kubecontainer.Status{}
+	for _, s := range podStatus.ContainerStatuses {
+		if kubecontainer.GetContainerSpec(pod, s.Name) != nil {
+			continue
+		}
+		if l, ok := latest[s.Name]; !ok || s.CreatedAt.After(l.CreatedAt) {
+			latest[s.Name] = s
+		}
+	}
+	if len(latest) <= maxRemovedContainers {
+		return nil
+	}
+
+	var stopped []*kubecontainer.Status
+	for _, s := range latest {
+		if s.State != kubecontainer.ContainerStateRunning && s.State != kubecontainer.ContainerStateUnknown {
+			stopped = append(stopped, s)
+		}
+	}
+	// Oldest finished first; names break ties for determinism.
+	sort.Slice(stopped, func(i, j int) bool {
+		if !stopped[i].FinishedAt.Equal(stopped[j].FinishedAt) {
+			return stopped[i].FinishedAt.Before(stopped[j].FinishedAt)
+		}
+		return stopped[i].Name < stopped[j].Name
+	})
+	toPrune := min(len(latest)-maxRemovedContainers, len(stopped))
+	names := sets.New[string]()
+	for _, s := range stopped[:toPrune] {
+		names.Insert(s.Name)
+	}
+
+	var ids []kubecontainer.ContainerID
+	for _, s := range podStatus.ContainerStatuses {
+		if names.Has(s.Name) && kubecontainer.GetContainerSpec(pod, s.Name) == nil {
+			ids = append(ids, s.ID)
+		}
+	}
+	return ids
+}
+
 // startingResizedContainer reports whether any of the contaniersToStart have been resized.
 func (m *kubeGenericRuntimeManager) startingResizedContainer(logger klog.Logger, pod *v1.Pod, containers []v1.Container, containersToStart []int) bool {
 	for _, i := range containersToStart {
@@ -1797,6 +1895,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		if result.Error() != nil {
 			return
 		}
+
+		// Failures are retried on the next sync, and don't block the rest of this one.
+		result.AddSyncResult(m.pruneRemovedContainers(ctx, pod, podStatus)...)
 
 		// Removes the containers if they are marked for removal (for in-place restart)
 		if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {

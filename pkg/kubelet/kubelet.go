@@ -2371,9 +2371,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// If we just performed a RestartAllContainers reset, we want to immediately
 	// trigger another sync to start the containers, rather than waiting for PLEG
-	// or the periodic resync.
-	if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) &&
-		restartingAllContainers && result.Error() == nil {
+	// or the periodic resync. The same goes for pruning the containers removed from
+	// the pod spec, so that the pod status drops them: the status was generated
+	// before they were removed, and PLEG doesn't sync a pod for removed containers.
+	if result.Error() == nil {
 		shouldRequeue := false
 		for _, r := range result.SyncResults {
 			if r.Action == kubecontainer.RemoveContainer && r.Error == nil {
@@ -2385,6 +2386,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			// This will not cause an infinite loop because UpdatePod merges concurrent updates
 			// to the same pod. Because all containers are removed, the subsequent SyncPod
 			// execution will unset the AllContainersRestarting condition and break the cycle.
+			// Pruned containers are gone from the subsequent SyncPod, so it prunes nothing.
 			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,

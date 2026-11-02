@@ -4080,3 +4080,40 @@ func TestSchedulerEvaluationCompletedRemoval(t *testing.T) {
 		assert.True(t, hasSEC(t, ctx, client, pod), "expected SchedulerEvaluationCompleted with non-DeferredPodResize reason to be preserved")
 	})
 }
+
+// A removed-container status that the kubelet stops reporting (pruned, or its
+// runtime container was garbage collected) must be dropped from the API, not
+// merged back in from the old API status.
+func TestSyncPodDropsRemovedContainerStatus(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	running := v1.ContainerStatus{
+		Name:  "main",
+		State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+	}
+	removed := v1.ContainerStatus{
+		Name:  "removed",
+		State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}},
+	}
+
+	pod := getTestPod()
+	pod.Spec.Containers = []v1.Container{{Name: "main"}}
+	pod.Status.ContainerStatuses = []v1.ContainerStatus{running, removed}
+
+	syncer := newTestManager(&fake.Clientset{})
+	syncer.podManager.(mutablePodManager).AddPod(pod)
+	client := fake.NewSimpleClientset(pod)
+	syncer.kubeClient = client
+
+	status := *pod.Status.DeepCopy()
+	status.ContainerStatuses = []v1.ContainerStatus{running}
+	syncer.SetPodStatus(logger, pod, status)
+	verifyActions(t, syncer, []core.Action{getAction(), patchAction()})
+
+	updated, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+	var names []string
+	for _, s := range updated.Status.ContainerStatuses {
+		names = append(names, s.Name)
+	}
+	assert.Equal(t, []string{"main"}, names)
+}
