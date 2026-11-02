@@ -117,16 +117,18 @@ func (b *backend) ProcessEvents(events ...*auditinternal.Event) bool {
 	return success
 }
 
-// truncate removed request and response objects from the audit events,
-// to try and keep at least metadata.
+// truncate removes request and response objects from a deep copy of the audit
+// event, to try and keep at least metadata. A deep copy is used so that the
+// original event — forwarded to other backends and reused for later request
+// stages — is completely unaffected.
 func truncate(e *auditinternal.Event) *auditinternal.Event {
-	// Make a shallow copy to avoid copying response/request objects.
-	newEvent := &auditinternal.Event{}
-	*newEvent = *e
+	newEvent := e.DeepCopy()
 
 	newEvent.RequestObject = nil
 	newEvent.ResponseObject = nil
 
+	// The original event goes on to other backends and later stages, so mark
+	// only the copy as truncated.
 	if newEvent.Annotations == nil {
 		newEvent.Annotations = make(map[string]string)
 	}
