@@ -278,7 +278,7 @@ func Register() {
 
 // InitMetrics replaces the package-level metric globals with fresh instances.
 // It is called once by Register(); tests should call Register() instead, since
-// re-initializing the globals races with other tests using them.
+// re-initializing the globals orphans the metrics already registered by Register().
 func InitMetrics() {
 	scheduleAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
