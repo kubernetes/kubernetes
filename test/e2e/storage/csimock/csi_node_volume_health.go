@@ -59,7 +59,8 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 			expectedCalls            []csiCall
 			forbiddenCalls           []string
 			nodeVolumeHealthRequired bool
-			nodeAbnormalVolumeHealth bool
+			volumeHealth             *csipbv1.VolumeHealth_VolumeHealthEntry
+			expectedHealth           v1.VolumeHealthCondition
 		}{
 			{
 				name: "return normal volume health",
@@ -74,7 +75,11 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 					},
 				},
 				nodeVolumeHealthRequired: true,
-				nodeAbnormalVolumeHealth: false,
+				expectedHealth: v1.VolumeHealthCondition{
+					Status:  v1.VolumeHealthGood,
+					Reason:  "VolumeHealthy",
+					Message: "Volume is healthy",
+				},
 			},
 			{
 				name: "return normal volume stats without volume health",
@@ -86,7 +91,6 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				},
 				forbiddenCalls:           []string{"NodeGetVolumeHealth"},
 				nodeVolumeHealthRequired: false,
-				nodeAbnormalVolumeHealth: false,
 			},
 			{
 				name: "return abnormal volume health",
@@ -101,7 +105,40 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 					},
 				},
 				nodeVolumeHealthRequired: true,
-				nodeAbnormalVolumeHealth: true,
+				volumeHealth: &csipbv1.VolumeHealth_VolumeHealthEntry{
+					Status:  csipbv1.VolumeHealthErrorType_INACCESSIBLE,
+					Reason:  "AbnormalVolumeHealth",
+					Message: "The target path of the volume doesn't exist",
+				},
+				expectedHealth: v1.VolumeHealthCondition{
+					Status:  v1.VolumeHealthInaccessible,
+					Reason:  "AbnormalVolumeHealth",
+					Message: "The target path of the volume doesn't exist",
+				},
+			},
+			{
+				name: "persist unrecognized volume health as Unknown",
+				expectedCalls: []csiCall{
+					{
+						expectedMethod: "NodeGetVolumeStats",
+						expectedError:  codes.OK,
+					},
+					{
+						expectedMethod: "NodeGetVolumeHealth",
+						expectedError:  codes.OK,
+					},
+				},
+				nodeVolumeHealthRequired: true,
+				volumeHealth: &csipbv1.VolumeHealth_VolumeHealthEntry{
+					Status:  csipbv1.VolumeHealthErrorType(999),
+					Reason:  "FutureHealth",
+					Message: "The driver reports an unrecognized volume health status",
+				},
+				expectedHealth: v1.VolumeHealthCondition{
+					Status:  v1.VolumeHealthUnknown,
+					Reason:  "FutureHealth",
+					Message: "The driver reports an unrecognized volume health status",
+				},
 			},
 		}
 		for _, test := range tests {
@@ -109,7 +146,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				m.init(ctx, testParameters{
 					registerDriver:            true,
 					enableNodeVolumeCondition: test.nodeVolumeHealthRequired,
-					hooks:                     createVolumeHealthHook(test.nodeAbnormalVolumeHealth),
+					hooks:                     createVolumeHealthHook(test.volumeHealth),
 				})
 				ginkgo.DeferCleanup(m.cleanup)
 				_, claim, pod := m.createPod(ctx, pvcReference)
@@ -139,7 +176,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 						if err != nil {
 							return false, err
 						}
-						return podVolumeHealthMatches(updated, test.nodeAbnormalVolumeHealth), nil
+						return podVolumeHealthMatches(updated, test.expectedHealth), nil
 					})
 					framework.ExpectNoError(waitErr, "pod.status.volumeStatuses[*].healthStatus should reflect NodeGetVolumeHealth")
 				}
@@ -228,7 +265,7 @@ func expectedCSICallsSeen(
 	return true, nil
 }
 
-func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
+func podVolumeHealthMatches(pod *v1.Pod, expected v1.VolumeHealthCondition) bool {
 	if len(pod.Status.VolumeStatuses) == 0 {
 		return false
 	}
@@ -240,21 +277,7 @@ func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
 			break
 		}
 	}
-	if !abnormal {
-		return entry != nil && len(entry.HealthConditions) == 1 &&
-			entry.HealthConditions[0].Status == v1.VolumeHealthGood &&
-			entry.HealthConditions[0].Reason == "VolumeHealthy"
-	}
-	if entry == nil || len(entry.HealthConditions) == 0 {
-		return false
-	}
-
-	for _, c := range entry.HealthConditions {
-		if c.Status == v1.VolumeHealthInaccessible && c.Reason == "AbnormalVolumeHealth" {
-			return true
-		}
-	}
-	return false
+	return entry != nil && len(entry.HealthConditions) == 1 && entry.HealthConditions[0] == expected
 }
 
 func csiNodeStorageHealthMatches(csiNode *storagev1.CSINode, driverName string, unhealthy bool) bool {
@@ -275,23 +298,17 @@ func csiNodeStorageHealthMatches(csiNode *storagev1.CSINode, driverName string, 
 	return !unhealthy
 }
 
-func createVolumeHealthHook(abnormalVolumeHealth bool) *drivers.Hooks {
+func createVolumeHealthHook(health *csipbv1.VolumeHealth_VolumeHealthEntry) *drivers.Hooks {
 	return &drivers.Hooks{
 		Post: func(ctx context.Context, fullMethod string, request, reply interface{}, err error) (interface{}, error) {
 			if !strings.Contains(fullMethod, "NodeGetVolumeHealth") {
 				return reply, err
 			}
-			if resp, ok := reply.(*csipbv1.NodeGetVolumeHealthResponse); ok && abnormalVolumeHealth {
+			if resp, ok := reply.(*csipbv1.NodeGetVolumeHealthResponse); ok && health != nil {
 				if resp.VolumeHealth == nil {
 					resp.VolumeHealth = &csipbv1.VolumeHealth{}
 				}
-				resp.VolumeHealth.HealthStatuses = []*csipbv1.VolumeHealth_VolumeHealthEntry{
-					{
-						Status:  csipbv1.VolumeHealthErrorType_INACCESSIBLE,
-						Reason:  "AbnormalVolumeHealth",
-						Message: "The target path of the volume doesn't exist",
-					},
-				}
+				resp.VolumeHealth.HealthStatuses = []*csipbv1.VolumeHealth_VolumeHealthEntry{health}
 				return resp, nil
 			}
 			return reply, err
