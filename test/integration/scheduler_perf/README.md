@@ -251,6 +251,92 @@ This allows to analyze which workload failed. Make sure that the failure is not 
 by checking multiple runs of the job. If the failures are not related to any regression, 
 but to an incorrect threshold setting, it is reasonable to decrease it.
 
+### Updating Thresholds
+
+These steps can be followed by a human or an AI agent to (re)calculate
+thresholds for all `performance` workloads of a test case directory, using the
+DRA tests under `dra` as the example. This should be applicable to other
+directories because the "Average" "SchedulingThroughput" data point is
+typically what the threshold gets defined for.
+
+In this example, 20 runs were analyzed because the implementation changed
+recently. When it has been stable for longer, more runs could be considered -
+needs to be checked before starting.
+
+How much lower the thresholds need to be to avoid flakes depends on the
+directory and workloads. 20% respectively 40% for noisy workloads worked out
+okay for DRA.
+
+1. **Collect the last 20 runs.** The job history is at
+   `https://prow.k8s.io/job-history/gs/kubernetes-ci-logs/logs/ci-benchmark-scheduler-perf-master`.
+   The page embeds a JSON array (`allBuilds = [...]`, newest first) with the run
+   `ID`s. For each run, list the artifacts with
+   `https://storage.googleapis.com/storage/v1/b/kubernetes-ci-logs/o?prefix=logs/ci-benchmark-scheduler-perf-master/<ID>/artifacts/BenchmarkPerfScheduling_benchmark_dra`
+   and download the `BenchmarkPerfScheduling_benchmark_<topic>_<datetime>.json`
+   files from `https://storage.googleapis.com/kubernetes-ci-logs/<object name>`.
+   There is one file per topic, i.e. the name passed as third parameter to
+   `RunBenchmarkPerfScheduling` in the `*_test.go` file
+   (for example `dra`, `dra_experimental`, `dra_partitionabledevices`).
+   Only the main `dra` directory has two topics (`dra` and `dra_experimental`).
+   Use the file whose topic matches the directory.
+
+2. **Extract the data points.** For each workload with the `performance` label
+   in `<dir>/performance-config.yaml`, look in `dataItems` of the matching file
+   for the item with `labels.Metric == "SchedulingThroughput"` and
+   `labels.Name == "BenchmarkPerfScheduling/<test case>/<workload>/test"`
+   (`BenchmarkPerfSchedulingExperimental/...` for `dra_experimental`).
+   The value is `data.Average`. Workloads without such an item (for example
+   `PublishResourceSlices`) get no threshold. The same workload name can occur
+   in several test cases, so always match on test case *and* workload.
+
+3. **Exclude overall slow runs.** Compute the median per workload, then look for
+   runs which are below it for many workloads at once. Those are caused by a slow
+   CI node and not by the workload. Leave them out and recompute the medians.
+   A single outlier for one workload is not a reason to exclude the whole run.
+
+4. **Classify workloads as stable or flaky.** Compare the minimum of the
+   remaining runs against `0.8 * median`. Workloads that regularly fall below
+   that (in the DRA tests: `5000pods_500nodes` and `SharedPodGroupResourceClaim`)
+   are flaky and get 40% below the median instead of 20%. If a stable workload
+   is still violated by a recent run, look at the job log
+   (`<run>/build-log.txt`, the "pods/s in last interval" lines): a short stall
+   is noise, a sustained drop is a regression and must be investigated before
+   lowering the threshold. Mention such cases when reporting the result.
+
+5. **Set the thresholds.** Round down to an integer. In the workload, use the
+   map form so that the key matches the topic name:
+
+   ```yaml
+   - name: empty_500nodes
+     labels: [performance]
+     threshold:
+       # <perf-dash URL>
+       dra_partitionabledevices: 157 # 20% below median of last 20 runs excluding overall slow runs
+   ```
+
+   Replace plain numbers (`threshold: 120`) with this form. In `dra/performance-config.yaml`
+   also set `dra_experimental` with the same value and the comment `same as dra above`.
+   Use 40% instead of 20% for flaky workloads. Use the number of runs
+   *including* the excluded ones for "last N runs".
+
+6. **Add the perf-dash URL** above each entry, with the test case and workload
+   substituted into this template (`BenchmarkPerfSchedulingExperimental` for
+   `dra_experimental`):
+
+   ```
+   https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2F<test case>%2F<workload>%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+   ```
+
+7. **Validate.** Parse all `performance-config.yaml` files, check that every
+   `performance` workload with a `SchedulingThroughput` metric has a threshold
+   with the right topic key(s), that the URL contains the right
+   `<test case>/<workload>`, and run `go test ./test/integration/scheduler_perf/...`
+   (at least build) to make sure the configs still load. Count how many
+   data points would fail the new thresholds and report that together with the
+   table of medians and thresholds.
+
+Do not edit generated files and do not commit the downloaded JSON files.
+
 ### Visualization
 
 Some support for visualizing progress over time is built into the
