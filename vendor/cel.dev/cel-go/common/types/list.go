@@ -72,6 +72,7 @@ func NewDynamicList(adapter Adapter, value any) traits.Lister {
 	if meta := getDynamicSliceMeta(rt); meta.supported {
 		sh := (*unsafeSlice)(anyDataPtr(value))
 		isNil := sh == nil || sh.Data == nil
+		qualifyRaw := canQualifyRawVal(adapter, meta.sliceType.Elem(), meta.qualifyRawVal)
 		if meta.isPtrElem {
 			var elems []unsafe.Pointer
 			if sh != nil && sh.Len > 0 {
@@ -82,7 +83,7 @@ func NewDynamicList(adapter Adapter, value any) traits.Lister {
 				elems:         elems,
 				elemTypePtr:   meta.elemTypePtr,
 				meta:          meta,
-				qualifyRawVal: meta.qualifyRawVal,
+				qualifyRawVal: qualifyRaw,
 				isNilSlice:    isNil,
 			}
 		}
@@ -95,7 +96,7 @@ func NewDynamicList(adapter Adapter, value any) traits.Lister {
 			elems:         elems,
 			elemTypePtr:   meta.elemTypePtr,
 			meta:          meta,
-			qualifyRawVal: meta.qualifyRawVal,
+			qualifyRawVal: qualifyRaw,
 			isNilSlice:    isNil,
 		}
 	}
@@ -116,7 +117,7 @@ func NewList[T any](adapter Adapter, elems []T) traits.Lister {
 		Adapter:       adapter,
 		elems:         elems,
 		elemTypePtr:   elemTypePtrFor[T](),
-		qualifyRawVal: isQualifyRawStruct[T](),
+		qualifyRawVal: isQualifyRawStructFor[T](adapter),
 	}
 }
 
@@ -129,7 +130,10 @@ func NewStringList(adapter Adapter, elems []string) traits.Lister {
 //
 // This type specialization is used with list literals within CEL expressions.
 func NewRefValList(adapter Adapter, elems []ref.Val) traits.Lister {
-	return NewList(adapter, elems)
+	return &sliceList[ref.Val]{
+		Adapter: adapter,
+		elems:   elems,
+	}
 }
 
 // NewProtoList returns a traits.Lister based on a pb.List instance.
@@ -183,6 +187,7 @@ func MaybeSliceList(adapter Adapter, list traits.Lister, start, end int) (traits
 	if start < 0 || end < 0 || start > end || end > rv.Len() {
 		return nil, false
 	}
+	adapter = maybeCustomAdapter(adapter, list)
 	sub := rv.Slice(start, end).Interface()
 	return NewDynamicList(adapter, sub), true
 }
@@ -208,11 +213,25 @@ func MaybeReverseList(adapter Adapter, list traits.Lister) (traits.Lister, bool)
 	if n <= 1 {
 		return list, true
 	}
+	adapter = maybeCustomAdapter(adapter, list)
 	out := reflect.MakeSlice(rv.Type(), n, n)
 	for i := range n {
 		out.Index(n - 1 - i).Set(rv.Index(i))
 	}
 	return NewDynamicList(adapter, out.Interface()), true
+}
+
+type listAdapter interface {
+	listAdapter() Adapter
+}
+
+func maybeCustomAdapter(adapter Adapter, list traits.Lister) Adapter {
+	if la, ok := list.(listAdapter); ok {
+		if listAdapt := la.listAdapter(); listAdapt != nil && !isStandardAdapter(listAdapt) {
+			return listAdapt
+		}
+	}
+	return adapter
 }
 
 // baseList points to a list containing elements of any type.
@@ -228,6 +247,10 @@ type baseList struct {
 	// the memoization contract.
 	aggSize uint32
 	get     func(int) any
+}
+
+func (l *baseList) listAdapter() Adapter {
+	return l.Adapter
 }
 
 // Add implements the traits.Adder interface method.
@@ -365,8 +388,14 @@ func (l *baseList) IsZeroValue() bool {
 
 // Fold calls the FoldEntry method for each (index, value) pair in the list.
 func (l *baseList) Fold(f traits.Folder) {
+	get := l.get
+	if !isStandardAdapter(l.Adapter) {
+		get = func(i int) any {
+			return l.Adapter.NativeToValue(l.get(i))
+		}
+	}
 	for i := 0; i < l.size; i++ {
-		if !f.FoldEntry(i, l.get(i)) {
+		if !f.FoldEntry(i, get(i)) {
 			break
 		}
 	}
@@ -754,6 +783,10 @@ type sliceList[T any] struct {
 	isNilSlice    bool
 }
 
+func (l *sliceList[T]) listAdapter() Adapter {
+	return l.Adapter
+}
+
 func (l *sliceList[T]) len() int {
 	if l.meta != nil && l.meta.elemStride > 0 {
 		return len(l.elems) / int(l.meta.elemStride)
@@ -792,10 +825,14 @@ func (l *sliceList[T]) rawElemAt(ind int) (any, bool) {
 		}
 	case *sliceList[uint8]:
 		if s.meta != nil && s.meta.elemStride > 0 && s.elemTypePtr != nil {
-			return packAny(s.elemTypePtr, unsafe.Pointer(&s.elems[uintptr(ind)*s.meta.elemStride])), true
+			addr := unsafe.Pointer(&s.elems[uintptr(ind)*s.meta.elemStride])
+			if !s.qualifyRawVal {
+				return reflect.NewAt(s.meta.sliceType.Elem(), addr).Elem().Interface(), true
+			}
+			return packAny(s.elemTypePtr, addr), true
 		}
 	}
-	if l.elemTypePtr != nil {
+	if l.qualifyRawVal && l.elemTypePtr != nil {
 		return packAny(l.elemTypePtr, unsafe.Pointer(&l.elems[ind])), true
 	}
 	return nil, false
@@ -1128,6 +1165,14 @@ func (l *sliceList[T]) IsZeroValue() bool {
 	return l.len() == 0
 }
 
+func (l *sliceList[T]) foldElems(f traits.Folder) {
+	for i := range l.len() {
+		if !f.FoldEntry(i, l.getElem(i)) {
+			break
+		}
+	}
+}
+
 func (l *sliceList[T]) Fold(f traits.Folder) {
 	switch s := any(l).(type) {
 	case *sliceList[string]:
@@ -1180,6 +1225,10 @@ func (l *sliceList[T]) Fold(f traits.Folder) {
 		}
 	case *sliceList[uint8]:
 		if s.meta != nil && s.meta.elemStride > 0 && s.elemTypePtr != nil {
+			if !s.qualifyRawVal {
+				s.foldElems(f)
+				return
+			}
 			stride := s.meta.elemStride
 			n := len(s.elems) / int(stride)
 			for i := 0; i < n; i++ {
@@ -1224,6 +1273,10 @@ func (l *sliceList[T]) Fold(f traits.Folder) {
 		}
 	case *sliceList[unsafe.Pointer]:
 		if s.elemTypePtr != nil {
+			if !s.qualifyRawVal {
+				s.foldElems(f)
+				return
+			}
 			for i, ptr := range s.elems {
 				if ptr == nil {
 					if !f.FoldEntry(i, NullValue) {
@@ -1238,12 +1291,16 @@ func (l *sliceList[T]) Fold(f traits.Folder) {
 			return
 		}
 	default:
-		if l.elemTypePtr != nil {
+		if l.qualifyRawVal && l.elemTypePtr != nil {
 			for i := range l.elems {
 				if !f.FoldEntry(i, packAny(l.elemTypePtr, unsafe.Pointer(&l.elems[i]))) {
 					break
 				}
 			}
+			return
+		}
+		if !l.qualifyRawVal && (!isStandardAdapter(l.Adapter) || l.elemTypePtr != nil) {
+			l.foldElems(f)
 			return
 		}
 		for i, e := range l.elems {

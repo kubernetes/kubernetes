@@ -1192,32 +1192,69 @@ type unsafeSlice struct {
 }
 
 type dynamicSliceMeta struct {
-	sliceType     reflect.Type
-	sliceTypePtr  unsafe.Pointer
-	elemTypePtr   unsafe.Pointer
-	elemStride    uintptr
-	qualifyRawVal bool
-	isPtrElem     bool
-	supported     bool
+	sliceType      reflect.Type
+	sliceTypePtr   unsafe.Pointer
+	elemTypePtr    unsafe.Pointer
+	elemValTypePtr unsafe.Pointer
+	elemStride     uintptr
+	qualifyRawVal  bool
+	isDirectIface  bool
+	isPtrElem      bool
+	supported      bool
 }
 
 var dynamicSliceMetaCache sync.Map
 
-func isQualifyRawStruct[T any]() bool {
-	return isQualifyRawStructType(reflect.TypeFor[T]())
+func isStandardAdapter(adapter Adapter) bool {
+	switch a := adapter.(type) {
+	case nil, *defaultTypeAdapter:
+		return true
+	case *Registry:
+		return a.adapter == nil
+	default:
+		return false
+	}
+}
+
+func canQualifyRawVal(adapter Adapter, elemType reflect.Type, metaQualifyRaw bool) bool {
+	if !metaQualifyRaw {
+		return false
+	}
+	if isStandardAdapter(adapter) {
+		return true
+	}
+	if elemType != nil && elemType.Implements(refValType) {
+		return true
+	}
+	if reg, ok := adapter.(*Registry); ok && len(reg.reflectTypes) > 0 {
+		if st, found := reg.findStructDescriptorByReflectType(elemType); found {
+			_, isNative := st.(*NativeType)
+			return isNative
+		}
+	}
+	return false
+}
+
+func isQualifyRawStructFor[T any](adapter Adapter) bool {
+	rt := reflect.TypeFor[T]()
+	if !isQualifyRawStructType(rt) {
+		return false
+	}
+	return canQualifyRawVal(adapter, rt, true)
 }
 
 func isQualifyRawStructType(rt reflect.Type) bool {
-	if rt == nil || rt.Implements(reflect.TypeFor[ref.Val]()) || rt.Implements(reflect.TypeFor[protoreflect.ProtoMessage]()) {
+	if rt == nil {
 		return false
 	}
-	if rt.Kind() == reflect.Struct {
-		return rt != reflect.TypeFor[time.Time]()
+	elem := rt
+	if rt.Kind() == reflect.Pointer {
+		elem = rt.Elem()
 	}
-	if rt.Kind() == reflect.Ptr && rt.Elem().Kind() == reflect.Struct {
-		return rt.Elem() != reflect.TypeFor[time.Time]()
+	if elem.Kind() != reflect.Struct || elem == timestampType {
+		return false
 	}
-	return false
+	return !rt.Implements(refValType) && !rt.Implements(pbMsgInterfaceType)
 }
 
 var unsupportedDynamicSliceMeta = &dynamicSliceMeta{supported: false}
@@ -1238,19 +1275,21 @@ func getDynamicSliceMeta(rt reflect.Type) *dynamicSliceMeta {
 			sliceType:     rt,
 			sliceTypePtr:  sliceTypPtr,
 			elemTypePtr:   runtimeTypePtr(elemType),
-			qualifyRawVal: isQualifyRawStructType(elemType),
+			qualifyRawVal: isQualifyRawStructType(elemType) || elemType.Implements(refValType),
 			isPtrElem:     true,
 			supported:     true,
 		}
 	case reflect.Struct:
 		if elemTyp := elemTypePtrForType(elemType); elemTyp != nil {
 			meta = &dynamicSliceMeta{
-				sliceType:     rt,
-				sliceTypePtr:  sliceTypPtr,
-				elemTypePtr:   elemTyp,
-				elemStride:    elemType.Size(),
-				qualifyRawVal: true,
-				supported:     true,
+				sliceType:      rt,
+				sliceTypePtr:   sliceTypPtr,
+				elemTypePtr:    elemTyp,
+				elemValTypePtr: runtimeTypePtr(elemType),
+				elemStride:     elemType.Size(),
+				qualifyRawVal:  true,
+				isDirectIface:  isDirectIface(elemType),
+				supported:      true,
 			}
 		}
 	}

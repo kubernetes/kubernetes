@@ -1134,6 +1134,7 @@ func (t *NativeType) makeFieldGetter(refField reflect.StructField) func(obj any)
 				return sliceFieldGetter[any](t, refField, offset, expectedPtrTyp, expectedStructTyp)
 			default:
 				if meta := getDynamicSliceMeta(refField.Type); meta.supported {
+					elemType := meta.sliceType.Elem()
 					if meta.isPtrElem {
 						return func(obj any) (any, error) {
 							adapter := t.adapterFrom(obj)
@@ -1144,7 +1145,7 @@ func (t *NativeType) makeFieldGetter(refField reflect.StructField) func(obj any)
 									elems:         elems,
 									elemTypePtr:   meta.elemTypePtr,
 									meta:          meta,
-									qualifyRawVal: meta.qualifyRawVal,
+									qualifyRawVal: canQualifyRawVal(adapter, elemType, meta.qualifyRawVal),
 									isNilSlice:    elems == nil,
 								}, nil
 							}
@@ -1169,7 +1170,7 @@ func (t *NativeType) makeFieldGetter(refField reflect.StructField) func(obj any)
 								elems:         bytes,
 								elemTypePtr:   meta.elemTypePtr,
 								meta:          meta,
-								qualifyRawVal: meta.qualifyRawVal,
+								qualifyRawVal: canQualifyRawVal(adapter, elemType, meta.qualifyRawVal),
 								isNilSlice:    hdr.Data == nil,
 							}, nil
 						}

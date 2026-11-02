@@ -53,7 +53,7 @@ func NewMap[K comparable, V any](adapter Adapter, value map[K]V) traits.Mapper {
 		Adapter:       adapter,
 		mapVal:        value,
 		valTypePtr:    elemTypePtrFor[V](),
-		qualifyRawVal: isQualifyRawStruct[V](),
+		qualifyRawVal: isQualifyRawStructFor[V](adapter),
 	}
 }
 
@@ -546,6 +546,14 @@ func (m *reflectMapAccessor) Iterator() traits.Iterator {
 // Fold calls the FoldEntry method for each (key, value) pair in the map.
 func (m *reflectMapAccessor) Fold(f traits.Folder) {
 	mapRange := m.refValue.MapRange()
+	if !isStandardAdapter(m.Adapter) {
+		for mapRange.Next() {
+			if !f.FoldEntry(m.NativeToValue(mapRange.Key().Interface()), m.NativeToValue(mapRange.Value().Interface())) {
+				break
+			}
+		}
+		return
+	}
 	for mapRange.Next() {
 		if !f.FoldEntry(mapRange.Key().Interface(), mapRange.Value().Interface()) {
 			break
@@ -645,7 +653,7 @@ func (m *nativeMap[K, V]) valToRefVal(v V) ref.Val {
 	case *[]byte:
 		return Bytes(*(*[]byte)(unsafe.Pointer(&v)))
 	default:
-		if m.valTypePtr != nil {
+		if m.qualifyRawVal && m.valTypePtr != nil {
 			return m.Adapter.NativeToValue(packAny(m.valTypePtr, unsafe.Pointer(heapCopy(v))))
 		}
 		return m.Adapter.NativeToValue(v)
@@ -1008,8 +1016,24 @@ func (m *nativeMap[K, V]) IsZeroValue() bool {
 
 func (m *nativeMap[K, V]) Fold(f traits.Folder) {
 	if kf, ok := f.(interface{ FoldKeyOnly() bool }); ok && kf.FoldKeyOnly() {
+		if !isStandardAdapter(m.Adapter) {
+			for k := range m.mapVal {
+				if !f.FoldEntry(m.keyToRefVal(k), nil) {
+					break
+				}
+			}
+			return
+		}
 		for k := range m.mapVal {
 			if !f.FoldEntry(m.keyToFoldAny(k), nil) {
+				break
+			}
+		}
+		return
+	}
+	if !m.qualifyRawVal && !isStandardAdapter(m.Adapter) {
+		for k, v := range m.mapVal {
+			if !f.FoldEntry(m.keyToRefVal(k), m.valToRefVal(v)) {
 				break
 			}
 		}

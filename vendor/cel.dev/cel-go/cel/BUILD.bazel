@@ -64,6 +64,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cel_adapter_test.go",
         "cel_example_test.go",
         "cel_test.go",
         "timestamp_legacy_test.go",
