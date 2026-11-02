@@ -207,13 +207,6 @@ func (s *fakeResourceMetricsServer) registerAPIService(ctx context.Context, gv s
 		return fmt.Errorf("fake resource metrics service is not ready")
 	}
 
-	// Give v1beta1 a higher APIService priority to verify that the resource
-	// metrics client prefers v1 based on its own version ordering.
-	versionPriority := int32(100)
-	if gv == metricsv1beta1.SchemeGroupVersion {
-		versionPriority = 200
-	}
-
 	apiService := &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: apiServiceName(gv),
@@ -222,7 +215,7 @@ func (s *fakeResourceMetricsServer) registerAPIService(ctx context.Context, gv s
 			Group:                 gv.Group,
 			Version:               gv.Version,
 			GroupPriorityMinimum:  100,
-			VersionPriority:       versionPriority,
+			VersionPriority:       100,
 			InsecureSkipTLSVerify: true,
 			Service: &apiregistrationv1.ServiceReference{
 				Namespace: "default",
