@@ -756,10 +756,7 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 		if entry == nil {
 			continue
 		}
-		status, ok := mapVolumeHealthStatus(entry.GetStatus())
-		if !ok {
-			continue
-		}
+		status := mapVolumeHealthStatus(entry.GetStatus())
 		key := conditionKey{status: status, reason: entry.GetReason()}
 		if _, exists := seen[key]; exists {
 			continue
@@ -777,16 +774,16 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 	return out
 }
 
-func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) (api.VolumeHealthStatusType, bool) {
+func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) api.VolumeHealthStatusType {
 	switch status {
 	case csipbv1.VolumeHealthErrorType_INACCESSIBLE:
-		return api.VolumeHealthInaccessible, true
+		return api.VolumeHealthInaccessible
 	case csipbv1.VolumeHealthErrorType_DATA_LOSS:
-		return api.VolumeHealthDataLoss, true
+		return api.VolumeHealthDataLoss
 	case csipbv1.VolumeHealthErrorType_DEGRADED:
-		return api.VolumeHealthDegraded, true
+		return api.VolumeHealthDegraded
 	default:
-		return "", false
+		return api.VolumeHealthUnknown
 	}
 }
 

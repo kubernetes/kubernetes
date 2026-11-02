@@ -872,7 +872,7 @@ type VolumeHealthCondition struct {
 // VolumeHealthStatus contains health information for a volume reported
 // by a CSI controller or node plugin.
 type VolumeHealthStatus struct {
-	// healthConditions is the set of adverse conditions reported by
+	// healthConditions is the set of health conditions reported by
 	// a CSI plugin. An empty list means no adverse condition.
 	// At most 16 conditions may be reported.
 	// +optional

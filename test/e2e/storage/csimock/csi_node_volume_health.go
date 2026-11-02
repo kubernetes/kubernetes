@@ -230,7 +230,7 @@ func expectedCSICallsSeen(
 
 func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
 	if len(pod.Status.VolumeStatuses) == 0 {
-		return !abnormal
+		return false
 	}
 	var entry *v1.VolumeHealthStatus
 	for i := range pod.Status.VolumeStatuses {
@@ -241,8 +241,9 @@ func podVolumeHealthMatches(pod *v1.Pod, abnormal bool) bool {
 		}
 	}
 	if !abnormal {
-		// Healthy: either no health report, or a report with empty conditions.
-		return entry == nil || len(entry.HealthConditions) == 0
+		return entry != nil && len(entry.HealthConditions) == 1 &&
+			entry.HealthConditions[0].Status == v1.VolumeHealthGood &&
+			entry.HealthConditions[0].Reason == "VolumeHealthy"
 	}
 	if entry == nil || len(entry.HealthConditions) == 0 {
 		return false

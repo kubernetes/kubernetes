@@ -30,6 +30,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csi"
 )
 
+const (
+	CSIVolumeHealthy = "VolumeHealthy"
+)
+
 // StatusUpdater updates pod volume health in the kubelet status cache.
 type StatusUpdater interface {
 	SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volumeName string, conditions []v1.VolumeHealthCondition) bool
@@ -128,9 +132,19 @@ func (m *manager) probeVolumeHealth(ctx context.Context) {
 			continue
 		}
 
+		if len(conditions) == 0 {
+			conditions = []v1.VolumeHealthCondition{{
+				Status:  v1.VolumeHealthGood,
+				Reason:  CSIVolumeHealthy,
+				Message: "Volume is healthy",
+			}}
+		}
+
 		// Dedup / PATCH suppression lives in status_manager.SetPodVolumeHealth.
 		if m.statusUpdater != nil {
 			m.statusUpdater.SetPodVolumeHealth(logger, vol.Pod.UID, vol.OuterVolumeName, conditions)
+		} else {
+			logger.V(2).Info("unable to update health of", "volume", vol.OuterVolumeName, "pod", vol.Pod.UID)
 		}
 	}
 }

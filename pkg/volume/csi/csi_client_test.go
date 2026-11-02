@@ -1464,6 +1464,19 @@ func TestMapVolumeHealthConditions(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "unknown statuses map to Unknown and preserve driver details",
+			vh: &csipbv1.VolumeHealth{
+				HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{
+					{Status: csipbv1.VolumeHealthErrorType_UNKNOWN_VOLUME_HEALTH_TYPE, Reason: "UnknownHealth", Message: "driver cannot determine health"},
+					{Status: csipbv1.VolumeHealthErrorType(999), Reason: "FutureHealth", Message: "driver reports a new health status"},
+				},
+			},
+			want: []api.VolumeHealthCondition{
+				{Status: api.VolumeHealthUnknown, Reason: "UnknownHealth", Message: "driver cannot determine health"},
+				{Status: api.VolumeHealthUnknown, Reason: "FutureHealth", Message: "driver reports a new health status"},
+			},
+		},
+		{
 			name: "unique statuses preserved",
 			vh: &csipbv1.VolumeHealth{
 				HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{

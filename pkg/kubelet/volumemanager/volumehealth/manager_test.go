@@ -19,6 +19,7 @@ package volumehealth
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -181,11 +182,20 @@ func TestProbeVolumeHealth(t *testing.T) {
 	degraded := []v1.VolumeHealthCondition{{
 		Status: v1.VolumeHealthDegraded, Reason: "DiskSlow", Message: "slow disk",
 	}}
+	healthy := []v1.VolumeHealthCondition{{
+		Status:  v1.VolumeHealthGood,
+		Reason:  CSIVolumeHealthy,
+		Message: "Volume is healthy",
+	}}
+	unknown := []v1.VolumeHealthCondition{{
+		Status: v1.VolumeHealthUnknown, Reason: "FutureHealth", Message: "unrecognized driver health status",
+	}}
 
 	type step struct {
 		volumeConditions []v1.VolumeHealthCondition
 		volumeErr        error
 		wantCallCount    int
+		wantConditions   []v1.VolumeHealthCondition
 	}
 
 	tests := []struct {
@@ -197,15 +207,32 @@ func TestProbeVolumeHealth(t *testing.T) {
 			name:                 "bad health updates pod status",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 			},
 		},
 		{
-			name:                 "cleared health clears pod status",
+			name:                 "healthy and degraded transitions update pod status",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
-				{volumeConditions: nil, wantCallCount: 2},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{volumeConditions: nil, wantCallCount: 2, wantConditions: healthy},
+				{volumeConditions: degraded, wantCallCount: 3, wantConditions: degraded},
+			},
+		},
+		{
+			name:                 "initial empty report populates healthy status",
+			supportsVolumeHealth: true,
+			steps: []step{
+				{volumeConditions: nil, wantCallCount: 1, wantConditions: healthy},
+				{volumeConditions: []v1.VolumeHealthCondition{}, wantCallCount: 2, wantConditions: healthy},
+				{volumeErr: errors.New("rpc failed"), wantCallCount: 2},
+			},
+		},
+		{
+			name:                 "unknown health is not considered healthy",
+			supportsVolumeHealth: true,
+			steps: []step{
+				{volumeConditions: unknown, wantCallCount: 1, wantConditions: unknown},
 			},
 		},
 		{
@@ -213,15 +240,15 @@ func TestProbeVolumeHealth(t *testing.T) {
 			name:                 "same condition twice still calls status updater",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
-				{volumeConditions: degraded, wantCallCount: 2},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{volumeConditions: degraded, wantCallCount: 2, wantConditions: degraded},
 			},
 		},
 		{
 			name:                 "error leaves previous conditions unchanged",
 			supportsVolumeHealth: true,
 			steps: []step{
-				{volumeConditions: degraded, wantCallCount: 1},
+				{volumeConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 				{volumeErr: errors.New("rpc failed"), wantCallCount: 1},
 			},
 		},
@@ -255,14 +282,8 @@ func TestProbeVolumeHealth(t *testing.T) {
 					if last.podUID != "pod-uid-1" || last.volumeName != "vol1" {
 						t.Fatalf("step %d: update for wrong pod/volume: %+v", i, last)
 					}
-					if len(last.conditions) != len(s.volumeConditions) {
-						t.Fatalf("step %d: expected %d conditions, got %d", i, len(s.volumeConditions), len(last.conditions))
-					}
-					for j, want := range s.volumeConditions {
-						if last.conditions[j].Status != want.Status || last.conditions[j].Reason != want.Reason {
-							t.Fatalf("step %d: condition %d: want {%s,%s}, got {%s,%s}",
-								i, j, want.Status, want.Reason, last.conditions[j].Status, last.conditions[j].Reason)
-						}
+					if !reflect.DeepEqual(last.conditions, s.wantConditions) {
+						t.Fatalf("step %d: expected conditions %+v, got %+v", i, s.wantConditions, last.conditions)
 					}
 				}
 				prevCalls = got
