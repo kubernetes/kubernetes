@@ -1439,11 +1439,21 @@ func TestMapStorageBackendHealthLimit(t *testing.T) {
 	for i := range entries {
 		entries[i] = &csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
 			Status: csipbv1.StorageHealthErrorType_STORAGE_DEGRADED,
+			Reason: fmt.Sprintf("Reason%d", i),
 		}
 	}
 
-	if _, err := mapStorageBackendHealth(entries); err == nil {
-		t.Fatalf("mapStorageBackendHealth() expected an error for %d conditions", len(entries))
+	conditions, err := mapStorageBackendHealth(entries)
+	if err != nil {
+		t.Fatalf("mapStorageBackendHealth() returned error: %v", err)
+	}
+	if len(conditions) != maxStorageHealthConditions {
+		t.Fatalf("expected %d conditions, got %d", maxStorageHealthConditions, len(conditions))
+	}
+	for i, c := range conditions {
+		if want := fmt.Sprintf("Reason%d", i); c.Reason != want {
+			t.Errorf("condition %d: expected reason %q, got %q", i, want, c.Reason)
+		}
 	}
 }
 

@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	CSIVolumeHealthy = "VolumeHealthy"
+	CSIVolumeHealthy  = "VolumeHealthy"
+	CSIBackendHealthy = "StorageHealthy"
 )
 
 // StatusUpdater updates pod volume health in the kubelet status cache.
@@ -172,6 +173,14 @@ func (m *manager) probeStorageHealth(ctx context.Context) {
 			logger.V(4).Info("NodeGetStorageHealth failed; leaving previous conditions unchanged",
 				"driver", driverName, "err", err)
 			continue
+		}
+
+		if len(backendHealth) == 0 {
+			backendHealth = []storagev1.StorageHealthCondition{{
+				Status:  storagev1.StorageHealthy,
+				Reason:  CSIBackendHealthy,
+				Message: "Storage subsystems are healthy",
+			}}
 		}
 
 		gaugeKeys := make([]storageHealthKey, 0, len(backendHealth))

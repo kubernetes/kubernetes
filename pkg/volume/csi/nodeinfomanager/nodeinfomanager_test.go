@@ -1264,6 +1264,12 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 	health1New := storage.StorageHealth{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1New}}
 	health2 := storage.StorageHealth{Name: driver2, HealthConditions: []storage.StorageHealthCondition{cond2}}
 	health1Filesystem := storage.StorageHealth{Name: driver1, HealthConditions: []storage.StorageHealthCondition{cond1Filesystem}}
+	condHealthy := storage.StorageHealthCondition{
+		Status:  storage.StorageHealthy,
+		Reason:  "StorageHealthy",
+		Message: "Storage subsystems are healthy",
+	}
+	health1Healthy := storage.StorageHealth{Name: driver1, HealthConditions: []storage.StorageHealthCondition{condHealthy}}
 
 	testcases := []struct {
 		name            string
@@ -1382,6 +1388,57 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			driverName:   driver1,
 			conditions:   []storage.StorageHealthCondition{cond1, cond1},
 			expectStatus: []storage.StorageHealth{health1},
+			expectUpdate: false,
+		},
+		{
+			name:           "set healthy for driver with empty status",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{condHealthy},
+			expectStatus: []storage.StorageHealth{health1Healthy},
+			expectUpdate: true,
+		},
+		{
+			name:           "healthy replaces degraded conditions",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{condHealthy},
+			expectStatus: []storage.StorageHealth{health1Healthy},
+			expectUpdate: true,
+		},
+		{
+			name:           "degraded replaces healthy condition",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1Healthy}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{cond1},
+			expectStatus: []storage.StorageHealth{health1},
+			expectUpdate: true,
+		},
+		{
+			name:           "no-op when healthy is unchanged",
+			featureEnabled: true,
+			existingCSINode: &storage.CSINode{
+				ObjectMeta: getCSINodeObjectMeta(),
+				Spec:       storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: driver1, NodeID: "n1"}}},
+				Status:     storage.CSINodeStatus{StorageHealth: []storage.StorageHealth{health1Healthy}},
+			},
+			driverName:   driver1,
+			conditions:   []storage.StorageHealthCondition{condHealthy},
+			expectStatus: []storage.StorageHealth{health1Healthy},
 			expectUpdate: false,
 		},
 		{

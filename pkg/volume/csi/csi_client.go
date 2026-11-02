@@ -793,9 +793,6 @@ func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_Sto
 	if len(entries) == 0 {
 		return nil, nil
 	}
-	if len(entries) > maxStorageHealthConditions {
-		return nil, fmt.Errorf("NodeGetStorageHealth returned %d conditions, maximum is %d", len(entries), maxStorageHealthConditions)
-	}
 	out := make([]storagev1.StorageHealthCondition, 0, len(entries))
 	for i, entry := range entries {
 		if entry == nil {
@@ -815,6 +812,9 @@ func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_Sto
 			condition.VolumeMode = &volumeMode
 		}
 		out = append(out, condition)
+		if len(out) == maxStorageHealthConditions {
+			break
+		}
 	}
 	return out, nil
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
@@ -300,11 +302,20 @@ func TestProbeStorageHealth(t *testing.T) {
 	degraded := []storagev1.StorageHealthCondition{{
 		Status: storagev1.StorageDegraded, Reason: "PoolFull", Message: "pool nearly full",
 	}}
+	healthy := []storagev1.StorageHealthCondition{{
+		Status:  storagev1.StorageHealthy,
+		Reason:  CSIBackendHealthy,
+		Message: "Storage subsystems are healthy",
+	}}
+	unknown := []storagev1.StorageHealthCondition{{
+		Status: storagev1.StorageHealthUnknown, Reason: "FutureHealth", Message: "unrecognized driver health status",
+	}}
 
 	type step struct {
 		storageConditions []storagev1.StorageHealthCondition
 		storageErr        error
 		wantCallCount     int
+		wantConditions    []storagev1.StorageHealthCondition
 	}
 
 	tests := []struct {
@@ -316,15 +327,32 @@ func TestProbeStorageHealth(t *testing.T) {
 			name:                  "bad health updates CSINode",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 			},
 		},
 		{
-			name:                  "cleared health clears CSINode",
+			name:                  "healthy and degraded transitions update CSINode",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
-				{storageConditions: nil, wantCallCount: 2},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{storageConditions: nil, wantCallCount: 2, wantConditions: healthy},
+				{storageConditions: degraded, wantCallCount: 3, wantConditions: degraded},
+			},
+		},
+		{
+			name:                  "initial empty report populates healthy status",
+			supportsStorageHealth: true,
+			steps: []step{
+				{storageConditions: nil, wantCallCount: 1, wantConditions: healthy},
+				{storageConditions: []storagev1.StorageHealthCondition{}, wantCallCount: 2, wantConditions: healthy},
+				{storageErr: errors.New("rpc failed"), wantCallCount: 2},
+			},
+		},
+		{
+			name:                  "unknown health is not considered healthy",
+			supportsStorageHealth: true,
+			steps: []step{
+				{storageConditions: unknown, wantCallCount: 1, wantConditions: unknown},
 			},
 		},
 		{
@@ -332,15 +360,15 @@ func TestProbeStorageHealth(t *testing.T) {
 			name:                  "same condition twice still calls CSINode updater",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
-				{storageConditions: degraded, wantCallCount: 2},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
+				{storageConditions: degraded, wantCallCount: 2, wantConditions: degraded},
 			},
 		},
 		{
 			name:                  "error leaves previous conditions unchanged",
 			supportsStorageHealth: true,
 			steps: []step{
-				{storageConditions: degraded, wantCallCount: 1},
+				{storageConditions: degraded, wantCallCount: 1, wantConditions: degraded},
 				{storageErr: errors.New("rpc failed"), wantCallCount: 1},
 			},
 		},
@@ -368,32 +396,68 @@ func TestProbeStorageHealth(t *testing.T) {
 
 				updater.mu.Lock()
 				got := len(updater.calls)
+				var last storageCall
+				if got > 0 {
+					last = updater.calls[got-1]
+				}
+				updater.mu.Unlock()
+
 				if got != s.wantCallCount {
-					updater.mu.Unlock()
 					t.Fatalf("step %d: expected %d CSINode update(s), got %d", i, s.wantCallCount, got)
 				}
 				if got > prevCalls {
-					last := updater.calls[got-1]
 					if last.driverName != "test.driver" {
-						updater.mu.Unlock()
 						t.Fatalf("step %d: unexpected driver: %s", i, last.driverName)
 					}
-					if len(last.conditions) != len(s.storageConditions) {
-						updater.mu.Unlock()
-						t.Fatalf("step %d: expected %d conditions, got %d", i, len(s.storageConditions), len(last.conditions))
-					}
-					for j, want := range s.storageConditions {
-						if last.conditions[j].Status != want.Status || last.conditions[j].Reason != want.Reason {
-							updater.mu.Unlock()
-							t.Fatalf("step %d: condition %d: want {%s,%s}, got {%s,%s}",
-								i, j, want.Status, want.Reason, last.conditions[j].Status, last.conditions[j].Reason)
-						}
+					if !reflect.DeepEqual(last.conditions, s.wantConditions) {
+						t.Fatalf("step %d: expected conditions %+v, got %+v", i, s.wantConditions, last.conditions)
 					}
 				}
-				updater.mu.Unlock()
 				prevCalls = got
 			}
 		})
+	}
+}
+
+func TestProbeStorageHealthGauges(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	registerHealthMetrics()
+	t.Cleanup(func() {
+		csiNodeStorageHealthStatus.DeletePartialMatch(map[string]string{"driver_name": "test.driver"})
+	})
+
+	client := &fakeHealthClient{supportsStorageHealth: true}
+	m := newTestManager(t, &testStatusUpdater{}, client)
+	m.csiNodeUpdater = func() CSINodeUpdater { return &fakeCSINodeUpdater{} }
+
+	const header = `
+		# HELP csi_node_storage_health_status [ALPHA] CSI node storage backend health conditions currently reported (1 = present).
+		# TYPE csi_node_storage_health_status gauge
+`
+	steps := []struct {
+		conditions []storagev1.StorageHealthCondition
+		want       string
+	}{
+		{
+			conditions: nil,
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="Healthy"} 1` + "\n",
+		},
+		{
+			conditions: []storagev1.StorageHealthCondition{{Status: storagev1.StorageUnreachable, Reason: "BackendDown"}},
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="BackendDown",status="StorageUnreachable"} 1` + "\n",
+		},
+		{
+			conditions: nil,
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="Healthy"} 1` + "\n",
+		},
+	}
+	for i, s := range steps {
+		client.storageConditions = s.conditions
+		m.probeStorageHealth(tCtx)
+		if err := testutil.CollectAndCompare(csiNodeStorageHealthStatus, strings.NewReader(s.want), "csi_node_storage_health_status"); err != nil {
+			t.Fatalf("step %d: %v", i, err)
+		}
 	}
 }
 
