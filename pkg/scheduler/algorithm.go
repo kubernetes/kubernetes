@@ -194,7 +194,7 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 		SuggestedHost:  node,
 		EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
 		FeasibleNodes:  len(feasibleNodes),
-	}, err
+	}, nil
 }
 
 // preFilterOutcome captures the state and intermediate results produced while running
