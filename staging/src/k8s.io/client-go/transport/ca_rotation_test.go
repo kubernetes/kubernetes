@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientgofeaturegate "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
@@ -174,7 +175,8 @@ func TestCheckCAFileAndRotate(t *testing.T) {
 			}
 
 			clock := testingclock.NewFakeClock(time.Now())
-			holder := newAtomicTransportHolder(caFile, tt.setupCA, transport)
+			initialTransport := &rotatableCAHTTPTransport{transport}
+			holder := newAtomicTransportHolder(caFile, tt.setupCA, initialTransport)
 			holder.clock = clock
 			holder.transportLastChecked = clock.Now()
 
@@ -190,18 +192,42 @@ func TestCheckCAFileAndRotate(t *testing.T) {
 
 			// Check CA file rotation
 			newTransport := holder.getTransport(t.Context())
-			newRoots := newTransport.TLSClientConfig.RootCAs
+			newRoots := newTransport.GetRootCAs()
 
 			if newRoots == nil || !expectedRoots.Equal(newRoots) {
 				t.Error("new roots did not match expected roots")
 			}
 
-			transportRotated := newTransport != transport
+			transportRotated := newTransport != initialTransport
 			if tt.expectRotation != transportRotated {
 				t.Error("transport rotation did not match")
 			}
 
 		})
+	}
+}
+
+// TestCAReloadTransportUnwrapping verifies that helpers that inspect the
+// underlying *http.Transport still work through a CA reloading holder.
+func TestCAReloadTransportUnwrapping(t *testing.T) {
+	caData := []byte(testCACert1)
+	transport := createTestTransport(t, caData)
+	transport.DialContext = (&net.Dialer{}).DialContext
+	holder := newAtomicTransportHolder(writeCAFile(t, caData), caData, &rotatableCAHTTPTransport{transport})
+
+	tlsConfig, err := utilnet.TLSClientConfig(holder)
+	if err != nil {
+		t.Fatalf("TLSClientConfig: %v", err)
+	}
+	if tlsConfig != transport.TLSClientConfig {
+		t.Error("expected the TLS config of the underlying transport")
+	}
+	dial, err := utilnet.DialerFor(holder)
+	if err != nil {
+		t.Fatalf("DialerFor: %v", err)
+	}
+	if dial == nil {
+		t.Error("expected the dialer of the underlying transport")
 	}
 }
 
@@ -467,7 +493,7 @@ func TestCARotationMetricsEmitted(t *testing.T) {
 	transport := createTestTransport(t, caData)
 
 	clock := testingclock.NewFakeClock(time.Now())
-	holder := newAtomicTransportHolder(caFile, caData, transport)
+	holder := newAtomicTransportHolder(caFile, caData, &rotatableCAHTTPTransport{transport})
 	holder.clock = clock
 	holder.transportLastChecked = clock.Now()
 
