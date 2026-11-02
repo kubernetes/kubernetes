@@ -46,7 +46,7 @@ func main() {
 	expectedIssuer := os.Getenv("WEBHOOK_LOVE_KITTENS_ISSUER")
 	verificationOption := webhookAuth.WithAudience(expectedAudience)
 	if expectedIssuer != "" {
-		verificationOption = webhookAuth.WithRemoteIssuer(expectedIssuer, expectedAudience, nil)
+		verificationOption = webhookAuth.WithIssuer(expectedIssuer, expectedAudience, nil)
 	}
 	kittenPolicyHandlerFunc := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		if strings.Contains(req.Name, resourceNameMustContainForAdmission) {
@@ -93,7 +93,7 @@ format and namespace; it cannot tell whether the name, port or path matches the
 registration. Never derive the expected audience from the token or request.
 URL-backed registrations and selectorless Services in another namespace are
 not supported by local `WithAudience`. URL-backed registrations require
-`WithRemoteIssuer` with the exact `clientConfig.url` and a client able to reach
+`WithIssuer` with the exact `clientConfig.url` and a client able to reach
 issuer discovery and its JWKS; that path may need additional configuration for
 a private in-cluster issuer.
 
@@ -279,7 +279,7 @@ webhooks:
 The issuer must match the calling cluster's token issuer. Discovery and JWKS
 must permit credential-free access. The example's nil HTTP client trusts system
 roots; for a private issuer CA, pass a credential-free client that trusts it to
-`webhookAuth.WithRemoteIssuer` instead. No ServiceAccount credential from the
+`webhookAuth.WithIssuer` instead. No ServiceAccount credential from the
 hosting cluster is needed.
 
 ## Appendix: Audience inference and trust
