@@ -2540,8 +2540,9 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 			expectedPodStatusUpdates: 1,
 		},
 		// Node created long time ago, with status updated by kubelet exceeds grace period.
-		// First monitorNodeHealth check will fail to list pods (with False -> Unknown transition).
-		// Second monitorNodeHealth check will update pod status to NotReady (retry).
+		// First monitorNodeHealth check sees a fresh False status, nothing to do.
+		// Second check moves the node False -> Unknown, the pod list fails, and the node is queued for retry.
+		// Third check marks the pod NotReady from the retry queue.
 		{
 			desc: "unsuccessful pod list on false -> unknown transition, retry required",
 			fakeNodeHandler: &testutil.FakeNodeHandler{
