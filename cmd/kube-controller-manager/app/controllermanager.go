@@ -377,7 +377,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(waitForSync))
 
-		go leaseCandidate.Run(ctx)
+		go func() {
+			defer utilruntime.HandleCrashWithContext(ctx)
+			leaseCandidate.Run(ctx)
+		}()
 	}
 
 	// Start the main lock.
@@ -774,6 +777,8 @@ func RunControllers(ctx context.Context, controllerCtx ControllerContext, contro
 	loggingCtx, cancelLoggingCtx := context.WithCancel(context.Background())
 	defer cancelLoggingCtx()
 	go func() {
+		defer utilruntime.HandleCrashWithContext(ctx)
+
 		// Only start logging when terminating.
 		select {
 		case <-ctx.Done():
@@ -805,11 +810,13 @@ func RunControllers(ctx context.Context, controllerCtx ControllerContext, contro
 
 	terminatedCh := make(chan struct{})
 	go func() {
+		defer utilruntime.HandleCrashWithContext(ctx)
 		defer close(terminatedCh)
 		var wg sync.WaitGroup
 		wg.Add(len(controllers))
 		for _, controller := range controllers {
 			go func() {
+				defer utilruntime.HandleCrashWithContext(ctx)
 				defer wg.Done()
 
 				// It would be better to unblock and return on context cancelled here,

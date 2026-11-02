@@ -19,6 +19,8 @@ package app
 import (
 	"context"
 	"sync"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // This file contains utility functions for implementing controller wrappers,
@@ -33,6 +35,7 @@ func (rx runFuncSlice) Run(ctx context.Context) {
 	wg.Add(len(rx))
 	for _, fnc := range rx {
 		go func() {
+			defer utilruntime.HandleCrashWithContext(ctx)
 			defer wg.Done()
 			fnc(ctx)
 		}()
