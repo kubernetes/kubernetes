@@ -254,7 +254,8 @@ func NewVolumeManager(
 			vm.desiredStateOfWorld,
 			vm.actualStateOfWorld,
 			volumeHealthStatusUpdater,
-			volumeHealthProbeInterval)
+			volumeHealthProbeInterval,
+			volumehealth.DefaultWorkers)
 	}
 	return vm
 }

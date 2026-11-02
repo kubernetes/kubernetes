@@ -19,6 +19,7 @@ package nodeinfomanager
 import (
 	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"math"
 	"os"
@@ -1461,7 +1462,7 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			reportedCopy := (&storage.StorageHealth{HealthConditions: tc.reported}).DeepCopy().HealthConditions
 
 			before := metav1.Now().Rfc3339Copy()
-			if err := nim.UpdateCSINodeStorageHealth(driver1, tc.reported); err != nil {
+			if err := nim.UpdateCSINodeStorageHealth(t.Context(), driver1, tc.reported); err != nil {
 				t.Fatalf("UpdateCSINodeStorageHealth returned error: %v", err)
 			}
 			after := metav1.Now()
@@ -1477,7 +1478,7 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 			assert.Equal(t, tc.want, got.Status.StorageHealth)
 
 			actionsBefore := len(client.Actions())
-			if err := nim.UpdateCSINodeStorageHealth(driver1, tc.reported); err != nil {
+			if err := nim.UpdateCSINodeStorageHealth(t.Context(), driver1, tc.reported); err != nil {
 				t.Fatalf("UpdateCSINodeStorageHealth returned error: %v", err)
 			}
 			assert.Zero(t, countStatusUpdates(client.Actions()[actionsBefore:]), "repeated report must not cause another status update")
@@ -1615,6 +1616,25 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateCSINodeStorageHealthCancelled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	nim, client, _ := newStorageHealthTestManager(t, nil)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	conditions := []storage.StorageHealthCondition{
+		{
+			Status: storage.StorageDegraded,
+			Reason: "DiskSlow",
+		},
+	}
+	err := nim.UpdateCSINodeStorageHealth(ctx, "com.example.csi.driver1", conditions)
+	if !goerrors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+	assert.Zero(t, countStatusUpdates(client.Actions()), "cancelled context must not update status")
 }
 
 // checkFreshTransitionTimes verifies that every condition whose expected

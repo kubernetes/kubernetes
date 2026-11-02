@@ -97,7 +97,7 @@ type Interface interface {
 	// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
 	// driver with the provided conditions. Other drivers' entries are preserved.
 	// No-ops if the condition identity set for this driver is unchanged.
-	UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error
+	UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error
 }
 
 // NewNodeInfoManager initializes nodeInfoManager
@@ -741,7 +741,7 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 // driver with the provided conditions. Other drivers' entries are preserved.
 // No-ops if the status, reason, and volume-capability identities for this driver
 // are unchanged.
-func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
+func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		return nil
 	}
@@ -752,8 +752,8 @@ func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, condit
 	}
 
 	var updateErrs []error
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if err := nim.tryUpdateCSINodeStorageHealth(csiKubeClient, driverName, conditions); err != nil {
+	err := wait.ExponentialBackoffWithContext(ctx, updateBackoff, func(ctx context.Context) (bool, error) {
+		if err := nim.tryUpdateCSINodeStorageHealth(ctx, csiKubeClient, driverName, conditions); err != nil {
 			updateErrs = append(updateErrs, err)
 			return false, nil
 		}
@@ -766,6 +766,7 @@ func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, condit
 }
 
 func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
+	ctx context.Context,
 	csiKubeClient clientset.Interface,
 	driverName string,
 	conditions []storagev1.StorageHealthCondition) error {
@@ -773,7 +774,7 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 	nim.lock.Lock()
 	defer nim.lock.Unlock()
 
-	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(ctx, string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -817,7 +818,7 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 		combined = append(combined, storagev1.StorageHealth{Name: driverName, HealthConditions: updatedConditions})
 	}
 	nodeInfo.Status.StorageHealth = combined
-	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(ctx, nodeInfo, metav1.UpdateOptions{})
 	return err
 }
 

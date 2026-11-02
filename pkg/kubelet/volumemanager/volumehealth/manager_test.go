@@ -115,7 +115,7 @@ type storageCall struct {
 	conditions []storagev1.StorageHealthCondition
 }
 
-func (f *fakeCSINodeUpdater) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
+func (f *fakeCSINodeUpdater) UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, storageCall{
@@ -162,18 +162,25 @@ func newTestManager(t *testing.T, statusUpdater StatusUpdater, client csi.Health
 	}
 	asw.MarkVolumeAsMountAttempted(util.GetUniquePodName(pod), volumeName)
 
-	return &manager{
-		dsw:           dsw,
-		asw:           asw,
-		statusUpdater: statusUpdater,
-		probeInterval: time.Minute,
-		clientFactory: func(driverName string) csi.HealthClient {
-			return client
-		},
-		listDrivers: func() []string { return []string{"test.driver"} },
-		csiNodeUpdater: func() CSINodeUpdater {
-			return nil
-		},
+	m := newManager(statusUpdater, time.Minute, DefaultWorkers)
+	t.Cleanup(m.queue.ShutDown)
+	m.listVolumes = func() []cache.VolumeToHealthCheck {
+		return cache.GetVolumesToReportHealth(dsw, asw)
+	}
+	m.clientFactory = func(driverName string) csi.HealthClient {
+		return client
+	}
+	m.listDrivers = func() []string { return []string{"test.driver"} }
+	m.csiNodeUpdater = func() CSINodeUpdater { return nil }
+	return m
+}
+
+// syncVolumes runs one volume probe cycle synchronously: enqueue every volume,
+// then process the queue on the calling goroutine until it is empty.
+func syncVolumes(ctx context.Context, m *manager) {
+	m.enqueueVolumes(ctx)
+	for m.queue.Len() > 0 {
+		m.processNextVolume(ctx)
 	}
 }
 
@@ -273,7 +280,7 @@ func TestProbeVolumeHealth(t *testing.T) {
 			for i, s := range tc.steps {
 				client.volumeConditions = s.volumeConditions
 				client.volumeErr = s.volumeErr
-				m.probeVolumeHealth(tCtx)
+				syncVolumes(tCtx, m)
 
 				got := status.callCount()
 				if got != s.wantCallCount {
