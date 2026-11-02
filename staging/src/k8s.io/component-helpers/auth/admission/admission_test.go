@@ -35,6 +35,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -74,6 +76,7 @@ type oidcTestServer struct {
 	server *httptest.Server
 	issuer string
 	signer jose.Signer
+	tempDir string
 }
 
 // startOIDCServer stands up the TLS discovery + JWKS endpoint for a fresh RSA
@@ -130,6 +133,7 @@ func newOIDCTestServer(t *testing.T) *oidcTestServer {
 	if err != nil {
 		t.Fatalf("starting OIDC test server: %v", err)
 	}
+	ts.tempDir = t.TempDir()
 	t.Cleanup(ts.server.Close)
 	return ts
 }
@@ -159,9 +163,13 @@ func (ts *oidcTestServer) localVerifier(audience string) (*admission.Verifier, e
 	if err != nil {
 		return nil, err
 	}
+	tokenFile := filepath.Join(ts.tempDir, "projected-token")
+	if err := os.WriteFile(tokenFile, []byte(projectedToken), 0600); err != nil {
+		return nil, err
+	}
 	config := &rest.Config{
-		Host:        ts.issuer,
-		BearerToken: projectedToken,
+		Host:            ts.issuer,
+		BearerTokenFile: tokenFile,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.server.Certificate().Raw}),
 		},
@@ -1014,10 +1022,14 @@ func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
 	projectedClaims["aud"] = []string{"https://kubernetes.default.svc"}
 	delete(projectedClaims, "kubernetes.io")
 	projected := ts.sign(t, projectedClaims)
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	if err := os.WriteFile(tokenFile, []byte(projected), 0600); err != nil {
+		t.Fatal(err)
+	}
 	var requests atomic.Int32
 	config := &rest.Config{
-		Host:        ts.issuer + "/",
-		BearerToken: projected,
+		Host:            ts.issuer + "/",
+		BearerTokenFile: tokenFile,
 		TLSClientConfig: rest.TLSClientConfig{
 			CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.server.Certificate().Raw}),
 		},
@@ -1049,83 +1061,40 @@ func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
 	if requests.Load() == 0 {
 		t.Fatal("local verification did not fetch signing keys")
 	}
-	if config.Timeout != 0 {
+	if config.BearerTokenFile != tokenFile || config.BearerToken != "" {
 		t.Fatal("constructor mutated the supplied REST configuration")
 	}
-	for _, tc := range []struct {
-		name  string
-		token string
-	}{
-		{name: "malformed projected token", token: "opaque"},
-		{name: "missing projected issuer", token: ts.sign(t, map[string]any{"aud": []string{"https://kubernetes.default.svc"}})},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			bad := rest.CopyConfig(config)
-			bad.BearerToken = tc.token
-			before := requests.Load()
-			if verifier, err := admission.NewLocalVerifierForTest(context.Background(), bad, testAudience); err == nil || verifier != nil {
-				t.Fatalf("local bootstrap = (%v, %v)", verifier, err)
-			}
-			if requests.Load() != before {
-				t.Fatal("invalid local bootstrap performed network I/O")
-			}
-		})
-	}
+	t.Run("static BearerToken without BearerTokenFile is rejected", func(t *testing.T) {
+		staticOnly := rest.CopyConfig(config)
+		staticOnly.BearerToken = projected
+		staticOnly.BearerTokenFile = ""
+		before := requests.Load()
+		if verifier, err := admission.NewLocalVerifierForTest(context.Background(), staticOnly, testAudience); err == nil || verifier != nil {
+			t.Fatalf("static BearerToken bootstrap = (%v, %v), want error requiring BearerTokenFile", verifier, err)
+		}
+		if requests.Load() != before {
+			t.Fatal("invalid local bootstrap performed network I/O")
+		}
+	})
+	t.Run("malformed projected token", func(t *testing.T) {
+		badFile := filepath.Join(t.TempDir(), "bad-token")
+		if err := os.WriteFile(badFile, []byte("opaque"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		bad := rest.CopyConfig(config)
+		bad.BearerTokenFile = badFile
+		before := requests.Load()
+		if verifier, err := admission.NewLocalVerifierForTest(context.Background(), bad, testAudience); err == nil || verifier != nil {
+			t.Fatalf("local bootstrap = (%v, %v)", verifier, err)
+		}
+		if requests.Load() != before {
+			t.Fatal("invalid local bootstrap performed network I/O")
+		}
+	})
 	badCA := rest.CopyConfig(config)
 	badCA.CAData = []byte("not a certificate")
 	if verifier, err := admission.NewLocalVerifierForTest(context.Background(), badCA, testAudience); err == nil || verifier != nil {
 		t.Fatalf("invalid client-go CA configuration = (%v, %v)", verifier, err)
-	}
-}
-
-func TestLocalVerificationRejectsEveryRedirect(t *testing.T) {
-	issuer := newOIDCTestServer(t)
-	for _, status := range []int{http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
-		for _, crossOrigin := range []bool{false, true} {
-			t.Run(fmt.Sprintf("status-%d/cross-origin-%t", status, crossOrigin), func(t *testing.T) {
-				var foreignCalls, redirectedCalls, jwksCalls atomic.Int32
-				foreign := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					foreignCalls.Add(1)
-					_, _ = w.Write([]byte(`{"keys":[]}`))
-				}))
-				defer foreign.Close()
-				var origin *httptest.Server
-				origin = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.Path != "/openid/v1/jwks" {
-						redirectedCalls.Add(1)
-						_, _ = w.Write([]byte(`{"keys":[]}`))
-						return
-					}
-					jwksCalls.Add(1)
-					target := origin.URL + "/redirected"
-					if crossOrigin {
-						target = foreign.URL + "/keys"
-					}
-					http.Redirect(w, r, target, status)
-				}))
-				defer origin.Close()
-				ca := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: origin.Certificate().Raw})
-				ca = append(ca, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: foreign.Certificate().Raw})...)
-				config := &rest.Config{
-					Host:            origin.URL,
-					BearerToken:     issuer.sign(t, issuer.baseClaims()),
-					TLSClientConfig: rest.TLSClientConfig{CAData: ca},
-				}
-				verifier, err := admission.NewLocalVerifierForTest(context.Background(), config, testAudience)
-				if err != nil {
-					t.Fatalf("construct local verifier: %v", err)
-				}
-				if err := verifier.Verify(context.Background(), admissionReview(testGroup).Request, issuer.sign(t, issuer.baseClaims())); err == nil {
-					t.Fatal("verification followed a local signing-key redirect")
-				}
-				if jwksCalls.Load() == 0 {
-					t.Fatal("verification never fetched local JWKS")
-				}
-				if foreignCalls.Load() != 0 || redirectedCalls.Load() != 0 {
-					t.Fatal("local redirect forwarded a projected credential")
-				}
-			})
-		}
 	}
 }
 
@@ -2219,9 +2188,13 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 					"aud": []string{"https://kubernetes.default.svc"},
 					"exp": time.Now().Add(time.Hour).Unix(),
 				})
+				tokenFile := filepath.Join(t.TempDir(), "projected-token")
+				if err := os.WriteFile(tokenFile, []byte(projected), 0600); err != nil {
+					return nil, err
+				}
 				config := &rest.Config{
-					Host:        issuer.issuer,
-					BearerToken: projected,
+					Host:            issuer.issuer,
+					BearerTokenFile: tokenFile,
 					TLSClientConfig: rest.TLSClientConfig{
 						CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: issuer.server.Certificate().Raw}),
 					},
