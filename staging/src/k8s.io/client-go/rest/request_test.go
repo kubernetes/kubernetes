@@ -1612,6 +1612,7 @@ func (s stepClockDuringSleep) SleepWithContext(ctx context.Context, d time.Durat
 }
 
 type testBackoffManager struct {
+	delay  time.Duration
 	sleeps []time.Duration
 }
 
@@ -1619,7 +1620,7 @@ func (b *testBackoffManager) UpdateBackoffWithContext(ctx context.Context, actua
 }
 
 func (b *testBackoffManager) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
-	return time.Duration(0)
+	return b.delay
 }
 
 func (b *testBackoffManager) SleepWithContext(ctx context.Context, d time.Duration) {
@@ -1644,8 +1645,10 @@ func TestCheckRetryClosesBody(t *testing.T) {
 
 	backoff := &testBackoffManager{}
 
-	// testBackoffManager.CalculateBackoff always returns 0
-	expectedSleeps := []time.Duration{0, time.Second, time.Second, time.Second, time.Second}
+	// testBackoffManager.CalculateBackoff returns 0, so the first sleep is 0 and
+	// each retry sleeps the Retry-After of 1s plus up to 10% jitter.
+	minSleeps := []time.Duration{0, time.Second, time.Second, time.Second, time.Second}
+	maxSleeps := []time.Duration{0, 1100 * time.Millisecond, 1100 * time.Millisecond, 1100 * time.Millisecond, 1100 * time.Millisecond}
 
 	c := testRESTClient(t, testServer)
 	c.createBackoffMgr = func() BackoffManagerWithContext { return backoff }
@@ -1662,8 +1665,13 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	if count != 5 {
 		t.Errorf("unexpected retries: %d", count)
 	}
-	if !reflect.DeepEqual(backoff.sleeps, expectedSleeps) {
-		t.Errorf("unexpected sleeps, expected: %v, got: %v", expectedSleeps, backoff.sleeps)
+	if len(backoff.sleeps) != len(minSleeps) {
+		t.Fatalf("unexpected sleeps, expected %d, got: %v", len(minSleeps), backoff.sleeps)
+	}
+	for i, sleep := range backoff.sleeps {
+		if sleep < minSleeps[i] || sleep > maxSleeps[i] {
+			t.Errorf("sleep %d: got %v, want within [%v, %v]", i, sleep, minSleeps[i], maxSleeps[i])
+		}
 	}
 }
 
@@ -3131,6 +3139,9 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Do() {
 }
 
 func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc func(ctx context.Context, r *Request)) {
+	// the expected sleeps below are exact Retry-After values
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientRetryAfterJitter, false)
+
 	type expected struct {
 		attempts    int
 		order       []string

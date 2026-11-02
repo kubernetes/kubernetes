@@ -38,6 +38,14 @@ const (
 	// events for items popped off the FIFO.
 	AtomicFIFO Feature = "AtomicFIFO"
 
+	// owner: @atif1996
+	// beta: v1.38
+	//
+	// If enabled, the wait before retrying a request that was rejected with a
+	// Retry-After header is jittered by up to 10%, so clients rejected together
+	// do not retry together.
+	ClientRetryAfterJitter Feature = "ClientRetryAfterJitter"
+
 	// owner: @yt2985
 	// beta: 1.36
 	//
@@ -119,6 +127,9 @@ const (
 var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	AtomicFIFO: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	ClientRetryAfterJitter: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: Beta},
 	},
 	ClientsAllowCARotation: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
