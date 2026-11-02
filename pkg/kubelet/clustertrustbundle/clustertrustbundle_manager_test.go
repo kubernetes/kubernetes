@@ -263,6 +263,104 @@ func testGetTrustAnchorsByNameCaching[T clusterTrustBundle](tCtx ktesting.TConte
 	}()
 }
 
+func TestInformerManager_dropCacheFor(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) {
+		testInformerManagerDropCacheFor(tCtx, alphaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1beta1", func(tCtx ktesting.TContext) {
+		testInformerManagerDropCacheFor(tCtx, betaFunctionsBundle)
+	})
+	tCtx.SyncTest("v1", func(tCtx ktesting.TContext) {
+		testInformerManagerDropCacheFor(tCtx, gaFunctionsBundle)
+	})
+}
+
+func testInformerManagerDropCacheFor[T clusterTrustBundle](tCtx ktesting.TContext, b testingFunctionBundle[T]) {
+	t := tCtx.TB()
+
+	labelSelector := &metav1.LabelSelector{MatchLabels: map[string]string{"label": "a"}}
+
+	ctb1 := b.ctbConstructor("ctb1", "", nil, mustMakeRoot(t, "root1"))
+	ctb2 := b.ctbConstructor("ctb2", "foo.bar/a", map[string]string{"label": "a"}, mustMakeRoot(t, "root2"))
+
+	kc := fake.NewSimpleClientset(b.ctbToObj(ctb1), b.ctbToObj(ctb2))
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(kc, 0)
+
+	ctbManager, _ := b.informerManagerConstructor(tCtx, informerFactory, 256, 5*time.Minute)
+
+	informerFactory.Start(tCtx.Done())
+	ctbInformer := b.informerGetter(informerFactory)
+	if !cache.WaitForCacheSync(tCtx.Done(), ctbInformer.HasSynced) {
+		t.Fatalf("Timed out waiting for informer to sync")
+	}
+
+	m, ok := ctbManager.(*InformerManager[T])
+	if !ok {
+		t.Fatalf("Got a %T, wanted an *InformerManager", ctbManager)
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		t.Fatalf("Error while parsing the label selector: %v", err)
+	}
+	ctb1Key := cacheKeyType{ctbName: "ctb1"}
+	ctb2Key := cacheKeyType{ctbName: "ctb2"}
+	signerKey := cacheKeyType{signerName: "foo.bar/a", labelSelector: selector.String()}
+
+	// The initial informer sync delivers an add for every ClusterTrustBundle,
+	// and each one calls dropCacheFor. Let those run before populating, so that
+	// the entries asserted on below are the ones this test put there.
+	time.Sleep(5 * time.Second)
+
+	populate := func() {
+		for _, name := range []string{"ctb1", "ctb2"} {
+			if _, err := m.GetTrustAnchorsByName(tCtx, name, false); err != nil {
+				t.Fatalf("Error while calling GetTrustAnchorsByName(%q): %v", name, err)
+			}
+		}
+		if _, err := m.GetTrustAnchorsBySigner(tCtx, "foo.bar/a", labelSelector, false); err != nil {
+			t.Fatalf("Error while calling GetTrustAnchorsBySigner: %v", err)
+		}
+		for name, key := range map[string]cacheKeyType{"ctb1": ctb1Key, "ctb2": ctb2Key, "foo.bar/a": signerKey} {
+			if _, ok := m.normalizationCache.Get(key); !ok {
+				t.Fatalf("Cache entry for %q is missing right after populating it", name)
+			}
+		}
+	}
+
+	populate()
+
+	t.Log("dropping the cache for ctb1, which has no signer name")
+	m.dropCacheFor(ctb1)
+
+	if _, ok := m.normalizationCache.Get(ctb1Key); ok {
+		t.Errorf("Cache entry for ctb1 survived dropCacheFor(ctb1), wanted it dropped")
+	}
+	if _, ok := m.normalizationCache.Get(ctb2Key); !ok {
+		t.Errorf("Cache entry for the unrelated ctb2 was dropped by dropCacheFor(ctb1), wanted it kept")
+	}
+	if _, ok := m.normalizationCache.Get(signerKey); !ok {
+		t.Errorf("Cache entry for signer foo.bar/a was dropped by dropCacheFor(ctb1), wanted it kept")
+	}
+
+	populate()
+
+	t.Log("dropping the cache for ctb2, which has signer name foo.bar/a")
+	m.dropCacheFor(ctb2)
+
+	if _, ok := m.normalizationCache.Get(ctb2Key); ok {
+		t.Errorf("Cache entry for ctb2 survived dropCacheFor(ctb2), wanted it dropped")
+	}
+	if _, ok := m.normalizationCache.Get(signerKey); ok {
+		t.Errorf("Cache entry for signer foo.bar/a survived dropCacheFor(ctb2), wanted it dropped")
+	}
+	if _, ok := m.normalizationCache.Get(ctb1Key); !ok {
+		t.Errorf("Cache entry for the unrelated ctb1 was dropped by dropCacheFor(ctb2), wanted it kept")
+	}
+}
+
 func TestGetTrustAnchorsBySignerName(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tCtx.SyncTest("v1alpha1", func(tCtx ktesting.TContext) { testGetTrustAnchorsBySignerName(tCtx, alphaFunctionsBundle) })
@@ -446,6 +544,20 @@ func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](tCtx ktesting.
 		}
 	}()
 
+	func() {
+		t.Log("signer-a-label-a-1 by name should yield its certificate, and cache a name-keyed entry")
+		gotBundle, err := ctbManager.GetTrustAnchorsByName(tCtx, "signer-a-label-a-1", false)
+		if err != nil {
+			t.Fatalf("Got error while calling GetTrustAnchorsByName: %v", err)
+		}
+
+		wantBundle := b.ctbTrustBundle(ctb1)
+
+		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
+			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+		}
+	}()
+
 	client := b.clientGetter(kc)
 	if err := client.Delete(tCtx, "signer-a-label-a-1", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Error while deleting the old CTB: %v", err)
@@ -470,6 +582,14 @@ func testGetTrustAnchorsBySignerNameCaching[T clusterTrustBundle](tCtx ktesting.
 
 		if diff := diffBundles(gotBundle, []byte(wantBundle)); diff != "" {
 			t.Fatalf("Bad bundle; diff (-got +want)\n%s", diff)
+		}
+	}()
+
+	func() {
+		t.Log("signer-a-label-a-1 by name should be gone, its name-keyed entry must not survive the delete")
+		gotBundle, err := ctbManager.GetTrustAnchorsByName(tCtx, "signer-a-label-a-1", false)
+		if err == nil {
+			t.Errorf("Got bundle %q and nil error for a deleted ClusterTrustBundle, wanted an error", gotBundle)
 		}
 	}()
 }
