@@ -1,0 +1,37 @@
+before:
+  hooks:
+    - go mod tidy
+
+gomod:
+  proxy: true
+
+builds:
+  - id: pap
+    main: ./cmd/pap
+    binary: pap
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+
+archives:
+  - id: pap
+    builds:
+      - pap
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+source:
+  enabled: true
+
+checksum: {}
+
+sboms:
+  - artifacts: source

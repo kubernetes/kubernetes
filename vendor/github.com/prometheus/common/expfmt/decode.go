@@ -65,6 +65,16 @@ func ResponseFormat(h http.Header) Format {
 			return FmtUnknown
 		}
 		return FmtText
+
+	case OpenMetricsType:
+		switch params["version"] {
+		case "", OpenMetricsVersion_0_0_1:
+			return FmtOpenMetrics_0_0_1
+		case OpenMetricsVersion_1_0_0:
+			return FmtOpenMetrics_1_0_0
+		default:
+			return FmtUnknown
+		}
 	}
 
 	return FmtUnknown
@@ -73,14 +83,12 @@ func ResponseFormat(h http.Header) Format {
 // NewDecoder returns a new decoder based on the given input format. Metric
 // names are validated based on the provided Format -- if the format requires
 // escaping, traditional Prometheus validity checking is used. Otherwise, names
-// are checked for UTF-8 validity. Supported formats include delimited protobuf
-// and Prometheus text format. For historical reasons, this decoder falls back
-// to classic text decoding for other legacy formats, but returns an error for
-// unsupported formats such as OpenMetrics 2.0. This decoder does not fully
-// support OpenMetrics although it may often succeed for OpenMetrics 1.0 due to
-// the similarities between the formats. This decoder may not support the latest
-// features of Prometheus text format and is not intended for high-performance
-// applications.
+// are checked for UTF-8 validity. Supported formats include delimited protobuf,
+// Prometheus text format, and OpenMetrics 0.0.1 / 1.0.0. For historical
+// reasons, this decoder falls back to classic text decoding for other legacy
+// formats, but returns an error for unsupported formats such as OpenMetrics 2.0.
+// This decoder may not support the latest features of Prometheus text format
+// and is not intended for high-performance applications.
 // See: https://github.com/prometheus/common/issues/812
 func NewDecoder(r io.Reader, format Format) Decoder {
 	scheme := model.LegacyValidation
@@ -94,7 +102,13 @@ func NewDecoder(r io.Reader, format Format) Decoder {
 		return &errDecoder{err: fmt.Errorf("format %s not supported for decoding", format)}
 	case TypeOpenMetrics:
 		_, params, err := mime.ParseMediaType(string(format))
-		if err == nil && params["version"] == OpenMetricsVersion_2_0_0 {
+		if err != nil {
+			return &errDecoder{err: fmt.Errorf("format %s not supported for decoding", format)}
+		}
+		switch params["version"] {
+		case "", OpenMetricsVersion_0_0_1, OpenMetricsVersion_1_0_0:
+			return &openMetricsDecoder{p: newOpenMetricsParser(r, scheme)}
+		default:
 			return &errDecoder{err: fmt.Errorf("format %s not supported for decoding", format)}
 		}
 	}
@@ -144,6 +158,24 @@ type errDecoder struct {
 
 func (d *errDecoder) Decode(*dto.MetricFamily) error {
 	return d.err
+}
+
+// openMetricsDecoder implements the Decoder interface for the OpenMetrics 1.0 protocol.
+type openMetricsDecoder struct {
+	p   *openMetricsParser
+	err error
+}
+
+// Decode implements the Decoder interface.
+func (d *openMetricsDecoder) Decode(v *dto.MetricFamily) error {
+	if d.err != nil {
+		return d.err
+	}
+	if err := d.p.next(v); err != nil {
+		d.err = err
+		return err
+	}
+	return nil
 }
 
 // textDecoder implements the Decoder interface for the text protocol.
