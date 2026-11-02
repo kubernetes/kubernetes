@@ -439,6 +439,29 @@ func omitPartiallySetCPUMemLimits(pod *v1.Pod, limits v1.ResourceList) {
 	}
 }
 
+// omitPartiallySetEphemeralStorageLimit deletes the ephemeral-storage limit if no
+// container sets one. Extra node allocatable resources (like DRA allocations) raise a declared
+// limit but must not create one, so a pod without ephemeral-storage limits stays unbounded.
+//
+// Unlike omitPartiallySetCPUMemLimits, which omits the cpu and memory
+// limits when ANY container does not set them, it keeps the partial sum when only some containers
+// set an ephemeral-storage limit.
+// TODO(pravk03): Omit partially set ephemeral-storage limits like cpu and memory, and remove this
+// function. That changes pod-level eviction and the limits.ephemeral-storage quota for all pods.
+func omitPartiallySetEphemeralStorageLimit(pod *v1.Pod, limits v1.ResourceList, extraRes extraNodeAllocatableResources) {
+	if len(extraRes.podFixed) == 0 && len(extraRes.perContainer) == 0 {
+		return
+	}
+	for _, containers := range [][]v1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
+		for i := range containers {
+			if _, found := containers[i].Resources.Limits[v1.ResourceEphemeralStorage]; found {
+				return
+			}
+		}
+	}
+	delete(limits, v1.ResourceEphemeralStorage)
+}
+
 // AggregateContainerLimits computes the aggregated resource limits of all the containers
 // in a pod. This computation follows the formula defined in the KEP for sidecar
 // containers. See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
@@ -479,6 +502,7 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 	}
 
 	omitPartiallySetCPUMemLimits(pod, limits)
+	omitPartiallySetEphemeralStorageLimit(pod, limits, extraRes)
 	return limits
 }
 

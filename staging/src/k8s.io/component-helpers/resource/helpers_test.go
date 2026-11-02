@@ -4189,6 +4189,102 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				hugePageResource1Gi: resource.MustParse("3"), // max(0 + 3, 2)
 			},
 		},
+		{
+			description: "Ephemeral-storage mapping without a container ephemeral-storage limit does not create a pod limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "disk-claim"},
+							Containers: []string{"c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceEphemeralStorage, Quantity: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseExtraNodeAllocatableResources: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("600Mi"), // 100Mi + 500Mi
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			description: "Ephemeral-storage per-container overhead without a container ephemeral-storage limit does not create a pod limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "disk-claim"},
+							Containers: []string{"c1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceEphemeralStorage, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseExtraNodeAllocatableResources: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("600Mi"), // 100Mi + 500Mi
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			description: "Ephemeral-storage mapping on a container without a limit adds to the limit of another container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name: "c2",
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+						{
+							Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "disk-claim"},
+							Containers: []string{"c2"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceEphemeralStorage, Quantity: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseExtraNodeAllocatableResources: true},
+			// Partially set ephemeral-storage limits are summed, unlike cpu and memory.
+			expectedLimits: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("1524Mi"), // 1Gi + 500Mi
+			},
+		},
 	}
 
 	for _, tc := range testCases {
