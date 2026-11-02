@@ -41,11 +41,14 @@ import (
 type factoryImpl struct {
 	clientGetter genericclioptions.RESTClientGetter
 
-	// Caches OpenAPI document and parsed resources
+	// Caches OpenAPI document and parsed resources.
 	openAPIParser *openapi.CachedOpenAPIParser
 	oapi          *openapi.CachedOpenAPIGetter
 	parser        sync.Once
 	getter        sync.Once
+
+	// Shared across Validator calls made by this factory.
+	verifierCache *resource.VerifierCache
 }
 
 func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
@@ -53,7 +56,8 @@ func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
 	f := &factoryImpl{
-		clientGetter: clientGetter,
+		clientGetter:  clientGetter,
+		verifierCache: resource.NewVerifierCache(0),
 	}
 
 	return f
@@ -173,7 +177,12 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 	// the discovery client.
 	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
 	queryParam := resource.QueryParamFieldValidation
-	verifier := newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam))
+	verifier := resource.NewCachingQueryParamVerifier(
+		resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam),
+		oapiV3Client,
+		queryParam,
+		f.verifierCache,
+	)
 	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
 }
 
