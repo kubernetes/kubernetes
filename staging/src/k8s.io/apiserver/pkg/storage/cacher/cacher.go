@@ -581,7 +581,6 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.clock,
 		identifier,
 		selector,
-		requestedWatchRV,
 		requiredResourceVersion,
 	)
 

@@ -2725,7 +2725,6 @@ func TestForgetWatcher(t *testing.T) {
 		"1",
 		watchSelector{},
 		0,
-		0,
 	)
 	forgetWatcherFn = forgetWatcher(cacher, w, 0)
 	addWatcher := func(w *cacheWatcher) {
