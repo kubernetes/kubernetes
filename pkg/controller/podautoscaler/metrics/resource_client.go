@@ -35,16 +35,6 @@ import (
 	metricsv1beta1client "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
-// metricVersions is the set of supported resource metrics API versions, in
-// descending order of preference. Unlike the aggregated discovery preferred
-// version, this client-side ordering guarantees that v1 is used whenever the
-// server serves it, even if the server still reports v1beta1 as its
-// preferred version (e.g. due to legacy APIService priorities).
-var metricVersions = []schema.GroupVersion{
-	metricsv1.SchemeGroupVersion,
-	metricsv1beta1.SchemeGroupVersion,
-}
-
 // VersionedPodMetricsGetter is a metricsv1client.PodMetricsesGetter that works
 // with whichever version of the resource metrics API (metrics.k8s.io) the
 // server serves, converting legacy responses so consumers use stable v1 types.
@@ -151,13 +141,12 @@ func (g *versionedPodMetricsGetter) fetchPreferredVersion(ctx context.Context) (
 		return schema.GroupVersion{}, fmt.Errorf("no resource metrics API (%s) registered", metricsint.GroupName)
 	}
 
-	served := make(map[string]struct{}, len(apiGroup.Versions))
 	for _, version := range apiGroup.Versions {
-		served[version.GroupVersion] = struct{}{}
-	}
-	for _, gv := range metricVersions {
-		if _, present := served[gv.String()]; present {
-			return gv, nil
+		switch version.GroupVersion {
+		case metricsv1.SchemeGroupVersion.String():
+			return metricsv1.SchemeGroupVersion, nil
+		case metricsv1beta1.SchemeGroupVersion.String():
+			return metricsv1beta1.SchemeGroupVersion, nil
 		}
 	}
 

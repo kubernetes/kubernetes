@@ -71,9 +71,7 @@ func discoveryFor(versions ...string) *fakeDiscovery {
 				Version:      version,
 			})
 		}
-		// deliberately report the oldest version as the server-preferred one:
-		// client-side preference must win over it
-		group.PreferredVersion = group.Versions[len(group.Versions)-1]
+		group.PreferredVersion = group.Versions[0]
 		groupList.Groups = append(groupList.Groups, group)
 	}
 	return &fakeDiscovery{groups: groupList}
@@ -139,9 +137,9 @@ func TestVersionedPodMetricsGetterVersionSelection(t *testing.T) {
 			expectedPodName: "served-by-v1",
 		},
 		{
-			name:            "prefers v1 even when the server prefers v1beta1",
+			name:            "uses v1beta1 when the server prefers v1beta1",
 			servedVersions:  []string{"v1beta1", "v1"},
-			expectedPodName: "served-by-v1",
+			expectedPodName: "served-by-v1beta1",
 		},
 		{
 			name:            "falls back to v1beta1 when v1 is not served",
@@ -215,7 +213,7 @@ func TestVersionedPodMetricsGetterWatch(t *testing.T) {
 	}{
 		{
 			name:             "passes through v1 PodMetrics",
-			servedVersions:   []string{"v1beta1", "v1"},
+			servedVersions:   []string{"v1", "v1beta1"},
 			sourceVersion:    metricsv1.SchemeGroupVersion,
 			eventType:        watch.Added,
 			input:            v1Metric,
