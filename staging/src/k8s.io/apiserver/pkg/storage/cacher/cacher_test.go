@@ -587,15 +587,20 @@ func TestKeySchema(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	for _, watchWithoutPrevKV := range []bool{true, false} {
-		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
-			testWatch(t)
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			for _, watchWithoutPrevKV := range []bool{true, false} {
+				t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+					testWatch(t, watchCacheStallResume)
+				})
+			}
 		})
 	}
 }
 
-func testWatch(t *testing.T) {
+func testWatch(t *testing.T, watchCacheStallResume bool) {
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 		ctx, cacher, terminate := Setup(t)
@@ -701,7 +706,7 @@ func testWatch(t *testing.T) {
 			fakeClock.Step(DefaultBookmarkFrequency + time.Second)
 			time.Sleep(50 * time.Millisecond)
 		}
-		storagetesting.RunTestWatchResync(ctx, t, store, true, CompactWatch(cacher, server.V3Client.Client), resync, triggerBookmarks)
+		storagetesting.RunTestWatchResync(ctx, t, store, true, watchCacheStallResume, CompactWatch(cacher, server.V3Client.Client), resync, triggerBookmarks)
 	})
 	// These tests override WatchList and must finish before the parallel subtests start.
 	t.Run("WatchSemantics", func(t *testing.T) {
@@ -1055,10 +1060,15 @@ func TestCorrectness(t *testing.T) {
 	for _, consistentGetFromCache := range []bool{true, false} {
 		t.Run(fmt.Sprintf("ConsistentGetFromCache=%v", consistentGetFromCache), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, consistentGetFromCache)
-			ForceRequestWatchProgressSupport(t)
-			ctx, cacher, server, terminate := SetupWithEtcdServer(t)
-			t.Cleanup(terminate)
-			correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, CompactStore(cacher, server.V3Client.Client))
+			for _, watchCacheStallResume := range []bool{true, false} {
+				t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+					ForceRequestWatchProgressSupport(t)
+					ctx, cacher, server, terminate := SetupWithEtcdServer(t)
+					t.Cleanup(terminate)
+					correctness.RunTestCorrectness(ctx, t, cacher, etcd3testing.PathPrefix(), cacher.cacher.watchCache.config.keyFunc, CompactStore(cacher, server.V3Client.Client))
+				})
+			}
 		})
 	}
 }

@@ -77,6 +77,10 @@ const (
 	// defaultBookmarkFrequency defines how frequently watch bookmarks should be send
 	// in addition to sending a bookmark right before watch deadline.
 	defaultBookmarkFrequency = time.Minute
+
+	// watcherResyncPeriod defines how frequently unsynchronized watchers are resynced
+	// with the watch cache.
+	watcherResyncPeriod = 100 * time.Millisecond
 )
 
 // Config contains the configuration for a given Cache.
@@ -333,6 +337,7 @@ type Cacher struct {
 	// timer is used to avoid unnecessary allocations in underlying watchers.
 	timer *time.Timer
 
+	unsyncedWatchers watchersMap
 	// dispatching determines whether there is currently dispatching of
 	// any event in flight.
 	dispatching bool
@@ -413,6 +418,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			scopeWatchers: make(map[namespacedName]watchersMap),
 			indexWatchers: make(map[string]watchersMap),
 		},
+		unsyncedWatchers: make(watchersMap),
 		// TODO: Figure out the correct value for the buffer size.
 		incoming:              make(chan watchCacheEvent, 100),
 		dispatchTimeoutBudget: newTimeBudget(),
@@ -479,6 +485,22 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	go cacher.dispatchEvents()
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		cacher.stopWg.Add(1)
+		ticker := config.Clock.NewTicker(watcherResyncPeriod)
+		go func() {
+			defer cacher.stopWg.Done()
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ticker.C():
+					cacher.resyncWatchers()
+				}
+			}
+		}()
+	}
 	go progressRequester.Run(stopCh)
 
 	cacher.stopWg.Add(1)
@@ -563,6 +585,14 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		metrics.RecordShardedWatchStarted(c.groupResource)
 	}
 	go watcher.process(ctx)
+	select {
+	case <-watcher.synced.Wait():
+	case <-watcher.done:
+	case <-ctx.Done():
+		watcher.Stop()
+	case <-c.stopCh:
+		watcher.Stop()
+	}
 	return watcher, nil
 }
 
@@ -631,7 +661,6 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		}
 		span.AddEvent("watchCache fresh enough")
 	}
-
 	// requiredResourceVersion = 0 means that we don't require any specific starting point
 	// and we would like to start watching from ~now.
 	if requiredResourceVersion == 0 && opts.SendInitialEvents != nil && !*opts.SendInitialEvents {
@@ -639,10 +668,14 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		watcher.requiredResourceVersion = requiredResourceVersion
 	}
 
-	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher)
-	if err != nil {
-		return nil, err
+	var cacheInterval *watchCacheInterval
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		cacheInterval, err = c.initWatcherIntervalLocked(ctx, watcher)
+		if err != nil {
+			return nil, err
+		}
 	}
+	isSharding := opts.Predicate.ShardingEnabled()
 
 	c.Lock()
 	defer c.Unlock()
@@ -656,14 +689,18 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 
 	// Update watcher.forget function once we can compute it.
 	watcher.forget = forgetWatcher(c, watcher, c.watcherIdx)
-	if opts.Predicate.ShardingEnabled() {
+	if isSharding {
 		originalForget := watcher.forget
 		watcher.forget = func(drainWatcher bool) {
 			metrics.RecordShardedWatchStopped(c.groupResource)
 			originalForget(drainWatcher)
 		}
 	}
-	c.registerWatcherLocked(watcher, c.watcherIdx, cacheInterval)
+	if cacheInterval != nil {
+		c.registerWatcherLocked(watcher, c.watcherIdx, cacheInterval)
+	} else {
+		c.unsyncedWatchers.addWatcher(watcher, c.watcherIdx)
+	}
 	c.watcherIdx++
 	return watcher, nil
 }
@@ -675,6 +712,7 @@ func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, idx int, cacheInte
 		c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
 	}
 	watcher.input <- watcherInput{interval: cacheInterval}
+	watcher.synced.Notify()
 }
 
 func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWatcher) (*watchCacheInterval, error) {
@@ -696,6 +734,39 @@ func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWa
 		watcher.state = cacheWatcherBookmarkSent
 	}
 	return cacheInterval, nil
+}
+
+func (c *Cacher) resyncWatchers() {
+	c.RLock()
+	hasUnsynced := len(c.unsyncedWatchers) > 0
+	c.RUnlock()
+	if !hasUnsynced {
+		return
+	}
+
+	c.watchCache.RLock()
+	defer c.watchCache.RUnlock()
+
+	c.Lock()
+	defer c.Unlock()
+
+	if !c.Ready() {
+		return
+	}
+
+	for idx, watcher := range c.unsyncedWatchers {
+		c.unsyncedWatchers.deleteWatcher(idx)
+		if watcher.stopped {
+			continue
+		}
+		cacheInterval, err := c.initWatcherIntervalLocked(context.Background(), watcher)
+		if err != nil {
+			watcher.input <- watcherInput{err: err}
+			c.stopWatcherLocked(watcher, true)
+			continue
+		}
+		c.registerWatcherLocked(watcher, idx, cacheInterval)
+	}
 }
 
 func (c *Cacher) watchSelector(ctx context.Context, pred storage.SelectionPredicate) watchSelector {
@@ -1254,6 +1325,9 @@ func (c *Cacher) terminateAllWatchers() {
 	c.watchers.terminateAll(c.groupResource, func(watcher *cacheWatcher) {
 		c.stopWatcherLocked(watcher, false)
 	})
+	c.unsyncedWatchers.terminateAll(func(watcher *cacheWatcher) {
+		c.stopWatcherLocked(watcher, false)
+	})
 }
 
 // watcherToStop is a stop deferred to the end of a dispatch. It keeps its own
@@ -1320,6 +1394,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int) func(bool) {
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
 		c.watchers.deleteWatcher(w, index)
+		c.unsyncedWatchers.deleteWatcher(index)
 		c.stopWatcherLocked(w, drainWatcher)
 	}
 }
