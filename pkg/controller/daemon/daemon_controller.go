@@ -856,7 +856,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	requiredNodeAffinity nodeaffinity.RequiredNodeAffinity,
 ) (nodesNeedingDaemonPods, podsToDelete []string) {
 
-	shouldRun, shouldContinueRunning := nodeShouldRunDaemonPod(logger, node, ds, tolerations, requiredNodeAffinity)
+	shouldRun, shouldContinueRunning := NodeShouldRunDaemonPodWithPrecomputed(logger, node, ds, tolerations, requiredNodeAffinity)
 	daemonPods, exists := nodeToDaemonPods[node.Name]
 
 	switch {
@@ -1221,7 +1221,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 	tolerations := daemonPodTolerations(ds)
 	requiredNodeAffinity := nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity)
 	for _, node := range nodeList {
-		shouldRun, _ := nodeShouldRunDaemonPod(logger, node, ds, tolerations, requiredNodeAffinity)
+		shouldRun, _ := NodeShouldRunDaemonPodWithPrecomputed(logger, node, ds, tolerations, requiredNodeAffinity)
 		scheduled := len(nodeToDaemonPods[node.Name]) > 0
 
 		if shouldRun {
@@ -1390,7 +1390,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
 func NodeShouldRunDaemonPod(logger klog.Logger, node *v1.Node, ds *apps.DaemonSet) (bool, bool) {
-	return nodeShouldRunDaemonPod(logger, node, ds, daemonPodTolerations(ds),
+	return NodeShouldRunDaemonPodWithPrecomputed(logger, node, ds, daemonPodTolerations(ds),
 		nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity))
 }
 
@@ -1403,14 +1403,19 @@ func daemonPodTolerations(ds *apps.DaemonSet) []v1.Toleration {
 	return spec.Tolerations
 }
 
-// nodeShouldRunDaemonPod is NodeShouldRunDaemonPod for callers that evaluate
+// NodeShouldRunDaemonPodWithPrecomputed is NodeShouldRunDaemonPod for callers that evaluate
 // many nodes against the same DaemonSet: tolerations and requiredNodeAffinity
 // depend only on ds — daemonPodTolerations(ds) and the parsing result of the
 // pod template's nodeSelector and affinity — so per-node loops build them
 // once instead of once per node. Parsing the required node affinity
 // dominates the cost of this check, and the sync paths run it for every node
 // in the cluster.
-func nodeShouldRunDaemonPod(logger klog.Logger, node *v1.Node, ds *apps.DaemonSet, tolerations []v1.Toleration, requiredNodeAffinity nodeaffinity.RequiredNodeAffinity) (bool, bool) {
+//   - tolerations must be the tolerations of ds's pod template after
+//     util.AddOrUpdateDaemonPodTolerations adds the default daemon pod
+//     tolerations.
+//   - requiredNodeAffinity must be
+//     nodeaffinity.NewRequiredNodeAffinity(ds.Spec.Template.Spec.NodeSelector, ds.Spec.Template.Spec.Affinity).
+func NodeShouldRunDaemonPodWithPrecomputed(logger klog.Logger, node *v1.Node, ds *apps.DaemonSet, tolerations []v1.Toleration, requiredNodeAffinity nodeaffinity.RequiredNodeAffinity) (bool, bool) {
 	// If the daemon set specifies a node name, check that it matches with node.Name.
 	if !(ds.Spec.Template.Spec.NodeName == "" || ds.Spec.Template.Spec.NodeName == node.Name) {
 		return false, false

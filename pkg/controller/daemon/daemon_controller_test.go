@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2394,6 +2395,19 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			}
 			if shouldContinueRunning != c.shouldContinueRunning {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldContinueRunning: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldContinueRunning, shouldContinueRunning)
+			}
+
+			// Build the inputs the way an external caller would, from the exported helpers.
+			spec := c.ds.Spec.Template.Spec
+			util.AddOrUpdateDaemonPodTolerations(&spec)
+			requiredNodeAffinity := nodeaffinity.NewRequiredNodeAffinity(spec.NodeSelector, spec.Affinity)
+			shouldRunWithPrecomputed, shouldContinueRunningWithPrecomputed := NodeShouldRunDaemonPodWithPrecomputed(logger, node, c.ds, spec.Tolerations, requiredNodeAffinity)
+
+			if shouldRunWithPrecomputed != c.shouldRun {
+				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRunWithPrecomputed = %v, got %v ", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRunWithPrecomputed)
+			}
+			if shouldContinueRunningWithPrecomputed != c.shouldContinueRunning {
+				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldCountinueRunningWithPrecomputed = %v, got %v ", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldContinueRunning, shouldContinueRunningWithPrecomputed)
 			}
 		}
 	}
