@@ -106,7 +106,7 @@ func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomina
 	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" &&
 		oldNodeName == nominatingInfo.NominatedNodeName && npm.nominatedPodToNode[pi.GetPod().UID] == oldNodeName {
 		// An explicit nomination to the same node may come with resources
-		// selected anew (NominationExtensions.PrepareNomination), so it
+		// selected anew (AllocationExtensions.PrepareAllocation), so it
 		// replaces the previous nomination.
 		npm.changes = append(npm.changes, nominationChange{pod: pi.GetPod(), oldNodeName: oldNodeName, newNodeName: oldNodeName})
 	} else {
