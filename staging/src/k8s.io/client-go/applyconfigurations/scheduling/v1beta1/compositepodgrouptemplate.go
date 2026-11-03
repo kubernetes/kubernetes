@@ -40,16 +40,11 @@ type CompositePodGroupTemplateApplyConfiguration struct {
 	// This field is immutable.
 	DisruptionMode *CompositeDisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// priorityClassName indicates the priority that should be considered when scheduling
-	// a composite pod group created from this template. If no priority class is specified,
-	// admission control can set this to the global default priority class if it exists.
-	// Otherwise, composite pod groups created from this template will have the priority set
-	// to zero.
+	// a composite pod group created from this template.
 	// This field is immutable.
 	PriorityClassName *string `json:"priorityClassName,omitempty"`
 	// priority is the value of priority of composite pod groups created from this template.
 	// Various system components use this field to find the priority of the composite pod group.
-	// When Priority Admission Controller is enabled, it prevents users from setting this field.
-	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is immutable.
 	Priority *int32 `json:"priority,omitempty"`
