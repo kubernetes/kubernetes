@@ -18,7 +18,10 @@ package cacher
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -163,6 +166,17 @@ func TestWaitUntilFreshLocked(t *testing.T) {
 				{at: 3500 * time.Millisecond, updateRV: 10},
 			},
 		},
+		{
+			name: "waiter registered after earlier waiter on same rv timed out still wakes",
+			steps: []step{
+				{updateRV: 2},
+				{waiter: &waiter{requestRV: 15, wantOutcome: outcome{rv: 2, duration: blockTimeout, err: tooLargeErr(15, 2)}}},
+				{at: 500 * time.Millisecond, waiter: &waiter{requestRV: 10, wantOutcome: outcome{rv: 15, duration: 2700 * time.Millisecond}}},
+				{at: 600 * time.Millisecond, waiter: &waiter{requestRV: 20, wantOutcome: outcome{rv: 15, duration: blockTimeout, err: tooLargeErr(20, 15)}}},
+				{at: blockTimeout + 100*time.Millisecond, waiter: &waiter{requestRV: 15, wantOutcome: outcome{rv: 15, duration: 100 * time.Millisecond}}},
+				{at: blockTimeout + 200*time.Millisecond, updateRV: 15},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -242,4 +256,123 @@ func (tw *testFreshnessWaiter) updateRV(rv uint64) {
 	defer tw.mu.Unlock()
 	tw.rv = rv
 	tw.w.broadcast()
+}
+
+func BenchmarkWaitUntilFreshLocked(b *testing.B) {
+	b.Cleanup(metrics.WatchCacheReadWait.Reset)
+	for _, waiterCount := range []int{500} {
+		b.Run(fmt.Sprintf("Waiters=%d", waiterCount), func(b *testing.B) {
+			maxRV := uint64(waiterCount)
+			for _, waiterDistribution := range []string{"late", "uniform", "mixed"} {
+				waiterResourceVersions := waiterResourceVersions(waiterCount, maxRV, waiterDistribution)
+				b.Run(fmt.Sprintf("WaitersDistribution=%s", waiterDistribution), func(b *testing.B) {
+					for _, updateDistribution := range []string{"dense", "coarse", "single", "mixed"} {
+						resourceVersionUpdates := resourceVersionUpdates(maxRV, updateDistribution)
+						b.Run(fmt.Sprintf("ResourceVersionDistribution=%s", updateDistribution), func(b *testing.B) {
+							runBenchmarkWaitUntilFresh(b, waiterResourceVersions, resourceVersionUpdates, maxRV)
+						})
+					}
+				})
+			}
+		})
+	}
+}
+
+func runBenchmarkWaitUntilFresh(b *testing.B, waiterResourceVersions, resourceVersionUpdates []uint64, maxRV uint64) {
+	b.ReportAllocs()
+	ctx := b.Context()
+	fw := newTestFreshnessWaiter()
+
+	var stopWaiters atomic.Bool
+	var remainingWaiters atomic.Int64
+	remainingWaiters.Store(int64(len(waiterResourceVersions)))
+	waiterWokenUp := make(chan struct{}, 1)
+	var wg sync.WaitGroup
+	for _, rvOffset := range waiterResourceVersions {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for baseRV := uint64(0); ; baseRV += maxRV {
+				if stopWaiters.Load() {
+					return
+				}
+				if remainingWaiters.Add(-1) == 0 {
+					waiterWokenUp <- struct{}{}
+				}
+				if _, err := fw.waitUntilFresh(ctx, baseRV+rvOffset); err != nil {
+					b.Errorf("unexpected error: %v", err)
+					return
+				}
+			}
+		}()
+	}
+	<-waiterWokenUp
+
+	var baseRV uint64
+	for b.Loop() {
+		remainingWaiters.Store(int64(len(waiterResourceVersions)))
+		for _, step := range resourceVersionUpdates {
+			fw.updateRV(baseRV + step)
+		}
+		<-waiterWokenUp
+		baseRV += maxRV
+	}
+
+	stopWaiters.Store(true)
+	fw.updateRV(math.MaxUint64)
+	wg.Wait()
+}
+
+func waiterResourceVersions(count int, maxRV uint64, dist string) []uint64 {
+	offsets := make([]uint64, count)
+	for i := range count {
+		switch dist {
+		case "late":
+			offsets[i] = maxRV
+		case "uniform":
+			offsets[i] = uint64(i*37)%maxRV + 1
+		case "mixed":
+			if i < count/2 {
+				offsets[i] = uint64(i*37)%maxRV + 1
+			} else {
+				offsets[i] = maxRV
+			}
+		default:
+			panic(fmt.Sprintf("unknown target distribution: %s", dist))
+		}
+	}
+	return offsets
+}
+
+func resourceVersionUpdates(maxRV uint64, pattern string) []uint64 {
+	switch pattern {
+	case "dense":
+		steps := make([]uint64, maxRV)
+		for i := range maxRV {
+			steps[i] = i + 1
+		}
+		return steps
+	case "coarse":
+		stride := max(maxRV/5, 1)
+		var steps []uint64
+		for rv := stride; rv < maxRV; rv += stride {
+			steps = append(steps, rv)
+		}
+		return append(steps, maxRV)
+	case "single":
+		return []uint64{maxRV}
+	case "mixed":
+		chunk := max(maxRV/5, 1)
+		denseRun := max(chunk/5, 1)
+		var steps []uint64
+		for base := uint64(0); base < maxRV; base += chunk {
+			for d := uint64(1); d <= denseRun && base+d < base+chunk; d++ {
+				steps = append(steps, base+d)
+			}
+			steps = append(steps, min(base+chunk, maxRV))
+		}
+		return steps
+	default:
+		panic(fmt.Sprintf("unknown update pattern: %s", pattern))
+	}
 }
