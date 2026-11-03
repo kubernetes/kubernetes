@@ -18,6 +18,8 @@ package framework
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +87,248 @@ func TestNewResource(t *testing.T) {
 				t.Errorf("Unexpected resource (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestSaturatingAdd(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		a, b int64
+		want int64
+	}{
+		{"no overflow", 2, 3, 5},
+		{"positive saturates", math.MaxInt64, 1, math.MaxInt64},
+		{"both positive saturate", math.MaxInt64, math.MaxInt64, math.MaxInt64},
+		{"opposite signs cannot overflow", math.MaxInt64, math.MinInt64, -1},
+	} {
+		if got := SaturatingAdd(tc.a, tc.b); got != tc.want {
+			t.Errorf("%s: SaturatingAdd(%d, %d) = %d, want %d", tc.name, tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
+func TestNodeInfoSaturatesAndRecomputesEveryRequestedField(t *testing.T) {
+	// Two MaxInt64 pods must saturate each accumulated field, and removing one
+	// must rebuild that field from the other.
+	dev := v1.ResourceName("example.com/dev")
+	cases := []struct {
+		name             string
+		res              Resource
+		non0CPU, non0Mem int64
+		got              func(*NodeInfo) int64
+	}{
+		{"MilliCPU", Resource{MilliCPU: math.MaxInt64}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.MilliCPU }},
+		{"Memory", Resource{Memory: math.MaxInt64}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.Memory }},
+		{"EphemeralStorage", Resource{EphemeralStorage: math.MaxInt64}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.EphemeralStorage }},
+		{"ScalarResources", Resource{ScalarResources: map[v1.ResourceName]int64{dev: math.MaxInt64}}, 0, 0, func(n *NodeInfo) int64 { return n.Requested.ScalarResources[dev] }},
+		{"NonZeroCPU", Resource{}, math.MaxInt64, 0, func(n *NodeInfo) int64 { return n.NonZeroRequested.MilliCPU }},
+		{"NonZeroMemory", Resource{}, 0, math.MaxInt64, func(n *NodeInfo) int64 { return n.NonZeroRequested.Memory }},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ni := NewNodeInfo()
+			r1, r2 := c.res, c.res
+			p1 := addCachedResource(ni, "p1", &r1, c.non0CPU, c.non0Mem)
+			p2 := addCachedResource(ni, "p2", &r2, c.non0CPU, c.non0Mem)
+			if got := c.got(ni); got != math.MaxInt64 {
+				t.Errorf("%s = %d after two MaxInt64 adds, want MaxInt64 (wrapped instead of saturating)", c.name, got)
+			}
+			if err := ni.RemovePod(klog.Background(), p1); err != nil {
+				t.Fatal(err)
+			}
+			if got := c.got(ni); got != math.MaxInt64 {
+				t.Errorf("%s = %d after removing one of two MaxInt64 pods, want MaxInt64 (subtracted instead of rebuilding)", c.name, got)
+			}
+			if err := ni.RemovePod(klog.Background(), p2); err != nil {
+				t.Fatal(err)
+			}
+			if got := c.got(ni); got != 0 {
+				t.Errorf("%s = %d after removing both pods, want 0", c.name, got)
+			}
+		})
+	}
+}
+
+func TestNodeInfoRemovePodRecomputesAfterSaturation(t *testing.T) {
+	// The MilliCPU case of the table above, but through the Quantity projection
+	// and with a 100m pod that must survive the rebuild.
+	logger := klog.Background()
+	huge := map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"} // MilliValue is math.MaxInt64
+	small := map[v1.ResourceName]string{v1.ResourceCPU: "100m"}
+
+	ni := NewNodeInfo()
+	base := st.MakePod().Name("base").UID("base").Req(small).Obj()
+	a := st.MakePod().Name("a").UID("a").Req(huge).Obj()
+	b := st.MakePod().Name("b").UID("b").Req(huge).Obj()
+	ni.AddPod(base)
+	ni.AddPod(a)
+	ni.AddPod(b)
+	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Fatalf("after adds, Requested.MilliCPU = %d, want %d", got, int64(math.MaxInt64))
+	}
+
+	if err := ni.RemovePod(logger, a); err != nil {
+		t.Fatal(err)
+	}
+	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Errorf("after removing a, Requested.MilliCPU = %d, want %d (b still present)", got, int64(math.MaxInt64))
+	}
+
+	if err := ni.RemovePod(logger, b); err != nil {
+		t.Fatal(err)
+	}
+	if got := ni.Requested.MilliCPU; got != 100 {
+		t.Errorf("after removing b, Requested.MilliCPU = %d, want 100 (base restored)", got)
+	}
+	if got := ni.NonZeroRequested.MilliCPU; got != 100 {
+		t.Errorf("after removing b, NonZeroRequested.MilliCPU = %d, want 100", got)
+	}
+}
+
+// addCachedResource adds a pod with a prebuilt PodResource, so a test can set exact int64 totals.
+func addCachedResource(ni *NodeInfo, name string, res *Resource, non0CPU, non0Mem int64) *v1.Pod {
+	pod := st.MakePod().Name(name).UID(name).Obj()
+	ni.AddPodInfo(&PodInfo{Pod: pod, cachedResource: &fwk.PodResource{Resource: res, Non0CPU: non0CPU, Non0Mem: non0Mem}})
+	return pod
+}
+
+func TestNodeInfoRecomputeIsOrderIndependent(t *testing.T) {
+	// A saturated non-negative sum stays at MaxInt64, so the rebuild must not
+	// depend on the order of n.Pods.
+	build := func(order []int) *NodeInfo {
+		res := []*Resource{{Memory: math.MaxInt64}, {Memory: math.MaxInt64}, {Memory: math.MaxInt64 / 2}}
+		ni := NewNodeInfo()
+		for _, i := range order {
+			addCachedResource(ni, fmt.Sprintf("p%d", i), res[i], 0, res[i].Memory)
+		}
+		ni.recomputeRequested()
+		return ni
+	}
+	for _, order := range [][]int{{0, 1, 2}, {2, 1, 0}, {1, 2, 0}, {2, 0, 1}} {
+		if got := build(order).Requested.Memory; got != math.MaxInt64 {
+			t.Errorf("rebuild in order %v = %d, want MaxInt64 (order-independent rail)", order, got)
+		}
+	}
+}
+
+func TestNodeInfoSnapshotStaysSaturatedAfterRemoval(t *testing.T) {
+	// A removal on a snapshot, as preemption does, rebuilds the snapshot's totals
+	// and leaves the source node alone.
+	logger := klog.Background()
+	huge := map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"}
+
+	ni := NewNodeInfo()
+	ni.AddPod(st.MakePod().Name("a").UID("a").Req(huge).Obj())
+	ni.AddPod(st.MakePod().Name("b").UID("b").Req(huge).Obj())
+
+	clone := ni.SnapshotConcrete()
+	if err := clone.RemovePod(logger, st.MakePod().Name("a").UID("a").Req(huge).Obj()); err != nil {
+		t.Fatal(err)
+	}
+	if got := clone.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Errorf("after removing a from the snapshot, Requested.MilliCPU = %d, want %d", got, int64(math.MaxInt64))
+	}
+	if got := ni.Requested.MilliCPU; got != math.MaxInt64 {
+		t.Errorf("source Requested.MilliCPU = %d after a removal on its snapshot, want %d", got, int64(math.MaxInt64))
+	}
+	if len(ni.Pods) != 2 || ni.Pods[0].GetPod().Name != "a" || ni.Pods[1].GetPod().Name != "b" {
+		t.Errorf("source pods changed after a removal on its snapshot, want a and b")
+	}
+}
+
+func TestNodeInfoStaysFailClosedUnderRandomOps(t *testing.T) {
+	// Random adds and removes, some at MaxInt64, must keep Memory non-negative and
+	// equal to a saturating fold of the live pods.
+	logger := klog.Background()
+	r := rand.New(rand.NewSource(1)) // deterministic
+	pickMem := func() int64 {
+		switch r.Intn(3) {
+		case 0:
+			return int64(r.Intn(1000))
+		case 1:
+			return math.MaxInt64
+		default:
+			return r.Int63()
+		}
+	}
+	ni := NewNodeInfo()
+	var live []*v1.Pod
+	for i := range 10000 {
+		if len(live) == 0 || (len(live) < 500 && r.Intn(2) == 0) {
+			name := fmt.Sprintf("p%d", i)
+			mem := pickMem()
+			pod := st.MakePod().Name(name).UID(name).Obj()
+			ni.AddPodInfo(&PodInfo{Pod: pod, cachedResource: &fwk.PodResource{Resource: &Resource{Memory: mem}, Non0Mem: mem}})
+			live = append(live, pod)
+		} else {
+			j := r.Intn(len(live))
+			if err := ni.RemovePod(logger, live[j]); err != nil {
+				t.Fatal(err)
+			}
+			live[j] = live[len(live)-1]
+			live = live[:len(live)-1]
+		}
+		if ni.Requested.Memory < 0 || ni.NonZeroRequested.Memory < 0 {
+			t.Fatalf("op %d (%d pods): Requested.Memory=%d NonZeroRequested.Memory=%d, want >= 0",
+				i, len(live), ni.Requested.Memory, ni.NonZeroRequested.Memory)
+		}
+		var fold int64
+		for _, p := range ni.Pods {
+			fold = SaturatingAdd(fold, p.CalculateResource().Resource.GetMemory())
+		}
+		if fold != ni.Requested.Memory {
+			t.Fatalf("op %d: running Requested.Memory=%d != fold of pods=%d", i, ni.Requested.Memory, fold)
+		}
+	}
+	for _, p := range live {
+		if err := ni.RemovePod(logger, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ni.Requested.Memory != 0 || ni.NonZeroRequested.Memory != 0 {
+		t.Fatalf("drained node: Requested.Memory=%d NonZeroRequested.Memory=%d, want 0/0",
+			ni.Requested.Memory, ni.NonZeroRequested.Memory)
+	}
+}
+
+func BenchmarkNodeInfoRemovePods(b *testing.B) {
+	// On a saturated node each removal rebuilds the totals; on an unsaturated node
+	// it subtracts. The scalar variant also clears and refills the scalar map.
+	logger := klog.Background()
+	variants := []struct {
+		name       string
+		saturated  bool
+		small, big map[v1.ResourceName]string
+	}{
+		{"cpu/unsaturated", false, map[v1.ResourceName]string{v1.ResourceCPU: "1m"}, nil},
+		{"cpu/saturated", true, map[v1.ResourceName]string{v1.ResourceCPU: "1m"}, map[v1.ResourceName]string{v1.ResourceCPU: "9223372036854775807m"}},
+		{"scalar/saturated", true, map[v1.ResourceName]string{"example.com/dev": "1"}, map[v1.ResourceName]string{"example.com/dev": "9223372036854775807"}},
+	}
+	for _, v := range variants {
+		for _, n := range []int{100, 1000} {
+			b.Run(fmt.Sprintf("%s/pods=%d", v.name, n), func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					b.StopTimer()
+					ni := NewNodeInfo()
+					if v.saturated {
+						ni.AddPod(st.MakePod().Name("h1").UID("h1").Req(v.big).Obj())
+						ni.AddPod(st.MakePod().Name("h2").UID("h2").Req(v.big).Obj())
+					}
+					pods := make([]*v1.Pod, n)
+					for j := range pods {
+						pods[j] = st.MakePod().Name(fmt.Sprintf("p%d", j)).UID(fmt.Sprintf("p%d", j)).Req(v.small).Obj()
+						ni.AddPod(pods[j])
+					}
+					b.StartTimer()
+					for _, p := range pods {
+						if err := ni.RemovePod(logger, p); err != nil {
+							b.Fatal(err)
+						}
+					}
+				}
+			})
+		}
 	}
 }
 

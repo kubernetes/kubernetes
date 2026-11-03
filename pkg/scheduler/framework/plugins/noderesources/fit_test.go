@@ -18,6 +18,8 @@ package noderesources
 
 import (
 	"fmt"
+	"math"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -146,6 +148,18 @@ var defaultScoringStrategy = &config.ScoringStrategy{
 func newPodLevelResourcesPod(pod *v1.Pod, podResources v1.ResourceRequirements) *v1.Pod {
 	pod.Spec.Resources = &podResources
 	return pod
+}
+
+func TestFitsSaturatedNodeStaysFailClosed(t *testing.T) {
+	// Two MaxInt64 memory requests must saturate the node total, not wrap it to -2 and fit a 1-byte pod.
+	huge := framework.Resource{Memory: math.MaxInt64}
+	nodeInfo := framework.NewNodeInfo(newResourcePod(huge), newResourcePod(huge))
+	nodeInfo.SetNode(&v1.Node{Status: v1.NodeStatus{Allocatable: makeAllocatableResources(0, 100, 32, 0, 0, 0)}})
+
+	got := Fits(newResourcePod(framework.Resource{Memory: 1}), nodeInfo, nil, ResourceRequestsOptions{})
+	if !slices.ContainsFunc(got, func(r InsufficientResource) bool { return r.ResourceName == v1.ResourceMemory }) {
+		t.Errorf("a 1-byte memory request fits on a saturated node, insufficient resources = %v", got)
+	}
 }
 
 func TestEnoughRequests(t *testing.T) { testEnoughRequests(ktesting.Init(t)) }

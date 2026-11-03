@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -373,7 +374,7 @@ func (n *NodeInfo) AddPodInfo(podInfo fwk.PodInfo) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InterPodAffinityHostnameFastPath) && podWithRequiredNonHostScopedAntiAffinity(podInfo.GetPod()) {
 		n.PodsWithRequiredNonHostScopedAntiAffinity = append(n.PodsWithRequiredNonHostScopedAntiAffinity, podInfo)
 	}
-	n.update(podInfo, 1)
+	n.update(podInfo, true /* add */)
 }
 
 // AddPod is a wrapper around AddPodInfo.
@@ -450,33 +451,71 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 
 	var removedPod fwk.PodInfo
 	if n.Pods, removedPod = removeFromSlice(logger, n.Pods, k); removedPod != nil {
-		n.update(removedPod, -1)
+		n.update(removedPod, false /* add */)
 		return nil
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
-// update node info based on the pod, and sign.
-// The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
-func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
+// update updates NodeInfo when AddPodInfo adds a pod or RemovePod removes a pod.
+func (n *NodeInfo) update(podInfo fwk.PodInfo, add bool) {
+	n.updateRequested(podInfo, add)
+	n.updateUsedPorts(podInfo.GetPod(), add)
+	n.updatePVCRefCounts(podInfo.GetPod(), add)
+	n.Generation = nextGeneration()
+}
+
+// updateRequested updates Requested and NonZeroRequested for a pod addition or removal.
+func (n *NodeInfo) updateRequested(podInfo fwk.PodInfo, add bool) {
+	if !add && n.requestedSaturated() {
+		// Saturation loses the exact sum, so rebuild from the remaining pods in n.Pods.
+		n.recomputeRequested()
+		return
+	}
+
 	podResource := podInfo.CalculateResource()
-	n.Requested.MilliCPU += sign * podResource.Resource.GetMilliCPU()
-	n.Requested.Memory += sign * podResource.Resource.GetMemory()
-	n.Requested.EphemeralStorage += sign * podResource.Resource.GetEphemeralStorage()
-	if n.Requested.ScalarResources == nil && len(podResource.Resource.GetScalarResources()) > 0 {
+	n.Requested.MilliCPU = addOrSub(n.Requested.MilliCPU, podResource.Resource.GetMilliCPU(), add)
+	n.Requested.Memory = addOrSub(n.Requested.Memory, podResource.Resource.GetMemory(), add)
+	n.Requested.EphemeralStorage = addOrSub(n.Requested.EphemeralStorage, podResource.Resource.GetEphemeralStorage(), add)
+	scalars := podResource.Resource.GetScalarResources()
+	if n.Requested.ScalarResources == nil && len(scalars) > 0 {
 		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
 	}
-	for rName, rQuant := range podResource.Resource.GetScalarResources() {
-		n.Requested.ScalarResources[rName] += sign * rQuant
+	for rName, rQuant := range scalars {
+		n.Requested.ScalarResources[rName] = addOrSub(n.Requested.ScalarResources[rName], rQuant, add)
 	}
-	n.NonZeroRequested.MilliCPU += sign * podResource.Non0CPU
-	n.NonZeroRequested.Memory += sign * podResource.Non0Mem
+	n.NonZeroRequested.MilliCPU = addOrSub(n.NonZeroRequested.MilliCPU, podResource.Non0CPU, add)
+	n.NonZeroRequested.Memory = addOrSub(n.NonZeroRequested.Memory, podResource.Non0Mem, add)
+}
 
-	// Consume ports when pod added or release ports when pod removed.
-	n.updateUsedPorts(podInfo.GetPod(), sign > 0)
-	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
+// requestedSaturated reports whether any total kept by updateRequested is at math.MaxInt64.
+func (n *NodeInfo) requestedSaturated() bool {
+	if n.Requested.MilliCPU == math.MaxInt64 ||
+		n.Requested.Memory == math.MaxInt64 ||
+		n.Requested.EphemeralStorage == math.MaxInt64 ||
+		n.NonZeroRequested.MilliCPU == math.MaxInt64 ||
+		n.NonZeroRequested.Memory == math.MaxInt64 {
+		return true
+	}
+	for _, v := range n.Requested.ScalarResources {
+		if v == math.MaxInt64 {
+			return true
+		}
+	}
+	return false
+}
 
-	n.Generation = nextGeneration()
+// recomputeRequested rebuilds Requested and NonZeroRequested from the pods in n.Pods.
+func (n *NodeInfo) recomputeRequested() {
+	n.Requested.MilliCPU = 0
+	n.Requested.Memory = 0
+	n.Requested.EphemeralStorage = 0
+	clear(n.Requested.ScalarResources)
+	n.NonZeroRequested.MilliCPU = 0
+	n.NonZeroRequested.Memory = 0
+	for _, p := range n.Pods {
+		n.updateRequested(p, true /* add */)
+	}
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
@@ -1544,6 +1583,25 @@ func NewResource(rl v1.ResourceList) *Resource {
 	r := &Resource{}
 	r.Add(rl)
 	return r
+}
+
+// SaturatingAdd returns a + b for non-negative totals, capping at math.MaxInt64
+// instead of wrapping; a wrapped total would misreport the node as having spare capacity.
+func SaturatingAdd(a, b int64) int64 {
+	sum := a + b
+	if a > 0 && b > 0 && sum < 0 {
+		return math.MaxInt64
+	}
+	return sum
+}
+
+// addOrSub adds b to a with SaturatingAdd, or subtracts it when add is false.
+// The subtract stays exact because updateRequested rebuilds a saturated total instead.
+func addOrSub(a, b int64, add bool) int64 {
+	if add {
+		return SaturatingAdd(a, b)
+	}
+	return a - b
 }
 
 // Add adds ResourceList into Resource.
