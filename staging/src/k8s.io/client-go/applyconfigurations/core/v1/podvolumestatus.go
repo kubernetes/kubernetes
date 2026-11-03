@@ -27,6 +27,7 @@ type PodVolumeStatusApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	// healthStatus contains health reported by the CSI node plugin for this volume
 	// on the pod's node. Populated by the kubelet.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	HealthStatus *VolumeHealthStatusApplyConfiguration `json:"healthStatus,omitempty"`
 }
 

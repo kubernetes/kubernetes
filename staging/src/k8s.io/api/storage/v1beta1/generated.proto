@@ -369,6 +369,7 @@ message CSINodeSpec {
 // CSINodeStatus contains health and status information for storage on a node.
 message CSINodeStatus {
   // storageHealth contains backend health reports for CSI drivers registered on the node.
+  // This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
   // +optional
   // +k8s:optional
   // +listType=map
@@ -565,7 +566,7 @@ message StorageHealth {
 message StorageHealthCondition {
   // status is the health status category.
   // Possible values are:
-  // - "StorageHealthUnknown": the reported health status is not recognized; the backend must not be considered healthy.
+  // - "StorageHealthUnknown": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy.
   // - "StorageUnreachable": the storage backend is unreachable.
   // - "StorageDegraded": the storage backend is functioning with reduced capability.
   // - "StorageHealthy": the storage backend is healthy as seen from this node.

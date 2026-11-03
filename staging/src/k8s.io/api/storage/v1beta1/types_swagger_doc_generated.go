@@ -110,7 +110,7 @@ func (CSINodeSpec) SwaggerDoc() map[string]string {
 
 var map_CSINodeStatus = map[string]string{
 	"":              "CSINodeStatus contains health and status information for storage on a node.",
-	"storageHealth": "storageHealth contains backend health reports for CSI drivers registered on the node.",
+	"storageHealth": "storageHealth contains backend health reports for CSI drivers registered on the node. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 }
 
 func (CSINodeStatus) SwaggerDoc() map[string]string {
@@ -178,7 +178,7 @@ func (StorageHealth) SwaggerDoc() map[string]string {
 
 var map_StorageHealthCondition = map[string]string{
 	"":                   "StorageHealthCondition represents a health condition reported by a CSI driver for its storage backend on a node.",
-	"status":             "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.",
+	"status":             "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.",
 	"reason":             "reason is a brief CamelCase machine-parseable reason. Maximum permitted length of a reason is 256 bytes.",
 	"message":            "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 	"accessMode":         "accessMode is the access mode affected. Nil means all access modes are affected.",

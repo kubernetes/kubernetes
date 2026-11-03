@@ -27179,7 +27179,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 					},
 					"healthStatus": {
 						SchemaProps: spec.SchemaProps{
-							Description: "healthStatus contains the latest controller-reported health information for the volume bound to this claim.",
+							Description: "healthStatus contains the latest controller-reported health information for the volume bound to this claim. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 							Ref:         ref(corev1.VolumeHealthStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -29797,7 +29797,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "VolumeStatuses contains the status of individual volumes used by this pod. This is an ALPHA field.",
+							Description: "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -29955,7 +29955,7 @@ func schema_k8sio_api_core_v1_PodVolumeStatus(ref common.ReferenceCallback) comm
 					},
 					"healthStatus": {
 						SchemaProps: spec.SchemaProps{
-							Description: "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet.",
+							Description: "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 							Ref:         ref(corev1.VolumeHealthStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -33612,12 +33612,12 @@ func schema_k8sio_api_core_v1_VolumeHealthCondition(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "VolumeHealthCondition represents an adverse health condition reported for a volume. Both pod and PVC reuse this type to report volume health in their status fields.",
+				Description: "VolumeHealthCondition represents a health condition reported for a volume. Both pod and PVC reuse this type to report volume health in their status fields.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the machine-parseable health category. Possible values are : - \"Unknown\": the driver is reporting a unknown health condition. Volume should not be considered healthy. - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability. - \"Healthy\" : the volume is healthy.\n\nThis field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change. A future version of CSI driver may emit health conditions about which Kubernetes component aren't aware.\n\nA writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status as unknown.\n\nA reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting purpose.\n\nPossible enum values:\n - `\"DataLoss\"` indicates data loss has been detected on the volume.\n - `\"Degraded\"` indicates the volume is functioning but with reduced capability.\n - `\"Healthy\"` indicates the volume is healthy and there are no issues with it.\n - `\"Inaccessible\"` indicates the volume cannot be accessed.\n - `\"Unknown\"` indicates that driver is returning a health status which is not recognized by Kubernetes. Volume should not be considered healthy.",
+							Description: "status is the machine-parseable health category. Possible values are: - \"Unknown\": the driver reported an unknown health status, or a status Kubernetes does not recognize. The volume must not be considered healthy. - \"Inaccessible\": the volume cannot be accessed. - \"DataLoss\": data loss has been detected on the volume. - \"Degraded\": the volume is functioning with reduced capability. - \"Healthy\": the volume is healthy.\n\nThis field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change. A future version of a CSI driver may emit health conditions that Kubernetes components are not aware of.\n\nA writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status as unknown.\n\nA reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting purposes.\n\nPossible enum values:\n - `\"DataLoss\"` indicates data loss has been detected on the volume.\n - `\"Degraded\"` indicates the volume is functioning but with reduced capability.\n - `\"Healthy\"` indicates the volume is healthy and there are no issues with it.\n - `\"Inaccessible\"` indicates the volume cannot be accessed.\n - `\"Unknown\"` indicates that the driver reported an unknown health status, or a status Kubernetes does not recognize. The volume must not be considered healthy.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -60309,7 +60309,7 @@ func schema_k8sio_api_storage_v1_CSINodeStatus(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "storageHealth contains backend health reports for CSI drivers registered on the node.",
+							Description: "storageHealth contains backend health reports for CSI drivers registered on the node. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -60662,7 +60662,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageHealthUnknown\"` indicates that driver is returning a health status which is not recognized by kubelet. Health of storage subsystem should not be considered healthy.\n - `\"StorageHealthy\"` indicates that the storage backend is healthy as seen from this node.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
+							Description: "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageHealthUnknown\"` indicates that the driver reported an unknown health status, or a status Kubernetes does not recognize. The storage subsystem should not be considered healthy.\n - `\"StorageHealthy\"` indicates that the storage backend is healthy as seen from this node.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -62024,7 +62024,7 @@ func schema_k8sio_api_storage_v1beta1_CSINodeStatus(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "storageHealth contains backend health reports for CSI drivers registered on the node.",
+							Description: "storageHealth contains backend health reports for CSI drivers registered on the node. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -62376,7 +62376,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 				Properties: map[string]spec.Schema{
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageHealthUnknown\"` indicates that driver is returning a health status which is not recognized by kubelet. Health of storage subsystem should not be considered healthy.\n - `\"StorageHealthy\"` indicates that the storage backend is healthy as seen from this node.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
+							Description: "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.\n\nPossible enum values:\n - `\"StorageDegraded\"` indicates the storage backend is functioning with reduced capability.\n - `\"StorageHealthUnknown\"` indicates that the driver reported an unknown health status, or a status Kubernetes does not recognize. The storage subsystem should not be considered healthy.\n - `\"StorageHealthy\"` indicates that the storage backend is healthy as seen from this node.\n - `\"StorageUnreachable\"` indicates the storage backend is unreachable.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
