@@ -49146,11 +49146,17 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 							Format:      "",
 						},
 					},
+					"extendedResourceCapacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "extendedResourceCapacityRequests defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
+							Ref:         ref(resourcev1.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1.CapacityRequirements{}.OpenAPIModelName(), resourcev1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -52574,11 +52580,17 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"extendedResourceCapacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "extendedResourceCapacityRequests defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
+							Ref:         ref(resourcev1beta1.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1beta1.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta1.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -55016,11 +55028,17 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"extendedResourceCapacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "extendedResourceCapacityRequests defines the fixed capacity amounts that the scheduler requests on every ResourceClaim it synthesizes to satisfy the extended resource of this class.\n\nThe value is copied, unmodified, onto the capacity of each device request synthesized for this class, so it has the same semantics as DeviceRequest.capacity: it applies to each device allocation. A pod requesting more than one device through the extended resource gets that capacity once per device, not once per pod.\n\nThe devices selected by this class must advertise the referenced capacities. Otherwise the extended resource requests cannot be satisfied, the same way as with a selector that matches no devices.\n\nThis is an alpha field and requires enabling the DRAExtendedResourceCapacity feature gate, which depends on DRAConsumableCapacity.",
+							Ref:         ref(resourcev1beta2.CapacityRequirements{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName()},
+			resourcev1beta2.CapacityRequirements{}.OpenAPIModelName(), resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName(), resourcev1beta2.DeviceSelector{}.OpenAPIModelName()},
 	}
 }
 

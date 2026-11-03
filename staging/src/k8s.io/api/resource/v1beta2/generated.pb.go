@@ -1264,6 +1264,18 @@ func (m *DeviceClassSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ExtendedResourceCapacityRequests != nil {
+		{
+			size, err := m.ExtendedResourceCapacityRequests.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.ExtendedResourceName != nil {
 		i -= len(*m.ExtendedResourceName)
 		copy(dAtA[i:], *m.ExtendedResourceName)
@@ -3516,6 +3528,10 @@ func (m *DeviceClassSpec) Size() (n int) {
 		l = len(*m.ExtendedResourceName)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.ExtendedResourceCapacityRequests != nil {
+		l = m.ExtendedResourceCapacityRequests.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -4536,6 +4552,7 @@ func (this *DeviceClassSpec) String() string {
 		`Selectors:` + repeatedStringForSelectors + `,`,
 		`Config:` + repeatedStringForConfig + `,`,
 		`ExtendedResourceName:` + valueToStringGenerated(this.ExtendedResourceName) + `,`,
+		`ExtendedResourceCapacityRequests:` + strings.Replace(this.ExtendedResourceCapacityRequests.String(), "CapacityRequirements", "CapacityRequirements", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -8550,6 +8567,42 @@ func (m *DeviceClassSpec) Unmarshal(dAtA []byte) error {
 			}
 			s := string(dAtA[iNdEx:postIndex])
 			m.ExtendedResourceName = &s
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExtendedResourceCapacityRequests", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExtendedResourceCapacityRequests == nil {
+				m.ExtendedResourceCapacityRequests = &CapacityRequirements{}
+			}
+			if err := m.ExtendedResourceCapacityRequests.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
