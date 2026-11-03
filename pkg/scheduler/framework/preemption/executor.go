@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -163,6 +164,14 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 	return e
 }
 
+// assumeVictim lets plugins track what the victim releases asynchronously,
+// once its preemption is under way.
+func (e *Executor) assumeVictim(ctx context.Context, victim *v1.Pod) {
+	if runner, ok := e.fh.(framework.VictimExtensionsRunner); ok {
+		runner.RunVictimExtensionsAssumeVictim(ctx, victim)
+	}
+}
+
 // ActuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of victims to be evicted.
 // victims to be evicted.
 func (e *Executor) ActuatePodPreemption(ctx context.Context, candidate fwk.PreemptionCandidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
@@ -203,6 +212,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		if victim.DeletionTimestamp != nil {
 			// Graceful pod deletion has already started. Sending another API call is unnecessary.
 			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(preemptor), "node", c.Name(), "victim", klog.KObj(victim))
+			e.assumeVictim(ctx, victim)
 			continue
 		}
 		victimPods = append(victimPods, victim)
@@ -219,7 +229,9 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
+			return
 		}
+		e.assumeVictim(ctx, victim)
 	}
 
 	e.mu.Lock()
@@ -293,8 +305,9 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
-			} else if preemptedInMemory {
-				preemptedLastVictimInMemory = true
+			} else {
+				e.assumeVictim(ctx, lastVictim)
+				preemptedLastVictimInMemory = preemptedInMemory
 			}
 		}
 		e.mu.Lock()
@@ -330,11 +343,14 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 		if victim.DeletionTimestamp != nil {
 			// Graceful pod deletion has already started. Sending another API call is unnecessary.
 			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(preemptor), "node", c.Name(), "victim", klog.KObj(victim))
+			e.assumeVictim(ctx, victim)
 			return
 		}
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
+			return
 		}
+		e.assumeVictim(ctx, victim)
 	}, pluginName)
 	if err := errCh.Receive(); err != nil {
 		metricsResult = metrics.GoroutineResultError

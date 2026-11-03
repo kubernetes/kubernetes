@@ -37,12 +37,14 @@ import (
 
 // recordingNominationExtensions appends its calls to a log shared by all instances.
 type recordingNominationExtensions struct {
-	name        string
-	log         *[]string
-	numPrepared int
+	name              string
+	notEligibleReason string
+	log               *[]string
+	numPrepared       int
 }
 
 var _ framework.NominationExtensions = &recordingNominationExtensions{}
+var _ framework.VictimExtensions = &recordingNominationExtensions{}
 
 func (pl *recordingNominationExtensions) Name() string { return pl.name }
 
@@ -70,27 +72,73 @@ func (pl *recordingNominationExtensions) RemoveNomination(_ context.Context, pod
 	return framework.NominationChangeResult{Events: []framework.NominationEvent{{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: pl.name}}}}
 }
 
+func (pl *recordingNominationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
+	*pl.log = append(*pl.log, fmt.Sprintf("%s: assume %s", pl.name, victim.Name))
+}
+
+func (pl *recordingNominationExtensions) PodEligibleToPreempt(_ context.Context, pod *v1.Pod, nodeName string) (bool, string) {
+	*pl.log = append(*pl.log, fmt.Sprintf("%s: eligible %s %s", pl.name, pod.Name, nodeName))
+	return pl.notEligibleReason == "", pl.notEligibleReason
+}
+
 func TestNominationExtensions(t *testing.T) {
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "preemptor"}}
 
 	for name, tc := range map[string]struct {
 		gateEnabled    bool
+		notEligible    map[string]string
+		wantEligible   bool
+		wantReason     string
 		wantCalls      []string
 		wantEvents     []string
 		withoutPlugins bool
 	}{
-		"gate-disabled": {},
+		"gate-disabled": {
+			wantEligible: true,
+		},
 		"no-plugins": {
 			gateEnabled:    true,
 			withoutPlugins: true,
+			wantEligible:   true,
 		},
-		"with-plugins": {
-			gateEnabled: true,
-			wantEvents:  []string{"a", "b"},
+		"eligible": {
+			gateEnabled:  true,
+			wantEligible: true,
+			wantEvents:   []string{"a", "b"},
 			wantCalls: []string{
 				"a: prepare preemptor node1", "b: prepare preemptor node1",
 				"a: add preemptor node1 prepared 1 by a", "b: add preemptor node1 prepared 1 by b",
 				"a: remove preemptor node1", "b: remove preemptor node1",
+				"a: assume victim", "b: assume victim",
+				"a: eligible preemptor node1", "b: eligible preemptor node1",
+			},
+		},
+		"not-eligible": {
+			gateEnabled:  true,
+			notEligible:  map[string]string{"b": "still reclaiming"},
+			wantEligible: false,
+			wantReason:   "still reclaiming",
+			wantEvents:   []string{"a", "b"},
+			wantCalls: []string{
+				"a: prepare preemptor node1", "b: prepare preemptor node1",
+				"a: add preemptor node1 prepared 1 by a", "b: add preemptor node1 prepared 1 by b",
+				"a: remove preemptor node1", "b: remove preemptor node1",
+				"a: assume victim", "b: assume victim",
+				"a: eligible preemptor node1", "b: eligible preemptor node1",
+			},
+		},
+		"stops-at-first-not-eligible": {
+			gateEnabled:  true,
+			notEligible:  map[string]string{"a": "reason a", "b": "reason b"},
+			wantEligible: false,
+			wantReason:   "reason a",
+			wantEvents:   []string{"a", "b"},
+			wantCalls: []string{
+				"a: prepare preemptor node1", "b: prepare preemptor node1",
+				"a: add preemptor node1 prepared 1 by a", "b: add preemptor node1 prepared 1 by b",
+				"a: remove preemptor node1", "b: remove preemptor node1",
+				"a: assume victim", "b: assume victim",
+				"a: eligible preemptor node1",
 			},
 		},
 	} {
@@ -106,8 +154,8 @@ func TestNominationExtensions(t *testing.T) {
 			if !tc.withoutPlugins {
 				// Registered out of order to check that calls are sorted by name.
 				for _, pl := range []*recordingNominationExtensions{
-					{name: "b", log: &log},
-					{name: "a", log: &log},
+					{name: "b", notEligibleReason: tc.notEligible["b"], log: &log},
+					{name: "a", notEligibleReason: tc.notEligible["a"], log: &log},
 				} {
 					registry[pl.name] = func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) { return pl, nil }
 					profile.Plugins.PreFilter.Enabled = append(profile.Plugins.PreFilter.Enabled, config.Plugin{Name: pl.name})
@@ -126,6 +174,11 @@ func TestNominationExtensions(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.wantEvents, events); diff != "" {
 				t.Errorf("unexpected events (-want, +got):\n%s", diff)
+			}
+			f.RunVictimExtensionsAssumeVictim(ctx, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "victim"}})
+			eligible, reason := f.RunVictimExtensionsPodEligibleToPreempt(ctx, pod, "node1")
+			if eligible != tc.wantEligible || reason != tc.wantReason {
+				t.Errorf("PodEligibleToPreempt: got (%v, %q), want (%v, %q)", eligible, reason, tc.wantEligible, tc.wantReason)
 			}
 			if diff := cmp.Diff(tc.wantCalls, log); diff != "" {
 				t.Errorf("unexpected calls (-want, +got):\n%s", diff)
