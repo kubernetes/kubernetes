@@ -746,8 +746,8 @@ const (
 	VolumeHealthDataLoss VolumeHealthStatusType = "DataLoss"
 	// VolumeHealthDegraded indicates the volume is functioning but with reduced capability.
 	VolumeHealthDegraded VolumeHealthStatusType = "Degraded"
-	// VolumeHealthGood indicates the volume is healthy and there are no issues with it.
-	VolumeHealthGood VolumeHealthStatusType = "Healthy"
+	// VolumeHealthHealthy indicates the volume is healthy and there are no issues with it.
+	VolumeHealthHealthy VolumeHealthStatusType = "Healthy"
 )
 
 // VolumeHealthCondition represents an health condition reported for a volume.

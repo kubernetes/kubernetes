@@ -76,7 +76,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				},
 				nodeVolumeHealthRequired: true,
 				expectedHealth: v1.VolumeHealthCondition{
-					Status:  v1.VolumeHealthGood,
+					Status:  v1.VolumeHealthHealthy,
 					Reason:  "VolumeHealthy",
 					Message: "Volume is healthy",
 				},

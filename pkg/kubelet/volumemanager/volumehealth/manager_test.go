@@ -192,7 +192,7 @@ func TestProbeVolumeHealth(t *testing.T) {
 		Status: v1.VolumeHealthDegraded, Reason: "DiskSlow", Message: "slow disk",
 	}}
 	healthy := []v1.VolumeHealthCondition{{
-		Status:  v1.VolumeHealthGood,
+		Status:  v1.VolumeHealthHealthy,
 		Reason:  CSIVolumeHealthy,
 		Message: "Volume is healthy",
 	}}
@@ -448,7 +448,7 @@ func TestProbeStorageHealthGauges(t *testing.T) {
 	}{
 		{
 			conditions: nil,
-			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="Healthy"} 1` + "\n",
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="StorageHealthy"} 1` + "\n",
 		},
 		{
 			conditions: []storagev1.StorageHealthCondition{{Status: storagev1.StorageUnreachable, Reason: "BackendDown"}},
@@ -456,7 +456,7 @@ func TestProbeStorageHealthGauges(t *testing.T) {
 		},
 		{
 			conditions: nil,
-			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="Healthy"} 1` + "\n",
+			want:       header + `csi_node_storage_health_status{driver_name="test.driver",reason="StorageHealthy",status="StorageHealthy"} 1` + "\n",
 		},
 	}
 	for i, s := range steps {

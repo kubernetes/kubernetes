@@ -704,7 +704,7 @@ const (
 	// StorageDegraded indicates the storage backend is functioning with reduced capability.
 	StorageDegraded StorageHealthStatusType = "StorageDegraded"
 	// StorageHealthy indicates that the storage backend is healthy as seen from this node.
-	StorageHealthy StorageHealthStatusType = "Healthy"
+	StorageHealthy StorageHealthStatusType = "StorageHealthy"
 )
 
 // StorageHealthCondition represents a health condition reported
@@ -715,7 +715,7 @@ type StorageHealthCondition struct {
 	// - "StorageHealthUnknown": the reported health status is not recognized; the backend must not be considered healthy.
 	// - "StorageUnreachable": the storage backend is unreachable.
 	// - "StorageDegraded": the storage backend is functioning with reduced capability.
-	// - "Healthy": the storage backend is healthy as seen from this node.
+	// - "StorageHealthy": the storage backend is healthy as seen from this node.
 	//
 	// Additional values may be introduced as the CSI specification evolves.
 	// Writers that do not recognize a status may classify it as StorageHealthUnknown.

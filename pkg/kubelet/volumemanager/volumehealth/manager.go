@@ -194,7 +194,7 @@ func (m *manager) probeVolumeHealth(ctx context.Context, vol volumeToProbe) {
 
 	if len(conditions) == 0 {
 		conditions = []v1.VolumeHealthCondition{{
-			Status:  v1.VolumeHealthGood,
+			Status:  v1.VolumeHealthHealthy,
 			Reason:  CSIVolumeHealthy,
 			Message: "Volume is healthy",
 		}}
