@@ -303,6 +303,12 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 			test:            workloadResourceClaimsUpgradeDowngrade,
 			driverResources: workloadResourceClaimsDriverResources(nodes),
 		},
+		"optional-node-operations": {
+			test:            optionalNodeOperationsUpgradeDowngrade(nodes),
+			driverResources: optionalNodeOperationsResources(nodes),
+			// Releases before 1.38 drop skipNodeOperations because the feature is off by default there.
+			configureDriver: func(d *drautils.Driver) { d.SetExpectDroppedFields(true) },
+		},
 	}
 
 	// Create a driver and builder for each sub-test. Opening sockets locally
