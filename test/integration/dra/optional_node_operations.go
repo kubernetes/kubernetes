@@ -26,8 +26,10 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/ktesting"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
+	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -74,6 +76,9 @@ func testOptionalNodeOperations(tCtx ktesting.TContext, enabled bool) {
 
 	for name, tt := range tests {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			if tt.usePodGroup && !utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
+				tCtx.Skip("PodGroup ResourceClaims need the DRAWorkloadResourceClaims feature gate")
+			}
 			tCtx.Parallel()
 			namespace := createTestNamespace(tCtx, nil)
 			startScheduler(tCtx)

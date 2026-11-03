@@ -5484,6 +5484,13 @@ func TestAllocatorSelection(t *testing.T) {
 		"default": {
 			features:             "",
 			usingFeatureGroup:    true,
+			expectImplementation: "incubating",
+		},
+
+		// Rolling back DRAOptionalNodeOperations falls back to the "stable" allocator.
+		"default-without-optional-node-operations": {
+			features:             "DRAOptionalNodeOperations=false",
+			usingFeatureGroup:    true,
 			expectImplementation: "stable",
 		},
 
