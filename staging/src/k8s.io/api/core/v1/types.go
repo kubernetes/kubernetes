@@ -873,8 +873,10 @@ type VolumeHealthCondition struct {
 // by a CSI controller or node plugin.
 type VolumeHealthStatus struct {
 	// healthConditions is the set of health conditions reported by
-	// a CSI plugin. An empty list means no adverse condition.
-	// At most 16 conditions may be reported.
+	// a CSI plugin. At most 16 conditions may be reported.
+	// An empty list means the CSI driver either does not support volume health
+	// or has not reported it yet. If the driver supports volume health and the
+	// volume is healthy, a Healthy condition is reported.
 	// +optional
 	// +listType=map
 	// +listMapKey=status

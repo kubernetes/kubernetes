@@ -685,6 +685,9 @@ type StorageHealth struct {
 	Name string
 	// healthConditions are the storage backend conditions reported by the CSI driver.
 	// At most 16 conditions may be reported.
+	// An empty list means the CSI driver either does not support storage health
+	// or has not reported it yet. If the driver supports storage health and its
+	// storage backend is healthy, the kubelet reports a StorageHealthy condition.
 	// +optional
 	// +listType=atomic
 	HealthConditions []StorageHealthCondition

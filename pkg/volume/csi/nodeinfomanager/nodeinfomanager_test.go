@@ -1545,7 +1545,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			preCreateNewCSI:    true,
 			enableVolumeHealth: true,
 			act: func(nim Interface) error {
-				return nim.UpdateCSINodeStorageHealth(driverName, healthConds)
+				return nim.UpdateCSINodeStorageHealth(t.Context(), driverName, healthConds)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action) {
 				for _, action := range actions {
