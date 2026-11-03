@@ -3108,14 +3108,16 @@ type fakePodActivator struct {
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
 
-// TestPreemptNominationExtensions checks that preemption only asks plugins
-// with NominationExtensions whether the pod may preempt. Preparing the
+// TestPreemptNominationExtensions checks that preemption asks plugins with
+// VictimExtensions whether the pod may preempt and reports victims once
+// their deletion succeeded, but not when it failed. Preparing the
 // nomination is up to the framework, once PostFilter nominated the pod.
 func TestPreemptNominationExtensions(t *testing.T) {
 	metrics.Register()
 	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
 	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).Obj()
 	eligibleCall := "PodEligibleToPreempt default/p "
+	assumeCall := "AssumeVictim default/v"
 
 	for name, tc := range map[string]struct {
 		asyncPreemption bool
@@ -3123,7 +3125,7 @@ func TestPreemptNominationExtensions(t *testing.T) {
 		wantCalls       []string
 	}{
 		"sync": {
-			wantCalls: []string{eligibleCall},
+			wantCalls: []string{eligibleCall, assumeCall},
 		},
 		"sync-failure": {
 			deleteErr: errors.New("injected delete error"),
@@ -3131,7 +3133,7 @@ func TestPreemptNominationExtensions(t *testing.T) {
 		},
 		"async": {
 			asyncPreemption: true,
-			wantCalls:       []string{eligibleCall},
+			wantCalls:       []string{eligibleCall, assumeCall},
 		},
 		"async-failure": {
 			asyncPreemption: true,

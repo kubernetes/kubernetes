@@ -43,6 +43,7 @@ type recordingNominationExtensions struct {
 }
 
 var _ framework.NominationExtensions = &recordingNominationExtensions{}
+var _ framework.VictimExtensions = &recordingNominationExtensions{}
 
 func (pl *recordingNominationExtensions) Name() string { return pl.name }
 
@@ -65,6 +66,10 @@ func (pl *recordingNominationExtensions) AddNomination(_ context.Context, pod *v
 func (pl *recordingNominationExtensions) RemoveNomination(_ context.Context, pod *v1.Pod, nodeName string) framework.NominationChangeResult {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: remove %s %s", pl.name, pod.Name, nodeName))
 	return framework.NominationChangeResult{Events: []framework.NominationEvent{{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: pl.name}}}}
+}
+
+func (pl *recordingNominationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
+	*pl.log = append(*pl.log, fmt.Sprintf("%s: assume %s", pl.name, victim.Name))
 }
 
 func (pl *recordingNominationExtensions) PodEligibleToPreempt(_ context.Context, pod *v1.Pod, nodeName string) (bool, string) {
@@ -100,6 +105,7 @@ func TestNominationExtensions(t *testing.T) {
 				"a: prepare preemptor node1", "b: prepare preemptor node1",
 				"a: add preemptor node1", "b: add preemptor node1",
 				"a: remove preemptor node1", "b: remove preemptor node1",
+				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
 			},
 		},
@@ -113,6 +119,7 @@ func TestNominationExtensions(t *testing.T) {
 				"a: prepare preemptor node1", "b: prepare preemptor node1",
 				"a: add preemptor node1", "b: add preemptor node1",
 				"a: remove preemptor node1", "b: remove preemptor node1",
+				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
 			},
 		},
@@ -126,6 +133,7 @@ func TestNominationExtensions(t *testing.T) {
 				"a: prepare preemptor node1", "b: prepare preemptor node1",
 				"a: add preemptor node1", "b: add preemptor node1",
 				"a: remove preemptor node1", "b: remove preemptor node1",
+				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1",
 			},
 		},
@@ -162,7 +170,8 @@ func TestNominationExtensions(t *testing.T) {
 			if diff := cmp.Diff(tc.wantEvents, events); diff != "" {
 				t.Errorf("unexpected events (-want, +got):\n%s", diff)
 			}
-			eligible, reason := f.RunNominationExtensionsPodEligibleToPreempt(ctx, pod, "node1")
+			f.RunVictimExtensionsAssumeVictim(ctx, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "victim"}})
+			eligible, reason := f.RunVictimExtensionsPodEligibleToPreempt(ctx, pod, "node1")
 			if eligible != tc.wantEligible || reason != tc.wantReason {
 				t.Errorf("PodEligibleToPreempt: got (%v, %q), want (%v, %q)", eligible, reason, tc.wantEligible, tc.wantReason)
 			}

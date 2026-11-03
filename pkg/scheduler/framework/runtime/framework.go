@@ -79,6 +79,7 @@ type frameworkImpl struct {
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 	rankNodesPlugins          []framework.RankNodesPlugin
 	nominationExtensions      []framework.NominationExtensions
+	victimExtensions          []framework.VictimExtensions
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin
