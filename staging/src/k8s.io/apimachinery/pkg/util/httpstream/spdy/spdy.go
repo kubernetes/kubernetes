@@ -18,6 +18,7 @@ package spdy
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -196,6 +197,19 @@ func (c *connectionAdapter) CreateStream(headers http.Header) (apihttpstream.Str
 
 func (c *connectionAdapter) Close() error {
 	return c.delegate.Close()
+}
+
+// connectionPinger is implemented by connections whose transport can verify
+// the peer is still reachable with a protocol-level round trip.
+type connectionPinger interface {
+	Ping() (time.Duration, error)
+}
+
+func (c *connectionAdapter) Ping() (time.Duration, error) {
+	if p, ok := c.delegate.(connectionPinger); ok {
+		return p.Ping()
+	}
+	return 0, fmt.Errorf("connection %T does not support ping", c.delegate)
 }
 
 func (c *connectionAdapter) CloseChan() <-chan bool {

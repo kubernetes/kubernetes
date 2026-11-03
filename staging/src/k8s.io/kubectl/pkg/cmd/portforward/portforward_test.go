@@ -23,15 +23,22 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	clientgofake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/portforward"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -43,7 +50,7 @@ type fakePortForwarder struct {
 	pfErr  error
 }
 
-func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
+func (f *fakePortForwarder) ForwardPorts(ctx context.Context, method string, url *url.URL, opts PortForwardOptions) error {
 	f.method = method
 	f.url = url
 	return f.pfErr
@@ -1019,4 +1026,180 @@ func TestCreateDialer(t *testing.T) {
 		t.Errorf("expected fallback dialer, got %#v", dialer)
 	}
 
+}
+
+func TestWaitForPodTermination(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
+	original := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", UID: "original"},
+		Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+	}
+	replacement := original.DeepCopy()
+	replacement.UID = "replacement"
+	terminating := original.DeepCopy()
+	now := metav1.Now()
+	terminating.DeletionTimestamp = &now
+	terminated := original.DeepCopy()
+	terminated.Status.Phase = corev1.PodSucceeded
+	failed := original.DeepCopy()
+	failed.Status.Phase = corev1.PodFailed
+
+	tests := []struct {
+		name    string
+		initial *corev1.Pod
+		event   *watch.Event
+	}{
+		{name: "already deleted"},
+		{name: "already replaced", initial: replacement},
+		{name: "already terminating", initial: terminating},
+		{name: "already terminated", initial: terminated},
+		{name: "deleted while idle", initial: original, event: &watch.Event{Type: watch.Deleted, Object: original}},
+		{name: "replaced while idle", initial: original, event: &watch.Event{Type: watch.Modified, Object: replacement}},
+		{name: "terminating while idle", initial: original, event: &watch.Event{Type: watch.Modified, Object: terminating}},
+		{name: "terminated while idle", initial: original, event: &watch.Event{Type: watch.Modified, Object: terminated}},
+		{name: "failed while idle", initial: original, event: &watch.Event{Type: watch.Modified, Object: failed}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			client := clientgofake.NewSimpleClientset()
+			if tt.initial != nil {
+				if err := client.Tracker().Add(tt.initial); err != nil {
+					t.Fatal(err)
+				}
+			}
+			watcher := watch.NewRaceFreeFake()
+			watchStarted := make(chan struct{}, 1)
+			client.PrependWatchReactor("pods", func(action clienttesting.Action) (bool, watch.Interface, error) {
+				if got := action.(clienttesting.WatchAction).GetWatchRestrictions().Fields.String(); got != "metadata.name=foo" {
+					return true, nil, fmt.Errorf("unexpected watch field selector %q", got)
+				}
+				watchStarted <- struct{}{}
+				return true, watcher, nil
+			})
+			done := make(chan error, 1)
+			go func() {
+				done <- waitForPodTermination(ctx, PortForwardOptions{
+					PodClient: client.CoreV1(), Namespace: "test", PodName: "foo", PodUID: original.UID,
+				})
+			}()
+			if tt.event != nil {
+				select {
+				case <-watchStarted:
+				case <-ctx.Done():
+					t.Fatal("pod watch did not start")
+				}
+				watcher.Action(tt.event.Type, tt.event.Object)
+			}
+			if err := <-done; err != nil {
+				t.Fatalf("waiting for pod termination: %v", err)
+			}
+			if !watcher.IsStopped() {
+				t.Error("pod watch was not stopped")
+			}
+			for _, action := range client.Actions() {
+				if action.GetVerb() == "list" {
+					if got := action.(clienttesting.ListAction).GetListRestrictions().Fields.String(); got != "metadata.name=foo" {
+						t.Errorf("unexpected list field selector %q", got)
+					}
+				}
+				if action.GetVerb() == "get" {
+					t.Error("pod monitoring must not issue GET requests")
+				}
+			}
+		})
+	}
+}
+
+func TestWaitForPodTerminationRetriesWatchFailure(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", UID: "original"},
+		Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+	}
+	client := clientgofake.NewSimpleClientset(pod)
+	watcher := watch.NewRaceFreeFake()
+	attempts := 0
+	client.PrependWatchReactor("pods", func(clienttesting.Action) (bool, watch.Interface, error) {
+		attempts++
+		if attempts == 1 {
+			return true, nil, fmt.Errorf("temporary watch failure")
+		}
+		watcher.Delete(pod)
+		return true, watcher, nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := waitForPodTermination(ctx, PortForwardOptions{
+		PodClient: client.CoreV1(), Namespace: "test", PodName: "foo", PodUID: pod.UID,
+	}); err != nil {
+		t.Fatalf("watch should recover from a temporary failure: %v", err)
+	}
+}
+
+func TestWaitForPodTerminationCancellation(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
+	client := clientgofake.NewSimpleClientset()
+	started := make(chan struct{})
+	client.PrependReactor("list", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
+		close(started)
+		return true, nil, fmt.Errorf("temporary list failure")
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- waitForPodTermination(ctx, PortForwardOptions{
+			PodClient: client.CoreV1(), Namespace: "test", PodName: "foo", PodUID: "original",
+		})
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pod list did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("a failed list must not be interpreted as pod deletion")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("pod monitor did not stop after cancellation")
+	}
+}
+
+func TestWaitForPodTerminationWatchList(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", UID: "original", ResourceVersion: "1"},
+		Status:     corev1.PodStatus{Phase: corev1.PodRunning},
+	}
+	client := clientgofake.NewSimpleClientset()
+	watcher := watch.NewRaceFreeFake()
+	client.PrependWatchReactor("pods", func(clienttesting.Action) (bool, watch.Interface, error) {
+		watcher.Add(pod)
+		watcher.Action(watch.Bookmark, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+			ResourceVersion: "1",
+			Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+		}})
+		watcher.Delete(pod)
+		return true, watcher, nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := waitForPodTermination(ctx, PortForwardOptions{
+		PodClient: client.CoreV1(), Namespace: "test", PodName: "foo", PodUID: pod.UID,
+	}); err != nil {
+		t.Fatalf("waiting for pod deletion with WatchList: %v", err)
+	}
+	if !watcher.IsStopped() {
+		t.Error("pod watch was not stopped")
+	}
+	for _, action := range client.Actions() {
+		if action.GetVerb() == "list" {
+			t.Error("WatchList should synchronize without a separate LIST request")
+		}
+	}
 }

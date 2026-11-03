@@ -18,6 +18,7 @@ package portforward
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -31,12 +32,18 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/portforward"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport/spdy"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -51,6 +58,7 @@ import (
 type PortForwardOptions struct {
 	Namespace     string
 	PodName       string
+	PodUID        types.UID
 	RESTClient    restclient.Interface
 	Config        *restclient.Config
 	PodClient     corev1client.PodsGetter
@@ -97,6 +105,13 @@ var (
 const (
 	// Amount of time to wait until at least one pod is running
 	defaultPodPortForwardWaitTimeout = 60 * time.Second
+
+	// Session keepalive defaults: ping the forwarding transport this often,
+	// and end the session when a reply is not seen within the timeout. The
+	// timeout is far above any realistic round trip so only a peer that is
+	// actually unreachable trips it.
+	defaultKeepaliveInterval = 15 * time.Second
+	defaultKeepaliveTimeout  = 30 * time.Second
 )
 
 func NewCmdPortForward(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
@@ -129,11 +144,15 @@ func NewDefaultPortForwardOptions(streams genericiooptions.IOStreams) *PortForwa
 }
 
 type portForwarder interface {
-	ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error
+	ForwardPorts(ctx context.Context, method string, url *url.URL, opts PortForwardOptions) error
 }
 
 type defaultPortForwarder struct {
 	genericiooptions.IOStreams
+	// Keepalive knobs for the forwarding session, overridable for tests.
+	// Zero values select the defaults.
+	keepaliveInterval time.Duration
+	keepaliveTimeout  time.Duration
 }
 
 func createDialer(method string, url *url.URL, opts PortForwardOptions) (streamhttp.Dialer, error) {
@@ -153,16 +172,104 @@ func createDialer(method string, url *url.URL, opts PortForwardOptions) (streamh
 	}), nil
 }
 
-func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
+func (f *defaultPortForwarder) ForwardPorts(ctx context.Context, method string, url *url.URL, opts PortForwardOptions) error {
 	dialer, err := createDialer(method, url, opts)
 	if err != nil {
 		return err
 	}
-	fw, err := portforward.NewOnAddressesForStreaming(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	// The forwarder stops when ctx is done; bridge it to the interrupt-driven
+	// StopChannel so Ctrl-C still tears down the forwarding.
+	fwdCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	if opts.StopChannel != nil {
+		go func() {
+			select {
+			case <-opts.StopChannel:
+				cancel(nil)
+			case <-fwdCtx.Done():
+			}
+		}()
+	}
+	keepaliveInterval, keepaliveTimeout := f.keepaliveInterval, f.keepaliveTimeout
+	if keepaliveInterval <= 0 {
+		keepaliveInterval = defaultKeepaliveInterval
+	}
+	if keepaliveTimeout <= 0 {
+		keepaliveTimeout = defaultKeepaliveTimeout
+	}
+	// Two independent monitors end an idle session when its target is gone:
+	// the pod watch below covers termination visible in the API, the session
+	// keepalive covers a transport that died silently (e.g. an unresponsive
+	// node while the pod object still reports Running).
+	fw, err := portforward.NewOnAddressesForStreamingWithOptions(fwdCtx, dialer, opts.Address, opts.Ports, opts.ReadyChannel, f.Out, f.ErrOut,
+		portforward.WithErrorHandler(func(context.Context, portforward.ForwardedPort, error) bool { return false }),
+		portforward.WithSessionKeepalive(keepaliveInterval, keepaliveTimeout))
 	if err != nil {
 		return err
 	}
-	return fw.ForwardPorts()
+	watchDone := make(chan struct{})
+	go func() {
+		defer close(watchDone)
+		if err := waitForPodTermination(fwdCtx, opts); err != nil {
+			if fwdCtx.Err() == nil {
+				cancel(fmt.Errorf("unable to monitor pod %s/%s: %w", opts.Namespace, opts.PodName, err))
+			}
+			return
+		}
+		cancel(portforward.ErrLostConnectionToPod)
+	}()
+	defer func() {
+		cancel(nil)
+		<-watchDone
+	}()
+	if err := fw.ForwardPorts(); err != nil {
+		return err
+	}
+	if cause := context.Cause(fwdCtx); !errors.Is(cause, context.Canceled) && !errors.Is(cause, context.DeadlineExceeded) {
+		return cause
+	}
+	return nil
+}
+
+// waitForPodTermination watches independently of forwarding errors so even an
+// idle session ends when its original pod disappears. The informer retries
+// failed watches and relists after expired resource versions.
+func waitForPodTermination(ctx context.Context, opts PortForwardOptions) error {
+	pods := opts.PodClient.Pods(opts.Namespace)
+	selector := fields.OneTermEqualSelector("metadata.name", opts.PodName).String()
+	lw := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+		ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = selector
+			return pods.List(ctx, options)
+		},
+		WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = selector
+			return pods.Watch(ctx, options)
+		},
+	}, pods)
+	podIsGone := func(pod *corev1.Pod) bool {
+		return pod.UID != opts.PodUID || pod.DeletionTimestamp != nil || pod.Status.Phase != corev1.PodRunning
+	}
+	// The initial list closes the gap between selecting the pod and starting
+	// the watch, including deletion or replacement before the watch starts.
+	precondition := func(store cache.Store) (bool, error) {
+		obj, exists, err := store.GetByKey(opts.Namespace + "/" + opts.PodName)
+		if err != nil || !exists {
+			return !exists, err
+		}
+		return podIsGone(obj.(*corev1.Pod)), nil
+	}
+	_, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, precondition, func(event watch.Event) (bool, error) {
+		if event.Type == watch.Error {
+			return false, nil
+		}
+		pod, ok := event.Object.(*corev1.Pod)
+		if !ok {
+			return false, fmt.Errorf("expected a pod watch event, got %T", event.Object)
+		}
+		return event.Type == watch.Deleted || podIsGone(pod), nil
+	})
+	return err
 }
 
 // splitPort splits port string which is in form of [LOCAL PORT]:REMOTE PORT
@@ -414,13 +521,14 @@ func (o PortForwardOptions) RunPortForward() error {
 }
 
 // RunPortForwardContext implements all the necessary functionality for port-forward cmd.
-// It ends portforwarding when an error is received from the backend, or an os.Interrupt
-// signal is received, or the provided context is done.
+// It ends portforwarding when the target pod terminates, the forwarding session
+// closes, an os.Interrupt signal is received, or the provided context is done.
 func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
 	pod, err := o.PodClient.Pods(o.Namespace).Get(ctx, o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
+	o.PodUID = pod.UID
 
 	if pod.Status.Phase != corev1.PodRunning {
 		return fmt.Errorf("unable to forward port because pod is not running. Current status=%v", pod.Status.Phase)
@@ -449,5 +557,5 @@ func (o PortForwardOptions) RunPortForwardContext(ctx context.Context) error {
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	return o.PortForwarder.ForwardPorts(ctx, "POST", req.URL(), o)
 }
