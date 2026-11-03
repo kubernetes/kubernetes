@@ -77,6 +77,9 @@ type RuntimeHelper interface {
 	// PodCPUAndMemoryStats reads the latest CPU & memory usage stats.
 	PodCPUAndMemoryStats(context.Context, *v1.Pod, *PodStatus) (*statsapi.PodStats, error)
 
+	// WaitForAttachAndMount waits for all volumes to be attached and mounted for the given pod.
+	WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error
+
 	// OnPodSandboxReady callback is invoked after pod sandbox, networking, volume are ready.
 	// This is used to update the PodReadyToStartContainers condition.
 	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error

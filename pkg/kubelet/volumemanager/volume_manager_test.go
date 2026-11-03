@@ -477,6 +477,55 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	}
 }
 
+func TestGetExtraSupplementalGroupsForPodBeforeMount(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	podManager := kubepod.NewBasicPodManager()
+
+	node, pod, _, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
+
+	fs := v1.PersistentVolumeFilesystem
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pvA",
+			Annotations: map[string]string{
+				util.VolumeGidAnnotationKey: "777",
+			},
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				RBD: &v1.RBDPersistentVolumeSource{
+					RBDImage: "fake-device",
+				},
+			},
+			ClaimRef: &v1.ObjectReference{
+				Name:      claim.ObjectMeta.Name,
+				Namespace: claim.ObjectMeta.Namespace,
+			},
+			VolumeMode: &fs,
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+
+	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
+	podManager.SetPods([]*v1.Pod{pod})
+
+	// Process the pod volumes into desiredStateOfWorld before mounting occurs
+	manager.ProcessPodVolumes(tCtx, pod)
+
+	// Verify that GetExtraSupplementalGroupsForPod returns the volume GID from desired state of world
+	// before the volume has been attached or mounted in actual state of the world.
+	actual := manager.GetExtraSupplementalGroupsForPod(pod)
+	expected := []int64{777}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected supplemental groups %v from desired state before mount, got %v", expected, actual)
+	}
+}
+
 type fakePodStateProvider struct {
 	shouldRemove map[kubetypes.UID]struct{}
 	terminating  map[kubetypes.UID]struct{}

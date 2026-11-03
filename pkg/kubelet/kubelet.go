@@ -2238,21 +2238,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, nil, err
 	}
 
-	// Wait for volumes to attach/mount
-	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
-		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
-		if errors.As(err, &volumeAttachLimitErr) {
-			kl.rejectPod(ctx, pod, volumemanager.VolumeAttachmentLimitExceededReason, volumeAttachLimitErr.Error())
-			recordAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
-			return true, nil, nil
-		}
-		if !wait.Interrupted(err) {
-			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
-			logger.Error(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
-		}
-		return false, nil, err
-	}
-	// Volumes are finished mounting. Make sure actuated state (container resources and volume limits) is initialized.
+	// Process the pod's desired volumes into the desired state of the world cache
+	kl.volumeManager.ProcessPodVolumes(ctx, pod)
+
+	// Make sure actuated state (container resources and volume limits) is initialized.
 	kl.containerRuntime.InitializeActuatedPod(logger, pod)
 
 	// Fetch the pull secrets for the pod
@@ -2331,6 +2320,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	err = result.Error()
+	var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
+	if errors.As(err, &volumeAttachLimitErr) {
+		return true, nil, nil
+	}
 	if len(result.SyncResults) > 0 && err == nil {
 		postSync = func() {
 			kl.RequestPodRelist(klog.FromContext(ctx), pod.UID)
@@ -3632,6 +3625,26 @@ var _ allocation.PodProvider = &Kubelet{}
 func (kl *Kubelet) SyncPodNow(ctx context.Context, pod *v1.Pod) {
 	kl.HandlePodSyncs(ctx, []*v1.Pod{pod})
 	kl.RequestPodRelist(klog.FromContext(ctx), pod.UID)
+}
+
+// WaitForAttachAndMount waits for all volumes to be attached and mounted for the given pod.
+// This method implements the RuntimeHelper interface.
+func (kl *Kubelet) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error {
+	logger := klog.FromContext(ctx)
+	if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
+		var volumeAttachLimitErr *volumemanager.VolumeAttachLimitExceededError
+		if errors.As(err, &volumeAttachLimitErr) {
+			kl.rejectPod(ctx, pod, volumemanager.VolumeAttachmentLimitExceededReason, volumeAttachLimitErr.Error())
+			recordAdmissionRejection(volumemanager.VolumeAttachmentLimitExceededReason)
+			return err
+		}
+		if !wait.Interrupted(err) {
+			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
+			logger.Error(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
+		}
+		return err
+	}
+	return nil
 }
 
 // OnPodSandboxReady is the callback implementation invoked by the container runtime after

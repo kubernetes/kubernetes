@@ -108,6 +108,10 @@ type VolumeManager interface {
 	// the duration defined in podAttachAndMountTimeout.
 	WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error
 
+	// ProcessPodVolumes processes the volumes referenced in the specified pod and
+	// adds them to the desired state of the world cache.
+	ProcessPodVolumes(ctx context.Context, pod *v1.Pod)
+
 	// WaitForUnmount processes the volumes referenced in the specified
 	// pod and blocks until they are all unmounted (reflected in the actual
 	// state of the world).
@@ -359,12 +363,21 @@ func (vm *volumeManager) HasPossiblyMountedVolumesForPod(podName types.UniquePod
 }
 
 func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
+	if pod == nil {
+		return nil
+	}
+
 	podName := util.GetUniquePodName(pod)
 	supplementalGroups := sets.New[string]()
 
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
 		if mountedVolume.VolumeGIDValue != "" {
 			supplementalGroups.Insert(mountedVolume.VolumeGIDValue)
+		}
+	}
+	for _, gidValue := range vm.desiredStateOfWorld.GetVolumeGIDValuesForPod(podName) {
+		if gidValue != "" {
+			supplementalGroups.Insert(gidValue)
 		}
 	}
 
@@ -434,10 +447,7 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 	logger.V(3).Info("Waiting for volumes to attach and mount for pod", "pod", klog.KObj(pod))
 	uniquePodName := util.GetUniquePodName(pod)
 
-	// Some pods expect to have Setup called over and over again to update.
-	// Remount plugins for which this is true. (Atomically updating volumes,
-	// like Downward API, depend on this to update the contents of the volume).
-	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
+	vm.ProcessPodVolumes(ctx, pod)
 
 	err := wait.PollUntilContextTimeout(
 		ctx,
@@ -494,6 +504,16 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 
 	logger.V(3).Info("All volumes are attached and mounted for pod", "pod", klog.KObj(pod))
 	return nil
+}
+
+func (vm *volumeManager) ProcessPodVolumes(ctx context.Context, pod *v1.Pod) {
+	if pod == nil {
+		return
+	}
+	uniquePodName := util.GetUniquePodName(pod)
+	// set the pod processed to false, to allow processPodVolumes to proceed.
+	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
+	vm.desiredStateOfWorldPopulator.ProcessPodVolumes(ctx, pod)
 }
 
 func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error {

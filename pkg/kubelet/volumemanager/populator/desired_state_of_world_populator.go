@@ -60,6 +60,10 @@ type DesiredStateOfWorldPopulator interface {
 	// depend on this behavior to ensure volume content is updated).
 	ReprocessPod(podName volumetypes.UniquePodName)
 
+	// ProcessPodVolumes synchronously processes the volumes in the given pod and adds them
+	// to the desired state of the world cache.
+	ProcessPodVolumes(ctx context.Context, pod *v1.Pod)
+
 	// HasAddedPods returns whether the populator has looped through the list
 	// of active pods and added them to the desired state of the world cache,
 	// at a time after sources are all ready, at least once. It does not
@@ -161,6 +165,10 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	podName volumetypes.UniquePodName) {
 	dswp.markPodProcessingFailed(podName)
+}
+
+func (dswp *desiredStateOfWorldPopulator) ProcessPodVolumes(ctx context.Context, pod *v1.Pod) {
+	dswp.processPodVolumes(ctx, pod)
 }
 
 func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {

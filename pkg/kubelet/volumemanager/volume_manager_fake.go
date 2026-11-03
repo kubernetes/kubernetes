@@ -65,6 +65,10 @@ func (f *FakeVolumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.P
 	return nil
 }
 
+// ProcessPodVolumes is not implemented
+func (f *FakeVolumeManager) ProcessPodVolumes(ctx context.Context, pod *v1.Pod) {
+}
+
 // WaitForUnmount is not implemented
 func (f *FakeVolumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error {
 	return nil
