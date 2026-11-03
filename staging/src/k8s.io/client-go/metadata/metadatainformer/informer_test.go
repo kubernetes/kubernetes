@@ -233,6 +233,21 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 				t.Fatalf("informer for %s hasn't synced: %v", ts.gvr, result.Err)
 			}
 
+			// Ensure the watch is established before triggering the event.
+			// WaitForCacheSync only guarantees the initial list has synced to the indexer;
+			// if an action (like Delete) occurs before the reflector's watch is started,
+			// the fake client's object tracker drops the event because there are no active watchers yet.
+			if err := wait.PollUntilContextCancel(tCtx, 10*time.Millisecond, true, func(_ context.Context) (bool, error) {
+				for _, action := range fakeClient.Actions() {
+					if action.Matches("watch", ts.gvr.Resource) {
+						return true, nil
+					}
+				}
+				return false, nil
+			}); err != nil {
+				t.Fatalf("timed out waiting for watch to start: %v", err)
+			}
+
 			testObject := ts.trigger(tCtx, ts.gvr, ts.ns, fakeClient, ts.existingObj)
 			select {
 			case objFromInformer := <-informerReciveObjectCh:
