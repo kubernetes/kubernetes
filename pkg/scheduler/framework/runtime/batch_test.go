@@ -790,7 +790,7 @@ func TestBatchRescore(t *testing.T) {
 			assertBatchCounters(t, profile, wantAttempts, wantFlushes, tt.wantRescoreAttempts)
 			assertHistogramCount(t, metrics.BatchRescoreDuration.Name, metrics.BatchRescoreDuration.WithLabelValues(profile), uint64(tt.wantRescoreAttempts))
 
-			// Every flush in this test discards a usable state, so GetNodeHint must drop it.
+			// Every flush in this test discards the state, so GetNodeHint must drop it.
 			if tt.wantFlushReason != "" && batch.state != nil {
 				t.Fatal("expected batch state to be dropped")
 			}
@@ -895,7 +895,7 @@ func TestBatchMetricsOtherPaths(t *testing.T) {
 			wantStoreResults: map[string]int{metrics.StoreResultStored: 1},
 		},
 		{
-			name: "pod without a signature replaces clears a usable state",
+			name: "pod without a signature clears the state",
 			run: func(ctx context.Context, batch *OpportunisticBatch) {
 				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
 				batch.StoreScheduleResults(ctx, nil, "", "n3", otherNodes(), 2)
@@ -903,7 +903,7 @@ func TestBatchMetricsOtherPaths(t *testing.T) {
 			wantStoreResults: map[string]int{metrics.StoreResultStored: 1, metrics.StoreResultPodNotBatchable: 1},
 		},
 		{
-			name: "pod with no other nodes replaces a usable state",
+			name: "pod with no other nodes clears the state",
 			run: func(ctx context.Context, batch *OpportunisticBatch) {
 				batch.StoreScheduleResults(ctx, sig, "", "n2", otherNodes(), 1)
 				batch.StoreScheduleResults(ctx, sig, "", "n3", nil, 2)
