@@ -45,8 +45,6 @@ import (
 )
 
 const (
-	fakeExtendedResource = "dummy.com/dummy"
-
 	originalCPU       = "20m"
 	originalCPULimit  = "30m"
 	reducedCPU        = "15m"
@@ -85,21 +83,8 @@ func offsetMemory(index int64, value string) string {
 func doGuaranteedPodResizeTests(f *framework.Framework) {
 	ginkgo.DescribeTableSubtree("guaranteed qos - 1 container with resize policy", feature.InPlacePodVerticalScaling, func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
 		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredCPU, desiredMem string) {
-
-			// The tests for guaranteed pods include extended resources.
-			nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
-			framework.ExpectNoError(err, "list ready schedulable nodes")
-			for _, node := range nodes.Items {
-				e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
-			}
-			defer func() {
-				for _, node := range nodes.Items {
-					e2enode.RemoveExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource)
-				}
-			}()
-
-			originalContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, originalCPU, originalMem)
-			expectedContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, desiredCPU, desiredMem)
+			originalContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, originalCPU, originalMem)
+			expectedContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, desiredCPU, desiredMem)
 			for i, c := range expectedContainers {
 				// If the pod has init containers, but we are not resizing them, keep the original resources.
 				if c.InitCtr && !resizeInitCtrs {
@@ -141,7 +126,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 	// This results in coverage of both the operation as described, and its reverse.
 	ginkgo.Describe("guaranteed pods with multiple containers", func() {
 		ginkgo.It("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
-			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
 				originalContainers[i].MemPolicy = nil
@@ -166,7 +151,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 		})
 
 		ginkgo.It("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
-			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
 				originalContainers[i].MemPolicy = nil
@@ -191,7 +176,7 @@ func doGuaranteedPodResizeTests(f *framework.Framework) {
 		})
 
 		ginkgo.It("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
-			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
 				originalContainers[i].MemPolicy = nil
@@ -1279,7 +1264,7 @@ func createAndVerifyPod(ctx context.Context, f *framework.Framework, podClient *
 
 func makeGuaranteedContainers(numContainers int,
 	cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy,
-	initContainers, extendedResources bool,
+	initContainers bool,
 	cpu, mem string) []podresize.ResizableContainerInfo {
 
 	containers := []podresize.ResizableContainerInfo{}
@@ -1290,11 +1275,6 @@ func makeGuaranteedContainers(numContainers int,
 			CPULim: offsetCPU(i, cpu),
 			MemReq: offsetMemory(int64(i), mem),
 			MemLim: offsetMemory(int64(i), mem),
-		}
-
-		if extendedResources {
-			resources.ExtendedResourceReq = "1"
-			resources.ExtendedResourceLim = "1"
 		}
 
 		containers = append(containers, podresize.ResizableContainerInfo{
