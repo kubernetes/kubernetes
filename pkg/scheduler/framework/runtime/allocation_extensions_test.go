@@ -35,49 +35,49 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-// recordingNominationExtensions appends its calls to a log shared by all instances.
-type recordingNominationExtensions struct {
+// recordingAllocationExtensions appends its calls to a log shared by all instances.
+type recordingAllocationExtensions struct {
 	name              string
 	notEligibleReason string
 	log               *[]string
 }
 
-var _ framework.NominationExtensions = &recordingNominationExtensions{}
-var _ framework.VictimExtensions = &recordingNominationExtensions{}
+var _ framework.AllocationExtensions = &recordingAllocationExtensions{}
+var _ framework.VictimExtensions = &recordingAllocationExtensions{}
 
-func (pl *recordingNominationExtensions) Name() string { return pl.name }
+func (pl *recordingAllocationExtensions) Name() string { return pl.name }
 
-func (pl *recordingNominationExtensions) PreFilter(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+func (pl *recordingAllocationExtensions) PreFilter(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
-func (pl *recordingNominationExtensions) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
+func (pl *recordingAllocationExtensions) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
 
-func (pl *recordingNominationExtensions) PrepareNomination(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
+func (pl *recordingAllocationExtensions) PrepareAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: prepare %s %s", pl.name, pod.Name, nodeName))
 }
 
-func (pl *recordingNominationExtensions) AddNomination(_ context.Context, pod *v1.Pod, nodeName string) framework.NominationChangeResult {
+func (pl *recordingAllocationExtensions) AddAllocation(_ context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: add %s %s", pl.name, pod.Name, nodeName))
-	return framework.NominationChangeResult{}
+	return framework.AllocationChangeResult{}
 }
 
-// RemoveNomination returns one event per plugin, labeled with its name.
-func (pl *recordingNominationExtensions) RemoveNomination(_ context.Context, pod *v1.Pod, nodeName string) framework.NominationChangeResult {
+// RemoveAllocation returns one event per plugin, labeled with its name.
+func (pl *recordingAllocationExtensions) RemoveAllocation(_ context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: remove %s %s", pl.name, pod.Name, nodeName))
-	return framework.NominationChangeResult{Events: []framework.NominationEvent{{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: pl.name}}}}
+	return framework.AllocationChangeResult{Events: []framework.AllocationEvent{{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: pl.name}}}}
 }
 
-func (pl *recordingNominationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
+func (pl *recordingAllocationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: assume %s", pl.name, victim.Name))
 }
 
-func (pl *recordingNominationExtensions) PodEligibleToPreempt(_ context.Context, pod *v1.Pod, nodeName string) (bool, string) {
+func (pl *recordingAllocationExtensions) PodEligibleToPreempt(_ context.Context, pod *v1.Pod, nodeName string) (bool, string) {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: eligible %s %s", pl.name, pod.Name, nodeName))
 	return pl.notEligibleReason == "", pl.notEligibleReason
 }
 
-func TestNominationExtensions(t *testing.T) {
+func TestAllocationExtensions(t *testing.T) {
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "preemptor"}}
 
 	for name, tc := range map[string]struct {
@@ -149,7 +149,7 @@ func TestNominationExtensions(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: &config.Plugins{}}
 			if !tc.withoutPlugins {
 				// Registered out of order to check that calls are sorted by name.
-				for _, pl := range []*recordingNominationExtensions{
+				for _, pl := range []*recordingAllocationExtensions{
 					{name: "b", notEligibleReason: tc.notEligible["b"], log: &log},
 					{name: "a", notEligibleReason: tc.notEligible["a"], log: &log},
 				} {
@@ -162,9 +162,9 @@ func TestNominationExtensions(t *testing.T) {
 				t.Fatalf("create framework: %v", err)
 			}
 
-			f.RunNominationExtensionsPrepareNomination(ctx, nil, pod, "node1")
+			f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
 			var events []string
-			for _, event := range append(f.RunNominationExtensionsAddNomination(ctx, pod, "node1"), f.RunNominationExtensionsRemoveNomination(ctx, pod, "node1")...) {
+			for _, event := range append(f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1"), f.RunAllocationExtensionsRemoveAllocation(ctx, pod, "node1")...) {
 				events = append(events, event.Event.CustomLabel)
 			}
 			if diff := cmp.Diff(tc.wantEvents, events); diff != "" {

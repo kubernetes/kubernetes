@@ -310,7 +310,7 @@ func (sched *Scheduler) schedulingAlgorithm(
 		// for the node now. Assigned pods (deferred resizes) don't get
 		// nominated.
 		if status.IsSuccess() && nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" && pod.Spec.NodeName == "" {
-			schedFramework.RunNominationExtensionsPrepareNomination(ctx, state, pod, nominatingInfo.NominatedNodeName)
+			schedFramework.RunAllocationExtensionsPrepareAllocation(ctx, state, pod, nominatingInfo.NominatedNodeName)
 		}
 		return ScheduleResult{nominatingInfo: nominatingInfo}, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 	}

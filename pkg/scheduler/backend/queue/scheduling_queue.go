@@ -297,7 +297,7 @@ type priorityQueueOptions struct {
 // NominationChangeHandler gets called for every change of the node that a
 // pod is nominated to, while the queue is locked. It returns events for
 // resources which became available because of the change.
-type NominationChangeHandler func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent
+type NominationChangeHandler func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.AllocationEvent
 
 // Option configures a PriorityQueue
 type Option func(*priorityQueueOptions)

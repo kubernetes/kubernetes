@@ -406,7 +406,7 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		wantStatusCode       fwk.Code
 		wantNominatingInfo   *fwk.NominatingInfo
 		wantPostFilterCalled bool
-		// wantNominationCalls are the calls of NominationExtensions.
+		// wantNominationCalls are the calls of AllocationExtensions.
 		wantNominationCalls []string
 	}{
 		{
@@ -441,7 +441,7 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				NominatingMode:    fwk.ModeOverride,
 			},
 			wantPostFilterCalled: true,
-			wantNominationCalls:  []string{"PrepareNomination default/pod1 node1"},
+			wantNominationCalls:  []string{"PrepareAllocation default/pod1 node1"},
 		},
 	}
 
@@ -470,20 +470,20 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				},
 			}
 
-			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
 			registry := frameworkruntime.Registry{
 				queuesort.Name:     queuesort.New,
 				defaultbinder.Name: defaultbinder.New,
 				"AssumeReserveTestPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					return fakePlugin, nil
 				},
-				nominationExtensions.Name(): tf.NewFakeNominationExtensionsPlugin(nominationExtensions),
+				allocationExtensions.Name(): tf.NewFakeAllocationExtensionsPlugin(allocationExtensions),
 			}
 			profileCfg := schedulerapi.KubeSchedulerProfile{
 				SchedulerName: "default-scheduler",
 				Plugins: &schedulerapi.Plugins{
 					QueueSort:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
-					PreFilter:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: nominationExtensions.Name()}}},
+					PreFilter:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: allocationExtensions.Name()}}},
 					Filter:     schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					Bind:       schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
@@ -528,8 +528,8 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			if diff := cmp.Diff(tt.wantNominatingInfo, scheduleResult.nominatingInfo); diff != "" {
 				t.Errorf("Unexpected nominatingInfo (-want,+got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tt.wantNominationCalls, nominationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected NominationExtensions calls (-want,+got):\n%s", diff)
+			if diff := cmp.Diff(tt.wantNominationCalls, allocationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
 			}
 		})
 	}
