@@ -94,6 +94,14 @@ func testFeatureGateCycle(tCtx ktesting.TContext) {
 			// emulate that version so the test keeps working once the gate locks.
 			emulatedVersion: "1.37",
 		},
+		"optional-node-operations": {
+			test:                optionalNodeOperationsGateCycle,
+			driverResourcesFunc: optionalNodeOperationsClusterResources,
+			toggledGates:        []string{"DRAOptionalNodeOperations"},
+			// DRAOptionalNodeOperations is beta and toggleable in 1.38;
+			// emulate that version so the test keeps working once the gate locks.
+			emulatedVersion: "1.38",
+		},
 	}
 
 	for name, def := range subTests {
