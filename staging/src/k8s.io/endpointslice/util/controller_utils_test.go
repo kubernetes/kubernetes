@@ -22,12 +22,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
@@ -357,6 +359,9 @@ func TestGetPodServicesToUpdate(t *testing.T) {
 					"label": fmt.Sprintf("label-%d", i),
 				},
 			},
+			Status: v1.PodStatus{
+				PodIP: fmt.Sprintf("1.2.3.%d", 4+i),
+			},
 		}
 		pods = append(pods, pod)
 	}
@@ -430,6 +435,9 @@ func BenchmarkGetPodServicesToUpdate(b *testing.B) {
 				"app": "test-0",
 			},
 		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+		},
 	}
 
 	expect := sets.NewString("test/service-0")
@@ -442,6 +450,183 @@ func BenchmarkGetPodServicesToUpdate(b *testing.B) {
 		if len(services) != len(expect) {
 			b.Errorf("Expect services size %d, but got: %v", len(expect), len(services))
 		}
+	}
+}
+
+func TestGetPodUpdateProjectionKey(t *testing.T) {
+	podWithoutIP := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "test-ns",
+			Name:            "pod-no-ip",
+			Labels:          map[string]string{"app": "foo"},
+			ResourceVersion: "1",
+		},
+	}
+
+	podWithIP := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "test-ns",
+			Name:            "pod-with-ip",
+			Labels:          map[string]string{"app": "foo"},
+			ResourceVersion: "1",
+		},
+		Status: v1.PodStatus{
+			PodIP:  "10.0.0.1",
+			PodIPs: []v1.PodIP{{IP: "10.0.0.1"}},
+		},
+	}
+
+	podWithIPBumpedRV := podWithIP.DeepCopy()
+	podWithIPBumpedRV.ResourceVersion = "2"
+
+	podWithIPChangedLabels := podWithIP.DeepCopy()
+	podWithIPChangedLabels.ResourceVersion = "2"
+	podWithIPChangedLabels.Labels = map[string]string{"app": "bar"}
+
+	podWithoutIPChangedLabels := podWithoutIP.DeepCopy()
+	podWithoutIPChangedLabels.ResourceVersion = "2"
+	podWithoutIPChangedLabels.Labels = map[string]string{"app": "bar"}
+
+	podAssignedIP := podWithoutIP.DeepCopy()
+	podAssignedIP.ResourceVersion = "2"
+	podAssignedIP.Status.PodIP = "10.0.0.1"
+	podAssignedIP.Status.PodIPs = []v1.PodIP{{IP: "10.0.0.1"}}
+
+	podLostIP := podWithIP.DeepCopy()
+	podLostIP.ResourceVersion = "2"
+	podLostIP.Status.PodIP = ""
+	podLostIP.Status.PodIPs = nil
+
+	now := metav1.Now()
+
+	podTerminatingWithIP := podWithIP.DeepCopy()
+	podTerminatingWithIP.DeletionTimestamp = &now
+
+	podUnreadyWithIP := podWithIP.DeepCopy()
+	podUnreadyWithIP.Status.Phase = v1.PodRunning
+	podUnreadyWithIP.Status.Conditions = []v1.PodCondition{
+		{Type: v1.PodReady, Status: v1.ConditionFalse},
+	}
+
+	podUnreadyFailedWithIP := podUnreadyWithIP.DeepCopy()
+	podUnreadyFailedWithIP.ResourceVersion = "2"
+	podUnreadyFailedWithIP.Status.Phase = v1.PodFailed
+
+	podKey := &PodProjectionKey{
+		Namespace: "test-ns",
+		Labels:    map[string]string{"app": "foo"},
+	}
+
+	tests := []struct {
+		name     string
+		oldObj   interface{}
+		newObj   interface{}
+		expected *PodProjectionKey
+	}{
+		{
+			name:     "both old and new are nil",
+			oldObj:   nil,
+			newObj:   nil,
+			expected: nil,
+		},
+		{
+			name:     "add pod without IP",
+			oldObj:   nil,
+			newObj:   podWithoutIP,
+			expected: nil,
+		},
+		{
+			name:     "add pod with IP",
+			oldObj:   nil,
+			newObj:   podWithIP,
+			expected: podKey,
+		},
+		{
+			name:     "add terminating pod with IP",
+			oldObj:   nil,
+			newObj:   podTerminatingWithIP,
+			expected: podKey,
+		},
+		{
+			name:     "delete pod without IP",
+			oldObj:   podWithoutIP,
+			newObj:   nil,
+			expected: nil,
+		},
+		{
+			name:     "delete pod with IP",
+			oldObj:   podWithIP,
+			newObj:   nil,
+			expected: podKey,
+		},
+		{
+			name:     "delete terminating pod with IP",
+			oldObj:   podTerminatingWithIP,
+			newObj:   nil,
+			expected: podKey,
+		},
+		{
+			name:     "delete pod with tombstone and IP",
+			oldObj:   cache.DeletedFinalStateUnknown{Key: "test-ns/pod-with-ip", Obj: podWithIP},
+			newObj:   nil,
+			expected: podKey,
+		},
+		{
+			name:     "update pod without IP with label change (neither has IP)",
+			oldObj:   podWithoutIP,
+			newObj:   podWithoutIPChangedLabels,
+			expected: nil,
+		},
+		{
+			name:     "update pod gaining IP",
+			oldObj:   podWithoutIP,
+			newObj:   podAssignedIP,
+			expected: podKey,
+		},
+		{
+			name:     "update pod losing IP",
+			oldObj:   podWithIP,
+			newObj:   podLostIP,
+			expected: podKey,
+		},
+		{
+			name:     "update unready pod transitioning to Failed without readiness change",
+			oldObj:   podUnreadyWithIP,
+			newObj:   podUnreadyFailedWithIP,
+			expected: podKey,
+		},
+		{
+			name:   "update pod with IP and label change",
+			oldObj: podWithIP,
+			newObj: podWithIPChangedLabels,
+			expected: &PodProjectionKey{
+				Namespace:  "test-ns",
+				Labels:     map[string]string{"app": "bar"},
+				OldLabels:  map[string]string{"app": "foo"},
+				PodChanged: false,
+			},
+		},
+		{
+			name:     "update pod with bumped resourceVersion and no relevant change",
+			oldObj:   podWithIP,
+			newObj:   podWithIPBumpedRV,
+			expected: nil,
+		},
+		{
+			name:     "update pod with same resourceVersion (resync)",
+			oldObj:   podWithIP,
+			newObj:   podWithIP,
+			expected: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			key := GetPodUpdateProjectionKey(tc.oldObj, tc.newObj)
+			if diff := cmp.Diff(tc.expected, key); diff != "" {
+				t.Errorf("unexpected PodProjectionKey (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -552,6 +737,15 @@ func Test_podChanged(t *testing.T) {
 			modifier: func(old, new *v1.Pod) {
 				now := metav1.NewTime(time.Now().UTC())
 				new.ObjectMeta.DeletionTimestamp = &now
+			},
+			podChanged:    true,
+			labelsChanged: false,
+		}, {
+			testName: "unready pod with IP reaches terminal phase",
+			modifier: func(old, new *v1.Pod) {
+				old.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
+				new.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
+				new.Status.Phase = v1.PodFailed
 			},
 			podChanged:    true,
 			labelsChanged: false,
