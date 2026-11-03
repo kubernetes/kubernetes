@@ -24,8 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/ktesting"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -37,6 +39,9 @@ func testOptionalNodeOperations(tCtx ktesting.TContext, enabled bool) {
 	if !enabled {
 		return
 	}
+	// Run before tCtx.Parallel(): this subtest temporarily adds a node, which would
+	// interfere with parallel tests that expect a fixed set of nodes.
+	tCtx.Run("pod-scheduled-after-node-starts-declaring-feature", testOptionalNodeOperationsRequeue)
 	tCtx.Parallel()
 
 	tests := map[string]struct {
@@ -149,4 +154,86 @@ func testOptionalNodeOperations(tCtx ktesting.TContext, enabled bool) {
 			}
 		})
 	}
+}
+
+// testOptionalNodeOperationsRequeue verifies that a pod pending because no node declares
+// DRAOptionalNodeOperations is requeued and scheduled as soon as a node declares it,
+// rather than waiting for the 5-minute unschedulable pod flush.
+func testOptionalNodeOperationsRequeue(tCtx ktesting.TContext) {
+	namespace := createTestNamespace(tCtx, nil)
+	startScheduler(tCtx)
+	class, driverName := createTestClass(tCtx, namespace)
+	createSlice(tCtx, st.MakeResourceSliceWithAllNodes("shared-slice", driverName).
+		Devices(device1).
+		SkipNodeOperations(resourceapi.SkipNodeOperationAll).
+		Obj())
+
+	// The taint keeps pods of other tests off this node while it exists.
+	taint := v1.Taint{Key: namespace + ".example.com/dedicated", Effect: v1.TaintEffectNoSchedule}
+	node := createDedicatedNode(tCtx, namespace+"-node", taint)
+
+	claimObj := createClaim(tCtx, namespace, "", class, claim)
+	pod := podWithClaimName.DeepCopy()
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": node.Name}
+	pod.Spec.Tolerations = []v1.Toleration{{Key: taint.Key, Operator: v1.TolerationOpExists, Effect: taint.Effect}}
+	pod = createPod(tCtx, namespace, "", pod, claimObj)
+	// Wait until DynamicResources itself rejects the pod; updating DeclaredFeatures
+	// before that (e.g. while the node informer is still syncing) wouldn't test DynamicResources requeueing.
+	tCtx.Eventually(func(tCtx ktesting.TContext) (string, error) {
+		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		for _, condition := range p.Status.Conditions {
+			if condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse {
+				return condition.Message, nil
+			}
+		}
+		return "", nil
+	}).WithTimeout(schedulingTimeout).Should(gomega.ContainSubstring("cannot allocate all claims"), "pod should be rejected by the DynamicResources plugin")
+
+	node.Status.DeclaredFeatures = append(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate)
+	_, err := tCtx.Client().CoreV1().Nodes().UpdateStatus(tCtx, node, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "declare DRAOptionalNodeOperations on node %s", node.Name)
+
+	tCtx.Eventually(func(tCtx ktesting.TContext) (string, error) {
+		p, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		return p.Spec.NodeName, nil
+	}).WithTimeout(schedulingTimeout).Should(gomega.Equal(node.Name), "pod should get scheduled once node %s declares DRAOptionalNodeOperations", node.Name)
+}
+
+// createDedicatedNode creates a ready node with the given taint and removes it when the test is done.
+func createDedicatedNode(tCtx ktesting.TContext, name string, taint v1.Taint) *v1.Node {
+	tCtx.Helper()
+	node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{"kubernetes.io/hostname": name},
+		},
+	}, metav1.CreateOptions{FieldValidation: "Strict"})
+	tCtx.ExpectNoError(err, "create node %s", name)
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(tCtx.Client().CoreV1().Nodes().Delete(tCtx, name, metav1.DeleteOptions{}), "delete node %s", name)
+	})
+
+	node.Status = v1.NodeStatus{
+		Capacity: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse(nodeCPUCapacity),
+			v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity),
+			v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
+		},
+		Phase:      v1.NodeRunning,
+		Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+	}
+	node, err = tCtx.Client().CoreV1().Nodes().UpdateStatus(tCtx, node, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "set status of node %s", name)
+
+	// Replaces the not-ready taint added by the TaintNodesByCondition admission check.
+	node.Spec.Taints = []v1.Taint{taint}
+	node, err = tCtx.Client().CoreV1().Nodes().Update(tCtx, node, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "taint node %s", name)
+	return node
 }
