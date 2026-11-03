@@ -1617,11 +1617,20 @@ func TestNominationChangeHandler(t *testing.T) {
 	if events := handler(logger, otherProfile, "node1", ""); len(events) != 0 {
 		t.Errorf("Unexpected events for a pod of an unknown profile: %v", events)
 	}
+	// The nomination of an assumed pod ends without its node, and the
+	// pod itself stays as it is.
+	assumed := pod.DeepCopy()
+	assumed.Spec.NodeName = "node1"
+	handler(logger, assumed, "node1", "")
+	if assumed.Spec.NodeName != "node1" {
+		t.Errorf("The handler changed the pod's node to %q", assumed.Spec.NodeName)
+	}
 	want := []string{
-		"AddAllocation ns/p node1",
-		"RemoveAllocation ns/p node1 assigned=", "AddAllocation ns/p node2",
-		"RemoveAllocation ns/p node2 assigned=", "AddAllocation ns/p node2",
+		"AddAllocation ns/p node1 assigned=",
+		"RemoveAllocation ns/p node1 assigned=", "AddAllocation ns/p node2 assigned=",
+		"RemoveAllocation ns/p node2 assigned=", "AddAllocation ns/p node2 assigned=",
 		"RemoveAllocation ns/p node2 assigned=",
+		"RemoveAllocation ns/p node1 assigned=",
 	}
 	if diff := cmp.Diff(want, allocationExtensions.Calls()); diff != "" {
 		t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
