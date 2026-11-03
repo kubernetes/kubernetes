@@ -666,7 +666,7 @@ func (t *unstructuredMap) Iterator() traits.Iterator {
 			i++
 		}
 	}
-	return &mapIterator{unstructuredMap: t, keys: keys}
+	return &mapIterator{unstructuredMap: t, keys: keys[:i]}
 }
 
 type mapIterator struct {

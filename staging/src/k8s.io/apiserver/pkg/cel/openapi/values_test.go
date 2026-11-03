@@ -18,6 +18,7 @@ package openapi
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"cel.dev/cel-go/common/types"
@@ -624,6 +625,65 @@ func TestMapper(t *testing.T) {
 				if mapper.Contains(notContains) != types.False {
 					t.Errorf("Expected Contains to return false for %v", notContains)
 				}
+			}
+		})
+	}
+}
+
+// Fields without a schema are skipped by Iterator. Previously this left trailing
+// nil keys, which CEL comprehensions (all, exists, map, ...) iterated over.
+func TestMapperIteratorSkipsFieldsWithoutSchema(t *testing.T) {
+	preserveUnknown := *objectSchema
+	preserveUnknown.Extensions = spec.Extensions{extPreserveUnknownFields: true}
+
+	embedded := *emptyObjectSchema
+	embedded.Extensions = spec.Extensions{extEmbeddedResource: true, extPreserveUnknownFields: true}
+
+	cases := []struct {
+		name         string
+		schema       *spec.Schema
+		unstructured map[string]interface{}
+		wantKeys     []string
+	}{
+		{
+			name:         "object with properties and unknown fields",
+			schema:       &preserveUnknown,
+			unstructured: map[string]interface{}{"field1": "a", "unknown1": "b", "unknown2": "c"},
+			wantKeys:     []string{"field1"},
+		},
+		{
+			name:         "object without properties or additionalProperties",
+			schema:       emptyObjectSchema,
+			unstructured: map[string]interface{}{"unknown": "a"},
+			wantKeys:     []string{},
+		},
+		{
+			name:   "embedded resource with unknown fields",
+			schema: &embedded,
+			unstructured: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Thing",
+				"spec":       map[string]interface{}{},
+			},
+			wantKeys: []string{"apiVersion", "kind"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mapper := UnstructuredToVal(tc.unstructured, tc.schema).(traits.Mapper)
+			got := []string{}
+			for it := mapper.Iterator(); it.HasNext() == types.True; {
+				k := it.Next()
+				s, ok := k.(types.String)
+				if !ok {
+					t.Fatalf("Iterator().Next() = %v (%T), want types.String", k, k)
+				}
+				got = append(got, string(s))
+			}
+			sort.Strings(got)
+			if !reflect.DeepEqual(got, tc.wantKeys) {
+				t.Errorf("Iterator() keys = %v, want %v", got, tc.wantKeys)
 			}
 		})
 	}
