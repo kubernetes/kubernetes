@@ -177,7 +177,11 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 		}
 
 		if !exists {
-			// Current node does not exist, we should delete it, its taints do not matter anymore
+			// A missing UID cannot safely identify the object whose instance was checked.
+			if node.UID == "" {
+				klog.Errorf("skipping deletion of node %q: cached node has no UID", node.Name)
+				return
+			}
 
 			klog.V(2).Infof("deleting node since it is no longer present in cloud provider: %s", node.Name)
 
@@ -192,7 +196,9 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 			c.recorder.Eventf(ref, v1.EventTypeNormal, deleteNodeEvent,
 				"Deleting node %s because it does not exist in the cloud provider", node.Name)
 
-			if err := c.kubeClient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
+			if err := c.kubeClient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{
+				Preconditions: &metav1.Preconditions{UID: &node.UID},
+			}); err != nil {
 				klog.Errorf("unable to delete node %q: %v", node.Name, err)
 				c.recorder.Eventf(ref, v1.EventTypeWarning, deleteNodeFailedEvent,
 					"Failed deleting node %s: %v", node.Name, err)
