@@ -29,7 +29,11 @@ import (
 type Policy interface {
 	Name() string
 	Start(logger klog.Logger, s state.State) error
-	// Allocate call is idempotent
+	// Allocate call is idempotent.
+	// For an update, such as a resize, s is a scratch copy of the state, which
+	// becomes effective only if the admission succeeds; until then the policy must
+	// not change anything else, such as its internal state or metrics derived from
+	// the assignments.
 	Allocate(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 	// RemoveContainer call is idempotent
 	RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string) error
@@ -42,6 +46,7 @@ type Policy interface {
 	// among this and other resource controllers.
 	GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 	// AllocatePod is called to trigger the allocation of CPUs to a pod.
+	// For an update, the same rules as for Allocate apply.
 	AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) error
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
