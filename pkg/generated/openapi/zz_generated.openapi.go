@@ -33664,7 +33664,7 @@ func schema_k8sio_api_core_v1_VolumeHealthStatus(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "healthConditions is the set of health conditions reported by a CSI plugin. An empty list means no adverse condition. At most 16 conditions may be reported.",
+							Description: "healthConditions is the set of health conditions reported by a CSI plugin. At most 16 conditions may be reported. An empty list means the CSI driver either does not support volume health or has not reported it yet. If the driver supports volume health and the volume is healthy, a Healthy condition is reported.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -60633,7 +60633,7 @@ func schema_k8sio_api_storage_v1_StorageHealth(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Description: "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported. An empty list means the CSI driver either does not support storage health or has not reported it yet. If the driver supports storage health and its storage backend is healthy, the kubelet reports a StorageHealthy condition.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -62347,7 +62347,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealth(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+							Description: "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported. An empty list means the CSI driver either does not support storage health or has not reported it yet. If the driver supports storage health and its storage backend is healthy, the kubelet reports a StorageHealthy condition.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

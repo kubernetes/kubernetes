@@ -169,7 +169,7 @@ func (StorageClassList) SwaggerDoc() map[string]string {
 var map_StorageHealth = map[string]string{
 	"":                 "StorageHealth contains storage backend health reported by a CSI driver on a node.",
 	"name":             "name is the CSI driver name, matching CSINodeDriver.name.",
-	"healthConditions": "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported.",
+	"healthConditions": "healthConditions are the storage backend conditions reported by the CSI driver. At most 16 conditions may be reported. An empty list means the CSI driver either does not support storage health or has not reported it yet. If the driver supports storage health and its storage backend is healthy, the kubelet reports a StorageHealthy condition.",
 }
 
 func (StorageHealth) SwaggerDoc() map[string]string {
