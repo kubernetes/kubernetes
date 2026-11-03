@@ -878,15 +878,13 @@ type VolumeHealthStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=status
-	// +patchMergeKey=status
-	// +patchStrategy=merge
 	// +listMapKey=reason
 	// +k8s:optional
 	// +k8s:listType=map
 	// +k8s:listMapKey=status
 	// +k8s:listMapKey=reason
 	// +k8s:maxItems=16
-	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" patchStrategy:"merge" patchMergeKey:"status" protobuf:"bytes,1,rep,name=healthConditions"`
+	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,1,rep,name=healthConditions"`
 	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
 	// Changes to condition messages do not affect this field.
 	// +optional
