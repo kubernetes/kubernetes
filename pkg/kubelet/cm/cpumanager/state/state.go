@@ -136,6 +136,49 @@ func (as ContainerCPUBaselines) Clone() ContainerCPUBaselines {
 	return ret
 }
 
+// PendingResize is a resize of a pod that is admitted, but not applied to the
+// state yet.
+type PendingResize struct {
+	// PodUID is the UID of the resized pod.
+	PodUID string
+	// ContainerCPUSets are the target CPU sets of the changed containers, by container name.
+	ContainerCPUSets map[string]cpuset.CPUSet
+	// PodCPUSet is the target pod-level CPU set, or nil if it does not change.
+	PodCPUSet *cpuset.CPUSet
+}
+
+func podCPUs(assignments ContainerCPUAssignments, podAssignments PodCPUAssignments, podUID string) cpuset.CPUSet {
+	cpus := podAssignments[podUID].CPUSet.Clone()
+	for _, cset := range assignments[podUID] {
+		cpus = cpus.Union(cset)
+	}
+	return cpus
+}
+
+// PendingResizeDelta compares current container and pod level assignments with
+// the pending resize of the pod and calculates which CPUs should be taken from
+// the default CPU set and which should be returned to it. It takes the
+// assignments instead of a Reader, so that the state can use it while holding
+// its lock.
+func PendingResizeDelta(assignments ContainerCPUAssignments, podAssignments PodCPUAssignments, pending PendingResize) (taken, released cpuset.CPUSet) {
+	podUID := pending.PodUID
+	before := podCPUs(assignments, podAssignments, podUID)
+	after := podAssignments[podUID].CPUSet.Clone()
+	if pending.PodCPUSet != nil {
+		after = pending.PodCPUSet.Clone()
+	}
+	for containerName, cset := range assignments[podUID] {
+		if target, ok := pending.ContainerCPUSets[containerName]; ok {
+			cset = target
+		}
+		after = after.Union(cset)
+	}
+	for _, target := range pending.ContainerCPUSets {
+		after = after.Union(target)
+	}
+	return after.Difference(before), before.Difference(after)
+}
+
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
@@ -166,6 +209,9 @@ type writer interface {
 	DeletePod(podUID string)
 	// SetCPUBaselines stores all container-level CPU assignments recorded at admission time, prior to any resize
 	SetCPUBaselines(ContainerCPUBaselines)
+	// CommitPendingResize applies the pending resize at once: the target CPU sets
+	// and the change of the default CPU set.
+	CommitPendingResize(PendingResize)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment
