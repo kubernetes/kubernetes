@@ -5464,7 +5464,7 @@ func TestAllocatorSelection(t *testing.T) {
 		"default": {
 			features:             "",
 			usingFeatureGroup:    true,
-			expectImplementation: "stable",
+			expectImplementation: "incubating",
 		},
 
 		// Disabling DRAOptionalNodeOperations is the rollback path for that feature.
