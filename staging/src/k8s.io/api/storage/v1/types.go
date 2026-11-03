@@ -685,8 +685,8 @@ type VolumeNodeResources struct {
 type StorageHealthStatusType string
 
 const (
-	// StorageHealthUnknown indicates that driver is returning a health status which is not recognized
-	// by kubelet. Health of storage subsystem should not be considered healthy.
+	// StorageHealthUnknown indicates that the driver reported an unknown health status, or a status
+	// Kubernetes does not recognize. The storage subsystem should not be considered healthy.
 	StorageHealthUnknown StorageHealthStatusType = "StorageHealthUnknown"
 	// StorageUnreachable indicates the storage backend is unreachable.
 	StorageUnreachable StorageHealthStatusType = "StorageUnreachable"
@@ -701,7 +701,7 @@ const (
 type StorageHealthCondition struct {
 	// status is the health status category.
 	// Possible values are:
-	// - "StorageHealthUnknown": the reported health status is not recognized; the backend must not be considered healthy.
+	// - "StorageHealthUnknown": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy.
 	// - "StorageUnreachable": the storage backend is unreachable.
 	// - "StorageDegraded": the storage backend is functioning with reduced capability.
 	// - "StorageHealthy": the storage backend is healthy as seen from this node.
@@ -755,6 +755,7 @@ type StorageHealth struct {
 // CSINodeStatus contains health and status information for storage on a node.
 type CSINodeStatus struct {
 	// storageHealth contains backend health reports for CSI drivers registered on the node.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +optional
 	// +k8s:optional
 	// +listType=map

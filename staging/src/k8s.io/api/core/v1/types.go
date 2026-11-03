@@ -819,8 +819,8 @@ type PersistentVolumeClaimCondition struct {
 type VolumeHealthStatusType string
 
 const (
-	// VolumeHealthUnknown indicates that driver is returning a health status which is not recognized by
-	// Kubernetes. Volume should not be considered healthy.
+	// VolumeHealthUnknown indicates that the driver reported an unknown health status, or a status
+	// Kubernetes does not recognize. The volume must not be considered healthy.
 	VolumeHealthUnknown VolumeHealthStatusType = "Unknown"
 	// VolumeHealthInaccessible indicates the volume cannot be accessed.
 	VolumeHealthInaccessible VolumeHealthStatusType = "Inaccessible"
@@ -837,20 +837,20 @@ const (
 type VolumeHealthCondition struct {
 	// status is the machine-parseable health category.
 	// Possible values are:
-	// - "Unknown": the driver is reporting an unknown health condition. Volume should not be considered healthy.
+	// - "Unknown": the driver reported an unknown health status, or a status Kubernetes does not recognize. The volume must not be considered healthy.
 	// - "Inaccessible": the volume cannot be accessed.
 	// - "DataLoss": data loss has been detected on the volume.
 	// - "Degraded": the volume is functioning with reduced capability.
 	// - "Healthy": the volume is healthy.
 	//
 	// This field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change.
-	// A future version of CSI driver may emit health conditions about which Kubernetes component aren't aware.
+	// A future version of a CSI driver may emit health conditions that Kubernetes components are not aware of.
 	//
 	// A writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status
 	// as unknown.
 	//
 	// A reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting
-	// purpose.
+	// purposes.
 	// +required
 	// +k8s:required
 	Status VolumeHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=VolumeHealthStatusType"`
@@ -986,6 +986,7 @@ type PersistentVolumeClaimStatus struct {
 	ModifyVolumeStatus *ModifyVolumeStatus `json:"modifyVolumeStatus,omitempty" protobuf:"bytes,9,opt,name=modifyVolumeStatus"`
 	// healthStatus contains the latest controller-reported health information
 	// for the volume bound to this claim.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +featureGate=CSIVolumeHealth
 	// +optional
 	// +k8s:optional
@@ -5816,6 +5817,7 @@ type PodVolumeStatus struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// healthStatus contains health reported by the CSI node plugin for this volume
 	// on the pod's node. Populated by the kubelet.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +featureGate=CSIVolumeHealth
 	// +optional
 	// +k8s:optional
@@ -6011,7 +6013,7 @@ type PodStatus struct {
 	// VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
 
 	// VolumeStatuses contains the status of individual volumes used by this pod.
-	// This is an ALPHA field.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +featureGate=CSIVolumeHealth
 	// +optional
 	// +patchMergeKey=name
