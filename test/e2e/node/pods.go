@@ -488,7 +488,9 @@ var _ = SIGDescribe("Pods Extended (pod generation)", func() {
 				{
 					name: "updating container image to trigger generation bump",
 					updateFn: func(pod *v1.Pod) {
-						pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
+						// Use pause: it's the sandbox image, so it's already on the node. An image
+						// pull here eats into the 20s observedGeneration timeout below (#142462).
+						pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Pause)
 					},
 					expectGenerationBump: true,
 				},
