@@ -1,6 +1,7 @@
 {{$numRequests := (or .numRequests 1) | Int}}
 {{$selectors := (or .selectors nil) | JSON}}
 {{$constraints := (or .constraints nil) | JSON}}
+{{$derivedAttributes := or .derivedAttributes nil}}
 
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
@@ -14,4 +15,5 @@ spec:
       - name: req-{{.}}
         exactly:
           deviceClassName: test-class
-          selectors: {{$selectors}}{{end}}
+          selectors: {{$selectors}}{{if $derivedAttributes}}
+          derivedAttributes: {{$derivedAttributes | JSON}}{{end}}{{end}}
