@@ -1435,6 +1435,25 @@ func TestMapStorageBackendHealthStatuses(t *testing.T) {
 	}
 }
 
+func TestMapStorageBackendHealthSanitizesReasonAndMessage(t *testing.T) {
+	conditions, err := mapStorageBackendHealth([]*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth{
+		{Status: csipbv1.StorageHealthErrorType_STORAGE_UNREACHABLE, Reason: "", Message: "empty"},
+		{Status: csipbv1.StorageHealthErrorType_STORAGE_DEGRADED, Reason: "path down", Message: "space"},
+		{Status: csipbv1.StorageHealthErrorType_STORAGE_DEGRADED, Reason: "R" + strings.Repeat("a", 256), Message: "too long"},
+		// Byte 1024 falls in the middle of a 2-byte rune.
+		{Status: csipbv1.StorageHealthErrorType_STORAGE_DEGRADED, Reason: "LongMessage", Message: "x" + strings.Repeat("é", 600)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, []storagev1.StorageHealthCondition{
+		{Status: storagev1.StorageUnreachable, Reason: invalidHealthReason, Message: "empty"},
+		{Status: storagev1.StorageDegraded, Reason: invalidHealthReason, Message: "space"},
+		{Status: storagev1.StorageDegraded, Reason: invalidHealthReason, Message: "too long"},
+		{Status: storagev1.StorageDegraded, Reason: "LongMessage", Message: "x" + strings.Repeat("é", 511)},
+	}, conditions)
+}
+
 func TestMapStorageBackendHealthLimit(t *testing.T) {
 	entries := make([]*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth, maxStorageHealthConditions+1)
 	for i := range entries {
@@ -1522,9 +1541,9 @@ func TestMapVolumeHealthConditions(t *testing.T) {
 				},
 			},
 			want: []api.VolumeHealthCondition{
-				{Status: api.VolumeHealthDataLoss, Reason: invalidVolumeHealthReason, Message: "empty"},
-				{Status: api.VolumeHealthDegraded, Reason: invalidVolumeHealthReason, Message: "space"},
-				{Status: api.VolumeHealthInaccessible, Reason: invalidVolumeHealthReason, Message: "too long"},
+				{Status: api.VolumeHealthDataLoss, Reason: invalidHealthReason, Message: "empty"},
+				{Status: api.VolumeHealthDegraded, Reason: invalidHealthReason, Message: "space"},
+				{Status: api.VolumeHealthInaccessible, Reason: invalidHealthReason, Message: "too long"},
 			},
 		},
 		{
@@ -1536,7 +1555,7 @@ func TestMapVolumeHealthConditions(t *testing.T) {
 				},
 			},
 			want: []api.VolumeHealthCondition{
-				{Status: api.VolumeHealthDegraded, Reason: invalidVolumeHealthReason, Message: "first"},
+				{Status: api.VolumeHealthDegraded, Reason: invalidHealthReason, Message: "first"},
 			},
 		},
 		{

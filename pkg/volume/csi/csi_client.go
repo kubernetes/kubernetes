@@ -147,11 +147,12 @@ var _ csiClient = &csiDriverClient{}
 
 const (
 	maxVolumeHealthConditions = 16
-	maxVolumeHealthReasonLen  = 256
-	maxVolumeHealthMessageLen = 1024
-	// invalidVolumeHealthReason replaces driver reasons the API server would
-	// reject. A rejected reason fails the whole pod status update.
-	invalidVolumeHealthReason = "InvalidDriverReason"
+	// Volume and storage health conditions share the same reason and message limits.
+	maxHealthReasonLen  = 256
+	maxHealthMessageLen = 1024
+	// invalidHealthReason replaces driver reasons the API server would reject.
+	// A rejected reason fails the whole pod or CSINode status update.
+	invalidHealthReason = "InvalidDriverReason"
 
 	maxStorageHealthConditions = 16
 )
@@ -768,7 +769,7 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 			continue
 		}
 		status := mapVolumeHealthStatus(entry.GetStatus())
-		reason := mapVolumeHealthReason(entry.GetReason())
+		reason := mapHealthReason(entry.GetReason())
 		key := conditionKey{status: status, reason: reason}
 		if _, exists := seen[key]; exists {
 			continue
@@ -777,7 +778,7 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 		out = append(out, api.VolumeHealthCondition{
 			Status:  status,
 			Reason:  reason,
-			Message: truncateVolumeHealthMessage(entry.GetMessage()),
+			Message: truncateHealthMessage(entry.GetMessage()),
 		})
 		if len(out) == maxVolumeHealthConditions {
 			break
@@ -786,21 +787,21 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 	return out
 }
 
-func mapVolumeHealthReason(reason string) string {
-	if len(reason) == 0 || len(reason) > maxVolumeHealthReasonLen || len(metav1validation.IsValidConditionReason(reason)) > 0 {
-		klog.V(4).Info(log("replacing invalid volume health reason %q with %q", reason, invalidVolumeHealthReason))
-		return invalidVolumeHealthReason
+func mapHealthReason(reason string) string {
+	if len(reason) == 0 || len(reason) > maxHealthReasonLen || len(metav1validation.IsValidConditionReason(reason)) > 0 {
+		klog.V(4).Info(log("replacing invalid health reason %q with %q", reason, invalidHealthReason))
+		return invalidHealthReason
 	}
 	return reason
 }
 
-// truncateVolumeHealthMessage cuts message to the API limit without splitting
+// truncateHealthMessage cuts message to the API limit without splitting
 // a multi-byte UTF-8 character.
-func truncateVolumeHealthMessage(message string) string {
-	if len(message) <= maxVolumeHealthMessageLen {
+func truncateHealthMessage(message string) string {
+	if len(message) <= maxHealthMessageLen {
 		return message
 	}
-	n := maxVolumeHealthMessageLen
+	n := maxHealthMessageLen
 	for n > 0 && !utf8.RuneStart(message[n]) {
 		n--
 	}
@@ -831,8 +832,8 @@ func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_Sto
 		}
 		condition := storagev1.StorageHealthCondition{
 			Status:  mapStorageHealthStatus(entry.GetStatus()),
-			Reason:  entry.GetReason(),
-			Message: entry.GetMessage(),
+			Reason:  mapHealthReason(entry.GetReason()),
+			Message: truncateHealthMessage(entry.GetMessage()),
 		}
 		if capability := entry.GetVolumeCapability(); capability != nil {
 			accessMode, volumeMode, err := mapStorageHealthVolumeCapability(capability)
