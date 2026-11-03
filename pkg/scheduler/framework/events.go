@@ -42,6 +42,9 @@ const (
 	// UnschedulableTimeout is the event when a pod is moved from unschedulableEntities
 	// due to the timeout specified at pod-max-in-unschedulable-pods-duration.
 	UnschedulableTimeout = "UnschedulableTimeout"
+	// ResourceClaimHoldReleased is the event when devices that the DynamicResources
+	// plugin held for a nominated pod become available again.
+	ResourceClaimHoldReleased = "ResourceClaimHoldReleased"
 )
 
 var (
@@ -63,6 +66,9 @@ var (
 	EventUnschedulableTimeout = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: UnschedulableTimeout}
 	// EventForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ to activeQ.
 	EventForceActivate = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: ForceActivate}
+	// EventResourceClaimHoldReleased looks like a ResourceClaim update to queueing hints,
+	// because the devices become available as if a claim got deallocated.
+	EventResourceClaimHoldReleased = fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: ResourceClaimHoldReleased}
 )
 
 // PodSchedulingPropertiesChange interprets the update of a pod and returns corresponding UpdatePodXYZ event(s).

@@ -23,8 +23,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -349,6 +351,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
 	sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
 	if hasNominatedNodeNameChanged(oldPod, newPod) {
+		sched.removeNomination(klog.NewContext(context.Background(), logger), oldPod, oldPod.Status.NominatedNodeName)
 		// Nominated node changed in pod, so we need to treat it as if the pod was deleted from the old nominated node,
 		// because the scheduler treats such a pod as if it was already assigned when scheduling lower or equal priority pods.
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, getLEPriorityPreCheck(corev1helpers.PodPriority(oldPod)))
@@ -367,6 +370,9 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(pod *v1.Pod, inBinding bool
 
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.SchedulingQueue.Delete(logger, pod)
+	// Covers deletion and binding by another component. A nomination ends in
+	// both cases; a pod bound by this scheduler already ended it when it got assumed.
+	sched.removeNomination(klog.NewContext(context.Background(), logger), pod, "")
 	if inBinding {
 		// In the case of a binding, the rest can be skipped because it is not really a pod removal operation, but a binding.
 		// Any necessary notifications will be sent by the binding process, unless it was an unlikely external binding.
@@ -403,6 +409,26 @@ func getLEPriorityPreCheck(priority int32) queue.PreEnqueueCheck {
 	return func(entity framework.QueuedEntityInfo) bool {
 		return entity.GetPriority() <= priority
 	}
+}
+
+// nominationReleaseHandlerSetter is implemented by the DRA manager of the
+// DynamicResources plugin.
+type nominationReleaseHandlerSetter interface {
+	SetNominationReleaseHandler(handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32))
+}
+
+// removeNomination notifies plugins which implement
+// framework.NominationExtensions that the nomination of the pod ended.
+// A non-empty nodeName restricts this to a nomination for that node.
+func (sched *Scheduler) removeNomination(ctx context.Context, pod *v1.Pod, nodeName string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		return
+	}
+	schedFramework, err := sched.frameworkForPod(pod)
+	if err != nil {
+		return
+	}
+	schedFramework.RunNominationExtensionsRemoveNominatedPod(ctx, pod, nodeName, false)
 }
 
 func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
@@ -818,6 +844,17 @@ func addAllEventHandlers(
 				buildEvtResHandler(at, fwk.ResourceClaim),
 			)
 			handlers = append(handlers, handlerRegistration)
+			if setter, ok := draManager.(nominationReleaseHandlerSetter); ok && utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+				setter.SetNominationReleaseHandler(func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32) {
+					deallocated := claim.DeepCopy()
+					deallocated.Status.Allocation = nil
+					// Only other pods with lower or equal priority had to respect the held devices.
+					differentUID, lePriority := getDifferentUIDPreCheck(holderUID), getLEPriorityPreCheck(priority)
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventResourceClaimHoldReleased, claim, deallocated, func(entity framework.QueuedEntityInfo) bool {
+						return differentUID(entity) && lePriority(entity)
+					})
+				})
+			}
 		case fwk.ResourceSlice:
 			if handlerRegistration, err = resourceSliceTracker.AddEventHandler(
 				buildEvtResHandler(at, fwk.ResourceSlice),

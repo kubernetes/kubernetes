@@ -33,6 +33,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -219,6 +220,161 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 func newDefaultQueueSort() fwk.LessFunc {
 	sort := &queuesort.PrioritySort{}
 	return sort.Less
+}
+
+// TestEventHandlers_RemoveNomination checks which pod events end a nomination
+// for plugins with framework.NominationExtensions.
+func TestEventHandlers_RemoveNomination(t *testing.T) {
+	nominatedPod := st.MakePod().Name("p").Namespace("ns").UID("p").SchedulerName(testSchedulerName).NominatedNodeName("node1").Obj()
+	withNomination := func(nodeName string) *v1.Pod {
+		pod := nominatedPod.DeepCopy()
+		pod.Status.NominatedNodeName = nodeName
+		pod.ResourceVersion = "2"
+		return pod
+	}
+
+	for name, tc := range map[string]struct {
+		disabled  bool
+		event     func(s *Scheduler)
+		wantCalls []string
+	}{
+		"nominated-node-changed": {
+			event:     func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("node2")) },
+			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned= failed=false"},
+		},
+		"nominated-node-cleared": {
+			event:     func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("")) },
+			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned= failed=false"},
+		},
+		"nominated-node-added": {
+			event: func(s *Scheduler) { s.updatePodInSchedulingQueue(withNomination(""), nominatedPod) },
+		},
+		"other-update": {
+			event: func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("node1")) },
+		},
+		"deleted": {
+			event:     func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, false) },
+			wantCalls: []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+		},
+		"bound-by-other": {
+			event:     func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, true) },
+			wantCalls: []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+		},
+		"disabled": {
+			disabled: true,
+			event:    func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, false) },
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, !tc.disabled)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := fake.NewClientset(nominatedPod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			queue := internalqueue.NewPriorityQueue(newDefaultQueueSort(), informerFactory)
+			schedulerCache := internalcache.New(ctx, nil, false, false /* CompositePodGroup */)
+			queue.Add(ctx, nominatedPod)
+
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			s, _, err := initScheduler(ctx, schedulerCache, queue, nil, client, informerFactory,
+				tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)))
+			if err != nil {
+				t.Fatalf("Failed to initialize test scheduler: %v", err)
+			}
+			s.logger = logger
+
+			tc.event(s)
+			if diff := cmp.Diff(tc.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// releaseHandlerRecorder is a DRA manager which only records the handler for
+// devices that stopped being held for a preemptor.
+type releaseHandlerRecorder struct {
+	fwk.SharedDRAManager
+	handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32)
+}
+
+func (r *releaseHandlerRecorder) SetNominationReleaseHandler(handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32)) {
+	r.handler = handler
+}
+
+// TestEventHandlers_NominationReleased checks that devices which stopped
+// being held for a preemptor give other pods with lower or equal priority
+// which wait for devices another chance.
+func TestEventHandlers_NominationReleased(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	newPod := func(name string, priority int32) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").UID(name).Priority(priority).SchedulerName(testSchedulerName).Obj()
+	}
+	holder := newPod("holder", midPriority)
+	pods := []*v1.Pod{holder, newPod("lower", lowPriority), newPod("equal", midPriority), newPod("higher", highPriority)}
+	const pluginName = "DynamicResources"
+	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+		testSchedulerName: {
+			framework.EventResourceClaimHoldReleased: {{
+				PluginName: pluginName,
+				QueueingHintFn: func(klog.Logger, *v1.Pod, interface{}, interface{}) (fwk.QueueingHint, error) {
+					return fwk.Queue, nil
+				},
+			}},
+		},
+	}
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var objs []runtime.Object
+	for _, pod := range pods {
+		objs = append(objs, pod)
+	}
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
+	queue := internalqueue.NewPriorityQueue(
+		newDefaultQueueSort(),
+		informerFactory,
+		internalqueue.WithMetricsRecorder(metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())),
+		internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+		internalqueue.WithPodInitialBackoffDuration(0),
+		internalqueue.WithPodMaxBackoffDuration(0))
+	for _, pod := range pods {
+		queue.Add(ctx, pod)
+		entity, err := queue.Pop(logger)
+		if err != nil {
+			t.Fatalf("Pop failed: %v", err)
+		}
+		poppedPod := entity.(*framework.QueuedPodInfo)
+		poppedPod.UnschedulablePlugins = sets.New(pluginName)
+		if err := queue.AddUnschedulablePodIfNotPresent(ctx, poppedPod, queue.SchedulingCycle()); err != nil {
+			t.Fatalf("Unexpected error from AddUnschedulablePodIfNotPresent: %v", err)
+		}
+	}
+
+	sched := &Scheduler{StopEverything: ctx.Done(), SchedulingQueue: queue, logger: logger}
+	resourceClaimCache := assumecache.NewAssumeCache(logger, informerFactory.Resource().V1().ResourceClaims().Informer(), "ResourceClaim", "", nil)
+	draManager := &releaseHandlerRecorder{}
+	if err := addAllEventHandlers(sched, informerFactory, nil, resourceClaimCache, nil, draManager, map[fwk.EventResource]fwk.ActionType{fwk.ResourceClaim: fwk.Update}); err != nil {
+		t.Fatalf("Add event handlers failed: %v", err)
+	}
+	if draManager.handler == nil {
+		t.Fatal("No handler for released devices installed.")
+	}
+
+	claim := st.MakeResourceClaim().Name("holder-claim").Namespace("ns").Obj()
+	claim.Status.Allocation = &resourceapi.AllocationResult{}
+	draManager.handler(claim, holder.UID, midPriority)
+	var requeued []string
+	for _, pod := range append(queue.PodsInActiveQ(), queue.PodsInBackoffQ()...) {
+		requeued = append(requeued, pod.Name)
+	}
+	slices.Sort(requeued)
+	if diff := cmp.Diff([]string{"equal", "lower"}, requeued); diff != "" {
+		t.Errorf("Unexpected requeued pods (-want, +got):\n%s", diff)
+	}
 }
 
 func TestUpdateAssignedPodInCache(t *testing.T) {
