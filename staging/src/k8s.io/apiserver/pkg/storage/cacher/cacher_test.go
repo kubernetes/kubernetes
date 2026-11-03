@@ -101,36 +101,42 @@ func checkStorageInvariants(ctx context.Context, t *testing.T, key string) {
 }
 
 func TestCreate(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCreate(ctx, t, cacher, checkStorageInvariants)
 }
 
 func TestCreateWithTTL(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCreateWithTTL(ctx, t, cacher)
 }
 
 func TestCreateWithKeyExist(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCreateWithKeyExist(ctx, t, cacher)
 }
 
 func TestGet(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGet(ctx, t, cacher, increaseRVFunc(server.V3Client.Client))
 }
 
 func TestDeleteOnce(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestDeleteOnce(ctx, t, cacher, etcd3testing.PathPrefix(), examplev1ProtoCodec)
 }
 
 func TestUpdateOnce(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestUpdateOnce(ctx, t, cacher, etcd3testing.PathPrefix(), examplev1ProtoCodec)
@@ -170,41 +176,49 @@ func (tc *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into
 
 func TestDelete(t *testing.T) {
 	t.Run("UnconditionalDelete", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestUnconditionalDelete(ctx, t, cacher)
 	})
 	t.Run("ConditionalDelete", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestConditionalDelete(ctx, t, cacher)
 	})
 	t.Run("DeleteWithSuggestion", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestDeleteWithSuggestion(ctx, t, cacher)
 	})
 	t.Run("DeleteWithSuggestionAndConflict", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestDeleteWithSuggestionAndConflict(ctx, t, cacher)
 	})
 	t.Run("DeleteWithSuggestionOfDeletedObject", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestDeleteWithSuggestionOfDeletedObject(ctx, t, cacher)
 	})
 	t.Run("ValidateDeletionWithSuggestion", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestValidateDeletionWithSuggestion(ctx, t, cacher)
 	})
 	t.Run("ValidateDeletionWithOnlySuggestionValid", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestValidateDeletionWithOnlySuggestionValid(ctx, t, cacher)
 	})
 	t.Run("DeleteWithConflict", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestDeleteWithConflict(ctx, t, cacher)
@@ -240,11 +254,13 @@ func TestDelete(t *testing.T) {
 		storagetesting.RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(ctx, t, cacher)
 	})
 	t.Run("PreconditionalDeleteWithSuggestion", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestPreconditionalDeleteWithSuggestion(ctx, t, cacher)
 	})
 	t.Run("PreconditionalDeleteWithSuggestionPass", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, cacher)
@@ -252,6 +268,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestListPaging(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestListPaging(ctx, t, cacher)
@@ -407,6 +424,7 @@ func TestCompactPastLastWrite(t *testing.T) {
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
+	t.Parallel()
 	ctx, store, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
@@ -417,18 +435,21 @@ func checkStorageCalls(t *testing.T, pageSize, estimatedProcessedObjects uint64)
 }
 
 func TestListContinuation(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestListContinuation(ctx, t, cacher, checkStorageCalls)
 }
 
 func TestListPaginationRareObject(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestListPaginationRareObject(ctx, t, cacher, checkStorageCalls)
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, cacher, checkStorageCalls)
@@ -443,6 +464,7 @@ func TestListResourceVersionMatch(t *testing.T) {
 }
 
 func TestNamespaceScopedList(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestNamespaceScopedList(ctx, t, cacher)
@@ -491,17 +513,20 @@ func (c *cacherWithPrefixTransformer) UpdatePrefixTransformer(modifier storagete
 
 func TestGuaranteedUpdate(t *testing.T) {
 	t.Run("GuaranteedUpdate", func(t *testing.T) {
+		t.Parallel()
 		transformer := newSwappablePrefixTransformer()
 		ctx, cacher, terminate := testSetup(t, withTransformer(transformer))
 		t.Cleanup(terminate)
 		storagetesting.RunTestGuaranteedUpdate(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer}, checkStorageInvariants)
 	})
 	t.Run("GuaranteedUpdateWithTTL", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestGuaranteedUpdateWithTTL(ctx, t, cacher)
 	})
 	t.Run("GuaranteedUpdateChecksStoredData", func(t *testing.T) {
+		t.Parallel()
 		transformer := newSwappablePrefixTransformer()
 		// Leading-whitespace normalization in RunTestGuaranteedUpdateChecksStoredData requires a JSON codec.
 		ctx, cacher, terminate := testSetup(t, withCodec(apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)), withTransformer(transformer))
@@ -509,11 +534,13 @@ func TestGuaranteedUpdate(t *testing.T) {
 		storagetesting.RunTestGuaranteedUpdateChecksStoredData(ctx, t, &cacherWithPrefixTransformer{CacheDelegator: cacher, transformer: transformer})
 	})
 	t.Run("GuaranteedUpdateWithConflict", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestGuaranteedUpdateWithConflict(ctx, t, cacher)
 	})
 	t.Run("GuaranteedUpdateWithSuggestionAndConflict", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx, t, cacher)
@@ -535,6 +562,7 @@ func TestStats(t *testing.T) {
 	}
 }
 func TestKeySchema(t *testing.T) {
+	t.Parallel()
 	ctx, cacher, terminate := testSetup(t, func(options *setupOptions) {
 		options.keyFunc = func(obj runtime.Object) (string, error) {
 			accessor, err := meta.Accessor(obj)
@@ -601,6 +629,7 @@ func testWatch(t *testing.T) {
 		storagetesting.RunTestWatchContextCancel(ctx, t, cacher)
 	})
 	t.Run("WatcherTimeout", func(t *testing.T) {
+		t.Parallel()
 		ctx, cacher, terminate := testSetup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestWatcherTimeout(ctx, t, cacher)

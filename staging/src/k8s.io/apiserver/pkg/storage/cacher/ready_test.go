@@ -27,6 +27,7 @@ import (
 )
 
 func Test_newReady(t *testing.T) {
+	t.Parallel()
 	errCh := make(chan error, 10)
 	ready := newReady(testingclock.NewFakeClock(time.Now()))
 	ready.setError(nil)
@@ -50,6 +51,7 @@ func Test_newReady(t *testing.T) {
 }
 
 func Test_newReadySetIdempotent(t *testing.T) {
+	t.Parallel()
 	errCh := make(chan error, 10)
 	ready := newReady(testingclock.NewFakeClock(time.Now()))
 	ready.setError(nil)
@@ -93,6 +95,7 @@ func Test_newReadySetIdempotent(t *testing.T) {
 // Test_newReadyRacy executes all the possible transitions randomly.
 // It must run with the race detector enabled.
 func Test_newReadyRacy(t *testing.T) {
+	t.Parallel()
 	concurrency := 1000
 	errCh := make(chan error, concurrency)
 	ready := newReady(testingclock.NewFakeClock(time.Now()))
@@ -125,6 +128,7 @@ func Test_newReadyRacy(t *testing.T) {
 }
 
 func Test_newReadyStop(t *testing.T) {
+	t.Parallel()
 	errCh := make(chan error, 10)
 	ready := newReady(testingclock.NewFakeClock(time.Now()))
 	ready.setError(nil)
@@ -148,6 +152,7 @@ func Test_newReadyStop(t *testing.T) {
 }
 
 func Test_newReadyCheck(t *testing.T) {
+	t.Parallel()
 	ready := newReady(testingclock.NewFakeClock(time.Now()))
 	// it starts as false
 	if _, err := ready.check(); err == nil {
@@ -174,6 +179,7 @@ func Test_newReadyCheck(t *testing.T) {
 }
 
 func Test_newReadyCancelPending(t *testing.T) {
+	t.Parallel()
 	errCh := make(chan error, 10)
 	ready := newReady(testingclock.NewFakeClock(time.Now()))
 	ready.setError(nil)
@@ -198,6 +204,7 @@ func Test_newReadyCancelPending(t *testing.T) {
 }
 
 func Test_newReadyStateChangeTimestamp(t *testing.T) {
+	t.Parallel()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	fakeClock.SetTime(time.Now())
 
@@ -235,6 +242,7 @@ func checkReadyTransitionTime(t *testing.T, r *ready, expectedLastStateChangeDur
 }
 
 func TestReadyError(t *testing.T) {
+	t.Parallel()
 	ready := newReady(testingclock.NewFakeClock(time.Now()))
 	_, _, err := ready.checkAndReadGeneration()
 	if err == nil || err.Error() != "storage is (re)initializing" {
