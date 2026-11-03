@@ -100,7 +100,6 @@ type cacheWatcher struct {
 	state int
 
 	selector                watchSelector
-	requestedWatchRV        uint64
 	requiredResourceVersion uint64
 }
 
@@ -116,7 +115,6 @@ func newCacheWatcher(
 	clk clock.Clock,
 	identifier string,
 	selector watchSelector,
-	requestedWatchRV uint64,
 	requiredResourceVersion uint64,
 ) *cacheWatcher {
 	if clk == nil {
@@ -137,7 +135,6 @@ func newCacheWatcher(
 		clock:                   clk,
 		identifier:              identifier,
 		selector:                selector,
-		requestedWatchRV:        requestedWatchRV,
 		requiredResourceVersion: requiredResourceVersion,
 	}
 }
@@ -347,19 +344,6 @@ func (c *cacheWatcher) markBookmarkAfterRvSent(event *watchCacheEvent) {
 	}
 }
 
-// setBookmarkAfterResourceVersion sets the bookmarkAfterResourceVersion and the state associated with it
-func (c *cacheWatcher) setBookmarkAfterResourceVersion(bookmarkAfterResourceVersion uint64, cacheInterval *watchCacheInterval) {
-	switch {
-	case bookmarkAfterResourceVersion == 0:
-		c.state = cacheWatcherBookmarkSent // if no specific RV was requested we assume no-op
-	case cacheInterval != nil && cacheInterval.initialEventsEndBookmark != nil:
-		c.state = cacheWatcherBookmarkReceived
-	default:
-		c.state = cacheWatcherWaitingForBookmark
-	}
-	c.bookmarkAfterResourceVersion = bookmarkAfterResourceVersion
-}
-
 // setDrainInputBufferLocked if set to true indicates that we should delay closing this watcher
 // until we send all events residing in the input buffer.
 func (c *cacheWatcher) setDrainInputBufferLocked(drain bool) {
@@ -558,10 +542,10 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 	const initProcessThreshold = 500 * time.Millisecond
 	startTime := time.Now()
 
-	if cacheInterval.resourceVersion < c.requiredResourceVersion || cacheInterval.resourceVersion < c.requestedWatchRV {
-		klog.ErrorS(nil, "Watch cache interval resourceVersion must be greater than or equal to requiredResourceVersion and requestedWatchRV", "resource", c.groupResource, "identifier", c.identifier, "intervalResourceVersion", cacheInterval.resourceVersion, "requiredResourceVersion", c.requiredResourceVersion, "requestedWatchRV", c.requestedWatchRV)
+	if cacheInterval.resourceVersion < c.requiredResourceVersion {
+		klog.ErrorS(nil, "Watch cache interval resourceVersion must be greater than or equal to requiredResourceVersion", "resource", c.groupResource, "identifier", c.identifier, "intervalResourceVersion", cacheInterval.resourceVersion, "requiredResourceVersion", c.requiredResourceVersion)
 		if consistency.PanicOnCacheInconsistency {
-			panic(fmt.Sprintf("Watch cache interval resourceVersion (%d) must be greater than or equal to requiredResourceVersion (%d) and requestedWatchRV (%d), resource: %q, identifier: %q", cacheInterval.resourceVersion, c.requiredResourceVersion, c.requestedWatchRV, c.groupResource, c.identifier))
+			panic(fmt.Sprintf("Watch cache interval resourceVersion (%d) must be greater than or equal to requiredResourceVersion (%d), resource: %q, identifier: %q", cacheInterval.resourceVersion, c.requiredResourceVersion, c.groupResource, c.identifier))
 		}
 	}
 
@@ -586,16 +570,16 @@ func (c *cacheWatcher) processInitialEvents(cacheInterval *watchCacheInterval) e
 			klog.Warningf("couldn't retrieve watch event to serve: %#v", err)
 			return err
 		}
-		if event.ResourceVersion < c.requiredResourceVersion || event.ResourceVersion < c.requestedWatchRV || event.ResourceVersion > cacheInterval.resourceVersion {
-			klog.ErrorS(nil, "Watch cache interval event resourceVersion out of bounds", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion, "requestedWatchRV", c.requestedWatchRV, "intervalResourceVersion", cacheInterval.resourceVersion)
+		if event.ResourceVersion < c.requiredResourceVersion || event.ResourceVersion > cacheInterval.resourceVersion {
+			klog.ErrorS(nil, "Watch cache interval event resourceVersion out of bounds", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion, "intervalResourceVersion", cacheInterval.resourceVersion)
 			if consistency.PanicOnCacheInconsistency {
-				panic(fmt.Sprintf("Watch cache interval event resourceVersion (%d) out of bounds [max(%d, %d), %d], resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.requestedWatchRV, cacheInterval.resourceVersion, c.groupResource, c.identifier))
+				panic(fmt.Sprintf("Watch cache interval event resourceVersion (%d) out of bounds [%d, %d], resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, cacheInterval.resourceVersion, c.groupResource, c.identifier))
 			}
 		}
-		if !sendInitialEvents && (event.ResourceVersion <= c.requiredResourceVersion || event.ResourceVersion <= c.requestedWatchRV) {
-			klog.ErrorS(nil, "Watch cache non-initial interval event resourceVersion must be greater than requiredResourceVersion and requestedWatchRV", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion, "requestedWatchRV", c.requestedWatchRV)
+		if !sendInitialEvents && (event.ResourceVersion <= c.requiredResourceVersion) {
+			klog.ErrorS(nil, "Watch cache non-initial interval event resourceVersion must be greater than requiredResourceVersion", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion)
 			if consistency.PanicOnCacheInconsistency {
-				panic(fmt.Sprintf("Watch cache non-initial interval event resourceVersion (%d) must be greater than requiredResourceVersion (%d) and requestedWatchRV (%d), resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.requestedWatchRV, c.groupResource, c.identifier))
+				panic(fmt.Sprintf("Watch cache non-initial interval event resourceVersion (%d) must be greater than requiredResourceVersion (%d), resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.groupResource, c.identifier))
 			}
 		}
 		c.sendWatchCacheEvent(event)
@@ -631,17 +615,17 @@ func (c *cacheWatcher) processEvent(event *watchCacheEvent, resourceVersion uint
 	if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
 		switch event.Type {
 		case watch.Bookmark:
-			if event.ResourceVersion < c.requiredResourceVersion || event.ResourceVersion < c.requestedWatchRV {
-				klog.ErrorS(nil, "Watch bookmark event resourceVersion must be greater than or equal to requiredResourceVersion and requestedWatchRV", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion, "requestedWatchRV", c.requestedWatchRV)
+			if event.ResourceVersion < c.requiredResourceVersion {
+				klog.ErrorS(nil, "Watch bookmark event resourceVersion must be greater than or equal to requiredResourceVersion", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion)
 				if consistency.PanicOnCacheInconsistency {
-					panic(fmt.Sprintf("Watch bookmark event resourceVersion (%d) must be greater than or equal to requiredResourceVersion (%d) and requestedWatchRV (%d), resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.requestedWatchRV, c.groupResource, c.identifier))
+					panic(fmt.Sprintf("Watch bookmark event resourceVersion (%d) must be greater than or equal to requiredResourceVersion (%d), resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.groupResource, c.identifier))
 				}
 			}
 		default:
-			if event.ResourceVersion <= c.requiredResourceVersion || event.ResourceVersion <= c.requestedWatchRV {
-				klog.ErrorS(nil, "Watch event resourceVersion must be greater than requiredResourceVersion and requestedWatchRV", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion, "requestedWatchRV", c.requestedWatchRV)
+			if event.ResourceVersion <= c.requiredResourceVersion {
+				klog.ErrorS(nil, "Watch event resourceVersion must be greater than requiredResourceVersion", "resource", c.groupResource, "identifier", c.identifier, "eventResourceVersion", event.ResourceVersion, "requiredResourceVersion", c.requiredResourceVersion)
 				if consistency.PanicOnCacheInconsistency {
-					panic(fmt.Sprintf("Watch event resourceVersion (%d) must be greater than requiredResourceVersion (%d) and requestedWatchRV (%d), resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.requestedWatchRV, c.groupResource, c.identifier))
+					panic(fmt.Sprintf("Watch event resourceVersion (%d) must be greater than requiredResourceVersion (%d), resource: %q, identifier: %q", event.ResourceVersion, c.requiredResourceVersion, c.groupResource, c.identifier))
 				}
 			}
 		}
