@@ -41,18 +41,6 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const (
-	// blockTimeout determines how long we're willing to block the request
-	// to wait for a given resource version to be propagated to cache,
-	// before terminating request and returning Timeout error with retry
-	// after suggestion.
-	blockTimeout = 3 * time.Second
-
-	// resourceVersionTooHighRetrySeconds is the seconds before a operation should be retried by the client
-	// after receiving a 'too high resource version' error.
-	resourceVersionTooHighRetrySeconds = 1
-)
-
 // watchCacheEvent is a single "watch event" that is send to users of
 // watchCache. Additionally to a typical "watch.Event" it contains
 // the previous value of the object to enable proper filtering in the
@@ -82,9 +70,8 @@ type watchCacheEvent struct {
 type watchCache struct {
 	sync.RWMutex
 
-	// Condition on which lists are waiting for the fresh enough
-	// resource version.
-	cond *sync.Cond
+	// freshness is used to notify waiters when the cache is fresh enough.
+	freshness *freshnessWaiter
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -121,10 +108,6 @@ type ImmutableWatchCacheConfig struct {
 	// For testing cache interval invalidation.
 	indexValidator indexValidator
 
-	// Requests progress notification if there are requests waiting for watch
-	// to be fresh
-	waitingUntilFresh *progress.ConditionalProgressRequester
-
 	getCurrentRV func(context.Context) (uint64, error)
 }
 
@@ -141,14 +124,13 @@ func newWatchCache(
 	getCurrentRV func(context.Context) (uint64, error),
 ) *watchCache {
 	config := &ImmutableWatchCacheConfig{
-		keyFunc:           keyFunc,
-		getAttrsFunc:      getAttrsFunc,
-		eventHandler:      eventHandler,
-		clock:             clock,
-		versioner:         versioner,
-		groupResource:     groupResource,
-		waitingUntilFresh: progressRequester,
-		getCurrentRV:      getCurrentRV,
+		keyFunc:       keyFunc,
+		getAttrsFunc:  getAttrsFunc,
+		eventHandler:  eventHandler,
+		clock:         clock,
+		versioner:     versioner,
+		groupResource: groupResource,
+		getCurrentRV:  getCurrentRV,
 	}
 
 	wc := &watchCache{
@@ -157,7 +139,7 @@ func newWatchCache(
 		history:         newWatchCacheHistory(config, eventFreshDuration),
 		storage:         store.NewWatchCacheStorage(indexers),
 	}
-	wc.cond = sync.NewCond(wc.RLocker())
+	wc.freshness = newFreshnessWaiter(wc.RLocker(), &wc.resourceVersion, clock, groupResource, progressRequester)
 	wc.config.indexValidator = wc.history.isIndexValidLocked
 
 	return wc
@@ -258,7 +240,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64) err
 
 		w.history.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
-		defer w.cond.Broadcast()
+		defer w.freshness.broadcast()
 
 		if w.history.isCacheFullLocked() {
 			oldestRV := w.history.OldestResourceVersionLocked()
@@ -305,7 +287,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		defer w.Unlock()
 		w.storage.UpdateResourceVersion(rv)
 		w.resourceVersion = rv
-		w.cond.Broadcast()
+		w.freshness.broadcast()
 	}()
 
 	// Avoid calling event handler under lock.
@@ -324,47 +306,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 
 // waitUntilFreshLocked waits until cache is at least as fresh as given resourceVersion.
 func (w *watchCache) waitUntilFreshLocked(ctx context.Context, resourceVersion uint64) error {
-	if resourceVersion == 0 || resourceVersion <= w.resourceVersion {
-		return nil
-	}
-	w.config.waitingUntilFresh.Add()
-	defer w.config.waitingUntilFresh.Remove()
-	startTime := w.config.clock.Now()
-	defer func() {
-		if resourceVersion > 0 {
-			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.config.groupResource.Group, w.config.groupResource.Resource).Observe(w.config.clock.Since(startTime).Seconds())
-		}
-	}()
-
-	// In case resourceVersion is 0, we accept arbitrarily stale result.
-	// As a result, the condition in the below for loop will never be
-	// satisfied (w.resourceVersion is never negative), this call will
-	// never hit the w.cond.Wait().
-	// As a result - we can optimize the code by not firing the wakeup
-	// function (and avoid starting a gorotuine), especially given that
-	// resourceVersion=0 is the most common case.
-	if resourceVersion > 0 {
-		go func() {
-			// Wake us up when the time limit has expired.  The docs
-			// promise that time.After (well, NewTimer, which it calls)
-			// will wait *at least* the duration given. Since this go
-			// routine starts sometime after we record the start time, and
-			// it will wake up the loop below sometime after the broadcast,
-			// we don't need to worry about waking it up before the time
-			// has expired accidentally.
-			<-w.config.clock.After(blockTimeout)
-			w.cond.Broadcast()
-		}()
-	}
-
-	for w.resourceVersion < resourceVersion {
-		if w.config.clock.Since(startTime) >= blockTimeout {
-			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
-			return storage.NewTooLargeResourceVersionError(resourceVersion, w.resourceVersion, resourceVersionTooHighRetrySeconds)
-		}
-		w.cond.Wait()
-	}
-	return nil
+	return w.freshness.waitUntilFreshLocked(ctx, resourceVersion)
 }
 
 func (c *watchCache) WaitUntilFreshAndGetList(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
@@ -650,7 +592,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	if w.onReplace != nil {
 		w.onReplace()
 	}
-	w.cond.Broadcast()
+	w.freshness.broadcast()
 
 	metrics.RecordResourceVersion(w.config.groupResource, version)
 	klog.V(3).Infof("Replaced watchCache (rev: %v) ", resourceVersion)
