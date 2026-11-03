@@ -3217,6 +3217,7 @@ func RunTestCorrectness(ctx context.Context, t *testing.T, store storage.Interfa
 
 	for _, tc := range readTestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
 			var out runtime.Object
 			var err error
 			switch tc.Request.Op {
