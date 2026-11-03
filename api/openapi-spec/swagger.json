@@ -22002,7 +22002,7 @@
           "type": "string"
         },
         "status": {
-          "description": "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"Healthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.",
+          "description": "status is the health status category. Possible values are: - \"StorageHealthUnknown\": the reported health status is not recognized; the backend must not be considered healthy. - \"StorageUnreachable\": the storage backend is unreachable. - \"StorageDegraded\": the storage backend is functioning with reduced capability. - \"StorageHealthy\": the storage backend is healthy as seen from this node.\n\nAdditional values may be introduced as the CSI specification evolves. Writers that do not recognize a status may classify it as StorageHealthUnknown. Readers that do not recognize a status must use it only for health reporting and observability.",
           "type": "string"
         },
         "volumeMode": {
