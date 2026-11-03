@@ -120,9 +120,9 @@ func (a *Allocator) Allocate(n uint64) []byte {
 	}
 	// grow the buffer
 	var size uint64
-	if maxPool := maxPooledBufferCapacity.Load(); maxPool > 0 {
-		// Grow geometrically up to maxPool (or n if a single request exceeds maxPool).
-		size = max(n, min(uint64(2*cap(a.buf)), uint64(maxPool)))
+	if maxPooledBufferCapacity.Load() > 0 {
+		// Grow geometrically; PutAllocator drops buffers above maxPooledBufferCapacity.
+		size = max(n, uint64(2*cap(a.buf)))
 	} else {
 		// Although the legacy 2*cap+n formula over-allocates up to 3x, keep it
 		// unchanged here to preserve exact prior behavior when the cap is disabled.
