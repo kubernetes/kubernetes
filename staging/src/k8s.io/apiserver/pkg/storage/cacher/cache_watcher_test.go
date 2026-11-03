@@ -70,7 +70,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	w.input <- watcherInput{interval: intervalFromEvents(initEvents)}
 	go w.process(context.Background())
 	w.Stop()
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil
@@ -382,7 +382,7 @@ func TestCacheWatcherDraining(t *testing.T) {
 	if eventCount != 3 {
 		t.Errorf("Unexpected number of objects received: %d, expected: 3", eventCount)
 	}
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil
@@ -416,7 +416,7 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 	}
 	forget(true) // drain the watcher
 	w.Stop()     // client disconnected, timeout expired or ctx was actually closed
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 3, nil
@@ -469,7 +469,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 	if w.add(&watchCacheEvent{Object: &v1.Pod{}}, time.NewTimer(10*time.Millisecond)) {
 		t.Fatal("expected the add method to fail")
 	}
-	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, 5*time.Second, true, func(_ context.Context) (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil
@@ -558,7 +558,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, time.NewTimer(1*time.Second)) {
 		t.Fatal("expected the add method to fail")
 	}
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 1, nil
@@ -582,7 +582,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 		{Type: watch.Added, Object: makePod(15)},
 	}, true)
 
-	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()
 		return count == 2, nil

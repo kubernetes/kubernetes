@@ -3180,7 +3180,7 @@ func forceRequestWatchProgressSupport(t *testing.T) {
 
 	server, _ := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
 		return etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress), nil
 	}); err != nil {
 		t.Fatalf("failed to wait for required %v storage feature to initialize", storage.RequestWatchProgress)

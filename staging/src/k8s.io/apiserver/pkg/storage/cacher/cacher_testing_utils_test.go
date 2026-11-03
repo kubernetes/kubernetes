@@ -197,15 +197,11 @@ func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 		}
 		// Wait for compaction to be observed.
 		if c.cacher.compactor != nil {
-			for {
+			for c.storage.CompactRevision() != int64(rv) {
 				select {
 				case <-ctx.Done():
 					t.Fatal(ctx.Err())
-				case <-time.After(100 * time.Millisecond):
-				}
-				compactedRev := c.storage.CompactRevision()
-				if compactedRev == int64(rv) {
-					break
+				case <-time.After(5 * time.Millisecond):
 				}
 			}
 			c.cacher.compactor.compactIfNeeded()

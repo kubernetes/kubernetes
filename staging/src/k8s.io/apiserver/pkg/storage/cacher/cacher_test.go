@@ -819,7 +819,7 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 
 	// Since some tests depend on the fact that GetList shouldn't fail,
 	// we wait until the error from the underlying storage is consumed.
-	if err := wait.PollInfinite(100*time.Millisecond, wrappedStorage.ErrorsConsumed); err != nil {
+	if err := wait.PollInfinite(5*time.Millisecond, wrappedStorage.ErrorsConsumed); err != nil {
 		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
@@ -853,7 +853,7 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 	if err := c.CacheDelegator.Create(ctx, key, obj, out, ttl); err != nil {
 		return err
 	}
-	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 5*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 		currentObj := c.CacheDelegator.cacher.newFunc()
 		err := c.CacheDelegator.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
 		if err != nil {
