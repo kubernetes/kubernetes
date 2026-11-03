@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
@@ -1509,6 +1510,47 @@ func TestMapVolumeHealthConditions(t *testing.T) {
 			},
 			want: []api.VolumeHealthCondition{
 				{Status: api.VolumeHealthDegraded, Reason: "missing_controller", Message: "missing controller for storage"},
+			},
+		},
+		{
+			name: "invalid reasons are replaced",
+			vh: &csipbv1.VolumeHealth{
+				HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{
+					{Status: csipbv1.VolumeHealthErrorType_DATA_LOSS, Reason: "", Message: "empty"},
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "missing controller", Message: "space"},
+					{Status: csipbv1.VolumeHealthErrorType_INACCESSIBLE, Reason: "R" + strings.Repeat("a", 256), Message: "too long"},
+				},
+			},
+			want: []api.VolumeHealthCondition{
+				{Status: api.VolumeHealthDataLoss, Reason: invalidVolumeHealthReason, Message: "empty"},
+				{Status: api.VolumeHealthDegraded, Reason: invalidVolumeHealthReason, Message: "space"},
+				{Status: api.VolumeHealthInaccessible, Reason: invalidVolumeHealthReason, Message: "too long"},
+			},
+		},
+		{
+			name: "invalid reasons with the same status are deduplicated after replacement",
+			vh: &csipbv1.VolumeHealth{
+				HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "bad reason", Message: "first"},
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "bad-reason", Message: "second"},
+				},
+			},
+			want: []api.VolumeHealthCondition{
+				{Status: api.VolumeHealthDegraded, Reason: invalidVolumeHealthReason, Message: "first"},
+			},
+		},
+		{
+			name: "long messages are truncated",
+			vh: &csipbv1.VolumeHealth{
+				HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "Ascii", Message: strings.Repeat("a", 2000)},
+					// "é" is 2 bytes; byte 1024 falls in the middle of a rune.
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "MultiByte", Message: "x" + strings.Repeat("é", 600)},
+				},
+			},
+			want: []api.VolumeHealthCondition{
+				{Status: api.VolumeHealthDegraded, Reason: "Ascii", Message: strings.Repeat("a", 1024)},
+				{Status: api.VolumeHealthDegraded, Reason: "MultiByte", Message: "x" + strings.Repeat("é", 511)},
 			},
 		},
 		{

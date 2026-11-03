@@ -24,6 +24,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"unicode/utf8"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
@@ -33,6 +34,7 @@ import (
 	api "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -142,6 +144,17 @@ type csiResizeOptions struct {
 }
 
 var _ csiClient = &csiDriverClient{}
+
+const (
+	maxVolumeHealthConditions = 16
+	maxVolumeHealthReasonLen  = 256
+	maxVolumeHealthMessageLen = 1024
+	// invalidVolumeHealthReason replaces driver reasons the API server would
+	// reject. A rejected reason fails the whole pod status update.
+	invalidVolumeHealthReason = "InvalidDriverReason"
+
+	maxStorageHealthConditions = 16
+)
 
 type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
 	nodeClient csipbv1.NodeClient,
@@ -736,8 +749,6 @@ func (c *csiDriverClient) NodeGetStorageHealth(ctx context.Context, secrets map[
 	return mapStorageBackendHealth(resp.GetBackendHealth())
 }
 
-const maxVolumeHealthConditions = 16
-
 func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondition {
 	if vh == nil {
 		return nil
@@ -757,21 +768,43 @@ func mapVolumeHealthConditions(vh *csipbv1.VolumeHealth) []api.VolumeHealthCondi
 			continue
 		}
 		status := mapVolumeHealthStatus(entry.GetStatus())
-		key := conditionKey{status: status, reason: entry.GetReason()}
+		reason := mapVolumeHealthReason(entry.GetReason())
+		key := conditionKey{status: status, reason: reason}
 		if _, exists := seen[key]; exists {
 			continue
 		}
 		seen[key] = struct{}{}
 		out = append(out, api.VolumeHealthCondition{
 			Status:  status,
-			Reason:  entry.GetReason(),
-			Message: entry.GetMessage(),
+			Reason:  reason,
+			Message: truncateVolumeHealthMessage(entry.GetMessage()),
 		})
 		if len(out) == maxVolumeHealthConditions {
 			break
 		}
 	}
 	return out
+}
+
+func mapVolumeHealthReason(reason string) string {
+	if len(reason) == 0 || len(reason) > maxVolumeHealthReasonLen || len(metav1validation.IsValidConditionReason(reason)) > 0 {
+		klog.V(4).Info(log("replacing invalid volume health reason %q with %q", reason, invalidVolumeHealthReason))
+		return invalidVolumeHealthReason
+	}
+	return reason
+}
+
+// truncateVolumeHealthMessage cuts message to the API limit without splitting
+// a multi-byte UTF-8 character.
+func truncateVolumeHealthMessage(message string) string {
+	if len(message) <= maxVolumeHealthMessageLen {
+		return message
+	}
+	n := maxVolumeHealthMessageLen
+	for n > 0 && !utf8.RuneStart(message[n]) {
+		n--
+	}
+	return message[:n]
 }
 
 func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) api.VolumeHealthStatusType {
@@ -786,8 +819,6 @@ func mapVolumeHealthStatus(status csipbv1.VolumeHealthErrorType) api.VolumeHealt
 		return api.VolumeHealthUnknown
 	}
 }
-
-const maxStorageHealthConditions = 16
 
 func mapStorageBackendHealth(entries []*csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth) ([]storagev1.StorageHealthCondition, error) {
 	if len(entries) == 0 {
