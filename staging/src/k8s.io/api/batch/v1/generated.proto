@@ -325,7 +325,7 @@ message JobSpec {
   // +optional
   // +k8s:optional
   // +k8s:alpha(since: "1.38")=+k8s:minimum=0
-  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("backoffLimitPerIndex")
+  // +k8s:beta(since: "1.38")=+k8s:dependentRequired("backoffLimitPerIndex")
   optional int32 maxFailedIndexes = 13;
 
   // selector is a label query over pods that should match the pod count.

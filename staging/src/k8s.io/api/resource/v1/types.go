@@ -593,7 +593,7 @@ type NodeAllocatableMapping struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:unionMember
-	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityMultiplier")
+	// +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityMultiplier")
 	CapacityKey *QualifiedName `json:"capacityKey,omitempty" protobuf:"bytes,1,opt,name=capacityKey"`
 
 	// capacityMultiplier is used as a multiplier for the allocated capacity consumed.
@@ -605,7 +605,7 @@ type NodeAllocatableMapping struct {
 	// If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityKey")
+	// +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityKey")
 	CapacityMultiplier *resource.Quantity `json:"capacityMultiplier,omitempty" protobuf:"bytes,2,opt,name=capacityMultiplier"`
 
 	// deviceMultiplier is used as a multiplier for the allocated device count in the claim.
@@ -922,7 +922,7 @@ type DeviceAttribute struct {
 	// +k8s:listType=atomic
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	// +k8s:beta(since: "1.37")=+k8s:unionMember
-	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:maxBytes=64
+	// +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:maxBytes=64
 	// +featureGate=DRAListTypeAttributes
 	StringValues []string `json:"strings,omitempty" protobuf:"bytes,8,opt,name=strings"`
 
@@ -1155,9 +1155,9 @@ type DeviceTaintRuleStatus struct {
 	// +listMapKey=type
 	// +patchStrategy=merge
 	// +patchMergeKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
@@ -2631,9 +2631,9 @@ type AllocatedDeviceStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions" protobuf:"bytes,4,opt,name=conditions"`
 
 	// Data contains arbitrary driver-specific data.

@@ -338,7 +338,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:                         mkValidPodGroup(setParentCompositePodGroupName("my-parent"), unsetWorkloadRef()),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
-			expectedErrs:                  field.ErrorList{field.Required(field.NewPath("spec", "workloadRef"), "").WithOrigin("dependentRequired").MarkAlpha()},
+			expectedErrs:                  field.ErrorList{field.Required(field.NewPath("spec", "workloadRef"), "").WithOrigin("dependentRequired").MarkBeta()},
 		},
 	}
 	for k, tc := range testCases {

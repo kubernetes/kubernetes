@@ -78,9 +78,9 @@ message AllocatedDeviceStatus {
   // +optional
   // +listType=map
   // +listMapKey=type
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 4;
 
   // Data contains arbitrary driver-specific data.
@@ -648,7 +648,7 @@ message DeviceAttribute {
   // +k8s:listType=atomic
   // +k8s:beta(since: "1.37")=+k8s:optional
   // +k8s:beta(since: "1.37")=+k8s:unionMember
-  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:maxBytes=64
+  // +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:maxBytes=64
   // +featureGate=DRAListTypeAttributes
   repeated string strings = 8;
 
@@ -1479,9 +1479,9 @@ message DeviceTaintRuleStatus {
   // +listMapKey=type
   // +patchStrategy=merge
   // +patchMergeKey=type
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
@@ -1771,7 +1771,7 @@ message NodeAllocatableMapping {
   // +optional
   // +k8s:optional
   // +k8s:unionMember
-  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityMultiplier")
+  // +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityMultiplier")
   optional string capacityKey = 1;
 
   // capacityMultiplier is used as a multiplier for the allocated capacity consumed.
@@ -1783,7 +1783,7 @@ message NodeAllocatableMapping {
   // If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
   // +optional
   // +k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityKey")
+  // +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityKey")
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity capacityMultiplier = 2;
 
   // deviceMultiplier is used as a multiplier for the allocated device count in the claim.

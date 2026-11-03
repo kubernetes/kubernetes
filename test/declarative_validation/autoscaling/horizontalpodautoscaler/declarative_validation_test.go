@@ -66,13 +66,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid: scaleTargetRef.kind empty (required)": {
 			input: makeValidHPA(tweakScaleTargetRefKind("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkBeta(),
 			},
 		},
 		"invalid: scaleTargetRef.name empty (required)": {
 			input: makeValidHPA(tweakScaleTargetRefName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkBeta(),
 			},
 		},
 		"invalid: maxReplicas = 0 (required)": {
@@ -146,14 +146,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    makeValidHPA(),
 			updateObj: makeValidHPA(tweakScaleTargetRefKind("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "scaleTargetRef", "kind"), "").MarkBeta(),
 			},
 		},
 		"invalid update: scaleTargetRef.name empty (required)": {
 			oldObj:    makeValidHPA(),
 			updateObj: makeValidHPA(tweakScaleTargetRefName("")),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkAlpha(),
+				field.Required(field.NewPath("spec", "scaleTargetRef", "name"), "").MarkBeta(),
 			},
 		},
 		"invalid update: maxReplicas = 0 (required)": {

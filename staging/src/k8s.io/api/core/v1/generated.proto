@@ -3132,9 +3132,9 @@ message NodeSpec {
 
   // providerID is the ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
-  // +k8s:alpha(since: "1.36")=+k8s:update=NoModify
-  // +k8s:alpha(since: "1.36")=+k8s:update=NoUnset
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:update=NoModify
+  // +k8s:beta(since: "1.38")=+k8s:update=NoUnset
   optional string providerID = 3;
 
   // unschedulable controls node schedulability of new pods. By default, node is schedulable.
@@ -4878,7 +4878,7 @@ message PodSpec {
   // tolerations specifies the pod's tolerations.
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:optional
   repeated Toleration tolerations = 22;
 
   // hostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts
@@ -5121,7 +5121,7 @@ message PodSpec {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=10
-  // +k8s:alpha(since: "1.37")=+k8s:dependentForbidden("schedulingGroup")
+  // +k8s:beta(since: "1.38")=+k8s:dependentForbidden("schedulingGroup")
   repeated EvictionResponder evictionResponders = 44;
 }
 
@@ -5819,7 +5819,7 @@ message ReplicationControllerSpec {
   // The only allowed template.spec.restartPolicy value is "Always".
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
-  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:optional
   // +k8s:alpha(since: "1.38")=+k8s:subfield(spec)=+k8s:subfield(restartPolicy)=+k8s:eq="Always"
   optional PodTemplateSpec template = 3;
 }
@@ -6233,7 +6233,7 @@ message Secret {
   // More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
   // +optional
   // +k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:immutable
+  // +k8s:beta(since: "1.38")=+k8s:immutable
   optional string type = 3;
 }
 
@@ -6909,7 +6909,7 @@ message ServiceStatus {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=type
-  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
+  // +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:opaqueType
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 2;
 }
 
@@ -7040,8 +7040,8 @@ message Toleration {
   // key is the taint key that the toleration applies to. Empty means match all taint keys.
   // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:format=k8s-label-key
   optional string key = 1;
 
   // operator represents a key's relationship to the value.

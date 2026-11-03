@@ -71,7 +71,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"jobTemplate.spec.maxFailedIndexes set without backoffLimitPerIndex": {
 			input: mkCronJob(tweakJobTemplateMaxFailedIndexes(ptr.To[int32](5))),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "jobTemplate", "spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
+				field.Required(field.NewPath("spec", "jobTemplate", "spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkBeta(),
 			},
 		},
 		"jobTemplate.spec.maxFailedIndexes and backoffLimitPerIndex both set": {
@@ -268,7 +268,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"tolerations: invalid key format": {
 			input: mkCronJob(tweakTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "jobTemplate", "spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"activeDeadlineSeconds minimum boundary violation": {

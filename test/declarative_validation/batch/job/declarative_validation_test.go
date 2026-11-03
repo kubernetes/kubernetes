@@ -72,7 +72,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"maxFailedIndexes set without backoffLimitPerIndex": {
 			input: mkJob(tweakMaxFailedIndexes(ptr.To[int32](5))),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
+				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkBeta(),
 			},
 		},
 		"negative parallelism": {
@@ -278,7 +278,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid toleration key format": {
 			input: mkJob(tweakTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 			},
 		},
 		"activeDeadlineSeconds minimum boundary violation": {

@@ -435,7 +435,7 @@ func Validate_JobSpec(
 				return false
 			}
 			return obj.BackoffLimitPerIndex != nil
-		}).MarkAlpha(); len(e) != 0 {
+		}).MarkBeta(); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
