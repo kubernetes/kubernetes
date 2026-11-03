@@ -623,6 +623,8 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 	fc := store.config.clock.(*testingclock.FakeClock)
+	done := make(chan struct{})
+	defer close(done)
 
 	// In background, step clock after the below call starts the timer.
 	go func() {
@@ -636,8 +638,12 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		// Add an object to make sure the test would
 		// eventually fail instead of just waiting
 		// forever.
-		time.Sleep(30 * time.Second)
-		store.Add(makeTestPod("bar", 4))
+		select {
+		case <-done:
+			return
+		case <-time.After(30 * time.Second):
+			store.Add(makeTestPod("bar", 4))
+		}
 	}()
 
 	_, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
