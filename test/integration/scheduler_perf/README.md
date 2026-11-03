@@ -289,21 +289,27 @@ okay for DRA.
    `PublishResourceSlices`) get no threshold. The same workload name can occur
    in several test cases, so always match on test case *and* workload.
 
-3. **Exclude overall slow runs.** Compute the median per workload, then look for
-   runs which are below it for many workloads at once. Those are caused by a slow
-   CI node and not by the workload. Leave them out and recompute the medians.
-   A single outlier for one workload is not a reason to exclude the whole run.
-
-4. **Classify workloads as stable or flaky.** Compare the minimum of the
-   remaining runs against `0.8 * median`. Workloads that regularly fall below
-   that (in the DRA tests: `5000pods_500nodes` and `SharedPodGroupResourceClaim`)
+3. **Classify workloads as stable or flaky.** Compute the median per workload
+   over all runs. Do not exclude slow runs (for example caused by a slow CI
+   node): they happen in the real job, too, and the thresholds must not flake
+   because of them. Compare the minimum against `0.8 * median`. Workloads that
+   fall below that (in the DRA tests: `empty_500nodes` in `dra`,
+   `SharedPodGroupResourceClaim`, and some of the `extendedresource` workloads)
    are flaky and get 40% below the median instead of 20%. If a stable workload
    is still violated by a recent run, look at the job log
    (`<run>/build-log.txt`, the "pods/s in last interval" lines): a short stall
    is noise, a sustained drop is a regression and must be investigated before
    lowering the threshold. Mention such cases when reporting the result.
 
-5. **Set the thresholds.** Round down to an integer. In the workload, use the
+   The `pull-kubernetes-scheduler-perf` presubmit enforces the same thresholds
+   and is configured like the periodic job (same cluster, 6 CPU / 24Gi, same
+   `make test-integration` invocation), but it only gets a handful of runs per
+   PR, so it samples the tail of the noise more often than the periodic history
+   suggests. A run that misses many unrelated thresholds by a wide margin hit a
+   slow node: retrigger instead of lowering all thresholds further. A single
+   stable-looking workload that keeps failing is a reason to use the 40% margin.
+
+4. **Set the thresholds.** Round down to an integer. In the workload, use the
    map form so that the key matches the topic name:
 
    ```yaml
@@ -311,15 +317,14 @@ okay for DRA.
      labels: [performance]
      threshold:
        # <perf-dash URL>
-       dra_partitionabledevices: 157 # 20% below median of last 20 runs excluding overall slow runs
+       dra_partitionabledevices: 157 # 20% below median of last 20 runs
    ```
 
    Replace plain numbers (`threshold: 120`) with this form. In `dra/performance-config.yaml`
    also set `dra_experimental` with the same value and the comment `same as dra above`.
-   Use 40% instead of 20% for flaky workloads. Use the number of runs
-   *including* the excluded ones for "last N runs".
+   Use 40% instead of 20% for flaky workloads.
 
-6. **Add the perf-dash URL** above each entry, with the test case and workload
+5. **Add the perf-dash URL** above each entry, with the test case and workload
    substituted into this template (`BenchmarkPerfSchedulingExperimental` for
    `dra_experimental`):
 
@@ -327,7 +332,7 @@ okay for DRA.
    https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2F<test case>%2F<workload>%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
    ```
 
-7. **Validate.** Parse all `performance-config.yaml` files, check that every
+6. **Validate.** Parse all `performance-config.yaml` files, check that every
    `performance` workload with a `SchedulingThroughput` metric has a threshold
    with the right topic key(s), that the URL contains the right
    `<test case>/<workload>`, and run `go test ./test/integration/scheduler_perf/...`

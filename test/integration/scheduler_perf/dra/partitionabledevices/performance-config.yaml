@@ -89,7 +89,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionable%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 157 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 157 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -101,7 +101,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionable%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 144 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 145 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -113,7 +113,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionable%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 168 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 169 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -125,7 +125,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionable%2Fempty_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 129 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 129 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -137,7 +137,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionable%2Fhalf_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 112 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 112 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -149,7 +149,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionable%2Ffull_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 138 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 138 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -231,7 +231,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionableBacktracking%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 39 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 39 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -243,7 +243,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionableBacktracking%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 33 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 33 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -255,7 +255,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionableBacktracking%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 112 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 112 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -267,7 +267,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionableBacktracking%2Fempty_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 23 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 23 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -279,7 +279,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionableBacktracking%2Fhalf_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 19 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 19 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0
@@ -291,7 +291,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FPartitionableBacktracking%2Ffull_1000nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_partitionabledevices: 72 # 20% below median of last 20 runs excluding overall slow runs
+      dra_partitionabledevices: 72 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 1000
       nodesWithoutDRA: 0

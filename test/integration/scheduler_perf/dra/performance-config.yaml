@@ -123,9 +123,9 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra: 174 # 40% below median of last 20 runs excluding overall slow runs
+      dra: 232 # 20% below median of last 20 runs
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfSchedulingExperimental%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_experimental: 174 # same as dra above
+      dra_experimental: 232 # same as dra above
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -151,9 +151,9 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra: 173 # 20% below median of last 20 runs excluding overall slow runs
+      dra: 130 # 40% below median of last 20 runs
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfSchedulingExperimental%2FSchedulingWithResourceClaimTemplate%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_experimental: 173 # same as dra above
+      dra_experimental: 130 # same as dra above
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -182,7 +182,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra: 167 # 20% below median of last 20 runs excluding overall slow runs
+      dra: 167 # 20% below median of last 20 runs
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfSchedulingExperimental%2FSchedulingWithResourceClaimTemplate%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
       dra_experimental: 167 # same as dra above
     params:
@@ -213,9 +213,9 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra: 164 # 20% below median of last 20 runs excluding overall slow runs
+      dra: 165 # 20% below median of last 20 runs
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfSchedulingExperimental%2FSchedulingWithResourceClaimTemplate%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_experimental: 164 # same as dra above
+      dra_experimental: 165 # same as dra above
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -242,9 +242,9 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2Fselector_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra: 159 # 20% below median of last 20 runs excluding overall slow runs
+      dra: 160 # 20% below median of last 20 runs
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfSchedulingExperimental%2FSchedulingWithResourceClaimTemplate%2Fselector_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_experimental: 159 # same as dra above
+      dra_experimental: 160 # same as dra above
     params:
       nodesWithDRA: 500
       nodesWithoutDRA: 0
@@ -277,7 +277,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2Fmatch_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra: 96 # 20% below median of last 20 runs excluding overall slow runs
+      dra: 96 # 20% below median of last 20 runs
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfSchedulingExperimental%2FSchedulingWithResourceClaimTemplate%2Fmatch_empty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
       dra_experimental: 96 # same as dra above
     params:

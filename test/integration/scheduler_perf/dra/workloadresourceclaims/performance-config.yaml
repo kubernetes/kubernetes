@@ -70,7 +70,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSharedPodGroupResourceClaim%2F100podgroups_5000pods%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_workloadresourceclaims: 150 # 40% below median of last 20 runs excluding overall slow runs
+      dra_workloadresourceclaims: 151 # 40% below median of last 20 runs
     params:
       nodesWithDRA: 50
       nodesWithoutDRA: 0
@@ -134,7 +134,7 @@
     labels: [performance]
     threshold:
       # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSharedPodGroupResourceClaimTemplate%2F100podgroups_5000pods%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
-      dra_workloadresourceclaims: 173 # 20% below median of last 20 runs excluding overall slow runs
+      dra_workloadresourceclaims: 173 # 20% below median of last 20 runs
     params:
       nodesWithDRA: 50
       nodesWithoutDRA: 0
