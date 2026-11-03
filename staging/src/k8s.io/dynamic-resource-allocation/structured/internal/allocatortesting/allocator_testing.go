@@ -1486,6 +1486,14 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResultWithSkipNodeOperations(req0, driverA, pool1, device1, resourceapi.SkipNodeOperationAll),
 			)},
 		},
+		"optional-node-operations-feature-disabled": {
+			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices:           unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA).withSkipNodeOperations(resourceapi.SkipNodeOperationAll)),
+			node:             nodeWithDRAOptionalNodeOperations(node1, region1),
+
+			expectResults: nil,
+		},
 		"optional-node-operations-missing-feature": {
 			features:         Features{OptionalNodeOperations: true},
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),

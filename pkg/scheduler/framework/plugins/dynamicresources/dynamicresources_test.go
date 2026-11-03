@@ -5388,6 +5388,13 @@ func TestAllocatorSelection(t *testing.T) {
 			expectImplementation: "stable",
 		},
 
+		// Disabling DRAOptionalNodeOperations is the rollback path for that feature.
+		"default-without-optional-node-operations": {
+			features:             "DRAOptionalNodeOperations=false",
+			usingFeatureGroup:    true,
+			expectImplementation: "stable",
+		},
+
 		// Alpha features may need the experimental implementation, if there are any
 		// and if those influence allocation.
 		"alpha": {
