@@ -463,8 +463,8 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(ctx context.Context, pod
 
 	// Asked also without a nominated node: with asynchronous API calls the
 	// pod in the informer may not show the nomination which plugins already know about.
-	if runner, ok := pl.fh.(framework.NominationExtensionsRunner); ok {
-		if eligible, reason := runner.RunNominationExtensionsPodEligibleToPreempt(ctx, pod, nomNodeName); !eligible {
+	if runner, ok := pl.fh.(framework.VictimExtensionsRunner); ok {
+		if eligible, reason := runner.RunVictimExtensionsPodEligibleToPreempt(ctx, pod, nomNodeName); !eligible {
 			return false, reason
 		}
 	}
