@@ -325,6 +325,14 @@ const (
 	// Enables post-start-hook for storage readiness
 	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
 
+	// owner: @nami-ant
+	// kep: https://kep.k8s.io/6268
+	//
+	// A watcher whose buffer fills up is served from the watch cache event
+	// history instead of being terminated. It ends with an in-stream 410
+	// only when its position ages out of the history.
+	WatchCacheStallResume featuregate.Feature = "WatchCacheStallResume"
+
 	// owner: @shadowofs
 	//
 	// Enables watch cache ingestion without fetching previous values from etcd.
@@ -540,6 +548,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	WatchCacheStallResume: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	WatchFromStorageWithoutPrevKV: {

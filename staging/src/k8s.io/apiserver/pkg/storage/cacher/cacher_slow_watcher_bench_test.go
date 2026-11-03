@@ -39,13 +39,17 @@ import (
 
 // BenchmarkSlowWatcherTax measures event delivery latency through the cacher's
 // dispatch path to a healthy watcher, alone and next to a companion watcher.
+// Every scenario runs with the WatchCacheStallResume gate off and on.
 // It needs wall-clock time; run it with:
 //
 //	go test ./staging/src/k8s.io/apiserver/pkg/storage/cacher/ -run xxx -bench BenchmarkSlowWatcherTax -benchtime 1x -v
 func BenchmarkSlowWatcherTax(b *testing.B) {
 	registry := compbasemetrics.NewKubeRegistry()
 	// The cacher's own instruments; an unregistered vector records nothing.
-	for _, m := range []compbasemetrics.Registerable{metrics.DispatchStageDuration, metrics.TerminatedWatchersCounter} {
+	for _, m := range []compbasemetrics.Registerable{
+		metrics.DispatchStageDuration, metrics.TerminatedWatchersCounter,
+		metrics.WatcherStalls, metrics.WatcherDeferredEvents, metrics.WatcherCatchupEvents,
+	} {
 		if err := registry.Register(m); err != nil {
 			b.Fatal(err)
 		}
@@ -59,20 +63,29 @@ func BenchmarkSlowWatcherTax(b *testing.B) {
 		{name: "baseline-1000", eventsPerSecond: 1000},
 		{name: "stalled-reconnecting-1000", eventsPerSecond: 1000, companion: true, companionReconnects: true},
 	}
-	for _, scenario := range scenarios {
-		b.Run(scenario.name, func(b *testing.B) {
-			var r slowWatcherResult
-			for b.Loop() {
-				r = runSlowWatcherScenario(b, registry, scenario)
-			}
-			b.ReportMetric(float64(r.percentile(0.5).Microseconds()), "p50-us")
-			b.ReportMetric(float64(r.percentile(0.9).Microseconds()), "p90-us")
-			b.ReportMetric(float64(r.percentile(0.99).Microseconds()), "p99-us")
-			b.ReportMetric(float64(r.percentile(1.0).Microseconds()), "max-us")
-			b.ReportMetric(float64(r.slowDispatches), "slow-dispatches")
-			b.ReportMetric(float64(r.terminated), "force-closed")
-			b.ReportMetric(float64(r.incomingHWM), "incoming-hwm")
-		})
+	for _, gateOn := range []bool{false, true} {
+		for _, scenario := range scenarios {
+			b.Run(fmt.Sprintf("gate=%v/%s", gateOn, scenario.name), func(b *testing.B) {
+				// The cacher reads the gate at construction.
+				setStallResumeGate(b, gateOn)
+				var r slowWatcherResult
+				for b.Loop() {
+					r = runSlowWatcherScenario(b, registry, scenario)
+				}
+				b.ReportMetric(float64(r.percentile(0.5).Microseconds()), "p50-us")
+				b.ReportMetric(float64(r.percentile(0.9).Microseconds()), "p90-us")
+				b.ReportMetric(float64(r.percentile(0.99).Microseconds()), "p99-us")
+				b.ReportMetric(float64(r.percentile(1.0).Microseconds()), "max-us")
+				b.ReportMetric(float64(r.slowDispatches), "slow-dispatches")
+				b.ReportMetric(float64(r.terminated), "force-closed")
+				b.ReportMetric(float64(r.incomingHWM), "incoming-hwm")
+				if gateOn {
+					b.ReportMetric(r.stalls, "stalls")
+					b.ReportMetric(r.deferredEvents, "deferred-events")
+					b.ReportMetric(float64(r.catchups), "catchups")
+				}
+			})
+		}
 	}
 }
 
@@ -103,6 +116,9 @@ type slowWatcherResult struct {
 	slowDispatches  uint64
 	terminated      int
 	incomingHWM     int64
+	// Always zero with the gate off.
+	stalls, deferredEvents float64
+	catchups               uint64
 }
 
 func (r slowWatcherResult) percentile(p float64) time.Duration {
@@ -226,8 +242,9 @@ func runSlowWatcherScenario(b *testing.B, registry compbasemetrics.KubeRegistry,
 			continue
 		}
 		// Events arrive in injection order: one fake watcher channel, one
-		// dispatch goroutine, one input channel per watcher. So the k-th
-		// Added event is pod k, and the loop bound keeps k below totalEvents.
+		// dispatch goroutine, one input channel per watcher, and with the gate
+		// on sync passes read the history in order. So the k-th Added event
+		// is pod k, and the loop bound keeps k below totalEvents.
 		latencies = append(latencies, time.Since(injected[len(latencies)]))
 	}
 	slices.Sort(latencies)
@@ -254,14 +271,21 @@ func runSlowWatcherScenario(b *testing.B, registry compbasemetrics.KubeRegistry,
 	// Deltas over this scenario only: the vectors are global and shared with other tests.
 	after := snapshotSlowWatcherMetrics(b, registry)
 	terminated := after.terminated - before.terminated
-	if scenario.companion && !scenario.companionDrainsChannel && terminated == 0 {
+	if scenario.companion && !scenario.companionDrainsChannel && cacher.stall == nil && terminated == 0 {
 		b.Fatalf("%s: no companion was force closed, so none blocked the dispatcher and the scenario measured nothing", scenario.name)
+	}
+	stalls := after.stalls - before.stalls
+	if scenario.companion && !scenario.companionDrainsChannel && cacher.stall != nil && stalls == 0 {
+		b.Fatalf("%s: no companion went unsynced, so the scenario measured nothing", scenario.name)
 	}
 	return slowWatcherResult{
 		sortedLatencies: latencies,
 		slowDispatches:  after.slowDispatches - before.slowDispatches,
 		terminated:      terminated,
 		incomingHWM:     atomic.LoadInt64((*int64)(&cacher.incomingHWM)),
+		stalls:          stalls,
+		deferredEvents:  after.deferredEvents - before.deferredEvents,
+		catchups:        after.catchups - before.catchups,
 	}
 }
 
@@ -323,6 +347,9 @@ func openCompanionWatcher(b *testing.B, scenario slowWatcherScenario, newWatch f
 type slowWatcherMetrics struct {
 	slowDispatches uint64 // stage="total" observations above slowDispatchGate
 	terminated     int
+	// WatchCacheStallResume counters.
+	stalls, deferredEvents float64
+	catchups               uint64
 }
 
 func snapshotSlowWatcherMetrics(b *testing.B, registry compbasemetrics.KubeRegistry) slowWatcherMetrics {
@@ -332,7 +359,19 @@ func snapshotSlowWatcherMetrics(b *testing.B, registry compbasemetrics.KubeRegis
 	}
 	var s slowWatcherMetrics
 	for _, mf := range families {
+		var total float64
+		for _, m := range mf.GetMetric() {
+			total += m.GetCounter().GetValue()
+		}
 		switch mf.GetName() {
+		case "apiserver_watch_cache_watcher_stalls_total":
+			s.stalls = total
+		case "apiserver_watch_cache_watcher_deferred_events_total":
+			s.deferredEvents = total
+		case "apiserver_watch_cache_watcher_catchup_events":
+			for _, m := range mf.GetMetric() {
+				s.catchups += m.GetHistogram().GetSampleCount()
+			}
 		case "apiserver_watch_events_dispatch_duration_seconds":
 			for _, m := range mf.GetMetric() {
 				if !testutil.LabelsMatch(m, map[string]string{"stage": "total"}) {
@@ -359,4 +398,139 @@ func snapshotSlowWatcherMetrics(b *testing.B, registry compbasemetrics.KubeRegis
 		}
 	}
 	return s
+}
+
+// BenchmarkMassStall reproduces the capacity limit of the sync passes with the
+// gate on. massStallWatchers watchers select every event and read at full speed.
+// The writer pauses once and then sends the delayed events back to back, which
+// can make all watchers unsynced together. They return to the live path only if
+// the passes deliver more than watchers times the write rate. With the gate off
+// the report shows the forced closes instead. Run it with:
+//
+//	go test ./staging/src/k8s.io/apiserver/pkg/storage/cacher/ -run xxx -bench BenchmarkMassStall -benchtime 1x
+func BenchmarkMassStall(b *testing.B) {
+	for _, gateOn := range []bool{false, true} {
+		b.Run(fmt.Sprintf("gate=%v", gateOn), func(b *testing.B) {
+			setStallResumeGate(b, gateOn)
+			var r massStallResult
+			for b.Loop() {
+				r = runMassStall(b)
+			}
+			b.ReportMetric(float64(r.slots), "slots")
+			b.ReportMetric(float64(r.maxUnsynced), "max-unsynced")
+			b.ReportMetric(float64(r.unsyncedAtEnd), "unsynced-at-end")
+			b.ReportMetric(float64(r.maxLagAtEnd), "max-lag-events")
+			b.ReportMetric(float64(r.closed), "closed")
+			b.ReportMetric(r.pushesPerSecond, "pass-pushes/s")
+		})
+	}
+}
+
+const (
+	massStallWatchers        = 500
+	massStallEventsPerSecond = 2000
+	massStallPause           = 100 * time.Millisecond
+	massStallBefore          = 2 * time.Second  // writes before the pause
+	massStallAfter           = 10 * time.Second // writes after the pause
+	massStallSample          = 10 * time.Millisecond
+)
+
+type massStallResult struct {
+	slots, maxUnsynced, unsyncedAtEnd int
+	maxLagAtEnd, closed               int64
+	pushesPerSecond                   float64
+}
+
+func runMassStall(b *testing.B) massStallResult {
+	// The cacher resolves its metrics at construction.
+	ensureStallResumeMetrics()
+	total := massStallEventsPerSecond * int((massStallBefore+massStallAfter)/time.Second)
+	pauseAt := massStallEventsPerSecond * int(massStallBefore/time.Second)
+	fw := watch.NewFakeWithChanSize(total+10, false)
+	cacher, _, err := newTestCacher(&cachertesting.MockStorage{
+		WatchFn: func(context.Context, string, storage.ListOptions) (watch.Interface, error) { return fw, nil },
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer cacher.Stop()
+
+	var r massStallResult
+	seen := make([]atomic.Int64, massStallWatchers)
+	var closed atomic.Int64
+	var stopping atomic.Bool
+	var readers sync.WaitGroup
+	watchers := make([]watch.Interface, massStallWatchers)
+	for i := range watchers {
+		w, err := cacher.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "100", Predicate: storage.Everything, Recursive: true})
+		if err != nil {
+			b.Fatal(err)
+		}
+		watchers[i] = w
+		r.slots = cap(w.(*cacheWatcher).input)
+		readers.Go(func() {
+			for ev := range w.ResultChan() {
+				if ev.Type == watch.Added {
+					seen[i].Add(1)
+				}
+			}
+			if !stopping.Load() {
+				closed.Add(1)
+			}
+		})
+	}
+	before := readStallResumeCounters(b)
+	unsynced := func() int {
+		c := readStallResumeCounters(b)
+		return int((c.stalls - before.stalls) - float64(c.roundSamples-before.roundSamples) - (c.expired - before.expired) - (c.expiredInitial - before.expiredInitial))
+	}
+
+	var paused atomic.Bool
+	var written atomic.Int64
+	writerDone := make(chan struct{})
+	go func() {
+		defer close(writerDone)
+		// An absolute schedule: after the pause the writer is behind it and
+		// sends the delayed events back to back.
+		interval := time.Second / massStallEventsPerSecond
+		start := time.Now()
+		for i := range total {
+			if i == pauseAt {
+				time.Sleep(massStallPause)
+				paused.Store(true)
+			}
+			time.Sleep(time.Until(start.Add(time.Duration(i+1) * interval)))
+			fw.Add(&example.Pod{Name: fmt.Sprintf("pod-%06d", i), Namespace: "ns", ResourceVersion: fmt.Sprintf("%d", 101+i)})
+			written.Add(1)
+		}
+	}()
+
+	var pushedAtPause float64
+	tick := time.NewTicker(massStallSample)
+	defer tick.Stop()
+sampling:
+	for {
+		select {
+		case <-writerDone:
+			break sampling
+		case <-tick.C:
+			if !paused.Load() {
+				pushedAtPause = readStallResumeCounters(b).deferred
+				continue
+			}
+			r.maxUnsynced = max(r.maxUnsynced, unsynced())
+		}
+	}
+	r.unsyncedAtEnd = unsynced()
+	for i := range seen {
+		r.maxLagAtEnd = max(r.maxLagAtEnd, written.Load()-seen[i].Load())
+	}
+	r.pushesPerSecond = (readStallResumeCounters(b).deferred - pushedAtPause) / massStallAfter.Seconds()
+	r.closed = closed.Load()
+	stopping.Store(true)
+	for _, w := range watchers {
+		w.Stop()
+	}
+	readers.Wait()
+	return r
 }

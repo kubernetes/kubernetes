@@ -674,6 +674,42 @@ func TestBookmarkAfterResourceVersionWatchers(t *testing.T) {
 	}
 }
 
+func TestForceCloseIncrementsTerminatedWatchers(t *testing.T) {
+	registry := compbasemetrics.NewKubeRegistry()
+	if err := registry.Register(metrics.TerminatedWatchersCounter); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var w *cacheWatcher
+	forget := func(drainWatcher bool) {
+		w.setDrainInputBufferLocked(drainWatcher)
+		w.stopLocked()
+	}
+	w = newCacheWatcher(1, filterAny, forget, storage.APIObjectVersioner{}, time.Now(), false, schema.GroupResource{Resource: "pods"}, metrics.NewNoopWatcherMetricsObservers(), nil, "", watchSelector{}, 0, 0)
+	if !w.nonblockingAdd(makeWatchCacheEvent(1)) {
+		t.Fatal("failed to fill the watcher's input buffer")
+	}
+
+	counter := metrics.TerminatedWatchersCounter.WithLabelValues("", "pods", metrics.TerminationReasonUnresponsive)
+	before, err := testutil.GetCounterMetricValue(counter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// With a nil timer add terminates the watcher when the push fails.
+	if w.add(makeWatchCacheEvent(2), nil) {
+		t.Fatal("expected add to fail and terminate the watcher")
+	}
+	after, err := testutil.GetCounterMetricValue(counter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after-before != 1 {
+		t.Errorf("expected the counter to increase by 1, got %v -> %v", before, after)
+	}
+	if !w.stopped {
+		t.Errorf("expected the watcher to be stopped")
+	}
+}
+
 func gatherWithoutBuckets(gatherer compbasemetrics.Gatherer) testutil.GathererFunc {
 	return func() ([]*testutil.MetricFamily, error) {
 		got, err := gatherer.Gather()
