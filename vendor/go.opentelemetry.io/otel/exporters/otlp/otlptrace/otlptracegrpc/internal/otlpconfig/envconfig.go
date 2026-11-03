@@ -100,6 +100,8 @@ func getOptionsFromEnv() []GenericOption {
 		envconfig.WithHeaders("TRACES_HEADERS", func(h map[string]string) { opts = append(opts, WithHeaders(h)) }),
 		WithEnvCompression("COMPRESSION", func(c Compression) { opts = append(opts, WithCompression(c)) }),
 		WithEnvCompression("TRACES_COMPRESSION", func(c Compression) { opts = append(opts, WithCompression(c)) }),
+		WithEnvProtocol("PROTOCOL", func(p Protocol) { opts = append(opts, WithProtocol(p)) }),
+		WithEnvProtocol("TRACES_PROTOCOL", func(p Protocol) { opts = append(opts, WithProtocol(p)) }),
 		envconfig.WithDuration("TIMEOUT", func(d time.Duration) { opts = append(opts, WithTimeout(d)) }),
 		envconfig.WithDuration("TRACES_TIMEOUT", func(d time.Duration) { opts = append(opts, WithTimeout(d)) }),
 	)
@@ -117,10 +119,20 @@ func withEndpointScheme(u *url.URL) GenericOption {
 }
 
 func withEndpointForGRPC(u *url.URL) func(cfg Config) Config {
+	target := u.String()
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		target = u.Host
+	case "":
+		if u.Host != "" {
+			target = path.Join(u.Host, u.Path)
+		}
+	}
+
 	return func(cfg Config) Config {
 		// For OTLP/gRPC endpoints, this is the target to which the
 		// exporter is going to send telemetry.
-		cfg.Traces.Endpoint = path.Join(u.Host, u.Path)
+		cfg.Traces.Endpoint = target
 		return cfg
 	}
 }
@@ -135,6 +147,25 @@ func WithEnvCompression(n string, fn func(Compression)) func(e *envconfig.EnvOpt
 			}
 
 			fn(cp)
+		}
+	}
+}
+
+// WithEnvProtocol retrieves the specified config and passes it to ConfigFn as a Protocol.
+func WithEnvProtocol(n string, fn func(Protocol)) func(e *envconfig.EnvOptionsReader) {
+	return func(e *envconfig.EnvOptionsReader) {
+		if v, ok := e.GetEnvValue(n); ok {
+			protocol := ProtocolHTTPProtobuf
+			switch v {
+			case "grpc":
+				protocol = ProtocolGRPC
+			case "http/protobuf":
+				protocol = ProtocolHTTPProtobuf
+			case "http/json":
+				protocol = ProtocolHTTPJSON
+			}
+
+			fn(protocol)
 		}
 	}
 }

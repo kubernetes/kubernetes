@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/dustin/go-humanize"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -86,7 +86,11 @@ func bootstrap(cfg config.ServerConfig) (b *bootstrappedServer, err error) {
 			return nil, fmt.Errorf("cannot write to WAL directory: %w", err)
 		}
 		cfg.Logger.Info("Bootstrapping WAL from snapshot")
-		bwal = bootstrapWALFromSnapshot(cfg, backend.snapshot, backend.ci)
+		bwal, err = bootstrapWALFromSnapshot(cfg, backend.snapshot, backend.ci)
+		if err != nil {
+			backend.Close()
+			return nil, err
+		}
 	}
 
 	cfg.Logger.Info("bootstrapping cluster")
@@ -225,6 +229,30 @@ func bootstrapSnapshot(cfg config.ServerConfig) *snap.Snapshotter {
 			zap.Error(err),
 		)
 	}
+
+	if err := fileutil.RemoveMatchFile(cfg.Logger, cfg.SnapDir(), func(fileName string) bool {
+		return strings.HasPrefix(strings.ToLower(fileName), "db.tmp")
+	}); err != nil {
+		cfg.Logger.Error(
+			"failed to remove orphaned defragmentation file in snapshot directory",
+			zap.String("path", cfg.SnapDir()),
+			zap.Error(err),
+		)
+	}
+
+	// TODO: we can remove this code in the next release etcd v3.9
+	if err := fileutil.RemoveMatchFile(cfg.Logger, cfg.SnapDir(), func(fileName string) bool {
+		return strings.HasSuffix(strings.ToLower(fileName), ".snap")
+	}); err != nil {
+		cfg.Logger.Error(
+			"failed to remove v2 snapshot file(s) in snapshot directory",
+			zap.String("path", cfg.SnapDir()),
+			zap.Error(err),
+		)
+	} else {
+		cfg.Logger.Info("cleaned up all legacy v2 snapshot files")
+	}
+
 	return snap.New(cfg.Logger, cfg.SnapDir())
 }
 
@@ -483,7 +511,7 @@ func (c *bootstrappedCluster) Finalize(cfg config.ServerConfig, s *bootstrappedS
 }
 
 func (c *bootstrappedCluster) databaseFileMissing(s *bootstrappedStorage) bool {
-	v3Cluster := c.cl.Version() != nil && !c.cl.Version().LessThan(semver.Version{Major: 3})
+	v3Cluster := c.cl.Version() != nil && !c.cl.Version().LessThan(semver.New(3, 0, 0, "", ""))
 	return v3Cluster && !s.backend.beExist
 }
 
@@ -573,7 +601,7 @@ func (b *bootstrappedRaft) newRaftNode(ss *snap.Snapshotter, wal *wal.WAL, cl *m
 	)
 }
 
-func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot, ci cindex.ConsistentIndexer) *bootstrappedWAL {
+func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot, ci cindex.ConsistentIndexer) (*bootstrappedWAL, error) {
 	wal, st, ents, snap, meta := openWALFromSnapshot(cfg, snapshot)
 	bwal := &bootstrappedWAL{
 		lg:       cfg.Logger,
@@ -597,7 +625,18 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 		// committed, we reset Commit to max(HardState.Commit, consistent_index).
 		//
 		// See: https://github.com/etcd-io/raft/pull/300 for more details.
-		bwal.st.Commit = new(max(oldCommitIndex, consistentIndex))
+		adjustedCommitIndex := max(oldCommitIndex, consistentIndex)
+		lastIdx := bwal.lastIndex()
+		if adjustedCommitIndex > lastIdx {
+			cfg.Logger.Error(
+				"adjusted commit index is ahead of the last WAL entry",
+				zap.Uint64("adjusted-commit-index", adjustedCommitIndex),
+				zap.Uint64("last-wal-entry-index", lastIdx),
+			)
+			bwal.w.Close()
+			return nil, fmt.Errorf("adjusted commit index %d exceeds the last WAL entry index %d", adjustedCommitIndex, lastIdx)
+		}
+		bwal.st.Commit = new(adjustedCommitIndex)
 
 		// discard the previously uncommitted entries
 		bwal.ents = bwal.CommitedEntries()
@@ -619,7 +658,7 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 			zap.Uint64("commit-index", bwal.st.GetCommit()),
 		)
 	}
-	return bwal
+	return bwal, nil
 }
 
 // openWALFromSnapshot reads the WAL at the given snap and returns the wal, its latest HardState and cluster ID, and all entries that appear
@@ -698,52 +737,68 @@ type bootstrappedWAL struct {
 	meta     *snapshotMetadata
 }
 
-func (wal *bootstrappedWAL) MemoryStorage() *raft.MemoryStorage {
+func (bwal *bootstrappedWAL) MemoryStorage() *raft.MemoryStorage {
 	s := raft.NewMemoryStorage()
-	if wal.snapshot != nil {
-		s.ApplySnapshot(wal.snapshot)
+	if bwal.snapshot != nil {
+		s.ApplySnapshot(bwal.snapshot)
 	}
-	if wal.st != nil {
-		s.SetHardState(wal.st)
+	if bwal.st != nil {
+		s.SetHardState(bwal.st)
 	}
-	if len(wal.ents) != 0 {
-		s.Append(wal.ents)
+	if len(bwal.ents) != 0 {
+		s.Append(bwal.ents)
 	}
 	return s
 }
 
-func (wal *bootstrappedWAL) CommitedEntries() []*raftpb.Entry {
-	for i, ent := range wal.ents {
-		if ent.GetIndex() > wal.st.GetCommit() {
-			wal.lg.Info(
+func (bwal *bootstrappedWAL) CommitedEntries() []*raftpb.Entry {
+	for i, ent := range bwal.ents {
+		if ent.GetIndex() > bwal.st.GetCommit() {
+			bwal.lg.Info(
 				"discarding uncommitted WAL entries",
 				zap.Uint64("entry-index", ent.GetIndex()),
-				zap.Uint64("commit-index-from-wal", wal.st.GetCommit()),
-				zap.Int("number-of-discarded-entries", len(wal.ents)-i),
+				zap.Uint64("commit-index-from-wal", bwal.st.GetCommit()),
+				zap.Int("number-of-discarded-entries", len(bwal.ents)-i),
 			)
-			return wal.ents[:i]
+			return bwal.ents[:i]
 		}
 	}
-	return wal.ents
+	return bwal.ents
 }
 
-func (wal *bootstrappedWAL) NewConfigChangeEntries() []*raftpb.Entry {
+func (bwal *bootstrappedWAL) NewConfigChangeEntries() []*raftpb.Entry {
 	return serverstorage.CreateConfigChangeEnts(
-		wal.lg,
-		serverstorage.GetEffectiveNodeIDsFromWALEntries(wal.lg, wal.snapshot, wal.ents),
-		uint64(wal.meta.nodeID),
-		wal.st.GetTerm(),
-		wal.st.GetCommit(),
+		bwal.lg,
+		serverstorage.GetEffectiveNodeIDsFromWALEntries(bwal.lg, bwal.snapshot, bwal.ents),
+		uint64(bwal.meta.nodeID),
+		bwal.st.GetTerm(),
+		bwal.st.GetCommit(),
 	)
 }
 
-func (wal *bootstrappedWAL) AppendAndCommitEntries(ents []*raftpb.Entry) {
-	wal.ents = append(wal.ents, ents...)
-	err := wal.w.Save(&raftpb.HardState{}, ents)
+func (bwal *bootstrappedWAL) AppendAndCommitEntries(ents []*raftpb.Entry) {
+	bwal.ents = append(bwal.ents, ents...)
+	err := bwal.w.Save(&raftpb.HardState{}, ents)
 	if err != nil {
-		wal.lg.Fatal("failed to save hard state and entries", zap.Error(err))
+		bwal.lg.Fatal("failed to save hard state and entries", zap.Error(err))
 	}
-	if len(wal.ents) != 0 {
-		wal.st.Commit = wal.ents[len(wal.ents)-1].Index
+	if len(bwal.ents) != 0 {
+		bwal.st.Commit = bwal.ents[len(bwal.ents)-1].Index
 	}
+}
+
+// `lastIndex` returns the index of the last entry, or the snapshot index if there are no entries
+func (bwal *bootstrappedWAL) lastIndex() uint64 {
+	var idx uint64
+	if bwal.snapshot != nil {
+		idx = bwal.snapshot.GetMetadata().GetIndex()
+	}
+
+	if len(bwal.ents) != 0 {
+		if entIdx := bwal.ents[len(bwal.ents)-1].GetIndex(); entIdx > idx {
+			idx = entIdx
+		}
+	}
+
+	return idx
 }

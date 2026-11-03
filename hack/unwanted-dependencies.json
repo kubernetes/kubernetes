@@ -8,10 +8,6 @@
       "github.com/google/cel-go": {
         "version": "v0.29.2",
         "reason": "pin to v0.29.2 until the CEL runtime cost changes in newer releases are handled, see #141056"
-      },
-      "github.com/grpc-ecosystem/grpc-gateway/v2": {
-        "version": "v2.29.0",
-        "reason": "pin to v2.29.0 until grpc-gateway drops go-openapi, see grpc-ecosystem/grpc-gateway#7343 and #7325; v2.30.0 pulls in go-openapi analysis, spec, strfmt and validate"
       }
     },
     "unwantedModules": {
@@ -117,14 +113,8 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "go.etcd.io/bbolt",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/pkg/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/pkg/v3",
-        "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
         "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
         "go.uber.org/goleak",
         "go.uber.org/multierr",
         "go.uber.org/zap",
@@ -168,10 +158,10 @@
       "golang.org/x/exp": [
         "cel.dev/cel-go",
         "github.com/antlr4-go/antlr/v4",
-        "github.com/grpc-ecosystem/go-grpc-middleware/v2"
+        "github.com/grpc-ecosystem/go-grpc-middleware/v2",
+        "github.com/grpc-ecosystem/grpc-gateway/v2"
       ],
       "gopkg.in/yaml.v3": [
-        "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
         "github.com/go-task/slim-sprig/v3",
@@ -179,14 +169,8 @@
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "go.etcd.io/bbolt",
-        "go.etcd.io/etcd/api/v3",
-        "go.etcd.io/etcd/client/pkg/v3",
-        "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/pkg/v3",
-        "go.etcd.io/etcd/server/v3",
         "go.etcd.io/raft/v3",
         "go.opentelemetry.io/auto/sdk",
-        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
         "go.uber.org/goleak",
         "go.uber.org/multierr",
         "go.uber.org/zap"

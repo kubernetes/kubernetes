@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
@@ -62,6 +62,7 @@ var (
 		"3.5.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"3.6.0": {streamTypeMsgAppV2, streamTypeMessage},
 		"3.7.0": {streamTypeMsgAppV2, streamTypeMessage},
+		"3.8.0": {streamTypeMsgAppV2, streamTypeMessage},
 	}
 )
 
@@ -609,7 +610,7 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 	}
 
 	rv := serverVersion(resp.Header)
-	lv := semver.Must(semver.NewVersion(version.Version))
+	lv := semver.MustParse(version.Version)
 	if compareMajorMinorVersion(rv, lv) == -1 && !checkStreamSupport(rv, t) {
 		httputil.GracefulClose(resp)
 		cr.picker.unreachable(u)
@@ -708,7 +709,7 @@ func (cr *streamReader) resume() {
 // checkStreamSupport checks whether the stream type is supported in the
 // given version.
 func checkStreamSupport(v *semver.Version, t streamType) bool {
-	nv := &semver.Version{Major: v.Major, Minor: v.Minor}
+	nv := semver.New(v.Major(), v.Minor(), 0, "", "")
 	for _, s := range supportedStream[nv.String()] {
 		if s == t {
 			return true

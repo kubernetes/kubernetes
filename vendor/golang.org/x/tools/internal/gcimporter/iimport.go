@@ -93,16 +93,11 @@ const (
 // If the export data version is not recognized or the format is otherwise
 // compromised, an error is returned.
 func IImportData(fset *token.FileSet, imports map[string]*types.Package, data []byte, path string) (*types.Package, error) {
-	pkgs, err := iimportCommon(fset, GetPackagesFromMap(imports), data, false, path, false, nil)
+	pkgs, err := iimportCommon(fset, GetPackagesFromMap(imports), data, path, false, nil)
 	if err != nil {
 		return nil, err
 	}
 	return pkgs[0], nil
-}
-
-// IImportBundle imports a set of packages from the serialized package bundle.
-func IImportBundle(fset *token.FileSet, imports map[string]*types.Package, data []byte) ([]*types.Package, error) {
-	return iimportCommon(fset, GetPackagesFromMap(imports), data, true, "", false, nil)
 }
 
 // A GetPackagesFunc function obtains the non-nil symbols for a set of
@@ -144,15 +139,13 @@ func GetPackagesFromMap(m map[string]*types.Package) GetPackagesFunc {
 	}
 }
 
-func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte, bundle bool, path string, shallow bool, reportf ReportFunc) (pkgs []*types.Package, err error) {
+func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte, path string, shallow bool, reportf ReportFunc) (pkgs []*types.Package, err error) {
 	const currentVersion = iexportVersionCurrent
 	version := int64(-1)
 	if !debug {
 		defer func() {
 			if e := recover(); e != nil {
-				if bundle {
-					err = fmt.Errorf("%v", e)
-				} else if version > currentVersion {
+				if version > currentVersion {
 					err = fmt.Errorf("cannot import %q (%v), export data is newer version - update tool", path, e)
 				} else {
 					err = fmt.Errorf("internal error while importing %q (%v); please report an issue", path, e)
@@ -162,12 +155,6 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 	}
 
 	r := &intReader{bytes.NewReader(data), path}
-
-	if bundle {
-		if v := r.uint64(); v != bundleVersion {
-			errorf("unknown bundle format version %d", v)
-		}
-	}
 
 	version = int64(r.uint64())
 	switch version {
@@ -287,29 +274,16 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 		pkgList[i] = pkg
 	}
 
-	if bundle {
-		pkgs = make([]*types.Package, r.uint64())
-		for i := range pkgs {
-			pkg := p.pkgAt(r.uint64())
-			imps := make([]*types.Package, r.uint64())
-			for j := range imps {
-				imps[j] = p.pkgAt(r.uint64())
-			}
-			pkg.SetImports(imps)
-			pkgs[i] = pkg
-		}
-	} else {
-		if len(pkgList) == 0 {
-			errorf("no packages found for %s", path)
-			panic("unreachable")
-		}
-		pkgs = pkgList[:1]
-
-		// record all referenced packages as imports
-		list := slices.Clone(pkgList[1:])
-		sort.Sort(byPath(list))
-		pkgs[0].SetImports(list)
+	if len(pkgList) == 0 {
+		errorf("no packages found for %s", path)
+		panic("unreachable")
 	}
+	pkgs = pkgList[:1]
+
+	// record all referenced packages as imports
+	list := slices.Clone(pkgList[1:])
+	sort.Sort(byPath(list))
+	pkgs[0].SetImports(list)
 
 	for _, pkg := range pkgs {
 		if pkg.Complete() {

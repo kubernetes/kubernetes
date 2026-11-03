@@ -25,7 +25,7 @@ import (
 type CredsRequirement int
 
 const (
-	// CredsRequire - Credentials/certificate required for thi type of connection.
+	// CredsRequire - Credentials/certificate required for this type of connection.
 	CredsRequire CredsRequirement = iota
 	// CredsDrop - Credentials/certificate not needed and should get ignored.
 	CredsDrop

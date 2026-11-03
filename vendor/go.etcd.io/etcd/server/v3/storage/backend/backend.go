@@ -15,6 +15,7 @@
 package backend
 
 import (
+	"bytes"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -24,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	humanize "github.com/dustin/go-humanize"
+	"github.com/dustin/go-humanize"
 	"go.uber.org/zap"
 
 	bolt "go.etcd.io/bbolt"
@@ -72,6 +73,14 @@ type Backend interface {
 
 	// SetTxPostLockInsideApplyHook sets a txPostLockInsideApplyHook.
 	SetTxPostLockInsideApplyHook(func())
+
+	// LockForSafeRangeDelete must be held for the full duration of any operation that
+	// deletes keys from a bucket registered as safe-range (e.g. compaction). It prevents
+	// such deletes from running concurrently with a non-blocking Defrag(): otherwise, the
+	// removed keys could be carried over into the defragmented db, causing this etcd
+	// server's db hash to differ from other members'.
+	LockForSafeRangeDelete()
+	UnlockForSafeRangeDelete()
 }
 
 type Snapshot interface {
@@ -122,6 +131,14 @@ type backend struct {
 	stopc chan struct{}
 	donec chan struct{}
 
+	// nonBlockingDefrag enables non-blocking defragmentation.
+	nonBlockingDefrag bool
+	// defragMu serializes Defrag() calls.
+	defragMu sync.Mutex
+	// safeRangeDeleteMu excludes safe-range-bucket deletes (e.g. Compact()) from running
+	// concurrently with a non-blocking Defrag() call; see LockForSafeRangeDelete.
+	safeRangeDeleteMu sync.RWMutex
+
 	hooks Hooks
 
 	// txPostLockInsideApplyHook is called each time right after locking the tx.
@@ -141,6 +158,9 @@ type BackendConfig struct {
 	BackendFreelistType bolt.FreelistType
 	// MmapSize is the number of bytes to mmap for the backend.
 	MmapSize uint64
+	// NonBlockingDefrag enables non-blocking defragmentation: the bulk of the copy runs
+	// concurrently with live traffic, followed by a short stop-the-world catch-up phase.
+	NonBlockingDefrag bool
 	// Logger logs backend-side operations.
 	Logger *zap.Logger
 	// UnsafeNoFsync disables all uses of fsync.
@@ -244,6 +264,8 @@ func newBackend(bcfg BackendConfig) *backend {
 
 		stopc: make(chan struct{}),
 		donec: make(chan struct{}),
+
+		nonBlockingDefrag: bcfg.NonBlockingDefrag,
 
 		lg: bcfg.Logger,
 	}
@@ -474,37 +496,29 @@ func (b *backend) Defrag() error {
 }
 
 func (b *backend) defrag() error {
-	verify.Assert(b.lg != nil, "the logger should not be nil")
-	now := time.Now()
-	isDefragActive.Set(1)
-	defer isDefragActive.Set(0)
+	// Serialize Defrag() calls, so that any two of them (e.g. two non-blocking defrags, or one
+	// blocking and one non-blocking defrag) can never run concurrently against the same db.
+	b.defragMu.Lock()
+	defer b.defragMu.Unlock()
 
-	// TODO: make this non-blocking?
-	// lock batchTx to ensure nobody is using previous tx, and then
-	// close previous ongoing tx.
-	b.batchTx.LockOutsideApply()
-	defer b.batchTx.Unlock()
+	if b.nonBlockingDefrag {
+		return b.defragNonBlocking()
+	}
+	return b.defragBlocking()
+}
 
-	// lock database after lock tx to avoid deadlock.
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// block concurrent read requests while resetting tx
-	b.readTx.Lock()
-	defer b.readTx.Unlock()
-
+// createDefragTmpDB creates the temporary bbolt database that a defrag pass (blocking or
+// non-blocking) copies into before it's renamed over the live db.
+func (b *backend) createDefragTmpDB() (*bolt.DB, string, error) {
 	// Create a temporary file to ensure we start with a clean slate.
 	// Snapshotter.cleanupSnapdir cleans up any of these that are found during startup.
 	dir := filepath.Dir(b.db.Path())
 	temp, err := os.CreateTemp(dir, "db.tmp.*")
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
-	options := bolt.Options{}
-	if boltOpenOptions != nil {
-		options = *boltOpenOptions
-	}
+	options := *b.bopts
 	options.OpenFile = func(_ string, _ int, _ os.FileMode) (file *os.File, err error) {
 		// gofail: var defragOpenFileError string
 		// return nil, fmt.Errorf(defragOpenFileError)
@@ -512,6 +526,10 @@ func (b *backend) defrag() error {
 	}
 	// Don't load tmp db into memory regardless of opening options
 	options.Mlock = false
+	// Skip fsync on intermediate commits to avoid contending with the live db's own fsyncs;
+	// finishDefrag syncs the tmp db explicitly before renaming it over the live db.
+	options.NoSync = true
+
 	tdbp := temp.Name()
 	tmpdb, err := bolt.Open(tdbp, 0o600, &options)
 	if err != nil {
@@ -524,60 +542,52 @@ func (b *backend) defrag() error {
 			)
 		}
 
-		return err
+		return nil, "", err
 	}
+	return tmpdb, tdbp, nil
+}
 
-	dbp := b.db.Path()
-	size1, sizeInUse1 := b.Size(), b.SizeInUse()
-	b.lg.Info(
-		"defragmenting",
-		zap.String("path", dbp),
-		zap.Int64("current-db-size-bytes", size1),
-		zap.String("current-db-size", humanize.Bytes(uint64(size1))),
-		zap.Int64("current-db-size-in-use-bytes", sizeInUse1),
-		zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse1))),
-	)
-
-	defer func() {
-		// NOTE: We should exit as soon as possible because that tx
-		// might be closed. The inflight request might use invalid
-		// tx and then panic as well. The real panic reason might be
-		// shadowed by new panic. So, we should fatal here with lock.
-		if rerr := recover(); rerr != nil {
-			b.lg.Fatal("unexpected panic during defrag", zap.Any("panic", rerr))
-		}
-	}()
-
-	// Commit/stop and then reset current transactions (including the readTx)
-	b.batchTx.unsafeCommit(true)
-	b.batchTx.tx = nil
-
-	// gofail: var defragBeforeCopy struct{}
-	err = defragdb(b.db, tmpdb, defragLimit)
-	if err != nil {
-		tmpdb.Close()
-		if rmErr := os.RemoveAll(tmpdb.Path()); rmErr != nil {
-			b.lg.Error("failed to remove db.tmp after defragmentation completed", zap.Error(rmErr))
-		}
-
-		// restore the bbolt transactions if defragmentation fails
-		b.batchTx.tx = b.unsafeBegin(true)
-		b.readTx.tx = b.unsafeBegin(false)
-
-		return err
+// cleanupTmpDB closes tmpdb (idempotent if already closed) and removes its underlying file. It's
+// called whenever a defrag pass is aborted or fails, so a stray, potentially large db.tmp.* file
+// doesn't linger on disk until the next startup.
+func (b *backend) cleanupTmpDB(tmpdb *bolt.DB, tdbp string) {
+	if cerr := tmpdb.Close(); cerr != nil {
+		b.lg.Error("failed to close tmp database", zap.String("path", tdbp), zap.Error(cerr))
 	}
+	if rmErr := os.RemoveAll(tdbp); rmErr != nil {
+		b.lg.Error("failed to remove tmp database", zap.String("path", tdbp), zap.Error(rmErr))
+	}
+}
 
-	err = b.db.Close()
+// finishDefrag closes the live db and tmpdb, renames tmpdb over the live db, reopens it, and
+// updates size metrics/logs. It assumes the caller already holds the batchTx/mu/readTx locks and
+// has reset the batchTx/readTx bbolt transactions.
+func (b *backend) finishDefrag(tmpdb *bolt.DB, tdbp, dbp string, now time.Time, size1, sizeInUse1 int64) error {
+	// If etcd is in the process of transferring a snapshot to a client, this
+	// will block until the read-only transaction used for reading the
+	// snapshot is closed. Users should avoid downloading a snapshot at the
+	// same time as defragmentation.
+	err := b.db.Close()
 	if err != nil {
+		b.cleanupTmpDB(tmpdb, tdbp)
 		b.lg.Fatal("failed to close database", zap.Error(err))
+	}
+	// tmpdb is opened with NoSync (see createDefragTmpDB) so its intermediate commits don't
+	// contend with the live db's own fsyncs. Force one explicit sync here so its final,
+	// complete state is durable on disk before it's renamed over the live db.
+	if err = tmpdb.Sync(); err != nil {
+		b.cleanupTmpDB(tmpdb, tdbp)
+		b.lg.Fatal("failed to sync tmp database", zap.Error(err))
 	}
 	err = tmpdb.Close()
 	if err != nil {
+		b.cleanupTmpDB(tmpdb, tdbp)
 		b.lg.Fatal("failed to close tmp database", zap.Error(err))
 	}
 	// gofail: var defragBeforeRename struct{}
 	err = os.Rename(tdbp, dbp)
 	if err != nil {
+		b.cleanupTmpDB(tmpdb, tdbp)
 		b.lg.Fatal("failed to rename tmp database", zap.Error(err))
 	}
 
@@ -613,14 +623,184 @@ func (b *backend) defrag() error {
 	return nil
 }
 
-func defragdb(odb, tmpdb *bolt.DB, limit int) error {
+func (b *backend) defragBlocking() error {
+	verify.Assert(b.lg != nil, "the logger should not be nil")
+	now := time.Now()
+	isDefragActive.Set(1)
+	defer isDefragActive.Set(0)
+
+	// TODO: make this non-blocking?
+	// lock batchTx to ensure nobody is using previous tx, and then
+	// close previous ongoing tx.
+	b.batchTx.LockOutsideApply()
+	defer b.batchTx.Unlock()
+
+	// lock database after lock tx to avoid deadlock.
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// block concurrent read requests while resetting tx
+	b.readTx.Lock()
+	defer b.readTx.Unlock()
+
+	tmpdb, tdbp, err := b.createDefragTmpDB()
+	if err != nil {
+		return err
+	}
+
+	dbp := b.db.Path()
+	size1, sizeInUse1 := b.Size(), b.SizeInUse()
+	b.lg.Info(
+		"defragmenting",
+		zap.String("path", dbp),
+		zap.Int64("current-db-size-bytes", size1),
+		zap.String("current-db-size", humanize.Bytes(uint64(size1))),
+		zap.Int64("current-db-size-in-use-bytes", sizeInUse1),
+		zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse1))),
+	)
+
+	defer func() {
+		// NOTE: We should exit as soon as possible because that tx
+		// might be closed. The inflight request might use invalid
+		// tx and then panic as well. The real panic reason might be
+		// shadowed by new panic. So, we should fatal here with lock.
+		if rerr := recover(); rerr != nil {
+			b.lg.Fatal("unexpected panic during defrag", zap.Any("panic", rerr))
+		}
+	}()
+
+	// Commit/stop and then reset current transactions (including the readTx)
+	b.batchTx.unsafeCommit(true)
+	b.batchTx.tx = nil
+
+	// gofail: var defragBeforeCopy struct{}
+	err = defragdb(b.db, tmpdb, defragLimit)
+	if err != nil {
+		b.cleanupTmpDB(tmpdb, tdbp)
+
+		// restore the bbolt transactions if defragmentation fails
+		b.batchTx.tx = b.unsafeBegin(true)
+		b.readTx.tx = b.unsafeBegin(false)
+
+		return err
+	}
+
+	return b.finishDefrag(tmpdb, tdbp, dbp, now, size1, sizeInUse1)
+}
+
+// defragNonBlocking performs a non-blocking defrag: the bulk of the copy runs against a
+// read-only snapshot of the live db while normal reads/writes continue via the regular
+// batchTx/readTx path, followed by a short stop-the-world catch-up phase.
+func (b *backend) defragNonBlocking() error {
+	// Exclude safe-range-bucket deletes (e.g. Compact()) for the whole call: their deletes
+	// from the "key" bucket (the only safe-range bucket) would otherwise be invisible to
+	// catchUpDefrag's incremental, append-only resync, which only detects keys added after
+	// the bulk-copy phase's snapshot, never ones removed by a delete that ran during it.
+	b.safeRangeDeleteMu.Lock()
+	defer b.safeRangeDeleteMu.Unlock()
+
+	verify.Assert(b.lg != nil, "the logger should not be nil")
+	now := time.Now()
+	isDefragActive.Set(1)
+	defer isDefragActive.Set(0)
+
+	tmpdb, tdbp, err := b.createDefragTmpDB()
+	if err != nil {
+		return err
+	}
+
+	dbp := b.db.Path()
+	size1, sizeInUse1 := b.Size(), b.SizeInUse()
+	b.lg.Info(
+		"defragmenting (non-blocking)",
+		zap.String("path", dbp),
+		zap.Int64("current-db-size-bytes", size1),
+		zap.String("current-db-size", humanize.Bytes(uint64(size1))),
+		zap.Int64("current-db-size-in-use-bytes", sizeInUse1),
+		zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse1))),
+	)
+
+	// Phase 1: bulk-copy the live db using only a read-only bbolt transaction, mirroring
+	// Snapshot()'s locking (b.mu.RLock() only around Begin, not held for the copy itself), so
+	// live reads/writes keep flowing through the normal batchTx/readTx path throughout.
+	b.ForceCommit()
+	b.mu.RLock()
+	odb := b.db
+	b.mu.RUnlock()
+
+	// setupDuration is the time from the start of defrag to the point where the read-only
+	// snapshot of the live db is ready to copy: creating tmpdb and ForceCommit.
+	setupDuration := time.Since(now)
+
+	// gofail: var defragNonBlockBeforeCopy struct{}
+	lastKeys, err := defragdbAndTrackLastKeys(odb, tmpdb, defragLimit)
+	if err != nil {
+		b.cleanupTmpDB(tmpdb, tdbp)
+		return err
+	}
+
+	// bulkCopyDuration is Phase 1's duration: bulk-copying the live db into tmpdb from the
+	// read-only snapshot, while normal reads/writes keep flowing through batchTx/readTx.
+	bulkCopyDuration := time.Since(now) - setupDuration
+
+	// Phase 2: short stop-the-world catch-up + swap.
+	b.batchTx.LockOutsideApply()
+	defer b.batchTx.Unlock()
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.readTx.Lock()
+	defer b.readTx.Unlock()
+
+	defer func() {
+		// See the equivalent comment in defragBlocking: we must fatal here with the locks held,
+		// since a partially-reset tx could otherwise be used by an inflight request and panic.
+		if rerr := recover(); rerr != nil {
+			b.lg.Fatal("unexpected panic during non-blocking defrag", zap.Any("panic", rerr))
+		}
+	}()
+
+	// Commit/stop and then reset current transactions (including the readTx)
+	b.batchTx.unsafeCommit(true)
+	b.batchTx.tx = nil
+
+	// gofail: var defragNonBlockBeforeCatchup struct{}
+	if err = catchUpDefrag(b.db, tmpdb, lastKeys, defragLimit); err != nil {
+		b.cleanupTmpDB(tmpdb, tdbp)
+
+		// restore the bbolt transactions if defragmentation fails
+		b.batchTx.tx = b.unsafeBegin(true)
+		b.readTx.tx = b.unsafeBegin(false)
+
+		return err
+	}
+
+	err = b.finishDefrag(tmpdb, tdbp, dbp, now, size1, sizeInUse1)
+
+	// stopTheWorldDuration is Phase 2's duration: the client-visible blocking window, covering
+	// lock acquisition, committing/resetting the current tx, and the incremental catch-up copy.
+	stopTheWorldDuration := time.Since(now) - setupDuration - bulkCopyDuration
+
+	defragBlockingSec.Observe(stopTheWorldDuration.Seconds())
+
+	b.lg.Info("non-blocking defragmentation",
+		zap.String("path", dbp),
+		zap.Duration("setupDuration", setupDuration),
+		zap.Duration("bulkCopyDuration", bulkCopyDuration),
+		zap.Duration("stopTheWorldDuration", stopTheWorldDuration))
+
+	return err
+}
+
+func defragdb(odb, tmpdb *bolt.DB, limit int) (err error) {
 	// gofail: var defragdbFail string
 	// return fmt.Errorf(defragdbFail)
 
 	// open a tx on tmpdb for writes
-	tmptx, err := tmpdb.Begin(true)
-	if err != nil {
-		return err
+	tmptx, beginErr := tmpdb.Begin(true)
+	if beginErr != nil {
+		return beginErr
 	}
 	defer func() {
 		if err != nil {
@@ -629,9 +809,9 @@ func defragdb(odb, tmpdb *bolt.DB, limit int) error {
 	}()
 
 	// open a tx on old db for read
-	tx, err := odb.Begin(false)
-	if err != nil {
-		return err
+	tx, txErr := odb.Begin(false)
+	if txErr != nil {
+		return txErr
 	}
 	defer tx.Rollback()
 
@@ -650,16 +830,16 @@ func defragdb(odb, tmpdb *bolt.DB, limit int) error {
 		}
 		tmpb.FillPercent = 0.9 // for bucket2seq write in for each
 
-		if err = b.ForEach(func(k, v []byte) error {
+		if foreachErr := b.ForEach(func(k, v []byte) error {
 			count++
 			if count > limit {
-				err = tmptx.Commit()
-				if err != nil {
-					return err
+				if commitErr := tmptx.Commit(); commitErr != nil {
+					return commitErr
 				}
-				tmptx, err = tmpdb.Begin(true)
-				if err != nil {
-					return err
+				var reopenErr error
+				tmptx, reopenErr = tmpdb.Begin(true)
+				if reopenErr != nil {
+					return reopenErr
 				}
 				tmpb = tmptx.Bucket(next)
 				tmpb.FillPercent = 0.9 // for bucket2seq write in for each
@@ -667,12 +847,240 @@ func defragdb(odb, tmpdb *bolt.DB, limit int) error {
 				count = 0
 			}
 			return tmpb.Put(k, v)
+		}); foreachErr != nil {
+			return foreachErr
+		}
+	}
+
+	return tmptx.Commit()
+}
+
+// defragdbAndTrackLastKeys behaves like defragdb, but only copies safe-range buckets, recording
+// for each the last (largest) key it copied. It's used by non-blocking defrag's bulk-copy phase:
+// non-safe-range buckets are skipped here since catchUpDefrag always fully re-copies them anyway,
+// and the recorded last keys tell catchUpDefrag where to resume for the safe-range ones.
+func defragdbAndTrackLastKeys(odb, tmpdb *bolt.DB, limit int) (lastKeys map[string][]byte, err error) {
+	// gofail: var defragdbNonBlockFail string
+	// return nil, fmt.Errorf(defragdbNonBlockFail)
+
+	lastKeys = make(map[string][]byte)
+
+	// open a tx on tmpdb for writes
+	tmptx, beginErr := tmpdb.Begin(true)
+	if beginErr != nil {
+		return nil, beginErr
+	}
+	defer func() {
+		if err != nil && tmptx != nil {
+			tmptx.Rollback()
+		}
+	}()
+
+	// Open a readonly transaction on the old db for read. Note normally a readonly
+	// transaction doesn't block write transaction, so etcd can still serve client
+	// requests during the following bulk-copy phase. For more details,
+	// refer to https://github.com/etcd-io/etcd/pull/22425#issuecomment-5664626212
+	tx, txErr := odb.Begin(false)
+	if txErr != nil {
+		return nil, txErr
+	}
+	defer tx.Rollback()
+
+	c := tx.Cursor()
+
+	count := 0
+	for next, _ := c.First(); next != nil; next, _ = c.Next() {
+		// Only safe-range buckets can be caught up via a "keys greater than the last one
+		// copied" range scan (see catchUpDefrag); other buckets are always fully re-copied
+		// there, so copying them here too would just be wasted work.
+		if !isRegisteredSafeRangeBucket(next) {
+			continue
+		}
+
+		b := tx.Bucket(next)
+		if b == nil {
+			return nil, fmt.Errorf("backend: cannot defrag(non-blocking) bucket %s", next)
+		}
+
+		tmpb, berr := tmptx.CreateBucketIfNotExists(next)
+		if berr != nil {
+			return nil, berr
+		}
+		tmpb.FillPercent = 0.9 // for bucket2seq write in for each
+
+		bucketName := string(next)
+		var lastKey []byte
+		if foreachErr := b.ForEach(func(k, v []byte) error {
+			count++
+			if count > limit {
+				if commitErr := tmptx.Commit(); commitErr != nil {
+					return commitErr
+				}
+				var reopenErr error
+				tmptx, reopenErr = tmpdb.Begin(true)
+				if reopenErr != nil {
+					return reopenErr
+				}
+				tmpb = tmptx.Bucket(next)
+				tmpb.FillPercent = 0.9 // for bucket2seq write in for each
+
+				count = 0
+			}
+			lastKey = k
+			return tmpb.Put(k, v)
+		}); foreachErr != nil {
+			return nil, foreachErr
+		}
+		if lastKey != nil {
+			// Any value (including `lastKey`) read from bbolt are only valid
+			// while the transaction is open, so we copy it to another byte slice.
+			lastKeys[bucketName] = bytes.Clone(lastKey)
+		}
+	}
+
+	if commitErr := tmptx.Commit(); commitErr != nil {
+		return nil, commitErr
+	}
+
+	// Proactively sync the bulk copy here, outside the stop-the-world phase, so Phase 2
+	// only has the much smaller catch-up data left to sync, minimizing its duration.
+	if syncErr := tmpdb.Sync(); syncErr != nil {
+		return nil, syncErr
+	}
+
+	return lastKeys, nil
+}
+
+// catchUpDefrag runs during non-blocking defrag's short stop-the-world phase, against the live db (which
+// may have received writes since defragdbAndTrackLastKeys took its snapshot) and the tmpdb that
+// snapshot was copied into. For each bucket it either appends entries newer than the last key
+// defragdbAndTrackLastKeys copied (only valid for buckets registered as "safe range", i.e. known
+// to never overwrite an existing key), or fully re-copies the bucket's current contents —
+// buckets that aren't safe-range can be mutated in place, so a key-based diff could miss updates.
+func catchUpDefrag(odb, tmpdb *bolt.DB, lastKeys map[string][]byte, limit int) (err error) {
+	verifyBulkCopyConsistency(odb, tmpdb, lastKeys)
+
+	tx, err := odb.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	tmptx, err := tmpdb.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tmptx.Rollback()
+		}
+	}()
+
+	c := tx.Cursor()
+	for next, _ := c.First(); next != nil; next, _ = c.Next() {
+		liveBucket := tx.Bucket(next)
+		if liveBucket == nil {
+			return fmt.Errorf("backend: cannot defrag bucket %s", next)
+		}
+
+		if lastKey, wasCopied := lastKeys[string(next)]; wasCopied && isRegisteredSafeRangeBucket(next) {
+			tmpb := tmptx.Bucket(next)
+			if tmpb == nil {
+				return fmt.Errorf("backend: missing defragmented bucket %s", next)
+			}
+			tmpb.FillPercent = 0.9
+			bc := liveBucket.Cursor()
+			count := 0
+			for k, v := bc.Seek(lastKey); k != nil; k, v = bc.Next() {
+				if bytes.Equal(k, lastKey) {
+					continue
+				}
+				count++
+				if count > limit {
+					if commitErr := tmptx.Commit(); commitErr != nil {
+						return commitErr
+					}
+					var reopenErr error
+					tmptx, reopenErr = tmpdb.Begin(true)
+					if reopenErr != nil {
+						return reopenErr
+					}
+					tmpb = tmptx.Bucket(next)
+					tmpb.FillPercent = 0.9
+					count = 0
+				}
+				if err = tmpb.Put(k, v); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		// For the buckets that aren't safe to range, copy its entire current contents here instead.
+		tmpb, berr := tmptx.CreateBucketIfNotExists(next)
+		if berr != nil {
+			return berr
+		}
+		tmpb.FillPercent = 0.9
+		if err = liveBucket.ForEach(func(k, v []byte) error {
+			return tmpb.Put(k, v)
 		}); err != nil {
 			return err
 		}
 	}
 
 	return tmptx.Commit()
+}
+
+// verifyBulkCopyConsistency verifies that, for each safe-range bucket with a recorded lastKey,
+// the entries in odb up to and including that lastKey hash identically to the corresponding
+// entries in tmpdb. It only covers the portion of data copied by defragdbAndTrackLastKeys's
+// bulk-copy phase; entries after lastKey are handled separately by catchUpDefrag.
+func verifyBulkCopyConsistency(odb, tmpdb *bolt.DB, lastKeys map[string][]byte) {
+	verify.Verify("verify data consistency between the existing db and the new db", func() (condition bool, details map[string]any) {
+		for bucketName, lastKey := range lastKeys {
+			oldHash, oldErr := hashBucketUpToKey(odb, bucketName, lastKey)
+			if oldErr != nil {
+				return false, map[string]any{"error": fmt.Sprintf("failed to hash old db bucket %s: %s", bucketName, oldErr.Error())}
+			}
+			newHash, newErr := hashBucketUpToKey(tmpdb, bucketName, lastKey)
+			if newErr != nil {
+				return false, map[string]any{"error": fmt.Sprintf("failed to hash new db bucket %s: %s", bucketName, newErr.Error())}
+			}
+			if oldHash != newHash {
+				return false, map[string]any{"error": fmt.Sprintf("hash mismatch for bucket %s: old=%d, new=%d", bucketName, oldHash, newHash)}
+			}
+		}
+
+		return true, nil
+	})
+}
+
+// hashBucketUpToKey returns the CRC32 hash of all key/value pairs in
+// the named bucket up to and including lastKey.
+func hashBucketUpToKey(db *bolt.DB, bucketName string, lastKey []byte) (uint32, error) {
+	h := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return fmt.Errorf("bucket %s not found", bucketName)
+		}
+		c := bucket.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			h.Write(k)
+			h.Write(v)
+			if bytes.Equal(k, lastKey) {
+				break
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return h.Sum32(), nil
 }
 
 func (b *backend) begin(write bool) *bolt.Tx {
@@ -702,6 +1110,14 @@ func (b *backend) unsafeBegin(write bool) *bolt.Tx {
 
 func (b *backend) OpenReadTxN() int64 {
 	return atomic.LoadInt64(&b.openReadTxN)
+}
+
+func (b *backend) LockForSafeRangeDelete() {
+	b.safeRangeDeleteMu.RLock()
+}
+
+func (b *backend) UnlockForSafeRangeDelete() {
+	b.safeRangeDeleteMu.RUnlock()
 }
 
 type snapshot struct {

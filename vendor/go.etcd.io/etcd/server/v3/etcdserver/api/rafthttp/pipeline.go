@@ -52,7 +52,7 @@ type pipeline struct {
 	status *peerStatus
 	raft   Raft
 	errorc chan error
-	// deprecate when we depercate v2 API
+	// deprecate when we deprecate v2 API
 	followerStats *stats.FollowerStats
 
 	msgc chan *raftpb.Message

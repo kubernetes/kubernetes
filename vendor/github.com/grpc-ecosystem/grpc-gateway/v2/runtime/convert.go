@@ -3,6 +3,7 @@ package runtime
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -44,9 +45,40 @@ func BoolSlice(val, sep string) ([]bool, error) {
 	return values, nil
 }
 
+// parseFloat parses a floating point value the way the proto3 JSON mapping
+// does: a decimal number, or the exact strings "Infinity", "-Infinity" and
+// "NaN". strconv.ParseFloat additionally accepts hexadecimal floats ("0x1p4"),
+// underscore digit separators ("1_000") and alternate infinity/NaN spellings
+// ("Inf", "nan", "infinity"), none of which protojson (and so the request body
+// and backend) accept. Reject those so a value bound from a query or path
+// parameter can't differ from the same value sent in the body.
+func parseFloat(val string, bitSize int) (float64, error) {
+	switch val {
+	case "Infinity":
+		return math.Inf(1), nil
+	case "-Infinity":
+		return math.Inf(-1), nil
+	case "NaN":
+		return math.NaN(), nil
+	}
+	if strings.ContainsAny(val, "xX_") {
+		return 0, fmt.Errorf("invalid syntax %q", val)
+	}
+	f, err := strconv.ParseFloat(val, bitSize)
+	if err != nil {
+		return 0, err
+	}
+	// ParseFloat only yields Inf/NaN without an error for the alternate
+	// spellings handled above; overflow returns a range error instead.
+	if math.IsInf(f, 0) || math.IsNaN(f) {
+		return 0, fmt.Errorf("invalid syntax %q", val)
+	}
+	return f, nil
+}
+
 // Float64 converts the given string representation into representation of a floating point number into float64.
 func Float64(val string) (float64, error) {
-	return strconv.ParseFloat(val, 64)
+	return parseFloat(val, 64)
 }
 
 // Float64Slice converts 'val' where individual floating point numbers are separated by
@@ -66,7 +98,7 @@ func Float64Slice(val, sep string) ([]float64, error) {
 
 // Float32 converts the given string representation of a floating point number into float32.
 func Float32(val string) (float32, error) {
-	f, err := strconv.ParseFloat(val, 32)
+	f, err := parseFloat(val, 32)
 	if err != nil {
 		return 0, err
 	}
@@ -90,7 +122,7 @@ func Float32Slice(val, sep string) ([]float32, error) {
 
 // Int64 converts the given string representation of an integer into int64.
 func Int64(val string) (int64, error) {
-	return strconv.ParseInt(val, 0, 64)
+	return strconv.ParseInt(val, 10, 64)
 }
 
 // Int64Slice converts 'val' where individual integers are separated by
@@ -110,7 +142,7 @@ func Int64Slice(val, sep string) ([]int64, error) {
 
 // Int32 converts the given string representation of an integer into int32.
 func Int32(val string) (int32, error) {
-	i, err := strconv.ParseInt(val, 0, 32)
+	i, err := strconv.ParseInt(val, 10, 32)
 	if err != nil {
 		return 0, err
 	}
@@ -134,7 +166,7 @@ func Int32Slice(val, sep string) ([]int32, error) {
 
 // Uint64 converts the given string representation of an integer into uint64.
 func Uint64(val string) (uint64, error) {
-	return strconv.ParseUint(val, 0, 64)
+	return strconv.ParseUint(val, 10, 64)
 }
 
 // Uint64Slice converts 'val' where individual integers are separated by
@@ -154,7 +186,7 @@ func Uint64Slice(val, sep string) ([]uint64, error) {
 
 // Uint32 converts the given string representation of an integer into uint32.
 func Uint32(val string) (uint32, error) {
-	i, err := strconv.ParseUint(val, 0, 32)
+	i, err := strconv.ParseUint(val, 10, 32)
 	if err != nil {
 		return 0, err
 	}
@@ -176,21 +208,22 @@ func Uint32Slice(val, sep string) ([]uint32, error) {
 	return values, nil
 }
 
-// Bytes converts the given string representation of a byte sequence into a slice of bytes
-// A bytes sequence is encoded in URL-safe base64 without padding
+// Bytes converts the given string representation of a byte sequence into a slice of bytes.
+// Like the protobuf JSON mapping, it accepts standard or URL-safe base64, with or
+// without padding.
 func Bytes(val string) ([]byte, error) {
-	b, err := base64.StdEncoding.DecodeString(val)
-	if err != nil {
-		b, err = base64.URLEncoding.DecodeString(val)
-		if err != nil {
-			return nil, err
-		}
+	enc := base64.StdEncoding
+	if strings.ContainsAny(val, "-_") {
+		enc = base64.URLEncoding
 	}
-	return b, nil
+	if len(val)%4 != 0 {
+		enc = enc.WithPadding(base64.NoPadding)
+	}
+	return enc.DecodeString(val)
 }
 
-// BytesSlice converts 'val' where individual bytes sequences, encoded in URL-safe
-// base64 without padding, are separated by 'sep' into a slice of byte slices.
+// BytesSlice converts 'val' where individual bytes sequences, encoded in standard or
+// URL-safe base64, are separated by 'sep' into a slice of byte slices.
 func BytesSlice(val, sep string) ([][]byte, error) {
 	s := strings.Split(val, sep)
 	values := make([][]byte, len(s))

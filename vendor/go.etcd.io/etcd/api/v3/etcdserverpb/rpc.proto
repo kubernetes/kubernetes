@@ -429,6 +429,10 @@ message ResponseHeader {
   int64 revision = 3;
   // raft_term is the raft term when the request was applied.
   uint64 raft_term = 4;
+  // leader_id is the member ID of the raft leader that the responding
+  // member believes is the current leader, or 0 if the responding member
+  // does not know who the leader is.
+  uint64 leader_id = 5 [(versionpb.etcd_version_field)="3.8"];
 }
 
 message RangeRequest {
@@ -1447,8 +1451,9 @@ message RangeStreamResponse {
   // same RangeResponse response as to the Range() method.
   //
   // Field population across chunks:
-  //   - kvs: each chunk carries a disjoint slice of the result. Concatenating
-  //     them in order yields the full key set.
+  //   - kvs: each chunk carries a non-empty, disjoint slice of the result (or is
+  //     empty on a single-chunk response when no keys match or count_only is set).
+  //     Concatenating them in order yields the full key set.
   //   - header, more, count: set only on the final chunk. Non-merge clients
   //     can rely on io.EOF (end of stream) to detect completion. These
   //     fields are provided for clients that merge all responses into a

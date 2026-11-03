@@ -38,3 +38,15 @@ const (
 	// MarshalJSON tells the driver to send using json format.
 	MarshalJSON
 )
+
+// Protocol describes the transport protocol used to send data to the collector.
+type Protocol int
+
+const (
+	// ProtocolGRPC describes the "grpc" protocol.
+	ProtocolGRPC Protocol = iota
+	// ProtocolHTTPProtobuf describes the "http/protobuf" protocol.
+	ProtocolHTTPProtobuf
+	// ProtocolHTTPJSON describes the "http/json" protocol.
+	ProtocolHTTPJSON
+)

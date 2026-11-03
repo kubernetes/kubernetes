@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -267,7 +267,7 @@ func (c *RaftCluster) Recover(onSet func(*zap.Logger, *semver.Version)) {
 
 	c.buildMembershipMetric()
 
-	sv := semver.Must(semver.NewVersion(version.Version))
+	sv := semver.MustParse(version.Version)
 	if c.downgradeInfo != nil && c.downgradeInfo.Enabled {
 		c.lg.Info(
 			"cluster is downgrading to target version",
@@ -583,7 +583,7 @@ func (c *RaftCluster) Version() *semver.Version {
 	if c.version == nil {
 		return nil
 	}
-	return semver.Must(semver.NewVersion(c.version.String()))
+	return semver.MustParse(c.version.String())
 }
 
 func (c *RaftCluster) SetVersion(ver *semver.Version, onSet func(*zap.Logger, *semver.Version), shouldApplyV3 ShouldApplyV3) {
@@ -607,7 +607,7 @@ func (c *RaftCluster) SetVersion(ver *semver.Version, onSet func(*zap.Logger, *s
 	}
 	oldVer := c.version
 	c.version = ver
-	sv := semver.Must(semver.NewVersion(version.Version))
+	sv := semver.MustParse(version.Version)
 	serverversion.MustDetectDowngrade(c.lg, sv, c.version)
 
 	if shouldApplyV3 {

@@ -98,7 +98,7 @@ type WAL struct {
 // Create creates a WAL ready for appending records. The given metadata is
 // recorded at the head of each WAL file, and can be retrieved with ReadAll
 // after the file is Open.
-func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
+func Create(lg *zap.Logger, dirpath string, metadata []byte) (_ *WAL, retErr error) {
 	if Exist(dirpath) {
 		return nil, os.ErrExist
 	}
@@ -136,6 +136,11 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 		)
 		return nil, err
 	}
+	defer func() {
+		if retErr != nil {
+			f.Close()
+		}
+	}()
 	if _, err = f.Seek(0, io.SeekEnd); err != nil {
 		lg.Warn(
 			"failed to seek an initial WAL file",
@@ -192,7 +197,6 @@ func Create(lg *zap.Logger, dirpath string, metadata []byte) (*WAL, error) {
 			w.cleanupWAL(lg)
 		}
 	}()
-
 	// directory was renamed; sync parent dir to persist rename
 	pdir, perr := fileutil.OpenDir(filepath.Dir(w.dir))
 	if perr != nil {
@@ -349,6 +353,7 @@ func Open(lg *zap.Logger, dirpath string, snap *walpb.Snapshot) (*WAL, error) {
 		return nil, fmt.Errorf("openAtIndex failed: %w", err)
 	}
 	if w.dirFile, err = fileutil.OpenDir(w.dir); err != nil {
+		w.Close()
 		return nil, fmt.Errorf("fileutil.OpenDir failed: %w", err)
 	}
 	return w, nil
@@ -535,7 +540,7 @@ func (w *WAL) ReadAll() (metadata []byte, state *raftpb.HardState, ents []*raftp
 
 		default:
 			state.Reset()
-			return nil, state, nil, fmt.Errorf("unexpected block type %d", rec.Type)
+			return nil, state, nil, fmt.Errorf("unexpected block type %d", rec.GetType())
 		}
 	}
 
@@ -762,7 +767,7 @@ func Verify(lg *zap.Logger, walDir string, snap *walpb.Snapshot) (*raftpb.HardSt
 		case StateType:
 			pbutil.MustUnmarshalMessage(state, rec.Data)
 		default:
-			return nil, fmt.Errorf("unexpected block type %d", rec.Type)
+			return nil, fmt.Errorf("unexpected block type %d", rec.GetType())
 		}
 	}
 

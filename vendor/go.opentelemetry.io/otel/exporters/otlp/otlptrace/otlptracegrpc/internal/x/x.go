@@ -34,9 +34,9 @@ func newFeature[T any](suffix []string, parse func(string) (T, bool)) Feature[T]
 // feature.
 func (f Feature[T]) Keys() []string { return f.keys }
 
-// Lookup returns the user configured value for the feature and true if the
+// Lookup returns the user-configured value for the feature and true if the
 // user has enabled the feature. Otherwise, if the feature is not enabled, a
-// zero-value and false are returned.
+// zero value and false are returned.
 func (f Feature[T]) Lookup() (v T, ok bool) {
 	// https://github.com/open-telemetry/opentelemetry-specification/blob/62effed618589a0bec416a87e559c0a9d96289bb/specification/configuration/sdk-environment-variables.md#parsing-empty-value
 	//

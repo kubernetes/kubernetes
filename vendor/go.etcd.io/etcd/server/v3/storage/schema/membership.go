@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/coreos/go-semver/semver"
+	"github.com/Masterminds/semver/v3"
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/client/pkg/v3/types"
@@ -202,7 +202,7 @@ func (s *membershipBackend) ClusterVersionFromBackend() *semver.Version {
 			zap.Int("number-of-key", len(keys)),
 		)
 	}
-	return semver.Must(semver.NewVersion(string(vals[0])))
+	return semver.MustParse(string(vals[0]))
 }
 
 // DowngradeInfoFromBackend reads downgrade info from backend.

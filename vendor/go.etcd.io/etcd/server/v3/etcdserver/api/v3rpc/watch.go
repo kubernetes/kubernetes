@@ -646,6 +646,7 @@ func (sws *serverWatchStream) newResponseHeader(rev int64) *pb.ResponseHeader {
 		MemberId:  uint64(sws.memberID),
 		Revision:  rev,
 		RaftTerm:  sws.sg.Term(),
+		LeaderId:  uint64(sws.sg.Leader()),
 	}
 }
 
