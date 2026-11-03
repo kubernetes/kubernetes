@@ -558,13 +558,14 @@ func (pl *DefaultPreemption) RankNodes(ctx context.Context, cycleState fwk.Cycle
 		})
 	}
 
+	preemptionManager := pl.fh.PreemptionManager()
 	slices.SortStableFunc(evals, func(a, b nodeVictimEval) int {
-		return preemption.CompareVictimSets(a.victims, b.victims)
+		return preemptionManager.CompareVictimSets(ctx, a.victims, b.victims)
 	})
 
 	rank := 0
 	for i := range evals {
-		if i == 0 || preemption.CompareVictimSets(evals[i-1].victims, evals[i].victims) != 0 {
+		if i == 0 || preemptionManager.CompareVictimSets(ctx, evals[i-1].victims, evals[i].victims) != 0 {
 			rank++
 		}
 		rankedNodes = append(rankedNodes, framework.NodeWithRank{

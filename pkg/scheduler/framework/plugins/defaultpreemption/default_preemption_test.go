@@ -17,6 +17,7 @@ limitations under the License.
 package defaultpreemption
 
 import (
+	stdcmp "cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -4381,9 +4382,10 @@ type mockPreemptionManager struct {
 	fwk.PreemptionManager
 	fwk.PreemptionExecutor
 
-	victims        []fwk.PreemptionVictim
-	reprieveFilter fwk.ReprieveFilter
-	candidate      fwk.PreemptionCandidate
+	victims           []fwk.PreemptionVictim
+	reprieveFilter    fwk.ReprieveFilter
+	compareVictimSets func(set1, set2 []fwk.PreemptionVictim) int
+	candidate         fwk.PreemptionCandidate
 }
 
 func (m *mockPreemptionManager) GenerateVictims(_ context.Context, pgi fwk.PodGroupInfo) ([]fwk.PreemptionVictim, *fwk.Status) {
@@ -4399,6 +4401,15 @@ func (m *mockPreemptionManager) NewReprieveFilter(ctx context.Context, allVictim
 		return m.reprieveFilter
 	}
 	return m.PreemptionManager.NewReprieveFilter(ctx, allVictims)
+}
+
+// CompareVictimSets delegates to the custom comparator when set so tests can verify
+// RankNodes against non-default victim ordering logic.
+func (m *mockPreemptionManager) CompareVictimSets(ctx context.Context, set1, set2 []fwk.PreemptionVictim) int {
+	if m.compareVictimSets != nil {
+		return m.compareVictimSets(set1, set2)
+	}
+	return m.PreemptionManager.CompareVictimSets(ctx, set1, set2)
 }
 
 func (m *mockPreemptionManager) ActuatePodGroupPreemption(_ context.Context, candidate fwk.PreemptionCandidate, _ fwk.PodGroupInfo, _ string) *fwk.Status {
@@ -4707,31 +4718,43 @@ func (v *testPreemptionVictim) NumPDBViolations() int {
 	return v.pdbViolations
 }
 
+type rankedNode struct {
+	Node string
+	Rank int
+}
+
+type podGroupPreemptionRankNodesTestCase struct {
+	name                       string
+	nodeNames                  []string
+	victims                    []fwk.PreemptionVictim
+	withoutPreemptionState     bool
+	expectedRankNodesCode      fwk.Code
+	expectedInitialRanked      []rankedNode
+	reserveNode                string
+	expectedRankedAfterReserve []rankedNode
+}
+
 func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
-	type victimSpec struct {
-		pods          []*v1.Pod
-		priority      int32
-		keyType       fwk.EntityKeyType
-		pdbViolations int
-	}
-	type rankedNode struct {
-		Node string
-		Rank int
+	makeVictim := func(priority int32, keyType fwk.EntityKeyType, pdbViolations int, pods ...*v1.Pod) fwk.PreemptionVictim {
+		podInfos := make([]fwk.PodInfo, 0, len(pods))
+		for _, p := range pods {
+			pi, err := framework.NewPodInfo(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			podInfos = append(podInfos, pi)
+		}
+		v, err := preemption.NewVictim(podInfos, priority, keyType)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &testPreemptionVictim{
+			Victim:        v,
+			pdbViolations: pdbViolations,
+		}
 	}
 
-	preemptor1 := st.MakePod().Name("preemptor-1").UID("preemptor-1").Priority(100).Obj()
-	preemptor2 := st.MakePod().Name("preemptor-2").UID("preemptor-2").Priority(100).Obj()
-
-	tests := []struct {
-		name                       string
-		nodeNames                  []string
-		victims                    []victimSpec
-		withoutPreemptionState     bool
-		expectedRankNodesCode      fwk.Code
-		expectedInitialRanked      []rankedNode
-		reserveNode                string
-		expectedRankedAfterReserve []rankedNode
-	}{
+	tests := []podGroupPreemptionRankNodesTestCase{
 		{
 			name:                   "normal scheduling cycle without PodGroupPreemptionState returns Skip",
 			nodeNames:              []string{"node-1", "node-2"},
@@ -4750,22 +4773,10 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 		{
 			name:      "tied victim sets (CompareVictimSets == 0) receive identical ranks and preserve input order",
 			nodeNames: []string{"node-high", "node-tie-1", "node-tie-2"},
-			victims: []victimSpec{
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-tie-1").UID("victim-tie-1").Node("node-tie-1").Priority(10).Obj()},
-					priority: 10,
-					keyType:  fwk.PodKeyType,
-				},
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-tie-2").UID("victim-tie-2").Node("node-tie-2").Priority(10).Obj()},
-					priority: 10,
-					keyType:  fwk.PodKeyType,
-				},
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()},
-					priority: 20,
-					keyType:  fwk.PodKeyType,
-				},
+			victims: []fwk.PreemptionVictim{
+				makeVictim(10, fwk.PodKeyType, 0, st.MakePod().Name("victim-tie-1").UID("victim-tie-1").Node("node-tie-1").Priority(10).Obj()),
+				makeVictim(10, fwk.PodKeyType, 0, st.MakePod().Name("victim-tie-2").UID("victim-tie-2").Node("node-tie-2").Priority(10).Obj()),
+				makeVictim(20, fwk.PodKeyType, 0, st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()),
 			},
 			expectedInitialRanked: []rankedNode{
 				{Node: "node-tie-1", Rank: 1},
@@ -4774,27 +4785,16 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 			},
 		},
 		{
-			name:      "multiple victims on a single node sorted by MoreImportantVictim",
+			name:      "multiple victims on a single node merge PDB-violating and non-violating runs by priority",
 			nodeNames: []string{"node-multi", "node-mid"},
-			victims: []victimSpec{
-				// Listed before victim-low so iterating potentialVictims backward visits victim-low first;
-				// NewPodGroupPreemptionState must sort node-multi's victims by MoreImportantVictim (prio 20 before prio 5)
-				// so node-multi is recognized as more costly than node-mid (prio 15).
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-multi").Priority(20).Obj()},
-					priority: 20,
-					keyType:  fwk.PodKeyType,
-				},
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-low").UID("victim-low").Node("node-multi").Priority(5).Obj()},
-					priority: 5,
-					keyType:  fwk.PodKeyType,
-				},
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-mid").UID("victim-mid").Node("node-mid").Priority(15).Obj()},
-					priority: 15,
-					keyType:  fwk.PodKeyType,
-				},
+			// In GenerateVictims order, non-violating victims precede PDB-violating victims.
+			// Reversing into SurvivingVictimsOnNode places PDB-violating victim-low (priority 5)
+			// before non-violating victim-high (priority 20) on node-multi; CompareVictimSets merges
+			// both runs so node-multi (1 PDB violation, max priority 20) ranks after node-mid (1 PDB violation, priority 15).
+			victims: []fwk.PreemptionVictim{
+				makeVictim(20, fwk.PodKeyType, 0, st.MakePod().Name("victim-high").UID("victim-high").Node("node-multi").Priority(20).Obj()),
+				makeVictim(5, fwk.PodKeyType, 1, st.MakePod().Name("victim-low").UID("victim-low").Node("node-multi").Priority(5).Obj()),
+				makeVictim(15, fwk.PodKeyType, 1, st.MakePod().Name("victim-mid").UID("victim-mid").Node("node-mid").Priority(15).Obj()),
 			},
 			expectedInitialRanked: []rankedNode{
 				{Node: "node-mid", Rank: 1},
@@ -4804,25 +4804,13 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 		{
 			name:      "free node, standalone pod, multi-node PodGroup, and higher-priority pod with Reserve and Unreserve",
 			nodeNames: []string{"node-high", "node-pg-1", "node-pg-2", "node-pod", "node-free"},
-			victims: []victimSpec{
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-pod").UID("victim-pod").Node("node-pod").Priority(10).Obj()},
-					priority: 10,
-					keyType:  fwk.PodKeyType,
-				},
-				{
-					pods: []*v1.Pod{
-						st.MakePod().Name("victim-pg-1").UID("victim-pg-1").Node("node-pg-1").Priority(10).PodGroupName("pg-victim").Obj(),
-						st.MakePod().Name("victim-pg-2").UID("victim-pg-2").Node("node-pg-2").Priority(10).PodGroupName("pg-victim").Obj(),
-					},
-					priority: 10,
-					keyType:  fwk.PodGroupKeyType,
-				},
-				{
-					pods:     []*v1.Pod{st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()},
-					priority: 20,
-					keyType:  fwk.PodKeyType,
-				},
+			victims: []fwk.PreemptionVictim{
+				makeVictim(10, fwk.PodKeyType, 0, st.MakePod().Name("victim-pod").UID("victim-pod").Node("node-pod").Priority(10).Obj()),
+				makeVictim(10, fwk.PodGroupKeyType, 0,
+					st.MakePod().Name("victim-pg-1").UID("victim-pg-1").Node("node-pg-1").Priority(10).PodGroupName("pg-victim").Obj(),
+					st.MakePod().Name("victim-pg-2").UID("victim-pg-2").Node("node-pg-2").Priority(10).PodGroupName("pg-victim").Obj(),
+				),
+				makeVictim(20, fwk.PodKeyType, 0, st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()),
 			},
 			expectedInitialRanked: []rankedNode{
 				{Node: "node-free", Rank: 0},
@@ -4841,6 +4829,20 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 			},
 		},
 	}
+
+	runPodGroupPreemptionRankNodesTests(t, tests, nil)
+}
+
+func runPodGroupPreemptionRankNodesTests(
+	t *testing.T,
+	tests []podGroupPreemptionRankNodesTestCase,
+	newPreemptionManager func(fh fwk.Handle, fts feature.Features) fwk.PreemptionManager,
+) {
+	if newPreemptionManager == nil {
+		newPreemptionManager = preemption.NewPreemptionManager
+	}
+	preemptor1 := st.MakePod().Name("preemptor-1").UID("preemptor-1").Priority(100).Obj()
+	preemptor2 := st.MakePod().Name("preemptor-2").UID("preemptor-2").Priority(100).Obj()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4871,7 +4873,7 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 				frameworkruntime.WithPodGroupManager(internalcache.New(ctx, nil, true, false)),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
-					return preemption.NewPreemptionManager(fh, fts)
+					return newPreemptionManager(fh, fts)
 				}),
 			)
 			if err != nil {
@@ -4900,27 +4902,7 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 				return
 			}
 
-			var allVictims []fwk.PreemptionVictim
-			for _, entry := range tt.victims {
-				podInfos := make([]fwk.PodInfo, 0, len(entry.pods))
-				for _, p := range entry.pods {
-					pi, err := framework.NewPodInfo(p)
-					if err != nil {
-						t.Fatal(err)
-					}
-					podInfos = append(podInfos, pi)
-				}
-				v, err := preemption.NewVictim(podInfos, entry.priority, entry.keyType)
-				if err != nil {
-					t.Fatal(err)
-				}
-				allVictims = append(allVictims, &testPreemptionVictim{
-					Victim:        v,
-					pdbViolations: entry.pdbViolations,
-				})
-			}
-
-			preemptState := preemption.NewPodGroupPreemptionState(allVictims)
+			preemptState := preemption.NewPodGroupPreemptionState(tt.victims)
 			pgState := framework.NewCycleState()
 			preemptState.WriteToPodGroupCycleState(pgState)
 			newCycleStateWithPreemption := func() fwk.CycleState {
@@ -4972,4 +4954,109 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDefaultPreemption_PodGroupPreemptionRankNodes_CustomPreemptionManager(t *testing.T) {
+	makeVictimPod := func(name, nodeName string, priority int32) *v1.Pod {
+		return st.MakePod().Name(name).UID(name).Node(nodeName).Priority(priority).Obj()
+	}
+	makeFakeVictim := func(pods ...*v1.Pod) fwk.PreemptionVictim {
+		podInfos := make([]fwk.PodInfo, 0, len(pods))
+		for _, p := range pods {
+			pi, err := framework.NewPodInfo(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			podInfos = append(podInfos, pi)
+		}
+		return &fakeVictim{pods: podInfos}
+	}
+
+	// sumPodPriorities extracts pod priorities from fwk.PreemptionVictim.Pods() so custom CompareVictimSets
+	// can score fakeVictim instances without relying on the internal preemption.Victim interface.
+	sumPodPriorities := func(victims []fwk.PreemptionVictim) int {
+		var total int
+		for _, v := range victims {
+			for _, pi := range v.Pods() {
+				total += int(corev1helpers.PodPriority(pi.GetPod()))
+			}
+		}
+		return total
+	}
+	// compareByTotalPodPriority orders victim sets solely by total pod priority sum, diverging from
+	// defaultPreemptionManager.CompareVictimSets (which requires preemption.Victim and compares max priority first).
+	compareByTotalPodPriority := func(set1, set2 []fwk.PreemptionVictim) int {
+		return stdcmp.Compare(sumPodPriorities(set1), sumPodPriorities(set2))
+	}
+
+	tests := []podGroupPreemptionRankNodesTestCase{
+		{
+			name:      "custom CompareVictimSets orders fakeVictim sets by total pod priority sum",
+			nodeNames: []string{"node-single-30", "node-pair-12", "node-single-20", "node-free"},
+			// Default CompareVictimSets requires preemption.Victim (panicking on fakeVictim) and ranks max-priority 12 ahead of 20.
+			victims: []fwk.PreemptionVictim{
+				makeFakeVictim(makeVictimPod("victim-single-30", "node-single-30", 30)),
+				makeFakeVictim(makeVictimPod("victim-pair-12a", "node-pair-12", 12), makeVictimPod("victim-pair-12b", "node-pair-12", 12)),
+				makeFakeVictim(makeVictimPod("victim-single-20", "node-single-20", 20)),
+			},
+			// Total pod priority sums: node-free (0) < node-single-20 (20) < node-pair-12 (24) < node-single-30 (30).
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-free", Rank: 0},
+				{Node: "node-single-20", Rank: 1},
+				{Node: "node-pair-12", Rank: 2},
+				{Node: "node-single-30", Rank: 3},
+			},
+		},
+		{
+			name:      "tied victim sets across different pod counts receive identical ranks and preserve input order",
+			nodeNames: []string{"node-single-30", "node-single-20", "node-pair-10"},
+			// node-single-20 (1 pod, priority 20) and node-pair-10 (2 pods, priority 10 each) both sum to 20,
+			// verifying RankNodes assigns identical ranks when custom CompareVictimSets returns 0.
+			victims: []fwk.PreemptionVictim{
+				makeFakeVictim(makeVictimPod("victim-single-30", "node-single-30", 30)),
+				makeFakeVictim(makeVictimPod("victim-single-20", "node-single-20", 20)),
+				makeFakeVictim(makeVictimPod("victim-pair-10a", "node-pair-10", 10), makeVictimPod("victim-pair-10b", "node-pair-10", 10)),
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-single-20", Rank: 1},
+				{Node: "node-pair-10", Rank: 1},
+				{Node: "node-single-30", Rank: 2},
+			},
+		},
+		{
+			name:      "Reserve and Unreserve condemn a multi-node fakeVictim and re-rank a partially affected node",
+			nodeNames: []string{"node-shared-2", "node-shared-1", "node-single-20", "node-free"},
+			// node-shared-1 and node-shared-2 share a 2-pod fakeVictim (12 + 12 = 24), and node-shared-2 also hosts
+			// a local priority-15 fakeVictim so its initial cost is 24 + 15 = 39 (Rank 3).
+			victims: []fwk.PreemptionVictim{
+				makeFakeVictim(makeVictimPod("victim-shared-1", "node-shared-1", 12), makeVictimPod("victim-shared-2", "node-shared-2", 12)),
+				makeFakeVictim(makeVictimPod("victim-local-2", "node-shared-2", 15)),
+				makeFakeVictim(makeVictimPod("victim-single-20", "node-single-20", 20)),
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-free", Rank: 0},
+				{Node: "node-single-20", Rank: 1},
+				{Node: "node-shared-1", Rank: 2},
+				{Node: "node-shared-2", Rank: 3},
+			},
+			reserveNode: "node-shared-1",
+			// Condemning the shared victim on node-shared-1 drops node-shared-1 to 0 surviving victims (Rank 0)
+			// and reduces node-shared-2's surviving victim sum from 39 to 15 (Rank 1, ahead of node-single-20's 20).
+			expectedRankedAfterReserve: []rankedNode{
+				{Node: "node-shared-1", Rank: 0},
+				{Node: "node-free", Rank: 0},
+				{Node: "node-shared-2", Rank: 1},
+				{Node: "node-single-20", Rank: 2},
+			},
+		},
+	}
+
+	runPodGroupPreemptionRankNodesTests(t, tests, func(fh fwk.Handle, fts feature.Features) fwk.PreemptionManager {
+		m := preemption.NewPreemptionManager(fh, fts)
+		return &mockPreemptionManager{
+			PreemptionManager:  m,
+			PreemptionExecutor: m.Executor(),
+			compareVictimSets:  compareByTotalPodPriority,
+		}
+	})
 }
