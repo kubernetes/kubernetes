@@ -3632,3 +3632,54 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 		})
 	}
 }
+
+// TestStaticPolicyAddWithResizedAllocation checks that a container admitted
+// again with allocated resources that differ from its CPU assignment, for
+// example after a kubelet restart, is handled as a resize. The static policy
+// does not support resize yet, so the pod is admitted with its CPU assignment
+// unchanged.
+func TestStaticPolicyAddWithResizedAllocation(t *testing.T) {
+	testCases := []struct {
+		name string
+		pod  *v1.Pod
+	}{
+		{
+			name: "scale up",
+			pod:  makePod("pod", "c1", "4", "4"),
+		},
+		{
+			name: "scale down",
+			pod:  makePod("pod", "c1", "1", "1"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ktesting.SetDefaultVerbosity(2)
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			require.NoError(t, err)
+
+			s := state.NewMemoryState(logger)
+			s.SetCPUSet("pod", "c1", cpuset.New(1, 5))
+			s.SetDefaultCPUSet(cpuset.New(0, 2, 3, 4, 6, 7))
+			before := cloneState(logger, s)
+
+			hints := policy.GetTopologyHints(logger, s, tc.pod, &tc.pod.Spec.Containers[0], lifecycle.AddOperation)
+			require.Nil(t, hints, "the hints of a resize must have no preference")
+			require.NoError(t, policy.Allocate(logger, s, tc.pod, &tc.pod.Spec.Containers[0], lifecycle.AddOperation))
+
+			require.Equal(t, before.GetCPUAssignments(), s.GetCPUAssignments(), "assignments")
+			require.True(t, before.GetDefaultCPUSet().Equals(s.GetDefaultCPUSet()), "expected default %s, got %s", before.GetDefaultCPUSet(), s.GetDefaultCPUSet())
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			require.True(t, ok, "expected a ktesting LogSink, got %T", logger.GetSink())
+			logs := underlier.GetBuffer().String()
+			for _, expectedLog := range []string{
+				"CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy",
+				"CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy",
+			} {
+				require.Contains(t, logs, expectedLog, "the resize path must be taken")
+			}
+		})
+	}
+}
