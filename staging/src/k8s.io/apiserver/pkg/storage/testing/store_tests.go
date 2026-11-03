@@ -126,10 +126,9 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface, incr
 	updateObj.Annotations = map[string]string{"test-annotation": "1"}
 	storedObj := &example.Pod{}
 	err := store.GuaranteedUpdate(ctx, key, storedObj, true, nil,
-		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
-			ttl := uint64(1)
-			return updateObj, &ttl, nil
-		}, nil)
+		storage.SimpleUpdate(func(_ runtime.Object) (runtime.Object, error) {
+			return updateObj, nil
+		}), nil)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
