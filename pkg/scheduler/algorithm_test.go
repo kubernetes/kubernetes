@@ -217,25 +217,91 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 	}
 }
 
+// TestAssumeAndReserveInCacheNomination checks that a nomination to the node
+// which the pod gets assumed on survives the assume, so that it ends with the
+// binding cycle, while a nomination to another node ends right away.
+func TestAssumeAndReserveInCacheNomination(t *testing.T) {
+	node1 := st.MakeNode().Name("node1").Obj()
+
+	tests := []struct {
+		name          string
+		nominatedNode string
+		wantKept      bool
+	}{
+		{
+			name:          "nominated to the assumed node",
+			nominatedNode: "node1",
+			wantKept:      true,
+		},
+		{
+			name:          "nominated to another node",
+			nominatedNode: "node2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			pod := st.MakePod().Name("pod1").Namespace("default").UID("pod1").NominatedNodeName(tt.nominatedNode).Obj()
+			plugin := &assumeReserveTestPlugin{
+				fakePodGroupPlugin: &fakePodGroupPlugin{
+					filterStatus: map[string]*fwk.Status{pod.Name: fwk.NewStatus(fwk.Success)},
+				},
+			}
+			f := newAssumeReserveFixture(t, ctx, node1, plugin, pod)
+
+			podInfo, err := framework.NewPodInfo(pod)
+			if err != nil {
+				t.Fatalf("Failed to create PodInfo: %v", err)
+			}
+			f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{
+				NominatedNodeName: tt.nominatedNode,
+				NominatingMode:    fwk.ModeOverride,
+			})
+			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+
+			state := framework.NewCycleState()
+			scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
+			if err != nil {
+				t.Fatalf("schedulePod failed: %v", err)
+			}
+			if _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); !status.IsSuccess() {
+				t.Fatalf("AssumeAndReserveInCache status = %v, want success", status)
+			}
+			if got := len(f.fwk.NominatedPodsForNode(logger, tt.nominatedNode)) != 0; got != tt.wantKept {
+				t.Errorf("nomination kept after assume = %v, want %v", got, tt.wantKept)
+			}
+		})
+	}
+}
+
 // TestAssumeAndReserveInSnapshot covers the pod group scheduling cycle, where the
 // placement is only tentative: it goes into the snapshot rather than the cache, and
 // the returned revert function has to undo every part of it.
 func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
 	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
-	podWithNomination := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").NominatedNodeName("node1").Obj()
+	podNominatedToNode1 := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").NominatedNodeName("node1").Obj()
+	podNominatedToNode2 := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").NominatedNodeName("node2").Obj()
 
 	tests := []struct {
 		name string
 		pod  *v1.Pod
+		// wantKept is true if the nomination survives the assume.
+		wantKept bool
 	}{
 		{
 			name: "pod group cycle with cache: still assumed in the snapshot only",
 			pod:  pod1,
 		},
 		{
-			name: "pod group cycle: nomination is dropped on assume and restored on revert",
-			pod:  podWithNomination,
+			name:     "pod group cycle: nomination to the assumed node is kept",
+			pod:      podNominatedToNode1,
+			wantKept: true,
+		},
+		{
+			name: "pod group cycle: nomination to another node is dropped on assume and restored on revert",
+			pod:  podNominatedToNode2,
 		},
 	}
 
@@ -293,8 +359,10 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			if tt.pod.Spec.NodeName != "" {
 				t.Errorf("input pod Spec.NodeName mutated = %q, want empty", tt.pod.Spec.NodeName)
 			}
-			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) != 0 {
-				t.Error("expected the nomination to be dropped once the pod was assumed")
+			if nominated != "" {
+				if got := len(f.fwk.NominatedPodsForNode(logger, nominated)) != 0; got != tt.wantKept {
+					t.Errorf("nomination kept after assume = %v, want %v", got, tt.wantKept)
+				}
 			}
 
 			revertFn()
@@ -406,6 +474,8 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		wantStatusCode       fwk.Code
 		wantNominatingInfo   *fwk.NominatingInfo
 		wantPostFilterCalled bool
+		// wantNominationCalls are the calls of NominationExtensions.
+		wantNominationCalls []string
 	}{
 		{
 			name:                 "failure: algorithm finds no nodes",
@@ -439,11 +509,13 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				NominatingMode:    fwk.ModeOverride,
 			},
 			wantPostFilterCalled: true,
+			wantNominationCalls:  []string{"PrepareNomination default/pod1 node1"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
 			logger, ctx := ktesting.NewTestContext(t)
 			client := clientsetfake.NewClientset(node1, pod1)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -466,17 +538,20 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				},
 			}
 
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
 			registry := frameworkruntime.Registry{
 				queuesort.Name:     queuesort.New,
 				defaultbinder.Name: defaultbinder.New,
 				"AssumeReserveTestPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					return fakePlugin, nil
 				},
+				nominationExtensions.Name(): tf.NewFakeNominationExtensionsPlugin(nominationExtensions),
 			}
 			profileCfg := schedulerapi.KubeSchedulerProfile{
 				SchedulerName: "default-scheduler",
 				Plugins: &schedulerapi.Plugins{
 					QueueSort:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
+					PreFilter:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: nominationExtensions.Name()}}},
 					Filter:     schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					Bind:       schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
@@ -520,6 +595,9 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantNominatingInfo, scheduleResult.nominatingInfo); diff != "" {
 				t.Errorf("Unexpected nominatingInfo (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantNominationCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected NominationExtensions calls (-want,+got):\n%s", diff)
 			}
 		})
 	}

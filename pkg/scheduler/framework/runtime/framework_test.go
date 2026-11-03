@@ -3850,6 +3850,21 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			nodeInfo:     framework.NewNodeInfo(pod),
 			wantStatus:   nil,
 		},
+		{
+			name: "node has a high-priority nominated pod which is assumed on it already",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(fwk.Error),
+				},
+			},
+			filterPlugin: nil,
+			pod:          lowPriorityPod,
+			nominatedPod: highPriorityPod,
+			node:         node,
+			nodeInfo:     framework.NewNodeInfo(pod, highPriorityPod),
+			wantStatus:   nil,
+		},
 	}
 
 	for _, tt := range tests {

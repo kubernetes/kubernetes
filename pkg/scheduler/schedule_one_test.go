@@ -1329,6 +1329,57 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	}
 }
 
+// TestBindingCycleEndsNomination checks that a nomination which the assume
+// kept ends once the pod is bound.
+func TestBindingCycleEndsNomination(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	node := st.MakeNode().Name("node1").Obj()
+	pod := st.MakePod().Name("foo").Namespace("ns").UID("foo").SchedulerName(testSchedulerName).Obj()
+	client := clientsetfake.NewClientset(node, pod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(queue),
+		frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
+
+	queue.AddNominatedPod(logger, mustNewPodInfo(t, pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: node.Name})
+	if got := queue.NominatedPodsForNode(logger, node.Name); len(got) != 1 {
+		t.Fatalf("expected the pod to be nominated before binding, got %v", got)
+	}
+
+	assumedPod := pod.DeepCopy()
+	assumedPod.Spec.NodeName = node.Name
+	sched := &Scheduler{client: client, SchedulingQueue: queue}
+	status := sched.bindingCycle(ctx, framework.NewCycleState(), schedFramework, ScheduleResult{SuggestedHost: node.Name},
+		&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, assumedPod)}, time.Now(), framework.NewPodsToActivate())
+	if !status.IsSuccess() {
+		t.Fatalf("bindingCycle status = %v, want success", status)
+	}
+	if got := queue.NominatedPodsForNode(logger, node.Name); len(got) != 0 {
+		t.Errorf("expected the nomination to end with the binding, got %v", got)
+	}
+}
+
 func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)

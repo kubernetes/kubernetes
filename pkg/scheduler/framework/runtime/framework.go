@@ -78,6 +78,7 @@ type frameworkImpl struct {
 	batchablePlugins          []fwk.SignPlugin
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 	rankNodesPlugins          []framework.RankNodesPlugin
+	nominationExtensions      []framework.NominationExtensions
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin
@@ -470,6 +471,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 		f.fillEnqueueExtensions(p)
 	}
+	f.fillNominationExtensions()
 
 	// initialize plugins per individual extension points
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
@@ -1433,7 +1435,7 @@ func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state f
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
-		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID {
+		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID && !hasPod(nodeInfo, pi.GetPod().UID) {
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {
@@ -1443,6 +1445,17 @@ func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state f
 		}
 	}
 	return podsAdded, stateOut, nodeInfoOut, nil
+}
+
+// hasPod returns true if the pod is on the node already. An assumed pod stays
+// nominated to its node until its binding ends.
+func hasPod(nodeInfo fwk.NodeInfo, uid types.UID) bool {
+	for _, pi := range nodeInfo.GetPods() {
+		if pi.GetPod().UID == uid {
+			return true
+		}
+	}
+	return false
 }
 
 // RunPreScorePlugins runs the set of configured pre-score plugins. If any
