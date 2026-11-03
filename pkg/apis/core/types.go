@@ -750,11 +750,11 @@ const (
 	VolumeHealthHealthy VolumeHealthStatusType = "Healthy"
 )
 
-// VolumeHealthCondition represents an health condition reported for a volume.
+// VolumeHealthCondition represents a health condition reported for a volume.
 // Both pod and PVC reuse this type to report volume health in their status fields.
 type VolumeHealthCondition struct {
 	// status is the machine-parseable health category.
-	// Possible values are :
+	// Possible values are:
 	// - "Unknown": the driver is reporting a unknown health condition. Volume should not be considered healthy.
 	// - "Inaccessible": the volume cannot be accessed.
 	// - "DataLoss": data loss has been detected on the volume.

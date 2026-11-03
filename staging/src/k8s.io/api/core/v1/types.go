@@ -832,16 +832,16 @@ const (
 	VolumeHealthHealthy VolumeHealthStatusType = "Healthy"
 )
 
-// VolumeHealthCondition represents an adverse health condition reported for a volume.
+// VolumeHealthCondition represents a health condition reported for a volume.
 // Both pod and PVC reuse this type to report volume health in their status fields.
 type VolumeHealthCondition struct {
 	// status is the machine-parseable health category.
-	// Possible values are :
-	// - "Unknown": the driver is reporting a unknown health condition. Volume should not be considered healthy.
+	// Possible values are:
+	// - "Unknown": the driver is reporting an unknown health condition. Volume should not be considered healthy.
 	// - "Inaccessible": the volume cannot be accessed.
 	// - "DataLoss": data loss has been detected on the volume.
 	// - "Degraded": the volume is functioning with reduced capability.
-	// - "Healthy" : the volume is healthy.
+	// - "Healthy": the volume is healthy.
 	//
 	// This field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change.
 	// A future version of CSI driver may emit health conditions about which Kubernetes component aren't aware.
@@ -6007,7 +6007,7 @@ type PodStatus struct {
 	// +k8s:listMapKey=resourceClaimName
 	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"resourceClaimName" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
 
-	// VolumeHealth is tombstoned because it moved into VolumeStatus.
+	// VolumeHealth is tombstoned because it moved into VolumeStatuses.
 	// VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
 
 	// VolumeStatuses contains the status of individual volumes used by this pod.
