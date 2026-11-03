@@ -52,6 +52,7 @@ type ResizableContainerInfo struct {
 	RestartCount  int32
 	RestartPolicy v1.ContainerRestartPolicy
 	InitCtr       bool
+	Command       string
 }
 
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
@@ -68,6 +69,9 @@ func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.Containe
 
 func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	if tcInfo.Command != "" {
+		cmd = tcInfo.Command
+	}
 	resizePol := getTestResizePolicy(tcInfo)
 	tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmd)
 	tc.ResizePolicy = resizePol
@@ -76,6 +80,27 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	}
 
 	return tc
+}
+
+func makeResizableInitContainer(tcInfo ResizableContainerInfo) v1.Container {
+	cmd := "grep Cpus_allowed_list /proc/self/status"
+	cmdSidecar := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	resizePol := getTestResizePolicy(tcInfo)
+	if tcInfo.RestartPolicy == v1.ContainerRestartPolicyAlways {
+		tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmdSidecar)
+		tc.ResizePolicy = resizePol
+		if tcInfo.RestartPolicy != "" {
+			tc.RestartPolicy = &tcInfo.RestartPolicy
+		}
+		return tc
+	} else {
+		tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmd)
+		tc.ResizePolicy = resizePol
+		if tcInfo.RestartPolicy != "" {
+			tc.RestartPolicy = &tcInfo.RestartPolicy
+		}
+		return tc
+	}
 }
 
 func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo, podResources *v1.ResourceRequirements) *v1.Pod {
@@ -111,10 +136,11 @@ func separateContainers(tcInfo []ResizableContainerInfo) ([]v1.Container, []v1.C
 	var initContainers, containers []v1.Container
 
 	for _, ci := range tcInfo {
-		tc := makeResizableContainer(ci)
 		if ci.InitCtr {
+			tc := makeResizableInitContainer(ci)
 			initContainers = append(initContainers, tc)
 		} else {
+			tc := makeResizableContainer(ci)
 			containers = append(containers, tc)
 		}
 	}
