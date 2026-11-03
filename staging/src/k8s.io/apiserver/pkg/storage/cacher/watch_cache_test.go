@@ -575,7 +575,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
-	forceRequestWatchProgressSupport(t)
+	ForceRequestWatchProgressSupport(t)
 	ctx := context.Background()
 	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
