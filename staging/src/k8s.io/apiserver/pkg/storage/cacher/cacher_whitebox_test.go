@@ -53,6 +53,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
@@ -69,8 +70,6 @@ import (
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
-
-	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
 func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
@@ -101,7 +100,7 @@ func newTestCacherWithoutSyncingAndIndexers(s storage.Interface, c clock.WithTic
 		Indexers:    indexers,
 		NewFunc:     func() runtime.Object { return &example.Pod{} },
 		NewListFunc: func() runtime.Object { return &example.PodList{} },
-		Codec:       Codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Codec:       cachertesting.Codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:       c,
 	}
 	cacher, err := NewCacherFromConfig(config)
@@ -349,7 +348,7 @@ func TestShouldDelegateList(t *testing.T) {
 	// If you were to run only TestGetListCacheBypass you would see that the test fail.
 	// However in CI all test are run and there must be a test(s) that properly
 	// initialize the storage layer so that the mentioned method evaluates to true
-	ForceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 
 	consistentListFromCacheOverrides := map[opts]bool{}
 	for _, recursive := range []bool{true, false} {
@@ -518,7 +517,7 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 
 func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, fallbackError, skipStorageFallback bool) (*CacheDelegator, *testingclock.FakeClock, *int, k8smetrics.KubeRegistry) {
 	t.Helper()
-	ForceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
 	if skipStorageFallback {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
@@ -738,7 +737,7 @@ func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ListFromCacheSnapshot: false,
 	})
-	ForceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 
 	tests := []struct {
 		name                    string
@@ -884,7 +883,7 @@ func TestGetCacheBypass(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, scenario.consistentGetFromCache)
 			if scenario.watchProgressSupported {
-				ForceRequestWatchProgressSupport(t)
+				cachertesting.ForceRequestWatchProgressSupport(t)
 			} else {
 				origChecker := etcdfeature.DefaultFeatureSupportChecker
 				etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
@@ -1020,7 +1019,7 @@ func TestWatchCacheBypass(t *testing.T) {
 
 func TestEmptyWatchEventCache(t *testing.T) {
 	t.Parallel()
-	server, etcdStorage := NewEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, etcdStorage := cachertesting.NewEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 
 	// add a few objects
@@ -1029,7 +1028,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i), Namespace: "test-ns"}}
 		out := &example.Pod{}
-		key := ComputePodKey(pod)
+		key := cachertesting.ComputePodKey(pod)
 		if err := etcdStorage.Create(context.Background(), key, pod, out, 0); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -1238,7 +1237,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 }
 
 func TestCacherDontAcceptRequestsStopped(t *testing.T) {
-	ForceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
@@ -1586,7 +1585,7 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 		t.Run(fmt.Sprintf("ListFromCacheSnapshot=%v", listFromCacheSnapshot), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
-			ForceRequestWatchProgressSupport(t)
+			cachertesting.ForceRequestWatchProgressSupport(t)
 
 			backingStorage := &cachertesting.MockStorage{}
 			cacher, _, err := newTestCacher(backingStorage)
@@ -2376,7 +2375,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.WatchList: true,
 	})
-	ForceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 
 	scenarios := []struct {
 		name               string
@@ -2969,7 +2968,7 @@ func (b *stopDuringDispatchBudget) returnUnused(_ time.Duration) {
 // Stop, a draining close would leave the watcher goroutine waiting forever to
 // send to a client that is gone.
 func TestWatchListStopDuringDispatch(t *testing.T) {
-	ForceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 	// Only this goroutine counts. Etcd clients of earlier tests can start
 	// goroutines at any time, so goleak may report those as well.
 	const watcherGoroutine = "cacher.(*cacheWatcher).process"
@@ -3293,25 +3292,6 @@ func TestComputeListLimit(t *testing.T) {
 				t.Errorf("computeListLimit returned = %v, expected %v", actualLimit, scenario.expectedLimit)
 			}
 		})
-	}
-}
-
-// TODO(p0lyn0mial): ForceRequestWatchProgressSupport inits the storage layer
-// so that tests that require storage.RequestWatchProgress pass
-//
-// In the future we could have a function that would allow for setting the feature
-// only for duration of a test.
-func ForceRequestWatchProgressSupport(t testing.TB) {
-	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
-		return
-	}
-
-	server, _ := NewEtcdTestStorage(t, etcd3testing.PathPrefix())
-	defer server.Terminate(t)
-	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
-		return etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress), nil
-	}); err != nil {
-		t.Fatalf("failed to wait for required %v storage feature to initialize", storage.RequestWatchProgress)
 	}
 }
 
