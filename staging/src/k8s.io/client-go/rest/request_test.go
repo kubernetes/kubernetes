@@ -4302,3 +4302,173 @@ func TestTryThrottleWithInfoContextDeadline(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	assert.NotContains(t, err.Error(), "client rate limiter")
 }
+
+func TestMetricsRequestInfo(t *testing.T) {
+	appsV1 := schema.GroupVersion{
+		Group:   "apps",
+		Version: "v1",
+	}
+	coreV1 := schema.GroupVersion{
+		Version: "v1",
+	}
+
+	tests := []struct {
+		name    string
+		request Request
+		want    metrics.RequestInfo
+	}{
+		{
+			name: "non-resource request",
+			request: Request{
+				verb: http.MethodGet,
+				contentConfig: ClientContentConfig{
+					GroupVersion: appsV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb: http.MethodGet,
+			},
+		},
+		{
+			name: "get namespaced resource",
+			request: Request{
+				verb:         http.MethodGet,
+				namespace:    "default",
+				resource:     "deployments",
+				resourceName: "deployment-1",
+				contentConfig: ClientContentConfig{
+					GroupVersion: appsV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb:     http.MethodGet,
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "deployments",
+				Scope:    "resource",
+			},
+		},
+		{
+			name: "list namespaced resources",
+			request: Request{
+				verb:      http.MethodGet,
+				namespace: "default",
+				resource:  "deployments",
+				contentConfig: ClientContentConfig{
+					GroupVersion: appsV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb:     "LIST",
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "deployments",
+				Scope:    "namespace",
+			},
+		},
+		{
+			name: "list cluster-scoped resources",
+			request: Request{
+				verb:     http.MethodGet,
+				resource: "nodes",
+				contentConfig: ClientContentConfig{
+					GroupVersion: coreV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb:     "LIST",
+				Version:  "v1",
+				Resource: "nodes",
+				Scope:    "cluster",
+			},
+		},
+		{
+			name: "watch namespaced resources",
+			request: Request{
+				verb:      http.MethodGet,
+				namespace: "default",
+				resource:  "deployments",
+				params: url.Values{
+					"watch": []string{"true"},
+				},
+				contentConfig: ClientContentConfig{
+					GroupVersion: appsV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb:     "WATCH",
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "deployments",
+				Scope:    "namespace",
+			},
+		},
+		{
+			name: "watch disabled is list",
+			request: Request{
+				verb:      http.MethodGet,
+				namespace: "default",
+				resource:  "deployments",
+				params: url.Values{
+					"watch": []string{"false"},
+				},
+				contentConfig: ClientContentConfig{
+					GroupVersion: appsV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb:     "LIST",
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "deployments",
+				Scope:    "namespace",
+			},
+		},
+		{
+			name: "create resource",
+			request: Request{
+				verb:      http.MethodPost,
+				namespace: "default",
+				resource:  "deployments",
+				contentConfig: ClientContentConfig{
+					GroupVersion: appsV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb:     http.MethodPost,
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "deployments",
+				Scope:    "resource",
+			},
+		},
+		{
+			name: "other HTTP method remains unchanged",
+			request: Request{
+				verb:         http.MethodPatch,
+				namespace:    "default",
+				resource:     "deployments",
+				resourceName: "deployment-1",
+				contentConfig: ClientContentConfig{
+					GroupVersion: appsV1,
+				},
+			},
+			want: metrics.RequestInfo{
+				Verb:     http.MethodPatch,
+				Group:    "apps",
+				Version:  "v1",
+				Resource: "deployments",
+				Scope:    "resource",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := test.request.metricsRequestInfo()
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("metricsRequestInfo() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

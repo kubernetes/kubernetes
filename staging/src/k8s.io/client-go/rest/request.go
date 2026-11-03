@@ -761,6 +761,8 @@ func (b *throttledLogger) info(logger klog.Logger, message string, kv ...any) {
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
+	ctx = metrics.WithRequestInfo(ctx, r.metricsRequestInfo())
+
 	if r.body == nil {
 		logBody(klog.FromContext(ctx), 2, "Request Body", r.bodyBytes)
 	}
@@ -895,6 +897,8 @@ func sanitize(req *Request, resp *http.Response, err error) (string, string) {
 // Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
 // If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
 func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
+	ctx = metrics.WithRequestInfo(ctx, r.metricsRequestInfo())
+
 	if r.body == nil {
 		logBody(klog.FromContext(ctx), 2, "Request Body", r.bodyBytes)
 	}
@@ -1033,6 +1037,8 @@ func newDNSMetricsTrace(ctx context.Context) *httptrace.ClientTrace {
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
 // server - the provided function is responsible for handling server errors.
 func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Response)) error {
+	ctx = metrics.WithRequestInfo(ctx, r.metricsRequestInfo())
+
 	// Metrics for total request latency
 	start := time.Now()
 	defer func() {
@@ -1363,6 +1369,50 @@ func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool,
 		retryAfter,
 		true,
 	)
+}
+
+func (r *Request) metricsRequestInfo() metrics.RequestInfo {
+	info := metrics.RequestInfo{}
+
+	if r.resource != "" {
+		info.Group = r.contentConfig.GroupVersion.Group
+		info.Version = r.contentConfig.GroupVersion.Version
+		info.Resource = r.resource
+
+		switch {
+		case r.resourceName != "" || r.verb == http.MethodPost:
+			info.Scope = "resource"
+		case r.namespace != "":
+			info.Scope = "namespace"
+		default:
+			info.Scope = "cluster"
+		}
+	}
+
+	info.Verb = r.metricsVerb(info.Scope)
+	return info
+}
+
+func (r *Request) metricsVerb(scope string) string {
+	switch r.verb {
+	case http.MethodGet, http.MethodHead:
+		if values := r.params["watch"]; len(values) > 0 {
+			switch strings.ToLower(values[0]) {
+			case "0", "false":
+			default:
+				return "WATCH"
+			}
+		}
+
+		if scope != "" && scope != "resource" {
+			return "LIST"
+		}
+
+		return http.MethodGet
+
+	default:
+		return r.verb
+	}
 }
 
 // isTextResponse returns true if the response appears to be a textual media type.
