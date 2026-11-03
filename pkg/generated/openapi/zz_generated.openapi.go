@@ -33660,9 +33660,7 @@ func schema_k8sio_api_core_v1_VolumeHealthStatus(ref common.ReferenceCallback) c
 									"status",
 									"reason",
 								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "status",
-								"x-kubernetes-patch-strategy":  "merge",
+								"x-kubernetes-list-type": "map",
 							},
 						},
 						SchemaProps: spec.SchemaProps{

@@ -7414,8 +7414,6 @@ message VolumeHealthStatus {
   // +optional
   // +listType=map
   // +listMapKey=status
-  // +patchMergeKey=status
-  // +patchStrategy=merge
   // +listMapKey=reason
   // +k8s:optional
   // +k8s:listType=map
