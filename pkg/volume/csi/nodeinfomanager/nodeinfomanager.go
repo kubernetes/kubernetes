@@ -24,6 +24,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"sync"
 
@@ -712,7 +713,7 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 		return err
 	}
 
-	hasModified := false
+	specModified := false
 	// Uninstall CSINodeDriver with name csiDriverName
 	drivers := nodeInfo.Spec.Drivers[:0]
 	for _, driver := range nodeInfo.Spec.Drivers {
@@ -720,21 +721,40 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 			drivers = append(drivers, driver)
 		} else {
 			// Found a driver with name csiDriverName
-			// Set hasModified to true because it will be removed
-			hasModified = true
+			// Set specModified to true because it will be removed
+			specModified = true
 		}
 	}
 
-	if !hasModified {
-		// No changes, don't update
+	if specModified {
+		nodeInfo.Spec.Drivers = drivers
+		nodeInfo, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+		if err != nil {
+			return err // do not wrap error
+		}
+	}
+
+	// Update() ignores status, so the driver's storage health is removed with a
+	// separate status update. On retry the spec is already clean and only this runs.
+	storageHealth, statusModified := withoutStorageHealth(nodeInfo.Status.StorageHealth, csiDriverName)
+	if !statusModified {
 		return nil
 	}
-	nodeInfo.Spec.Drivers = drivers
-
-	_, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
-
+	nodeInfo.Status.StorageHealth = storageHealth
+	_, err = nodeInfoClient.UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 	return err // do not wrap error
+}
 
+// withoutStorageHealth returns health without driverName's entry and whether
+// an entry was removed.
+func withoutStorageHealth(health []storagev1.StorageHealth, driverName string) ([]storagev1.StorageHealth, bool) {
+	remaining := make([]storagev1.StorageHealth, 0, len(health))
+	for _, h := range health {
+		if h.Name != driverName {
+			remaining = append(remaining, h)
+		}
+	}
+	return remaining, len(remaining) != len(health)
 }
 
 // UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
@@ -781,6 +801,13 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 
 	if err = nim.ensureNodeOwnsCSINode(csiKubeClient, nodeInfo); err != nil {
 		return err
+	}
+
+	// A probe that started before the driver was uninstalled must not re-add
+	// its health entry. Uninstall holds nim.lock too, so this check is not racy.
+	if !slices.ContainsFunc(nodeInfo.Spec.Drivers, func(d storagev1.CSINodeDriver) bool { return d.Name == driverName }) {
+		klog.V(4).InfoS("Skipping storage health update for driver not installed in CSINode", "driver", driverName)
+		return nil
 	}
 
 	var existingDriverConds []storagev1.StorageHealthCondition

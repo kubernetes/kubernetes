@@ -1458,7 +1458,7 @@ func TestUpdateCSINodeStorageHealth(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, !tc.featureDisabled)
-			nim, client, nodeName := newStorageHealthTestManager(t, tc.stored)
+			nim, client, nodeName := newStorageHealthTestManager(t, []string{driver1, driver2}, tc.stored)
 			reportedCopy := (&storage.StorageHealth{HealthConditions: tc.reported}).DeepCopy().HealthConditions
 
 			before := metav1.Now().Rfc3339Copy()
@@ -1620,7 +1620,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 
 func TestUpdateCSINodeStorageHealthCancelled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
-	nim, client, _ := newStorageHealthTestManager(t, nil)
+	nim, client, _ := newStorageHealthTestManager(t, []string{"com.example.csi.driver1"}, nil)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -1635,6 +1635,105 @@ func TestUpdateCSINodeStorageHealthCancelled(t *testing.T) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
 	assert.Zero(t, countStatusUpdates(client.Actions()), "cancelled context must not update status")
+}
+
+func TestUpdateCSINodeStorageHealthSkipsUninstalledDriver(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	nim, client, nodeName := newStorageHealthTestManager(t, nil, nil)
+
+	conditions := []storage.StorageHealthCondition{
+		{
+			Status: storage.StorageDegraded,
+			Reason: "DiskSlow",
+		},
+	}
+	if err := nim.UpdateCSINodeStorageHealth(t.Context(), "com.example.csi.driver1", conditions); err != nil {
+		t.Fatalf("UpdateCSINodeStorageHealth returned error: %v", err)
+	}
+
+	assert.Zero(t, countStatusUpdates(client.Actions()), "health for an uninstalled driver must not be written")
+	got, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting CSINode: %v", err)
+	}
+	assert.Empty(t, got.Status.StorageHealth)
+}
+
+func TestUninstallCSIDriverRemovesStorageHealth(t *testing.T) {
+	const (
+		driver1 = "com.example.csi.driver1"
+		driver2 = "com.example.csi.driver2"
+	)
+	health1 := storage.StorageHealth{
+		Name: driver1,
+		HealthConditions: []storage.StorageHealthCondition{
+			{
+				Status: storage.StorageDegraded,
+				Reason: "DiskSlow",
+			},
+		},
+	}
+	health2 := storage.StorageHealth{
+		Name: driver2,
+		HealthConditions: []storage.StorageHealthCondition{
+			{
+				Status: storage.StorageHealthy,
+				Reason: "StorageHealthy",
+			},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		installed        []string
+		stored           []storage.StorageHealth
+		wantHealth       []storage.StorageHealth
+		wantStatusUpdate bool
+	}{
+		{
+			name:             "removes health and preserves other drivers",
+			installed:        []string{driver1, driver2},
+			stored:           []storage.StorageHealth{health1, health2},
+			wantHealth:       []storage.StorageHealth{health2},
+			wantStatusUpdate: true,
+		},
+		{
+			// A previous attempt removed the spec entry but failed to update status.
+			name:             "removes leftover health when spec is already clean",
+			installed:        []string{driver2},
+			stored:           []storage.StorageHealth{health1, health2},
+			wantHealth:       []storage.StorageHealth{health2},
+			wantStatusUpdate: true,
+		},
+		{
+			name:       "no status update without health entry",
+			installed:  []string{driver1, driver2},
+			stored:     []storage.StorageHealth{health2},
+			wantHealth: []storage.StorageHealth{health2},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			nim, client, nodeName := newStorageHealthTestManager(t, tc.installed, tc.stored)
+
+			if err := nim.uninstallDriverFromCSINode(driver1); err != nil {
+				t.Fatalf("uninstallDriverFromCSINode returned error: %v", err)
+			}
+
+			// The fake client does not drop status on Update(), so check that the
+			// status subresource was written explicitly.
+			assert.Equal(t, tc.wantStatusUpdate, countStatusUpdates(client.Actions()) > 0, "status update")
+			got, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("error getting CSINode: %v", err)
+			}
+			assert.Equal(t, tc.wantHealth, got.Status.StorageHealth)
+			for _, driver := range got.Spec.Drivers {
+				assert.NotEqual(t, driver1, driver.Name, "driver must be removed from spec")
+			}
+		})
+	}
 }
 
 // checkFreshTransitionTimes verifies that every condition whose expected
@@ -1657,12 +1756,22 @@ func checkFreshTransitionTimes(t *testing.T, got, want []storage.StorageHealth, 
 }
 
 // newStorageHealthTestManager returns a nodeInfoManager backed by a fake client
-// holding a CSINode with the given storage health.
-func newStorageHealthTestManager(t *testing.T, stored []storage.StorageHealth) (*nodeInfoManager, *fake.Clientset, string) {
+// holding a CSINode with the given drivers installed and the given storage health.
+func newStorageHealthTestManager(t *testing.T, installed []string, stored []storage.StorageHealth) (*nodeInfoManager, *fake.Clientset, string) {
 	t.Helper()
 	node := generateNode(nil, nil, nil)
+	drivers := make([]storage.CSINodeDriver, 0, len(installed))
+	for _, name := range installed {
+		drivers = append(drivers, storage.CSINodeDriver{
+			Name:   name,
+			NodeID: "node1",
+		})
+	}
 	csiNode := &storage.CSINode{
 		ObjectMeta: getCSINodeObjectMeta(),
+		Spec: storage.CSINodeSpec{
+			Drivers: drivers,
+		},
 		Status: storage.CSINodeStatus{
 			StorageHealth: stored,
 		},

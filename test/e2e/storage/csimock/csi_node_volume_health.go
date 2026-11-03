@@ -248,6 +248,13 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 		}
 		for _, test := range tests {
 			ginkgo.It(test.name, func(ctx context.Context) {
+				var nodeName, driverName string
+				// Register before m.init so this runs after the driver's deferred
+				// teardown. DeferCleanup callbacks run in reverse registration order.
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					checkCSINodeDriverRemoved(ctx, f, nodeName, driverName)
+				})
+
 				var backendHealth atomic.Pointer[csipbv1.NodeGetStorageHealthResponse_StorageBackendHealth]
 				backendHealth.Store(test.steps[0].backendHealth)
 				m.init(ctx, testParameters{
@@ -257,8 +264,8 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				})
 				ginkgo.DeferCleanup(m.cleanup)
 
-				nodeName := m.config.ClientNodeSelection.Name
-				driverName := m.config.GetUniqueDriverName()
+				nodeName = m.config.ClientNodeSelection.Name
+				driverName = m.config.GetUniqueDriverName()
 
 				for _, step := range test.steps {
 					backendHealth.Store(step.backendHealth)
@@ -350,6 +357,31 @@ func csiNodeStorageHealthMatches(csiNode *storagev1.CSINode, driverName string, 
 			got.VolumeMode == nil
 	}
 	return false
+}
+
+func checkCSINodeDriverRemoved(ctx context.Context, f *framework.Framework, nodeName, driverName string) {
+	if driverName == "" {
+		return
+	}
+	ginkgo.By("Waiting for the uninstalled driver's registration and storage health to be removed from CSINode")
+	err := wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+		csiNode, err := f.ClientSet.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name == driverName {
+				return false, nil
+			}
+		}
+		for _, health := range csiNode.Status.StorageHealth {
+			if health.Name == driverName {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "driver %q should be removed from CSINode %q spec.drivers and status.storageHealth after uninstall", driverName, nodeName)
 }
 
 func createVolumeHealthHook(health *csipbv1.VolumeHealth_VolumeHealthEntry) *drivers.Hooks {
