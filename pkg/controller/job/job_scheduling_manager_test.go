@@ -26,7 +26,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,8 +59,8 @@ func newGangSchedulingJob(name string, parallelism int32) *batch.Job {
 			Completions:    new(parallelism),
 			CompletionMode: &indexed,
 			Scheduling: &batch.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-					Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(parallelism)},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+					Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(parallelism)},
 				},
 			},
 			Selector: &metav1.LabelSelector{
@@ -300,36 +300,36 @@ func TestGenerateWorkload(t *testing.T) {
 		},
 		"explicit basic policy": {
 			job: newJob("basic-explicit", 4, &batch.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}},
 			}),
 			wantBasic: true,
 		},
 		"gang with explicit minCount": {
 			job: newJob("gang", 4, &batch.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(3))}},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(3))}},
 			}),
 			wantGangMinCount: 3,
 		},
 		"gang without minCount defaults to parallelism": {
 			job: newJob("gang-zero", 4, &batch.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{}},
 			}),
 			wantGangMinCount: 4,
 		},
 		"gang without minCount and zero parallelism clamps to 1": {
 			job: newJob("gang-zero-parallelism", 0, &batch.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{}},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{}},
 			}),
 			wantGangMinCount: 1,
 		},
 		"gang, topology, disruption, and claims passthrough": {
 			job: newJob("full", 4, &batch.JobSchedulingConfiguration{
-				SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(4))}},
-				SchedulingConstraints: &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{
-					Topology: []schedulingv1alpha3.TopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
+				SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(4))}},
+				SchedulingConstraints: &schedulingv1.WorkloadPodGroupSchedulingConstraints{
+					Topology: []schedulingv1.WorkloadTopologyConstraint{{Key: "topology.kubernetes.io/zone"}},
 				},
-				DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}},
-				ResourceClaims: []schedulingv1alpha3.WorkloadPodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("my-claim")}},
+				DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{}},
+				ResourceClaims: []schedulingv1.WorkloadPodGroupResourceClaim{{Name: "gpu", ResourceClaimName: new("my-claim")}},
 			}),
 			wantGangMinCount: 4,
 			wantTopologyKey:  "topology.kubernetes.io/zone",

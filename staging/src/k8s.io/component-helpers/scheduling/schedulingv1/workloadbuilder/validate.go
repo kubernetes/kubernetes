@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"slices"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -267,27 +267,27 @@ func (b *Builder) validatePodGroupItemDeclarative(ctx context.Context, op operat
 
 	if item.Input.Policy.PodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Policy.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
+		var oldData *schedulingv1.WorkloadPodGroupSchedulingPolicy
 		if oldItem != nil && oldItem.Input.Policy.PodGroupData != nil {
 			oldData = oldItem.Input.Policy.PodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.PodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.PodGroupData, oldData)...)
 	}
 	if item.Input.Constraints.PodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Constraints.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
+		var oldData *schedulingv1.WorkloadPodGroupSchedulingConstraints
 		if oldItem != nil && oldItem.Input.Constraints.PodGroupData != nil {
 			oldData = oldItem.Input.Constraints.PodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.PodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.PodGroupData, oldData)...)
 	}
 	if item.Input.DisruptionMode.PodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
+		var oldData *schedulingv1.WorkloadPodGroupDisruptionMode
 		if oldItem != nil && oldItem.Input.DisruptionMode.PodGroupData != nil {
 			oldData = oldItem.Input.DisruptionMode.PodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.PodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.PodGroupData, oldData)...)
 	}
 
 	allErrs = append(allErrs, b.validateResourceClaims(ctx, op, item, oldItem)...)
@@ -302,27 +302,27 @@ func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, 
 
 	if item.Input.Policy.CompositePodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Policy.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy
+		var oldData *schedulingv1.WorkloadCompositePodGroupSchedulingPolicy
 		if oldItem != nil && oldItem.Input.Policy.CompositePodGroupData != nil {
 			oldData = oldItem.Input.Policy.CompositePodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.CompositePodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadCompositePodGroupSchedulingPolicy(ctx, op, path, item.Input.Policy.CompositePodGroupData, oldData)...)
 	}
 	if item.Input.Constraints.CompositePodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.Constraints.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints
+		var oldData *schedulingv1.WorkloadCompositePodGroupSchedulingConstraints
 		if oldItem != nil && oldItem.Input.Constraints.CompositePodGroupData != nil {
 			oldData = oldItem.Input.Constraints.CompositePodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.CompositePodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadCompositePodGroupSchedulingConstraints(ctx, op, path, item.Input.Constraints.CompositePodGroupData, oldData)...)
 	}
 	if item.Input.DisruptionMode.CompositePodGroupData != nil {
 		path := appendPathElements(item.Path, item.Input.DisruptionMode.PathElements)
-		var oldData *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode
+		var oldData *schedulingv1.WorkloadCompositePodGroupDisruptionMode
 		if oldItem != nil && oldItem.Input.DisruptionMode.CompositePodGroupData != nil {
 			oldData = oldItem.Input.DisruptionMode.CompositePodGroupData
 		}
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadCompositePodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.CompositePodGroupData, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadCompositePodGroupDisruptionMode(ctx, op, path, item.Input.DisruptionMode.CompositePodGroupData, oldData)...)
 	}
 
 	return allErrs
@@ -334,7 +334,7 @@ func (b *Builder) validateCompositePodGroupItemDeclarative(ctx context.Context, 
 // checks; a new claim with no old match validates as an addition.
 func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Operation, item, oldItem *WorkloadItem) field.ErrorList {
 	newClaims := item.Input.ResourceClaims.PodGroupData
-	var oldClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim
+	var oldClaims []schedulingv1.WorkloadPodGroupResourceClaim
 	if oldItem != nil {
 		oldClaims = oldItem.Input.ResourceClaims.PodGroupData
 	}
@@ -344,7 +344,7 @@ func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Opera
 
 	path := appendPathElements(item.Path, item.Input.ResourceClaims.PathElements)
 
-	oldByName := make(map[string]*schedulingv1alpha3.WorkloadPodGroupResourceClaim, len(oldClaims))
+	oldByName := make(map[string]*schedulingv1.WorkloadPodGroupResourceClaim, len(oldClaims))
 	for i := range oldClaims {
 		oldByName[oldClaims[i].Name] = &oldClaims[i]
 	}
@@ -353,7 +353,7 @@ func (b *Builder) validateResourceClaims(ctx context.Context, op operation.Opera
 	for idx := range newClaims {
 		data := &newClaims[idx]
 		oldData := oldByName[data.Name]
-		allErrs = append(allErrs, schedulingv1alpha3.Validate_WorkloadPodGroupResourceClaim(ctx, op, path.Index(idx), data, oldData)...)
+		allErrs = append(allErrs, schedulingv1.Validate_WorkloadPodGroupResourceClaim(ctx, op, path.Index(idx), data, oldData)...)
 	}
 	return allErrs
 }

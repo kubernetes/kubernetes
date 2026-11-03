@@ -1930,6 +1930,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupDisruptionMode"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupDisruptionModeApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupGangSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupGangSchedulingPolicyApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupResourceClaim"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupResourceClaimApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1.WorkloadPodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1.SchemeGroupVersion.WithKind("WorkloadTopologyConstraint"):
+		return &applyconfigurationsschedulingv1.WorkloadTopologyConstraintApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha3
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositeDisruptionMode"):
@@ -1974,16 +1986,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha3.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("Workload"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupDisruptionMode"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupDisruptionModeApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupGangSchedulingPolicy"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicyApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupResourceClaim"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupResourceClaimApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingConstraints"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingConstraintsApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupSchedulingPolicy"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadReference"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadSpec"):

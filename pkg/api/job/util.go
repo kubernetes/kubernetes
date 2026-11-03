@@ -18,7 +18,7 @@ package job
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	workloadbuilder "k8s.io/component-helpers/scheduling/schedulingv1/workloadbuilder"
@@ -58,14 +58,14 @@ func WorkloadInputForJobV1(s *batchv1.JobSchedulingConfiguration) workloadbuilde
 // WorkloadInput maps a Job's spec.scheduling building blocks into a
 // workloadbuilder.WorkloadInput, pairing each block with the spec.scheduling
 // sub-path where it lives so validation errors are reported at the right field.
-// Both Job controller and the internal batch API embed the schedulingv1alpha3
+// Both Job controller and the internal batch API embed the schedulingv1
 // building blocks directly, so this single mapping serves both.
 // Nil blocks fall back to the item's DefaultConfig.
 func WorkloadInput(
-	policy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy,
-	constraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints,
-	disruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode,
-	resourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim,
+	policy *schedulingv1.WorkloadPodGroupSchedulingPolicy,
+	constraints *schedulingv1.WorkloadPodGroupSchedulingConstraints,
+	disruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode,
+	resourceClaims []schedulingv1.WorkloadPodGroupResourceClaim,
 ) workloadbuilder.WorkloadInput {
 	return workloadbuilder.WorkloadInput{
 		Policy: workloadbuilder.PolicyInput{

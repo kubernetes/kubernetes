@@ -17,7 +17,7 @@ limitations under the License.
 package batch
 
 import (
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -491,19 +491,19 @@ type JobSchedulingConfiguration struct {
 	// Exactly one of Basic or Gang must be set.
 	//
 	// +optional
-	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicy
 
 	// SchedulingConstraints defines optional scheduling constraints (e.g. topology)
 	// for the Job's pods.
 	//
 	// +optional
-	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraints
 
 	// DisruptionMode defines the mode in which the Job's pods can be disrupted.
 	// One of Single, All.
 	//
 	// +optional
-	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode
 
 	// ResourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Job. Pods consume the devices allocated to a PodGroup's claim by
@@ -517,7 +517,7 @@ type JobSchedulingConfiguration struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
-	ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaim
 }
 
 // JobStatus represents the current state of a Job.

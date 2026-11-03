@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -2572,7 +2572,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:   validGeneratedSelector,
 					Template:   validPodTemplateSpecForGenerated,
-					Scheduling: &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}},
+					Scheduling: &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}},
 				},
 			},
 			update: func(job *batch.Job) {},
@@ -2584,7 +2584,7 @@ func TestValidateJobUpdate(t *testing.T) {
 					Selector:    validGeneratedSelector,
 					Template:    validPodTemplateSpecForGenerated,
 					Parallelism: ptr.To[int32](8),
-					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
+					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
 				},
 			},
 			update: func(job *batch.Job) { job.Spec.Scheduling.SchedulingPolicy.Gang.MinCount = ptr.To[int32](8) },
@@ -2595,11 +2595,11 @@ func TestValidateJobUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:   validGeneratedSelector,
 					Template:   validPodTemplateSpecForGenerated,
-					Scheduling: &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}},
+					Scheduling: &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}},
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](1)}}
+				job.Spec.Scheduling.SchedulingPolicy = &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](1)}}
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -2613,11 +2613,11 @@ func TestValidateJobUpdate(t *testing.T) {
 					Selector:    validGeneratedSelector,
 					Template:    validPodTemplateSpecForGenerated,
 					Parallelism: ptr.To[int32](4),
-					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
+					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: ptr.To[int32](4)}}},
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}
+				job.Spec.Scheduling.SchedulingPolicy = &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -3431,10 +3431,10 @@ func TestValidateCronJobSchedulingUpdate(t *testing.T) {
 		return cj
 	}
 	basic := func() *batch.JobSchedulingConfiguration {
-		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}}
 	}
 	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
-		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
 	}
 
 	// The CronJob update path does not enforce scheduling immutability
@@ -3501,18 +3501,18 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 	validSelector := getValidGeneratedSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validSelector)
 	basic := func() *batch.JobSchedulingConfiguration {
-		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}}
 	}
 	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
-		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
 	}
 	basicDisruptionModeAll := func() *batch.JobSchedulingConfiguration {
 		return &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 			},
-			DisruptionMode: &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-				All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+			DisruptionMode: &schedulingv1.WorkloadPodGroupDisruptionMode{
+				All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 			},
 		}
 	}
@@ -3632,21 +3632,21 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 	validSelector := getValidGeneratedSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(validSelector)
 	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
-		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
 	}
-	basic := &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}}}
+	basic := &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}}}
 	basicSingle := &batch.JobSchedulingConfiguration{
-		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}},
-		DisruptionMode:   &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{}},
+		SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}},
+		DisruptionMode:   &schedulingv1.WorkloadPodGroupDisruptionMode{Single: &schedulingv1.WorkloadPodGroupSingleDisruptionMode{}},
 	}
 	basicAll := &batch.JobSchedulingConfiguration{
-		SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{}},
-		DisruptionMode:   &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}},
+		SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{}},
+		DisruptionMode:   &schedulingv1.WorkloadPodGroupDisruptionMode{All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{}},
 	}
 	gangAll := func(minCount int32) *batch.JobSchedulingConfiguration {
 		return &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}},
-			DisruptionMode:   &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{}},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}},
+			DisruptionMode:   &schedulingv1.WorkloadPodGroupDisruptionMode{All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{}},
 		}
 	}
 	disruptionModePath := field.NewPath("spec", "scheduling", "disruptionMode")
@@ -3701,7 +3701,7 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 		},
 		"gang minCount unset (nil) defaults to parallelism and is accepted": {
 			parallelism: ptr.To[int32](4),
-			sched:       &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: nil}}},
+			sched:       &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: nil}}},
 		},
 		"nil parallelism defaults to 1, minCount 1 is allowed": {
 			sched: gang(1),
@@ -3754,7 +3754,7 @@ func TestValidateCronJobCreateGangMinCount(t *testing.T) {
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
 	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
-		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
+		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
 	}
 	mkCronJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration) *batch.CronJob {
 		return &batch.CronJob{
@@ -3818,7 +3818,7 @@ func TestValidateCronJobUpdateGangMinCount(t *testing.T) {
 				JobTemplate: batch.JobTemplateSpec{Spec: batch.JobSpec{
 					Parallelism: new(parallelism),
 					Template:    validPodTemplateSpec,
-					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}},
+					Scheduling:  &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}},
 				}},
 			},
 		}

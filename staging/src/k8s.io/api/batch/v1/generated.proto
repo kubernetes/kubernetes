@@ -22,7 +22,7 @@ syntax = "proto2";
 package k8s.io.api.batch.v1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/api/scheduling/v1alpha3/generated.proto";
+import "k8s.io/api/scheduling/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -199,7 +199,7 @@ message JobSchedulingConfiguration {
   // +k8s:optional
   // +k8s:update=NoSet
   // +k8s:update=NoUnset
-  optional .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingPolicy schedulingPolicy = 1;
+  optional .k8s.io.api.scheduling.v1.WorkloadPodGroupSchedulingPolicy schedulingPolicy = 1;
 
   // schedulingConstraints defines scheduling constraints (e.g. topology)
   // for the Job's pods.
@@ -208,7 +208,7 @@ message JobSchedulingConfiguration {
   // +optional
   // +k8s:optional
   // +k8s:immutable
-  optional .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupSchedulingConstraints schedulingConstraints = 2;
+  optional .k8s.io.api.scheduling.v1.WorkloadPodGroupSchedulingConstraints schedulingConstraints = 2;
 
   // disruptionMode defines the mode in which the Job's pods can be disrupted.
   // One of Single, All.
@@ -218,7 +218,7 @@ message JobSchedulingConfiguration {
   // +optional
   // +k8s:optional
   // +k8s:immutable
-  optional .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupDisruptionMode disruptionMode = 3;
+  optional .k8s.io.api.scheduling.v1.WorkloadPodGroupDisruptionMode disruptionMode = 3;
 
   // resourceClaims defines which ResourceClaims may be shared among Pods in
   // the Job. Pods consume the devices allocated to a PodGroup's claim by
@@ -239,7 +239,7 @@ message JobSchedulingConfiguration {
   // +k8s:listMapKey=name
   // +k8s:maxItems=4
   // +k8s:immutable
-  repeated .k8s.io.api.scheduling.v1alpha3.WorkloadPodGroupResourceClaim resourceClaims = 4;
+  repeated .k8s.io.api.scheduling.v1.WorkloadPodGroupResourceClaim resourceClaims = 4;
 }
 
 // JobSpec describes how the job execution will look like.

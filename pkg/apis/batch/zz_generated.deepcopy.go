@@ -22,8 +22,8 @@ limitations under the License.
 package batch
 
 import (
-	v1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/scheduling/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	core "k8s.io/kubernetes/pkg/apis/core"
@@ -245,22 +245,22 @@ func (in *JobSchedulingConfiguration) DeepCopyInto(out *JobSchedulingConfigurati
 	*out = *in
 	if in.SchedulingPolicy != nil {
 		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
-		*out = new(v1alpha3.WorkloadPodGroupSchedulingPolicy)
+		*out = new(v1.WorkloadPodGroupSchedulingPolicy)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.SchedulingConstraints != nil {
 		in, out := &in.SchedulingConstraints, &out.SchedulingConstraints
-		*out = new(v1alpha3.WorkloadPodGroupSchedulingConstraints)
+		*out = new(v1.WorkloadPodGroupSchedulingConstraints)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.DisruptionMode != nil {
 		in, out := &in.DisruptionMode, &out.DisruptionMode
-		*out = new(v1alpha3.WorkloadPodGroupDisruptionMode)
+		*out = new(v1.WorkloadPodGroupDisruptionMode)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ResourceClaims != nil {
 		in, out := &in.ResourceClaims, &out.ResourceClaims
-		*out = make([]v1alpha3.WorkloadPodGroupResourceClaim, len(*in))
+		*out = make([]v1.WorkloadPodGroupResourceClaim, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -323,7 +323,7 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
-		*out = new(v1.LabelSelector)
+		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ManualSelector != nil {
