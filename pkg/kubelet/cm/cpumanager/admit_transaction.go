@@ -34,6 +34,31 @@ var _ topologymanager.AdmitTransactionalHintProvider = &manager{}
 
 // resizeTransaction is the resize of a pod that is being admitted.
 // The policy allocates it on a scratch copy of the state.
+//
+// The transaction is kept in memory only. If the kubelet stops after the
+// allocation manager persisted the pod allocation of the resize, but before
+// CompleteAdmit committed the resize to the state, the prepared resize is lost.
+// The pod is then admitted again with the persisted pod allocation, which does
+// not match its CPU assignment, and the policy handles it as a resize (see
+// staticPolicy.allocateForAdd).
+//
+// That resize can fail, although the same resize was admitted before the
+// restart, only if all of the following happen:
+//   - the kubelet stops in the short window described above;
+//   - a new pod, not admitted before the restart, appears from another pod
+//     source than the resized pod, for example a new static pod manifest.
+//     Within one source, the pods admitted before the restart are admitted
+//     before new pods;
+//   - the source of the new pod is handled first after the restart;
+//   - the new pod takes CPUs that the resize needs. Free CPUs do not have to
+//     run out: it is enough to take the CPUs on the NUMA node or the cores that
+//     the resize needs, including a NUMA node required by the hints of another
+//     hint provider, such as the Memory Manager.
+//
+// The running pod is then rejected when it is admitted again, by the restricted
+// and single-numa-node Topology Manager policies or when the policy fails to
+// allocate the resize, or it gets the resize with a worse alignment. The new
+// pod is admitted instead.
 type resizeTransaction struct {
 	podUID  string
 	scratch state.State
