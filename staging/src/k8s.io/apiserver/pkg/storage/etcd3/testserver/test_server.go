@@ -166,6 +166,9 @@ func RunEtcd(t T, tweakConfig ...func(cfg *embed.Config)) *kubernetes.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
 	kubernetesRecorder := storagetesting.NewKubernetesRecorder(client.Kubernetes)
 	client.KV = storagetesting.NewKVRecorder(client.KV, kubernetesRecorder)
 	client.Kubernetes = kubernetesRecorder
