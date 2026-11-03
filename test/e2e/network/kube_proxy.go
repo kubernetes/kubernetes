@@ -60,8 +60,6 @@ func expandIPv6ForConntrack(ipStr string) string {
 		ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15])
 }
 
-var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
-
 var _ = common.SIGDescribe("KubeProxy", func() {
 	const (
 		testDaemonTCPPort     = 11302
@@ -139,71 +137,36 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		e2epod.NewPodClient(fr).CreateSync(ctx, hostExecPod)
 
 		// Create the client and server pods
-		clientPodSpec := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-net-client",
-				Namespace: fr.Namespace.Name,
-				Labels:    map[string]string{"app": "e2e-net-client"},
-			},
-			Spec: v1.PodSpec{
-				NodeName: clientNodeInfo.name,
-				Containers: []v1.Container{
-					{
-						Name:            "e2e-net-client",
-						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: v1.PullIfNotPresent,
-						Args: []string{
-							"net",
-							"--runner", "nat-closewait-client",
-							"--options",
-							fmt.Sprintf(`{"RemoteAddr":"%v", "PostFinTimeoutSeconds":%v, "TimeoutSeconds":%v, "LeakConnection":true}`,
-								net.JoinHostPort(serverNodeInfo.nodeIP, strconv.Itoa(testDaemonTCPPort)),
-								postFinTimeoutSeconds,
-								0),
-						},
-					},
-				},
-			},
-		}
+		clientPodSpec := e2epod.NewAgnhostPod(fr.Namespace.Name, "e2e-net-client", nil, nil, nil,
+			"net",
+			"--runner", "nat-closewait-client",
+			"--options",
+			fmt.Sprintf(`{"RemoteAddr":"%v", "PostFinTimeoutSeconds":%v, "TimeoutSeconds":%v, "LeakConnection":true}`,
+				net.JoinHostPort(serverNodeInfo.nodeIP, strconv.Itoa(testDaemonTCPPort)),
+				postFinTimeoutSeconds,
+				0),
+		)
+		clientPodSpec.Spec.NodeName = clientNodeInfo.name
 
-		serverPodSpec := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "e2e-net-server",
-				Namespace: fr.Namespace.Name,
-				Labels:    map[string]string{"app": "e2e-net-server"},
-			},
-			Spec: v1.PodSpec{
-				NodeName: serverNodeInfo.name,
-				Containers: []v1.Container{
-					{
-						Name:            "e2e-net-server",
-						Image:           kubeProxyE2eImage,
-						ImagePullPolicy: v1.PullIfNotPresent,
-						Args: []string{
-							"net",
-							"--runner", "nat-closewait-server",
-							"--options",
-							fmt.Sprintf(`{"LocalAddr":":%v", "PostFinTimeoutSeconds":%v}`,
-								testDaemonTCPPort,
-								postFinTimeoutSeconds),
-						},
-						Ports: []v1.ContainerPort{
-							{
-								Name:          "tcp",
-								ContainerPort: testDaemonTCPPort,
-								HostPort:      testDaemonTCPPort,
-							},
-						},
-					},
-				},
-			},
-		}
+		serverPodSpec := e2epod.NewAgnhostPod(fr.Namespace.Name, "e2e-net-server", nil, nil,
+			[]v1.ContainerPort{{
+				Name:          "tcp",
+				ContainerPort: testDaemonTCPPort,
+				HostPort:      testDaemonTCPPort,
+			}},
+			"net",
+			"--runner", "nat-closewait-server",
+			"--options",
+			fmt.Sprintf(`{"LocalAddr":":%v", "PostFinTimeoutSeconds":%v}`,
+				testDaemonTCPPort,
+				postFinTimeoutSeconds),
+		)
+		serverPodSpec.Spec.NodeName = serverNodeInfo.name
 
 		ginkgo.By(fmt.Sprintf(
-			"Launching a server daemon on node %v (node ip: %v, image: %v)",
+			"Launching a server daemon on node %v (node ip: %v)",
 			serverNodeInfo.name,
-			serverNodeInfo.nodeIP,
-			kubeProxyE2eImage))
+			serverNodeInfo.nodeIP))
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPodSpec)
 
 		// The server should be listening before spawning the client pod
@@ -212,10 +175,9 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		}
 		// Connect to the server and leak the connection
 		ginkgo.By(fmt.Sprintf(
-			"Launching a client connection on node %v (node ip: %v, image: %v)",
+			"Launching a client connection on node %v (node ip: %v)",
 			clientNodeInfo.name,
-			clientNodeInfo.nodeIP,
-			kubeProxyE2eImage))
+			clientNodeInfo.nodeIP))
 		e2epod.NewPodClient(fr).CreateSync(ctx, clientPodSpec)
 
 		ginkgo.By("Checking conntrack entries for the timeout")
