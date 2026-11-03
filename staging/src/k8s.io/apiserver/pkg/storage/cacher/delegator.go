@@ -37,6 +37,10 @@ func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegato
 		cacher:  cacher,
 		storage: storage,
 		stopCh:  make(chan struct{}),
+
+		watchList:             utilfeature.DefaultFeatureGate.Enabled(features.WatchList),
+		listFromCacheSnapshot: utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot),
+		consistentListFromCacheSkipTimeoutFallback: utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCacheSkipTimeoutFallback),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DetectCacheInconsistency) || consistency.PanicOnCacheInconsistency {
 		d.checker = consistency.NewChecker(cacher.resourcePrefix, cacher.groupResource, cacher.newListFunc, cacher, storage)
@@ -53,6 +57,11 @@ type CacheDelegator struct {
 	cacher  *Cacher
 	storage storage.Interface
 	checker *consistency.Checker
+
+	// Feature gates
+	watchList                                  bool
+	listFromCacheSnapshot                      bool
+	consistentListFromCacheSkipTimeoutFallback bool
 
 	wg       sync.WaitGroup
 	stopOnce sync.Once
@@ -103,7 +112,7 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 	//
 	// it should never happen due to our validation but let's just be super-safe here
 	// and disable sendingInitialEvents when the feature wasn't enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
+	if !c.watchList && opts.SendInitialEvents != nil {
 		opts.SendInitialEvents = nil
 	}
 	return c.cacher.Watch(ctx, key, opts)
@@ -156,14 +165,14 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	success := "true"
 	fallback := "false"
 	if err != nil {
-		if errors.IsResourceExpired(err) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+		if errors.IsResourceExpired(err) && c.listFromCacheSnapshot {
 			return c.storage.GetList(ctx, key, opts, listObj)
 		}
 		if result.ConsistentRead {
 			// IsTooLargeResourceVersion occurs when the requested RV is higher than cache's current RV
 			// and cache hasn't caught up within the timeout period.
 			if storage.IsTooLargeResourceVersion(err) {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCacheSkipTimeoutFallback) {
+				if c.consistentListFromCacheSkipTimeoutFallback {
 					fallback = "skipped"
 					err = errors.NewTooManyRequests(err.Error(), resourceVersionTooHighRetrySeconds)
 				} else {
