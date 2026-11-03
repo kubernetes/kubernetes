@@ -48,6 +48,7 @@ const (
 	Cgroup2MemoryHigh      string = "memory.high"
 	Cgroup2MaxCpuLimit     string = "max"
 	Cgroup2MaxSwapFilename string = "memory.swap.max"
+	Cgroup2MaxSwapLimit    string = "max"
 )
 
 var RootCgroupName = CgroupName([]string{})

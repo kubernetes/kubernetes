@@ -62,7 +62,16 @@ type podContainerManagerImpl struct {
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
 	// memoryThrottlingFactor is used to compute pod-level memory.high
 	memoryThrottlingFactor *float64
+	// memorySwapBehavior controls pod-level swap behavior (NoSwap or LimitedSwap)
+	memorySwapBehavior string
+	// memoryCapacity and swapCapacity are node capacities in bytes used for proportional swap calculation
+	memoryCapacity int64
+	swapCapacity   int64
+	// getSwapControllerAvailable reports whether the swap cgroup controller is available on the host
+	getSwapControllerAvailable func() bool
 }
+
+var isCgroup2UnifiedMode = libcontainercgroups.IsCgroup2UnifiedMode
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
 var _ PodContainerManager = &podContainerManagerImpl{}
@@ -87,7 +96,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 		}
 		enforceMemoryQoS := false
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-			libcontainercgroups.IsCgroup2UnifiedMode() {
+			isCgroup2UnifiedMode() {
 			enforceMemoryQoS = true
 		}
 		// Create the pod container
@@ -103,6 +112,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
+		m.applyPodLevelSwapConfig(logger, pod, containerConfig.ResourceParameters)
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
@@ -118,6 +128,11 @@ func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *Resou
 	if m.memoryThrottlingFactor != nil {
 		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
+}
+
+func (m *podContainerManagerImpl) applyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig) {
+	swapControllerAvailable := m.getSwapControllerAvailable != nil && m.getSwapControllerAvailable()
+	ApplyPodLevelSwapConfig(logger, pod, rc, m.memorySwapBehavior, m.memoryCapacity, m.swapCapacity, isCgroup2UnifiedMode(), swapControllerAvailable)
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.

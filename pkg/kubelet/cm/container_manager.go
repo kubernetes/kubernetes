@@ -198,6 +198,7 @@ type NodeConfig struct {
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
 	MemoryReservationPolicy      kubeletconfig.MemoryReservationPolicy
 	MemoryThrottlingFactor       *float64
+	MemorySwapBehavior           string
 	PodPidsLimit                 int64
 	EnforceCPULimits             bool
 	CPUCFSQuotaPeriod            time.Duration

@@ -305,7 +305,8 @@ func TestNewPodContainerManager(t *testing.T) {
 		Burstable:  CgroupName{"burstable"},
 	}
 	QosEnabled := NodeConfig{
-		CgroupsPerQOS: true,
+		CgroupsPerQOS:      true,
+		MemorySwapBehavior: "LimitedSwap",
 	}
 	QosDisabled := NodeConfig{
 		CgroupsPerQOS: false,
@@ -333,8 +334,9 @@ func TestNewPodContainerManager(t *testing.T) {
 					qosContainersInfo: info,
 					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, ""),
 				},
-
-				NodeConfig: QosEnabled,
+				memoryCapacity: 40 * 1024 * 1024 * 1024,
+				swapCapacity:   5 * 1024 * 1024 * 1024,
+				NodeConfig:     QosEnabled,
 			},
 		},
 		{
@@ -344,8 +346,9 @@ func TestNewPodContainerManager(t *testing.T) {
 					qosContainersInfo: info,
 					cgroupManager:     NewCgroupManager(logger, &CgroupSubsystems{}, "systemd"),
 				},
-
-				NodeConfig: QosEnabled,
+				memoryCapacity: 40 * 1024 * 1024 * 1024,
+				swapCapacity:   5 * 1024 * 1024 * 1024,
+				NodeConfig:     QosEnabled,
 			},
 		},
 		{
@@ -373,6 +376,9 @@ func TestNewPodContainerManager(t *testing.T) {
 				assert.Equal(t, c.cm.PodPidsLimit, got.podPidsLimit)
 				assert.Equal(t, c.cm.EnforceCPULimits, got.enforceCPULimits)
 				assert.Equal(t, uint64(c.cm.CPUCFSQuotaPeriod/time.Microsecond), got.cpuCFSQuotaPeriod)
+				assert.Equal(t, c.cm.MemorySwapBehavior, got.memorySwapBehavior)
+				assert.Equal(t, c.cm.memoryCapacity, got.memoryCapacity)
+				assert.Equal(t, c.cm.swapCapacity, got.swapCapacity)
 
 			} else {
 				assert.IsType(t, &podContainerManagerNoop{}, pcm)
