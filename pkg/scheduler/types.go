@@ -70,8 +70,8 @@ type podSchedulingContext struct {
 	podsToActivate *framework.PodsToActivate
 }
 
-// algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.
-type algorithmResult struct {
+// PodScheduledResult stores the scheduling result and status for a scheduling attempt of a single pod.
+type PodScheduledResult struct {
 	// podInfo is the pod info for the pod the result applies to.
 	podInfo *framework.QueuedPodInfo
 	// scheduleResult is a scheduling algorithm result.
@@ -84,30 +84,39 @@ type algorithmResult struct {
 	status *fwk.Status
 }
 
-func (ar *algorithmResult) GetPod() *v1.Pod {
+var _ fwk.ProposedAssignment = (*PodScheduledResult)(nil)
+
+// GetPod, GetPodInfo, GetNodeName, and GetCycleState keep the "Get" prefix
+// to implement fwk.ProposedAssignment.
+
+func (ar *PodScheduledResult) GetPod() *v1.Pod {
 	return ar.podInfo.Pod
 }
 
-func (ar *algorithmResult) GetPodInfo() fwk.PodInfo {
+func (ar *PodScheduledResult) GetPodInfo() fwk.PodInfo {
 	return ar.podInfo
 }
 
-func (ar *algorithmResult) GetNodeName() string {
+func (ar *PodScheduledResult) GetNodeName() string {
 	return ar.scheduleResult.SuggestedHost
 }
 
-func (ar *algorithmResult) GetCycleState() fwk.CycleState {
+func (ar *PodScheduledResult) GetCycleState() fwk.CycleState {
 	return ar.podCtx.state
 }
 
-// podGroupAlgorithmResult stores the scheduling pod scheduling results for a pod group
+func (ar *PodScheduledResult) Status() *fwk.Status {
+	return ar.status
+}
+
+// PodGroupScheduledResult stores the pod scheduling results for a pod group
 // and any information needed to act on these results.
-type podGroupAlgorithmResult struct {
+type PodGroupScheduledResult struct {
 	// podGroupInfo is the leaf pod group this result applies to.
 	podGroupInfo *framework.PodGroupInfo
 	// podResults is the list of scheduling results for each pod in the group.
 	// Only in the case of a pod group-wide Unschedulable or Error status can it contain fewer pods.
-	podResults []algorithmResult
+	podResults []PodScheduledResult
 	// status is the final status of the pod group algorithm.
 	//
 	// Success code indicates that the pod group is schedulable and does not require any preemption.
@@ -128,6 +137,26 @@ type podGroupAlgorithmResult struct {
 	placementCycleState fwk.PlacementCycleState
 	// anyScheduled indicates if at least one pod was scheduled in this pod group during this cycle.
 	anyScheduled bool
+}
+
+func (r *PodGroupScheduledResult) PodGroupInfo() *framework.PodGroupInfo {
+	return r.podGroupInfo
+}
+
+func (r *PodGroupScheduledResult) PodResults() []PodScheduledResult {
+	return r.podResults
+}
+
+func (r *PodGroupScheduledResult) Status() *fwk.Status {
+	return r.status
+}
+
+func (r *PodGroupScheduledResult) PlacementCycleState() fwk.PlacementCycleState {
+	return r.placementCycleState
+}
+
+func (r *PodGroupScheduledResult) AnyScheduled() bool {
+	return r.anyScheduled
 }
 
 // podGroupFitError describes a fit error for a PodGroup or CompositePodGroup
