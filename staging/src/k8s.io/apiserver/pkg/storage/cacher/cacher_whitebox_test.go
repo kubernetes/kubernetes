@@ -58,6 +58,7 @@ import (
 	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1828,18 +1829,23 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 
 	totalPods := 50
 
-	// Create watcher that will be blocked.
-	w1, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything, Recursive: true})
-	if err != nil {
-		t.Fatalf("Failed to create watch: %v", err)
+	createWatch := func() watch.Interface {
+		initSignal := utilflowcontrol.NewInitializationSignal()
+		ctx := utilflowcontrol.WithInitializationSignal(context.Background(), initSignal)
+		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything, Recursive: true})
+		if err != nil {
+			t.Fatalf("Failed to create watch: %v", err)
+		}
+		initSignal.Wait()
+		return w
 	}
+
+	// Create watcher that will be blocked.
+	w1 := createWatch()
 	defer w1.Stop()
 
 	// Create fast watcher and ensure it will get all objects.
-	w2, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: storage.Everything, Recursive: true})
-	if err != nil {
-		t.Fatalf("Failed to create watch: %v", err)
-	}
+	w2 := createWatch()
 	defer w2.Stop()
 
 	// Now push a ton of object to cache.
@@ -1945,10 +1951,13 @@ func TestCachingDeleteEvents(t *testing.T) {
 	}
 
 	createWatch := func(pred storage.SelectionPredicate) watch.Interface {
-		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
+		initSignal := utilflowcontrol.NewInitializationSignal()
+		ctx := utilflowcontrol.WithInitializationSignal(context.Background(), initSignal)
+		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
+		initSignal.Wait()
 		return w
 	}
 
@@ -2020,11 +2029,14 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 
 	watchers := make([]watch.Interface, 0, watchersCount)
 	for i := 0; i < watchersCount; i++ {
-		w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything, Recursive: true})
+		initSignal := utilflowcontrol.NewInitializationSignal()
+		ctx := utilflowcontrol.WithInitializationSignal(context.Background(), initSignal)
+		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "1000", Predicate: storage.Everything, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
 		defer w.Stop()
+		initSignal.Wait()
 		watchers = append(watchers, w)
 	}
 
