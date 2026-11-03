@@ -161,8 +161,13 @@ func (o *SetOptions) Validate() error {
 		return fmt.Errorf("--section must be %q, %q, or %q, got: %s", sectionDefaults, sectionAliases, sectionCredentialPlugin, o.Section)
 	}
 
-	if o.Section == sectionAliases && o.AliasName == "" {
-		return fmt.Errorf("--name is required when --section=%s", sectionAliases)
+	if o.Section == sectionAliases {
+		if o.AliasName == "" {
+			return fmt.Errorf("--name is required when --section=%s", sectionAliases)
+		}
+		if err := kuberc.ValidateAliasName(o.AliasName); err != nil {
+			return err
+		}
 	}
 
 	if o.Section == sectionDefaults && o.AliasName != "" {
