@@ -18,7 +18,10 @@ package portforward
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -29,9 +32,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	streamhttp "k8s.io/streaming/pkg/httpstream"
+)
+
+// Keep the original constructors assignable to their pre-options function types.
+var (
+	_ func(context.Context, httpstream.Dialer, []string, []string, chan struct{}, io.Writer, io.Writer) (*PortForwarder, error) = NewOnAddressesWithContext
+	_ func(context.Context, streamhttp.Dialer, []string, []string, chan struct{}, io.Writer, io.Writer) (*PortForwarder, error) = NewOnAddressesForStreamingWithContext
 )
 
 type fakeDialer struct {
@@ -550,6 +561,250 @@ func TestHandleConnectionSendsRemoteError(t *testing.T) {
 	assert.Equal(t, "", remoteDataReceived.String())
 	assert.Equal(t, "", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())
+}
+
+// newRemoteErrorPortForwarder builds a PortForwarder whose remote side reports
+// remoteError on the error stream, with an optional error handler installed.
+func newRemoteErrorPortForwarder(t *testing.T, remoteError string, opts ...Option) (*PortForwarder, *fakeConnection) {
+	t.Helper()
+	return newRemoteErrorPortForwarderWithContext(t, context.Background(), remoteError, opts...)
+}
+
+func newRemoteErrorPortForwarderWithContext(t *testing.T, ctx context.Context, remoteError string, opts ...Option) (*PortForwarder, *fakeConnection) {
+	t.Helper()
+	pf, err := NewOnAddressesWithOptions(
+		ctx,
+		&fakeDialer{},
+		[]string{"localhost"},
+		[]string{":2222"},
+		nil,
+		bytes.NewBufferString(""),
+		bytes.NewBufferString(""),
+		opts...,
+	)
+	if err != nil {
+		t.Fatalf("error while calling NewOnAddressesWithOptions: %s", err)
+	}
+
+	remoteConnection := newFakeConnection()
+	remoteConnection.dataStream.readFunc = bytes.NewBufferString("").Read
+	remoteConnection.dataStream.writeFunc = bytes.NewBufferString("").Write
+	remoteConnection.errorStream.readFunc = bytes.NewBufferString(remoteError).Read
+	pf.streamConn = remoteConnection
+	return pf, remoteConnection
+}
+
+func emptyFakeConn() *fakeConn {
+	return &fakeConn{
+		sendBuffer:    bytes.NewBufferString(""),
+		receiveBuffer: bytes.NewBufferString(""),
+	}
+}
+
+func TestHandleConnectionRemoteErrorClosesSessionByDefault(t *testing.T) {
+	pf, remoteConnection := newRemoteErrorPortForwarder(t, "error forwarding port 2222 to pod abc, uid : read: connection reset by peer")
+	pf.handleConnection(emptyFakeConn(), ForwardedPort{Local: 1111, Remote: 2222})
+
+	assert.True(t, remoteConnection.closed, "remote error with no error handler should close the session")
+	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
+}
+
+func TestHandleConnectionRemoteErrorKeepsSessionOpen(t *testing.T) {
+	pf, remoteConnection := newRemoteErrorPortForwarder(t,
+		"error forwarding port 2222 to pod abc, uid : read: connection reset by peer",
+		WithErrorHandler(func(ctx context.Context, port ForwardedPort, err error) (fatal bool) { return false }),
+	)
+	pf.handleConnection(emptyFakeConn(), ForwardedPort{Local: 1111, Remote: 2222})
+
+	assert.False(t, remoteConnection.closed, "non-fatal remote error should keep the session open")
+	assert.Equal(t, 0, remoteConnection.streamCount, "stream count should be zero")
+}
+
+func TestHandleConnectionClosesLocalConnectionBeforeErrorHandlerReturns(t *testing.T) {
+	local, peer := net.Pipe()
+	defer func() { _ = peer.Close() }()
+	if err := peer.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	handlerStarted := make(chan struct{})
+	releaseHandler := make(chan struct{})
+	done := make(chan struct{})
+	pf, remoteConnection := newRemoteErrorPortForwarder(t, "remote forwarding failure",
+		WithErrorHandler(func(context.Context, ForwardedPort, error) bool {
+			close(handlerStarted)
+			<-releaseHandler
+			return false
+		}),
+	)
+	defer func() {
+		close(releaseHandler)
+		<-done
+	}()
+	go func() {
+		defer close(done)
+		pf.handleConnection(local, ForwardedPort{Local: 1111, Remote: 2222})
+	}()
+	select {
+	case <-handlerStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("error handler was not called")
+	}
+	if _, err := peer.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+		t.Fatalf("local connection read = %v, want EOF while the handler is blocked", err)
+	}
+	assert.False(t, remoteConnection.closed, "session must remain open while the handler is deciding")
+}
+
+func TestHandleConnectionTCPClosure(t *testing.T) {
+	for _, scenario := range []string{"remote error", "error stream read failure", "clean EOF"} {
+		t.Run(scenario, func(t *testing.T) {
+			listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = listener.Close() }()
+			client, err := net.DialTCP("tcp4", nil, listener.Addr().(*net.TCPAddr))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = client.Close() }()
+			local, err := listener.AcceptTCP()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = local.Close() }()
+			if err := client.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			checkClosure := func() {
+				t.Helper()
+				_, err := client.Read(make([]byte, 1))
+				if scenario == "clean EOF" {
+					assert.ErrorIs(t, err, io.EOF)
+				} else if !isConnectionReset(err) {
+					t.Errorf("local client read = %v, want connection reset", err)
+				}
+			}
+			message := ""
+			if scenario == "remote error" {
+				message = "remote forwarding failure"
+			}
+			handlerCalled := false
+			pf, remote := newRemoteErrorPortForwarder(t, message,
+				WithErrorHandler(func(context.Context, ForwardedPort, error) bool {
+					handlerCalled = true
+					checkClosure()
+					return false
+				}),
+			)
+			if scenario == "error stream read failure" {
+				remote.errorStream.readFunc = func([]byte) (int, error) {
+					return 0, fmt.Errorf("error stream read failure")
+				}
+			}
+			pf.handleConnection(local, ForwardedPort{Local: 1111, Remote: 2222})
+			if scenario != "remote error" {
+				checkClosure()
+			}
+			assert.Equal(t, scenario == "remote error", handlerCalled)
+			assert.Equal(t, scenario == "error stream read failure", remote.closed)
+		})
+	}
+}
+
+func TestHandleConnectionRemoteErrorClosesSessionWhenHandlerSaysFatal(t *testing.T) {
+	var handledErr string
+	pf, remoteConnection := newRemoteErrorPortForwarder(t,
+		"error forwarding port 2222 to pod abc, uid : some unknown failure",
+		WithErrorHandler(func(ctx context.Context, port ForwardedPort, err error) (fatal bool) {
+			handledErr = err.Error()
+			return true
+		}),
+	)
+	pf.handleConnection(emptyFakeConn(), ForwardedPort{Local: 1111, Remote: 2222})
+
+	assert.Equal(t, "error forwarding port 2222 to pod abc, uid : some unknown failure", handledErr, "error handler should receive the remote error")
+	assert.True(t, remoteConnection.closed, "fatal remote error should close the session")
+}
+
+func TestErrorHandlerReceivesSessionContextAndPort(t *testing.T) {
+	for _, stop := range []string{"context canceled", "transport closed"} {
+		t.Run(stop, func(t *testing.T) {
+			type contextKey struct{}
+			ctx, cancel := context.WithTimeout(context.WithValue(context.Background(), contextKey{}, "session"), time.Minute)
+			defer cancel()
+			started := make(chan struct{})
+			handled := make(chan struct{})
+			port := ForwardedPort{Local: 1111, Remote: 2222}
+			pf, remote := newRemoteErrorPortForwarderWithContext(t, ctx, "remote forwarding failure",
+				WithErrorHandler(func(handlerCtx context.Context, handlerPort ForwardedPort, err error) bool {
+					assert.Equal(t, port, handlerPort)
+					assert.Equal(t, "remote forwarding failure", err.Error())
+					assert.Equal(t, "session", handlerCtx.Value(contextKey{}))
+					deadline, ok := handlerCtx.Deadline()
+					wantDeadline, _ := ctx.Deadline()
+					assert.True(t, ok, "handler context should preserve the caller's deadline")
+					assert.Equal(t, wantDeadline, deadline)
+					close(started)
+					<-handlerCtx.Done()
+					return false
+				}),
+			)
+			pf.dialer = &fakeDialer{conn: remote, negotiatedProtocol: PortForwardProtocolV1Name}
+			pf.Ready = make(chan struct{})
+			forwarded := make(chan error, 1)
+			go func() { forwarded <- pf.ForwardPorts() }()
+			select {
+			case <-pf.Ready:
+			case err := <-forwarded:
+				t.Fatalf("forwarding stopped before ready: %v", err)
+			case <-time.After(5 * time.Second):
+				t.Fatal("forwarding did not become ready")
+			}
+			go func() {
+				defer close(handled)
+				pf.handleConnection(emptyFakeConn(), port)
+			}()
+			select {
+			case <-started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("handler was not called")
+			}
+			if stop == "context canceled" {
+				cancel()
+			} else {
+				_ = remote.Close()
+			}
+			select {
+			case err := <-forwarded:
+				if stop == "transport closed" {
+					require.ErrorIs(t, err, ErrLostConnectionToPod)
+				} else {
+					require.NoError(t, err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("forwarding did not stop")
+			}
+			select {
+			case <-handled:
+			case <-time.After(5 * time.Second):
+				t.Fatal("handler context was not canceled when forwarding stopped")
+			}
+		})
+	}
+}
+
+func TestHandleConnectionErrorStreamReadErrorClosesSession(t *testing.T) {
+	pf, remoteConnection := newRemoteErrorPortForwarder(t, "",
+		WithErrorHandler(func(ctx context.Context, port ForwardedPort, err error) (fatal bool) { return false }),
+	)
+	// simulate the error stream itself failing, which means the session is broken
+	remoteConnection.errorStream.readFunc = func(p []byte) (int, error) {
+		return 0, fmt.Errorf("error stream read failure")
+	}
+	pf.handleConnection(emptyFakeConn(), ForwardedPort{Local: 1111, Remote: 2222})
+
+	assert.True(t, remoteConnection.closed, "error stream read failure should close the session even with a non-fatal error handler")
 }
 
 func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {
