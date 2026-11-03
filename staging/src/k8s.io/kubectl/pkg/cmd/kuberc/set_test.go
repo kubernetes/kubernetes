@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -1399,6 +1400,94 @@ credentialPluginAllowlist:
 			// Verify output message
 			if !strings.Contains(out.String(), "Updated") {
 				t.Errorf("expected output to contain 'Updated', got: %s", out.String())
+			}
+		})
+	}
+}
+
+func TestSetOptions_Validate_CommandAndOptions(t *testing.T) {
+	newRootCmd := func() *cobra.Command {
+		root := &cobra.Command{Use: "kubectl"}
+		root.PersistentFlags().StringP("namespace", "n", "", "")
+		get := &cobra.Command{Use: "get", Run: func(*cobra.Command, []string) {}}
+		get.Flags().StringP("output", "o", "", "")
+		set := &cobra.Command{Use: "set"}
+		env := &cobra.Command{Use: "env", Run: func(*cobra.Command, []string) {}}
+		env.Flags().Bool("overwrite", true, "")
+		set.AddCommand(env)
+		root.AddCommand(get, set)
+		return root
+	}
+
+	tests := []struct {
+		name          string
+		options       SetOptions
+		errorContains string
+	}{
+		{
+			name:    "defaults with known flag",
+			options: SetOptions{Section: sectionDefaults, Command: "get", Options: []string{"output=wide"}},
+		},
+		{
+			name:    "defaults with flag in dashed form",
+			options: SetOptions{Section: sectionDefaults, Command: "get", Options: []string{"--output=wide"}},
+		},
+		{
+			name:    "defaults with inherited flag",
+			options: SetOptions{Section: sectionDefaults, Command: "get", Options: []string{"namespace=kube-system"}},
+		},
+		{
+			name:    "defaults for subcommand",
+			options: SetOptions{Section: sectionDefaults, Command: "set env", Options: []string{"overwrite=false"}},
+		},
+		{
+			name:          "defaults with unknown command",
+			options:       SetOptions{Section: sectionDefaults, Command: "gett", Options: []string{"output=wide"}},
+			errorContains: `command "gett" not found`,
+		},
+		{
+			name:          "defaults with unknown flag",
+			options:       SetOptions{Section: sectionDefaults, Command: "get", Options: []string{"outptu=wide"}},
+			errorContains: `unknown flag "outptu" for command "get"`,
+		},
+		{
+			name:          "defaults with shorthand flag name",
+			options:       SetOptions{Section: sectionDefaults, Command: "get", Options: []string{"o=wide"}},
+			errorContains: `unknown flag "o" for command "get"`,
+		},
+		{
+			name:    "alias with known command and flag",
+			options: SetOptions{Section: sectionAliases, AliasName: "getn", Command: "get", Options: []string{"output=wide"}},
+		},
+		{
+			name:          "alias with unknown command",
+			options:       SetOptions{Section: sectionAliases, AliasName: "gp", Command: "gett"},
+			errorContains: `command "gett" not found`,
+		},
+		{
+			name:          "alias with unknown flag",
+			options:       SetOptions{Section: sectionAliases, AliasName: "getn", Command: "get", Options: []string{"outptu=wide"}},
+			errorContains: `unknown flag "outptu" for command "get"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.options.KubeRCFile = "kuberc"
+			tt.options.rootCmd = newRootCmd()
+
+			err := tt.options.Validate()
+			if tt.errorContains == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.errorContains)
+			}
+			if !strings.Contains(err.Error(), tt.errorContains) {
+				t.Errorf("expected error containing %q, got %q", tt.errorContains, err.Error())
 			}
 		})
 	}

@@ -90,6 +90,7 @@ type SetOptions struct {
 	AllowlistEntries []string
 
 	preferences kuberc.PreferencesHandler
+	rootCmd     *cobra.Command
 
 	genericiooptions.IOStreams
 }
@@ -148,6 +149,7 @@ func (o *SetOptions) Complete(cmd *cobra.Command) error {
 	}
 
 	o.KubeRCFile = kubeRCFile
+	o.rootCmd = cmd.Root()
 	return nil
 }
 
@@ -182,6 +184,12 @@ func (o *SetOptions) Validate() error {
 		return fmt.Errorf("--command is required when --section=%s or --section=%s", sectionAliases, sectionDefaults)
 	}
 
+	if o.Section != sectionCredentialPlugin && o.rootCmd != nil {
+		if err := o.validateCommandAndOptions(); err != nil {
+			return err
+		}
+	}
+
 	if o.Section == sectionCredentialPlugin {
 		if o.PluginPolicy == "" {
 			return fmt.Errorf("--policy is required when --section=%s", sectionCredentialPlugin)
@@ -200,6 +208,33 @@ func (o *SetOptions) Validate() error {
 			return fmt.Errorf(" --policy must be  %q, %q, or %q, got: %s", v1.PluginPolicyAllowAll, v1.PluginPolicyDenyAll, v1.PluginPolicyAllowlist, o.PluginPolicy)
 		}
 
+	}
+
+	return nil
+}
+
+// validateCommandAndOptions resolves the command and option names with the same
+// lookups kubectl uses when it applies the kuberc file, so a typo is rejected here
+// instead of breaking every later invocation of the command.
+func (o *SetOptions) validateCommandAndOptions() error {
+	target, _, err := o.rootCmd.Find(strings.Fields(o.Command))
+	if err != nil || target == o.rootCmd {
+		return fmt.Errorf("command %q not found, see '%s --help' for available commands", o.Command, o.rootCmd.CommandPath())
+	}
+
+	// Merges persistent flags of parent commands, e.g. --namespace.
+	_ = target.InheritedFlags()
+
+	for _, opt := range o.Options {
+		name, _, found := strings.Cut(opt, "=")
+		name = strings.TrimLeft(name, "-")
+		if !found || name == "" {
+			// malformed options are reported by parseOptions
+			continue
+		}
+		if target.Flag(name) == nil {
+			return fmt.Errorf("unknown flag %q for command %q, see '%s --help' for available flags", name, o.Command, target.CommandPath())
+		}
 	}
 
 	return nil
