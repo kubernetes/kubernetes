@@ -72,7 +72,7 @@ import (
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
 
-func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
+func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker, mutators ...func(*Config)) (*Cacher, storage.Versioner, error) {
 	prefix := "/pods/"
 	config := Config{
 		Storage:             s,
@@ -97,6 +97,9 @@ func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cach
 		NewListFunc: func() runtime.Object { return &example.PodList{} },
 		Codec:       codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:       c,
+	}
+	for _, mutate := range mutators {
+		mutate(&config)
 	}
 	cacher, err := NewCacherFromConfig(config)
 
@@ -1395,8 +1398,13 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		testCacherSendBookmarkEvents(t, tc.allowWatchBookmarks, tc.expectedBookmarks)
+	for _, stallResume := range []bool{false, true} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", stallResume), func(t *testing.T) {
+			setStallResumeGate(t, stallResume)
+			for _, tc := range testCases {
+				testCacherSendBookmarkEvents(t, tc.allowWatchBookmarks, tc.expectedBookmarks)
+			}
+		})
 	}
 }
 
@@ -1500,6 +1508,15 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 }
 
 func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
+	for _, stallResume := range []bool{false, true} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", stallResume), func(t *testing.T) {
+			setStallResumeGate(t, stallResume)
+			testCacherSendsMultipleWatchBookmarks(t)
+		})
+	}
+}
+
+func testCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2103,11 +2120,25 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 }
 
 func TestCachingObjects(t *testing.T) {
-	t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
-	t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+	for _, stallResume := range []bool{false, true} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", stallResume), func(t *testing.T) {
+			setStallResumeGate(t, stallResume)
+			t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
+			t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+		})
+	}
 }
 
 func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
+	for _, stallResume := range []bool{false, true} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", stallResume), func(t *testing.T) {
+			setStallResumeGate(t, stallResume)
+			testCacheIntervalInvalidationStopsWatch(t, stallResume)
+		})
+	}
+}
+
+func testCacheIntervalInvalidationStopsWatch(t *testing.T, stallResume bool) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2173,8 +2204,20 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	defer w.Stop()
 
 	received := 0
+	errorEvents := 0
 	resChan := w.ResultChan()
 	for event := range resChan {
+		if event.Type == watch.Error {
+			if !stallResume {
+				t.Errorf("unexpected error event with the feature gate off: %#v", event.Object)
+			}
+			status, ok := event.Object.(*metav1.Status)
+			if !ok || status.Reason != metav1.StatusReasonExpired || status.Code != 410 {
+				t.Errorf("unexpected error event object: %#v", event.Object)
+			}
+			errorEvents++
+			continue
+		}
 		received++
 		t.Logf("event type: %v, events received so far: %d", event.Type, received)
 		if event.Type != watch.Added {
@@ -2185,6 +2228,9 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	// we should have processed exactly bufferSize number of elements.
 	if received != bufferSize {
 		t.Errorf("unexpected number of events received, expected: %d, got: %d", bufferSize+1, received)
+	}
+	if want := map[bool]int{false: 0, true: 1}[stallResume]; errorEvents != want {
+		t.Errorf("unexpected number of error events, expected: %d, got: %d", want, errorEvents)
 	}
 }
 
@@ -2785,6 +2831,8 @@ func (b *stopDuringDispatchBudget) returnUnused(_ time.Duration) {
 // Stop, a draining close would leave the watcher goroutine waiting forever to
 // send to a client that is gone.
 func TestWatchListStopDuringDispatch(t *testing.T) {
+	// Only a blocking dispatch has this race.
+	setStallResumeGate(t, false)
 	forceRequestWatchProgressSupport(t)
 	// Only this goroutine counts. Etcd clients of earlier tests can start
 	// goroutines at any time, so goleak may report those as well.

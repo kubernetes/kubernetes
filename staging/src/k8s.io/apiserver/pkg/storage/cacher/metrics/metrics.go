@@ -33,6 +33,19 @@ const (
 	subsystem = "watch_cache"
 )
 
+// Values of the "reason" label of TerminatedWatchersCounter.
+const (
+	// TerminationReasonUnresponsive: the input buffer stayed full past the
+	// dispatch time budget.
+	TerminationReasonUnresponsive = "unresponsive"
+	// TerminationReasonResourceExpired: with WatchCacheStallResume, the
+	// position of a watcher on the live stream aged out of the history.
+	TerminationReasonResourceExpired = "resource_expired"
+	// TerminationReasonResourceExpiredInitial: as above, for a watcher that
+	// had not finished its initial events.
+	TerminationReasonResourceExpiredInitial = "resource_expired_initial"
+)
+
 // DispatchPoint identifies a point in a watch event's dispatch lifecycle. The
 // duration between two points forms a labeled "stage" of the dispatch_duration
 // metric.
@@ -161,10 +174,10 @@ var (
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
 			Name:           "terminated_watchers_total",
-			Help:           "Counter of watchers closed due to unresponsiveness broken by resource type.",
+			Help:           "Counter of watchers closed by the watch cache broken by resource type and reason.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "resource"},
+		[]string{"group", "resource", "reason"},
 	)
 
 	watchCacheResourceVersion = compbasemetrics.NewGaugeVec(
@@ -298,6 +311,40 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 		}, []string{"group", "resource", "stage"})
+
+	// Exported only with the WatchCacheStallResume feature gate.
+
+	WatcherStalls = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_stalls_total",
+			Help:           "Counter of watchers that became unsynced (their input buffer was full when an event was dispatched, so they are served from the watch cache history until they catch up), broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatcherDeferredEvents = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_deferred_events_total",
+			Help:           "Counter of events delivered to unsynced watchers from the watch cache history by sync passes, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatcherCatchupEvents = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_catchup_events",
+			Help:           "Histogram of the number of events a watcher received from the watch cache history between becoming unsynced and catching up, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{1, 10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000},
+		}, []string{"group", "resource"})
 )
 
 var registerMetrics sync.Once
@@ -328,6 +375,11 @@ func Register() {
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
 		legacyregistry.MustRegister(DispatchStageDuration)
+		if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+			legacyregistry.MustRegister(WatcherStalls)
+			legacyregistry.MustRegister(WatcherDeferredEvents)
+			legacyregistry.MustRegister(WatcherCatchupEvents)
+		}
 	})
 }
 
@@ -419,4 +471,26 @@ func NewNoopWatcherMetricsObservers() *WatcherMetricsObservers {
 		o.stageDurations[i] = noopObs
 	}
 	return o
+}
+
+// StallResumeObservers holds the (group, resource) children of the
+// WatchCacheStallResume metrics, one per Cacher.
+type StallResumeObservers struct {
+	Stalls                   compbasemetrics.CounterMetric
+	DeferredEvents           compbasemetrics.CounterMetric
+	CatchupEvents            compbasemetrics.ObserverMetric
+	TerminatedExpired        compbasemetrics.CounterMetric
+	TerminatedExpiredInitial compbasemetrics.CounterMetric
+}
+
+// NewStallResumeObservers resolves the children for the given resource type.
+func NewStallResumeObservers(groupResource schema.GroupResource) *StallResumeObservers {
+	group, resource := groupResource.Group, groupResource.Resource
+	return &StallResumeObservers{
+		Stalls:                   WatcherStalls.WithLabelValues(group, resource),
+		DeferredEvents:           WatcherDeferredEvents.WithLabelValues(group, resource),
+		CatchupEvents:            WatcherCatchupEvents.WithLabelValues(group, resource),
+		TerminatedExpired:        TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpired),
+		TerminatedExpiredInitial: TerminatedWatchersCounter.WithLabelValues(group, resource, TerminationReasonResourceExpiredInitial),
+	}
 }
