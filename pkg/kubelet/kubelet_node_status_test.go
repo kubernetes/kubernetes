@@ -1590,6 +1590,59 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 	}
 }
 
+func TestTryRegisterWithAPIServerProviderID(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		providerID string
+		existingID string
+		want       bool
+	}{
+		{name: "different instances", providerID: "test://replacement", existingID: "test://original", want: false},
+		{name: "same instance", providerID: "test://instance", existingID: "test://instance", want: true},
+		{name: "external provider supplies ID later", existingID: "test://instance", want: true},
+		{name: "existing ID not initialized", providerID: "test://instance", want: true},
+		{name: "no provider IDs", want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			client := fake.NewSimpleClientset()
+			kl.kubeClient = client
+			node, err := kl.initialNode(tCtx)
+			require.NoError(t, err)
+			node.Spec.ProviderID = tc.providerID
+			existing := node.DeepCopy()
+			existing.Spec.ProviderID = tc.existingID
+			// Force reconciliation to patch if registration incorrectly accepts a mismatch.
+			existing.Labels[v1.LabelHostname] = "old-hostname"
+			_, err = client.CoreV1().Nodes().Create(tCtx, existing, metav1.CreateOptions{})
+			require.NoError(t, err)
+			client.ClearActions()
+
+			require.Equal(t, tc.want, kl.tryRegisterWithAPIServer(tCtx, node))
+			if tc.want {
+				return
+			}
+			// Only the failed create and identity read are allowed on a mismatch.
+			require.Len(t, client.Actions(), 2)
+			assert.Equal(t, "create", client.Actions()[0].GetVerb())
+			assert.Equal(t, "get", client.Actions()[1].GetVerb())
+			got, err := client.CoreV1().Nodes().Get(tCtx, node.Name, metav1.GetOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, existing, got)
+
+			// A subsequent registration attempt succeeds once the stale Node is removed.
+			require.NoError(t, client.CoreV1().Nodes().Delete(tCtx, node.Name, metav1.DeleteOptions{}))
+			require.True(t, kl.tryRegisterWithAPIServer(tCtx, node))
+			got, err = client.CoreV1().Nodes().Get(tCtx, node.Name, metav1.GetOptions{})
+			require.NoError(t, err)
+			assert.Equal(t, tc.providerID, got.Spec.ProviderID)
+		})
+	}
+}
+
 func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	const nodeStatusMaxImages = 5
