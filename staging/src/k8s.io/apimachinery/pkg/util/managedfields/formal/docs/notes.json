@@ -1,0 +1,210 @@
+{
+  "SSA.accepted_valid": {
+    "title": "Accepted states satisfy the model invariant",
+    "scope": "guard",
+    "meaning": "Successful Apply implies the model's shape, required-value, and full-manager predicates.",
+    "limits": "This follows from acceptance guards. The current shape predicate is weaker than full object-tree validity."
+  },
+  "SSA.accepted_complete": {
+    "title": "Successful Apply leaves complete item ownership",
+    "scope": "guard",
+    "meaning": "Every accepted result passes the per-item full-manager check.",
+    "limits": "Completeness is an acceptance condition; this alone establishes no progress."
+  },
+  "SSA.every_surviving_item_has_full": {
+    "title": "Each surviving item has an individual full manager",
+    "scope": "guard",
+    "meaning": "For any item descriptor in the schema whose membership survives, there is one manager covering membership and the whole required core.",
+    "limits": "The witness is local to each associative-list item. It need not be the same manager at another level."
+  },
+  "SSA.rejected_is_atomic": {
+    "title": "Rejected requests retain the old state",
+    "scope": "guard",
+    "meaning": "The model's commit wrapper returns the original object and claims for any error.",
+    "limits": "This is a fact about the wrapper, not a proof of etcd transactionality."
+  },
+  "SSA.committed_valid": {
+    "title": "One committed transition preserves validity",
+    "scope": "guard",
+    "meaning": "From a valid state, either a successful valid result is committed or a rejected request retains the valid original.",
+    "limits": "Validity means this model's predicates, with the gaps listed in this explorer."
+  },
+  "SSA.key_only_full": {
+    "title": "Key-only items: every membership claimant is full",
+    "scope": "definition",
+    "meaning": "When there are no required fields beyond the key, full ownership reduces exactly to membership ownership.",
+    "limits": "The key is carried by the item path. Last-claim deletion is also exercised by execution fixtures."
+  },
+  "SSA.required_branches_same_manager": {
+    "title": "One manager must cover all required branches",
+    "scope": "definition",
+    "meaning": "Covering a conjunction requires both branches to be covered by the same manager argument.",
+    "limits": "A coalition where A covers one branch and B another is insufficient."
+  },
+  "SSA.partial_cannot_directly_delete": {
+    "title": "Partial managers cannot authorize direct item deletion",
+    "scope": "definition",
+    "meaning": "The lifetime-deletion predicate is false when the departing actor was not full.",
+    "limits": "An item can still disappear when an ancestor is deleted."
+  },
+  "SSA.surviving_full_blocks_direct_deletion": {
+    "title": "Another full manager blocks direct deletion",
+    "scope": "definition",
+    "meaning": "A full owner remaining in the provisional state prevents the direct deletion rule from firing.",
+    "limits": "The provisional state is after ownership transfers. Ancestor deletion is a separate operation."
+  },
+  "SSA.subtree_frame": {
+    "title": "Values outside deleted subtrees are unchanged",
+    "meaning": "A cell outside every deletion root belongs to the result of dropSubtrees exactly when it belonged to the input.",
+    "limits": "This theorem concerns the subtree-deletion phase, not the whole Apply transition."
+  },
+  "SSA.claims_frame": {
+    "title": "Claims outside deleted subtrees are unchanged",
+    "meaning": "Subtree deletion preserves exactly the claims whose targets lie outside every removed subtree.",
+    "limits": "Ownership replacement, force, and pruning have separate obligations."
+  },
+  "SSA.candidate_preserves_unrelated_value": {
+    "title": "Unwritten, unreleased values survive",
+    "meaning": "An old scalar survives the candidate when the request neither overwrites nor releases it and no deletion root contains it.",
+    "limits": "The theorem has explicit no-overwrite, no-release, and lifetime-boundary premises."
+  },
+  "SSA.ancestor_deletion_dominates": {
+    "title": "Ancestor deletion removes descendants",
+    "meaning": "A cell below a selected deletion root is absent after subtree deletion.",
+    "limits": "A child's own full manager does not shield it from a deleted ancestor."
+  },
+  "SSA.owns_monotone": {
+    "title": "Adding claims preserves existing ownership",
+    "meaning": "A manager's existing claim survives any extension of the claim set.",
+    "limits": "This says nothing about transitions that remove or transfer claims."
+  },
+  "SSA.map_presence_monotone": {
+    "title": "Adding claims preserves map presence coverage",
+    "meaning": "Existing descendant-based map presence coverage remains true when claims are added."
+  },
+  "SSA.covers_monotone": {
+    "title": "Adding claims preserves required-core coverage",
+    "meaning": "Coverage is monotone for every recursively defined required core.",
+    "limits": "The proof inducts over the required core; schema changes are not included."
+  },
+  "SSA.full_monotone": {
+    "title": "Co-ownership cannot make a full owner partial",
+    "meaning": "Adding claims preserves both membership ownership and required-core coverage."
+  },
+  "SSA.Contracts.accepted_preserves_intent": {
+    "title": "Successful Apply preserves every asserted cell",
+    "meaning": "Every value, item, or presence marker written by a successful request is in the accepted result.",
+    "limits": "Inputs are normalized assertions. This is conditional on the first request succeeding.",
+    "sketch": "Normalization requires enclosing item membership. Written cells therefore lie outside deletion roots. The actor also keeps each written footprint, so release pruning cannot remove those cells."
+  },
+  "SSA.Contracts.accepted_actor_claims_exact": {
+    "title": "The actor's resulting footprint is exactly its intent",
+    "meaning": "A footprint is owned by the actor after success if and only if the request contains it.",
+    "limits": "This is the model's normalized footprint, including presence assertions not all represented by current SMD.",
+    "sketch": "Old actor claims are replaced. Every new desired claim is tied to a written cell, whose enclosing membership keeps it outside deleted subtrees."
+  },
+  "SSA.Contracts.foreign_change_conflicts": {
+    "title": "Changing a foreign-owned scalar conflicts",
+    "meaning": "A valid initial state and normalized request that changes a foreign-owned scalar are rejected with conflict when force is false.",
+    "limits": "This models Apply; Update and admission are outside the operation."
+  },
+  "SSA.Contracts.equal_writes_do_not_conflict": {
+    "title": "Unchanged assertions cannot create a conflict",
+    "meaning": "If all writes leave values unchanged, the conflict predicate is false regardless of their owners.",
+    "limits": "Other acceptance guards may still reject the request."
+  },
+  "SSA.Contracts.force_transfers_changed_claim": {
+    "title": "Force removes changed foreign value claims",
+    "meaning": "The ownership-update phase removes each foreign scalar claim overwritten with a changed value under force.",
+    "limits": "This is a phase theorem. Force does not bypass required-value or full-manager guards."
+  },
+  "SSA.Contracts.unchanged_foreign_claim_preserved": {
+    "title": "Equal-value assertions preserve co-ownership",
+    "meaning": "A foreign claim survives ownership updating when writes at its path do not change the value, including under force.",
+    "limits": "Later ancestor deletion can still remove the claim."
+  },
+  "SSA.Contracts.unwritten_foreign_claim_preserved": {
+    "title": "Unwritten foreign claims survive ownership updating",
+    "meaning": "A request preserves another actor's claim when it does not write at that path.",
+    "limits": "The conclusion concerns updatedClaims, before lifetime deletion."
+  },
+  "SSA.Contracts.shared_omission_preserves_value": {
+    "title": "Shared unclaiming preserves the old scalar",
+    "meaning": "An old scalar survives if a foreign owner remains, it is not overwritten, and no deletion root contains it.",
+    "limits": "The no-ancestor-deletion premise matters: the proposed lifetime rule can remove a whole item and its partial contributions."
+  },
+  "SSA.Contracts.exclusive_omission_removes_value": {
+    "title": "Exclusive unclaiming removes the scalar",
+    "meaning": "Omitting a scalar previously owned only by the actor removes that scalar from the candidate.",
+    "limits": "This is before defaulting. A later defaulter could supply a new API value."
+  },
+  "SSA.Contracts.accepted_nonforce_preserves_foreign_assertion": {
+    "title": "Successful non-forced assertions retain foreign values",
+    "meaning": "If a successful request without force writes a foreign-owned scalar, that write did not change its value.",
+    "limits": "It does not prevent lifetime deletion from removing foreign fields elsewhere."
+  },
+  "SSA.Contracts.handoff_preserves_full_successor": {
+    "title": "An already-full successor stays full during release",
+    "meaning": "Another actor's successful non-forced request preserves a full successor when none of the successor's claims is below a deletion root.",
+    "limits": "This is handoff safety after acquisition. General acquisition/release progress is still open."
+  },
+  "SSA.Contracts.finite_history_preserves_validity": {
+    "title": "Every finite committed history preserves validity",
+    "meaning": "Starting from a valid state, any finite request sequence ends in a valid committed state, including rejected requests.",
+    "limits": "Every prefix is also a finite history. This is safety, not availability or fairness.",
+    "sketch": "Induct over the request list. The one-step commit theorem preserves validity, so the induction hypothesis applies to the remaining requests."
+  },
+  "SSA.Contracts.accepted_reapply_writes_unchanged": {
+    "title": "The first accepted result already contains every write",
+    "meaning": "After one success, every write in the same request is unchanged relative to that result.",
+    "sketch": "Intent preservation supplies each written cell. Unique cell paths in accepted results rule out a second cell with different content."
+  },
+  "SSA.Contracts.accepted_reapply_has_no_conflicts": {
+    "title": "Immediate repetition has no ownership conflict",
+    "meaning": "After one successful Apply, repeating that request cannot trigger the conflict predicate.",
+    "limits": "The stronger final idempotence theorem also proves that all remaining guards accept."
+  },
+  "SSA.Contracts.accepted_reapply_candidate_fixed": {
+    "title": "The transition phases reach an exact fixed point",
+    "meaning": "Running the same request's merge, deletion, and pruning phases again produces exactly the accepted state, including internal list order.",
+    "sketch": "Exact actor claims imply no releases and no deletion roots. The first success establishes stable cell/claim list forms, so replacing the same writes and claims changes neither list."
+  },
+  "SSA.Contracts.accepted_apply_idempotent": {
+    "title": "Repeating successful Apply succeeds with the same state",
+    "meaning": "For every schema, state, and request: if the first Apply succeeds, the immediate repetition succeeds and returns exactly that result, even with force.",
+    "limits": "No intervening operation is allowed. Storage resourceVersion, defaulting, conversion, and admission are not modeled.",
+    "sketch": "First prove that repeated writes are unchanged and cannot conflict. Exact actor claims eliminate releases and lifetime deletion. Stable list forms give the same candidate. That unchanged state is already valid, so every acceptance guard succeeds."
+  },
+  "SSA.Contracts.repeated_apply_observationally_equal": {
+    "title": "Repeated Apply preserves values and ownership observations",
+    "meaning": "Two immediately repeated successful requests yield identical cell and claim membership observations.",
+    "limits": "This follows from the stronger exact-state idempotence result."
+  },
+  "SSA.Examples.all_fixtures_pass": {
+    "title": "Fourteen scenarios satisfy their assertions",
+    "meaning": "The kernel checks the recorded expectations across fourteen finite scenarios and 49 transitions.",
+    "limits": "These are concrete execution witnesses, not a general theorem covering every possible sequence."
+  },
+  "SSA.Examples.fragment_values_are_valid": {
+    "title": "The fragmented counterexample still has valid required values",
+    "meaning": "In this specific counterexample, all required values remain present despite fragmented ownership."
+  },
+  "SSA.Examples.fragment_has_no_full_manager": {
+    "title": "The same counterexample has no full manager",
+    "meaning": "Although the required values exist, neither actor individually covers the whole required core."
+  },
+  "SSA.Examples.unchecked_partial_omission_deletes_foreign_host": {
+    "title": "The reduced unsafe rule deletes a foreign host",
+    "meaning": "In the concrete fragmented state, the reduced PR-style deletion rule removes another actor's host field.",
+    "limits": "The unsafe rule is a countermodel, not a mechanically translated Go revision."
+  },
+  "SSA.Examples.corrected_apply_rejects_fragment": {
+    "title": "The proposed Apply rejects this fragmentation",
+    "meaning": "The specific request that fragments the required core returns orphanedItem."
+  },
+  "SSA.Examples.repeating_same_apply_is_idempotent": {
+    "title": "A concrete repeated Apply is unchanged",
+    "meaning": "The initial example request is idempotent in its concrete accepted state.",
+    "limits": "The Contracts module also contains a separate general idempotence theorem."
+  }
+}

@@ -1,0 +1,29 @@
+# Copyright 2026 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Proposed config/jobs/kubernetes/sig-api-machinery/ssa-formal.yaml in
+# kubernetes/test-infra. This file is not itself active Prow configuration.
+presubmits:
+  kubernetes/kubernetes:
+  - name: pull-kubernetes-verify-ssa-formal
+    cluster: k8s-infra-prow-build
+    decorate: true
+    decoration_config:
+      timeout: 45m
+    path_alias: k8s.io/kubernetes
+    always_run: false
+    optional: false
+    run_if_changed: '^(staging/src/k8s.io/apimachinery/|vendor/sigs.k8s.io/structured-merge-diff/|vendor/modules.txt|go.mod|go.work)'
+    spec:
+      containers:
+      - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20261102-7f9e993948-master
+        command:
+        - bash
+        - staging/src/k8s.io/apimachinery/pkg/util/managedfields/formal/ci/verify.sh
+        resources:
+          requests:
+            cpu: "4"
+            memory: 8Gi
+          limits:
+            cpu: "4"
+            memory: 8Gi

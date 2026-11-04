@@ -1,0 +1,215 @@
+# Copyright 2026 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
+#
+# These expectations are authored independently of Lean and Go. Owners use SMD
+# path spelling; container-presence ownership is outside the shared projection.
+version: 1
+cases:
+- name: shared-scalar-release-conflict-force-and-idempotence
+  steps:
+  - manager: A
+    apply: {x: one, "y": two}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A: [.x, .y]}
+  - manager: B
+    apply: {x: one}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A: [.x, .y], B: [.x]}
+  - manager: A
+    apply: {"y": two}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A: [.y], B: [.x]}
+  - manager: C
+    apply: {x: changed}
+    expect:
+      error: conflict
+      object: {x: one, "y": two}
+      owners: {A: [.y], B: [.x]}
+  - manager: C
+    force: true
+    apply: {x: changed}
+    expect:
+      object: {x: changed, "y": two}
+      owners: {A: [.y], C: [.x]}
+  - manager: A
+    apply: {}
+    expect:
+      object: {x: changed}
+      owners: {C: [.x]}
+  - manager: C
+    force: true
+    apply: {x: changed}
+    expect:
+      object: {x: changed}
+      owners: {C: [.x]}
+  - manager: C
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: independent-granular-object-branches
+  steps:
+  - manager: A
+    apply: {settings: {left: one}}
+    expect:
+      object: {settings: {left: one}}
+      owners: {A: [.settings.left]}
+  - manager: B
+    apply: {settings: {right: two}}
+    expect:
+      object: {settings: {left: one, right: two}}
+      owners: {A: [.settings.left], B: [.settings.right]}
+  - manager: A
+    apply: {}
+    expect:
+      object: {settings: {right: two}}
+      owners: {B: [.settings.right]}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: atomic-map-is-one-value
+  steps:
+  - manager: A
+    apply: {atomic: {left: one, right: two}}
+    expect:
+      object: {atomic: {left: one, right: two}}
+      owners: {A: [.atomic]}
+  - manager: B
+    apply: {atomic: {left: one}}
+    expect:
+      error: conflict
+      object: {atomic: {left: one, right: two}}
+      owners: {A: [.atomic]}
+  - manager: B
+    force: true
+    apply: {atomic: {left: one}}
+    expect:
+      object: {atomic: {left: one}}
+      owners: {B: [.atomic]}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: key-only-item-last-membership
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      object: {items: [{name: db, host: h}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, host: h, note: injected}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: A
+    apply: {}
+    expect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].note']}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}
+- name: proposal-last-full-deletes-partial-contribution
+  required: {items: [host, port]}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h, port: p}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p, note: injected}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: A
+    apply: {}
+    expect: {object: {items: []}, owners: {}}
+    goExpect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].note']}
+    differenceKind: proposal
+    difference: Current SSA retains the partial applier's item; the proposed last-full-manager rule deletes it.
+- name: proposal-rejects-required-ownership-fragmentation
+  required: {items: [host, port]}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h, port: p}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']}
+  - manager: B
+    apply: {items: [{name: db, port: p}]}
+    expect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      error: orphanedItem
+      object: {items: [{name: db, host: h, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+    goExpect:
+      object: {items: [{name: db, host: h, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+    differenceKind: proposal
+    difference: Current SSA allows fragmentation; the proposed invariant rejects it atomically.
+- name: nested-full-and-partial-roles-switch-levels
+  required: {items: [host], 'items[].children': [url]}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      object: {items: [{name: db, host: h}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: [{name: db, children: [{name: api, url: u}]}]}
+    expect:
+      object: {items: [{name: db, host: h, children: [{name: api, url: u}]}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].url']
+  - manager: A
+    apply: {items: [{name: db, host: h, children: [{name: api, note: injected}]}]}
+    expect:
+      object: {items: [{name: db, host: h, children: [{name: api, url: u, note: injected}]}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].note']
+        B: ['.items[name="db"]', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].url']
+  - manager: A
+    apply: {items: [{name: db, host: h}]}
+    expect:
+      object: {items: [{name: db, host: h, children: [{name: api, url: u}]}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].children[name="api"]', '.items[name="db"].children[name="api"].url']
+- name: force-transfer-does-not-invent-container-ownership
+  steps:
+  - manager: A
+    apply: {settings: {left: one}}
+    expect:
+      object: {settings: {left: one}}
+      owners: {A: [.settings.left]}
+  - manager: B
+    force: true
+    apply: {settings: {left: two}}
+    expect:
+      object: {settings: {left: two}}
+      owners: {B: [.settings.left]}
+  - manager: B
+    apply: {}
+    expect: {object: {settings: {}}, owners: {}}
+    goExpect: {object: {}, owners: {}}
+    differenceKind: model-gap
+    difference: The current normalization assigns synthetic object-presence claims; after force transfer Lean retains an empty object that current SSA removes.
