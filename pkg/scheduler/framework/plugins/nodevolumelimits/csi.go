@@ -311,6 +311,17 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	if len(nodeVolumeLimits) == 0 {
 		return nil
 	}
+	// Only count existing volumes if one of this pod's drivers has a limit.
+	hasRelevantLimit := false
+	for _, driverName := range newVolumes {
+		if _, ok := nodeVolumeLimits[driverName]; ok {
+			hasRelevantLimit = true
+			break
+		}
+	}
+	if !hasRelevantLimit {
+		return nil
+	}
 
 	// Count CSI volumes from existing pods
 	attachedVolumes := make(map[string]string)
