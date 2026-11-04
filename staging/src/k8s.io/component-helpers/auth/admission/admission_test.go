@@ -735,7 +735,7 @@ func TestVerifierVerify(t *testing.T) {
 var (
 	_ http.Handler                                                                                       = (*admission.Handler)(nil)
 	_ func(context.Context, admission.AdmissionHandler, ...admission.Option) (*admission.Handler, error) = admission.WithTokenVerification
-	_ func(string) admission.Option                                                                      = admission.WithAudience
+	_ func(string, string, uint16) admission.Option                                                      = admission.WithServiceAudience
 	_ func(string, string, *http.Client) admission.Option                                                = admission.WithIssuer
 )
 
@@ -1424,14 +1424,14 @@ func Example_rawHTTPWebhook() {
 	// Output: admitted
 }
 
-// Example_inClusterWebhook uses a projected issuer and a configured audience.
+// Example_inClusterWebhook uses a projected issuer and a configured Service audience.
 func Example_inClusterWebhook() {
 	admit := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 	}
-	// Use the webhook configuration's audience, never a value from the request.
+	// Use the webhook configuration's Service reference, never a value from the request.
 	handler, err := admission.WithTokenVerification(context.Background(), admit,
-		admission.WithAudience("https://hook.webhooks.svc:443/validate"))
+		admission.WithServiceAudience("hook", "/validate", 443))
 	if err != nil {
 		panic(err)
 	}
@@ -1948,32 +1948,33 @@ func TestNewVerifier_InClusterExplicitAudience(t *testing.T) {
 	}
 }
 
-// TestWithAudience_ConflictsWithIssuer proves WithAudience and
+// TestWithServiceAudience_ConflictsWithIssuer proves WithServiceAudience and
 // WithIssuer cannot be combined: the audience would be set two ways, so the
 // builder fails closed at construction rather than applying a silent precedence.
-func TestWithAudience_ConflictsWithIssuer(t *testing.T) {
+func TestWithServiceAudience_ConflictsWithIssuer(t *testing.T) {
 	ts := newOIDCTestServer(t)
 
 	v, err := admission.NewVerifierForTest(context.Background(),
 		admission.WithIssuer(ts.issuer, testAudience, ts.client()),
-		admission.WithAudience(testAudience))
+		admission.WithServiceAudience("hook", "/validate", 443))
 	if err == nil {
-		t.Fatalf("expected a construction error combining WithAudience and WithIssuer, got verifier %v", v)
+		t.Fatalf("expected a construction error combining WithServiceAudience and WithIssuer, got verifier %v", v)
 	}
 	if v != nil {
 		t.Errorf("expected a nil verifier on a construction error, got %v", v)
 	}
-	if !strings.Contains(err.Error(), "WithAudience cannot be combined with WithIssuer") {
-		t.Errorf("error = %q, want it to mention the WithAudience/WithIssuer conflict", err)
+	if !strings.Contains(err.Error(), "WithServiceAudience cannot be combined with WithIssuer") {
+		t.Errorf("error = %q, want it to mention the WithServiceAudience/WithIssuer conflict", err)
 	}
 }
 
-// TestWithAudience_EmptyIsError proves an explicit but empty audience is a hard
-// construction error, never a verifier built with an audience-skipping audience.
-func TestWithAudience_EmptyIsError(t *testing.T) {
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithAudience(""))
+// TestWithServiceAudience_EmptyIsError proves an explicit but incomplete Service
+// audience is a hard construction error, never a verifier built with an
+// audience-skipping audience.
+func TestWithServiceAudience_EmptyIsError(t *testing.T) {
+	v, err := admission.NewVerifierForTest(context.Background(), admission.WithServiceAudience("", "", 0))
 	if err == nil || v != nil {
-		t.Fatalf("NewVerifier with empty audience = (%v, %v), want (nil, error)", v, err)
+		t.Fatalf("NewVerifier with empty Service audience = (%v, %v), want (nil, error)", v, err)
 	}
 }
 
@@ -1986,15 +1987,15 @@ func TestInClusterRequiresTrustedAudienceBeforeBootstrap(t *testing.T) {
 		opts []admission.Option
 	}{
 		{name: "no options"},
-		{name: "empty audience", opts: []admission.Option{admission.WithAudience("")}},
+		{name: "empty audience", opts: []admission.Option{admission.WithServiceAudience("", "", 0)}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h, err := admission.WithTokenVerification(context.Background(), admit, tc.opts...)
-			if h != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
+			if h != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 				t.Fatalf("WithTokenVerification = (%v, %v), want audience error", h, err)
 			}
 			v, err := admission.NewVerifierForTest(context.Background(), tc.opts...)
-			if v != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
+			if v != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 				t.Fatalf("NewVerifier = (%v, %v), want audience error", v, err)
 			}
 		})

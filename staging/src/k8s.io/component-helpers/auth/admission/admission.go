@@ -26,7 +26,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -53,8 +52,8 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(scheme))
 }
 
-// Match API server's 3MB limit:
-// https://github.com/kubernetes/kubernetes/blob/2a794afb5edcff2f21f8010d2508329479884be2/staging/src/k8s.io/apiserver/pkg/server/config.go#L485-L494
+// Match API server's 3MB limit
+// staging/src/k8s.io/apiserver/pkg/server/config.go#L485-L494
 const defaultMaxBodyBytes int64 = int64(3 * 1024 * 1024)
 
 const (
@@ -108,7 +107,10 @@ type builder struct {
 	audience   string
 	httpClient *http.Client
 
-	explicitAudience bool
+	serviceAudienceSet bool
+	serviceName        string
+	servicePath        string
+	servicePort        uint16
 }
 
 func newBuilder() *builder {
@@ -129,17 +131,19 @@ func WithIssuer(issuer, audience string, client *http.Client) Option {
 	}
 }
 
-// WithAudience sets the expected audience of a Service-backed in-cluster webhook.
-// Supply the registered Service's https://<name>.<namespace>.svc:<port><path>,
-// spelling out port 443 and path "/" when the registration omits them. The
-// namespace must match this Pod's projected namespace. This checks format and
-// namespace, not whether the Service or port matches the registration. Use
+// WithServiceAudience sets the expected audience of a Service-backed in-cluster
+// webhook to https://<name>.<namespace>.svc:<port><path>, reading <namespace>
+// from the Pod's projected ServiceAccount namespace file. Supply the registered
+// Service's name, path (starting with "/", or "/" if omitted in the
+// registration), and non-zero port (443 if omitted in the registration). Use
 // [WithIssuer] for URL-backed registrations; it cannot be combined with
-// WithAudience. Never derive the audience from a request or token.
-func WithAudience(audience string) Option {
+// WithServiceAudience. Never derive the audience from a request or token.
+func WithServiceAudience(name, path string, port uint16) Option {
 	return func(b *builder) {
-		b.explicitAudience = true
-		b.audience = audience
+		b.serviceAudienceSet = true
+		b.serviceName = name
+		b.servicePath = path
+		b.servicePort = port
 	}
 }
 
@@ -151,11 +155,12 @@ type Handler struct {
 }
 
 // WithTokenVerification authenticates requests before decoding their bodies and
-// calling next. Register admissionReviewVersions as ["v1"]. Use [WithAudience]
-// in-cluster or [WithIssuer] for explicit issuer discovery. Failed authentication
-// returns HTTP 401; authenticated admission-policy denials return an AdmissionReview
-// with Allowed:false. Use failurePolicy: Fail when authentication or transport
-// failures must block admission. A nil next returns an error.
+// calling next. Register admissionReviewVersions as ["v1"]. Use
+// [WithServiceAudience] in-cluster or [WithIssuer] for explicit issuer
+// discovery. Failed authentication returns HTTP 401; authenticated
+// admission-policy denials return an AdmissionReview with Allowed:false. Use
+// failurePolicy: Fail when authentication or transport failures must block
+// admission. A nil next returns an error.
 func WithTokenVerification(ctx context.Context, next AdmissionHandler, opts ...Option) (*Handler, error) {
 	if next == nil {
 		return nil, errors.New("admission: next AdmissionHandler must not be nil")
@@ -168,8 +173,8 @@ func WithTokenVerification(ctx context.Context, next AdmissionHandler, opts ...O
 }
 
 func (b *builder) buildVerifier(ctx context.Context) (*verifier, error) {
-	if b.remoteSet && b.explicitAudience {
-		return nil, errors.New("admission: WithAudience cannot be combined with WithIssuer")
+	if b.remoteSet && b.serviceAudienceSet {
+		return nil, errors.New("admission: WithServiceAudience cannot be combined with WithIssuer")
 	}
 	if b.remoteSet {
 		if b.issuer == "" || b.audience == "" {
@@ -177,62 +182,53 @@ func (b *builder) buildVerifier(ctx context.Context) (*verifier, error) {
 		}
 		return b.remoteVerifier(ctx)
 	}
-	if !b.explicitAudience || b.audience == "" {
-		return nil, errors.New("admission: in-cluster verification requires WithAudience set to the webhook's configured Service audience")
+	if !b.serviceAudienceSet {
+		return nil, errors.New("admission: in-cluster verification requires WithServiceAudience")
 	}
-	if err := validateInClusterAudience(b.audience, projectedServiceAccountNamespace); err != nil {
+	audience, err := buildInClusterServiceAudience(b.serviceName, b.servicePath, b.servicePort, projectedServiceAccountNamespace)
+	if err != nil {
 		return nil, err
 	}
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("admission: loading in-cluster configuration: %w", err)
 	}
-	return newLocalVerifier(ctx, config, b.audience)
+	return newLocalVerifier(ctx, config, audience)
 }
 
-func parseServiceAudience(audience string) (string, error) {
-	u, err := url.Parse(audience)
-	if err != nil {
-		return "", fmt.Errorf("admission: WithAudience requires a full HTTPS Service URL: %w", err)
+func buildInClusterServiceAudience(name, path string, port uint16, namespaceFile string) (string, error) {
+	var errs []error
+	if len(validation.IsDNS1123Label(name)) != 0 {
+		errs = append(errs, errors.New("Service name must be a valid DNS-1123 label"))
 	}
-	if u.Scheme != "https" || u.Opaque != "" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(audience, "#") {
-		return "", errors.New("admission: WithAudience requires https://<name>.<namespace>.svc:<port><path> without credentials, query, or fragment")
+	if port == 0 {
+		errs = append(errs, errors.New("Service port must be non-zero"))
 	}
-	labels := strings.Split(u.Hostname(), ".")
-	if len(labels) != 3 || labels[2] != "svc" || len(validation.IsDNS1123Label(labels[0])) != 0 || len(validation.IsDNS1123Label(labels[1])) != 0 {
-		return "", errors.New("admission: WithAudience requires a Service host <name>.<namespace>.svc; use WithIssuer for URL-backed webhooks")
+	if path == "" || !strings.HasPrefix(path, "/") {
+		errs = append(errs, errors.New("Service path must be non-empty and start with \"/\""))
+	} else {
+		u, err := url.Parse(path)
+		if err != nil || u.Scheme != "" || u.Opaque != "" || u.Host != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(path, "#") || !strings.HasPrefix(u.EscapedPath(), "/") {
+			errs = append(errs, errors.New("Service path must be a relative URL path without query or fragment"))
+		}
 	}
-	port := u.Port()
-	portNumber, err := strconv.Atoi(port)
-	if err != nil || len(validation.IsValidPortNum(portNumber)) != 0 || strconv.Itoa(portNumber) != port {
-		return "", errors.New("admission: WithAudience requires an explicit canonical Service port between 1 and 65535")
+	if len(errs) != 0 {
+		return "", fmt.Errorf("admission: invalid WithServiceAudience: %w", errors.Join(errs...))
 	}
-	if !strings.HasPrefix(u.EscapedPath(), "/") {
-		return "", errors.New("admission: WithAudience requires a Service path (use / if omitted in the registration)")
-	}
-	return labels[1], nil
-}
-
-func validateInClusterAudience(audience, namespaceFile string) error {
-	serviceNamespace, err := parseServiceAudience(audience)
-	if err != nil {
-		return err
-	}
-	// clientcmd falls back to "default" when the projected namespace is missing;
-	// audience binding must fail closed instead.
-	// https://github.com/kubernetes/kubernetes/blob/9b965ac43f05d304180c7b8b9611264530788948/staging/src/k8s.io/client-go/tools/clientcmd/client_config.go#L646-L661
 	data, err := os.ReadFile(namespaceFile)
 	if err != nil {
-		return fmt.Errorf("admission: reading projected Pod namespace for WithAudience: %w", err)
+		return "", fmt.Errorf("admission: reading projected Pod namespace for WithServiceAudience: %w", err)
 	}
 	podNamespace := strings.TrimSpace(string(data))
 	if len(validation.IsDNS1123Label(podNamespace)) != 0 {
-		return errors.New("admission: projected Pod namespace for WithAudience is empty or invalid")
+		return "", errors.New("admission: projected Pod namespace for WithServiceAudience is empty or invalid")
 	}
-	if serviceNamespace != podNamespace {
-		return fmt.Errorf("admission: WithAudience Service namespace %q differs from Pod namespace %q", serviceNamespace, podNamespace)
+	u := url.URL{
+		Scheme: "https",
+		Host:   fmt.Sprintf("%s.%s.svc:%d", name, podNamespace, port),
+		Path:   path,
 	}
-	return nil
+	return u.String(), nil
 }
 
 func (b *builder) remoteVerifier(ctx context.Context) (*verifier, error) {
@@ -416,9 +412,7 @@ func kindOrResourceIncomplete(req *admissionv1.AdmissionRequest) bool {
 	return req.Kind.Version == "" || req.Kind.Kind == "" || req.Resource.Version == "" || req.Resource.Resource == ""
 }
 
-// allowedKindResourceGroupMismatch reports whether req is a known subresource
-// whose admitted object Kind is in a different API group than the parent
-// resource attested by the token.
+// Tokens attest the parent resource group; these subresources have cross-group kinds.
 func allowedKindResourceGroupMismatch(req *admissionv1.AdmissionRequest) bool {
 	switch req.Kind {
 	case metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}:

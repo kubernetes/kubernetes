@@ -75,53 +75,46 @@ func TestBearerToken_Table(t *testing.T) {
 	}
 }
 
-func TestValidateInClusterAudience(t *testing.T) {
+func TestBuildInClusterServiceAudience(t *testing.T) {
 	namespaceFile := filepath.Join(t.TempDir(), "namespace")
 	if err := os.WriteFile(namespaceFile, []byte("webhooks\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	for _, tc := range []struct {
-		name     string
-		audience string
-		wantErr  bool
+		name    string
+		svc     string
+		path    string
+		port    uint16
+		want    string
+		wantErr bool
 	}{
-		{name: "default Service port and path written explicitly", audience: "https://hook.webhooks.svc:443/"},
-		{name: "explicit Service port and path", audience: "https://hook.webhooks.svc:9443/validate"},
-		{name: "trailing slash retained", audience: "https://hook.webhooks.svc:443/validate/"},
-		{name: "other Service in same namespace is syntactically valid", audience: "https://dinner.webhooks.svc:8443/validate"},
-		{name: "other Pod namespace", audience: "https://hook.elsewhere.svc:443/validate", wantErr: true},
-		{name: "non-Service URL-backed webhook", audience: "https://validate.example.com/hook", wantErr: true},
-		{name: "not HTTPS", audience: "http://hook.webhooks.svc:443/validate", wantErr: true},
-		{name: "no scheme", audience: "hook.webhooks.svc:443/validate", wantErr: true},
-		{name: "no Service name", audience: "https://.webhooks.svc:443/validate", wantErr: true},
-		{name: "invalid Service name", audience: "https://bad_name.webhooks.svc:443/validate", wantErr: true},
-		{name: "invalid namespace label", audience: "https://hook.bad_namespace.svc:443/validate", wantErr: true},
-		{name: "lookalike suffix", audience: "https://hook.webhooks.svc.evil:443/validate", wantErr: true},
-		{name: "cluster domain suffix", audience: "https://hook.webhooks.svc.cluster.local:443/validate", wantErr: true},
-		{name: "no Service port", audience: "https://hook.webhooks.svc/validate", wantErr: true},
-		{name: "empty Service port", audience: "https://hook.webhooks.svc:/validate", wantErr: true},
-		{name: "port zero", audience: "https://hook.webhooks.svc:0/validate", wantErr: true},
-		{name: "port too large", audience: "https://hook.webhooks.svc:65536/validate", wantErr: true},
-		{name: "noncanonical port", audience: "https://hook.webhooks.svc:0443/validate", wantErr: true},
-		{name: "nonnumeric port", audience: "https://hook.webhooks.svc:port/validate", wantErr: true},
-		{name: "missing path", audience: "https://hook.webhooks.svc:443", wantErr: true},
-		{name: "credentials", audience: "https://user@hook.webhooks.svc:443/validate", wantErr: true},
-		{name: "query", audience: "https://hook.webhooks.svc:443/validate?probe=true", wantErr: true},
-		{name: "empty query", audience: "https://hook.webhooks.svc:443/validate?", wantErr: true},
-		{name: "fragment", audience: "https://hook.webhooks.svc:443/validate#probe", wantErr: true},
-		{name: "empty fragment", audience: "https://hook.webhooks.svc:443/validate#", wantErr: true},
+		{name: "default Service port and path written explicitly", svc: "hook", path: "/", port: 443, want: "https://hook.webhooks.svc:443/"},
+		{name: "explicit Service port and path", svc: "hook", path: "/validate", port: 9443, want: "https://hook.webhooks.svc:9443/validate"},
+		{name: "trailing slash retained", svc: "hook", path: "/validate/", port: 443, want: "https://hook.webhooks.svc:443/validate/"},
+		{name: "other Service in same namespace is syntactically valid", svc: "dinner", path: "/validate", port: 8443, want: "https://dinner.webhooks.svc:8443/validate"},
+		{name: "empty Service name", svc: "", path: "/validate", port: 443, wantErr: true},
+		{name: "invalid Service name", svc: "bad_name", path: "/validate", port: 443, wantErr: true},
+		{name: "dotted Service name", svc: "hook.webhooks.svc", path: "/validate", port: 443, wantErr: true},
+		{name: "port zero", svc: "hook", path: "/validate", port: 0, wantErr: true},
+		{name: "empty path", svc: "hook", path: "", port: 443, wantErr: true},
+		{name: "relative path without leading slash", svc: "hook", path: "validate", port: 443, wantErr: true},
+		{name: "scheme-relative path", svc: "hook", path: "//evil.example/validate", port: 443, wantErr: true},
+		{name: "query", svc: "hook", path: "/validate?probe=true", port: 443, wantErr: true},
+		{name: "empty query", svc: "hook", path: "/validate?", port: 443, wantErr: true},
+		{name: "fragment", svc: "hook", path: "/validate#probe", port: 443, wantErr: true},
+		{name: "empty fragment", svc: "hook", path: "/validate#", port: 443, wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateInClusterAudience(tc.audience, namespaceFile)
+			got, err := buildInClusterServiceAudience(tc.svc, tc.path, tc.port, namespaceFile)
 			if tc.wantErr {
-				if err == nil || !strings.Contains(err.Error(), "WithAudience") {
-					t.Fatalf("validation = %v, want a helpful WithAudience error", err)
+				if err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
+					t.Fatalf("validation = (%q, %v), want a helpful WithServiceAudience error", got, err)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("valid Service audience %q rejected: %v", tc.audience, err)
+			if err != nil || got != tc.want {
+				t.Fatalf("buildInClusterServiceAudience = (%q, %v), want (%q, nil)", got, err, tc.want)
 			}
 		})
 	}
@@ -142,7 +135,7 @@ func TestValidateInClusterAudience(t *testing.T) {
 				}
 			}
 			// A missing projection must not silently become the default namespace.
-			if err := validateInClusterAudience("https://hook.default.svc:443/validate", path); err == nil || !strings.Contains(err.Error(), "projected Pod namespace") {
+			if _, err := buildInClusterServiceAudience("hook", "/validate", 443, path); err == nil || !strings.Contains(err.Error(), "projected Pod namespace") {
 				t.Fatalf("namespace validation = %v, want projected namespace error", err)
 			}
 		})
@@ -150,15 +143,14 @@ func TestValidateInClusterAudience(t *testing.T) {
 }
 
 func TestInClusterAudienceValidationPrecedesBootstrap(t *testing.T) {
-	const invalidAudience = "http://hook.webhooks.svc:443/validate"
-	v, err := newVerifier(context.Background(), WithAudience(invalidAudience))
-	if v != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
+	v, err := newVerifier(context.Background(), WithServiceAudience("hook", "/validate", 0))
+	if v != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 		t.Fatalf("newVerifier invalid audience = (%v, %v), want an audience error", v, err)
 	}
 	h, err := WithTokenVerification(context.Background(), func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		return &admissionv1.AdmissionResponse{Allowed: true}
-	}, WithAudience(invalidAudience))
-	if h != nil || err == nil || !strings.Contains(err.Error(), "WithAudience") {
+	}, WithServiceAudience("hook", "/validate", 0))
+	if h != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 		t.Fatalf("WithTokenVerification invalid audience = (%v, %v), want an audience error", h, err)
 	}
 }
