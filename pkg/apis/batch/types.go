@@ -475,9 +475,9 @@ type JobSpec struct {
 	// When set, it specifies the scheduling policy (basic or gang), topology
 	// constraints, disruption mode, and shared resource claims.
 	// When omitted, the Job defaults to the basic scheduling policy, which behaves
-	// as standard pod-by-pod scheduling.
-	// This field is alpha-level and requires the WorkloadWithJob feature gate.
-	// Once set, this field is immutable except for the policy.gang.minCount.
+	// as standard pod-by-pod scheduling. This field is gated by the WorkloadWithJob
+	// feature gate. Once set, this field is immutable except for the
+	// policy.gang.minCount.
 	//
 	// +featureGate=WorkloadWithJob
 	// +optional

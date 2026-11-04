@@ -31,4 +31,9 @@ const (
 	// (e.g., Job) creates its own PodGroup. If the parent centrally manages
 	// both the CompositePodGroup and PodGroups, this annotation is unnecessary.
 	ParentCompositePodGroupAnnotation = GroupName + "/parent-compositepodgroup"
+
+	// WorkloadNameAnnotation is the name of the Workload, in the same namespace,
+	// that holds the template named by GroupTemplateNameAnnotation.
+	// It is required whenever GroupTemplateNameAnnotation is set.
+	WorkloadNameAnnotation = GroupName + "/workload-name"
 )

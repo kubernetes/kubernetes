@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/utils/ptr"
 )
 
@@ -3516,13 +3517,13 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 			},
 		}
 	}
-	mkJob := func(sched *batch.JobSchedulingConfiguration, schedulingGroup bool) batch.Job {
+	mkJob := func(sched *batch.JobSchedulingConfiguration, schedulingGroup bool, annotations map[string]string) batch.Job {
 		template := validPodTemplateSpec
 		if schedulingGroup {
 			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: new("byo-pg")}
 		}
 		return batch.Job{
-			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c"), Annotations: annotations},
 			Spec: batch.JobSpec{
 				Selector: validSelector,
 				// Parallelism large enough that the gang minCount values used below do
@@ -3534,17 +3535,26 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 			},
 		}
 	}
+	delegation := map[string]string{
+		apischeduling.WorkloadNameAnnotation:      "parent-workload",
+		apischeduling.GroupTemplateNameAnnotation: "workers",
+	}
 	// Only an in-place basic<->gang variant switch is rejected; adding or removing
 	// spec.scheduling is left to declarative validation, and gang minCount is mutable.
+	workloadNameOnly := map[string]string{apischeduling.WorkloadNameAnnotation: "parent-workload"}
 	policyPath := field.NewPath("spec", "scheduling", "schedulingPolicy")
 	schedulingPath := field.NewPath("spec", "scheduling")
 	templatePath := field.NewPath("spec", "template")
 	disruptionModePath := field.NewPath("spec", "scheduling", "disruptionMode")
+	workloadNamePath := field.NewPath("metadata", "annotations").Key(apischeduling.WorkloadNameAnnotation)
+	templateNamePath := field.NewPath("metadata", "annotations").Key(apischeduling.GroupTemplateNameAnnotation)
 	cases := map[string]struct {
 		old                  *batch.JobSchedulingConfiguration
 		update               *batch.JobSchedulingConfiguration
 		oldSG                bool
 		updateSG             bool
+		oldAnnotations       map[string]string
+		updateAnnotations    map[string]string
 		updateJobParallelism *int32
 		errs                 field.ErrorList
 	}{
@@ -3599,6 +3609,48 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 			oldSG:    true,
 			updateSG: true,
 		},
+		"adding delegation annotations when scheduling is set is rejected": {
+			old:               basic(),
+			update:            basic(),
+			updateAnnotations: delegation,
+			errs:              field.ErrorList{field.Invalid(schedulingPath, nil, "")},
+		},
+		"adding scheduling when delegation annotations are set is rejected": {
+			oldAnnotations:    delegation,
+			update:            basic(),
+			updateAnnotations: delegation,
+			errs:              field.ErrorList{field.Invalid(schedulingPath, nil, "")},
+		},
+		"both scheduling and delegation annotations already present is allowed": {
+			old:               basic(),
+			update:            basic(),
+			oldAnnotations:    delegation,
+			updateAnnotations: delegation,
+		},
+		"adding the second delegation annotation when scheduling is set is rejected": {
+			old:               basic(),
+			update:            basic(),
+			oldAnnotations:    workloadNameOnly,
+			updateAnnotations: delegation,
+			errs:              field.ErrorList{field.Invalid(schedulingPath, nil, "")},
+		},
+		"unchanged incomplete delegation annotations are ratcheted": {
+			oldAnnotations:    workloadNameOnly,
+			updateAnnotations: workloadNameOnly,
+		},
+		"changed incomplete delegation annotations are rejected": {
+			oldAnnotations:    workloadNameOnly,
+			updateAnnotations: map[string]string{apischeduling.WorkloadNameAnnotation: "other-workload"},
+			errs:              field.ErrorList{field.Required(templateNamePath, "")},
+		},
+		"emptying a delegation annotation is rejected": {
+			oldAnnotations: delegation,
+			updateAnnotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "",
+				apischeduling.GroupTemplateNameAnnotation: "workers",
+			},
+			errs: field.ErrorList{field.Required(workloadNamePath, "")},
+		},
 		"unchanged spec with now-invalid scheduling is ratcheted": {
 			old:    basicDisruptionModeAll(),
 			update: basicDisruptionModeAll(),
@@ -3613,9 +3665,9 @@ func TestValidateJobSchedulingUpdate(t *testing.T) {
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for k, tc := range cases {
 		t.Run(k, func(t *testing.T) {
-			old := mkJob(tc.old, tc.oldSG)
+			old := mkJob(tc.old, tc.oldSG, tc.oldAnnotations)
 			old.ResourceVersion = "1"
-			update := mkJob(tc.update, tc.updateSG)
+			update := mkJob(tc.update, tc.updateSG, tc.updateAnnotations)
 			update.ResourceVersion = "2"
 			if tc.updateJobParallelism != nil {
 				update.Spec.Parallelism = tc.updateJobParallelism
@@ -3651,13 +3703,13 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 	}
 	disruptionModePath := field.NewPath("spec", "scheduling", "disruptionMode")
 	schedulingPath := field.NewPath("spec", "scheduling")
-	mkJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration, schedulingGroup bool) *batch.Job {
+	mkJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration, schedulingGroup bool, annotations map[string]string) *batch.Job {
 		template := validPodTemplateSpec
 		if schedulingGroup {
 			template.Spec.SchedulingGroup = &api.PodSchedulingGroup{PodGroupName: new("byo-pg")}
 		}
 		return &batch.Job{
-			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c"), Annotations: annotations},
 			Spec: batch.JobSpec{
 				Selector:    validSelector,
 				Parallelism: parallelism,
@@ -3667,13 +3719,16 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 		}
 	}
 	minCountPath := field.NewPath("spec", "scheduling", "schedulingPolicy", "gang", "minCount")
+	workloadNamePath := field.NewPath("metadata", "annotations").Key(apischeduling.WorkloadNameAnnotation)
+	templateNamePath := field.NewPath("metadata", "annotations").Key(apischeduling.GroupTemplateNameAnnotation)
 
 	cases := map[string]struct {
 		parallelism     *int32
 		sched           *batch.JobSchedulingConfiguration
 		schedulingGroup bool
+		annotations     map[string]string
 		opts            JobValidationOptions
-		err             *field.Error
+		errs            field.ErrorList
 	}{
 		"no scheduling": {
 			parallelism: ptr.To[int32](4),
@@ -3693,14 +3748,14 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 		"gang minCount above parallelism is rejected": {
 			parallelism: ptr.To[int32](2),
 			sched:       gang(4),
-			err:         field.Invalid(minCountPath, nil, ""),
+			errs:        field.ErrorList{field.Invalid(minCountPath, nil, "")},
 		},
 		"gang minCount unset (zero) is allowed": {
 			parallelism: ptr.To[int32](2),
 			sched:       gang(0),
 		},
 		"gang minCount unset (nil) defaults to parallelism and is accepted": {
-			parallelism: ptr.To[int32](4),
+			parallelism: new(int32(4)),
 			sched:       &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: nil}}},
 		},
 		"nil parallelism defaults to 1, minCount 1 is allowed": {
@@ -3708,7 +3763,7 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 		},
 		"nil parallelism defaults to 1, minCount 2 is rejected": {
 			sched: gang(2),
-			err:   field.Invalid(minCountPath, nil, ""),
+			errs:  field.ErrorList{field.Invalid(minCountPath, nil, "")},
 		},
 		"basic policy with single disruption is allowed": {
 			parallelism: ptr.To[int32](1),
@@ -3719,31 +3774,87 @@ func TestValidateJobSchedulingGangMinCount(t *testing.T) {
 			sched:       gangAll(2),
 		},
 		"basic policy with all disruption is rejected": {
-			parallelism: ptr.To[int32](1),
+			parallelism: new(int32(1)),
 			sched:       basicAll,
-			err:         field.Invalid(disruptionModePath, nil, ""),
+			errs:        field.ErrorList{field.Invalid(disruptionModePath, nil, "")},
 		},
 		"scheduling with schedulingGroup is rejected": {
-			parallelism:     ptr.To[int32](4),
+			parallelism:     new(int32(4)),
 			sched:           basic,
 			schedulingGroup: true,
-			err:             field.Invalid(schedulingPath, nil, ""),
+			errs:            field.ErrorList{field.Invalid(schedulingPath, nil, "")},
 		},
 		"schedulingGroup alone is allowed": {
-			parallelism:     ptr.To[int32](4),
+			parallelism:     new(int32(4)),
 			schedulingGroup: true,
+		},
+		"scheduling with workload-name annotation is rejected": {
+			parallelism: new(int32(4)),
+			sched:       basic,
+			annotations: map[string]string{apischeduling.WorkloadNameAnnotation: "parent-workload"},
+			errs: field.ErrorList{
+				field.Invalid(schedulingPath, nil, ""),
+				field.Required(templateNamePath, ""),
+			},
+		},
+		"scheduling with group-template-name annotation is rejected": {
+			parallelism: new(int32(4)),
+			sched:       basic,
+			annotations: map[string]string{apischeduling.GroupTemplateNameAnnotation: "workers"},
+			errs: field.ErrorList{
+				field.Invalid(schedulingPath, nil, ""),
+				field.Required(workloadNamePath, ""),
+			},
+		},
+		"scheduling with both delegation annotations is rejected": {
+			parallelism: new(int32(4)),
+			sched:       basic,
+			annotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "workers",
+			},
+			errs: field.ErrorList{field.Invalid(schedulingPath, nil, "")},
+		},
+		"delegation annotations without scheduling are allowed": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "workers",
+			},
+		},
+		"workload-name annotation alone is rejected": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{apischeduling.WorkloadNameAnnotation: "parent-workload"},
+			errs:        field.ErrorList{field.Required(templateNamePath, "")},
+		},
+		"group-template-name annotation alone is rejected": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{apischeduling.GroupTemplateNameAnnotation: "workers"},
+			errs:        field.ErrorList{field.Required(workloadNamePath, "")},
+		},
+		"empty workload-name annotation is rejected": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "",
+				apischeduling.GroupTemplateNameAnnotation: "workers",
+			},
+			errs: field.ErrorList{field.Required(workloadNamePath, "")},
+		},
+		"empty group-template-name annotation is rejected": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "",
+			},
+			errs: field.ErrorList{field.Required(templateNamePath, "")},
 		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			tc.opts.RequirePrefixedLabels = true
-			errs := ValidateJobCreate(mkJob(tc.parallelism, tc.sched, tc.schedulingGroup), tc.opts)
-			var wantErrs field.ErrorList
-			if tc.err != nil {
-				wantErrs = append(wantErrs, tc.err)
-			}
-			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+			errs := ValidateJobCreate(mkJob(tc.parallelism, tc.sched, tc.schedulingGroup, tc.annotations), tc.opts)
+			if diff := cmp.Diff(tc.errs, errs, ignoreValueAndDetail); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
@@ -3756,26 +3867,32 @@ func TestValidateCronJobCreateGangMinCount(t *testing.T) {
 	gang := func(minCount int32) *batch.JobSchedulingConfiguration {
 		return &batch.JobSchedulingConfiguration{SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)}}}
 	}
-	mkCronJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration) *batch.CronJob {
+	mkCronJob := func(parallelism *int32, sched *batch.JobSchedulingConfiguration, annotations map[string]string) *batch.CronJob {
 		return &batch.CronJob{
 			ObjectMeta: metav1.ObjectMeta{Name: "mycronjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
 			Spec: batch.CronJobSpec{
 				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{Spec: batch.JobSpec{
-					Parallelism: parallelism,
-					Template:    validPodTemplateSpec,
-					Scheduling:  sched,
-				}},
+				JobTemplate: batch.JobTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Annotations: annotations},
+					Spec: batch.JobSpec{
+						Parallelism: parallelism,
+						Template:    validPodTemplateSpec,
+						Scheduling:  sched,
+					},
+				},
 			},
 		}
 	}
 	minCountPath := field.NewPath("spec", "jobTemplate", "spec", "scheduling", "schedulingPolicy", "gang", "minCount")
+	schedulingPath := field.NewPath("spec", "jobTemplate", "spec", "scheduling")
+	annotationsPath := field.NewPath("spec", "jobTemplate", "metadata", "annotations")
 
 	cases := map[string]struct {
 		parallelism *int32
 		sched       *batch.JobSchedulingConfiguration
-		err         *field.Error
+		annotations map[string]string
+		errs        field.ErrorList
 	}{
 		"gang minCount below parallelism": {
 			parallelism: ptr.To[int32](4),
@@ -3784,22 +3901,47 @@ func TestValidateCronJobCreateGangMinCount(t *testing.T) {
 		"gang minCount above parallelism is rejected": {
 			parallelism: ptr.To[int32](2),
 			sched:       gang(4),
-			err:         field.Invalid(minCountPath, nil, ""),
+			errs:        field.ErrorList{field.Invalid(minCountPath, nil, "")},
 		},
 		"nil parallelism defaults to 1, minCount 2 is rejected": {
 			sched: gang(2),
-			err:   field.Invalid(minCountPath, nil, ""),
+			errs:  field.ErrorList{field.Invalid(minCountPath, nil, "")},
+		},
+		"scheduling with jobTemplate delegation annotation is rejected": {
+			parallelism: new(int32(4)),
+			sched:       gang(2),
+			annotations: map[string]string{apischeduling.GroupTemplateNameAnnotation: "workers"},
+			errs: field.ErrorList{
+				field.Invalid(schedulingPath, nil, ""),
+				field.Required(annotationsPath.Key(apischeduling.WorkloadNameAnnotation), ""),
+			},
+		},
+		"jobTemplate delegation annotations without scheduling are allowed": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "workers",
+			},
+		},
+		"jobTemplate workload-name annotation alone is rejected": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{apischeduling.WorkloadNameAnnotation: "parent-workload"},
+			errs:        field.ErrorList{field.Required(annotationsPath.Key(apischeduling.GroupTemplateNameAnnotation), "")},
+		},
+		"jobTemplate empty group-template-name annotation is rejected": {
+			parallelism: new(int32(4)),
+			annotations: map[string]string{
+				apischeduling.WorkloadNameAnnotation:      "parent-workload",
+				apischeduling.GroupTemplateNameAnnotation: "",
+			},
+			errs: field.ErrorList{field.Required(annotationsPath.Key(apischeduling.GroupTemplateNameAnnotation), "")},
 		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateCronJobCreate(mkCronJob(tc.parallelism, tc.sched), corevalidation.PodValidationOptions{})
-			var wantErrs field.ErrorList
-			if tc.err != nil {
-				wantErrs = append(wantErrs, tc.err)
-			}
-			if diff := cmp.Diff(wantErrs, errs, ignoreValueAndDetail); diff != "" {
+			errs := ValidateCronJobCreate(mkCronJob(tc.parallelism, tc.sched, tc.annotations), corevalidation.PodValidationOptions{})
+			if diff := cmp.Diff(tc.errs, errs, ignoreValueAndDetail); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
 			}
 		})
