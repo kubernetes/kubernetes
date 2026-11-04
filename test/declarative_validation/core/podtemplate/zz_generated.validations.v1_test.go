@@ -73,6 +73,42 @@ func init() {
 			"template.spec.containers": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"template.spec.containers[*].securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"template.spec.containers[*].securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.containers[*].securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.containers[*].securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.containers[*].securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.ephemeralContainers[*].securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -88,8 +124,44 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"template.spec.initContainers[*].securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"template.spec.initContainers[*].securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.initContainers[*].securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.initContainers[*].securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.initContainers[*].securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
+			},
+			"template.spec.securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"template.spec.securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"template.spec.securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"template.spec.securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
 			},
 			"template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},

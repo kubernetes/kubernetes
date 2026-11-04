@@ -19,7 +19,12 @@ package v1
 import (
 	"context"
 	"fmt"
+	"path"
+	"slices"
 	"strings"
+	"unicode/utf8"
+
+	"github.com/distribution/reference"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -68,4 +73,69 @@ func ValidateForbiddenReservedDomainSuffixes(fldPath *field.Path, value string, 
 		}
 	}
 	return allErrors
+}
+
+// The custom validators below return early for values longer than the
+// +k8s:maxLength of their field, so that an oversized value is neither parsed
+// nor echoed in an error; the maxLength rule reports it. Like that rule, they
+// count characters, and the constants must match the tags in
+// staging/src/k8s.io/api/core/v1/types.go.
+const (
+	securityProfileOCIRefMaxLength                  = 1024
+	securityProfileOCIBaseLocalhostProfileMaxLength = 4096
+)
+
+// ValidateCustom_SecurityProfileOCI_Ref is wired into the generated declarative
+// validation by +k8s:customValidation on corev1.SecurityProfileOCI.Ref. It
+// requires a canonical, digest-pinned OCI reference without a tag, with a
+// sha256, sha384, or sha512 digest. Empty and oversized values are left to
+// +k8s:required and +k8s:maxLength.
+func ValidateCustom_SecurityProfileOCI_Ref(ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *string) field.ErrorList {
+	if value == nil || len(*value) == 0 || utf8.RuneCountInString(*value) > securityProfileOCIRefMaxLength {
+		return nil
+	}
+	named, err := reference.ParseNamed(*value)
+	if err != nil {
+		return field.ErrorList{field.Invalid(fldPath, *value, fmt.Sprintf("must be a digest-pinned reference in canonical form (<registry>/<repository>@<algorithm>:<digest>): %v", err))}
+	}
+	if _, ok := named.(reference.Tagged); ok {
+		return field.ErrorList{field.Invalid(fldPath, *value, "must not contain a tag")}
+	}
+	digested, ok := named.(reference.Digested)
+	if !ok {
+		return field.ErrorList{field.Invalid(fldPath, *value, "must be pinned by digest (<registry>/<repository>@<algorithm>:<digest>)")}
+	}
+	// The parser accepts any algorithm registered with go-digest; the API
+	// documents these three.
+	switch string(digested.Digest().Algorithm()) {
+	case "sha256", "sha384", "sha512":
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, *value, "digest algorithm must be sha256, sha384, or sha512")}
+}
+
+// ValidateCustom_SecurityProfileOCIBase_LocalhostProfile is wired into the
+// generated declarative validation by +k8s:customValidation on
+// corev1.SecurityProfileOCIBase.LocalhostProfile. It requires a non-empty
+// relative path without ".." elements, like the localhostProfile of a seccomp
+// profile of type Localhost. Only "/" separates path elements: seccomp is
+// Linux-only and the kubelet resolves the path on the node, where a backslash
+// is an ordinary file name character. Whether the field may be set is decided
+// by the union with the base profile type, and oversized values are left to
+// +k8s:maxLength.
+func ValidateCustom_SecurityProfileOCIBase_LocalhostProfile(ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *string) field.ErrorList {
+	if value == nil || utf8.RuneCountInString(*value) > securityProfileOCIBaseLocalhostProfileMaxLength {
+		return nil
+	}
+	if len(*value) == 0 {
+		return field.ErrorList{field.Required(fldPath, "must not be empty")}
+	}
+	var allErrs field.ErrorList
+	if path.IsAbs(*value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, "must be a relative path"))
+	}
+	if slices.Contains(strings.Split(*value, "/"), "..") {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, "must not contain '..'"))
+	}
+	return allErrs
 }

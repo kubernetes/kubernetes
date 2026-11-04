@@ -25239,7 +25239,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		"sys admin without privilege escalation": {sysAdminPriv, false, true},
 	}
 	for k, v := range successCases {
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers, v.allowSysAdmin); len(errs) != 0 {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers, v.allowSysAdmin, false); len(errs) != 0 {
 			t.Errorf("[%s] Expected success, got %v", k, errs)
 		}
 	}
@@ -25299,7 +25299,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		})
 		// note the unconditional `true` here for hostUsers. The failure case to test for ProcMount only includes it being true,
 		// and the field is ignored if ProcMount isn't set. Thus, we can unconditionally set to `true` and simplify the test matrix setup.
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true, false); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true, false, false); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
 	}
@@ -27619,6 +27619,12 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 		description:     "localhost/test.json annotation and SeccompProfileTypeRuntimeDefault with different profile should error",
 		annotationValue: "localhost/test.json",
 		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault},
+		fldPath:         rootFld,
+		expectedErr:     field.Forbidden(rootFld.Child("type"), "seccomp type in annotation and field must match"),
+	}, {
+		description:     "runtime/default annotation and SeccompProfileTypeOCI should error",
+		annotationValue: "runtime/default",
+		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}},
 		fldPath:         rootFld,
 		expectedErr:     field.Forbidden(rootFld.Child("type"), "seccomp type in annotation and field must match"),
 	},
@@ -33325,4 +33331,171 @@ func TestValidateBasicResource(t *testing.T) {
 			}
 		})
 	}
+}
+
+const validOCIProfileReference = "registry.example.com/profiles/seccomp@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+// TestValidateSeccompProfileFieldOCI covers the handwritten part; the oci
+// field is validated declaratively (test/declarative_validation/core/pod).
+func TestValidateSeccompProfileFieldOCI(t *testing.T) {
+	fldPath := field.NewPath("seccompProfile")
+	oci := &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}}
+	tests := []struct {
+		name         string
+		profile      *core.SeccompProfile
+		disallowOCI  bool
+		expectedErrs field.ErrorList
+	}{{
+		name:    "type OCI",
+		profile: oci,
+	}, {
+		name: "type OCI with a Localhost base profile",
+		profile: &core.SeccompProfile{
+			Type: core.SeccompProfileTypeOCI,
+			OCI: &core.SecurityProfileOCI{
+				Ref:         validOCIProfileReference,
+				BaseProfile: &core.SecurityProfileOCIBase{Type: core.SecurityProfileOCIBaseTypeLocalhost, LocalhostProfile: new("profiles/base.json")},
+			},
+		},
+	}, {
+		name:         "type OCI with the feature disabled",
+		profile:      oci,
+		disallowOCI:  true,
+		expectedErrs: field.ErrorList{field.NotSupported(fldPath.Child("type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType{core.SeccompProfileTypeLocalhost, core.SeccompProfileTypeRuntimeDefault, core.SeccompProfileTypeUnconfined})},
+	}, {
+		name: "type OCI with localhostProfile",
+		profile: &core.SeccompProfile{
+			Type:             core.SeccompProfileTypeOCI,
+			LocalhostProfile: new("profile.json"),
+			OCI:              &core.SecurityProfileOCI{Ref: validOCIProfileReference},
+		},
+		expectedErrs: field.ErrorList{field.Invalid(fldPath.Child("localhostProfile"), nil, "")},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateSeccompProfileField(tc.profile, fldPath, !tc.disallowOCI)
+			matcher := field.ErrorMatcher{}.ByType().ByField()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+func TestValidatePrivilegedContainersSeccompOCI(t *testing.T) {
+	specPath := field.NewPath("spec")
+	oci := &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}}
+	runtimeDefault := &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
+	container := func(name string, privileged bool, profile *core.SeccompProfile) core.Container {
+		return core.Container{Name: name, SecurityContext: &core.SecurityContext{Privileged: new(privileged), SeccompProfile: profile}}
+	}
+	tests := []struct {
+		name         string
+		spec         *core.PodSpec
+		expectedErrs field.ErrorList
+	}{{
+		name: "unprivileged container with OCI profile",
+		spec: &core.PodSpec{Containers: []core.Container{container("c", false, oci)}},
+	}, {
+		name: "privileged container with RuntimeDefault profile and pod-level OCI profile",
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{SeccompProfile: oci},
+			Containers:      []core.Container{container("c", true, runtimeDefault)},
+		},
+	}, {
+		name:         "privileged container with OCI profile",
+		spec:         &core.PodSpec{Containers: []core.Container{container("c", true, oci)}},
+		expectedErrs: field.ErrorList{field.Forbidden(specPath.Child("containers").Index(0).Child("securityContext", "privileged"), "")},
+	}, {
+		name: "privileged containers inheriting a pod-level OCI profile",
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{SeccompProfile: oci},
+			InitContainers:  []core.Container{container("init", true, nil)},
+			Containers:      []core.Container{container("c", false, nil)},
+			EphemeralContainers: []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", SecurityContext: &core.SecurityContext{Privileged: new(true)}},
+			}},
+		},
+		expectedErrs: field.ErrorList{
+			field.Forbidden(specPath.Child("initContainers").Index(0).Child("securityContext", "privileged"), ""),
+			field.Forbidden(specPath.Child("ephemeralContainers").Index(0).Child("securityContext", "privileged"), ""),
+		},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validatePrivilegedContainersSeccompOCI(tc.spec, specPath)
+			matcher := field.ErrorMatcher{}.ByType().ByField()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+// TestValidatePodSecurityProfileOCI runs pods with OCI seccomp profiles through
+// the pod validation entry points, so that the feature gate option and the
+// privileged container rule are covered where they are wired in.
+func TestValidatePodSecurityProfileOCI(t *testing.T) {
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{AllowPrivileged: true})
+	t.Cleanup(capabilities.ResetForTest)
+
+	oci := &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}}
+	specPath := field.NewPath("spec")
+
+	createTests := []struct {
+		name         string
+		pod          *core.Pod
+		allowOCI     bool
+		expectedErrs field.ErrorList
+	}{{
+		name:     "container-level OCI profile",
+		pod:      podtest.MakePod("pod", podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{SeccompProfile: oci})))),
+		allowOCI: true,
+	}, {
+		name:         "container-level OCI profile with the feature disabled",
+		pod:          podtest.MakePod("pod", podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{SeccompProfile: oci})))),
+		expectedErrs: field.ErrorList{field.NotSupported(specPath.Child("containers").Index(0).Child("securityContext", "seccompProfile", "type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType(nil))},
+	}, {
+		name:         "pod-level OCI profile with the feature disabled",
+		pod:          podtest.MakePod("pod", podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci})),
+		expectedErrs: field.ErrorList{field.NotSupported(specPath.Child("securityContext", "seccompProfile", "type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType(nil))},
+	}, {
+		name: "privileged container with a pod-level OCI profile and the feature disabled",
+		pod: podtest.MakePod("pod",
+			podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci}),
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(true)})))),
+		expectedErrs: field.ErrorList{field.NotSupported(specPath.Child("securityContext", "seccompProfile", "type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType(nil))},
+	}, {
+		name: "privileged container inheriting a pod-level OCI profile",
+		pod: podtest.MakePod("pod",
+			podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci}),
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(true)})))),
+		allowOCI:     true,
+		expectedErrs: field.ErrorList{field.Forbidden(specPath.Child("containers").Index(0).Child("securityContext", "privileged"), "")},
+	}}
+	for _, tc := range createTests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidatePodCreate(tc.pod, PodValidationOptions{AllowSecurityProfileOCI: tc.allowOCI})
+			field.ErrorMatcher{}.ByType().ByField().Test(t, tc.expectedErrs, errs)
+		})
+	}
+
+	t.Run("privileged ephemeral container inheriting a pod-level OCI profile", func(t *testing.T) {
+		oldPod := podtest.MakePod("pod",
+			podtest.SetObjectMeta(metav1.ObjectMeta{Name: "pod", Namespace: "ns", ResourceVersion: "1"}),
+			podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci}))
+		newPod := oldPod.DeepCopy()
+		newPod.Spec.EphemeralContainers = []core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "debugger",
+				Image:                    "busybox",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				SecurityContext:          &core.SecurityContext{Privileged: new(true)},
+			},
+		}}
+		errs := ValidatePodEphemeralContainersUpdate(newPod, oldPod, PodValidationOptions{AllowSecurityProfileOCI: true})
+		field.ErrorMatcher{}.ByType().ByField().Test(t, field.ErrorList{
+			field.Forbidden(specPath.Child("ephemeralContainers").Index(0).Child("securityContext", "privileged"), ""),
+		}, errs)
+	})
 }

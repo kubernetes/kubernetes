@@ -3432,6 +3432,7 @@ type Container struct {
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
@@ -4521,6 +4522,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	InitContainers []Container `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
 	// containers is the list of containers belonging to the pod.
 	// Containers cannot currently be added or removed.
@@ -4541,6 +4543,7 @@ type PodSpec struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=name
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	EphemeralContainers []EphemeralContainer `json:"ephemeralContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,34,rep,name=ephemeralContainers"`
 	// restartPolicy is the restart policy for all containers within the pod.
 	// One of Always, OnFailure, Never. In some contexts, only a subset of those values may be permitted.
@@ -4626,6 +4629,7 @@ type PodSpec struct {
 	// securityContext holds pod-level security attributes and common container settings.
 	// Optional: Defaults to empty.  See type description for default values of each field.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SecurityContext *PodSecurityContext `json:"securityContext,omitempty" protobuf:"bytes,14,opt,name=securityContext"`
 	// imagePullSecrets is an optional list of references to secrets in the same namespace to use for pulling any of the images used by this PodSpec.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.
@@ -5339,6 +5343,7 @@ type PodSecurityContext struct {
 	// seccompProfile is the seccomp options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,10,opt,name=seccompProfile"`
 	// appArmorProfile is the AppArmor options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
@@ -5379,7 +5384,13 @@ type SeccompProfile struct {
 	// Localhost - a profile defined in a file on the node should be used.
 	// RuntimeDefault - the container runtime default profile should be used.
 	// Unconfined - no profile should be applied.
+	// OCI - a profile pulled from an OCI registry should be used, merged with a
+	// base profile (see oci.baseProfile). Privileged containers cannot use it,
+	// whether it is set on the container or inherited from the pod. This is an
+	// alpha value and requires enabling the SecurityProfileOCI feature gate.
 	// +unionDiscriminator
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:unionDiscriminator
 	Type SeccompProfileType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SeccompProfileType"`
 	// localhostProfile indicates a profile defined in a file on the node should be used.
 	// The profile must be preconfigured on the node to work.
@@ -5387,7 +5398,82 @@ type SeccompProfile struct {
 	// Must be set if type is "Localhost". Must NOT be set for any other type.
 	// +optional
 	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+	// oci specifies a seccomp profile stored as an artifact in an OCI registry.
+	// The container runtime merges the profile with a base profile, so the
+	// effective profile permits an operation only if both permit it.
+	// Must be set if type is "OCI". Must NOT be set for any other type.
+	// This is an alpha field and requires enabling the SecurityProfileOCI feature gate.
+	// +featureGate=SecurityProfileOCI
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	OCI *SecurityProfileOCI `json:"oci,omitempty" protobuf:"bytes,3,opt,name=oci"`
 }
+
+// SecurityProfileOCI references a security profile stored as an artifact in an
+// OCI registry, with an optional base profile.
+type SecurityProfileOCI struct {
+	// ref is the OCI reference of the profile.
+	// It must be a digest-pinned reference in canonical form,
+	// registry/repository@<algorithm>:<digest>, with the registry spelled out
+	// (for example docker.io/library/profile, not profile or docker.io/profile).
+	// Tags are rejected. The digest algorithm must be sha256, sha384, or sha512.
+	// The maximum length is 1024 characters.
+	// Pull secrets are assembled in the same way as for the container image by
+	// looking up node credentials, service account image pull secrets, and pod spec image pull secrets.
+	// +required
+	// +k8s:required
+	// +k8s:maxLength=1024
+	// +k8s:customValidation
+	Ref string `json:"ref" protobuf:"bytes,1,opt,name=ref"`
+	// baseProfile optionally specifies the base profile that the container
+	// runtime merges with the OCI profile. The effective profile permits an
+	// operation only if both permit it. When omitted, the container runtime
+	// default profile is the base; a Localhost base profile takes its place.
+	// +optional
+	// +k8s:optional
+	BaseProfile *SecurityProfileOCIBase `json:"baseProfile,omitempty" protobuf:"bytes,2,opt,name=baseProfile"`
+}
+
+// SecurityProfileOCIBase specifies the base profile of an OCI security profile.
+// +union
+type SecurityProfileOCIBase struct {
+	// type indicates which kind of base profile will be applied.
+	// Valid options are:
+	//
+	// Localhost - a profile defined in a file on the node should be used.
+	// RuntimeDefault - the container runtime default profile should be used.
+	// +unionDiscriminator
+	// +required
+	// +k8s:required
+	// +k8s:unionDiscriminator
+	Type SecurityProfileOCIBaseType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SecurityProfileOCIBaseType"`
+	// localhostProfile indicates a base profile defined in a file on the node
+	// should be used. The profile must be preconfigured on the node to work.
+	// Must be a non-empty descending path, relative to the kubelet's configured seccomp profile location,
+	// of at most 4096 characters.
+	// Must be set if type is "Localhost". Must NOT be set for any other type.
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember(memberName: "Localhost")
+	// +k8s:maxLength=4096
+	// +k8s:customValidation
+	LocalhostProfile *string `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
+}
+
+// SecurityProfileOCIBaseType defines the supported base profile types of an
+// OCI security profile.
+// +enum
+// +k8s:enum
+type SecurityProfileOCIBaseType string
+
+const (
+	// SecurityProfileOCIBaseTypeRuntimeDefault represents the default container runtime profile.
+	SecurityProfileOCIBaseTypeRuntimeDefault SecurityProfileOCIBaseType = "RuntimeDefault"
+	// SecurityProfileOCIBaseTypeLocalhost indicates a profile defined in a file on the node should be used.
+	// For seccomp, the file's location is relative to <kubelet-root-dir>/seccomp.
+	SecurityProfileOCIBaseTypeLocalhost SecurityProfileOCIBaseType = "Localhost"
+)
 
 // SeccompProfileType defines the supported seccomp profile types.
 // +enum
@@ -5402,6 +5488,8 @@ const (
 	// SeccompProfileTypeLocalhost indicates a profile defined in a file on the node should be used.
 	// The file's location relative to <kubelet-root-dir>/seccomp.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+	// SeccompProfileTypeOCI indicates a profile pulled from an OCI registry should be used.
+	SeccompProfileTypeOCI SeccompProfileType = "OCI"
 )
 
 // AppArmorProfile defines a pod or container's AppArmor settings.
@@ -5639,6 +5727,7 @@ type EphemeralContainerCommon struct {
 	// securityContext is optional: SecurityContext defines the security options the ephemeral container should be run with.
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
@@ -8852,6 +8941,7 @@ type SecurityContext struct {
 	// override the pod options.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	SeccompProfile *SeccompProfile `json:"seccompProfile,omitempty" protobuf:"bytes,11,opt,name=seccompProfile"`
 	// appArmorProfile is the AppArmor options to use by this container. If set, this profile
 	// overrides the pod's appArmorProfile.
