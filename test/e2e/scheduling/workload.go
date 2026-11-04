@@ -108,5 +108,48 @@ var _ = SIGDescribe("Workload", framework.WithFeatureGate(features.GenericWorklo
 				},
 			)
 		})
+
+		/*
+			Testname: CRUD operations for CompositePodGroups
+			Description: kube-apiserver must support create/get/list/update/patch/delete
+			operations for scheduling.k8s.io/v1beta1 CompositePodGroup.
+		*/
+		framework.It("CompositePodGroup API availability", framework.WithFeatureGate(features.CompositePodGroup), func(ctx context.Context) {
+			e2econformance.TestResource(ctx, f,
+				&e2econformance.ResourceTestcase[*schedulingv1beta1.CompositePodGroup]{
+					GVR:        schedulingv1beta1.SchemeGroupVersion.WithResource("compositepodgroups"),
+					Namespaced: new(true),
+					InitialSpec: &schedulingv1beta1.CompositePodGroup{
+						Spec: schedulingv1beta1.CompositePodGroupSpec{
+							WorkloadRef: &schedulingv1beta1.WorkloadReference{
+								WorkloadName: "foo",
+								TemplateName: "bar",
+							},
+							SchedulingPolicy: schedulingv1beta1.CompositePodGroupSchedulingPolicy{
+								Gang: &schedulingv1beta1.CompositeGangSchedulingPolicy{
+									MinGroupCount: 2,
+								},
+							},
+						},
+					},
+					UpdateSpec: func(obj *schedulingv1beta1.CompositePodGroup) *schedulingv1beta1.CompositePodGroup {
+						obj.Spec.SchedulingPolicy.Gang.MinGroupCount = 3
+						return obj
+					},
+					UpdateStatus: func(obj *schedulingv1beta1.CompositePodGroup) *schedulingv1beta1.CompositePodGroup {
+						obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
+							Type:               schedulingv1beta1.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingv1beta1.CompositePodGroupReasonUnschedulable,
+							Message:            "Test status condition message",
+							LastTransitionTime: metav1.Now(),
+						})
+						return obj
+					},
+					StrategicMergePatchSpec:   `{"spec": {"schedulingPolicy": {"gang": {"minGroupCount": 3}}}}`,
+					StrategicMergePatchStatus: `{"status": {"conditions": [{"type": "CompositePodGroupInitiallyScheduled", "status": "False", "reason": "Unschedulable", "message": "Test status condition message", "lastTransitionTime": "2026-01-01T00:00:00Z"}]}}`,
+				},
+			)
+		})
 	})
 })
