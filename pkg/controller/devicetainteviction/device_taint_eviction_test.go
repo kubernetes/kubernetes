@@ -2819,13 +2819,14 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 }
 
 // TestParallelPodDeletion covers the scenario that a pod gets deleted right before
-// trying to evict it.
+// trying to evict it, either completely or with deletion still in progress.
 func TestParallelPodDeletion(t *testing.T) { testParallelPodDeletion(ktesting.Init(t)) }
 func testParallelPodDeletion(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	tCtx.SyncTest("", synctestParallelPodDeletion)
+	tCtx.SyncTest("deleted", func(tCtx ktesting.TContext) { synctestParallelPodDeletion(tCtx, false) })
+	tCtx.SyncTest("terminating", func(tCtx ktesting.TContext) { synctestParallelPodDeletion(tCtx, true) })
 }
-func synctestParallelPodDeletion(tCtx ktesting.TContext) {
+func synctestParallelPodDeletion(tCtx ktesting.TContext, terminating bool) {
 	// This scenario is the same as "evict-pod-resourceclaim" above.
 	pod := podWithClaimName.DeepCopy()
 	fakeClientset := fake.NewClientset(
@@ -2847,6 +2848,15 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		podGets++
 		podName := action.(core.GetAction).GetName()
 		tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of patched pod")
+
+		if terminating {
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/143789.
+			// Someone else already started deleting the pod, for example with a grace period
+			// or a finalizer. The controller must leave it alone and not count it as evicted.
+			terminatingPod := pod.DeepCopy()
+			terminatingPod.DeletionTimestamp = metav1Time(time.Now())
+			return true, terminatingPod, nil
+		}
 
 		// This gets called directly before eviction. Pretend that it is deleted.
 		err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
