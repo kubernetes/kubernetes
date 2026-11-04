@@ -874,6 +874,25 @@ func updateRequestRetryMetric(ctx context.Context, req *Request, resp *http.Resp
 	metrics.RequestRetry.IncrementRetry(ctx, code, req.verb, host)
 }
 
+// overloadRejectedHeader is set by the apiserver on a 429 it sends because it
+// shed load (API Priority and Fairness or the max-in-flight limit). Other 429s,
+// such as an Eviction blocked by a PodDisruptionBudget, do not carry it.
+//
+// This must match the header the apiserver sets in
+// staging/src/k8s.io/apiserver/pkg/server/filters.
+const overloadRejectedHeader = "X-Kubernetes-Overload-Rejected"
+
+// updateRequestRejectedMetric increments the RequestRejected metric counter
+// if the server rejected this attempt because it is overloaded. It should be
+// called with the response of every attempt, like updateRequestResultMetric.
+func updateRequestRejectedMetric(ctx context.Context, req *Request, resp *http.Response) {
+	if resp == nil || resp.StatusCode != http.StatusTooManyRequests || resp.Header.Get(overloadRejectedHeader) != "true" {
+		return
+	}
+	_, host := sanitize(req, resp, nil)
+	metrics.RequestRejected.IncrementRejected(ctx, req.verb, host)
+}
+
 func sanitize(req *Request, resp *http.Response, err error) (string, string) {
 	host := "none"
 	if req.c.base != nil {

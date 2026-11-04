@@ -194,6 +194,12 @@ func TestWithRetryAfter(t *testing.T) {
 			if test.retryAfterExpected != retryAfterGot {
 				t.Errorf("expected Retry-After: %s, but got: %s", test.retryAfterExpected, retryAfterGot)
 			}
+
+			// A 429 sent because the apiserver is shutting down says nothing
+			// about load, so it must not be marked as an overload rejection.
+			if got := w.Header().Get(overloadRejectedHeader); got != "" {
+				t.Errorf("expected no %s header, but got: %q", overloadRejectedHeader, got)
+			}
 		})
 	}
 }

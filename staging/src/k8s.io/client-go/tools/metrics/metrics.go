@@ -104,6 +104,14 @@ type RetryMetric interface {
 	IncrementRetry(ctx context.Context, code string, method string, host string)
 }
 
+// RejectedMetric counts the requests the server rejected because it is
+// overloaded (API Priority and Fairness or the max-in-flight limit), partitioned
+// by method and host. Unlike a plain count of 429 responses, it excludes 429s
+// that are not about load, such as an Eviction blocked by a PodDisruptionBudget.
+type RejectedMetric interface {
+	IncrementRejected(ctx context.Context, method string, host string)
+}
+
 // TransportCacheMetric shows the number of entries in the internal transport cache
 type TransportCacheMetric interface {
 	Observe(value int)
@@ -159,6 +167,9 @@ var (
 	// RequestRetry is the retry metric that tracks the number of
 	// retries sent to the server.
 	RequestRetry RetryMetric = noopRetry{}
+	// RequestRejected is the metric that tracks the number of requests the
+	// server rejected because it is overloaded.
+	RequestRejected RejectedMetric = noopRejected{}
 	// TransportCacheEntries is the metric that tracks the number of entries in the
 	// internal transport cache.
 	TransportCacheEntries TransportCacheMetric = noopTransportCache{}
@@ -188,6 +199,7 @@ type RegisterOpts struct {
 	ExecPluginCalls              CallsMetric
 	ExecPluginPolicyCalls        PolicyCallsMetric
 	RequestRetry                 RetryMetric
+	RequestRejected              RejectedMetric
 	TransportCacheEntries        TransportCacheMetric
 	TransportCreateCalls         TransportCreateCallsMetric
 	TransportCAReloads           TransportCAReloadsMetric
@@ -237,6 +249,9 @@ func Register(opts RegisterOpts) {
 		}
 		if opts.RequestRetry != nil {
 			RequestRetry = opts.RequestRetry
+		}
+		if opts.RequestRejected != nil {
+			RequestRejected = opts.RequestRejected
 		}
 		if opts.TransportCacheEntries != nil {
 			TransportCacheEntries = opts.TransportCacheEntries
@@ -295,6 +310,10 @@ func (noopPolicy) Increment(string) {}
 type noopRetry struct{}
 
 func (noopRetry) IncrementRetry(context.Context, string, string, string) {}
+
+type noopRejected struct{}
+
+func (noopRejected) IncrementRejected(context.Context, string, string) {}
 
 type noopTransportCache struct{}
 
