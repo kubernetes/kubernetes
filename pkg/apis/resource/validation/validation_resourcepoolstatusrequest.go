@@ -61,13 +61,31 @@ func validateResourcePoolStatusRequestStatusUpdate(status, oldStatus *resource.R
 	// Validate conditions — not DV covered
 	allErrs = append(allErrs, metav1validation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
 
+	// A waiting status carries no results — not DV covered
+	if apimeta.IsStatusConditionTrue(status.Conditions, resource.ResourcePoolStatusRequestConditionWaitingForPools) {
+		if len(status.Pools) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("pools"), "must be empty while WaitingForPools is True"))
+		}
+		if status.PoolCount != nil && *status.PoolCount != 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("poolCount"), *status.PoolCount, "must be 0 while WaitingForPools is True"))
+		}
+		for _, t := range []string{resource.ResourcePoolStatusRequestConditionComplete, resource.ResourcePoolStatusRequestConditionFailed} {
+			if apimeta.FindStatusCondition(status.Conditions, t) != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), t, "must not be set while WaitingForPools is True"))
+			}
+		}
+	}
+
 	return allErrs
 }
 
 // isWaitingForPools reports whether status is a waiting status set before the
-// final calculation: WaitingForPools is true and neither Complete nor Failed is set.
+// final calculation: WaitingForPools is true, neither Complete nor Failed is
+// set, and there are no pool results.
 func isWaitingForPools(status *resource.ResourcePoolStatusRequestStatus) bool {
 	return apimeta.IsStatusConditionTrue(status.Conditions, resource.ResourcePoolStatusRequestConditionWaitingForPools) &&
 		apimeta.FindStatusCondition(status.Conditions, resource.ResourcePoolStatusRequestConditionComplete) == nil &&
-		apimeta.FindStatusCondition(status.Conditions, resource.ResourcePoolStatusRequestConditionFailed) == nil
+		apimeta.FindStatusCondition(status.Conditions, resource.ResourcePoolStatusRequestConditionFailed) == nil &&
+		len(status.Pools) == 0 &&
+		(status.PoolCount == nil || *status.PoolCount == 0)
 }
