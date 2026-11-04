@@ -110,7 +110,7 @@ func randomBytes(n int) []byte {
 	return b
 }
 
-// assertReadError also checks what value.IsDataCorruption says, since that is
+// assertReadError also checks what value.IsDataCorruption says, since that's
 // what the unsafe-deletion layer acts on.
 func assertReadError(t *testing.T, err, want error) {
 	t.Helper()
@@ -192,7 +192,7 @@ func TestDecodesPinnedFrames(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
-	lengths := []int{0, 1, 2, 7, 8, 9, 10, 16, 17, 128, 1023, 1024, 1025, 4096, 65536, 1 << 20, MaxPlaintextBytes}
+	lengths := []int{0, 1, 2, 7, 8, 9, 10, 16, 17, 128, 1023, 1024, 1025, 4096, 65536, 1 << 20, maxPlaintextBytes}
 	kinds := map[string]func(n int) []byte{
 		"compressible":   func(n int) []byte { return bytes.Repeat([]byte("abcd"), n/4+1)[:n] },
 		"incompressible": randomBytes,
@@ -281,13 +281,20 @@ func TestUnframeRejections(t *testing.T) {
 		{"truncated header", valid[:headerSize-1], errChecksum, ""},
 		{"checksum mismatch", damaged, errChecksum, ""},
 		{"checksum bytes damaged", badCRC, errChecksum, ""},
+		// Bytes appended to a sealed frame break its checksum. The two rows below
+		// that add bytes after the stream reseal the frame, so the reader has to
+		// catch those itself.
+		{"bytes appended without a new checksum", append(bytes.Clone(valid), 0x99, 0x99), errChecksum, ""},
 
 		{"wrong magic behind a valid checksum", wrongMagic, errFormat, "bad magic"},
 		{"wrong magic wins over an unknown algorithm", wrongMagicFutureAlg, errFormat, "bad magic"},
 		{"declared length zero", declaredDeflate(0, rawDeflate(t, nil)), errFormat, "invalid declared length"},
-		{"declared length above the ceiling", declaredDeflate(MaxPlaintextBytes+1, rawDeflate(t, []byte("x"))), errFormat, "invalid declared length"},
+		{"declared length above the ceiling", declaredDeflate(maxPlaintextBytes+1, rawDeflate(t, []byte("x"))), errFormat, "invalid declared length"},
 		{"declared length absurd", declaredDeflate(1<<40, rawDeflate(t, []byte("x"))), errFormat, "invalid declared length"},
 		{"truncated varint", rawFrame(algDeflate, []byte{0x80}), errFormat, "invalid declared length"},
+		// 1024 is 0x80 0x08 at its shortest, so these pad it with zero groups.
+		{"declared length padded to 3 bytes", rawFrame(algDeflate, append([]byte{0x80, 0x88, 0x00}, rawDeflate(t, bytes.Repeat([]byte("a"), 1024))...)), errFormat, "invalid declared length"},
+		{"declared length padded to 10 bytes", rawFrame(algDeflate, append([]byte{0x80, 0x88, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00}, rawDeflate(t, bytes.Repeat([]byte("a"), 1024))...)), errFormat, "invalid declared length"},
 		{"no deflate stream", declaredDeflate(16, nil), errFormat, "stream shorter than declared length"},
 		// A DEFLATE block starts with 3 bits read from the low end of the byte: a
 		// last-block flag, then a 2-bit block type. 0xff gives type 3, which the
@@ -296,6 +303,9 @@ func TestUnframeRejections(t *testing.T) {
 		{"stream shorter than declared", declaredDeflate(1024, rawDeflate(t, bytes.Repeat([]byte("a"), 512))), errFormat, "stream shorter than declared length"},
 		{"stream longer than declared", declaredDeflate(512, rawDeflate(t, bytes.Repeat([]byte("a"), 1024))), errFormat, "stream longer than declared length"},
 		{"stream without a final block", declaredDeflate(1024, unterminatedDeflate(t, bytes.Repeat([]byte("a"), 1024))), errFormat, "stream does not end at its declared length"},
+		{"a byte after the final block", declaredDeflate(1024, append(rawDeflate(t, bytes.Repeat([]byte("a"), 1024)), 0x99)), errFormat, "bytes after the end of the stream"},
+		// 0x03 0x00 is a complete empty final block, so a second stream is caught too.
+		{"a second stream after the first", declaredDeflate(1024, append(rawDeflate(t, bytes.Repeat([]byte("a"), 1024)), 0x03, 0x00)), errFormat, "bytes after the end of the stream"},
 
 		// The next algorithm ID a release would assign. With no body, a reader that
 		// parsed the body before checking the algorithm would call it malformed.
@@ -373,27 +383,8 @@ func TestEverySingleBitFlipIsCorruption(t *testing.T) {
 	}
 }
 
-// TestAppendedBytes covers trailing data. The checksum catches bytes appended
-// as-is. If whoever appends them also recomputes the checksum, DEFLATE ignores
-// them and the object still decodes correctly.
-func TestAppendedBytes(t *testing.T) {
-	plaintext := bytes.Repeat([]byte("a"), 64)
-	frame := mustDeflate(t, plaintext)
-
-	appended := append(bytes.Clone(frame), 0x99, 0x99)
-	if _, _, err := unframe(context.Background(), appended); !errors.Is(err, errChecksum) {
-		t.Fatalf("appended bytes without a new checksum: err = %v, want a checksum error", err)
-	}
-
-	resealed := seal(append(bytes.Clone(frame), 0x99, 0x99))
-	out, kind, err := unframe(context.Background(), resealed)
-	if err != nil || kind != framedDeflate || !bytes.Equal(out, plaintext) {
-		t.Fatalf("appended bytes with a new checksum: kind %v, err %v", kind, err)
-	}
-}
-
 func TestDeclaredLengthCheckedBeforeAllocation(t *testing.T) {
-	for _, declared := range []uint64{MaxPlaintextBytes + 1, 1 << 30} {
+	for _, declared := range []uint64{maxPlaintextBytes + 1, 1 << 30} {
 		t.Run(fmt.Sprint(declared), func(t *testing.T) {
 			bomb := declaredDeflate(declared, []byte{0x01, 0x02, 0x03})
 			const iterations = 200
@@ -413,6 +404,23 @@ func TestDeclaredLengthCheckedBeforeAllocation(t *testing.T) {
 				t.Fatalf("rejecting %d bombs allocated %d bytes; the declared length must be checked before allocating", iterations, allocated)
 			}
 		})
+	}
+}
+
+// TestReadCap pins the largest declared length a reader inflates. It's part of
+// the at-rest format, so the test uses a literal that a change to
+// MaxPlaintextBytes can't drag along.
+func TestReadCap(t *testing.T) {
+	const readCap = 1536*1024 - 64*1024
+	at := bytes.Repeat([]byte("a"), readCap)
+	if out, _, err := unframe(context.Background(), declaredDeflate(readCap, rawDeflate(t, at))); err != nil || !bytes.Equal(out, at) {
+		t.Fatalf("a declared length of %d must inflate, got err %v", readCap, err)
+	}
+	above := bytes.Repeat([]byte("a"), readCap+1)
+	_, _, err := unframe(context.Background(), declaredDeflate(readCap+1, rawDeflate(t, above)))
+	var re *readError
+	if !errors.As(err, &re) || re.reason != "invalid declared length" {
+		t.Fatalf("a declared length of %d must be rejected before inflating, got %v", readCap+1, err)
 	}
 }
 
@@ -448,34 +456,13 @@ func TestDecompressionBombBounded(t *testing.T) {
 	// find where it ends. That burns CPU on every read while allocating almost
 	// nothing, so the allocation check above misses it. Counting the stream bytes
 	// the inflater reads catches it: stopping just past 1 KiB needs a small prefix.
-	src := &countingReader{r: bytes.NewReader(stream)}
+	src := bytes.NewReader(stream)
 	if _, err := inflateExact(src, 1024); !errors.Is(err, errFormat) {
 		t.Fatalf("err = %v, want a format error", err)
 	}
-	if src.n > len(stream)/10 {
-		t.Fatalf("the inflater consumed %d of %d stream bytes; it must stop just past the declared length", src.n, len(stream))
+	if consumed := len(stream) - src.Len(); consumed > len(stream)/10 {
+		t.Fatalf("the inflater consumed %d of %d stream bytes; it must stop just past the declared length", consumed, len(stream))
 	}
-}
-
-// countingReader counts the bytes the inflater reads. ReadByte keeps flate from
-// wrapping it in a bufio.Reader, whose read-ahead would inflate the count.
-type countingReader struct {
-	r *bytes.Reader
-	n int
-}
-
-func (c *countingReader) Read(p []byte) (int, error) {
-	n, err := c.r.Read(p)
-	c.n += n
-	return n, err
-}
-
-func (c *countingReader) ReadByte() (byte, error) {
-	b, err := c.r.ReadByte()
-	if err == nil {
-		c.n++
-	}
-	return b, err
 }
 
 // TestCancelWhileWaiting checks a read already parked on a full budget returns
@@ -491,7 +478,6 @@ func TestCancelWhileWaiting(t *testing.T) {
 			saturated = true
 		}
 	}
-	// Give the slots back when the test ends.
 	defer func() {
 		for i := 0; i < held; i++ {
 			<-inflateBudget

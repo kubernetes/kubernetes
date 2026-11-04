@@ -44,7 +44,7 @@ const (
 # TYPE apiserver_storage_compression_operations_total counter
 `
 	rewritesHeader = `
-# HELP apiserver_storage_compression_rewrites_needed_total [ALPHA] Number of reads that reported a value stale because its compression framing disagreed with the policy, by resource and direction.
+# HELP apiserver_storage_compression_rewrites_needed_total [ALPHA] Number of reads that reported a value stale because its compression framing disagreed with the storage compression configuration, by resource and direction.
 # TYPE apiserver_storage_compression_rewrites_needed_total counter
 `
 	formatErrorsHeader = `
@@ -52,21 +52,21 @@ const (
 # TYPE apiserver_storage_compression_format_errors_total counter
 `
 	unsupportedHeader = `
-# HELP apiserver_storage_compression_unsupported_algorithm_total [ALPHA] Number of storage values read whose compression algorithm this apiserver does not implement, by resource. A newer apiserver wrote them.
+# HELP apiserver_storage_compression_unsupported_algorithm_total [ALPHA] Number of storage values read whose compression algorithm this apiserver does not implement, by resource. Usually a newer apiserver wrote them.
 # TYPE apiserver_storage_compression_unsupported_algorithm_total counter
 `
 )
 
 func TestOperationMetrics(t *testing.T) {
 	RegisterMetrics()
-	write := func(policy *Policy, data []byte) func(t *testing.T) {
+	write := func(rule Rule, data []byte) func(t *testing.T) {
 		return func(t *testing.T) {
-			mustTransformToStorage(t, WithCompression(newRecording(), policy, testGR), data)
+			mustTransformToStorage(t, WithCompression(newRecording(), rule, testGR), data)
 		}
 	}
-	read := func(policy *Policy, stored []byte, wantErr bool) func(t *testing.T) {
+	read := func(rule Rule, stored []byte, wantErr bool) func(t *testing.T) {
 		return func(t *testing.T) {
-			_, _, err := WithCompression(newRecording(), policy, testGR).TransformFromStorage(context.Background(), stored, testDataCtx)
+			_, _, err := WithCompression(newRecording(), rule, testGR).TransformFromStorage(context.Background(), stored, testDataCtx)
 			if (err != nil) != wantErr {
 				t.Fatalf("err = %v, wantErr %v", err, wantErr)
 			}
@@ -83,57 +83,57 @@ func TestOperationMetrics(t *testing.T) {
 	}{
 		{
 			desc:    "compressed write",
-			run:     write(policyFor(t, "configmaps"), compressible),
+			run:     write(compress, compressible),
 			metrics: []string{"apiserver_storage_compression_operations_total"},
 			want:    operationsHeader + `apiserver_storage_compression_operations_total{operation="to_storage",outcome="deflate",resource="configmaps"} 1` + "\n",
 		},
 		{
 			desc:    "incompressible write is stored",
-			run:     write(policyFor(t, "configmaps"), randomBytes(4096)),
+			run:     write(compress, randomBytes(4096)),
 			metrics: []string{"apiserver_storage_compression_operations_total"},
 			want:    operationsHeader + `apiserver_storage_compression_operations_total{operation="to_storage",outcome="stored",resource="configmaps"} 1` + "\n",
 		},
 		{
 			desc:    "write below the threshold",
-			run:     write(policyFor(t, "configmaps"), []byte("{}")),
+			run:     write(compress, []byte("{}")),
 			metrics: []string{"apiserver_storage_compression_operations_total"},
 			want:    operationsHeader + `apiserver_storage_compression_operations_total{operation="to_storage",outcome="unframed_below_threshold",resource="configmaps"} 1` + "\n",
 		},
 		{
 			desc:    "write above the ceiling",
-			run:     write(policyFor(t, "configmaps"), bytes.Repeat([]byte("a"), MaxPlaintextBytes+1)),
+			run:     write(compress, bytes.Repeat([]byte("a"), maxPlaintextBytes+1)),
 			metrics: []string{"apiserver_storage_compression_operations_total"},
 			want:    operationsHeader + `apiserver_storage_compression_operations_total{operation="to_storage",outcome="unframed_above_max",resource="configmaps"} 1` + "\n",
 		},
 		{
-			desc:    "a framed read is counted with the policy off",
-			run:     read(nil, mustDeflate(t, compressible), false),
+			desc:    "a framed read is counted with compression off",
+			run:     read(Rule{}, mustDeflate(t, compressible), false),
 			metrics: []string{"apiserver_storage_compression_operations_total", "apiserver_storage_compression_rewrites_needed_total"},
 			want: operationsHeader + `apiserver_storage_compression_operations_total{operation="from_storage",outcome="deflate",resource="configmaps"} 1` + "\n" +
 				rewritesHeader + `apiserver_storage_compression_rewrites_needed_total{direction="to_unframed",resource="configmaps"} 1` + "\n",
 		},
 		{
-			desc:    "an unframed read with the policy on drives migration",
-			run:     read(policyFor(t, "configmaps"), compressible, false),
+			desc:    "an unframed read with compression on drives migration",
+			run:     read(compress, compressible, false),
 			metrics: []string{"apiserver_storage_compression_operations_total", "apiserver_storage_compression_rewrites_needed_total"},
 			want: operationsHeader + `apiserver_storage_compression_operations_total{operation="from_storage",outcome="unframed_legacy",resource="configmaps"} 1` + "\n" +
 				rewritesHeader + `apiserver_storage_compression_rewrites_needed_total{direction="to_framed",resource="configmaps"} 1` + "\n",
 		},
 		{
 			desc:    "a checksum mismatch is counted as a format error",
-			run:     read(nil, damaged, true),
+			run:     read(Rule{}, damaged, true),
 			metrics: []string{"apiserver_storage_compression_format_errors_total"},
 			want:    formatErrorsHeader + `apiserver_storage_compression_format_errors_total{resource="configmaps"} 1` + "\n",
 		},
 		{
 			desc:    "a malformed frame is counted as a format error",
-			run:     read(nil, declaredDeflate(16, nil), true),
+			run:     read(Rule{}, declaredDeflate(16, nil), true),
 			metrics: []string{"apiserver_storage_compression_format_errors_total"},
 			want:    formatErrorsHeader + `apiserver_storage_compression_format_errors_total{resource="configmaps"} 1` + "\n",
 		},
 		{
 			desc:    "an unsupported algorithm is counted separately",
-			run:     read(nil, rawFrame(0xfe, nil), true),
+			run:     read(Rule{}, rawFrame(0xfe, nil), true),
 			metrics: []string{"apiserver_storage_compression_unsupported_algorithm_total", "apiserver_storage_compression_format_errors_total"},
 			want:    unsupportedHeader + `apiserver_storage_compression_unsupported_algorithm_total{resource="configmaps"} 1` + "\n",
 		},
@@ -168,7 +168,7 @@ func TestDurationAndInflationWaitObserved(t *testing.T) {
 	resetMetrics()
 	defer resetMetrics()
 
-	tr := WithCompression(newRecording(), policyFor(t, "configmaps"), testGR)
+	tr := WithCompression(newRecording(), compress, testGR)
 	stored := mustTransformToStorage(t, tr, compressible)
 	if _, _, err := tr.TransformFromStorage(context.Background(), stored, testDataCtx); err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestReadDurationExcludesTheWait(t *testing.T) {
 	defer resetMetrics()
 
 	// Build everything first, so little runs between taking the slots and the read.
-	tr := WithCompression(newRecording(), nil, testGR)
+	tr := WithCompression(newRecording(), Rule{}, testGR)
 	frame := mustDeflate(t, compressible)
 
 	// Take every inflation slot, so the read below has to wait for one.
@@ -261,7 +261,7 @@ func TestCancelledReadIsNotAFrameError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, _, err := WithCompression(newRecording(), nil, testGR).TransformFromStorage(ctx, mustDeflate(t, compressible), testDataCtx)
+	_, _, err := WithCompression(newRecording(), Rule{}, testGR).TransformFromStorage(ctx, mustDeflate(t, compressible), testDataCtx)
 	if !errors.Is(err, context.Canceled) || value.IsDataCorruption(err) {
 		t.Fatalf("err = %v: want context.Canceled, not reported as corruption", err)
 	}
@@ -276,7 +276,7 @@ func TestNoMetricsWhenInert(t *testing.T) {
 	resetMetrics()
 	defer resetMetrics()
 
-	tr := WithCompression(newRecording(), nil, testGR)
+	tr := WithCompression(newRecording(), Rule{}, testGR)
 	stored := mustTransformToStorage(t, tr, compressible)
 	if _, _, err := tr.TransformFromStorage(context.Background(), stored, testDataCtx); err != nil {
 		t.Fatal(err)
@@ -289,7 +289,7 @@ func TestNoMetricsWhenInert(t *testing.T) {
 		"apiserver_storage_compression_unsupported_algorithm_total",
 		"apiserver_storage_compression_inflation_wait_seconds",
 	); err != nil {
-		t.Errorf("an inert policy produced metric samples: %v", err)
+		t.Errorf("the zero Rule produced metric samples: %v", err)
 	}
 }
 
@@ -325,7 +325,7 @@ func TestExportsOnlyTheListedMetrics(t *testing.T) {
 	resetMetrics()
 	defer resetMetrics()
 
-	on := WithCompression(newRecording(), policyFor(t, "configmaps"), testGR)
+	on := WithCompression(newRecording(), compress, testGR)
 	mustTransformToStorage(t, on, compressible)
 	for _, stored := range [][]byte{mustDeflate(t, compressible), compressible} {
 		if _, _, err := on.TransformFromStorage(context.Background(), stored, testDataCtx); err != nil {

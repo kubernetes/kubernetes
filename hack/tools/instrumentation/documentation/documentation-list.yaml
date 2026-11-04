@@ -1896,7 +1896,7 @@
   subsystem: storage
   namespace: apiserver
   help: Number of reads that reported a value stale because its compression framing
-    disagreed with the policy, by resource and direction.
+    disagreed with the storage compression configuration, by resource and direction.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -1909,7 +1909,7 @@
   subsystem: storage
   namespace: apiserver
   help: Number of storage values read whose compression algorithm this apiserver does
-    not implement, by resource. A newer apiserver wrote them.
+    not implement, by resource. Usually a newer apiserver wrote them.
   type: Counter
   stabilityLevel: ALPHA
   labels:

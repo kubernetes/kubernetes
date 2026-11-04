@@ -31,36 +31,38 @@ import (
 type transformer struct {
 	delegate value.Transformer
 	resource string
-	// enabled and minSize are resolved once, since the policy only changes on
-	// restart. Neither one decides whether a read can succeed.
+	// enabled and minSize come from the Rule with its defaults applied. Neither
+	// one decides whether a read can succeed.
 	enabled bool
 	minSize int
 }
 
 var _ value.Transformer = &transformer{}
 
-// WithCompression wraps delegate for gr. Install it even when the policy selects
-// nothing, since it's the only thing that can read values framed under an earlier
-// configuration.
-func WithCompression(delegate value.Transformer, policy *Policy, gr schema.GroupResource) value.Transformer {
+// WithCompression wraps delegate to compress gr before the delegate transforms
+// to storage, and to decompress after. The rule, usually from compressionconfig's
+// RuleFor, sets how values are written and which reads report stale, but never
+// whether a read succeeds. Install it even when rule compresses nothing, since
+// it's the only thing that can read values framed under an earlier configuration.
+func WithCompression(delegate value.Transformer, rule Rule, gr schema.GroupResource) value.Transformer {
 	RegisterMetrics()
 	return &transformer{
 		delegate: delegate,
 		resource: gr.String(),
-		enabled:  policy.EnabledFor(gr),
-		minSize:  policy.MinSizeFor(gr),
+		enabled:  rule.Algorithm == AlgorithmDeflate,
+		minSize:  rule.MinSize,
 	}
 }
 
 // willFrame is both the write rule and the staleness rule, and sharing one
 // function lets a migration converge in one rewrite. The isFramed clause is
-// needed because an escaped value stays framed with the policy off; without it
+// needed because an escaped value stays framed with compression off; without it
 // that value would be reported stale and rewritten forever.
 func (t *transformer) willFrame(plaintext []byte) bool {
 	if isFramed(plaintext) {
 		return true
 	}
-	return t.enabled && len(plaintext) >= t.minSize && len(plaintext) <= MaxPlaintextBytes
+	return t.enabled && len(plaintext) >= t.minSize && len(plaintext) <= maxPlaintextBytes
 }
 
 func (t *transformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
@@ -126,17 +128,15 @@ func (t *transformer) TransformFromStorage(ctx context.Context, data []byte, dat
 }
 
 // markStale reports whether the value is stored in a different form than the
-// policy would write now. GuaranteedUpdate doesn't write back an unchanged object
+// Rule would write now. GuaranteedUpdate doesn't write back an unchanged object
 // unless its read was reported stale, so returning true makes the next update or
-// storage version migration rewrite the value in the form the policy wants.
+// storage version migration rewrite the value in the form the Rule wants.
 func (t *transformer) markStale(kind frameKind, plaintext []byte) bool {
-	// Whether this value would be framed if it were written now.
 	want := t.willFrame(plaintext)
 	// It's already stored that way, so a rewrite would change nothing.
 	if (kind != unframed) == want {
 		return false
 	}
-	// Count the pending rewrite by direction: into a frame or back out of one.
 	if want {
 		recordRewriteNeeded(t.resource, directionToFramed)
 	} else {
@@ -169,9 +169,9 @@ func (t *transformer) recordReadError(dataCtx value.Context, err error) {
 
 // skipOutcome names why a write to a resource with compression enabled went out
 // unframed. Size is the only possible reason, so a value that isn't above
-// MaxPlaintextBytes must be below minSize.
+// maxPlaintextBytes must be below minSize.
 func skipOutcome(plaintextLen int) string {
-	if plaintextLen > MaxPlaintextBytes {
+	if plaintextLen > maxPlaintextBytes {
 		return outcomeUnframedAboveMax
 	}
 	return outcomeUnframedBelowMin

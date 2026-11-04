@@ -26,12 +26,12 @@ import (
 // StorageCompressionConfiguration chooses which resources are compressed as
 // they're written to etcd, ahead of any encryption at rest. Entries are checked
 // in order and the first match wins, so a selector already covered by an earlier
-// one is rejected. Wildcards never match secrets; name secrets to compress them.
+// one is rejected. Wildcards never match core secrets; name secrets to compress them.
 type StorageCompressionConfiguration struct {
 	metav1.TypeMeta
-	// resources is the ordered list of resources and how to store each. An empty
-	// list compresses nothing.
-	Resources []CompressionResourceConfiguration
+	// compressionResources is the ordered list of resources and how to store each.
+	// An empty list compresses nothing.
+	CompressionResources []CompressionResourceConfiguration
 }
 
 // CompressionResourceConfiguration applies one algorithm and threshold to a list
@@ -39,14 +39,14 @@ type StorageCompressionConfiguration struct {
 type CompressionResourceConfiguration struct {
 	// resources lists resources as <resource> or <resource>.<group>. '*.<group>'
 	// selects a group, '*.' the core group and '*.*' every group. No wildcard
-	// selects secrets.
+	// selects core secrets.
 	Resources []string
 	// algorithm is Deflate or None. None keeps resources out of a later wildcard.
 	Algorithm CompressionAlgorithm
-	// minSize is the smallest serialized value that is compressed, as a quantity
-	// of bytes such as 512 or 4Ki. It defaults to 1Ki. It must be a whole number
-	// of bytes, at least 64 and less than 1472Ki, the largest value that's ever
-	// compressed.
+	// minSize is the smallest serialized value that's compressed, as a quantity
+	// of bytes such as 512 or 4Ki. It defaults to 1Ki, and a fraction rounds up. It
+	// must be at least 64 and less than 1472Ki. DEFLATE rarely shrinks anything
+	// under 64 bytes, and 1472Ki is the largest value that's ever compressed.
 	MinSize *resource.Quantity
 }
 

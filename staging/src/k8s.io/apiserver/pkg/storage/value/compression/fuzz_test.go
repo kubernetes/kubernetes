@@ -41,10 +41,11 @@ func FuzzUnframe(f *testing.F) {
 	f.Add([]byte{0x6b, 0x38, 0x73, 0x00, 0x0a, 0x01, 0x41}) // a bare protobuf value: k8s\x00 magic and a tiny body
 	f.Add([]byte{0xd9, 0xd9, 0xf7, 0xa0})                   // a bare CBOR value: self-describe tag and an empty map
 
-	f.Add(rawFrame(0xff, nil))                                                                      // a frame with unknown algorithm 0xff
-	f.Add(rawFrame(algDeflate, nil))                                                                // a deflate frame with no declared length and no stream
-	f.Add(rawFrame(algDeflate, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f})) // a declared length that overflows uint64
-	f.Add(rawFrame(algDeflate, []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80})) // a declared length whose varint is cut off
+	f.Add(rawFrame(0xff, nil))                                                                          // a frame with unknown algorithm 0xff
+	f.Add(rawFrame(algDeflate, nil))                                                                    // a deflate frame with no declared length and no stream
+	f.Add(rawFrame(algDeflate, []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f}))     // a declared length that overflows uint64
+	f.Add(rawFrame(algDeflate, []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80}))     // a declared length whose varint is cut off
+	f.Add(rawFrame(algDeflate, append([]byte{0x80, 0x88, 0x00}, rawDeflate(f, make([]byte, 1024))...))) // a declared length padded past its shortest form
 	f.Add(declaredDeflate(32, rawDeflate(f, make([]byte, 4<<20))))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -88,8 +89,8 @@ func FuzzUnframe(f *testing.F) {
 		case framedDeflate:
 			// Parse the declared length here too, rather than trust unframe's parse.
 			declared, w := binary.Uvarint(original[headerSize:])
-			if !intact || w <= 0 || uint64(len(out)) != declared || len(out) > MaxPlaintextBytes {
-				t.Fatalf("a deflate frame must be intact and inflate to its declared length %d within the ceiling, got %d", declared, len(out))
+			if !intact || w <= 0 || w != len(binary.AppendUvarint(nil, declared)) || uint64(len(out)) != declared || len(out) > maxPlaintextBytes {
+				t.Fatalf("a deflate frame must be intact and inflate to its declared length %d, written in its shortest form and within the ceiling, got %d", declared, len(out))
 			}
 		default:
 			t.Fatalf("unknown frame kind %v", kind)
@@ -108,14 +109,17 @@ func FuzzTransformerRoundTrip(f *testing.F) {
 
 	// Random bytes don't compress, so above the threshold the writer falls back to
 	// a stored frame. A fixed seed keeps the input the same on every run.
-	incompressible := make([]byte, 2*DefaultMinSize)
+	incompressible := make([]byte, 2*testMinSize)
 	_, _ = rand.NewChaCha8([32]byte{}).Read(incompressible)
 	f.Add(incompressible)
 
-	policies := []*Policy{nil, newPolicy(entry(deflate, "configmaps")), newPolicy(withMinSize(entry(deflate, "configmaps"), MinConfigurableMinSize))}
+	// A Rule with no MinSize has no floor, so it frames every value, even empty and
+	// short ones that a configured minSize would leave bare. The floor only saves
+	// CPU, so those values must round-trip too.
+	rules := []Rule{{}, compress, {Algorithm: AlgorithmDeflate}}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		for _, p := range policies {
-			tr := WithCompression(newRecording(), p, testGR)
+		for _, rule := range rules {
+			tr := WithCompression(newRecording(), rule, testGR)
 			stored, err := tr.TransformToStorage(context.Background(), data, testDataCtx)
 			if err != nil {
 				t.Fatalf("a write must never fail: %v", err)
@@ -128,7 +132,7 @@ func FuzzTransformerRoundTrip(f *testing.F) {
 				t.Fatal("round trip lost data")
 			}
 			if stale {
-				t.Fatal("a value written under a policy must not be stale under the same policy")
+				t.Fatal("a value written under a Rule must not be stale under the same Rule")
 			}
 		}
 	})

@@ -792,7 +792,7 @@ func Convert_apiserver_PrefixedClaimOrExpression_To_v1alpha1_PrefixedClaimOrExpr
 }
 
 func autoConvert_v1alpha1_StorageCompressionConfiguration_To_apiserver_StorageCompressionConfiguration(in *StorageCompressionConfiguration, out *apiserver.StorageCompressionConfiguration, s conversion.Scope) error {
-	out.Resources = *(*[]apiserver.CompressionResourceConfiguration)(unsafe.Pointer(&in.Resources))
+	out.CompressionResources = *(*[]apiserver.CompressionResourceConfiguration)(unsafe.Pointer(&in.CompressionResources))
 	return nil
 }
 
@@ -802,7 +802,7 @@ func Convert_v1alpha1_StorageCompressionConfiguration_To_apiserver_StorageCompre
 }
 
 func autoConvert_apiserver_StorageCompressionConfiguration_To_v1alpha1_StorageCompressionConfiguration(in *apiserver.StorageCompressionConfiguration, out *StorageCompressionConfiguration, s conversion.Scope) error {
-	out.Resources = *(*[]CompressionResourceConfiguration)(unsafe.Pointer(&in.Resources))
+	out.CompressionResources = *(*[]CompressionResourceConfiguration)(unsafe.Pointer(&in.CompressionResources))
 	return nil
 }
 

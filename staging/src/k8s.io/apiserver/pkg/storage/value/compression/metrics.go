@@ -87,7 +87,7 @@ var (
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "compression_unsupported_algorithm_total",
-			Help:           "Number of storage values read whose compression algorithm this apiserver does not implement, by resource. A newer apiserver wrote them.",
+			Help:           "Number of storage values read whose compression algorithm this apiserver does not implement, by resource. Usually a newer apiserver wrote them.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource"},
@@ -100,7 +100,7 @@ var (
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "compression_rewrites_needed_total",
-			Help:           "Number of reads that reported a value stale because its compression framing disagreed with the policy, by resource and direction.",
+			Help:           "Number of reads that reported a value stale because its compression framing disagreed with the storage compression configuration, by resource and direction.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource", "direction"},
@@ -123,6 +123,8 @@ var (
 
 var registerMetrics sync.Once
 
+// RegisterMetrics is exported like value's and envelope's, which encryptionconfig
+// registers in its init. WithCompression already calls it.
 func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(operationsTotal)

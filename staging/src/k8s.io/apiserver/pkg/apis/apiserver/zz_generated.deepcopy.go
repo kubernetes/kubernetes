@@ -665,8 +665,8 @@ func (in *SecretboxConfiguration) DeepCopy() *SecretboxConfiguration {
 func (in *StorageCompressionConfiguration) DeepCopyInto(out *StorageCompressionConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.Resources != nil {
-		in, out := &in.Resources, &out.Resources
+	if in.CompressionResources != nil {
+		in, out := &in.CompressionResources, &out.CompressionResources
 		*out = make([]CompressionResourceConfiguration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
