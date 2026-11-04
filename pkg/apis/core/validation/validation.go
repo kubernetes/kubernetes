@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"path"
@@ -6587,7 +6588,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		}
 	}
 
-	resizeErrs, mungedPodSpec := validateResizableSpecChanges(newPod, oldPod, specPath, opts)
+	resizeErrs, mungedPodSpec, _ := validateResizableSpecChanges(newPod, oldPod, specPath, opts)
 	allErrs = append(allErrs, resizeErrs...)
 	if len(allErrs) > 0 {
 		return allErrs
@@ -6650,9 +6651,9 @@ func isInitContainerResizable(ctr *core.Container) bool {
 }
 
 // validateResizableSpecChanges validates changes to the in-place resizable
-// fields, and returns a copy of newPod.Spec with the valid changes reverted.
-// Changes to any other fields are left for the caller.
-func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) (field.ErrorList, core.PodSpec) {
+// fields, and returns a copy of newPod.Spec with the valid changes reverted, and
+// whether there were any. Changes to any other fields are left for the caller.
+func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) (field.ErrorList, core.PodSpec, bool) {
 	var allErrs field.ErrorList
 
 	var mungedPodSpec core.PodSpec
@@ -6669,7 +6670,7 @@ func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path
 	containerOrderErrs := validatePodResizeContainerOrdering(newPod, oldPod, specPath)
 	allErrs = append(allErrs, containerOrderErrs...)
 	if containerOrderErrs != nil {
-		return allErrs, mungedPodSpec
+		return allErrs, mungedPodSpec, false
 	}
 
 	for ix := range mungedPodSpec.Containers {
@@ -6721,7 +6722,216 @@ func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path
 		}
 	}
 
-	return allErrs, mungedPodSpec
+	return allErrs, mungedPodSpec, !apiequality.Semantic.DeepEqual(mungedPodSpec, newPod.Spec)
+}
+
+// ValidatePodDynamicUpdate tests that an update through the pods/dynamic
+// subresource is valid. In addition to the changes allowed by ValidatePodUpdate
+// and ValidatePodResize, main containers may be added and removed.
+func ValidatePodDynamicUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
+	metaPath := field.NewPath("metadata")
+	specPath := field.NewPath("spec")
+	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, metaPath)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, metaPath.Child("annotations"), opts)...)
+
+	containerErrs, containersChanged := validateDynamicContainerChanges(newPod, oldPod, specPath, opts)
+	allErrs = append(allErrs, containerErrs...)
+	if len(containerErrs) > 0 {
+		return allErrs
+	}
+	// The remaining changes are validated against an old pod whose containers are aligned with the
+	// new pod's, rather than undoing the additions and removals on the new pod, so that error paths
+	// use the new pod's container indices and checks that aggregate containers see the new set.
+	// Added and removed containers are invisible to validateResizableSpecChanges this way; their
+	// resize checks are in validateDynamicContainerChanges.
+	alignedOldPod := *oldPod
+	alignedOldPod.Spec = alignOldContainers(newPod, oldPod)
+
+	resizeErrs, mungedPodSpec, resized := validateResizableSpecChanges(newPod, &alignedOldPod, specPath, opts)
+	allErrs = append(allErrs, resizeErrs...)
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+
+	if containersChanged || resized {
+		if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods cannot be resized or have containers added or removed")}
+		}
+		if oldPod.Spec.OS != nil && oldPod.Spec.OS.Name == core.Windows {
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "windows pods cannot be resized or have containers added or removed")}
+		}
+		if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
+			allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing or adding or removing containers"))
+		}
+	}
+	if resized {
+		allErrs = append(allErrs, validateResizeAllowed(newPod, oldPod, specPath, opts)...)
+	}
+
+	mungedPod := *newPod
+	mungedPod.Spec = mungedPodSpec
+	allErrs = append(allErrs, validatePodSpecUpdate(&mungedPod, &alignedOldPod, opts)...)
+	return allErrs
+}
+
+// validateResizeAllowed validates that the pod may be resized.
+func validateResizeAllowed(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+	if !opts.InPlacePodLevelResourcesVerticalScalingEnabled && (isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod)) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "resize of pods with pod-level resources is forbidden when InPlacePodLevelResourcesVerticalScalingEnabled feature gate is disabled"))
+	}
+	return allErrs
+}
+
+// validateDynamicContainerChanges validates the containers added to and removed
+// from the pod, and returns whether there were any.
+func validateDynamicContainerChanges(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) (field.ErrorList, bool) {
+	var allErrs field.ErrorList
+	ctrsPath := specPath.Child("containers")
+
+	if len(newPod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
+		return append(allErrs, field.Forbidden(specPath.Child("initContainers"), "init containers may not be added or removed")), false
+	}
+	for i, oldCtr := range oldPod.Spec.InitContainers {
+		if newPod.Spec.InitContainers[i].Name != oldCtr.Name {
+			return append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(i).Child("name"), "init containers may not be added, removed, renamed or reordered")), false
+		}
+	}
+
+	// Containers can't be reordered, and ContainerPairs yields a moved container as removed, then
+	// added.
+	var added, removed []int
+	i, j := 0, 0
+	for pair := range podshelper.ContainerPairs(newPod, oldPod, podshelper.Containers) {
+		switch {
+		case pair.Old == nil:
+			if slices.ContainsFunc(removed, func(r int) bool { return oldPod.Spec.Containers[r].Name == pair.New.Name }) {
+				return append(allErrs, field.Forbidden(ctrsPath, "existing containers may not be reordered")), false
+			}
+			added = append(added, i)
+			i++
+		case pair.New == nil:
+			removed = append(removed, j)
+			j++
+		default:
+			i++
+			j++
+		}
+	}
+	if len(added) == 0 && len(removed) == 0 {
+		return nil, false
+	}
+
+	if oldPod.DeletionTimestamp != nil {
+		return append(allErrs, field.Forbidden(ctrsPath, "containers may not be added or removed once the pod is terminating")), true
+	}
+	if oldPod.Status.Phase != core.PodRunning {
+		allErrs = append(allErrs, field.Forbidden(ctrsPath, fmt.Sprintf("containers may only be added or removed while the pod is %s, but it is %q", core.PodRunning, oldPod.Status.Phase)))
+	}
+	if !isPodInitialized(oldPod) {
+		allErrs = append(allErrs, field.Forbidden(ctrsPath, "containers may only be added or removed after all init containers have completed"))
+	}
+
+	// The kubelet tracks containers by name, so a name may not be reused while a
+	// status for the previous container with that name is still reported.
+	hasStatus := func(name string) bool {
+		isNamed := func(s core.ContainerStatus) bool { return s.Name == name }
+		return slices.ContainsFunc(oldPod.Status.InitContainerStatuses, isNamed) ||
+			slices.ContainsFunc(oldPod.Status.ContainerStatuses, isNamed) ||
+			slices.ContainsFunc(oldPod.Status.EphemeralContainerStatuses, isNamed)
+	}
+	hasResources := func(c *core.Container) bool {
+		return len(c.Resources.Requests)+len(c.Resources.Limits) > 0
+	}
+	resourcesChanged := false
+
+	for _, i := range added {
+		ctr := &newPod.Spec.Containers[i]
+		ctrPath := ctrsPath.Index(i)
+		// Image presence is not enforced by ValidatePodSpec, since pod templates may omit it.
+		allErrs = append(allErrs, validateContainerImage(ctr.Image, ctrPath.Child("image"))...)
+		if hasStatus(ctr.Name) {
+			allErrs = append(allErrs, field.Forbidden(ctrPath.Child("name"), fmt.Sprintf("a status for container %q is still present; the name may not be reused until the previous container's status is removed", ctr.Name)))
+		}
+		if ctr.SecurityContext != nil && ctr.SecurityContext.Privileged != nil && *ctr.SecurityContext.Privileged {
+			allErrs = append(allErrs, field.Forbidden(ctrPath.Child("securityContext", "privileged"), "privileged containers may not be added to an existing pod"))
+		}
+		for j, port := range ctr.Ports {
+			if port.HostPort != 0 {
+				allErrs = append(allErrs, field.Forbidden(ctrPath.Child("ports").Index(j).Child("hostPort"), "containers with host ports may not be added to an existing pod"))
+			}
+		}
+		allErrs = append(allErrs, validateDynamicContainerResources(&ctr.Resources, ctrPath.Child("resources"))...)
+		resourcesChanged = resourcesChanged || hasResources(ctr)
+	}
+
+	for _, i := range removed {
+		ctr := &oldPod.Spec.Containers[i]
+		if errs := validateDynamicContainerResources(&ctr.Resources, ctrsPath); len(errs) > 0 {
+			allErrs = append(allErrs, field.Forbidden(ctrsPath, fmt.Sprintf("container %q may not be removed: only containers whose resources are limited to %v may be removed", ctr.Name, sets.List(supportedResizeResources))))
+		}
+		// TODO(KEP-5972): Revisit this restriction in the next release, possibly by
+		// allowing ephemeral containers to be removed. Ephemeral containers can't be
+		// removed, so removing their target would leave a dangling targetContainerName.
+		var targetedBy []string
+		for _, ec := range oldPod.Spec.EphemeralContainers {
+			if ec.TargetContainerName == ctr.Name {
+				targetedBy = append(targetedBy, ec.Name)
+			}
+		}
+		if len(targetedBy) > 0 {
+			allErrs = append(allErrs, field.Forbidden(ctrsPath, fmt.Sprintf("container %q may not be removed: it is the target of ephemeral container(s) %s", ctr.Name, strings.Join(targetedBy, ", "))))
+		}
+		resourcesChanged = resourcesChanged || hasResources(ctr)
+	}
+
+	// Adding or removing a container with resources resizes the pod.
+	if resourcesChanged {
+		allErrs = append(allErrs, validateResizeAllowed(newPod, oldPod, specPath, opts)...)
+	}
+
+	return allErrs, true
+}
+
+// alignOldContainers returns a copy of oldPod.Spec whose containers are aligned
+// with newPod's: removed containers are dropped, and added containers are copied
+// from newPod.
+func alignOldContainers(newPod, oldPod *core.Pod) core.PodSpec {
+	alignedOldPodSpec := oldPod.Spec
+	alignedOldPodSpec.Containers = make([]core.Container, 0, len(newPod.Spec.Containers))
+	for pair := range podshelper.ContainerPairs(newPod, oldPod, podshelper.Containers) {
+		switch {
+		case pair.Old == nil:
+			alignedOldPodSpec.Containers = append(alignedOldPodSpec.Containers, *pair.New)
+		case pair.New != nil:
+			alignedOldPodSpec.Containers = append(alignedOldPodSpec.Containers, *pair.Old)
+		}
+	}
+	return alignedOldPodSpec
+}
+
+func validateDynamicContainerResources(resources *core.ResourceRequirements, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	validateResourceList := func(list core.ResourceList, listPath *field.Path) {
+		for _, name := range slices.Sorted(maps.Keys(list)) {
+			if !supportedResizeResources.Has(name) {
+				allErrs = append(allErrs, field.NotSupported(listPath.Key(string(name)), name, sets.List(supportedResizeResources)))
+			}
+		}
+	}
+	validateResourceList(resources.Requests, fldPath.Child("requests"))
+	validateResourceList(resources.Limits, fldPath.Child("limits"))
+	return allErrs
+}
+
+func isPodInitialized(pod *core.Pod) bool {
+	for _, c := range pod.Status.Conditions {
+		if c.Type == core.PodInitialized {
+			return c.Status == core.ConditionTrue
+		}
+	}
+	return false
 }
 
 // validatePodResizeContainerOrdering validates container ordering for a resize request.
