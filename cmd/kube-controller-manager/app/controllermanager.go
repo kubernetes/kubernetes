@@ -351,6 +351,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 	}
 
+	// Start the main lock.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
 		binaryVersion, err := semver.ParseTolerant(c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().String())
 		if err != nil {
@@ -382,10 +386,6 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			leaseCandidate.Run(ctx)
 		}()
 	}
-
-	// Start the main lock.
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	// startedLeading must be used to wrap any OnStartedLeading leader election callback.
 	var (
