@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -177,6 +178,26 @@ func TestGetResourceRequest(t *testing.T) {
 
 		actual := GetResourceRequest(tc.pod, tc.resourceName)
 		as.Equal(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+	}
+}
+
+func TestGetResourceRequestWithDRANodeAllocatableResources(t *testing.T) {
+	pod := getPod(containerName, resources{cpuRequest: "1", memoryRequest: "100Mi"})
+	pod.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: "claim",
+		Containers:        []string{containerName},
+		Mapping: []v1.NodeAllocatableMappedResources{
+			{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
+		},
+	}}
+
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("DRANodeAllocatableResources=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, enabled)
+			// DRA node allocatable resources are excluded from eviction ranking.
+			assert.Equal(t, int64(1000), GetResourceRequest(pod, v1.ResourceCPU))
+			assert.Equal(t, int64(100*1024*1024), GetResourceRequest(pod, v1.ResourceMemory))
+		})
 	}
 }
 
@@ -398,4 +419,30 @@ func getPodWithPodLevelResources(cname string, podResources resources, resources
 	pod.Spec.Resources = &r
 
 	return pod
+}
+
+func TestFeatures(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       false,
+		features.InPlacePodLevelResourcesVerticalScaling: false,
+		features.DRANodeAllocatableResources:             true,
+	})
+
+	fts := Features()
+	assert.False(t, fts.PodLevelResources)
+	assert.True(t, fts.InPlacePodVerticalScaling)
+	assert.False(t, fts.InPlacePodLevelResourcesVerticalScaling)
+	assert.True(t, fts.DRANodeAllocatableResources)
+
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
+		features.DRANodeAllocatableResources:             false,
+	})
+
+	opts := PodResourcesOptions()
+	assert.True(t, opts.Features.PodLevelResources)
+	assert.True(t, opts.Features.InPlacePodVerticalScaling)
+	assert.True(t, opts.Features.InPlacePodLevelResourcesVerticalScaling)
+	assert.False(t, opts.Features.DRANodeAllocatableResources)
 }

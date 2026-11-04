@@ -150,7 +150,10 @@ func (pl *DynamicResources) preFilterExtendedResources(pod *v1.Pod, logger klog.
 
 	// Try to build device class mapping from cache
 	cache := pl.draManager.DeviceClassResolver()
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+		ExcludeDRANodeAllocatableResources: true,
+		Features:                           pl.fts.ResourceFeatures(),
+	})
 
 	hasExtendedResource := hasDeviceClassMappedExtendedResource(reqs, cache)
 	if !hasExtendedResource {
