@@ -57,7 +57,7 @@ import (
 func TestAllocatorPoolBufferCapacityBounded(t *testing.T) {
 	const (
 		bigPayload   = 900 * 1024 // above DefaultMaxPooledEncodeBufferSize, under the 1MiB ConfigMap limit
-		smallPayload = 64 * 1024  // below DefaultMaxPooledEncodeBufferSize
+		smallPayload = 16 * 1024  // below DefaultMaxPooledEncodeBufferSize
 	)
 
 	cases := []struct {
