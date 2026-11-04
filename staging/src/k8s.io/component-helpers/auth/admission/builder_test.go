@@ -382,3 +382,38 @@ func TestRemoteVerificationBoundsBackgroundFetch(t *testing.T) {
 		t.Fatal("background key request outlived the HTTP client's timeout")
 	}
 }
+
+// TestGoModOIDCDependenciesMatchAPIServer ensures component-helpers' OIDC and
+// JOSE dependencies stay in lockstep with the root Kubernetes module used by
+// kube-apiserver.
+func TestGoModOIDCDependenciesMatchAPIServer(t *testing.T) {
+	componentHelpersMod, err := os.ReadFile("../../go.mod")
+	if err != nil {
+		t.Fatalf("read component-helpers go.mod: %v", err)
+	}
+	rootModPath := "../../../../../go.mod"
+	rootMod, err := os.ReadFile(rootModPath)
+	if err != nil {
+		t.Skipf("root go.mod not present outside main repository checkout: %v", err)
+	}
+	requiredVersion := func(modBytes []byte, modulePath string) string {
+		for line := range strings.SplitSeq(string(modBytes), "\n") {
+			fields := strings.Fields(strings.TrimSpace(line))
+			if len(fields) >= 2 && fields[0] == modulePath {
+				return fields[1]
+			}
+		}
+		return ""
+	}
+	for _, dep := range []string{
+		"github.com/coreos/go-oidc/v3",
+		"github.com/go-jose/go-jose/v4",
+	} {
+		got := requiredVersion(componentHelpersMod, dep)
+		want := requiredVersion(rootMod, dep)
+		if got == "" || want == "" || got != want {
+			t.Errorf("%s version in component-helpers/go.mod = %q, want %q from root go.mod", dep, got, want)
+		}
+	}
+}
+
