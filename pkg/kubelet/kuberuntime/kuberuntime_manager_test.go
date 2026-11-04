@@ -55,6 +55,7 @@ import (
 	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -3223,6 +3224,31 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 			podLevelResizeEnabled: true,
 		},
+		"Set pod-level CPU and memory resources on pod created without pod-level resources": {
+			setupFn: func(pod *v1.Pod) {
+				for i := range pod.Spec.Containers {
+					pod.Spec.Containers[i].Resources = v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+					}
+				}
+				m.InitializeActuatedPod(logger, pod)
+
+				pod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
+				}
+			},
+			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
+				pa := podActions{
+					SandboxID:               podStatus.SandboxStatuses[0].Id,
+					ContainersToStart:       []int{},
+					ContainersToKill:        getKillMap(pod, podStatus, []int{}),
+					ContainersToUpdate:      map[v1.ResourceName][]containerToUpdateInfo{},
+					UpdatePodLevelResources: true,
+				}
+				return &pa
+			},
+			podLevelResizeEnabled: true,
+		},
 		"Update pod-level and container CPU and memory resources pod resize disabled": {
 			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
@@ -4517,8 +4543,6 @@ func TestDoPodResizeAction(t *testing.T) {
 		t.Skip("unsupported OS")
 	}
 
-	tCtx := ktesting.Init(t)
-	logger := tCtx.Logger()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
@@ -4538,14 +4562,16 @@ func TestDoPodResizeAction(t *testing.T) {
 		desiredPodLevelResources *resourceRequirements
 		updatedPodLevelResources bool // indicates if pod-level resource specification changes
 		enablePLR                bool // enables InPlacePodLevelResourcesVerticalScaling feature gate
+		skipActuatedPodInit      bool // skips initializing the pod in actuatedState to simulate a missing record
 
 		// Mock configuration and runtime error injection
 		runtimeErrors               map[string][]error // mock failures for CRI calls to verify error propagation
 		injectPodUpdateCgroupsError error              // mock failures for cgroup writes to verify rollback flow
 
 		// Expected overall test execution results
-		expectedError        string // overall Kubelet error type expected
-		expectedErrorMessage string // expected text of Kubelet error
+		expectedError                  string // overall Kubelet error type expected
+		expectedErrorMessage           string // expected text of Kubelet error
+		expectMissingActuatedRecordLog bool   // expects "Missing actuated resource record" error log
 
 		// Expected actuation details to verify correctness
 		expectPodCgroupUpdates     int                // expected total calls to SetPodCgroupConfig
@@ -4998,8 +5024,60 @@ func TestDoPodResizeAction(t *testing.T) {
 				Memory: ptr.To[int64](250),
 			},
 		},
+		{
+			testName: "Set pod-level CPU and memory resources on pod created without pod-level resources",
+			currentResources: resourceRequirements{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: resourceRequirements{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredPodLevelResources: &resourceRequirements{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			updatedPodLevelResources: true,
+			updatedResources:         []v1.ResourceName{},
+			expectPodCgroupUpdates:   3, // mem lim, cpu lim, cpu req
+			enablePLR:                true,
+			expectedPodLevelResources: &cm.ResourceConfig{
+				CPUShares: ptr.To[uint64](204),
+				CPUQuota:  ptr.To[int64](20000),
+				Memory:    ptr.To[int64](200),
+			},
+		},
+		{
+			testName: "Set pod-level resources when actuated pod record is missing logs error",
+			currentResources: resourceRequirements{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: resourceRequirements{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredPodLevelResources: &resourceRequirements{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			updatedPodLevelResources:       true,
+			updatedResources:               []v1.ResourceName{},
+			expectPodCgroupUpdates:         3, // mem lim, cpu lim, cpu req
+			enablePLR:                      true,
+			skipActuatedPodInit:            true,
+			expectMissingActuatedRecordLog: true,
+			expectedPodLevelResources: &cm.ResourceConfig{
+				CPUShares: ptr.To[uint64](204),
+				CPUQuota:  ptr.To[int64](20000),
+				Memory:    ptr.To[int64](200),
+			},
+		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
 			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx, withErrors(tc.runtimeErrors))
 			require.NoError(t, err)
 			m.cpuCFSQuota = true // Enforce CPU Limits
@@ -5056,6 +5134,9 @@ func TestDoPodResizeAction(t *testing.T) {
 			}
 
 			pod, kps := makeBasePodAndStatus()
+			if !tc.skipActuatedPodInit {
+				m.InitializeActuatedPod(logger, pod)
+			}
 			_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 			for idx, fc := range fakeContainers {
 				kps.ContainerStatuses[idx].ID = kubecontainer.ContainerID{Type: "testRuntime", ID: fc.Id}
@@ -5163,6 +5244,8 @@ func TestDoPodResizeAction(t *testing.T) {
 					if tc.enablePLR {
 						assert.Equal(t, tc.desiredPodLevelResources.memoryRequest, updatedActuated.Requests.Memory().Value(), tc.testName)
 						assert.Equal(t, tc.desiredPodLevelResources.cpuRequest, updatedActuated.Requests.Cpu().MilliValue(), tc.testName)
+						assert.Equal(t, tc.desiredPodLevelResources.memoryLimit, updatedActuated.Limits.Memory().Value(), tc.testName)
+						assert.Equal(t, tc.desiredPodLevelResources.cpuLimit, updatedActuated.Limits.Cpu().MilliValue(), tc.testName)
 					} else {
 						assert.Equal(t, tc.currentPodLevelResources.memoryRequest, updatedActuated.Requests.Memory().Value(), tc.testName)
 						assert.Equal(t, tc.currentPodLevelResources.cpuRequest, updatedActuated.Requests.Cpu().MilliValue(), tc.testName)
@@ -5183,6 +5266,20 @@ func TestDoPodResizeAction(t *testing.T) {
 						assert.Equal(t, *tc.expectedContainerResources.Memory, c.LinuxResources.MemoryLimitInBytes, "Container Memory Limit did not match expected")
 					}
 				}
+			}
+
+			underlier, ok := logger.GetSink().(ktesting.Underlier)
+			require.True(t, ok, "expected ktesting LogSink")
+			var missingRecordLogs int
+			for _, entry := range underlier.GetBuffer().Data() {
+				if entry.Message == "Missing actuated resource record" {
+					missingRecordLogs++
+				}
+			}
+			if tc.expectMissingActuatedRecordLog {
+				assert.Equal(t, 1, missingRecordLogs, "expected 'Missing actuated resource record' error log")
+			} else {
+				assert.Zero(t, missingRecordLogs, "unexpected 'Missing actuated resource record' error log")
 			}
 
 			mock.AssertExpectationsForObjects(t, mockPCM)
