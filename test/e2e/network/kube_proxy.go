@@ -112,7 +112,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		// a privileged pod because /proc/net/nf_conntrack is not world-readable.
 		hostExecPod := e2epod.NewExecPodSpec(fr.Namespace.Name, "e2e-net-exec", true)
 		hostExecPod.Spec.Containers[0].SecurityContext.Privileged = new(true)
-		hostExecPod.Spec.NodeName = clientNodeInfo.name
+		e2epod.SetNodeSelection(&hostExecPod.Spec, e2epod.NodeSelection{Name: clientNodeInfo.name})
 		e2epod.NewPodClient(fr).CreateSync(ctx, hostExecPod)
 
 		// Create the client and server pods
@@ -125,7 +125,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 				postFinTimeoutSeconds,
 				0),
 		)
-		clientPodSpec.Spec.NodeName = clientNodeInfo.name
+		e2epod.SetNodeSelection(&clientPodSpec.Spec, e2epod.NodeSelection{Name: clientNodeInfo.name})
 
 		serverPodSpec := e2epod.NewAgnhostPod(fr.Namespace.Name, "e2e-net-server", nil, nil,
 			[]v1.ContainerPort{{
@@ -140,7 +140,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 				testDaemonTCPPort,
 				postFinTimeoutSeconds),
 		)
-		serverPodSpec.Spec.NodeName = serverNodeInfo.name
+		e2epod.SetNodeSelection(&serverPodSpec.Spec, e2epod.NodeSelection{Name: serverNodeInfo.name})
 
 		ginkgo.By(fmt.Sprintf(
 			"Launching a server daemon on node %v (node ip: %v)",
