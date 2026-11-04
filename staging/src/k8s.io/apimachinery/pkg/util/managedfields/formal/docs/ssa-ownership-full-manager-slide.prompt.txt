@@ -1,0 +1,128 @@
+Generated with the built-in image_gen tool.
+Source: executable SSA model and pinned SMD PR #336 head 6fab440a518a1b329e5cabd5a3c924d6c267828b.
+Style: visualize-slide whiteboard references.
+
+GENERATION PROMPT
+
+Use case: infographic-diagram.
+Create exactly ONE high-resolution 16:9 technical presentation slide, in ENGLISH, as a single raster image. Aim for 3840 x 2160 presentation quality. This is a Kubernetes server-side apply ownership explanation, grounded in an executable Lean model and SMD PR #336 at commit 6fab440. Do not turn it into multiple slides.
+
+STYLE: Excalidraw whiteboard drawing on pure white, thin slightly irregular dark outlines, handwritten-looking titles and annotations, restrained pale blue / pale green / pale amber / pale rose fills. Crisp legible monospaced YAML, generous line spacing. Manager A consistently blue, B consistently purple. Green = invariant preserved; red = rejection or demonstrated failure. Compact and technically dense, but carefully aligned. No decorative icons, logos, slide numbers, watermarks, or invented notation. ALL field examples must use ordinary, valid YAML. Use typography, not literal Markdown markup: within YAML, required field names are BOLD, and list-map key field names are BOLD AND UNDERLINED. Do NOT print "**" or HTML tags. Small legend: "In YAML: bold = required · bold + underline = key · # A, B = field owners".
+
+TITLE at top: "SSA ownership: one full manager per scope"
+Subtitle: "A local ownership invariant, checked atomically for the whole request"
+
+COMPOSITION: three organized main columns, about 28% / 46% / 26% width, with a slim full-width bottom boundary strip. The center is the dominant temporal counterexample. Keep text safely inside panels. Use readable type, avoid dense prose. Every arrow must convey time, branch outcome, or validation flow.
+
+LEFT COLUMN heading "What makes a manager full?"
+Text: "Item membership + its entire required core."
+Then a YAML stored-state example:
+items:
+- name: db          # A, B
+  host: old         # A
+  port: "p"         # A, B
+Make name bold+underlined; host and port bold. items normal.
+Labels underneath: "A: full" (green), "B: partial" (amber).
+Small two-line rule: "Required object branches recurse for the SAME manager. Nested items have their own scopes."
+
+Second left panel heading "Roles can switch between objects"
+YAML of one valid stored state:
+foo:
+  bar:              # A full; B partial
+    left: v         # A
+    right: v        # A, B
+  abc:              # B full; A partial
+    left: v         # A, B
+    right: v        # B
+Here foo, bar, abc are OPTIONAL object fields, so render these field names normal-weight. All four occurrences of left and right are REQUIRED field names: render them bold.
+Below: "Check bar and abc independently."
+Below in smaller text: "A may omit all of optional bar. A may not leave bar without a full manager. One failing scope rejects the entire request."
+Add a small line: "Key-only item: delete only after the LAST owner leaves."
+
+CENTER heading "The PR accepts a forbidden fragmentation"
+Use four compact sequential request cards from left to right, with ordinary YAML and actual requests, numbered 1–4 for temporal order (NOT slide numbering). All list instances use the same schema: name is the list-map key; host and port are required. Render name bold+underlined and host/port bold throughout.
+CARD 1 heading "A creates":
+items:
+- name: db
+  host: old
+  port: "p"
+Status "A full"
+Arrow meaning "next request" to CARD 2.
+CARD 2 heading "B co-claims":
+items:
+- name: db
+  port: "p"
+Status "A full · B partial"
+Arrow meaning "next request" to CARD 3.
+CARD 3 heading "A releases port":
+items:
+- name: db
+  host: old
+Under this card clearly BRANCH the two semantics:
+A short downward red connector labeled "Proposed full policy" ends at a red outcome box: "REJECT atomically" / "Keep the previous object AND claims."
+The rightward temporal arrow from card 3 to card 4 must be explicitly labeled "PR path only".
+Next to or beneath this rightward branch label: "PR accepts" and "A owns host; B owns port. Both values remain, but NO full manager remains."
+CARD 4 heading "B omits the item":
+{}
+Red result beneath: "PR deletes the item — including A's host."
+Extra short caption: "B was partial."
+Do NOT draw the proposed rejection branch continuing to card 4: only the raw PR accepted branch continues.
+
+A green supporting band below this timeline, heading "Safe handoff: acquire, then release"
+Show a compact YAML request labeled "B applies the whole core":
+items:
+- name: db
+  host: old
+  port: "p"
+Then meaningful arrow "both full" to a small "A applies {}" label, then arrow to "B stays full; item survives."
+Name bold+underlined, host and port bold here too.
+A small source caption under the counterexample: "Kernel-checked witnesses + exact tests against pinned SMD head and base."
+Do not claim the entire Go implementation is formally verified.
+
+RIGHT COLUMN heading "Two more classifier traps"
+Upper amber panel subheading "Required map"
+Small context line: "A owns required conn.endpoint."
+YAML request labeled "B applies":
+items:
+- name: db
+  conn: {}
+Here name bold+underlined; conn bold. items normal.
+Explanation: "PR treats the map member as full coverage, skipping its required child."
+Then a meaningful short flow: "A leaves → endpoint disappears."
+Note: "External validation may reject the SMD result."
+
+Lower amber panel subheading "Required granular list"
+YAML request labeled "A applies":
+items:
+- name: db
+  children: []
+Here name bold+underlined; children bold.
+Explanation: "FieldsV1 records NO direct list claim — empty or populated."
+Then: "PR calls the supplier partial."
+Emphasize a small final line: "List-presence encoding is still a design problem."
+
+BOTTOM FULL-WIDTH STRIP, pale blue, heading "Admission / CEL is a separate boundary"
+Draw a simple causal pipeline left to right:
+"Mutate proposed state" → "Check values + ownership in every scope" → "Commit atomically"
+Below, clear caveat: "Modeled as parameterized stages, not verified interpreters. Valid values alone do not prove valid ownership."
+
+TECHNICAL INVARIANTS:
+- "Full" is local to each scope, not a global label for a manager or a request.
+- One same manager must cover every required branch; A+B as a coalition is insufficient.
+- In the fragmentation example neither host nor port value vanishes at step 3; only ownership fragments.
+- Only the PR accepts step 3 and reaches the destructive step 4.
+- The safe handoff has B acquire unchanged full ownership BEFORE A omits the item.
+- Required list failure concerns granular known lists, not atomic lists.
+- The required-map shortcut is a PR classifier behavior, not the definition of full in the stronger policy.
+- Be accurate with YAML indentation, quotes, and braces. Do not add arbitrary connections.
+- Avoid extra math or nonstandard path-set notation. The user wants YAML and plain English.
+
+LOCALIZED CORRECTION PROMPT
+
+Precise localized edit of this English technical slide. Keep the existing 16:9 composition, hand-drawn style, colors, panels, arrows, examples and all unrelated text exactly as they are. Make ONLY these two correctness fixes:
+1. Replace the top title with: "SSA ownership: at least one full manager per scope". Adjust title size slightly if necessary so it fits on one line inside the page margins. This means at least one individual full owner, not exactly one.
+2. In the central timeline card headed "2. B co-claims", render the FULL YAML request, including the currently missing root line:
+items:
+- name: db
+  port: "p"
+Keep the field name name bold AND underlined, the field name port bold, and items normal. Correct indentation and preserve the "A full · B partial" status. Do not duplicate the items line. No other changes.

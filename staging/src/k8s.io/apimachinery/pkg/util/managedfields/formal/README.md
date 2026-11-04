@@ -11,6 +11,8 @@ source, axiom dependencies and proof dependency graph. The
 [property catalogue](PROPERTIES.md) maps the contracts to KEP-555 and existing
 SSA tests. Human review of the definitions remains necessary.
 
+![Full-manager scopes, PR counterexamples, and admission boundary](docs/ssa-ownership-full-manager-slide.png)
+
 ## Full-manager definition and scope
 
 For each associative-list item, a full manager owns membership plus its entire
