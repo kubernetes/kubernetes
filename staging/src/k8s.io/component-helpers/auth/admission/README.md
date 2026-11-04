@@ -104,6 +104,10 @@ The helper decodes the AdmissionReview, encodes the response and sets its UID.
 Failed authentication returns HTTP 401 without reading the body; policy denials
 return an AdmissionReview with `Allowed: false`.
 
+Cross-group kinds are limited to `autoscaling/v1 Scale` on `scale` (including
+custom resources), `policy/v1 Eviction` on core `v1 pods/eviction`, and
+`authentication.k8s.io/v1 TokenRequest` on core `v1 serviceaccounts/token`.
+
 ## 1. On-cluster: infer issuer and signing keys
 
 The webhook runs in the calling cluster. Leave `WEBHOOK_LOVE_KITTENS_ISSUER`
