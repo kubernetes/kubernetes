@@ -48,324 +48,11 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-helpers/auth/admission"
 )
-
-const (
-	testKeyID    = "test-signing-key"
-	testAudience = "webhook.example.com"
-	testGroup    = "apps"
-	testSubject  = "system:serviceaccount:kube-system:webhook-auth"
-	reviewUID    = "req-uid-1"
-
-	// admissionReviewAPIGroupsClaimKey is the KEP-6060 attestation claim key (the
-	// server-side authentication.AttestationAdmissionReviewAPIGroups value). The
-	// core package's constant is unexported, so the tests hard-code the wire
-	// string it must match.
-	admissionReviewAPIGroupsClaimKey = "admissionReviewAPIGroups"
-	wildcardAPIGroup                 = "*"
-)
-
-// oidcTestServer serves discovery and signing keys for real RSA verification.
-type oidcTestServer struct {
-	server  *httptest.Server
-	issuer  string
-	signer  jose.Signer
-	tempDir string
-}
-
-// startOIDCServer stands up the TLS discovery + JWKS endpoint for a fresh RSA
-// key. It returns an error rather than taking a *testing.T so both the tests
-// (via newOIDCTestServer) and the runnable examples can share one implementation.
-func startOIDCServer() (*oidcTestServer, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, err
-	}
-	signer, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.RS256, Key: jose.JSONWebKey{Key: priv, KeyID: testKeyID}},
-		(&jose.SignerOptions{}).WithType("JWT"),
-	)
-	if err != nil {
-		return nil, err
-	}
-	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{
-		Key:       priv.Public(),
-		KeyID:     testKeyID,
-		Algorithm: string(jose.RS256),
-		Use:       "sig",
-	}}}
-
-	ts := &oidcTestServer{signer: signer}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"issuer":                                ts.issuer,
-			"jwks_uri":                              ts.issuer + "/keys",
-			"id_token_signing_alg_values_supported": []string{string(jose.RS256)},
-		})
-	})
-	mux.HandleFunc("/keys", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(jwks)
-	})
-	// Local verification uses the fixed JWKS path.
-	mux.HandleFunc("/openid/v1/jwks", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(jwks)
-	})
-	ts.server = httptest.NewTLSServer(mux)
-	ts.issuer = ts.server.URL
-	return ts, nil
-}
-
-// newOIDCTestServer is the *testing.T wrapper around startOIDCServer, wiring
-// cleanup so the server is closed at the end of the test.
-func newOIDCTestServer(t *testing.T) *oidcTestServer {
-	t.Helper()
-	ts, err := startOIDCServer()
-	if err != nil {
-		t.Fatalf("starting OIDC test server: %v", err)
-	}
-	ts.tempDir = t.TempDir()
-	t.Cleanup(ts.server.Close)
-	return ts
-}
-
-func (ts *oidcTestServer) close()               { ts.server.Close() }
-func (ts *oidcTestServer) client() *http.Client { return ts.server.Client() }
-
-// verifier builds a fixed-audience Verifier via full OIDC discovery over TLS.
-func (ts *oidcTestServer) verifier(t *testing.T) *admission.VerifierForTest {
-	t.Helper()
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
-	if err != nil {
-		t.Fatalf("NewVerifier: %v", err)
-	}
-	return v
-}
-
-func (ts *oidcTestServer) localVerifier(audience string) (*admission.VerifierForTest, error) {
-	claims := ts.baseClaims()
-	claims["sub"] = "system:serviceaccount:webhooks:receiver"
-	claims["aud"] = []string{"https://kubernetes.default.svc"}
-	claims["kubernetes.io"] = map[string]any{
-		"namespace":      "webhooks",
-		"serviceaccount": map[string]any{"name": "receiver", "uid": "receiver-uid"},
-	}
-	projectedToken, err := ts.signClaims(claims)
-	if err != nil {
-		return nil, err
-	}
-	tokenFile := filepath.Join(ts.tempDir, "projected-token")
-	if err := os.WriteFile(tokenFile, []byte(projectedToken), 0600); err != nil {
-		return nil, err
-	}
-	config := &rest.Config{
-		Host:            ts.issuer,
-		BearerTokenFile: tokenFile,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.server.Certificate().Raw}),
-		},
-	}
-	return admission.NewLocalVerifierForTest(context.Background(), config, audience)
-}
-
-func (ts *oidcTestServer) localHandler(next admission.AdmissionHandler, audience string) (*admission.Handler, error) {
-	v, err := ts.localVerifier(audience)
-	if err != nil {
-		return nil, err
-	}
-	return admission.NewHandlerForTest(v, next), nil
-}
-
-// signClaims mints a compact RS256 JWS over claims using the server's advertised
-// key. It returns an error so the runnable examples can reuse it.
-func (ts *oidcTestServer) signClaims(claims map[string]any) (string, error) {
-	payload, err := json.Marshal(claims)
-	if err != nil {
-		return "", err
-	}
-	jws, err := ts.signer.Sign(payload)
-	if err != nil {
-		return "", err
-	}
-	return jws.CompactSerialize()
-}
-
-// sign is the *testing.T wrapper around signClaims.
-func (ts *oidcTestServer) sign(t *testing.T, claims map[string]any) string {
-	t.Helper()
-	tok, err := ts.signClaims(claims)
-	if err != nil {
-		t.Fatalf("signing claims: %v", err)
-	}
-	return tok
-}
-
-// baseClaims returns a valid validating-webhook-bound token claim set for
-// testGroup with a comfortably future expiry and this server's issuer. Tests
-// mutate the returned map to build sad-path variants.
-func (ts *oidcTestServer) baseClaims() map[string]any {
-	now := time.Now()
-	return map[string]any{
-		"iss": ts.issuer,
-		"sub": testSubject,
-		"aud": []string{testAudience},
-		"exp": now.Add(5 * time.Minute).Unix(),
-		"nbf": now.Add(-1 * time.Minute).Unix(),
-		"iat": now.Unix(),
-		"kubernetes.io": map[string]any{
-			"validatingwebhookconfiguration": map[string]any{"name": "vwc", "uid": "vwc-uid"},
-			"attestations": map[string]any{
-				admissionReviewAPIGroupsClaimKey: []string{testGroup},
-			},
-		},
-	}
-}
-
-// coreGroupClaims provides a valid core-group token to catch malformed reviews
-// accidentally accepted as empty-group requests.
-func (ts *oidcTestServer) coreGroupClaims() map[string]any {
-	c := ts.baseClaims()
-	k8s := c["kubernetes.io"].(map[string]any)
-	k8s["attestations"] = map[string]any{
-		admissionReviewAPIGroupsClaimKey: []string{""},
-	}
-	return c
-}
-
-func admissionRequest(kind metav1.GroupVersionKind, resource metav1.GroupVersionResource, subresource string, operation admissionv1.Operation) *admissionv1.AdmissionRequest {
-	apiVersion := kind.Version
-	if kind.Group != "" {
-		apiVersion = kind.Group + "/" + kind.Version
-	}
-	raw, _ := json.Marshal(metav1.TypeMeta{APIVersion: apiVersion, Kind: kind.Kind})
-	req := &admissionv1.AdmissionRequest{
-		UID:                types.UID(reviewUID),
-		Kind:               kind,
-		Resource:           resource,
-		SubResource:        subresource,
-		RequestKind:        &kind,
-		RequestResource:    &resource,
-		RequestSubResource: subresource,
-		Operation:          operation,
-		Name:               "my-deploy",
-	}
-	switch operation {
-	case admissionv1.Create, admissionv1.Connect:
-		req.Object.Raw = raw
-	case admissionv1.Update:
-		req.Object.Raw = raw
-		req.OldObject.Raw = bytes.Clone(raw)
-	case admissionv1.Delete:
-		req.OldObject.Raw = raw
-	}
-	return req
-}
-
-func admissionReview(apiGroup string) *admissionv1.AdmissionReview {
-	return &admissionv1.AdmissionReview{
-		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-		Request: admissionRequest(
-			metav1.GroupVersionKind{Group: apiGroup, Version: "v1", Kind: "Deployment"},
-			metav1.GroupVersionResource{Group: apiGroup, Version: "v1", Resource: "deployments"},
-			"", admissionv1.Create,
-		),
-	}
-}
-
-// admissionReviewBody builds a JSON AdmissionReview request body whose resource
-// belongs to apiGroup. It is the payload the adapter decodes.
-func admissionReviewBody(t *testing.T, apiGroup string) []byte {
-	t.Helper()
-	body, err := json.Marshal(admissionReview(apiGroup))
-	if err != nil {
-		t.Fatalf("marshal AdmissionReview: %v", err)
-	}
-	return body
-}
-
-func configMapUpdateReviewBody(t *testing.T, value string) []byte {
-	t.Helper()
-	object, err := json.Marshal(&corev1.ConfigMap{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
-		ObjectMeta: metav1.ObjectMeta{Name: "large-config"},
-		Data:       map[string]string{"payload": value},
-	})
-	if err != nil {
-		t.Fatalf("marshal ConfigMap: %v", err)
-	}
-	review := admissionv1.AdmissionReview{
-		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-		Request: &admissionv1.AdmissionRequest{
-			UID:       types.UID(reviewUID),
-			Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
-			Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "configmaps"},
-			Operation: admissionv1.Update,
-			Object:    runtime.RawExtension{Raw: object},
-			OldObject: runtime.RawExtension{Raw: object},
-		},
-	}
-	body, err := json.Marshal(review)
-	if err != nil {
-		t.Fatalf("marshal AdmissionReview: %v", err)
-	}
-	return body
-}
-
-// spyHandler is the downstream admission webhook the adapter forwards to. It is
-// an admission.AdmissionHandler: it receives the AdmissionRequest the
-// adapter already decoded and verified, records what it observed, and returns a
-// canned allow response (the adapter wraps and writes it).
-type spyHandler struct {
-	mu         sync.Mutex
-	reached    bool
-	gotRequest *admissionv1.AdmissionRequest
-	allowVal   bool
-}
-
-func newSpyHandler() *spyHandler {
-	return &spyHandler{allowVal: true}
-}
-
-// serve matches admission.AdmissionHandler.
-func (s *spyHandler) serve(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
-	s.mu.Lock()
-	s.reached = true
-	s.gotRequest = req
-	s.mu.Unlock()
-	return &admissionv1.AdmissionResponse{Allowed: s.allowVal}
-}
-
-func (s *spyHandler) wasReached() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.reached
-}
-
-func (s *spyHandler) request() *admissionv1.AdmissionRequest {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.gotRequest
-}
-
-// newRequest builds a POST carrying the AdmissionReview body and, when token is
-// non-empty, an Authorization: Bearer header.
-func newRequest(t *testing.T, body []byte, token string) *http.Request {
-	t.Helper()
-	r := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
-	r.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		r.Header.Set("Authorization", "Bearer "+token)
-	}
-	return r
-}
 
 // TestWithTokenVerification_EndToEnd checks that failed requests cannot reach
 // admission logic or disclose claim details in the response.
@@ -702,61 +389,12 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	assertNoLeak(t, rec.Body.String())
 }
 
-// TestVerifierVerify exercises the already-decoded consumer path without
-// allowing an unauthorized group or nil request through the admission gate.
-func TestVerifierVerify(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	vv := ts.verifier(t)
-
-	t.Run("valid token and matching group -> nil", func(t *testing.T) {
-		token := ts.sign(t, ts.baseClaims())
-		if err := vv.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("group not authorized -> generic failure", func(t *testing.T) {
-		token := ts.sign(t, ts.baseClaims())
-		err := vv.Verify(context.Background(), admissionReview("batch").Request, token)
-		if err == nil || err.Error() != "webhook token verification failed" {
-			t.Fatalf("want generic verification failure, got %v", err)
-		}
-	})
-
-	t.Run("nil request -> fails closed", func(t *testing.T) {
-		token := ts.sign(t, ts.baseClaims())
-		err := vv.Verify(context.Background(), nil, token)
-		if err == nil || err.Error() != "webhook token verification failed" {
-			t.Fatalf("want generic verification failure for a nil request, got %v", err)
-		}
-	})
-}
-
 var (
 	_ http.Handler                                                                                       = (*admission.Handler)(nil)
 	_ func(context.Context, admission.AdmissionHandler, ...admission.Option) (*admission.Handler, error) = admission.WithTokenVerification
 	_ func(string, string, uint16) admission.Option                                                      = admission.WithServiceAudience
 	_ func(string, string, *http.Client) admission.Option                                                = admission.WithIssuer
 )
-
-type observedBody struct {
-	reader    *bytes.Reader
-	reads     int
-	bytesRead int
-	closes    int
-}
-
-func (b *observedBody) Read(p []byte) (int, error) {
-	b.reads++
-	n, err := b.reader.Read(p)
-	b.bytesRead += n
-	return n, err
-}
-
-func (b *observedBody) Close() error {
-	b.closes++
-	return nil
-}
 
 func TestAuthenticationBeforeBodyRead(t *testing.T) {
 	ts := newOIDCTestServer(t)
@@ -819,48 +457,6 @@ func TestAuthenticationBeforeBodyRead(t *testing.T) {
 	}
 }
 
-func TestVerifierRequiresCompactJWT(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
-	compact := ts.sign(t, ts.baseClaims())
-	parts := strings.Split(compact, ".")
-	if len(parts) != 3 {
-		t.Fatalf("fixture is not a compact JWT: %d parts", len(parts))
-	}
-	for _, tc := range []struct {
-		name          string
-		serialization map[string]any
-	}{
-		{name: "flattened JWS", serialization: map[string]any{"protected": parts[0], "payload": parts[1], "signature": parts[2]}},
-		{name: "general JWS", serialization: map[string]any{"payload": parts[1], "signatures": []map[string]any{{"protected": parts[0], "signature": parts[2]}}}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			raw, err := json.Marshal(tc.serialization)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, token := range []string{string(raw), " \n" + string(raw)} {
-				if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err == nil || err.Error() != "webhook token verification failed" {
-					t.Fatalf("non-compact JWT: Verify = %v, want generic denial", err)
-				}
-			}
-			spy := newSpyHandler()
-			h := admission.NewHandlerForTest(v, spy.serve)
-			body := &observedBody{reader: bytes.NewReader(admissionReviewBody(t, testGroup))}
-			req := newRequest(t, nil, string(raw))
-			req.Body = body
-			rec := httptest.NewRecorder()
-			h.ServeHTTP(rec, req)
-			if rec.Code != http.StatusUnauthorized || rec.Body.String() != "webhook token verification failed\n" || body.reads != 0 || spy.wasReached() {
-				t.Fatalf("non-compact HTTP token: status=%d body=%q reads=%d callback=%t", rec.Code, rec.Body.String(), body.reads, spy.wasReached())
-			}
-		})
-	}
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, compact); err != nil {
-		t.Fatalf("compact JWT denied: %v", err)
-	}
-}
-
 func TestAuthenticatedBodyBoundaries(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
@@ -892,327 +488,6 @@ func TestAuthenticatedBodyBoundaries(t *testing.T) {
 				t.Fatalf("callback reached = %t for status %d", spy.wasReached(), tc.status)
 			}
 		})
-	}
-}
-
-func testJWKS(t *testing.T, server *httptest.Server, path string) []byte {
-	t.Helper()
-	resp, err := server.Client().Get(server.URL + path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		t.Fatalf("JWKS fixture = (%d, %v)", resp.StatusCode, err)
-	}
-	return data
-}
-
-func TestLibraryKeyRotationAndAvailability(t *testing.T) {
-	first := newOIDCTestServer(t)
-	second := newECDSAOIDCIssuer(t)
-	var keys atomic.Value
-	keys.Store(testJWKS(t, first.server, "/keys"))
-	var status atomic.Int32
-	status.Store(http.StatusOK)
-	var keyRequests atomic.Int32
-	var server *httptest.Server
-	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/.well-known/openid-configuration" {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"issuer":                                server.URL,
-				"jwks_uri":                              server.URL + "/keys",
-				"id_token_signing_alg_values_supported": []string{"RS256", "ES256"},
-			})
-			return
-		}
-		if r.URL.Path != "/keys" {
-			http.NotFound(w, r)
-			return
-		}
-		keyRequests.Add(1)
-		w.WriteHeader(int(status.Load()))
-		_, _ = w.Write(keys.Load().([]byte))
-	}))
-	defer server.Close()
-	newVerifier := func() (*admission.VerifierForTest, error) {
-		return admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client()))
-	}
-	v, err := newVerifier()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := keyRequests.Load(); got != 0 {
-		t.Fatalf("construction fetched signing keys %d times, want 0", got)
-	}
-	firstClaims := first.baseClaims()
-	firstClaims["iss"] = server.URL
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, first.sign(t, firstClaims)); err != nil {
-		t.Fatalf("first signing key: %v", err)
-	}
-	if got := keyRequests.Load(); got != 1 {
-		t.Fatalf("first verification requests = %d, want 1 (lazy key fetch)", got)
-	}
-	keys.Store(testJWKS(t, second.server, "/openid/v1/jwks"))
-	secondClaims := second.validWebhookClaims(testAudience, "validatingwebhookconfiguration", "vwc", "uid", []string{testGroup})
-	secondClaims["iss"] = server.URL
-	token := second.sign(t, secondClaims)
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
-		t.Fatalf("rotated signing key: %v", err)
-	}
-	if got := keyRequests.Load(); got != 2 {
-		t.Fatalf("rotation requests = %d, want 2", got)
-	}
-	status.Store(http.StatusServiceUnavailable)
-	before := keyRequests.Load()
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
-		t.Fatalf("cached signing keys unusable during endpoint outage: %v", err)
-	}
-	if keyRequests.Load() != before {
-		t.Fatal("cached verification fetched keys during endpoint outage")
-	}
-	status.Store(http.StatusOK)
-	keys.Store([]byte("not JSON"))
-	fresh, err := newVerifier()
-	if err != nil {
-		t.Fatalf("lazy verifier construction: %v", err)
-	}
-	if err := fresh.Verify(context.Background(), admissionReview(testGroup).Request, token); err == nil {
-		t.Fatal("real verification accepted malformed signing keys")
-	}
-	keys.Store(testJWKS(t, second.server, "/openid/v1/jwks"))
-	status.Store(http.StatusServiceUnavailable)
-	before = keyRequests.Load()
-	unavailable, err := newVerifier()
-	if err != nil || unavailable == nil {
-		t.Fatalf("discovery with unavailable signing keys = (%v, %v), want a lazy verifier", unavailable, err)
-	}
-	if keyRequests.Load() != before {
-		t.Fatal("construction fetched unavailable signing keys")
-	}
-	if err := unavailable.Verify(context.Background(), admissionReview(testGroup).Request, token); err == nil {
-		t.Fatal("verification accepted unavailable signing keys")
-	}
-	if keyRequests.Load() <= before {
-		t.Fatal("verification did not fetch unavailable signing keys")
-	}
-}
-
-type requestTransportFunc func(*http.Request) (*http.Response, error)
-
-func (f requestTransportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
-	return f(r)
-}
-
-func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	const projectedIssuer = "https://projected-issuer.example"
-	projectedClaims := ts.baseClaims()
-	projectedClaims["iss"] = projectedIssuer
-	projectedClaims["aud"] = []string{"https://kubernetes.default.svc"}
-	delete(projectedClaims, "kubernetes.io")
-	projected := ts.sign(t, projectedClaims)
-	tokenFile := filepath.Join(t.TempDir(), "token")
-	if err := os.WriteFile(tokenFile, []byte(projected), 0600); err != nil {
-		t.Fatal(err)
-	}
-	var requests atomic.Int32
-	config := &rest.Config{
-		Host:            ts.issuer + "/",
-		BearerTokenFile: tokenFile,
-		TLSClientConfig: rest.TLSClientConfig{
-			CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.server.Certificate().Raw}),
-		},
-		WrapTransport: func(next http.RoundTripper) http.RoundTripper {
-			return requestTransportFunc(func(r *http.Request) (*http.Response, error) {
-				requests.Add(1)
-				if r.URL.Path != "/openid/v1/jwks" {
-					t.Errorf("local verification requested %q", r.URL.Path)
-				}
-				if r.Header.Get("Authorization") != "Bearer "+projected {
-					t.Error("local JWKS request did not use the projected credential")
-				}
-				return next.RoundTrip(r)
-			})
-		},
-	}
-	v, err := admission.NewLocalVerifierForTest(context.Background(), config, testAudience)
-	if err != nil {
-		t.Fatal(err)
-	}
-	claims := ts.baseClaims()
-	claims["iss"] = projectedIssuer
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, ts.sign(t, claims)); err != nil {
-		t.Fatalf("projected issuer: %v", err)
-	}
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, ts.sign(t, ts.baseClaims())); err == nil {
-		t.Fatal("incoming token selected the expected issuer")
-	}
-	if requests.Load() == 0 {
-		t.Fatal("local verification did not fetch signing keys")
-	}
-	if config.BearerTokenFile != tokenFile || config.BearerToken != "" {
-		t.Fatal("constructor mutated the supplied REST configuration")
-	}
-	t.Run("static BearerToken without BearerTokenFile is rejected", func(t *testing.T) {
-		staticOnly := rest.CopyConfig(config)
-		staticOnly.BearerToken = projected
-		staticOnly.BearerTokenFile = ""
-		before := requests.Load()
-		if verifier, err := admission.NewLocalVerifierForTest(context.Background(), staticOnly, testAudience); err == nil || verifier != nil {
-			t.Fatalf("static BearerToken bootstrap = (%v, %v), want error requiring BearerTokenFile", verifier, err)
-		}
-		if requests.Load() != before {
-			t.Fatal("invalid local bootstrap performed network I/O")
-		}
-	})
-	t.Run("malformed projected token", func(t *testing.T) {
-		badFile := filepath.Join(t.TempDir(), "bad-token")
-		if err := os.WriteFile(badFile, []byte("opaque"), 0600); err != nil {
-			t.Fatal(err)
-		}
-		bad := rest.CopyConfig(config)
-		bad.BearerTokenFile = badFile
-		before := requests.Load()
-		if verifier, err := admission.NewLocalVerifierForTest(context.Background(), bad, testAudience); err == nil || verifier != nil {
-			t.Fatalf("local bootstrap = (%v, %v)", verifier, err)
-		}
-		if requests.Load() != before {
-			t.Fatal("invalid local bootstrap performed network I/O")
-		}
-	})
-	badCA := rest.CopyConfig(config)
-	badCA.CAData = []byte("not a certificate")
-	if verifier, err := admission.NewLocalVerifierForTest(context.Background(), badCA, testAudience); err == nil || verifier != nil {
-		t.Fatalf("invalid client-go CA configuration = (%v, %v)", verifier, err)
-	}
-}
-
-func TestRemoteIssuerConfiguration(t *testing.T) {
-	for _, issuer := range []string{
-		"http://issuer.example", "https://user:password@issuer.example", "https://issuer.example?query=value", "https://issuer.example#fragment",
-	} {
-		t.Run(issuer, func(t *testing.T) {
-			if verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(issuer, testAudience, nil)); err == nil || verifier != nil {
-				t.Fatalf("invalid remote issuer = (%v, %v)", verifier, err)
-			}
-		})
-	}
-	var keysRequested atomic.Int32
-	var server *httptest.Server
-	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/.well-known/openid-configuration" {
-			_ = json.NewEncoder(w).Encode(map[string]any{"issuer": "https://other.example", "jwks_uri": server.URL + "/keys"})
-			return
-		}
-		keysRequested.Add(1)
-		_, _ = w.Write([]byte(`{"keys":[]}`))
-	}))
-	defer server.Close()
-	if verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client())); err == nil || verifier != nil {
-		t.Fatalf("mismatched discovery issuer = (%v, %v)", verifier, err)
-	}
-	if keysRequested.Load() != 0 {
-		t.Fatal("mismatched issuer proceeded to the signing-key endpoint")
-	}
-}
-
-func TestRemoteVerificationBoundsBackgroundFetch(t *testing.T) {
-	issuer := newOIDCTestServer(t)
-	keys := testJWKS(t, issuer.server, "/keys")
-	var block atomic.Bool
-	started := make(chan struct{})
-	finished := make(chan struct{})
-	var server *httptest.Server
-	server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/.well-known/openid-configuration" {
-			_ = json.NewEncoder(w).Encode(map[string]any{"issuer": server.URL, "jwks_uri": server.URL + "/keys"})
-			return
-		}
-		if block.Load() {
-			close(started)
-			<-r.Context().Done()
-			close(finished)
-			return
-		}
-		_, _ = w.Write(keys)
-	}))
-	defer server.Close()
-	client := server.Client()
-	client.Timeout = 200 * time.Millisecond
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, client))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if client.CheckRedirect != nil || client.Timeout != 200*time.Millisecond {
-		t.Fatal("constructor mutated the caller's HTTP client")
-	}
-	claims := issuer.baseClaims()
-	claims["iss"] = server.URL
-	token := issuer.sign(t, claims)
-	block.Store(true)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	done := make(chan error, 1)
-	go func() { done <- v.Verify(ctx, admissionReview(testGroup).Request, token) }()
-	select {
-	case <-started:
-	case <-time.After(5 * time.Second):
-		t.Fatal("verification did not fetch signing keys lazily")
-	}
-	cancel()
-	select {
-	case err := <-done:
-		if err == nil || err.Error() != "webhook token verification failed" {
-			t.Fatalf("cancelled verification = %v", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("verification did not cancel its wait")
-	}
-	select {
-	case <-finished:
-	case <-time.After(5 * time.Second):
-		t.Fatal("background key request outlived the HTTP client's timeout")
-	}
-}
-
-func TestVerifierErrorsAreGeneric(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
-	good := ts.sign(t, ts.baseClaims())
-	invalidClaims := ts.baseClaims()
-	delete(invalidClaims, "kubernetes.io")
-	generic := v.Verify(context.Background(), nil, good)
-	for _, tc := range []struct {
-		name  string
-		token string
-		req   *admissionv1.AdmissionRequest
-	}{
-		{name: "signature", token: "invalid", req: admissionReview(testGroup).Request},
-		{name: "Kubernetes claims", token: ts.sign(t, invalidClaims), req: admissionReview(testGroup).Request},
-		{name: "group", token: good, req: admissionReview("batch").Request},
-		{name: "nil request", token: good},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			err := v.Verify(context.Background(), tc.req, tc.token)
-			//nolint:errorlint // Wrapped errors must fail this identity assertion.
-			if err == nil || err != generic || err.Error() != "webhook token verification failed" {
-				t.Fatalf("verification error = %v, want the same generic failure", err)
-			}
-		})
-	}
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, good); err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	//nolint:errorlint // Wrapped errors must fail this identity assertion.
-	if err := v.Verify(ctx, admissionReview(testGroup).Request, good); err != generic {
-		t.Fatalf("cancelled verification = %v, want generic failure", err)
 	}
 }
 
@@ -1902,103 +1177,6 @@ func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) 
 	// The downstream received the decoded request, not a re-read of the body.
 	if gotRequest == nil || gotRequest.Resource.Group != testGroup {
 		t.Errorf("downstream did not receive the single decoded request: %+v", gotRequest)
-	}
-}
-
-// TestVerifierVerify_ZeroDecode asserts the decoded entry point cannot read
-// an HTTP body because Verifier.Verify takes only an AdmissionRequest and token.
-func TestVerifierVerify_ZeroDecode(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	vv := ts.verifier(t)
-	token := ts.sign(t, ts.baseClaims())
-
-	req := admissionReview(testGroup).Request
-	if err := vv.Verify(context.Background(), req, token); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// A nil request fails closed with the generic error, still without any decode.
-	err := vv.Verify(context.Background(), nil, token)
-	if err == nil || err.Error() != "webhook token verification failed" {
-		t.Fatalf("nil request: want generic verification failure, got %v", err)
-	}
-}
-
-// TestNewVerifier_InClusterExplicitAudience verifies that the decoded in-cluster
-// path enforces the explicitly configured audience.
-func TestNewVerifier_InClusterExplicitAudience(t *testing.T) {
-	ts := newOIDCTestServer(t)
-
-	v, err := ts.localVerifier(testAudience)
-	if err != nil {
-		t.Fatalf("NewVerifier: %v", err)
-	}
-	token := ts.sign(t, ts.baseClaims())
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err != nil {
-		t.Errorf("unexpected verification error: %v", err)
-	}
-
-	// A token carrying the wrong audience is denied fail-closed (the bound audience
-	// is enforced natively as the go-oidc ClientID).
-	wrong := ts.baseClaims()
-	wrong["aud"] = []string{"someone.else.example.com"}
-	err = v.Verify(context.Background(), admissionReview(testGroup).Request, ts.sign(t, wrong))
-	if err == nil || err.Error() != "webhook token verification failed" {
-		t.Errorf("wrong audience: want generic verification failure, got %v", err)
-	}
-}
-
-// TestWithServiceAudience_ConflictsWithIssuer proves WithServiceAudience and
-// WithIssuer cannot be combined: the audience would be set two ways, so the
-// builder fails closed at construction rather than applying a silent precedence.
-func TestWithServiceAudience_ConflictsWithIssuer(t *testing.T) {
-	ts := newOIDCTestServer(t)
-
-	v, err := admission.NewVerifierForTest(context.Background(),
-		admission.WithIssuer(ts.issuer, testAudience, ts.client()),
-		admission.WithServiceAudience("hook", "/validate", 443))
-	if err == nil {
-		t.Fatalf("expected a construction error combining WithServiceAudience and WithIssuer, got verifier %v", v)
-	}
-	if v != nil {
-		t.Errorf("expected a nil verifier on a construction error, got %v", v)
-	}
-	if !strings.Contains(err.Error(), "WithServiceAudience cannot be combined with WithIssuer") {
-		t.Errorf("error = %q, want it to mention the WithServiceAudience/WithIssuer conflict", err)
-	}
-}
-
-// TestWithServiceAudience_EmptyIsError proves an explicit but incomplete Service
-// audience is a hard construction error, never a verifier built with an
-// audience-skipping audience.
-func TestWithServiceAudience_EmptyIsError(t *testing.T) {
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithServiceAudience("", "", 0))
-	if err == nil || v != nil {
-		t.Fatalf("NewVerifier with empty Service audience = (%v, %v), want (nil, error)", v, err)
-	}
-}
-
-func TestInClusterRequiresTrustedAudienceBeforeBootstrap(t *testing.T) {
-	admit := func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
-		return &admissionv1.AdmissionResponse{Allowed: true}
-	}
-	for _, tc := range []struct {
-		name string
-		opts []admission.Option
-	}{
-		{name: "no options"},
-		{name: "empty audience", opts: []admission.Option{admission.WithServiceAudience("", "", 0)}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			h, err := admission.WithTokenVerification(context.Background(), admit, tc.opts...)
-			if h != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
-				t.Fatalf("WithTokenVerification = (%v, %v), want audience error", h, err)
-			}
-			v, err := admission.NewVerifierForTest(context.Background(), tc.opts...)
-			if v != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
-				t.Fatalf("NewVerifier = (%v, %v), want audience error", v, err)
-			}
-		})
 	}
 }
 
@@ -2830,359 +2008,392 @@ func TestTokenReuseDoesNotSkipRequestChecks(t *testing.T) {
 	}
 }
 
-func TestVerifier_SubresourceKindAndObjectGroups(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
-	if err != nil {
-		t.Fatalf("construct token verifier: %v", err)
-	}
-	token := ts.sign(t, ts.baseClaims())
-	appsResource := metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
-	appsKind := metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
-	scaleKind := metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}
-	for _, tc := range []struct {
-		name     string
-		kind     metav1.GroupVersionKind
-		sub      string
-		object   string
-		old      string
-		wantDeny bool
-	}{
-		{
-			name: "legitimate deployments scale subresource",
-			kind: scaleKind, sub: "scale", object: `{"apiVersion":"autoscaling/v1","kind":"Scale"}`,
-		},
-		{
-			name: "scale subresource rejects unsupported kind version",
-			kind: metav1.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "Scale"},
-			sub:  "scale", object: `{"apiVersion":"autoscaling/v2","kind":"Scale"}`, wantDeny: true,
-		},
-		{
-			name: "ordinary resource cannot switch kind groups",
-			kind: scaleKind, object: `{"apiVersion":"autoscaling/v1","kind":"Scale"}`, wantDeny: true,
-		},
-		{
-			name: "forged scale subresource cannot carry a Role",
-			kind: metav1.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"},
-			sub:  "scale", object: `{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role"}`, wantDeny: true,
-		},
-		{
-			name: "unknown subresource cannot switch to autoscaling group",
-			kind: scaleKind, sub: "other", object: `{"apiVersion":"autoscaling/v1","kind":"Scale"}`, wantDeny: true,
-		},
-		{
-			name: "subresource object differs from admitted Scale kind",
-			kind: scaleKind, sub: "scale", object: `{"apiVersion":"apps/v1","kind":"Deployment"}`, wantDeny: true,
-		},
-		{
-			name: "subresource without a kind cannot claim another object group",
-			sub:  "scale", object: `{"apiVersion":"autoscaling/v1","kind":"Scale"}`, wantDeny: true,
-		},
-		{
-			name: "old object mismatches scale kind",
-			kind: scaleKind, sub: "scale", object: `{"apiVersion":"autoscaling/v1","kind":"Scale"}`,
-			old: `{"apiVersion":"apps/v1","kind":"Deployment"}`, wantDeny: true,
-		},
-		{
-			name: "ordinary object Kind disagrees with AdmissionRequest Kind",
-			kind: appsKind, object: `{"apiVersion":"apps/v1","kind":"Pod"}`, wantDeny: true,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			operation := admissionv1.Create
-			if tc.sub == "scale" || tc.old != "" {
-				operation = admissionv1.Update
-			}
-			request := admissionRequest(tc.kind, appsResource, tc.sub, operation)
-			request.Object.Raw = []byte(tc.object)
-			if operation == admissionv1.Update {
-				request.OldObject.Raw = bytes.Clone(request.Object.Raw)
-			}
-			if tc.old != "" {
-				request.OldObject.Raw = []byte(tc.old)
-			}
-			err := verifier.Verify(context.Background(), request, token)
-			if tc.wantDeny {
-				if err == nil || err.Error() != "webhook token verification failed" {
-					t.Fatalf("verification = %v, want generic denial", err)
-				}
-			} else if err != nil {
-				t.Fatalf("valid subresource request denied: %v", err)
-			}
-		})
-	}
-}
-
-func TestVerifier_DecodedObjectsMatchAdmittedKind(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
-	if err != nil {
-		t.Fatalf("construct token verifier: %v", err)
-	}
-	token := ts.sign(t, ts.baseClaims())
-	object := func(apiVersion, kind string) runtime.Object {
-		return &unstructured.Unstructured{Object: map[string]any{"apiVersion": apiVersion, "kind": kind}}
-	}
-	for _, tc := range []struct {
-		name     string
-		current  runtime.Object
-		old      runtime.Object
-		wantDeny bool
-	}{
-		{name: "matching current and old objects", current: object("apps/v1", "Deployment"), old: object("apps/v1", "Deployment")},
-		{name: "wrong current group", current: object("batch/v1", "Job"), wantDeny: true},
-		{name: "wrong old group", current: object("apps/v1", "Deployment"), old: object("batch/v1", "Job"), wantDeny: true},
-		{name: "missing object type metadata", current: &unstructured.Unstructured{Object: map[string]any{"metadata": map[string]any{"name": "missing"}}}, wantDeny: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			operation := admissionv1.Create
-			if tc.old != nil {
-				operation = admissionv1.Update
-			}
-			req := admissionRequest(
-				metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
-				metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-				"", operation,
-			)
-			req.Object = runtime.RawExtension{Object: tc.current}
-			if tc.old != nil {
-				req.OldObject = runtime.RawExtension{Object: tc.old}
-			}
-			err := verifier.Verify(context.Background(), req, token)
-			if tc.wantDeny {
-				if err == nil || err.Error() != "webhook token verification failed" {
-					t.Fatalf("verification = %v, want generic denial", err)
-				}
-			} else if err != nil {
-				t.Fatalf("matching decoded objects denied: %v", err)
-			}
-		})
-	}
-}
-
-func TestVerifier_CoreCrossGroupSubresources(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
-	if err != nil {
-		t.Fatalf("construct token verifier: %v", err)
-	}
-	claims := ts.baseClaims()
-	claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{
-		admissionReviewAPIGroupsClaimKey: []string{"*"},
-	}
-	token := ts.sign(t, claims)
-	for _, tc := range []struct {
-		name                                   string
-		resource, resourceVersion, subresource string
-		group, kindVersion, kind               string
-		object                                 string
-		wantDeny                               bool
-	}{
-		{
-			name: "Pod eviction", resource: "pods", resourceVersion: "v1", subresource: "eviction", group: "policy", kindVersion: "v1", kind: "Eviction",
-			object: `{"apiVersion":"policy/v1","kind":"Eviction"}`,
-		},
-		{
-			name: "ServiceAccount token", resource: "serviceaccounts", resourceVersion: "v1", subresource: "token", group: "authentication.k8s.io", kindVersion: "v1", kind: "TokenRequest",
-			object: `{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest"}`,
-		},
-		{
-			name: "Pod eviction rejects unsupported resource version", resource: "pods", resourceVersion: "v2", subresource: "eviction", group: "policy", kindVersion: "v1", kind: "Eviction",
-			object: `{"apiVersion":"policy/v1","kind":"Eviction"}`, wantDeny: true,
-		},
-		{
-			name: "ServiceAccount token rejects unsupported resource version", resource: "serviceaccounts", resourceVersion: "v2", subresource: "token", group: "authentication.k8s.io", kindVersion: "v1", kind: "TokenRequest",
-			object: `{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest"}`, wantDeny: true,
-		},
-		{
-			name: "Pod eviction rejects unsupported kind version", resource: "pods", resourceVersion: "v1", subresource: "eviction", group: "policy", kindVersion: "v2", kind: "Eviction",
-			object: `{"apiVersion":"policy/v2","kind":"Eviction"}`, wantDeny: true,
-		},
-		{
-			name: "ServiceAccount token rejects unsupported kind version", resource: "serviceaccounts", resourceVersion: "v1", subresource: "token", group: "authentication.k8s.io", kindVersion: "v2", kind: "TokenRequest",
-			object: `{"apiVersion":"authentication.k8s.io/v2","kind":"TokenRequest"}`, wantDeny: true,
-		},
-		{
-			name: "Pod eviction cannot claim a TokenRequest Kind", resource: "pods", resourceVersion: "v1", subresource: "eviction", group: "authentication.k8s.io", kindVersion: "v1", kind: "TokenRequest",
-			object: `{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest"}`, wantDeny: true,
-		},
-		{
-			name: "Secret cannot spoof a Pod eviction", resource: "secrets", resourceVersion: "v1", subresource: "eviction", group: "policy", kindVersion: "v1", kind: "Eviction",
-			object: `{"apiVersion":"policy/v1","kind":"Eviction"}`, wantDeny: true,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			request := admissionRequest(
-				metav1.GroupVersionKind{Group: tc.group, Version: tc.kindVersion, Kind: tc.kind},
-				metav1.GroupVersionResource{Version: tc.resourceVersion, Resource: tc.resource},
-				tc.subresource, admissionv1.Create,
-			)
-			request.Object.Raw = []byte(tc.object)
-			err := verifier.Verify(context.Background(), request, token)
-			if tc.wantDeny {
-				if err == nil || err.Error() != "webhook token verification failed" {
-					t.Fatalf("cross-group spoof: verification = %v, want generic denial", err)
-				}
-			} else if err != nil {
-				t.Fatalf("legitimate cross-group subresource denied: %v", err)
-			}
-		})
-	}
-}
-
-func TestVerifier_RejectsMissingObjectTypeMetaForCoreGroup(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
-	if err != nil {
-		t.Fatalf("construct token verifier: %v", err)
-	}
-	claims := ts.baseClaims()
-	claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{
-		admissionReviewAPIGroupsClaimKey: []string{"*"},
-	}
-	token := ts.sign(t, claims)
-	for _, tc := range []struct{ name, object string }{
-		{name: "JSON null", object: `null`},
-		{name: "empty object", object: `{}`},
-		{name: "versionless apiVersion", object: `{"apiVersion":"/","kind":"Pod"}`},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			request := admissionRequest(
-				metav1.GroupVersionKind{Version: "v1", Kind: "Pod"},
-				metav1.GroupVersionResource{Version: "v1", Resource: "pods"},
-				"", admissionv1.Create,
-			)
-			request.Object.Raw = []byte(tc.object)
-			if err := verifier.Verify(context.Background(), request, token); err == nil || err.Error() != "webhook token verification failed" {
-				t.Fatalf("missing object type metadata: got %v, want generic denial", err)
-			}
-		})
-	}
-}
-
-func TestVerifierOperationShapes(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
-	claims := ts.baseClaims()
-	claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{admissionReviewAPIGroupsClaimKey: []string{"*"}}
-	token := ts.sign(t, claims)
-	appsKind := metav1.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}
-	appsResource := metav1.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
-	for _, tc := range []struct {
+// TestBearerToken_Table exercises the header parser directly across the scheme
+// and token shapes it must accept or reject. The scheme match is
+// case-insensitive (RFC 7235); an empty or whitespace-only token is rejected so
+// a bare "Bearer" header cannot slip through as a present-but-empty credential.
+func TestBearerToken_Table(t *testing.T) {
+	tests := []struct {
 		name      string
-		operation admissionv1.Operation
-		mutate    func(*admissionv1.AdmissionRequest)
+		header    string // "" means no Authorization header at all
+		wantToken string
+		wantOK    bool
 	}{
-		{name: "create", operation: admissionv1.Create},
-		{name: "update", operation: admissionv1.Update},
-		{name: "delete old only", operation: admissionv1.Delete},
-		{name: "connect with options", operation: admissionv1.Connect, mutate: func(r *admissionv1.AdmissionRequest) {
-			*r = *admissionRequest(metav1.GroupVersionKind{Version: "v1", Kind: "PodExecOptions"}, metav1.GroupVersionResource{Version: "v1", Resource: "pods"}, "exec", admissionv1.Connect)
-		}},
-		{name: "connect without options", operation: admissionv1.Connect, mutate: func(r *admissionv1.AdmissionRequest) { r.Object = runtime.RawExtension{} }},
-		{name: "core group", operation: admissionv1.Create, mutate: func(r *admissionv1.AdmissionRequest) {
-			*r = *admissionRequest(metav1.GroupVersionKind{Version: "v1", Kind: "Pod"}, metav1.GroupVersionResource{Version: "v1", Resource: "pods"}, "", admissionv1.Create)
-		}},
-		{name: "CRD scale version differs from parent", operation: admissionv1.Update, mutate: func(r *admissionv1.AdmissionRequest) {
-			*r = *admissionRequest(metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}, metav1.GroupVersionResource{Group: "example.com", Version: "v2", Resource: "widgets"}, "scale", admissionv1.Update)
-		}},
-		{name: "custom future operation", operation: "CUSTOM"},
-	} {
+		{name: "valid bearer", header: "Bearer abc.def.ghi", wantToken: "abc.def.ghi", wantOK: true},
+		{name: "lowercase scheme is accepted", header: "bearer abc", wantToken: "abc", wantOK: true},
+		{name: "mixed-case scheme is accepted", header: "BeArEr abc", wantToken: "abc", wantOK: true},
+		{name: "trailing header whitespace is trimmed", header: "Bearer abc   ", wantToken: "abc", wantOK: true},
+		{name: "extra space before the token is rejected (matches apiserver)", header: "Bearer    abc", wantOK: false},
+		{name: "no header", header: "", wantOK: false},
+		{name: "non-bearer scheme", header: "Basic dXNlcjpwYXNz", wantOK: false},
+		{name: "bearer with empty token", header: "Bearer ", wantOK: false},
+		{name: "bearer with whitespace-only token", header: "Bearer      ", wantOK: false},
+		{name: "shorter than the scheme prefix", header: "Bear", wantOK: false},
+	}
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			req := admissionRequest(appsKind, appsResource, "", tc.operation)
-			if tc.mutate != nil {
-				tc.mutate(req)
+			r := httptest.NewRequest(http.MethodPost, "/validate", nil)
+			if tc.header != "" {
+				r.Header.Set("Authorization", tc.header)
 			}
-			if err := v.Verify(context.Background(), req, token); err != nil {
-				t.Fatalf("legitimate operation denied: %v", err)
+			token, ok := admission.BearerTokenForTest(r)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
 			}
-			raw, err := json.Marshal(&admissionv1.AdmissionReview{TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"}, Request: req})
-			if err != nil {
-				t.Fatal(err)
-			}
-			spy := newSpyHandler()
-			h := admission.NewHandlerForTest(v, spy.serve)
-			rec := httptest.NewRecorder()
-			h.ServeHTTP(rec, newRequest(t, raw, token))
-			var result admissionv1.AdmissionReview
-			if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
-				t.Fatal(err)
-			}
-			if rec.Code != http.StatusOK || result.Response == nil || !result.Response.Allowed || result.Response.UID != req.UID || !spy.wasReached() {
-				t.Fatalf("HTTP verification: status=%d response=%+v callback=%t", rec.Code, result.Response, spy.wasReached())
+			if ok && token != tc.wantToken {
+				t.Errorf("token = %q, want %q", token, tc.wantToken)
 			}
 		})
 	}
 }
 
-type metadataOnlyObject struct {
-	metav1.TypeMeta
-	NonJSON chan struct{} `json:"nonJSON"`
+const (
+	testKeyID    = "test-signing-key"
+	testAudience = "webhook.example.com"
+	testGroup    = "apps"
+	testSubject  = "system:serviceaccount:kube-system:webhook-auth"
+	reviewUID    = "req-uid-1"
+
+	// admissionReviewAPIGroupsClaimKey is the KEP-6060 attestation claim key (the
+	// server-side authentication.AttestationAdmissionReviewAPIGroups value). The
+	// core package's constant is unexported, so the tests hard-code the wire
+	// string it must match.
+	admissionReviewAPIGroupsClaimKey = "admissionReviewAPIGroups"
+	wildcardAPIGroup                 = "*"
+)
+
+// oidcTestServer serves discovery and signing keys for real RSA verification.
+type oidcTestServer struct {
+	server  *httptest.Server
+	issuer  string
+	signer  jose.Signer
+	tempDir string
 }
 
-func (o *metadataOnlyObject) DeepCopyObject() runtime.Object {
-	if o == nil {
-		return nil
+// startOIDCServer stands up the TLS discovery + JWKS endpoint for a fresh RSA
+// key. It returns an error rather than taking a *testing.T so both the tests
+// (via newOIDCTestServer) and the runnable examples can share one implementation.
+func startOIDCServer() (*oidcTestServer, error) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, err
 	}
-	copy := *o
-	return &copy
-}
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: jose.JSONWebKey{Key: priv, KeyID: testKeyID}},
+		(&jose.SignerOptions{}).WithType("JWT"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	jwks := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{
+		Key:       priv.Public(),
+		KeyID:     testKeyID,
+		Algorithm: string(jose.RS256),
+		Use:       "sig",
+	}}}
 
-func TestVerifierMetadataRepresentations(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
-	token := ts.sign(t, ts.baseClaims())
-	decoded := func(apiVersion, kind string) runtime.Object {
-		return &unstructured.Unstructured{Object: map[string]any{"apiVersion": apiVersion, "kind": kind}}
-	}
-	for _, tc := range []struct {
-		name   string
-		mutate func(*admissionv1.AdmissionRequest)
-		deny   bool
-	}{
-		{name: "complete metadata"},
-		{name: "missing kind", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Kind = metav1.GroupVersionKind{} }},
-		{name: "missing kind version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Kind.Version = "" }},
-		{name: "missing kind name", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Kind.Kind = "" }},
-		{name: "missing resource version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Resource.Version = "" }},
-		{name: "missing resource name", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Resource.Resource = "" }},
-		{name: "null object", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte(" \nnull\t ") }},
-		{name: "malformed raw object", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte("{") }},
-		{name: "missing object version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte(`{"kind":"Deployment"}`) }},
-		{name: "missing object kind", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Raw = []byte(`{"apiVersion":"apps/v1"}`) }},
-		{name: "wrong object version", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
-			r.Object.Raw = []byte(`{"apiVersion":"apps/v2","kind":"Deployment"}`)
-		}},
-		{name: "wrong object kind", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
-			r.Object.Raw = []byte(`{"apiVersion":"apps/v1","kind":"StatefulSet"}`)
-		}},
-		{name: "matching raw and decoded", mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Object = decoded("apps/v1", "Deployment") }},
-		{name: "conflicting raw and decoded", deny: true, mutate: func(r *admissionv1.AdmissionRequest) { r.Object.Object = decoded("batch/v1", "Job") }},
-		{name: "null raw and present decoded", deny: true, mutate: func(r *admissionv1.AdmissionRequest) {
-			r.Object.Raw = []byte("null")
-			r.Object.Object = decoded("apps/v1", "Deployment")
-		}},
-		{name: "decoded metadata only", mutate: func(r *admissionv1.AdmissionRequest) {
-			r.Object = runtime.RawExtension{Object: &metadataOnlyObject{TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, NonJSON: make(chan struct{})}}
-		}},
-		{name: "original equivalent version differs", mutate: func(r *admissionv1.AdmissionRequest) {
-			r.RequestKind = &metav1.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}
-			r.RequestResource = &metav1.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			req := admissionReview(testGroup).Request
-			if tc.mutate != nil {
-				tc.mutate(req)
-			}
-			err := v.Verify(context.Background(), req, token)
-			if tc.deny {
-				if err == nil || err.Error() != "webhook token verification failed" {
-					t.Fatalf("Verify = %v, want generic denial", err)
-				}
-			} else if err != nil {
-				t.Fatalf("matching metadata denied: %v", err)
-			}
+	ts := &oidcTestServer{signer: signer}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                                ts.issuer,
+			"jwks_uri":                              ts.issuer + "/keys",
+			"id_token_signing_alg_values_supported": []string{string(jose.RS256)},
 		})
+	})
+	mux.HandleFunc("/keys", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
+	// Local verification uses the fixed JWKS path.
+	mux.HandleFunc("/openid/v1/jwks", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(jwks)
+	})
+	ts.server = httptest.NewTLSServer(mux)
+	ts.issuer = ts.server.URL
+	return ts, nil
+}
+
+// newOIDCTestServer is the *testing.T wrapper around startOIDCServer, wiring
+// cleanup so the server is closed at the end of the test.
+func newOIDCTestServer(t *testing.T) *oidcTestServer {
+	t.Helper()
+	ts, err := startOIDCServer()
+	if err != nil {
+		t.Fatalf("starting OIDC test server: %v", err)
 	}
+	ts.tempDir = t.TempDir()
+	t.Cleanup(ts.server.Close)
+	return ts
+}
+
+func (ts *oidcTestServer) close()               { ts.server.Close() }
+func (ts *oidcTestServer) client() *http.Client { return ts.server.Client() }
+
+// verifier builds a fixed-audience Verifier via full OIDC discovery over TLS.
+func (ts *oidcTestServer) verifier(t *testing.T) *admission.VerifierForTest {
+	t.Helper()
+	v, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	if err != nil {
+		t.Fatalf("NewVerifier: %v", err)
+	}
+	return v
+}
+
+func (ts *oidcTestServer) localVerifier(audience string) (*admission.VerifierForTest, error) {
+	claims := ts.baseClaims()
+	claims["sub"] = "system:serviceaccount:webhooks:receiver"
+	claims["aud"] = []string{"https://kubernetes.default.svc"}
+	claims["kubernetes.io"] = map[string]any{
+		"namespace":      "webhooks",
+		"serviceaccount": map[string]any{"name": "receiver", "uid": "receiver-uid"},
+	}
+	projectedToken, err := ts.signClaims(claims)
+	if err != nil {
+		return nil, err
+	}
+	tokenFile := filepath.Join(ts.tempDir, "projected-token")
+	if err := os.WriteFile(tokenFile, []byte(projectedToken), 0600); err != nil {
+		return nil, err
+	}
+	config := &rest.Config{
+		Host:            ts.issuer,
+		BearerTokenFile: tokenFile,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.server.Certificate().Raw}),
+		},
+	}
+	return admission.NewLocalVerifierForTest(context.Background(), config, audience)
+}
+
+func (ts *oidcTestServer) localHandler(next admission.AdmissionHandler, audience string) (*admission.Handler, error) {
+	v, err := ts.localVerifier(audience)
+	if err != nil {
+		return nil, err
+	}
+	return admission.NewHandlerForTest(v, next), nil
+}
+
+// signClaims mints a compact RS256 JWS over claims using the server's advertised
+// key. It returns an error so the runnable examples can reuse it.
+func (ts *oidcTestServer) signClaims(claims map[string]any) (string, error) {
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		return "", err
+	}
+	jws, err := ts.signer.Sign(payload)
+	if err != nil {
+		return "", err
+	}
+	return jws.CompactSerialize()
+}
+
+// sign is the *testing.T wrapper around signClaims.
+func (ts *oidcTestServer) sign(t *testing.T, claims map[string]any) string {
+	t.Helper()
+	tok, err := ts.signClaims(claims)
+	if err != nil {
+		t.Fatalf("signing claims: %v", err)
+	}
+	return tok
+}
+
+// baseClaims returns a valid validating-webhook-bound token claim set for
+// testGroup with a comfortably future expiry and this server's issuer. Tests
+// mutate the returned map to build sad-path variants.
+func (ts *oidcTestServer) baseClaims() map[string]any {
+	now := time.Now()
+	return map[string]any{
+		"iss": ts.issuer,
+		"sub": testSubject,
+		"aud": []string{testAudience},
+		"exp": now.Add(5 * time.Minute).Unix(),
+		"nbf": now.Add(-1 * time.Minute).Unix(),
+		"iat": now.Unix(),
+		"kubernetes.io": map[string]any{
+			"validatingwebhookconfiguration": map[string]any{"name": "vwc", "uid": "vwc-uid"},
+			"attestations": map[string]any{
+				admissionReviewAPIGroupsClaimKey: []string{testGroup},
+			},
+		},
+	}
+}
+
+// coreGroupClaims provides a valid core-group token to catch malformed reviews
+// accidentally accepted as empty-group requests.
+func (ts *oidcTestServer) coreGroupClaims() map[string]any {
+	c := ts.baseClaims()
+	k8s := c["kubernetes.io"].(map[string]any)
+	k8s["attestations"] = map[string]any{
+		admissionReviewAPIGroupsClaimKey: []string{""},
+	}
+	return c
+}
+
+func admissionRequest(kind metav1.GroupVersionKind, resource metav1.GroupVersionResource, subresource string, operation admissionv1.Operation) *admissionv1.AdmissionRequest {
+	apiVersion := kind.Version
+	if kind.Group != "" {
+		apiVersion = kind.Group + "/" + kind.Version
+	}
+	raw, _ := json.Marshal(metav1.TypeMeta{APIVersion: apiVersion, Kind: kind.Kind})
+	req := &admissionv1.AdmissionRequest{
+		UID:                types.UID(reviewUID),
+		Kind:               kind,
+		Resource:           resource,
+		SubResource:        subresource,
+		RequestKind:        &kind,
+		RequestResource:    &resource,
+		RequestSubResource: subresource,
+		Operation:          operation,
+		Name:               "my-deploy",
+	}
+	switch operation {
+	case admissionv1.Create, admissionv1.Connect:
+		req.Object.Raw = raw
+	case admissionv1.Update:
+		req.Object.Raw = raw
+		req.OldObject.Raw = bytes.Clone(raw)
+	case admissionv1.Delete:
+		req.OldObject.Raw = raw
+	}
+	return req
+}
+
+func admissionReview(apiGroup string) *admissionv1.AdmissionReview {
+	return &admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
+		Request: admissionRequest(
+			metav1.GroupVersionKind{Group: apiGroup, Version: "v1", Kind: "Deployment"},
+			metav1.GroupVersionResource{Group: apiGroup, Version: "v1", Resource: "deployments"},
+			"", admissionv1.Create,
+		),
+	}
+}
+
+// admissionReviewBody builds a JSON AdmissionReview request body whose resource
+// belongs to apiGroup. It is the payload the adapter decodes.
+func admissionReviewBody(t *testing.T, apiGroup string) []byte {
+	t.Helper()
+	body, err := json.Marshal(admissionReview(apiGroup))
+	if err != nil {
+		t.Fatalf("marshal AdmissionReview: %v", err)
+	}
+	return body
+}
+
+func configMapUpdateReviewBody(t *testing.T, value string) []byte {
+	t.Helper()
+	object, err := json.Marshal(&corev1.ConfigMap{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{Name: "large-config"},
+		Data:       map[string]string{"payload": value},
+	})
+	if err != nil {
+		t.Fatalf("marshal ConfigMap: %v", err)
+	}
+	review := admissionv1.AdmissionReview{
+		TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
+		Request: &admissionv1.AdmissionRequest{
+			UID:       types.UID(reviewUID),
+			Kind:      metav1.GroupVersionKind{Version: "v1", Kind: "ConfigMap"},
+			Resource:  metav1.GroupVersionResource{Version: "v1", Resource: "configmaps"},
+			Operation: admissionv1.Update,
+			Object:    runtime.RawExtension{Raw: object},
+			OldObject: runtime.RawExtension{Raw: object},
+		},
+	}
+	body, err := json.Marshal(review)
+	if err != nil {
+		t.Fatalf("marshal AdmissionReview: %v", err)
+	}
+	return body
+}
+
+// spyHandler is the downstream admission webhook the adapter forwards to. It is
+// an admission.AdmissionHandler: it receives the AdmissionRequest the
+// adapter already decoded and verified, records what it observed, and returns a
+// canned allow response (the adapter wraps and writes it).
+type spyHandler struct {
+	mu         sync.Mutex
+	reached    bool
+	gotRequest *admissionv1.AdmissionRequest
+	allowVal   bool
+}
+
+func newSpyHandler() *spyHandler {
+	return &spyHandler{allowVal: true}
+}
+
+// serve matches admission.AdmissionHandler.
+func (s *spyHandler) serve(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+	s.mu.Lock()
+	s.reached = true
+	s.gotRequest = req
+	s.mu.Unlock()
+	return &admissionv1.AdmissionResponse{Allowed: s.allowVal}
+}
+
+func (s *spyHandler) wasReached() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.reached
+}
+
+func (s *spyHandler) request() *admissionv1.AdmissionRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.gotRequest
+}
+
+// newRequest builds a POST carrying the AdmissionReview body and, when token is
+// non-empty, an Authorization: Bearer header.
+func newRequest(t *testing.T, body []byte, token string) *http.Request {
+	t.Helper()
+	r := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		r.Header.Set("Authorization", "Bearer "+token)
+	}
+	return r
+}
+
+type observedBody struct {
+	reader    *bytes.Reader
+	reads     int
+	bytesRead int
+	closes    int
+}
+
+func (b *observedBody) Read(p []byte) (int, error) {
+	b.reads++
+	n, err := b.reader.Read(p)
+	b.bytesRead += n
+	return n, err
+}
+
+func (b *observedBody) Close() error {
+	b.closes++
+	return nil
+}
+
+func testJWKS(t *testing.T, server *httptest.Server, path string) []byte {
+	t.Helper()
+	resp, err := server.Client().Get(server.URL + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("JWKS fixture = (%d, %v)", resp.StatusCode, err)
+	}
+	return data
+}
+
+type requestTransportFunc func(*http.Request) (*http.Response, error)
+
+func (f requestTransportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
 }
