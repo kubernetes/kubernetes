@@ -41,8 +41,7 @@ type PodResourcesOptions struct {
 	// functions. All existing values in Reuse will be lost.
 	Reuse v1.ResourceList
 	// UseStatusResources indicates whether resources reported by the PodStatus should be considered
-	// when evaluating the pod resources. This MUST be false if the InPlacePodVerticalScaling
-	// feature is not enabled.
+	// when evaluating the pod resources.
 	UseStatusResources bool
 	// InPlacePodLevelResourcesVerticalScalingEnabled indicates whether resources reported by the
 	// PodStatus should be considered when evaluating the pod resources.
@@ -313,7 +312,7 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		var allocatedReqs, actuatedReqs v1.ResourceList
 		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
-		// Once InPlacePodLevelResourcesVerticalScaling and InPlacePodVerticalScaling are GA and feature gates are removed,
+		// Once InPlacePodLevelResourcesVerticalScaling is GA and its feature gate is removed,
 		// container-level fallback becomes redundant because max(spec, actuated, allocated) naturally evaluates to spec at creation time.
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.AllocatedResources != nil && pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
 			allocatedReqs = pod.Status.AllocatedResources
@@ -461,7 +460,7 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 		var actuatedLimits v1.ResourceList
 		// When pod-level status maps are populated, they already contain the aggregate values across all containers.
 		// When unpopulated (e.g., at creation time or when feature gates are disabled), we fall back to container status aggregation.
-		// Once InPlacePodLevelResourcesVerticalScaling and InPlacePodVerticalScaling are GA and feature gates are removed,
+		// Once InPlacePodLevelResourcesVerticalScaling is GA and its feature gate is removed,
 		// container-level fallback becomes redundant because max(spec, actuated) naturally evaluates to spec at creation time.
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
 			actuatedLimits = pod.Status.Resources.Limits

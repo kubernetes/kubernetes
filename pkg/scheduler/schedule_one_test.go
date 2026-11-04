@@ -1404,7 +1404,6 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 }
 
 func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
 
 	logger, ctx := ktesting.NewTestContext(t)

@@ -801,7 +801,6 @@ message Container {
 
   // resizePolicy is the resize policy for the container.
   // This field cannot be set on ephemeral containers.
-  // +featureGate=InPlacePodVerticalScaling
   // +optional
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
@@ -1176,7 +1175,6 @@ message ContainerStatus {
 
   // resources represents the compute resource requests and limits that have been successfully
   // enacted on the running container after it has been started or has been successfully resized.
-  // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional ResourceRequirements resources = 11;
 
@@ -1630,7 +1628,6 @@ message EphemeralContainerCommon {
   optional ResourceRequirements resources = 8;
 
   // resizePolicy is the resources resize policy for the container.
-  // +featureGate=InPlacePodVerticalScaling
   // +optional
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
@@ -5275,7 +5272,6 @@ message PodStatus {
   // Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
   // PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
   // PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
-  // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional string resize = 14;
 

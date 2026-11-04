@@ -521,23 +521,17 @@ const (
 	// Enables specifying resources at pod-level.
 	InPlacePodLevelResourcesVerticalScaling featuregate.Feature = "InPlacePodLevelResourcesVerticalScaling"
 
-	// owner: @vinaykul,@tallclair
-	// kep: http://kep.k8s.io/1287
-	//
-	// Enables In-Place Pod Vertical Scaling
-	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
-
 	// owner: @tallclair @esotsal
 	//
 	// Allow resource resize for containers in Guaranteed pods with integer CPU requests ( default false ).
-	// Applies only in nodes with InPlacePodVerticalScaling and CPU Manager features enabled, and
+	// Applies only in nodes with CPU Manager features enabled, and
 	// CPU Manager Static Policy option set.
 	InPlacePodVerticalScalingExclusiveCPUs featuregate.Feature = "InPlacePodVerticalScalingExclusiveCPUs"
 
 	// owner: @tallclair @pkrishn
 	//
 	// Allow memory resize for containers in Guaranteed pods (default false) when Memory Manager Policy is set to Static.
-	// Applies only in nodes with InPlacePodVerticalScaling and Memory Manager features enabled.
+	// Applies only in nodes with Memory Manager features enabled.
 	InPlacePodVerticalScalingExclusiveMemory featuregate.Feature = "InPlacePodVerticalScalingExclusiveMemory"
 
 	// owner: @natasha41575
@@ -1579,12 +1573,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	InPlacePodVerticalScaling: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
-	},
-
 	InPlacePodVerticalScalingExclusiveCPUs: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2437,7 +2425,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DisableNodeKubeProxyVersion: {},
 
-	DynamicNodeLocalEphemeralVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
+	DynamicNodeLocalEphemeralVolumes: {NodeDeclaredFeatures},
 
 	EmptyDirVolumeMode: {},
 
@@ -2481,19 +2469,17 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ImageVolumeWithDigest: {ImageVolume},
 
-	InPlacePodLevelResourcesVerticalScaling: {InPlacePodVerticalScaling, PodLevelResources, NodeDeclaredFeatures},
+	InPlacePodLevelResourcesVerticalScaling: {PodLevelResources, NodeDeclaredFeatures},
 
-	InPlacePodVerticalScaling: {},
+	InPlacePodVerticalScalingExclusiveCPUs: {},
 
-	InPlacePodVerticalScalingExclusiveCPUs: {InPlacePodVerticalScaling},
+	InPlacePodVerticalScalingExclusiveMemory: {},
 
-	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
+	InPlacePodVerticalScalingInitContainers: {NodeDeclaredFeatures},
 
-	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
+	InPlacePodVerticalScalingMemoryBackedVolumes: {NodeDeclaredFeatures},
 
-	InPlacePodVerticalScalingMemoryBackedVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
-
-	InPlacePodVerticalScalingSchedulerPreemption: {InPlacePodVerticalScaling},
+	InPlacePodVerticalScalingSchedulerPreemption: {},
 
 	InterPodAffinityHostnameFastPath: {},
 
@@ -2503,7 +2489,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	KubeProxyNFTablesLocalhostNodePorts: {},
 
-	KubeletAllocatedPodsEndpoint: {InPlacePodVerticalScaling},
+	KubeletAllocatedPodsEndpoint: {},
 
 	KubeletCgroupDriverFromCRI: {},
 

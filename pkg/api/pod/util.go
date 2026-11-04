@@ -420,7 +420,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowNonLocalProjectedTokenPath:                     false,
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
-		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
 		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
@@ -477,9 +476,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				}
 			}
 		}
-
-		// If oldPod has resize policy set on the restartable init container, we must allow it
-		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
 		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
@@ -770,20 +766,6 @@ func dropDisabledFields(
 	dropDisabledGRPCContainerProbeTLS(podSpec, oldPodSpec)
 	dropDisabledEvictionResponders(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
-		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
-		// field is mutable for certain controllers. Let ValidatePodUpdate handle it.
-		for i := range podSpec.Containers {
-			podSpec.Containers[i].ResizePolicy = nil
-		}
-		for i := range podSpec.InitContainers {
-			podSpec.InitContainers[i].ResizePolicy = nil
-		}
-		for i := range podSpec.EphemeralContainers {
-			podSpec.EphemeralContainers[i].ResizePolicy = nil
-		}
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) && !containerRestartRulesInUse(oldPodSpec) {
 		dropContainerRestartRules(podSpec)
 	}
@@ -1041,28 +1023,6 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		// Drop Resources and AllocatedResources fields from PodStatus
 		podStatus.Resources = nil
 		podStatus.AllocatedResources = nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
-		// Drop Resources fields
-		dropResourcesField := func(csl []api.ContainerStatus) {
-			for i := range csl {
-				csl[i].Resources = nil
-			}
-		}
-		dropResourcesField(podStatus.ContainerStatuses)
-		dropResourcesField(podStatus.InitContainerStatuses)
-		dropResourcesField(podStatus.EphemeralContainerStatuses)
-
-		// Drop AllocatedResources field
-		dropAllocatedResourcesField := func(csl []api.ContainerStatus) {
-			for i := range csl {
-				csl[i].AllocatedResources = nil
-			}
-		}
-		dropAllocatedResourcesField(podStatus.ContainerStatuses)
-		dropAllocatedResourcesField(podStatus.InitContainerStatuses)
-		dropAllocatedResourcesField(podStatus.EphemeralContainerStatuses)
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && !draExendedResourceInUse(oldPodStatus) {
@@ -1365,23 +1325,6 @@ func podLevelStatusResourcesInUse(podStatus *api.PodStatus) bool {
 	}
 
 	return podStatus.Resources != nil || podStatus.AllocatedResources != nil
-}
-
-// inPlacePodVerticalScalingInUse returns true if pod spec is non-nil and ResizePolicy is set
-func inPlacePodVerticalScalingInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	var inUse bool
-	containersMask := Containers | InitContainers
-	VisitContainers(podSpec, containersMask, func(c *api.Container, containerType ContainerType) bool {
-		if len(c.ResizePolicy) > 0 {
-			inUse = true
-			return false
-		}
-		return true
-	})
-	return inUse
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -1861,20 +1804,6 @@ func hasUserNamespacesWithVolumeDevices(podSpec *api.PodSpec) bool {
 		return true // keep iterating
 	})
 	return hasVolumeDevices
-}
-
-// hasRestartableInitContainerResizePolicy returns true if the pod spec is non-nil and
-// it has any init container with ContainerRestartPolicyAlways and non-nil ResizePolicy.
-func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for _, c := range podSpec.InitContainers {
-		if IsRestartableInitContainer(&c) && len(c.ResizePolicy) > 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // hasEmptyImageVolumeReference returns true if the pod spec has any image volume with an empty reference.

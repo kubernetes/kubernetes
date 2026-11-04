@@ -701,25 +701,22 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(ctx, status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(ctx, status.Labels)
-	var cStatusResources *kubecontainer.ContainerResources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// If runtime reports cpu & memory resources info, add it to container status
-		cStatusResources = toKubeContainerResources(status.Resources)
+	// If runtime reports cpu & memory resources info, add it to container status
+	cStatusResources := toKubeContainerResources(status.Resources)
 
-		// Fill missing resource values from the actuated resources.
-		if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
-			if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
-				if cStatusResources == nil {
-					cStatusResources = &kubecontainer.ContainerResources{
-						CPURequest:    actuatedResources.Requests.Cpu(),
-						CPULimit:      actuatedResources.Limits.Cpu(),
-						MemoryRequest: actuatedResources.Requests.Memory(),
-						MemoryLimit:   actuatedResources.Limits.Memory(),
-					}
-				} else if cStatusResources.MemoryRequest == nil {
-					if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
-						cStatusResources.MemoryRequest = &memReq
-					}
+	// Fill missing resource values from the actuated resources.
+	if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
+		if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
+			if cStatusResources == nil {
+				cStatusResources = &kubecontainer.ContainerResources{
+					CPURequest:    actuatedResources.Requests.Cpu(),
+					CPULimit:      actuatedResources.Limits.Cpu(),
+					MemoryRequest: actuatedResources.Requests.Memory(),
+					MemoryLimit:   actuatedResources.Limits.Memory(),
+				}
+			} else if cStatusResources.MemoryRequest == nil {
+				if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
+					cStatusResources.MemoryRequest = &memReq
 				}
 			}
 		}

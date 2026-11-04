@@ -92,7 +92,6 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 type Fit struct {
 	ignoredResources                                   sets.Set[string]
 	ignoredResourceGroups                              sets.Set[string]
-	enableInPlacePodVerticalScaling                    bool
 	enablePodLevelResources                            bool
 	enableDRAExtendedResource                          bool
 	enableInPlacePodLevelResourcesVerticalScaling      bool
@@ -203,7 +202,6 @@ func getScorer(strategy *config.ScoringStrategy, fts feature.Features) (*resourc
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy.Type)
 	}
 	scorer := scorerFactory(strategy)
-	scorer.enableInPlacePodVerticalScaling = fts.EnableInPlacePodVerticalScaling
 	scorer.enablePodLevelResources = fts.EnablePodLevelResources
 	scorer.enableInPlacePodLevelResourcesVerticalScaling = fts.EnableInPlacePodLevelResourcesVerticalScaling
 	return scorer, nil
@@ -236,12 +234,11 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 	}
 
 	pl := &Fit{
-		ignoredResources:                sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-		handle:                          h,
-		enablePodLevelResources:         fts.EnablePodLevelResources,
-		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
+		ignoredResources:          sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:     sets.New(args.IgnoredResourceGroups...),
+		handle:                    h,
+		enablePodLevelResources:   fts.EnablePodLevelResources,
+		enableDRAExtendedResource: fts.EnableDRAExtendedResource,
 
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 
@@ -313,18 +310,13 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 	events := []fwk.ClusterEventWithHint{
 		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: f.isSchedulableAfterAssignedPodDelete},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}, QueueingHintFn: f.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown},
 	}
 	if f.enableDRAExtendedResource {
 		events = append(events,
 			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
-	}
-	if f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
-		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
-		events = append(events,
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown})
 	}
 	if f.enableInPlacePodVerticalScalingSchedulerPreemption {
 		events = append(events,
@@ -436,7 +428,7 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
-	opts := resource.PodResourcesOptions{UseStatusResources: f.enableInPlacePodVerticalScaling, InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling}
+	opts := resource.PodResourcesOptions{UseStatusResources: true, InPlacePodLevelResourcesVerticalScalingEnabled: f.enableInPlacePodLevelResourcesVerticalScaling}
 	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, opts))
 	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, opts))
 

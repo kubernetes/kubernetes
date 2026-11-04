@@ -2873,7 +2873,6 @@ type Container struct {
 	Resources ResourceRequirements
 	// Resources resize policy for the container.
 	// This field cannot be set on ephemeral containers.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// RestartPolicy defines the restart behavior of individual containers in a pod.
@@ -3238,7 +3237,6 @@ type ContainerStatus struct {
 	AllocatedResources ResourceList
 	// Resources represents the compute resource requests and limits that have been successfully
 	// enacted on the running container after it has been started or has been successfully resized.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements
 	// Status of volume mounts.
@@ -4759,7 +4757,6 @@ type EphemeralContainerCommon struct {
 	// +optional
 	Resources ResourceRequirements
 	// Resources resize policy for the container.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
 	// Restart policy for the container to manage the restart behavior of each
@@ -4975,7 +4972,6 @@ type PodStatus struct {
 	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
 	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
 	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus
 

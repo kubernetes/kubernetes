@@ -255,7 +255,6 @@ func TestResizeAdmission(t *testing.T) {
 			plugin, err := NewPlugin()
 			require.NoError(t, err)
 			plugin.SetExternalKubeInformerFactory(informerFactory)
-			plugin.inPlacePodVerticalScalingEnabled = true
 
 			stopCh := make(chan struct{})
 			defer close(stopCh)

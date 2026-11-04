@@ -4932,34 +4932,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
-			description: "drop disabled status fields/InPlacePodVerticalScaling=false",
-			features: map[featuregate.Feature]bool{
-				features.InPlacePodVerticalScaling: false,
-			},
-			oldPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Status:     api.PodStatus{},
-			},
-			newPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
-						{Resources: &api.ResourceRequirements{}},
-					},
-				},
-			},
-			expected: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{{}},
-				},
-			},
-		},
-		{
-			description: "drop disabled status fields/InPlacePodVerticalScaling=true",
-			features: map[featuregate.Feature]bool{
-				features.InPlacePodVerticalScaling: true,
-			},
+			description: "preserve container status resources",
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status:     api.PodStatus{},
@@ -5500,9 +5473,6 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			if v, ok := tc.features[features.InPlacePodVerticalScaling]; ok && !v {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, tc.features)
 			StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
 			if !cmp.Equal(tc.expected, tc.newPod) {

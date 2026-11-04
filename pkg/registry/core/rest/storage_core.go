@@ -33,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/kubernetes"
 	admissionregistrationv1client "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
@@ -245,9 +243,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 			storage[resource+"/eviction"] = podStorage.Eviction
 		}
 		storage[resource+"/ephemeralcontainers"] = podStorage.EphemeralContainers
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			storage[resource+"/resize"] = podStorage.Resize
-		}
+		storage[resource+"/resize"] = podStorage.Resize
 	}
 	if resource := "bindings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = podStorage.LegacyBinding

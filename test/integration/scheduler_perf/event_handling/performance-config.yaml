@@ -144,8 +144,6 @@
 # that through QHints make the pods schedulable. 
 # Plugins covered: InterPodAffinity, NodeResources, NodeUnschedulable, PodTopologySpread, SchedulingGates and TaintToleration.
 - name: EventHandlingPodUpdate
-  featureGates:
-    InPlacePodVerticalScaling: true
   workloadTemplate:
   # Collect metrics from all createPods ops that initially create unschedulable pods (type: unsched).
   - opcode: startCollectingMetrics
