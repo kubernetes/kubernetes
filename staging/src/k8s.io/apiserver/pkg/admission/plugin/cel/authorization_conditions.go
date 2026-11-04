@@ -29,6 +29,7 @@ import (
 	admissionauthorizer "k8s.io/apiserver/pkg/admission/plugin/authorizer"
 	namespacematcher "k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -48,8 +49,9 @@ func getAuthorizationConditionsEnvTemplate() *environment.EnvSet {
 
 // NewAuthorizationConditionsEvaluatorBuilder creates a new authorizer.BuiltinConditionsEvaluatorBuilder that can evaluate
 // authorizer.ConditionTypeAuthorizationCEL-typed conditions.
+// runtimeCELCostBudget is shared by all conditions evaluated by one evaluator from EvaluatorForData, like the
+// per-binding budget of ValidatingAdmissionPolicy.
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-// TODO(luxas): Right now the budget is per-condition, not per-evaluator. Should we have two knobs or just that one?
 func NewAuthorizationConditionsEvaluatorBuilder(informerFactory informers.SharedInformerFactory, client kubernetes.Interface, runtimeCELCostBudget int64) (authorizer.BuiltinConditionsEvaluatorBuilder, error) {
 	if informerFactory == nil {
 		return nil, fmt.Errorf("NewAuthorizationConditionsEvaluator: informerFactory is required")
@@ -112,6 +114,7 @@ func (b *celAuthorizationConditionsEvaluatorBuilder) EvaluatorForData(ctx contex
 		builder:           b,
 		activation:        activation,
 		optionalVarsDecls: OptionalVariableDeclarations{HasParams: false, HasAuthorizer: apiServerAuthorizer != nil},
+		remainingBudget:   b.runtimeCELCostBudget,
 	}, nil
 }
 
@@ -139,10 +142,13 @@ func (b *celAuthorizationConditionsEvaluatorBuilder) getNamespace(ctx context.Co
 	return CreateNamespaceObject(namespace), nil
 }
 
+// celAuthorizationConditionsEvaluator is not safe for concurrent use, as it tracks the remaining cost budget.
 type celAuthorizationConditionsEvaluator struct {
 	builder           *celAuthorizationConditionsEvaluatorBuilder
 	optionalVarsDecls OptionalVariableDeclarations
 	activation        *evaluationActivation
+	// remainingBudget is negative once the budget has been exhausted.
+	remainingBudget int64
 }
 
 func (e *celAuthorizationConditionsEvaluator) EvaluateCondition(ctx context.Context, condition authorizer.Condition) authorizer.ConditionEvaluationResult {
@@ -160,12 +166,22 @@ func (e *celAuthorizationConditionsEvaluator) EvaluateCondition(ctx context.Cont
 		return authorizer.ConditionsEvaluationResultUnevaluatable()
 	}
 
+	// Like ValidatingAdmissionPolicy, don't evaluate further expressions once the budget is exhausted.
+	if e.remainingBudget < 0 {
+		return authorizer.ConditionEvaluationResultError(&apiservercel.Error{
+			Type:   apiservercel.ErrorTypeInvalid,
+			Detail: "validation failed due to running out of cost budget, no further validation rules will be run",
+			Cause:  apiservercel.ErrOutOfBudget,
+		})
+	}
+
 	compiledExpr := e.builder.compiler.CompileCELExpression(validationCondition(condStr), e.optionalVarsDecls, environment.StoredExpressions)
 
 	// if this activation supports composition, we will need the compositionCtx. It may be nil.
 	compositionCtx, _ := ctx.(CompositionContext)
 
-	evalResult, _, err := e.activation.Evaluate(ctx, compositionCtx, compiledExpr, e.builder.runtimeCELCostBudget)
+	evalResult, remainingBudget, err := e.activation.Evaluate(ctx, compositionCtx, compiledExpr, e.remainingBudget)
+	e.remainingBudget = remainingBudget
 	if err != nil {
 		return authorizer.ConditionEvaluationResultError(err)
 	}

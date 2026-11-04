@@ -18,6 +18,7 @@ package cel
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -382,5 +384,49 @@ func TestAuthorizationConditionsEvaluator_CachesAuthorizerChecks(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Errorf("expected the API server authorizer to be called once for identical checks, got %d calls", calls)
+	}
+}
+
+func TestAuthorizationConditionsEvaluator_AggregateCostBudget(t *testing.T) {
+	cond := celCond("c", "object.spec.nodeName == 'node1'")
+
+	// Measure the cost of a single evaluation, so the budget below fits exactly one.
+	measuring := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget, defaultNamespace)
+	evaluator, err := measuring.EvaluatorForData(t.Context(), versioned(t, podCreateAttributes()), nil)
+	if err != nil {
+		t.Fatalf("EvaluatorForData failed: %v", err)
+	}
+	if got := evalResultString(evaluator.EvaluateCondition(t.Context(), cond)); got != "True" {
+		t.Fatalf("got %s, want True", got)
+	}
+	cost := celconfig.RuntimeCELCostBudget - evaluator.(*celAuthorizationConditionsEvaluator).remainingBudget
+	if cost <= 0 {
+		t.Fatalf("expected a positive evaluation cost, got %d", cost)
+	}
+
+	builder := newTestAuthorizationConditionsEvaluatorBuilder(t, cost+cost/2, defaultNamespace)
+	newEvaluator := func() authorizer.BuiltinConditionsEvaluator {
+		e, err := builder.EvaluatorForData(t.Context(), versioned(t, podCreateAttributes()), nil)
+		if err != nil {
+			t.Fatalf("EvaluatorForData failed: %v", err)
+		}
+		return e
+	}
+
+	evaluator = newEvaluator()
+	if got := evalResultString(evaluator.EvaluateCondition(t.Context(), cond)); got != "True" {
+		t.Fatalf("first condition: got %s, want True", got)
+	}
+	// The second and third conditions exceed the shared budget; the third is not evaluated at all.
+	for _, name := range []string{"second", "third"} {
+		res := evaluator.EvaluateCondition(t.Context(), cond)
+		if !res.IsError() || !errors.Is(res.Error(), apiservercel.ErrOutOfBudget) {
+			t.Errorf("%s condition: got %s (err=%v), want out of budget error", name, evalResultString(res), res.Error())
+		}
+	}
+
+	// The budget is per evaluator, not per builder.
+	if got := evalResultString(newEvaluator().EvaluateCondition(t.Context(), cond)); got != "True" {
+		t.Errorf("fresh evaluator: got %s, want True", got)
 	}
 }

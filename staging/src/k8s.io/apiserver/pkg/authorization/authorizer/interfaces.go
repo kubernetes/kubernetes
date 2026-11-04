@@ -368,6 +368,8 @@ type BuiltinConditionsEvaluatorBuilder interface {
 // BuiltinConditionsEvaluator might allow in-process evaluation of a condition of a
 // certain type, in the context of a given ConditionsData.
 // If the condition type is not handled, return ConditionsEvaluationResultUnevaluatable().
+// Implementations may keep state across EvaluateCondition calls, e.g. an aggregate cost budget,
+// so an evaluator is scoped to one evaluation and need not be safe for concurrent use.
 type BuiltinConditionsEvaluator interface {
 	// EvaluateCondition evaluates a single condition in the current ConditionsData context
 	// into a ConditionEvaluationResult if possible, or returns ConditionsEvaluationResultUnevaluatable().
