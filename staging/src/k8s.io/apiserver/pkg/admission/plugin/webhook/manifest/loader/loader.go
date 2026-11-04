@@ -41,6 +41,9 @@ type AcceptObjectFunc[T metav1.Object] func(obj runtime.Object) ([]T, error)
 // the provided decoder and acceptObject callback. It handles file I/O, YAML
 // splitting, decoding, v1.List unwrapping, manifest name validation, webhook
 // client config validation, and deterministic sorting by name.
+// The content hash is returned with errors caused by the manifest content, so
+// callers can recognize content they already rejected; it is empty if the
+// content could not be read.
 func LoadManifests[T metav1.Object](
 	dir string,
 	decoder runtime.Decoder,
@@ -48,7 +51,7 @@ func LoadManifests[T metav1.Object](
 ) ([]T, string, error) {
 	fileDocs, hash, err := manifest.LoadFiles(dir)
 	if err != nil {
-		return nil, "", err
+		return nil, hash, err
 	}
 
 	configs := make([]T, 0)
@@ -57,12 +60,12 @@ func LoadManifests[T metav1.Object](
 	for _, fd := range fileDocs {
 		obj, _, err := decoder.Decode(fd.Doc, nil, nil)
 		if err != nil {
-			return nil, "", fmt.Errorf("error loading %s: %w", fd.FilePath, err)
+			return nil, hash, fmt.Errorf("error loading %s: %w", fd.FilePath, err)
 		}
 
 		items, err := acceptFileObject(obj, fd.FilePath, seenNames, decoder, acceptObject)
 		if err != nil {
-			return nil, "", fmt.Errorf("error loading %s: %w", fd.FilePath, err)
+			return nil, hash, fmt.Errorf("error loading %s: %w", fd.FilePath, err)
 		}
 		configs = append(configs, items...)
 	}

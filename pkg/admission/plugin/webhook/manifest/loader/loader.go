@@ -56,12 +56,14 @@ func init() {
 // and parses them as ValidatingWebhookConfiguration resources.
 // Files containing MutatingWebhookConfiguration cause an error.
 // Files are processed in alphabetical order for deterministic behavior.
+// The returned result is never nil. On error it only carries the Hash of the
+// content that failed to load, which is empty if the content could not be read.
 func LoadValidatingManifests(dir string) (*ValidatingLoadResult, error) {
 	configs, hash, err := stagingloader.LoadManifests(dir, codecs.UniversalDeserializer(), func(obj runtime.Object) ([]*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
 		return acceptObject(obj, extractValidating, defaultAndValidateVWC)
 	})
 	if err != nil {
-		return nil, err
+		return &ValidatingLoadResult{Hash: hash}, err
 	}
 	return &ValidatingLoadResult{Configurations: configs, Hash: hash}, nil
 }
@@ -70,12 +72,14 @@ func LoadValidatingManifests(dir string) (*ValidatingLoadResult, error) {
 // and parses them as MutatingWebhookConfiguration resources.
 // Files containing ValidatingWebhookConfiguration cause an error.
 // Files are processed in alphabetical order for deterministic behavior.
+// The returned result is never nil. On error it only carries the Hash of the
+// content that failed to load, which is empty if the content could not be read.
 func LoadMutatingManifests(dir string) (*MutatingLoadResult, error) {
 	configs, hash, err := stagingloader.LoadManifests(dir, codecs.UniversalDeserializer(), func(obj runtime.Object) ([]*admissionregistrationv1.MutatingWebhookConfiguration, error) {
 		return acceptObject(obj, extractMutating, defaultAndValidateMWC)
 	})
 	if err != nil {
-		return nil, err
+		return &MutatingLoadResult{Hash: hash}, err
 	}
 	return &MutatingLoadResult{Configurations: configs, Hash: hash}, nil
 }

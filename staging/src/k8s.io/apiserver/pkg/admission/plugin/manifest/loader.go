@@ -60,10 +60,17 @@ type FileDoc struct {
 	Doc      []byte
 }
 
+type fileData struct {
+	path string
+	data []byte
+}
+
 // LoadFiles reads all YAML/JSON files from dir, splits multi-document YAML,
 // and returns individual documents with their source file paths plus a
 // sha256-prefixed hash of the file contents for change detection.
 // Files are processed in alphabetical order for deterministic behavior.
+// If the files are read but cannot be split into YAML documents, the hash is
+// returned with the error; it is empty if the files could not be read.
 func LoadFiles(dir string) ([]FileDoc, string, error) {
 	if len(dir) == 0 {
 		return nil, "", fmt.Errorf("manifest directory path is empty")
@@ -75,10 +82,10 @@ func LoadFiles(dir string) ([]FileDoc, string, error) {
 		return nil, "", fmt.Errorf("failed to read manifest directory %q: %w", dir, err)
 	}
 
-	var fileDocs []FileDoc
+	// Read and hash every file before parsing any of them, so that a parse
+	// error can report the hash of the whole directory content.
+	var files []fileData
 	h := sha256.New()
-	hasData := false
-
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -100,20 +107,23 @@ func LoadFiles(dir string) ([]FileDoc, string, error) {
 
 		h.Write(data)
 		h.Write([]byte{0})
-		hasData = true
-
-		docs, err := splitYAMLDocuments(data)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to split YAML documents in file %q: %w", filePath, err)
-		}
-		for _, doc := range docs {
-			fileDocs = append(fileDocs, FileDoc{FilePath: filePath, Doc: doc})
-		}
+		files = append(files, fileData{path: filePath, data: data})
 	}
 
 	var hash string
-	if hasData {
+	if len(files) > 0 {
 		hash = fmt.Sprintf("sha256:%x", h.Sum(nil))
+	}
+
+	var fileDocs []FileDoc
+	for _, f := range files {
+		docs, err := splitYAMLDocuments(f.data)
+		if err != nil {
+			return nil, hash, fmt.Errorf("failed to split YAML documents in file %q: %w", f.path, err)
+		}
+		for _, doc := range docs {
+			fileDocs = append(fileDocs, FileDoc{FilePath: f.path, Doc: doc})
+		}
 	}
 
 	return fileDocs, hash, nil
