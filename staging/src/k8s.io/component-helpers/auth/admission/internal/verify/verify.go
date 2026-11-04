@@ -17,7 +17,6 @@ limitations under the License.
 package verify
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 
@@ -26,19 +25,9 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 )
 
-type webhookBinding struct {
-	Name string `json:"name"`
-	UID  string `json:"uid"`
-}
-
 type webhookPrivateClaims struct {
 	Kubernetes struct {
-		Pod                            *webhookBinding     `json:"pod"`
-		Secret                         *webhookBinding     `json:"secret"`
-		Node                           *webhookBinding     `json:"node"`
-		ValidatingWebhookConfiguration *webhookBinding     `json:"validatingwebhookconfiguration"`
-		MutatingWebhookConfiguration   *webhookBinding     `json:"mutatingwebhookconfiguration"`
-		Attestations                   map[string][]string `json:"attestations"`
+		Attestations map[string][]string `json:"attestations"`
 	} `json:"kubernetes.io"`
 }
 
@@ -48,20 +37,9 @@ func TokenGroups(token *oidc.IDToken) ([]string, error) {
 	if err := token.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("decoding Kubernetes token claims: %w", err)
 	}
-	vwc, mwc := claims.Kubernetes.ValidatingWebhookConfiguration, claims.Kubernetes.MutatingWebhookConfiguration
-	if (vwc == nil) == (mwc == nil) || claims.Kubernetes.Pod != nil || claims.Kubernetes.Secret != nil || claims.Kubernetes.Node != nil {
-		return nil, errors.New("token is not bound exclusively to one webhook configuration")
-	}
-	binding := vwc
-	if binding == nil {
-		binding = mwc
-	}
-	if binding.Name == "" || binding.UID == "" {
-		return nil, errors.New("webhook configuration binding must include a name and UID")
-	}
 	groups := claims.Kubernetes.Attestations[authenticationv1.AttestationAdmissionReviewAPIGroups]
-	if len(groups) != 1 || groups[0] == "" {
-		return nil, fmt.Errorf("token must carry exactly one nonempty %q attestation", authenticationv1.AttestationAdmissionReviewAPIGroups)
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("token must carry at least one %q attestation", authenticationv1.AttestationAdmissionReviewAPIGroups)
 	}
 	return groups, nil
 }
