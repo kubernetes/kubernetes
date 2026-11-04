@@ -41,7 +41,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/rest"
-	"k8s.io/component-helpers/auth/admission/internal/verify"
 	"k8s.io/klog/v2"
 )
 
@@ -527,7 +526,7 @@ func (v *verifier) authenticateToken(ctx context.Context, rawToken string) ([]st
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token authentication failed", "detail", err.Error())
 		return nil, errVerificationFailed
 	}
-	groups, err := verify.TokenGroups(token)
+	groups, err := tokenGroups(token)
 	if err != nil {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "invalid Kubernetes token claims", "detail", err.Error())
 		return nil, errVerificationFailed
@@ -539,7 +538,7 @@ func (v *verifier) checkDecodedRequest(ctx context.Context, req *admissionv1.Adm
 	if ctx.Err() != nil || req == nil {
 		return errVerificationFailed
 	}
-	if !verify.AllowsAPIGroup(groups, req.Resource.Group) {
+	if !allowsAPIGroup(groups, req.Resource.Group) {
 		klog.FromContext(ctx).V(2).Info("Webhook token verification denied", "reason", "token admissionReviewAPIGroups does not authorize the review's API group")
 		return errVerificationFailed
 	}
