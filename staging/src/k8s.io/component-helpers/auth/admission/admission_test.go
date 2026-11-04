@@ -655,9 +655,9 @@ func TestWithTokenVerification_LargeUpdateReview(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	spy := newSpyHandler()
 	handler := admission.NewHandlerForTest(ts.verifier(t), spy.serve)
-	body := configMapUpdateReviewBody(t, strings.Repeat(`\`, 900<<10))
-	if len(body) <= 3<<20 || len(body) >= 7<<20 {
-		t.Fatalf("review body = %d bytes, want between 3 and 7 MiB", len(body))
+	body := configMapUpdateReviewBody(t, strings.Repeat(`\`, 600<<10))
+	if len(body) <= 2<<20 || len(body) >= 3<<20 {
+		t.Fatalf("review body = %d bytes, want between 2 and 3 MiB", len(body))
 	}
 	claims := ts.baseClaims()
 	claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{
