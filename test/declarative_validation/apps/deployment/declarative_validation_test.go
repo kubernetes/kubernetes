@@ -21,7 +21,6 @@ import (
 
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -306,9 +305,6 @@ func TestDeclarativeValidate(t *testing.T) {
 		}
 
 		for k, tc := range testCases {
-			if apiVersion != "v1" && tc.input.Spec.Scheduling != nil {
-				continue
-			}
 			t.Run(k, func(t *testing.T) {
 				if tc.input.Spec.Scheduling != nil {
 					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -316,12 +312,7 @@ func TestDeclarativeValidate(t *testing.T) {
 						features.WorkloadWithDeployment: tc.enableWorkloadWithDeployment,
 					})
 				}
-				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs,
-					apitesting.WithOmittedFieldPaths(map[schema.GroupVersionKind][]string{
-						{Group: "apps", Version: "v1beta1", Kind: "Deployment"}: {"spec.scheduling"},
-						{Group: "apps", Version: "v1beta2", Kind: "Deployment"}: {"spec.scheduling"},
-					}),
-				)
+				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)
 			})
 		}
 		meta.RunObjectMetaTestCases(t, ctx, mkDeployment(), registry.Strategy,
@@ -346,9 +337,6 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		meta.RunObjectMetaUpdateTestCases(t, ctx, mkDeployment(), registry.Strategy,
 			meta.WithStringentFinalizerValidation(),
 		)
-		if apiVersion != "v1" {
-			continue
-		}
 		testCases := map[string]struct {
 			oldScheduling                *apps.DeploymentSchedulingConfiguration
 			scheduling                   *apps.DeploymentSchedulingConfiguration
@@ -485,12 +473,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				old.ResourceVersion = "1"
 				update := old.DeepCopy()
 				update.Spec.Scheduling = tc.scheduling
-				apitesting.VerifyUpdateValidationEquivalence(t, ctx, update, old, registry.Strategy, tc.expectedErrs,
-					apitesting.WithOmittedFieldPaths(map[schema.GroupVersionKind][]string{
-						{Group: "apps", Version: "v1beta1", Kind: "Deployment"}: {"spec.scheduling"},
-						{Group: "apps", Version: "v1beta2", Kind: "Deployment"}: {"spec.scheduling"},
-					}),
-				)
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, update, old, registry.Strategy, tc.expectedErrs)
 			})
 		}
 	}

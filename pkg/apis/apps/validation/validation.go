@@ -22,14 +22,11 @@ import (
 	"fmt"
 	"strconv"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -774,18 +771,6 @@ func validateDeploymentScheduling(spec, oldSpec *apps.DeploymentSpec, fldPath *f
 		AllowedDisruptionModes:       []workloadbuilder.DisruptionModeOption{workloadbuilder.SingleMode, workloadbuilder.AllMode},
 		DisableDeclarativeValidation: true,
 	}).Validate(context.Background(), workloadbuilder.ValidationInput{OldRoot: oldItem})
-}
-
-// OmittedFieldPaths returns, per versioned GVK, the field paths that do not exist
-// in that version and must be ignored by cross-version validation equivalence.
-func OmittedFieldPaths() map[schema.GroupVersionKind][]string {
-	// scheduling exists only in apps/v1. The beta Deployment versions cannot
-	// produce its validation.
-	scheduling := []string{"scheduling"}
-	return map[schema.GroupVersionKind][]string{
-		appsv1beta1.SchemeGroupVersion.WithKind("Deployment"): scheduling,
-		appsv1beta2.SchemeGroupVersion.WithKind("Deployment"): scheduling,
-	}
 }
 
 // ValidateDeploymentStatus validates given deployment status.
