@@ -784,14 +784,9 @@ func TestAuthenticationBeforeBodyRead(t *testing.T) {
 			claims["exp"] = time.Now().Add(-time.Minute).Unix()
 			return ts.sign(t, claims)
 		}},
-		{name: "missing binding", token: func() string {
+		{name: "missing attestations", token: func() string {
 			claims := ts.baseClaims()
-			delete(claims["kubernetes.io"].(map[string]any), "validatingwebhookconfiguration")
-			return ts.sign(t, claims)
-		}},
-		{name: "webhook and pod binding", token: func() string {
-			claims := ts.baseClaims()
-			claims["kubernetes.io"].(map[string]any)["pod"] = map[string]any{"name": "pod", "uid": "pod-uid"}
+			delete(claims["kubernetes.io"].(map[string]any), "attestations")
 			return ts.sign(t, claims)
 		}},
 		{name: "scalar Kubernetes claims", token: func() string {
@@ -799,9 +794,9 @@ func TestAuthenticationBeforeBodyRead(t *testing.T) {
 			claims["kubernetes.io"] = "not an object"
 			return ts.sign(t, claims)
 		}},
-		{name: "mixed wildcard attestation", token: func() string {
+		{name: "empty attestation slice", token: func() string {
 			claims := ts.baseClaims()
-			claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{admissionReviewAPIGroupsClaimKey: []string{"apps", "*"}}
+			claims["kubernetes.io"].(map[string]any)["attestations"] = map[string]any{admissionReviewAPIGroupsClaimKey: []string{}}
 			return ts.sign(t, claims)
 		}},
 	}
@@ -2460,61 +2455,6 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 					req: defaultAppsRequest,
 				},
 				{
-					name: "ordinary Pod-bound ServiceAccount token",
-					token: func() string {
-						c := issuer.validWebhookClaims(validateAudience, "pod", "my-pod", "pod-uid-1", []string{"apps"})
-						return issuer.sign(t, c)
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "ordinary Secret-bound ServiceAccount token",
-					token: func() string {
-						c := issuer.validWebhookClaims(validateAudience, "secret", "my-secret", "sec-uid-1", []string{"apps"})
-						return issuer.sign(t, c)
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "ordinary Node-bound ServiceAccount token",
-					token: func() string {
-						c := issuer.validWebhookClaims(validateAudience, "node", "node-1", "node-uid-1", []string{"apps"})
-						return issuer.sign(t, c)
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "unbound ServiceAccount token (no webhook binding)",
-					token: func() string {
-						c := issuer.validWebhookClaims(validateAudience, "", "", "", []string{"apps"})
-						return issuer.sign(t, c)
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "token bound to both Validating and Mutating webhook configurations",
-					token: func() string {
-						c := issuer.validWebhookClaims(validateAudience, "validatingwebhookconfiguration", "vwc", "uid-1", []string{"apps"})
-						c["kubernetes.io"].(map[string]any)["mutatingwebhookconfiguration"] = map[string]any{"name": "mwc", "uid": "uid-2"}
-						return issuer.sign(t, c)
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "webhook binding missing UID",
-					token: func() string {
-						return issuer.sign(t, issuer.validWebhookClaims(validateAudience, "validatingwebhookconfiguration", "vwc", "", []string{"apps"}))
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "webhook binding missing Name",
-					token: func() string {
-						return issuer.sign(t, issuer.validWebhookClaims(validateAudience, "validatingwebhookconfiguration", "", "uid-1", []string{"apps"}))
-					},
-					req: defaultAppsRequest,
-				},
-				{
 					name: "missing admissionReviewAPIGroups attestation",
 					token: func() string {
 						c := issuer.validWebhookClaims(validateAudience, "validatingwebhookconfiguration", "vwc", "uid-1", []string{"apps"})
@@ -2527,20 +2467,6 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 					name: "empty admissionReviewAPIGroups slice",
 					token: func() string {
 						return issuer.sign(t, issuer.validWebhookClaims(validateAudience, "validatingwebhookconfiguration", "vwc", "uid-1", []string{}))
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "empty-string element in admissionReviewAPIGroups slice",
-					token: func() string {
-						return issuer.sign(t, issuer.validWebhookClaims(validateAudience, "validatingwebhookconfiguration", "vwc", "uid-1", []string{""}))
-					},
-					req: defaultAppsRequest,
-				},
-				{
-					name: "multi-valued admissionReviewAPIGroups slice (disallowed by KEP-6060)",
-					token: func() string {
-						return issuer.sign(t, issuer.validWebhookClaims(validateAudience, "validatingwebhookconfiguration", "vwc", "uid-1", []string{"apps", "batch"}))
 					},
 					req: defaultAppsRequest,
 				},

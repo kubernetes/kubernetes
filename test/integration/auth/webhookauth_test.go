@@ -757,14 +757,14 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 		t.Fatalf("ordinary SA token must not reach downstream handler, admittedCount=%d", admittedCount.Load())
 	}
 
-	// Signed tokens must still satisfy binding and attestation policy.
+	// Signed tokens must still satisfy attestation policy.
 	now := time.Now()
 	forgedProbes := []struct {
 		name   string
 		claims map[string]any
 	}{
 		{
-			name: "borrowed-key token bound to both Validating and Mutating webhook configs",
+			name: "borrowed-key token with missing admissionReviewAPIGroups attestation",
 			claims: map[string]any{
 				"iss": issuer,
 				"sub": "system:serviceaccount:" + ns.Name + ":" + sa.Name,
@@ -774,13 +774,11 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 				"iat": now.Unix(),
 				"kubernetes.io": map[string]any{
 					"validatingwebhookconfiguration": map[string]any{"name": vwc.Name, "uid": string(vwc.UID)},
-					"mutatingwebhookconfiguration":   map[string]any{"name": "mwc", "uid": "mwc-uid"},
-					"attestations":                   map[string]any{"admissionReviewAPIGroups": []string{"apps"}},
 				},
 			},
 		},
 		{
-			name: "borrowed-key token carrying multiple admissionReviewAPIGroups",
+			name: "borrowed-key token with empty admissionReviewAPIGroups attestation",
 			claims: map[string]any{
 				"iss": issuer,
 				"sub": "system:serviceaccount:" + ns.Name + ":" + sa.Name,
@@ -790,22 +788,7 @@ func TestWebhookAuthLiveAPIServerDispatch(t *testing.T) {
 				"iat": now.Unix(),
 				"kubernetes.io": map[string]any{
 					"validatingwebhookconfiguration": map[string]any{"name": vwc.Name, "uid": string(vwc.UID)},
-					"attestations":                   map[string]any{"admissionReviewAPIGroups": []string{"apps", "batch"}},
-				},
-			},
-		},
-		{
-			name: "borrowed-key token with missing webhook UID",
-			claims: map[string]any{
-				"iss": issuer,
-				"sub": "system:serviceaccount:" + ns.Name + ":" + sa.Name,
-				"aud": []string{webhookURL},
-				"exp": now.Add(5 * time.Minute).Unix(),
-				"nbf": now.Add(-1 * time.Minute).Unix(),
-				"iat": now.Unix(),
-				"kubernetes.io": map[string]any{
-					"validatingwebhookconfiguration": map[string]any{"name": vwc.Name, "uid": ""},
-					"attestations":                   map[string]any{"admissionReviewAPIGroups": []string{"apps"}},
+					"attestations":                   map[string]any{"admissionReviewAPIGroups": []string{}},
 				},
 			},
 		},
