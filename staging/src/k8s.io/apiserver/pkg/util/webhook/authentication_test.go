@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -216,6 +217,92 @@ func TestAuthenticationDetection(t *testing.T) {
 				},
 			},
 			expected: rest.Config{BearerToken: "fallback"},
+		},
+		{
+			name:       "wildcard match ipv4 with non-default port",
+			serverName: "1.2.3.4:8443",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"1.2.3.4":      {Token: "exact-without-port"},
+					"*.2.3.4:8443": {Token: "first-with-port"},
+					"*.2.3.4":      {Token: "first-without-port"},
+					"*.3.4":        {Token: "second-without-port"},
+					"*.4":          {Token: "third-without-port"},
+					"*":            {Token: "fallback"},
+				},
+			},
+			expected: rest.Config{BearerToken: "first-with-port"},
+		},
+		{
+			name:       "wildcard match ipv4 with default port",
+			serverName: "1.2.3.4:443",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"*.2.3.4": {Token: "first-without-port"},
+					"*.3.4":   {Token: "second-without-port"},
+					"*.4":     {Token: "third-without-port"},
+					"*":       {Token: "fallback"},
+				},
+			},
+			expected: rest.Config{BearerToken: "first-without-port"},
+		},
+		{
+			name:       "no wildcard match ipv6 with non-default port",
+			serverName: "[::ffff:1.2.3.4]:8443",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"::ffff:1.2.3.4": {Token: "exact-without-port"},
+					"*.2.3.4:8443":   {Token: "first-with-port"},
+					"*.2.3.4":        {Token: "first-without-port"},
+					"*.3.4":          {Token: "second-without-port"},
+					"*.4":            {Token: "third-without-port"},
+					"*":              {Token: "fallback"},
+				},
+			},
+			expected: rest.Config{BearerToken: "fallback"},
+		},
+		{
+			name:       "no wildcard match ipv6 with default port",
+			serverName: "[::ffff:1.2.3.4]:443",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"*.2.3.4": {Token: "first-without-port"},
+					"*.3.4":   {Token: "second-without-port"},
+					"*.4":     {Token: "third-without-port"},
+					"*":       {Token: "fallback"},
+				},
+			},
+			expected: rest.Config{BearerToken: "fallback"},
+		},
+		{
+			name:       "explicit wildcard match ipv6 with non-default port",
+			serverName: "[::ffff:1.2.3.4]:8443",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"::ffff:1.2.3.4": {Token: "exact-without-port"},
+					"*.2.3.4]:8443":  {Token: "first-with-port-with-bracket"},
+					"*.2.3.4:8443":   {Token: "first-with-port"},
+					"*.2.3.4":        {Token: "first-without-port"},
+					"*.3.4":          {Token: "second-without-port"},
+					"*.4":            {Token: "third-without-port"},
+					"*":              {Token: "fallback"},
+				},
+			},
+			expected: rest.Config{BearerToken: "first-with-port-with-bracket"},
+		},
+		{
+			name:       "explicit wildcard match ipv6 with default port",
+			serverName: "[::ffff:1.2.3.4]:443",
+			kubeconfig: clientcmdapi.Config{
+				AuthInfos: map[string]*clientcmdapi.AuthInfo{
+					"*.2.3.4":  {Token: "first-without-port"},
+					"*.2.3.4]": {Token: "first-without-port-with-bracket"},
+					"*.3.4":    {Token: "second-without-port"},
+					"*.4":      {Token: "third-without-port"},
+					"*":        {Token: "fallback"},
+				},
+			},
+			expected: rest.Config{BearerToken: "first-without-port-with-bracket"},
 		},
 	}
 
