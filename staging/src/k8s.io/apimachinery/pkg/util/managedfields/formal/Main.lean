@@ -17,6 +17,8 @@ import SSA
 
 open Lean SSA
 
+private def allFixtures := SSA.Examples.fixtures ++ SSA.Counterexamples.fixtures
+
 private def report (fixture : Fixture) : Json :=
   Json.mkObj [
     ("name", toJson fixture.name),
@@ -42,18 +44,18 @@ def main (args : List String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
   match args with
-  | [] | ["--self-test"] => checkFixtures SSA.Examples.fixtures
+  | [] | ["--self-test"] => checkFixtures allFixtures
   | ["--list"] =>
-      for fixture in SSA.Examples.fixtures do
+      for fixture in allFixtures do
         stdout.putStrLn fixture.name
       return 0
   | ["--fixtures"] =>
       stdout.putStrLn ("[\n" ++
-        String.intercalate ",\n" (SSA.Examples.fixtures.map (fun f => (toJson f).compress)) ++
+        String.intercalate ",\n" (allFixtures.map (fun f => (toJson f).compress)) ++
         "\n]")
       return 0
   | ["--trace", name] =>
-      match SSA.Examples.fixtures.find? (fun fixture => fixture.name == name) with
+      match allFixtures.find? (fun fixture => fixture.name == name) with
       | some fixture =>
           stdout.putStrLn (report fixture).pretty
           return if passes fixture then 0 else 1

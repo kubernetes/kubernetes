@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v6/value"
@@ -35,12 +34,16 @@ type Corpus struct {
 }
 
 type Case struct {
-	Name     string              `json:"name"`
-	Required map[string][]string `json:"required,omitempty"`
-	Steps    []Step              `json:"steps"`
+	Name      string              `json:"name"`
+	Schema    string              `json:"schema,omitempty"`
+	RootType  string              `json:"rootType,omitempty"`
+	Semantics string              `json:"semantics,omitempty"`
+	Required  map[string][]string `json:"required,omitempty"`
+	Steps     []Step              `json:"steps"`
 }
 
 type Step struct {
+	Operation      string         `json:"operation,omitempty"`
 	Manager        string         `json:"manager"`
 	Force          bool           `json:"force,omitempty"`
 	Apply          map[string]any `json:"apply"`
@@ -64,6 +67,9 @@ type Snapshot struct {
 }
 
 type segment struct {
+	Element *struct {
+		Value string `json:"value"`
+	} `json:"element,omitempty"`
 	Field *struct {
 		Name string `json:"name"`
 	} `json:"field,omitempty"`
@@ -80,10 +86,26 @@ func (p path) field(name string) path {
 	}{name}})
 }
 
-func (p path) item(name string) path {
+func (p path) keys(keys [][2]string) path {
 	return append(append(path{}, p...), segment{Item: &struct {
 		Keys [][2]string `json:"keys"`
-	}{[][2]string{{"name", name}}}})
+	}{keys}})
+}
+func (p path) item(name string) path {
+	text, _ := json.Marshal(name)
+	return p.keys([][2]string{{"name", string(text)}})
+}
+func (p path) element(text string) path {
+	return append(append(path{}, p...), segment{Element: &struct {
+		Value string `json:"value"`
+	}{text}})
+}
+func jsonValue(text string) any {
+	var v any
+	if err := json.Unmarshal([]byte(text), &v); err != nil {
+		panic(err)
+	}
+	return v
 }
 
 func (p path) smd() fieldpath.Path {
@@ -91,10 +113,12 @@ func (p path) smd() fieldpath.Path {
 	for _, step := range p {
 		if step.Field != nil {
 			out = append(out, fieldpath.FieldNameElement(step.Field.Name))
+		} else if step.Element != nil {
+			out = append(out, fieldpath.ValueElement(value.NewValueInterface(jsonValue(step.Element.Value))))
 		} else {
 			fields := []value.Field{}
 			for _, pair := range step.Item.Keys {
-				fields = append(fields, value.Field{Name: pair[0], Value: value.NewValueInterface(pair[1])})
+				fields = append(fields, value.Field{Name: pair[0], Value: value.NewValueInterface(jsonValue(pair[1]))})
 			}
 			out = append(out, fieldpath.KeyElement(fields...))
 		}
@@ -157,10 +181,13 @@ type state struct {
 }
 
 type request struct {
-	Manager string      `json:"manager"`
-	Desired []footprint `json:"desired"`
-	Writes  []cell      `json:"writes"`
-	Force   bool        `json:"force"`
+	Named     []path      `json:"named"`
+	Operation string      `json:"operation"`
+	Manager   string      `json:"manager"`
+	Desired   []footprint `json:"desired"`
+	Writes    []cell      `json:"writes"`
+	Force     bool        `json:"force"`
+	Context   []cell      `json:"context"`
 }
 
 type itemSpec struct {
@@ -169,10 +196,12 @@ type itemSpec struct {
 }
 
 type fixture struct {
-	Name    string     `json:"name"`
-	Schema  []itemSpec `json:"schema"`
-	Initial state      `json:"initial"`
-	Steps   []struct {
+	Objects   []itemSpec `json:"objects"`
+	Name      string     `json:"name"`
+	Semantics string     `json:"semantics"`
+	Schema    []itemSpec `json:"schema"`
+	Initial   state      `json:"initial"`
+	Steps     []struct {
 		Request  request        `json:"request"`
 		Expected map[string]any `json:"expected"`
 	} `json:"steps"`
@@ -231,8 +260,8 @@ func readCorpus(data []byte, allowMissingOracles bool) (Corpus, error) {
 			if (step.GoExpect != nil) != (step.Difference != "") {
 				return corpus, fmt.Errorf("%s step %d: goExpect and difference must occur together", c.Name, i+1)
 			}
-			if step.Difference != "" && step.DifferenceKind != "proposal" && step.DifferenceKind != "model-gap" {
-				return corpus, fmt.Errorf("%s step %d: classify differenceKind as proposal or model-gap", c.Name, i+1)
+			if step.Difference != "" && step.DifferenceKind != "proposal" {
+				return corpus, fmt.Errorf("%s step %d: classify differenceKind as proposal", c.Name, i+1)
 			}
 			if step.Difference == "" && step.DifferenceKind != "" {
 				return corpus, fmt.Errorf("%s step %d: differenceKind needs a documented difference", c.Name, i+1)
@@ -245,85 +274,14 @@ func readCorpus(data []byte, allowMissingOracles bool) (Corpus, error) {
 	return corpus, nil
 }
 
-// Flatten retains all value/container/item cells. Only ownership of container
-// presence is projected out: SMD does not persist all of those Lean assertions.
+// flatten is the default-schema convenience used by adapter tests.
 func flatten(object map[string]any, required map[string][]string) ([]cell, []itemSpec, error) {
-	cells, specs := []cell{}, []itemSpec{}
-	var walk func(any, path, string) error
-	walk = func(node any, p path, schemaPath string) error {
-		if schemaPath == "atomic" {
-			text, err := json.Marshal(node)
-			if err != nil {
-				return err
-			}
-			cells = append(cells, cell{p, content{"value", string(text)}})
-			return nil
-		}
-		switch node := node.(type) {
-		case map[string]any:
-			isItem := len(p) > 0 && p[len(p)-1].Item != nil
-			if len(p) > 0 && !isItem {
-				cells = append(cells, cell{p, content{Kind: "object"}})
-			}
-			keys := make([]string, 0, len(node))
-			for key := range node {
-				keys = append(keys, key)
-			}
-			sort.Strings(keys)
-			for _, key := range keys {
-				if isItem && key == "name" {
-					continue
-				}
-				childSchema := key
-				if schemaPath != "" {
-					childSchema = schemaPath + "." + key
-				}
-				if err := walk(node[key], p.field(key), childSchema); err != nil {
-					return err
-				}
-			}
-		case []any:
-			cells = append(cells, cell{p, content{Kind: "collection"}})
-			seen := map[string]bool{}
-			for _, element := range node {
-				object, ok := element.(map[string]any)
-				if !ok {
-					return fmt.Errorf("%s: only associative lists of objects are supported", p.smd())
-				}
-				name, ok := object["name"].(string)
-				if !ok || seen[name] {
-					return fmt.Errorf("%s: missing/non-string/duplicate list-map key name", p.smd())
-				}
-				seen[name] = true
-				itemPath := p.item(name)
-				core := any("none")
-				for _, field := range required[schemaPath] {
-					if field == "" || strings.Contains(field, ".") {
-						return fmt.Errorf("%s: adapter requires direct scalar required fields", schemaPath)
-					}
-					leaf := map[string]any{"value": map[string]any{"path": itemPath.field(field)}}
-					if core == "none" {
-						core = leaf
-					} else {
-						core = map[string]any{"both": map[string]any{"left": core, "right": leaf}}
-					}
-				}
-				specs = append(specs, itemSpec{itemPath, core})
-				cells = append(cells, cell{itemPath, content{Kind: "item"}})
-				if err := walk(object, itemPath, schemaPath+"[]"); err != nil {
-					return err
-				}
-			}
-		case string:
-			text, _ := json.Marshal(node)
-			cells = append(cells, cell{p, content{"value", string(text)}})
-		default:
-			return fmt.Errorf("%s: adapter supports strings, granular objects, associative lists, and atomic maps; got %T", p.smd(), node)
-		}
-		return nil
+	s, err := schemaFor(Case{})
+	if err != nil {
+		return nil, nil, err
 	}
-	err := walk(object, nil, "")
-	return cells, specs, err
+	out, err := s.flatten(object, required)
+	return out.cells, out.specs, err
 }
 
 func cellMap(cells []cell) (map[string]string, error) {
@@ -341,8 +299,14 @@ func cellMap(cells []cell) (map[string]string, error) {
 	return out, nil
 }
 
-func expectedSnapshot(e Expected) (Snapshot, error) {
-	cells, _, err := flatten(e.Object, nil)
+func expectedSnapshot(e Expected) (Snapshot, error) { return expectedSnapshotFor(e, Case{}) }
+func expectedSnapshotFor(e Expected, c Case) (Snapshot, error) {
+	schema, err := schemaFor(c)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	flat, err := schema.flatten(e.Object, nil)
+	cells := flat.cells
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -368,9 +332,6 @@ func modelSnapshot(s state, errorName string) (Snapshot, error) {
 	out := Snapshot{errorName, cells, map[string][]string{}}
 	seen := map[string]bool{}
 	for _, claim := range s.Claims {
-		if claim.Target.Kind == "presence" {
-			continue
-		}
 		field := claim.Target.Path.smd().String()
 		key := claim.Manager + ":" + field
 		if seen[key] {
@@ -386,10 +347,43 @@ func modelSnapshot(s state, errorName string) (Snapshot, error) {
 }
 
 func normalize(c Case) (fixture, error) {
-	out := fixture{Name: c.Name, Schema: []itemSpec{}, Initial: state{[]cell{}, []claim{}}}
+	mode := c.Semantics
+	if mode == "" {
+		if len(c.Required) > 0 {
+			mode = "full"
+		} else {
+			mode = "current"
+		}
+	}
+	if mode != "full" && mode != "current" && mode != "predrag" {
+		return fixture{}, fmt.Errorf("unknown semantics %s", mode)
+	}
+	schema, err := schemaFor(c)
+	if err != nil {
+		return fixture{}, err
+	}
+	out := fixture{Name: c.Name, Semantics: mode, Schema: []itemSpec{}, Objects: []itemSpec{}, Initial: state{[]cell{}, []claim{}}}
 	known := map[string]bool{}
+	objectSeen := map[string]bool{}
+	named := []path{}
+	namedSeen := map[string]bool{}
 	for _, step := range c.Steps {
-		cells, specs, err := flatten(step.Apply, c.Required)
+		flat, err := schema.flatten(step.Apply, c.Required)
+		cells, specs := flat.cells, flat.specs
+		for _, spec := range flat.objects {
+			key := spec.Path.smd().String()
+			if !objectSeen[key] {
+				out.Objects = append(out.Objects, spec)
+				objectSeen[key] = true
+			}
+		}
+		for _, p := range flat.named {
+			key := p.smd().String()
+			if !namedSeen[key] {
+				named = append(named, p)
+				namedSeen[key] = true
+			}
+		}
 		if err != nil {
 			return out, err
 		}
@@ -400,9 +394,26 @@ func normalize(c Case) (fixture, error) {
 				known[key] = true
 			}
 		}
-		r := request{Manager: step.Manager, Desired: []footprint{}, Writes: cells, Force: step.Force}
+		operation := step.Operation
+		if operation == "" {
+			operation = "apply"
+		}
+		manager := step.Manager
+		if operation == "update" {
+			manager += "@update"
+		}
+		if operation != "apply" && operation != "update" {
+			return out, fmt.Errorf("unknown operation %s", operation)
+		}
+		r := request{Operation: operation, Manager: manager, Desired: []footprint{}, Writes: []cell{}, Context: []cell{}, Force: step.Force}
 		for _, cell := range cells {
 			kind := cell.Content.Kind
+			implicit := !flat.owned[cell.Path.smd().String()]
+			if implicit {
+				r.Context = append(r.Context, cell)
+				continue
+			}
+			r.Writes = append(r.Writes, cell)
 			if kind == "object" || kind == "collection" {
 				kind = "presence"
 			}
@@ -415,6 +426,9 @@ func normalize(c Case) (fixture, error) {
 			"error": nil, "present": []any{}, "absent": []any{},
 			"fullManagers": []any{}, "partialManagers": []any{},
 		}})
+	}
+	for i := range out.Steps {
+		out.Steps[i].Request.Named = named
 	}
 	return out, nil
 }

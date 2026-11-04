@@ -129,7 +129,7 @@ cases:
         B: ['.items[name="db"]', '.items[name="db"].note']
   - manager: A
     apply: {}
-    expect: {object: {items: []}, owners: {}}
+    expect: {object: {}, owners: {}}
     goExpect:
       object: {items: [{name: db, note: injected}]}
       owners: {B: ['.items[name="db"]', '.items[name="db"].note']}
@@ -209,7 +209,4 @@ cases:
       owners: {B: [.settings.left]}
   - manager: B
     apply: {}
-    expect: {object: {settings: {}}, owners: {}}
-    goExpect: {object: {}, owners: {}}
-    differenceKind: model-gap
-    difference: The current normalization assigns synthetic object-presence claims; after force transfer Lean retains an empty object that current SSA removes.
+    expect: {object: {}, owners: {}}

@@ -19,13 +19,26 @@ namespace SSA
 
 open Lean
 
+inductive Operation where
+  | apply
+  | update
+  deriving Repr, BEq, DecidableEq, FromJson, ToJson
+
+deriving instance ReflBEq, LawfulBEq for Operation
+
 /-- A normalized apply replaces one manager's complete footprint, as SSA does. -/
 structure Request where
   manager : String
   desired : List Footprint
   writes : List Cell
   force : Bool := false
+  context : List Cell := []
+  operation : Operation := .apply
+  named : List Path := []
   deriving Repr, BEq, DecidableEq, FromJson, ToJson
+
+/-- Structural nodes are data, but nonempty granular containers do not invent ownership. -/
+def Request.cells (r : Request) : List Cell := r.writes ++ r.context
 
 inductive ApplyError where
   | invalidInitialState
@@ -38,9 +51,10 @@ inductive ApplyError where
 /-- The normalized intent contains exactly the values and presence assertions being applied. -/
 def normalized (r : Request) : Bool :=
   r.desired == r.writes.map Cell.footprint &&
-    (r.writes.map (·.path)).eraseDups.length == r.writes.length &&
-    r.writes.all (fun cell => (prefixes cell.path).all (fun p =>
-      !isItemPath p || r.desired.contains ⟨p, .item⟩))
+    (r.cells.map (·.path)).eraseDups.length == r.cells.length &&
+    r.cells.all (fun cell => (prefixes cell.path).all (fun p =>
+      !isItemPath p || r.desired.contains ⟨p, .item⟩)) &&
+    r.context.all (fun cell => cell.content == .object || cell.content == .collection)
 
 def changed (s : State) (cell : Cell) : Bool :=
   s.cells.any fun old => old.path == cell.path && old.content != cell.content
@@ -55,11 +69,23 @@ def updatedClaims (s : State) (r : Request) : List Claim :=
   s.claims.filter (fun c => c.manager != r.manager &&
     !(r.force && c.target.kind == .value &&
       r.writes.any (fun cell => cell.path == c.target.path && changed s cell))) ++
-  r.desired.map (fun target => ⟨r.manager, target⟩)
+  r.desired.map (fun target => ⟨r.manager, target, true⟩)
 
 def merged (s : State) (r : Request) : State :=
-  { cells := r.writes ++ s.cells.filter (fun old => !r.writes.any (fun c => c.path == old.path))
+  { cells := r.cells ++ s.cells.filter (fun old => !r.cells.any (fun c => c.path == old.path))
     claims := updatedClaims s r }
+
+/-- Granular empty/null containers compare as leaves only while both sides are empty. -/
+def modifiedCell (before after : State) (cell : Cell) : Bool :=
+  match before.cells.find? (fun old => old.path == cell.path) with
+  | none => false
+  | some old =>
+      let emptyBoth := !before.cells.any (fun child => under cell.path child.path && cell.path != child.path) &&
+        !after.cells.any (fun child => under cell.path child.path && cell.path != child.path)
+      let leaf := match old.content,cell.content with
+        | .value _,.value _ => true
+        | _,_ => emptyBoth
+      leaf && old.content != cell.content
 
 /-- A direct lifetime deletion requires the departing manager to have been full. -/
 def deletesItem (before provisional : State) (r : Request) (item : ItemSpec) : Bool :=
@@ -80,15 +106,34 @@ def released (before : State) (r : Request) (path : Path) (kind : ClaimKind) : B
 def claimed (s : State) (path : Path) (kind : ClaimKind) : Bool :=
   s.claims.any fun c => c.target == ⟨path, kind⟩
 
-/-- Optional unowned values disappear; remaining descendants keep container markers present. -/
+def properUnder (parent child : Path) : Bool := under parent child && parent != child
+
+def releasesAny (before : State) (r : Request) : Bool :=
+  before.claims.any (fun claim => claim.manager == r.manager && !r.desired.contains claim.target)
+
+def retainedValue (before : State) (r : Request) (s : State) (cell : Cell) : Bool :=
+  !(released before r cell.path .value && !claimed s cell.path .value)
+
+/-- An empty unowned collection is real data; populated containers are inferred from children. -/
+def supportsContainer (before : State) (r : Request) (s : State) (cell : Cell) : Bool :=
+  match cell.content with
+  | .value _ => retainedValue before r s cell
+  | .item => true
+  | .object | .collection =>
+      r.cells.contains cell || claimed s cell.path .presence ||
+      (!before.cells.any (fun child => properUnder cell.path child.path) &&
+        !released before r cell.path .presence)
+
+def keepCell (before : State) (r : Request) (s : State) (cell : Cell) : Bool :=
+  match cell.content with
+  | .value _ => retainedValue before r s cell
+  | .item => true
+  | .object | .collection => !releasesAny before r || s.cells.any (fun descendant =>
+      under cell.path descendant.path && supportsContainer before r s descendant)
+
+/-- Prune released values and all unsupported implicit container ancestors together. -/
 def pruneReleased (before : State) (r : Request) (s : State) : State :=
-  { s with cells := s.cells.filter fun c =>
-      match c.content with
-      | .value _ => !(released before r c.path .value && !claimed s c.path .value)
-      | .object | .collection =>
-          !(released before r c.path .presence &&
-            !s.claims.any (fun claim => under c.path claim.target.path))
-      | .item => true }
+  { s with cells := s.cells.filter (keepCell before r s) }
 
 def candidate (schema : Schema) (before : State) (r : Request) : State :=
   let provisional := merged before r

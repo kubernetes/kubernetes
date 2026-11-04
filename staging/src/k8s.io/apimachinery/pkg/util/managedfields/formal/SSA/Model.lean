@@ -23,6 +23,7 @@ open Lean
 inductive Segment where
   | field (name : String)
   | item (keys : List (String × String))
+  | element (value : String)
   deriving Repr, BEq, DecidableEq, FromJson, ToJson
 
 abbrev Path := List Segment
@@ -75,6 +76,7 @@ structure Footprint where
 structure Claim where
   manager : String
   target : Footprint
+  applied : Bool := true
   deriving Repr, BEq, DecidableEq, FromJson, ToJson
 
 structure State where
@@ -152,7 +154,7 @@ def requiredPath (parent child : Path) : Bool :=
   under parent child && parent.length < child.length &&
     (child.drop parent.length).all (fun step => match step with
       | .field _ => true
-      | .item _ => false)
+      | .item _ | .element _ => false)
 
 def coreWithin (parent : Path) : RequiredCore → Bool
   | .none => true
@@ -170,8 +172,33 @@ def schemaValid (schema : Schema) : Bool :=
 def targetExists (s : State) (target : Footprint) : Bool :=
   match target.kind with
   | .value => s.hasValue target.path
-  | .presence => s.hasContainer target.path
+  | .presence => s.hasContainer target.path ||
+      s.cells.any (fun cell => cell.path == target.path && cell.content == .value "null")
   | .item => s.hasItem target.path
+
+/-- Strict key-name order gives composite selectors one canonical representation. -/
+def canonicalKeys : List (String × String) → Bool
+  | [] | [_] => true
+  | left :: right :: rest => decide (left.1 < right.1) && canonicalKeys (right :: rest)
+
+/-- Each proper prefix is a real container of the kind selected by the next segment. -/
+def compatiblePath (s : State) (path : Path) : Bool :=
+  !path.isEmpty && (prefixes path).all (fun parent =>
+    if parent.isEmpty then
+      match path.head? with
+      | some (.field _) => true
+      | _ => false
+    else if parent == path then true
+    else match (path.drop parent.length).head? with
+      | some (.field _) => s.cells.any (fun cell => cell.path == parent &&
+          (cell.content == .object || cell.content == .item))
+      | some (.item keys) => !keys.isEmpty &&
+          (keys.map Prod.fst).eraseDups.length == keys.length &&
+          canonicalKeys keys &&
+          s.cells.any (fun cell => cell.path == parent && cell.content == .collection)
+      | some (.element _) =>
+          s.cells.any (fun cell => cell.path == parent && cell.content == .collection)
+      | none => false)
 
 /-- Reject dangling claims, duplicate values, and descendants of absent item instances. -/
 def shapeValid (schema : Schema) (s : State) : Bool :=
@@ -179,7 +206,9 @@ def shapeValid (schema : Schema) (s : State) : Bool :=
   (s.cells.map (·.path)).eraseDups.length == s.cells.length &&
   s.cells.all (fun c =>
     (c.content != .item || schema.any (fun item => item.path == c.path)) &&
-    (prefixes c.path).all (fun p => !isItemPath p || s.hasItem p)) &&
+    (prefixes c.path).all (fun p => !isItemPath p || s.hasItem p) &&
+    compatiblePath s c.path &&
+    (isItemPath c.path == (c.content == .item))) &&
   s.claims.all (fun c => targetExists s c.target)
 
 def valid (schema : Schema) (s : State) : Bool :=

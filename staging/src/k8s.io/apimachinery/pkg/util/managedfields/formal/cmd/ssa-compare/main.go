@@ -55,14 +55,15 @@ func run() error {
 	cases := corpus.Cases
 	if *reproducer == "" {
 		cases = append(cases, bridge.GeneratedScalarCases(*seed, *count, *steps)...)
+		cases = append(cases, bridge.GeneratedStructuralCases(*seed, *count, *steps)...)
 	}
 	summary, err := bridge.Compare(context.Background(), *model, cases)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Compared %d cases / %d transitions: %d accepted, %d conflicts, %d proposal differences, %d known model gaps (seed %d).\n",
+	fmt.Printf("Compared %d cases / %d transitions: %d accepted, %d conflicts, %d proposal differences (seed %d).\n",
 		summary.Cases, summary.Steps, summary.Accepted, summary.Conflicts,
-		summary.Differences-summary.ModelGaps, summary.ModelGaps, *seed)
+		summary.Differences, *seed)
 	return nil
 }
 

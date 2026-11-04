@@ -41,4 +41,5 @@ diff -u fixtures/scenarios.json .lake/scenarios.regenerated.json
 
 go test ./bridge ./cmd/ssa-compare
 go run ./cmd/ssa-compare -model .lake/build/bin/ssa-model
+bash ci/verify-pr336.sh
 python3 docs/generate.py --check

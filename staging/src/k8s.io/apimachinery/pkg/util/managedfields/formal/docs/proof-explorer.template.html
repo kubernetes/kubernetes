@@ -39,14 +39,14 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
 <main>
   <div class="eyebrow">Executable reference model</div>
   <h1>What does this model prove?</h1>
-  <p class="lede">Explore the exact statements, their premises, and the lemmas they use. These proofs concern the proposed full/partial-item-manager model.</p>
+  <p class="lede">Explore the exact statements, their premises, and the lemmas they use. The model separates current SSA, the pinned PR, the stronger full-manager policy, and admission composition.</p>
   <div class="stats" id="stats"></div>
-  <div class="notice"><strong>Specification review remains open.</strong> The current model has two documented representation gaps. A checked proof establishes its Lean statement; it does not establish that the definitions match all Kubernetes behavior.</div>
+  <div class="notice"><strong>Specification review remains open.</strong> The two former representation defects are fixed. A checked proof establishes its Lean statement; implementation correspondence is checked separately on bounded traces.</div>
   <nav class="tabs" aria-label="Explorer views">
     <button class="tab" data-view="proofs">Proofs</button>
     <button class="tab" data-view="definitions">Definitions</button>
     <button class="tab" data-view="yaml">YAML walkthrough</button>
-    <button class="tab" data-view="gaps">Known gaps</button>
+    <button class="tab" data-view="gaps">Scope and PR failures</button>
     <button class="tab" data-view="checks">Verification</button>
   </nav>
   <section class="view" id="view-proofs" aria-label="Selected proof">
@@ -73,6 +73,7 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
   <section class="view" id="view-definitions" hidden>
     <div class="card"><h2>The ownership contract</h2>
       <p>A manager is <strong>full for one item</strong> when it claims that item's membership and its entire recursively required core. The same manager must cover every required object branch. Optional nested items have their own lifetimes and can have different full managers.</p>
+      <p>Optional required-bearing maps and the root have independent object scopes. Full ownership of an optional child may belong to a different manager. One required branch of a parent still needs the parent manager to cover that whole branch.</p>
       <p>For a key-only item, every membership claimant is full. Last-claim deletion follows the same lifetime rule. A full child does not protect a deleted ancestor.</p>
     </div>
     <div class="definition-grid" id="definition-grid"></div>
@@ -99,7 +100,7 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
         <pre>items:
 - <b><u>name</u></b>: database
   <b>host</b>: db.example.com</pre>
-        <div class="result">Rejected: no full manager would remain.</div>
+        <div class="result">Full policy: rejected. Raw PR: accepted.</div>
       </article>
     </div>
     <div class="card" style="margin-top:18px"><h3>Why the value check is insufficient</h3>
@@ -109,21 +110,21 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
     </div>
   </section>
   <section class="view" id="view-gaps" hidden>
-    <div class="card gap"><h2>1. The shape predicate is too weak</h2>
-      <p>The current flat-cell representation can simultaneously mark <code>foo</code> as a scalar and store <code>foo.bar</code>. No valid object tree can have both. The current <code>shapeValid</code> predicate checks item ancestors and unique paths, but does not forbid descendants under atomic values.</p>
-      <p>The theorem <code>accepted_valid</code> still correctly preserves that predicate. A stronger representation invariant, or a recursive tree representation with an appropriate encoding proof, is an open obligation.</p>
-      <button class="chip" data-proof="SSA.shapeValid">Inspect shapeValid</button>
+    <div class="card"><h2>Resolved: structural consistency and invented ownership</h2>
+      <p>Every proper ancestor must be a real container. Scalars cannot have descendants. Structural context no longer invents presence ownership for nonempty maps; actual empty-map claims are compared.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.Contracts.scalar_has_no_descendants">Structural theorem</button><button class="chip" data-proof="SSA.Contracts.accepted_preserves_cells">Separate data and ownership</button></div>
     </div>
-    <div class="card gap"><h2>2. Synthetic presence claims change later pruning</h2>
-      <p>A applies <code>settings.left: one</code>. B force-transfers it to <code>two</code>, then applies an empty configuration. The current normalization gives A an additional object-presence claim.</p>
-      <div class="comparison">
-        <div><h3>Lean model after B releases</h3><pre>settings: {}</pre></div>
-        <div><h3>Current Go SSA after B releases</h3><pre>{}</pre></div>
-      </div>
-      <p>The implementation comparison executes both outcomes and records this exact difference as <code>model-gap</code>. It is a known defect or normalization mismatch, not an intended full/partial semantic change.</p>
+    <div class="card gap"><h2>PR #336: fragmentation and partial-owner deletion</h2>
+      <p>The raw PR accepts A releasing half its required core while B owns the other half. B's later omission can then delete A's remaining required field. The strict full policy rejects the fragmenting request atomically.</p>
+      <button class="chip" data-proof="SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch">Inspect the kernel-checked counterexample</button>
     </div>
-    <div class="card"><h3>Other open boundaries</h3>
-      <p>General handoff progress, arbitrary schema normalization, Go refinement, Update, version conversion, defaulting, CEL, admission webhooks, and storage concurrency are outside the completed proof claims. Required granular collection presence is an explicit design assumption that current SMD field sets do not fully preserve.</p>
+    <div class="card gap"><h2>PR #336: required maps and granular lists</h2>
+      <p>A direct claim on <code>conn: {}</code> bypasses required-child recursion. Conversely, a known granular list has no direct member claim, including when explicitly applied empty. The PR classifies its supplier as partial. Both cases run against pinned head and base Go revisions.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.explicit_map_shortcuts_required_children">General map shortcut</button><button class="chip" data-proof="SSA.Counterexamples.pr_required_list_owner_is_misclassified">Actual list failure</button></div>
+    </div>
+    <div class="card"><h2>Boundaries still requiring separate work</h2>
+      <p>Theorems quantify over arbitrary finite normalized model inputs. Go comparisons cover supplied structural schemas, recursive types, composite keys, sets, atomics, empty/null containers and Apply/Update. They are bounded evidence, not a universal Go refinement proof.</p>
+      <p>Conversion, defaults, schema evolution, key defaults, duplicate-list behavior, reset/subresource filters and storage retries are not fully modeled. Admission and CEL are function parameters with composition theorems, not verified interpreters. The stronger required-empty-list rule still requires an ownership representation design.</p>
     </div>
   </section>
   <section class="view" id="view-checks" hidden>
@@ -131,7 +132,7 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
       <table><thead><tr><th>Question</th><th>Mechanism</th><th>Current boundary</th></tr></thead><tbody>
         <tr><td>Does the formal statement follow?</td><td>Pinned Lean build, automatic transitive axiom audit, fresh kernel replay.</td><td>Checks the chosen definitions and statements.</td></tr>
         <tr><td>Does the model describe the intended SSA contract?</td><td>Human review of definitions, premises, YAML examples, KEP/test mapping, and known gaps.</td><td>Still open. A stronger proof cannot repair a wrong specification by itself.</td></tr>
-        <tr><td>Does Go agree on tested inputs?</td><td>Independent YAML corpus, real managedfields wrappers, FieldsV1 round trips, generated scalar traces.</td><td>Bounded evidence with explicit proposal differences and one known model gap. No general Go refinement proof.</td></tr>
+        <tr><td>Does Go agree on tested inputs?</td><td>Independent YAML corpus, real managedfields wrappers, FieldsV1 round trips, generated scalar and structural Apply/Update traces; actual pinned PR head/base updater.</td><td>Bounded exact comparison with explicit policy differences. No tolerated model gaps and no universal Go refinement proof.</td></tr>
       </tbody></table>
     </div>
     <div class="card"><h3>Automated entrypoint</h3><pre>bash ci/verify.sh</pre>
@@ -141,7 +142,8 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
         <li>Replay Main and its imports with <code>leanchecker --fresh</code>.</li>
         <li>Reject five negative audit probes, including hidden proof holes and imported modules outside the SSA namespace.</li>
         <li>Execute the model scenarios, replay the JSON snapshot, and verify fixture regeneration.</li>
-        <li>Run the Go adapter tests and live model/Go comparison after each request.</li>
+        <li>Run Go adapter tests and live model/Go comparisons after each request.</li>
+        <li>Run actual merge suites and exact comparisons against pinned PR head and base.</li>
         <li>Regenerate this explorer and reject stale documentation.</li>
       </ol>
       <p class="quiet">The Prow job definition is a proposal for kubernetes/test-infra; this directory does not activate that job.</p>
@@ -161,18 +163,18 @@ function el(tag,attributes,...children){const node=document.createElement(tag);f
 function route(view,proof){const params=new URLSearchParams({view:view||"proofs"});if(proof)params.set("proof",proof);location.hash=params.toString();}
 function nodeButton(name,style){const node=NODES[name];const button=el("button",{class:style||"dependency","data-proof":name},node.title);if(style!=="chip")button.append(el("span",{class:"name",style:"display:block;margin-top:3px"},name));return button;}
 function sourceRoot(){try{const url=new URL(location.search.slice(1));const suffix="/docs/proofs.html";if(url.hostname==="github.com"&&url.pathname.endsWith(suffix))return url.origin+url.pathname.slice(0,-suffix.length)+"/";}catch{}return DATA.sourceRoot;}
-function renderList(){const search=document.querySelector("#search").value.trim().toLowerCase();const helpers=document.querySelector("#helpers").checked;const list=document.querySelector("#proof-list");list.replaceChildren();const nodes=DATA.nodes.filter(node=>node.kind==="theorem"&&(!node.private||helpers)&&(!search||(node.name+" "+node.title+" "+(node.meaning||"")).toLowerCase().includes(search)));for(const node of nodes){const button=el("button",{class:"list-item"+(node.name===selected?" active":""),"data-proof":node.name},node.title,el("small",{},LABELS[node.scope]||node.scope));if(node.name===selected)button.setAttribute("aria-current","true");list.append(button);}document.querySelector("#count").textContent=nodes.length+" statements shown";}
+function renderList(){const search=document.querySelector("#search").value.trim().toLowerCase();const helpers=document.querySelector("#helpers").checked;const list=document.querySelector("#proof-list");list.replaceChildren();const nodes=DATA.nodes.filter(node=>node.kind==="theorem"&&((!node.private&&node.scope!=="helper")||helpers)&&(!search||(node.name+" "+node.title+" "+(node.meaning||"")).toLowerCase().includes(search)));for(const node of nodes){const button=el("button",{class:"list-item"+(node.name===selected?" active":""),"data-proof":node.name},node.title,el("small",{},LABELS[node.scope]||node.scope));if(node.name===selected)button.setAttribute("aria-current","true");list.append(button);}document.querySelector("#count").textContent=nodes.length+" statements shown";}
 function renderProof(name){const node=NODES[name]||NODES[DEFAULT];selected=node.name;const head=el("div",{class:"selected-head"},el("div",{},el("div",{class:"name"},node.name),el("h2",{style:"margin-top:7px"},node.title)),el("a",{class:"source-link",href:sourceRoot()+node.file+"#L"+node.line,target:"_blank",rel:"noopener"},"View source ↗"));const card=document.querySelector("#selected");card.replaceChildren(head,el("span",{class:"badge "+node.scope},node.kind==="definition"?"Model definition":(LABELS[node.scope]||node.scope)));if(node.meaning)card.append(el("p",{style:"margin-top:13px"},node.meaning));if(node.limits)card.append(el("div",{class:"scope-note"},el("strong",{},"Scope: "),node.limits));document.querySelector("#statement").textContent=node.statement;document.querySelector("#source").textContent=node.source;document.querySelector("#source-position").textContent=node.file+":"+node.line+" • embedded source from this documentation snapshot";document.querySelector("#sketch-card").hidden=!node.sketch;document.querySelector("#sketch").textContent=node.sketch||"";const dependencies=node.dependencies.filter(id=>NODES[id].kind==="theorem");const dependents=node.dependents.filter(id=>NODES[id].kind==="theorem");const graph=document.querySelector("#graph");const column=(title,names)=>el("div",{},el("h3",{},title),names.length?names.map(id=>nodeButton(id)):el("p",{class:"empty"},"No explicit project theorem at this level."));graph.replaceChildren(column("Uses these lemmas",dependencies),el("div",{class:"graph-center"},el("div",{class:"graph-label"},"SELECTED STATEMENT"),el("strong",{},node.title),el("div",{class:"name",style:"margin-top:6px"},node.name)),column("Used by",dependents));const definitions=node.dependencies.filter(id=>NODES[id].kind!=="theorem");document.querySelector("#definitions-used").replaceChildren(...(definitions.length?definitions.map(id=>nodeButton(id,"chip")):[el("span",{class:"empty"},"No direct model definition after filtering generated declarations.")]));document.querySelector("#axioms").replaceChildren(...(node.axioms.length?node.axioms.map(name=>el("code",{class:"chip"},name)):[el("span",{class:"badge general"},"No axioms")]));renderList();}
 function render(){const params=new URLSearchParams(location.hash.slice(1));const view=["proofs","definitions","yaml","gaps","checks"].includes(params.get("view"))?params.get("view"):"proofs";for(const element of document.querySelectorAll(".view"))element.hidden=element.id!=="view-"+view;for(const button of document.querySelectorAll(".tab")){const active=button.dataset.view===view;button.classList.toggle("active",active);button.setAttribute("aria-current",active?"page":"false");}renderProof(params.get("proof")||selected);}
 document.addEventListener("click",event=>{const proof=event.target.closest("[data-proof]");if(proof){route("proofs",proof.dataset.proof);return;}const tab=event.target.closest("[data-view]");if(tab)route(tab.dataset.view,selected);});
 document.querySelector("#search").addEventListener("input",renderList);
 document.querySelector("#helpers").addEventListener("change",renderList);
 window.addEventListener("hashchange",render);
-const publicTheorems=DATA.nodes.filter(node=>node.kind==="theorem"&&!node.private).length;
-document.querySelector("#stats").replaceChildren(el("span",{class:"badge general"},DATA.toolchain),el("span",{class:"badge"},publicTheorems+" public statements"),el("span",{class:"badge"},DATA.scenarioCount+" execution scenarios / "+DATA.transitionCount+" transitions"),el("span",{class:"badge execution"},"2 open representation gaps"));
-const definitionNames=["SSA.RequiredCore","SSA.ItemSpec","SSA.State","SSA.full","SSA.covers","SSA.complete","SSA.requiredPresent","SSA.shapeValid","SSA.valid","SSA.normalized","SSA.deletesItem","SSA.candidate","SSA.apply","SSA.commit"];
+const publicTheorems=DATA.nodes.filter(node=>node.kind==="theorem"&&!node.private&&node.scope!=="helper").length;
+document.querySelector("#stats").replaceChildren(el("span",{class:"badge general"},DATA.toolchain),el("span",{class:"badge"},publicTheorems+" public statements"),el("span",{class:"badge"},DATA.scenarioCount+" execution scenarios / "+DATA.transitionCount+" transitions"),el("span",{class:"badge execution"},"3 contracts · actual PR head/base checks"));
+const definitionNames=["SSA.RequiredCore","SSA.ItemSpec","SSA.State","SSA.full","SSA.covers","SSA.complete","SSA.objectFull","SSA.objectsValid","SSA.writeScoped","SSA.applyWith","SSA.prCovers","SSA.pruneFieldSets","SSA.update","SSA.requiredPresent","SSA.shapeValid","SSA.valid","SSA.normalized","SSA.deletesItem","SSA.candidate","SSA.apply","SSA.commit"];
 document.querySelector("#definition-grid").replaceChildren(...definitionNames.filter(name=>NODES[name]).map(name=>{const node=NODES[name];return el("button",{class:"definition-button","data-proof":name},el("strong",{},name),el("span",{},node.description||node.statement));}));
-document.querySelector("#yaml-links").replaceChildren(...["SSA.Examples.fragment_values_are_valid","SSA.Examples.fragment_has_no_full_manager","SSA.Examples.corrected_apply_rejects_fragment"].map(name=>nodeButton(name,"chip")));
+document.querySelector("#yaml-links").replaceChildren(...["SSA.Counterexamples.pr_accepts_fragment_without_full_owner","SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch","SSA.Counterexamples.full_contract_rejects_same_fragment","SSA.Counterexamples.sibling_objects_have_independent_roles"].map(name=>nodeButton(name,"chip")));
 document.querySelector("#footer").textContent="Self-contained generated artifact • source SHA-256 "+DATA.sourceDigest+" • no external JavaScript or fonts • statements, source, and human explanations are included offline.";
 render();
 </script>

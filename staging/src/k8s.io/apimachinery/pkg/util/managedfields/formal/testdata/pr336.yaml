@@ -1,0 +1,262 @@
+# Copyright 2026 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
+# expect: the pinned PR. goExpect: its pinned base, only where behavior differs.
+version: 1
+cases:
+- name: fragmentation-then-partial-deletion
+  schema: &endpoint |
+    types:
+    - name: Document
+      map:
+        fields:
+        - name: items
+          type:
+            list:
+              elementRelationship: associative
+              keys: [name]
+              elementType: {namedType: Item}
+    - name: Item
+      map:
+        fields:
+        - name: name
+          required: true
+          type: {scalar: string}
+        - name: host
+          required: true
+          type: {scalar: string}
+        - name: port
+          required: true
+          type: {scalar: string}
+        - name: note
+          type: {scalar: string}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old, port: p}]}
+    expect:
+      object: {items: [{name: db, host: old, port: p}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']}
+  - manager: B
+    apply: {items: [{name: db, port: p}]}
+    expect:
+      object: {items: [{name: db, host: old, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+  - manager: A
+    apply: {items: [{name: db, host: old}]}
+    expect:
+      object: {items: [{name: db, host: old, port: p}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host']
+        B: ['.items[name="db"]', '.items[name="db"].port']
+  - manager: B
+    apply: {}
+    expect: {object: {items: null}, owners: {}}
+    goExpect:
+      object: {items: [{name: db, host: old}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+    differenceKind: proposal
+    difference: A partial manager deletes another partial manager's required branch after fragmentation.
+- name: last-full-owner-removes-partial-data
+  schema: *endpoint
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old, port: p}]}
+    expect:
+      object: {items: [{name: db, host: old, port: p}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, host: old, port: p, note: injected}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: A
+    apply: {}
+    expect: {object: {items: null}, owners: {}}
+    goExpect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].note']}
+    differenceKind: proposal
+    difference: The last full owner deletes the item, including a partial owner's optional value.
+- name: required-map-member-shortcut
+  schema: |
+    types:
+    - name: Document
+      map:
+        fields:
+        - name: items
+          type:
+            list:
+              elementRelationship: associative
+              keys: [name]
+              elementType: {namedType: Item}
+    - name: Item
+      map:
+        fields:
+        - name: name
+          type: {scalar: string}
+        - name: conn
+          required: true
+          type:
+            map:
+              fields:
+              - name: endpoint
+                required: true
+                type: {scalar: string}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, conn: {endpoint: live}}]}
+    expect:
+      object: {items: [{name: db, conn: {endpoint: live}}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].conn.endpoint']}
+  - manager: B
+    apply: {items: [{name: db, conn: {}}]}
+    expect:
+      object: {items: [{name: db, conn: {endpoint: live}}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].conn.endpoint']
+        B: ['.items[name="db"]', '.items[name="db"].conn']
+  - manager: A
+    apply: {}
+    expect:
+      object: {items: [{name: db, conn: null}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].conn']}
+- name: required-granular-list-populated
+  schema: &required-list |
+    types:
+    - name: Document
+      map:
+        fields:
+        - name: items
+          type:
+            list:
+              elementRelationship: associative
+              keys: [name]
+              elementType: {namedType: Item}
+    - name: Item
+      map:
+        fields:
+        - name: name
+          type: {scalar: string}
+        - name: children
+          required: true
+          type:
+            list:
+              elementRelationship: associative
+              keys: [name]
+              elementType: {namedType: Child}
+        - name: note
+          type: {scalar: string}
+    - name: Child
+      map:
+        fields:
+        - name: name
+          type: {scalar: string}
+  steps:
+  - manager: A
+    apply: {items: [{name: db, children: [{name: child}]}]}
+    expect:
+      object: {items: [{name: db, children: [{name: child}]}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].children[name="child"]']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, children: [{name: child}], note: injected}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].children[name="child"]']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: B
+    apply: {}
+    expect: {object: {items: null}, owners: {}}
+    goExpect:
+      object: {items: [{name: db, children: [{name: child}]}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].children[name="child"]']}
+    differenceKind: proposal
+    difference: A required granular list has no direct member claim, so the PR misclassifies A and lets B delete its data.
+- name: required-granular-list-empty
+  schema: *required-list
+  steps:
+  - manager: A
+    apply: {items: [{name: db, children: []}]}
+    expect:
+      object: {items: [{name: db, children: []}]}
+      owners: {A: ['.items[name="db"]']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, children: [], note: injected}]}
+      owners:
+        A: ['.items[name="db"]']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: B
+    apply: {}
+    expect: {object: {items: null}, owners: {}}
+    goExpect:
+      object: {items: [{name: db, children: []}]}
+      owners: {A: ['.items[name="db"]']}
+    differenceKind: proposal
+    difference: Applying an empty granular list also creates no direct member; the same classifier failure occurs.
+- name: updater-membership-is-exempt
+  schema: *endpoint
+  steps:
+  - manager: U
+    operation: update
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {'U@update': ['.items', '.items[name="db"]', '.items[name="db"].note']}
+  - manager: A
+    apply: {items: [{name: db, host: old, port: p}]}
+    expect:
+      object: {items: [{name: db, host: old, port: p, note: injected}]}
+      owners:
+        'U@update': ['.items', '.items[name="db"]', '.items[name="db"].note']
+        A: ['.items[name="db"]', '.items[name="db"].host', '.items[name="db"].port']
+  - manager: A
+    apply: {}
+    expect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {'U@update': ['.items', '.items[name="db"]', '.items[name="db"].note']}
+- name: key-only-item-waits-for-last-owner
+  schema: |
+    types:
+    - name: Document
+      map:
+        fields:
+        - name: items
+          type:
+            list:
+              elementRelationship: associative
+              keys: [name]
+              elementType: {namedType: Item}
+    - name: Item
+      map:
+        fields:
+        - name: name
+          required: true
+          type: {scalar: string}
+        - name: note
+          type: {scalar: string}
+  steps:
+  - manager: A
+    apply: {items: [{name: db}]}
+    expect:
+      object: {items: [{name: db}]}
+      owners: {A: ['.items[name="db"]']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, note: injected}]}
+      owners:
+        A: ['.items[name="db"]']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: A
+    apply: {}
+    expect:
+      object: {items: [{name: db, note: injected}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].note']}
+  - manager: B
+    apply: {}
+    expect: {object: {}, owners: {}}

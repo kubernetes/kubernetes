@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -/
-import SSA.Apply
+import SSA.ObjectScope
 
 namespace SSA
 
@@ -37,6 +37,8 @@ structure Fixture where
   schema : Schema
   initial : State := {}
   steps : List FixtureStep
+  semantics : Semantics := .full
+  objects : List ObjectSpec := []
   deriving Repr, FromJson, ToJson
 
 structure Observation where
@@ -48,8 +50,8 @@ structure Observation where
 def isFullAt (schema : Schema) (s : State) (manager : String) (path : Path) : Bool :=
   schema.any fun item => item.path == path && full s manager item
 
-def observe (schema : Schema) (before : State) (step : FixtureStep) : Observation :=
-  let result := apply schema before step.request
+def observe (objects : List ObjectSpec) (mode : Semantics) (schema : Schema) (before : State) (step : FixtureStep) : Observation :=
+  let result := writeScoped objects mode schema before step.request
   let after := commit before result
   let error := match result with
     | .ok _ => none
@@ -63,14 +65,14 @@ def observe (schema : Schema) (before : State) (step : FixtureStep) : Observatio
       expected.partialManagers.all (fun (m, p) =>
         after.owns m p .item && !isFullAt schema after m p) }
 
-def runSteps (schema : Schema) : State → List FixtureStep → List Observation
+def runSteps (objects : List ObjectSpec) (mode : Semantics) (schema : Schema) : State → List FixtureStep → List Observation
   | _, [] => []
   | before, step :: steps =>
-      let observation := observe schema before step
-      observation :: runSteps schema observation.state steps
+      let observation := observe objects mode schema before step
+      observation :: runSteps objects mode schema observation.state steps
 
 def runFixture (fixture : Fixture) : List Observation :=
-  runSteps fixture.schema fixture.initial fixture.steps
+  runSteps fixture.objects fixture.semantics fixture.schema fixture.initial fixture.steps
 
 def passes (fixture : Fixture) : Bool :=
   (runFixture fixture).all (·.matched)

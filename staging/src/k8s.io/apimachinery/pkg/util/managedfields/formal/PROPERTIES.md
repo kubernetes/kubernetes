@@ -39,13 +39,13 @@ guarantees.
 
 | ID | Observable contract | Source | Current proof boundary |
 | --- | --- | --- | --- |
-| BASE-01 | Every successfully applied value and presence assertion is present in the result. | KEP goals; typed merge/leaf tests linked in its testing plan. | `Contracts.accepted_preserves_intent`; normalized requests and a valid initial state are required. |
+| BASE-01 | Owned scalar intent is retained; empty/null containers need phase-specific treatment. | KEP goals; typed merge/leaf tests linked in its testing plan. | `Contracts.accepted_preserves_intent` proves the proposed core statement. The separate current/PR pruning model preserves actual SMD empty/null behavior; it does not inherit that stronger exact-container conclusion. |
 | BASE-02 | An omitted exclusively owned scalar disappears. | [Exclusive omission test][exclusive]. | `Contracts.exclusive_omission_removes_value`; applies to non-defaulted scalar cells in the candidate result. It does not claim the final API value stays absent after defaulting. |
 | BASE-03 | An omitted shared scalar survives while another owner remains. | [Shared omission test][shared]. | `Contracts.shared_omission_preserves_value`, with explicit no-overwrite and no-ancestor-deletion assumptions. The latter matters for the proposed extension. |
-| BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | `Contracts.foreign_change_conflicts` for normalized Apply. Update itself is outside the model. |
+| BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | `Contracts.foreign_change_conflicts` for normalized Apply. Update is modeled separately in `SSA/Update.lean`. |
 | BASE-05 | Asserting the same values cannot alone cause an ownership conflict. | Shared-ownership cases; KEP cooperative-management goal. | `Contracts.equal_writes_do_not_conflict`. Other guards may still reject the request. |
 | BASE-06 | Force transfers conflicting value claims, while equal-value claims may remain shared. | [Apply/Update/force test][conflict]. | `Contracts.force_transfers_changed_claim` and `Contracts.unchanged_foreign_claim_preserved` concern `updatedClaims`; subsequent lifetime deletion can still remove a subtree, and acceptance requires valid values and complete item ownership. |
-| BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | `Contracts.shared_omission_preserves_value` and `Contracts.handoff_preserves_full_successor` prove safety under explicit ownership and lifetime assumptions. General handoff progress is open. The existing controller test uses Update, which is not yet represented. |
+| BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | `Contracts.shared_omission_preserves_value` and `Contracts.handoff_preserves_full_successor` prove safety under explicit ownership and lifetime assumptions. `Progress.unchanged_snapshot_acquisition` proves fresh-manager acquisition; Update now has its own transition. Arbitrary validator-constrained release progress remains conditional. |
 | BASE-08 | Repeating the same intent by the same manager without intervening writes is observationally idempotent. | [Semantic no-op test][noop], [defaulted CRD no-op test][default-noop]. | `Contracts.accepted_apply_idempotent` proves immediate repetition succeeds with exactly the same model state, including force. `Contracts.repeated_apply_observationally_equal` exposes the weaker observation-level result. Defaulting, resourceVersion, and persistence are outside the model. |
 | BASE-09 | Atomic units cannot be partially overwritten; granular sibling fields can be independently managed. | [KEP topology][topology]. | Atoms are opaque scalar cells. The independent bridge corpus exercises both topologies against managedfields. General topology mapping and independent-request commutativity remain unproved. |
 | BASE-10 | Field sets and paths survive serialization round trips. | [Fields round trip][roundtrip], KEP testing plan. | The Go bridge checks the real FieldsV1 round trip after every request, including API version and operation. This is bounded evidence, not a general serialization theorem. |
@@ -85,8 +85,7 @@ proof then uses validity of that unchanged state.
 These are conditional safety laws for this executable transition. In particular,
 intent preservation and idempotence alone would be vacuous for an implementation
 that rejects every first request. Successful execution proofs supply concrete
-progress witnesses; general progress under useful preconditions is still a
-separate obligation.
+progress witnesses; `Progress.unchanged_snapshot_acquisition` additionally proves successful acquisition under general fresh-manager and unchanged-snapshot preconditions.
 
 ## Proposed full/partial extension
 
@@ -100,7 +99,7 @@ separate obligation.
 | FULL-06 | Key-only items remain until their last membership claimant leaves. | `key_only_full` is definitional; sharing and final deletion also have execution proofs. |
 | FULL-07 | Fragmenting the required claims is rejected atomically, even when all required values remain. | General acceptance/commit guarantees and concrete counterexample proofs. Existing malformed states require a separate migration policy. |
 | FULL-08 | Adding claims cannot destroy existing full ownership. | General `owns_monotone`, `covers_monotone`, `full_monotone`; these do not cover arbitrary claim removal or force. |
-| FULL-09 | Required granular collections retain a presence claim even when empty. | Representation assumption plus populated/empty-list execution proofs. A current-SMD adapter is missing. |
+| FULL-09 | Required granular collections retain a presence claim even when empty. | Explicit presence is a proposed representation assumption. The current/PR modes retain actual sparse FieldsV1 and prove concrete misclassification counterexamples; the upstream runner confirms them. |
 
 The extension must be reviewed against the existing contract. In particular,
 FULL-03/FULL-05 create a lifetime-based exception to a naive “every shared field
@@ -128,50 +127,58 @@ In particular:
 - `partial_cannot_directly_delete` concerns one lifetime-deletion predicate,
   not every reason an item can disappear.
 - The frame theorems concern specific phases or explicitly excluded effects.
-- The simplified unsafe PR rule is a countermodel, not a verified translation
-  of a particular Go revision.
+- The original simplified unsafe rule remains a countermodel. `Semantics` and
+  `Pruning` separately model the pinned PR and are compared to its actual Go code.
 
-## Remaining proof layers
+## Structural, progress and operation theorems
 
-Intent preservation, exclusive/shared pruning, conflict behavior, exact
-idempotence, and arbitrary finite-history validity now have general proofs.
-Finite-history validity builds on the one-step guard theorem; it does not prove
-availability or successful handoff.
+| Area | General statement | Boundary |
+| --- | --- | --- |
+| Structure | `Contracts.proper_ancestor_is_container`, `scalar_has_no_descendants` | Arbitrary path depth and finite cell sets; no recursive tree-codec refinement theorem. |
+| Locality | `Locality.required_core_local`, `full_manager_is_item_local` | Agreement of claims below the scope; independent scope does not imply arbitrary request commutativity. |
+| Acquisition | `Progress.unchanged_snapshot_acquisition` | Fresh actor, normalized sparse footprint, complete snapshot of unchanged data and a valid initial state; succeeds and extends old claims. |
+| Object scope | `accepted_objects_have_full_owner`, `object_full_is_local`, `partial_object_cannot_directly_delete` | Optional required-bearing maps and root constraints are instantiated independently. Item and ordinary map lifetimes remain distinct. |
+| Update | `update_candidate_replaces_data`, `update_preserves_untouched_claim`, `update_claims_touched_target` | Full replacement, touched-field ownership, operation flags; version/subresource envelopes are not formalized. |
+| Boundary | `Boundary.accepted_final_valid`, `accepted_satisfies_validator`, `validation_rejection_is_atomic` | Arbitrary mutator/relational validator functions, final check and atomic commit. No CEL/webhook interpreter correctness theorem. |
+| Validation limits | `value_only_validation_cannot_enforce_ownership`, `validator_can_block_any_handoff` | Same data can carry different claims; arbitrary external validation can prevent otherwise safe progress. |
+| PR compatibility | `no_required_transition_equivalence` | All finite states/requests and metadata-free item schemas, actual three-pass pruning modes. |
+| PR classifier | `explicit_map_shortcuts_required_children`, `granular_list_without_member_is_partial`, `updater_keeps_membership` | Direct classifier facts, distinct from a complete Go refinement proof. |
+| Raw pruning | `remove_items_has_no_selected_descendant` | Selected subtrees are absent; unselected empty container slots may become null. |
 
-1. Prove general handoff progress: construct accepted acquisition/release
-   requests under explicit preconditions. One successful fixture is insufficient.
-2. Prove independence/commutativity only under precise disjointness assumptions
-   that also exclude shared lifetime boundaries and validation dependencies.
-3. Add Update, normalization/defaulting, conversion, and the ownership protocol
-   before claiming the corresponding Kubernetes integration guarantees.
-4. Extend the bounded Go adapter to broader schema and normalization coverage.
-   Differential testing is implementation evidence; a proof of refinement
-   would be a further step.
+`SSA/Counterexamples.lean` kernel-checks the raw PR fragmentation, partial-owner
+deletion, required-map shortcut, required-list failure, and opposite roles in
+`foo.bar` / `foo.abc`. The sibling fixture checks whole-request rejection and
+scope-local optional-object deletion. These finite witnesses complement the
+general locality and acquisition theorems; they are not universal liveness proofs.
 
-The bounded Go adapter now exists: [bridge](bridge/) and the independent
-[YAML corpus](testdata/bridge.yaml) compare every transition, with exact,
-separately classified proposal differences. Generated traces add scalar-domain
-coverage. Arbitrary schema normalization and a general refinement theorem remain
-open.
+## Implementation checks and boundaries
 
-## Known model gaps requiring semantic review
+The baseline adapter now accepts supplied structural schemas, recursive named
+types, composite keys, scalar sets, JSON scalars, atomics, unknown map entries,
+empty/null containers and Apply/Update. It compares actual sparse ownership,
+including map/container presence. A separate harness runs the same independent
+PR corpus against pinned v7 head and base, including merge tests and field-set
+wire round trips. No arbitrary mismatch is tolerated; there is no `model-gap`
+exception category.
 
-- `shapeValid` currently allows a scalar/atomic cell and a descendant cell at the
-  same time. The existing preservation theorem therefore preserves a weaker
-  predicate than a complete object-tree well-formedness condition.
-- Normalization currently gives managers explicit object-presence claims for
-  nonempty objects. After A applies `settings.left`, B force-transfers it, and B
-  omits it, Lean retains `settings: {}` through A's synthetic presence claim,
-  while current SSA removes `settings`. The bridge executes and characterizes
-  this exact discrepancy as `differenceKind: model-gap`.
+The former scalar-ancestor and synthetic nonempty-map presence defects are
+closed. General structural theorems cover the former, and the force/unclaim
+regression agrees with current managedfields for the latter. The broader
+comparison also led to explicit modeling of implicit key leaves, named fields,
+three-pass restoration, null promotion and final ownership updates.
 
-Passing the automated jobs does not resolve these semantic review obligations.
-In particular, characterizing a known discrepancy does not establish equivalence
-on that input. New discrepancies fail; removing an exception also requires
-updating its independent expected outcomes.
+A universal Go refinement/normalization proof remains open. Version conversion,
+defaulting, schema evolution, reset/subresource filters, duplicate-list behavior,
+key defaults and storage concurrency remain integration obligations. The
+adapter rejects unsupported/duplicate shapes rather than silently projecting
+them away. Required-empty-list fullness still needs a representation design;
+the actual PR modes expose that problem instead of assuming it solved.
 
-No “all requests rejected” implementation should satisfy the entire catalogue:
-the progress and intent obligations must be kept alongside preservation.
+The general exact idempotence theorem concerns the proposed item-core `apply`,
+not arbitrary admission policies, Update, or the entire added object-scope
+operation. The original history theorem is a core safety induction; `scoped_history_preserves_invariants` also covers mixed scoped Apply/Update histories. The boundary
+composition theorems and bounded implementation comparisons are additional,
+different forms of evidence.
 
 [kep]: https://github.com/kubernetes/enhancements/blob/7e841ee17c39a07b3aeea71cc76995b662efdeb8/keps/sig-api-machinery/555-server-side-apply/README.md
 [proposal]: https://github.com/kubernetes/enhancements/blob/7e841ee17c39a07b3aeea71cc76995b662efdeb8/keps/sig-api-machinery/555-server-side-apply/README.md#proposal

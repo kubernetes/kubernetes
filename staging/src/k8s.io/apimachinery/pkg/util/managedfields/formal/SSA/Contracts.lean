@@ -69,7 +69,7 @@ private theorem accepted_normalized (schema : Schema) (before after : State) (r 
 private theorem desired_writes (r : Request) (norm : normalized r = true) :
     r.desired = r.writes.map Cell.footprint := by
   simp only [normalized, Bool.and_eq_true, beq_iff_eq] at norm
-  exact norm.1.1
+  exact norm.1.1.1
 
 private theorem under_iff_prefixes (parent child : Path) :
     under parent child = true ↔ parent ∈ prefixes child := by
@@ -102,7 +102,7 @@ private theorem schema_item_path (schema : Schema) (before : State)
 
 private theorem written_outside_deletions (schema : Schema) (before : State) (r : Request)
     (initial : valid schema before = true) (norm : normalized r = true)
-    (cell : Cell) (written : cell ∈ r.writes) :
+    (cell : Cell) (written : cell ∈ r.cells) :
     (deletedRoots schema before (merged before r) r).any
       (fun root => under root cell.path) = false := by
   apply Bool.eq_false_iff.mpr
@@ -114,7 +114,7 @@ private theorem written_outside_deletions (schema : Schema) (before : State) (r 
   have prefixMember := (under_iff_prefixes item.path cell.path).mp below
   have hn := norm
   simp only [normalized, Bool.and_eq_true, List.all_eq_true] at hn
-  have membership := hn.2 cell written item.path prefixMember
+  have membership := hn.1.2 cell written item.path prefixMember
   have desired : r.desired.contains ⟨item.path, .item⟩ = true := by
     simpa [keyPath] using membership
   simp only [deletesItem, Bool.and_eq_true] at deleting
@@ -122,40 +122,50 @@ private theorem written_outside_deletions (schema : Schema) (before : State) (r 
   rw [desired] at impossible
   cases impossible
 
-/-- Every asserted value or presence marker survives a successful apply. -/
-theorem accepted_preserves_intent (schema : Schema) (before after : State) (r : Request)
+/-- Structural data survives too, without claiming ownership of implicit containers. -/
+theorem accepted_preserves_cells (schema : Schema) (before after : State) (r : Request)
     (accepted : apply schema before r = .ok after)
-    (cell : Cell) (written : cell ∈ r.writes) :
-    cell ∈ after.cells := by
+    (cell : Cell) (written : cell ∈ r.cells) : cell ∈ after.cells := by
   have initial := accepted_initial_valid schema before after r accepted
   have norm := accepted_normalized schema before after r accepted
-  have intent : cell.footprint ∈ r.desired := by
-    rw [desired_writes r norm]
-    exact List.mem_map.mpr ⟨cell, written, rfl⟩
   have roots := written_outside_deletions schema before r initial norm cell written
-  have mergedMember : cell ∈ (merged before r).cells := by
-    simp [merged, written]
+  have mergedMember : cell ∈ (merged before r).cells := by simp [merged, written]
   have remaining := (subtree_frame (merged before r)
     (deletedRoots schema before (merged before r) r) cell roots).mpr mergedMember
   rw [← accepted_candidate schema before after r accepted]
   change cell ∈ List.filter _ _
   apply List.mem_filter.mpr
   refine ⟨remaining, ?_⟩
-  have asserted : r.desired.contains cell.footprint = true := by simpa using intent
+  change keepCell before r _ cell = true
   cases kind : cell.content with
-  | item => rfl
+  | item => simp [keepCell, kind]
   | value text =>
-      simp only [Cell.footprint, kind] at asserted
-      have member : ⟨cell.path, ClaimKind.value⟩ ∈ r.desired := by simpa using asserted
-      simp [released, member]
+      have assertedWrite : cell ∈ r.writes := by
+        rcases List.mem_append.mp written with owned | structural
+        · exact owned
+        · have h := norm
+          simp only [normalized, Bool.and_eq_true, List.all_eq_true] at h
+          have container := h.2 cell structural
+          simp [kind] at container
+      have intent : cell.footprint ∈ r.desired := by
+        rw [desired_writes r norm]
+        exact List.mem_map.mpr ⟨cell, assertedWrite, rfl⟩
+      simp [Cell.footprint, kind] at intent
+      simp [keepCell, retainedValue, kind, released, intent]
   | object =>
-      simp only [Cell.footprint, kind] at asserted
-      have member : ⟨cell.path, ClaimKind.presence⟩ ∈ r.desired := by simpa using asserted
-      simp [released, member]
+      simp only [keepCell, kind, Bool.or_eq_true]
+      right
+      exact List.any_eq_true.mpr ⟨cell, remaining, by simp [under, supportsContainer, kind, written]⟩
   | collection =>
-      simp only [Cell.footprint, kind] at asserted
-      have member : ⟨cell.path, ClaimKind.presence⟩ ∈ r.desired := by simpa using asserted
-      simp [released, member]
+      simp only [keepCell, kind, Bool.or_eq_true]
+      right
+      exact List.any_eq_true.mpr ⟨cell, remaining, by simp [under, supportsContainer, kind, written]⟩
+
+/-- Every asserted value or presence marker survives a successful apply. -/
+theorem accepted_preserves_intent (schema : Schema) (before after : State) (r : Request)
+    (accepted : apply schema before r = .ok after)
+    (cell : Cell) (written : cell ∈ r.writes) : cell ∈ after.cells :=
+  accepted_preserves_cells schema before after r accepted cell (List.mem_append_left _ written)
 
 /-- A conflicting change to a foreign-owned value is rejected unless force is set. -/
 theorem foreign_change_conflicts (schema : Schema) (before : State) (r : Request)
@@ -196,7 +206,7 @@ theorem force_transfers_changed_claim (before : State) (r : Request)
       !(r.force && c.target.kind == .value &&
         r.writes.any (fun cell => cell.path == c.target.path && changed before cell))) := by
     simp [forced, kind, changes]
-  have new : claim ∉ r.desired.map (fun target => Claim.mk r.manager target) := by
+  have new : claim ∉ r.desired.map (fun target => Claim.mk r.manager target true) := by
     intro member
     obtain ⟨target', _, equality⟩ := List.mem_map.mp member
     have managers := congrArg Claim.manager equality
@@ -234,12 +244,14 @@ theorem shared_omission_preserves_value (schema : Schema) (before : State) (r : 
     (cell : Cell) (text : String) (present : cell ∈ before.cells)
     (kind : cell.content = .value text) (claim : Claim) (owned : claim ∈ before.claims)
     (foreign : claim.manager ≠ r.manager) (target : claim.target = ⟨cell.path, .value⟩)
-    (unwritten : r.writes.any (fun c => c.path == cell.path) = false)
+    (unwritten : r.cells.any (fun c => c.path == cell.path) = false)
     (unrelated : (deletedRoots schema before (merged before r) r).any
       (fun root => under root cell.path) = false) :
     cell ∈ (candidate schema before r).cells := by
+  have noWrite := unwritten
+  simp only [Request.cells, List.any_append, Bool.or_eq_false_iff] at noWrite
   have kept := unwritten_foreign_claim_preserved before r claim owned foreign
-    (by simpa [target] using unwritten)
+    (by simpa [target] using noWrite.1)
   have remaining := (claims_frame (merged before r)
     (deletedRoots schema before (merged before r) r) claim
       (by simpa [target] using unrelated)).mpr kept
@@ -252,7 +264,7 @@ theorem shared_omission_preserves_value (schema : Schema) (before : State) (r : 
   have keptCell := (subtree_frame (merged before r)
     (deletedRoots schema before (merged before r) r) cell unrelated).mpr mergedCell
   change cell ∈ List.filter _ _
-  exact List.mem_filter.mpr ⟨keptCell, by simp [kind, isClaimed]⟩
+  exact List.mem_filter.mpr ⟨keptCell, by simp [keepCell, retainedValue, kind, isClaimed]⟩
 
 /-- Exclusive omission removes a non-defaulted scalar; no other claim can rescue it. -/
 theorem exclusive_omission_removes_value (schema : Schema) (before : State) (r : Request)
@@ -281,7 +293,7 @@ theorem exclusive_omission_removes_value (schema : Schema) (before : State) (r :
   change cell ∉ remaining.cells.filter _
   intro member
   have keep := (List.mem_filter.mp member).2
-  simp only [kind] at keep
+  simp only [keepCell, kind, retainedValue] at keep
   change (!(released before r cell.path .value && !claimed remaining cell.path .value)) = true at keep
   simp [dropping, noClaim] at keep
 
@@ -308,15 +320,15 @@ theorem accepted_actor_claims_exact (schema : Schema) (before after : State) (r 
     have mapped : fp ∈ r.writes.map Cell.footprint := by
       simpa only [desired_writes r norm] using desired
     obtain ⟨cell, written, targetEq⟩ := List.mem_map.mp mapped
-    have roots := written_outside_deletions schema before r initial norm cell written
+    have roots := written_outside_deletions schema before r initial norm cell (List.mem_append_left _ written)
     have pathEq : cell.path = fp.path := congrArg Footprint.path targetEq
-    have claimMember : Claim.mk r.manager fp ∈ updatedClaims before r :=
+    have claimMember : Claim.mk r.manager fp true ∈ updatedClaims before r :=
       List.mem_append_right _ (List.mem_map.mpr ⟨fp, desired, rfl⟩)
     have kept := (claims_frame (merged before r)
-      (deletedRoots schema before (merged before r) r) ⟨r.manager, fp⟩
+      (deletedRoots schema before (merged before r) r) ⟨r.manager, fp, true⟩
       (by simpa [pathEq] using roots)).mpr claimMember
     apply List.any_eq_true.mpr
-    exact ⟨⟨r.manager, fp⟩, kept, by simp⟩
+    exact ⟨⟨r.manager, fp, true⟩, kept, by simp⟩
 
 /-- Successful non-forced requests cannot change an asserted foreign-owned scalar. -/
 theorem accepted_nonforce_preserves_foreign_assertion
@@ -418,7 +430,7 @@ termination_by xs.length
 decreasing_by
   exact Nat.lt_succ_of_le (List.length_filter_le _ _)
 
-private theorem nodup_of_eraseDups_length {α : Type} [BEq α] [LawfulBEq α]
+theorem nodup_of_eraseDups_length {α : Type} [BEq α] [LawfulBEq α]
     (xs : List α) (equalLength : xs.eraseDups.length = xs.length) : xs.Nodup := by
   induction xs with
   | nil => exact List.nodup_nil
@@ -437,7 +449,7 @@ private theorem nodup_of_eraseDups_length {α : Type} [BEq α] [LawfulBEq α]
       rw [filterSelf] at tailLength
       exact List.nodup_cons.mpr ⟨absent, ih tailLength⟩
 
-private theorem cells_unique_by_path (cells : List Cell) (unique : (cells.map (·.path)).Nodup)
+theorem cells_unique_by_path (cells : List Cell) (unique : (cells.map (·.path)).Nodup)
     (left right : Cell) (hl : left ∈ cells) (hr : right ∈ cells)
     (same : left.path = right.path) : left = right := by
   induction cells with
@@ -451,7 +463,7 @@ private theorem cells_unique_by_path (cells : List Cell) (unique : (cells.map (�
       · exact False.elim (unique.1 (List.mem_map.mpr ⟨left, hl, same⟩))
       · exact ih unique.2 hl hr
 
-private theorem valid_unique_paths (schema : Schema) (s : State)
+theorem valid_unique_paths (schema : Schema) (s : State)
     (validState : valid schema s = true) : (s.cells.map (·.path)).Nodup := by
   simp only [valid, shapeValid, Bool.and_eq_true] at validState
   have equalLength := validState.1.1.1.1.2
@@ -510,6 +522,15 @@ private theorem accepted_reapply_candidate_is_merge
     (accepted : apply schema before r = .ok once) :
     candidate schema once r = merged once r := by
   have noRoots := accepted_reapply_deletes_nothing schema before once r accepted
+  have noRelease : releasesAny once r = false := by
+    apply Bool.eq_false_iff.mpr
+    intro found
+    obtain ⟨claim, member, dropped⟩ := List.any_eq_true.mp found
+    simp only [Bool.and_eq_true, beq_iff_eq] at dropped
+    have owned : once.owns r.manager claim.target.path claim.target.kind = true :=
+      List.any_eq_true.mpr ⟨claim, member, by simp [dropped.1]⟩
+    have desired := (accepted_actor_claims_exact schema before once r accepted claim.target).mp owned
+    simp [desired] at dropped
   change pruneReleased once r
     (dropSubtrees (merged once r) (deletedRoots schema once (merged once r) r)) = _
   rw [noRoots]
@@ -519,8 +540,9 @@ private theorem accepted_reapply_candidate_is_merge
   apply state_ext
   · apply List.filter_eq_self.mpr
     intro cell _
-    cases cell.content <;>
-      simp [accepted_reapply_releases_nothing schema before once r accepted]
+    cases kind : cell.content <;>
+      simp [keepCell, kind, retainedValue, noRelease,
+        accepted_reapply_releases_nothing schema before once r accepted]
   · rfl
 
 private theorem filter_prefix {α : Type} (front tail : List α) (predicate : α → Bool)
@@ -531,37 +553,32 @@ private theorem filter_prefix {α : Type} (front tail : List α) (predicate : α
 private theorem accepted_cells_normal_form
     (schema : Schema) (before once : State) (r : Request)
     (accepted : apply schema before r = .ok once) :
-    once.cells = r.writes ++ once.cells.filter
-      (fun old => !r.writes.any (fun c => c.path == old.path)) := by
+    once.cells = r.cells ++ once.cells.filter
+      (fun old => !r.cells.any (fun c => c.path == old.path)) := by
   let roots := deletedRoots schema before (merged before r) r
   let remaining := dropSubtrees (merged before r) roots
-  let noWrite : Cell → Bool := fun old => !r.writes.any (fun c => c.path == old.path)
+  let noWrite : Cell → Bool := fun old => !r.cells.any (fun c => c.path == old.path)
   let noRoot : Cell → Bool := fun c => !roots.any (fun root => under root c.path)
-  let keep : Cell → Bool := fun c => match c.content with
-    | .value _ => !(released before r c.path .value && !claimed remaining c.path .value)
-    | .object | .collection => !(released before r c.path .presence &&
-        !remaining.claims.any (fun claim => under c.path claim.target.path))
-    | .item => true
+  let keep : Cell → Bool := keepCell before r remaining
   have norm := accepted_normalized schema before once r accepted
-  have writesNoRoot : ∀ cell ∈ r.writes, noRoot cell = true := by
+  have writesNoRoot : ∀ cell ∈ r.cells, noRoot cell = true := by
     intro cell member
     simp only [noRoot, roots, written_outside_deletions schema before r
       (accepted_initial_valid schema before once r accepted) norm cell member, Bool.not_false]
-  have writesKept : ∀ cell ∈ r.writes, keep cell = true := by
+  have writesKept : ∀ cell ∈ r.cells, keep cell = true := by
     intro cell member
-    have asserted : cell.footprint ∈ r.desired := by
-      rw [desired_writes r norm]
-      exact List.mem_map.mpr ⟨cell, member, rfl⟩
-    cases kind : cell.content <;> simp_all [keep, released, Cell.footprint]
+    have asserted := accepted_preserves_cells schema before once r accepted cell member
+    rw [← accepted_candidate schema before once r accepted] at asserted
+    exact (List.mem_filter.mp asserted).2
   let tail := ((before.cells.filter noWrite).filter noRoot).filter keep
-  have form : once.cells = r.writes ++ tail := by
+  have form : once.cells = r.cells ++ tail := by
     rw [← accepted_candidate schema before once r accepted]
-    change ((r.writes ++ before.cells.filter noWrite).filter noRoot).filter keep = _
+    change ((r.cells ++ before.cells.filter noWrite).filter noRoot).filter keep = _
     rw [filter_prefix _ _ _ writesNoRoot, filter_prefix _ _ _ writesKept]
-  have writesExcluded : r.writes.filter noWrite = [] := by
+  have writesExcluded : r.cells.filter noWrite = [] := by
     apply List.filter_eq_nil_iff.mpr
     intro cell member
-    have found : r.writes.any (fun c => c.path == cell.path) = true :=
+    have found : r.cells.any (fun c => c.path == cell.path) = true :=
       List.any_eq_true.mpr ⟨cell, member, by simp⟩
     simp [noWrite, found]
   have tailKept : tail.filter noWrite = tail := by
@@ -574,13 +591,13 @@ private theorem accepted_claims_normal_form
     (schema : Schema) (before once : State) (r : Request)
     (accepted : apply schema before r = .ok once) :
     once.claims = once.claims.filter (fun c => c.manager != r.manager) ++
-      r.desired.map (fun target => Claim.mk r.manager target) := by
+      r.desired.map (fun target => Claim.mk r.manager target true) := by
   let roots := deletedRoots schema before (merged before r) r
   let noRoot : Claim → Bool := fun c => !roots.any (fun root => under root c.target.path)
   let old := before.claims.filter (fun c => c.manager != r.manager &&
     !(r.force && c.target.kind == .value &&
       r.writes.any (fun cell => cell.path == c.target.path && changed before cell)))
-  let fresh := r.desired.map (fun target => Claim.mk r.manager target)
+  let fresh := r.desired.map (fun target => Claim.mk r.manager target true)
   have freshKept : fresh.filter noRoot = fresh := by
     apply List.filter_eq_self.mpr
     intro claim member
@@ -591,7 +608,7 @@ private theorem accepted_claims_normal_form
     cases cell.content <;>
       simp [written_outside_deletions schema before r
         (accepted_initial_valid schema before once r accepted)
-        (accepted_normalized schema before once r accepted) cell written]
+        (accepted_normalized schema before once r accepted) cell (List.mem_append_left _ written)]
   have form : once.claims = old.filter noRoot ++ fresh := by
     rw [← accepted_candidate schema before once r accepted]
     change (old ++ fresh).filter noRoot = _
@@ -652,5 +669,58 @@ theorem repeated_apply_observationally_equal
   have same : once = twice := Except.ok.inj ((accepted_apply_idempotent schema before once r first).symm.trans second)
   subst twice
   exact ⟨fun _ => Iff.rfl, fun _ => Iff.rfl⟩
+
+/-- Every proper ancestor of a stored cell is a stored container, at arbitrary depth. -/
+theorem proper_ancestor_is_container (schema : Schema) (s : State)
+    (shape : shapeValid schema s = true) (cell : Cell) (present : cell ∈ s.cells)
+    (parent : Path) (nonempty : parent ≠ []) (next : Segment) (rest : Path)
+    (descendant : cell.path = parent ++ next :: rest) :
+    ∃ container ∈ s.cells, container.path = parent ∧
+      (container.content = .object ∨ container.content = .collection ∨ container.content = .item) := by
+  have h := shape
+  simp only [shapeValid, Bool.and_eq_true, List.all_eq_true] at h
+  have compatible := (h.1.2 cell present).1.2
+  simp only [compatiblePath, Bool.and_eq_true, List.all_eq_true] at compatible
+  have prefixMember : parent ∈ prefixes cell.path := by
+    apply (under_iff_prefixes parent cell.path).mp
+    simp [under, descendant]
+  have different : parent ≠ cell.path := by
+    intro same
+    have lengths := congrArg List.length same
+    simp [descendant] at lengths
+  have hp := compatible.2 parent prefixMember
+  simp only [List.isEmpty_iff, nonempty, ↓reduceIte, beq_iff_eq, different] at hp
+  have dropped : (cell.path.drop parent.length).head? = some next := by simp [descendant]
+  rw [dropped] at hp
+  cases next with
+  | field name =>
+      obtain ⟨container, member, kind⟩ := List.any_eq_true.mp hp
+      simp only [Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq] at kind
+      exact ⟨container, member, kind.1, kind.2.elim Or.inl (fun hi => Or.inr (Or.inr hi))⟩
+  | item keys =>
+      simp only [Bool.and_eq_true] at hp
+      obtain ⟨container, member, kind⟩ := List.any_eq_true.mp hp.2
+      simp only [Bool.and_eq_true, beq_iff_eq] at kind
+      exact ⟨container, member, kind.1, Or.inr (Or.inl kind.2)⟩
+  | element text =>
+      obtain ⟨container, member, kind⟩ := List.any_eq_true.mp hp
+      simp only [Bool.and_eq_true, beq_iff_eq] at kind
+      exact ⟨container, member, kind.1, Or.inr (Or.inl kind.2)⟩
+
+/-- A scalar and its descendant cannot coexist; this closes the former flat-representation gap. -/
+theorem scalar_has_no_descendants (schema : Schema) (s : State)
+    (shape : shapeValid schema s = true) (scalar : Cell) (stored : scalar ∈ s.cells)
+    (text : String) (value : scalar.content = .value text) (nonempty : scalar.path ≠ [])
+    (next : Segment) (rest : Path) (child : Cell)
+    (childPath : child.path = scalar.path ++ next :: rest) : child ∉ s.cells := by
+  intro member
+  obtain ⟨container, present, samePath, kind⟩ :=
+    proper_ancestor_is_container schema s shape child member scalar.path nonempty next rest childPath
+  have h := shape
+  simp only [shapeValid, Bool.and_eq_true] at h
+  have unique := nodup_of_eraseDups_length (s.cells.map (·.path)) (by simpa using h.1.1.2)
+  have same := cells_unique_by_path s.cells unique container scalar present stored samePath
+  rw [same, value] at kind
+  rcases kind with impossible | impossible | impossible <;> cases impossible
 
 end SSA.Contracts

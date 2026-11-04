@@ -35,7 +35,7 @@ def portCell : Cell := ⟨port, .value "5432"⟩
 def noteCell : Cell := ⟨note, .value "injected"⟩
 
 def request (manager : String) (cells : List Cell) (force := false) : Request :=
-  ⟨manager, cells.map Cell.footprint, cells, force⟩
+  ⟨manager, cells.map Cell.footprint, cells, force, [], .apply, []⟩
 
 def endpoint : ItemSpec := ⟨database, .both (.value host) (.value port)⟩
 def schema : Schema := [endpoint]

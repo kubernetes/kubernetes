@@ -97,7 +97,7 @@ theorem claims_frame (s : State) (roots : List Path) (claim : Claim)
 theorem candidate_preserves_unrelated_value (schema : Schema) (before : State) (r : Request)
     (cell : Cell) (text : String) (present : cell ∈ before.cells)
     (kind : cell.content = .value text)
-    (unwritten : r.writes.any (fun c => c.path == cell.path) = false)
+    (unwritten : r.cells.any (fun c => c.path == cell.path) = false)
     (unrelated : (deletedRoots schema before (merged before r) r).any
       (fun root => under root cell.path) = false)
     (unreleased : released before r cell.path .value = false) :
@@ -109,7 +109,7 @@ theorem candidate_preserves_unrelated_value (schema : Schema) (before : State) (
   change cell ∈ List.filter _
     (dropSubtrees (merged before r) (deletedRoots schema before (merged before r) r)).cells
   apply List.mem_filter.mpr
-  exact ⟨hd, by simp [kind, unreleased]⟩
+  exact ⟨hd, by simp [keepCell, retainedValue, kind, unreleased]⟩
 
 /-- A child's full owner cannot retain a cell beneath a deleted ancestor. -/
 theorem ancestor_deletion_dominates (s : State) (roots : List Path) (root : Path)

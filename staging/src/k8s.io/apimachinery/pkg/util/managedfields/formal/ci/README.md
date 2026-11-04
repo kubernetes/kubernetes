@@ -33,12 +33,14 @@ The required checks are:
 6. Ordinary Go tests against independently authored YAML outcomes, including
    actual FieldsV1 ownership serialization between requests.
 7. Live Lean/Go comparison of the corpus and deterministic generated sequences.
-8. Reproducibility of the self-contained HTML proof explorer against the Lean
+8. Actual merge tests and exact Lean/Go comparisons on both pinned SMD PR #336
+   head and base revisions (Go may install the upstream-required toolchain).
+9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
 
 No check is optional when invoking this entrypoint. The result establishes the
 documented proof and comparison checks, not correctness of the human-chosen
-formalization. Known model gaps are listed in `../PROPERTIES.md`.
+formalization. Proof boundaries are listed in `../PROPERTIES.md`.
 
 ## Prow configuration
 
@@ -67,14 +69,26 @@ go run ./cmd/ssa-compare -model .lake/build/bin/ssa-model -reproducer failure.js
 
 Each hand-authored step has a complete expected object and owner map. Expected
 proposal differences require both the Lean and Go outcome; changes to either
-outcome fail. Known model defects use a different category and remain visible
-in the summary. They are characterization cases, not evidence of equivalence.
+outcome fail. No model-defect exception category is accepted.
 The normal corpus reader refuses missing golden outcomes; only the explicit
 reproducer mode permits generated prefixes with no golden outcomes.
 
 The observation projection drops the API type envelope, redundant list-key leaf
-claims, and container-presence ownership. It compares all object cells, empty
-containers, scalar/atomic ownership, and item membership. Associative-list
+claims. It compares all object cells, empty
+containers, scalar/atomic ownership, item membership, and sparse container presence ownership. Associative-list
 ordering is outside the comparison. The bridge uses the real Go merge/pruning
 logic. Its schema conversion and observation
 projection require human review.
+
+## Pinned PR comparison
+
+```sh
+bash ci/verify-pr336.sh
+```
+
+The script fetches immutable upstream SHAs into the ignored `.lake/` cache,
+asserts their identity, and runs both merge suites plus the exact comparison.
+Generated harness sources reuse this project's independent schema walker and
+Kubernetes' pinned YAML decoder; no module file or upstream implementation is
+modified. `GOPATH` and `GOMODCACHE` can select writable task-local Go caches.
+The primary entrypoint includes this check; it is not optional in full verification.

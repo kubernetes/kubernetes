@@ -136,3 +136,34 @@ func TestNormalizerEncodesAtomicMapsAsLeaves(t *testing.T) {
 		t.Fatal("invalid Lean fixture JSON")
 	}
 }
+
+func TestStructuralOwnershipAcrossApplyAndUpdate(t *testing.T) {
+	initial := map[string]any{
+		"number": 1.5, "flag": true, "nullable": nil,
+		"entries":  map[string]any{"one": map[string]any{"left": "x"}},
+		"services": []any{map[string]any{"name": "n", "port": float64(80), "config": map[string]any{"left": "x"}}},
+		"tags":     []any{"green"},
+	}
+	replacement := map[string]any{
+		"number": 2.5, "flag": true, "nullable": nil,
+		"services": []any{map[string]any{"name": "n", "port": float64(80), "config": map[string]any{"left": "x"}}},
+		"tags":     []any{"green"},
+	}
+	owned := []string{".flag", ".nullable", `.services[name="n",port=80]`, `.services[name="n",port=80].config.left`, `.tags[="green"]`}
+	first := append(append([]string{}, owned...), ".number", ".entries.one", ".entries.one.left")
+	c := Case{Name: "structural ownership", Schema: structuralYAML, Semantics: "current", Steps: []Step{
+		{Manager: "A", Apply: initial, Expect: &Expected{Object: initial, Owners: map[string][]string{"A": first}}},
+		{Manager: "U", Operation: "update", Apply: replacement, Expect: &Expected{
+			Object: replacement, Owners: map[string][]string{"A": owned, "U@update": {".number"}},
+		}},
+		{Manager: "A", Apply: map[string]any{}, Expect: &Expected{
+			Object: map[string]any{"number": 2.5}, Owners: map[string][]string{"U@update": {".number"}},
+		}},
+	}}
+	if err := CheckGo([]Case{c}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := normalize(c); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -78,21 +78,30 @@ type goEngine struct {
 	manager internal.Manager
 	live    *unstructured.Unstructured
 	fields  internal.Managed
+	schema  *structuralSchema
 }
 
-func newGoEngine() (*goEngine, error) {
-	parser, err := typed.NewParser(typed.YAMLObject(schemaYAML))
+func newGoEngine(cases ...Case) (*goEngine, error) {
+	c := Case{}
+	if len(cases) > 0 {
+		c = cases[0]
+	}
+	sc, err := schemaFor(c)
+	if err != nil {
+		return nil, err
+	}
+	parser, err := typed.NewParser(typed.YAMLObject(sc.legacy))
 	if err != nil {
 		return nil, err
 	}
 	manager, err := internal.NewStructuredMergeManager(
-		typeConverter{parser.Type("Document")}, versionConverter{}, noDefaults{},
+		typeConverter{parser.Type(sc.root)}, versionConverter{}, noDefaults{},
 		groupVersion, groupVersion, nil)
 	if err != nil {
 		return nil, err
 	}
 	manager = internal.NewBuildManagerInfoManager(internal.NewStripMetaManager(manager), groupVersion, "")
-	return &goEngine{manager, envelope(map[string]any{}), internal.NewEmptyManaged()}, nil
+	return &goEngine{manager, envelope(map[string]any{}), internal.NewEmptyManaged(), sc}, nil
 }
 
 func envelope(object map[string]any) *unstructured.Unstructured {
@@ -106,7 +115,14 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 	// Updater works on a proposed managed-field map. Commit object and ownership
 	// together only after success, matching the reference model's commit wrapper.
 	working := internal.NewManaged(e.fields.Fields().Copy(), nil)
-	object, fields, err := e.manager.Apply(e.live, envelope(step.Apply), working, step.Manager, step.Force)
+	var object runtime.Object
+	var fields internal.Managed
+	var err error
+	if step.Operation == "update" {
+		object, fields, err = e.manager.Update(e.live, envelope(step.Apply), working, step.Manager)
+	} else {
+		object, fields, err = e.manager.Apply(e.live, envelope(step.Apply), working, step.Manager, step.Force)
+	}
 	errorName := ""
 	if err != nil {
 		var conflicts merge.Conflicts
@@ -137,7 +153,8 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 	objectValue := runtime.DeepCopyJSON(e.live.Object)
 	delete(objectValue, "apiVersion")
 	delete(objectValue, "kind")
-	cells, _, err := flatten(objectValue, nil)
+	flat, err := e.schema.flatten(objectValue, nil)
+	cells := flat.cells
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -151,11 +168,14 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 		if err := json.Unmarshal([]byte(identifier), &entry); err != nil {
 			return out, fmt.Errorf("invalid managedfields manager identity: %w", err)
 		}
-		if entry.Manager == "" || entry.Operation != metav1.ManagedFieldsOperationApply || entry.Subresource != "" {
+		if entry.Manager == "" || (entry.Operation != metav1.ManagedFieldsOperationApply && entry.Operation != metav1.ManagedFieldsOperationUpdate) || entry.Subresource != "" {
 			return out, fmt.Errorf("unrepresentable manager identity %s", identifier)
 		}
 		manager := entry.Manager
-		if !versioned.Applied() || string(versioned.APIVersion()) != groupVersion.String() {
+		if entry.Operation == metav1.ManagedFieldsOperationUpdate {
+			manager += "@update"
+		}
+		if versioned.Applied() != (entry.Operation == metav1.ManagedFieldsOperationApply) || string(versioned.APIVersion()) != groupVersion.String() {
 			return out, fmt.Errorf("unexpected manager version/operation for %q", manager)
 		}
 		var invalid error
@@ -169,16 +189,13 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 			}
 			// Lean encodes a list-map key in membership, rather than as another leaf.
 			if len(p) > 1 && p[len(p)-2].Key != nil && p[len(p)-1].FieldName != nil &&
-				*p[len(p)-1].FieldName == "name" {
+				isKeyField(p) {
 				return
 			}
 			key := p.String()
-			kind, exists := mapped[key]
+			_, exists := mapped[key]
 			if !exists {
 				invalid = fmt.Errorf("dangling or unrepresentable SMD claim %s by %q", key, manager)
-				return
-			}
-			if kind == "object" || kind == "collection" {
 				return
 			}
 			out.Owners[manager] = append(out.Owners[manager], key)
@@ -196,7 +213,7 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 // CheckGo runs every hand-authored expectation without requiring Lean.
 func CheckGo(cases []Case) error {
 	for _, c := range cases {
-		engine, err := newGoEngine()
+		engine, err := newGoEngine(c)
 		if err != nil {
 			return err
 		}
@@ -210,7 +227,7 @@ func CheckGo(cases []Case) error {
 				expected = step.GoExpect
 			}
 			if expected != nil {
-				want, err := expectedSnapshot(*expected)
+				want, err := expectedSnapshotFor(*expected, c)
 				if err != nil {
 					return err
 				}
@@ -221,4 +238,17 @@ func CheckGo(cases []Case) error {
 		}
 	}
 	return nil
+}
+
+// Key leaves repeat the identity already carried by the item selector.
+func isKeyField(p fieldpath.Path) bool {
+	if len(p) < 2 || p[len(p)-2].Key == nil || p[len(p)-1].FieldName == nil {
+		return false
+	}
+	for _, key := range *p[len(p)-2].Key {
+		if key.Name == *p[len(p)-1].FieldName {
+			return true
+		}
+	}
+	return false
 }

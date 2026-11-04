@@ -19,6 +19,7 @@ package bridge
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -32,7 +33,6 @@ type Summary struct {
 	Cases       int
 	Steps       int
 	Differences int
-	ModelGaps   int
 	Accepted    int
 	Conflicts   int
 }
@@ -88,7 +88,7 @@ func Compare(ctx context.Context, model string, cases []Case) (Summary, error) {
 		if report.Name != c.Name || len(report.Observations) != len(c.Steps) {
 			return summary, fmt.Errorf("Lean replay omitted or reordered observations for %s", c.Name)
 		}
-		engine, err := newGoEngine()
+		engine, err := newGoEngine(c)
 		if err != nil {
 			return summary, err
 		}
@@ -106,19 +106,16 @@ func Compare(ctx context.Context, model string, cases []Case) (Summary, error) {
 			if err != nil {
 				return summary, err
 			}
-			if err := compareStep(step, lean, actual); err != nil {
+			if err := compareStepFor(c, step, lean, actual); err != nil {
 				// The first failing prefix is enough to replay the discrepancy.
 				prefix, _ := json.Marshal(Corpus{Version: 1, Cases: []Case{{
-					Name: c.Name, Required: c.Required, Steps: c.Steps[:i+1],
+					Name: c.Name, Schema: c.Schema, RootType: c.RootType, Semantics: c.Semantics, Required: c.Required, Steps: c.Steps[:i+1],
 				}}})
 				return summary, fmt.Errorf("%s step %d: %w\nreproducer: %s", c.Name, i+1, err, prefix)
 			}
 			summary.Steps++
 			if step.Difference != "" {
 				summary.Differences++
-				if step.DifferenceKind == "model-gap" {
-					summary.ModelGaps++
-				}
 			}
 			if actual.Error == "" {
 				summary.Accepted++
@@ -131,11 +128,14 @@ func Compare(ctx context.Context, model string, cases []Case) (Summary, error) {
 }
 
 func compareStep(step Step, lean, goResult Snapshot) error {
+	return compareStepFor(Case{}, step, lean, goResult)
+}
+func compareStepFor(c Case, step Step, lean, goResult Snapshot) error {
 	if step.Difference != "" && (step.Expect == nil || step.GoExpect == nil) {
 		return fmt.Errorf("a proposal difference needs both independent expected results")
 	}
 	if step.Expect != nil {
-		want, err := expectedSnapshot(*step.Expect)
+		want, err := expectedSnapshotFor(*step.Expect, c)
 		if err != nil {
 			return err
 		}
@@ -146,7 +146,7 @@ func compareStep(step Step, lean, goResult Snapshot) error {
 		if step.GoExpect != nil {
 			goExpected = step.GoExpect
 		}
-		wantGo, err := expectedSnapshot(*goExpected)
+		wantGo, err := expectedSnapshotFor(*goExpected, c)
 		if err != nil {
 			return err
 		}
@@ -182,6 +182,93 @@ func GeneratedScalarCases(seed int64, count, steps int) []Case {
 				Manager: []string{"A", "B", "C"}[random.Intn(3)],
 				Force:   random.Intn(4) == 0, Apply: object,
 			})
+		}
+		cases = append(cases, c)
+	}
+	return cases
+}
+
+//go:embed structural.yaml
+var structuralYAML string
+
+// GeneratedStructuralCases combines nested maps, unknown map entries, atomic
+// containers, sets, composite numeric keys, null scalars, and Update/Apply.
+func GeneratedStructuralCases(seed int64, count, steps int) []Case {
+	random := rand.New(rand.NewSource(seed))
+	cases := make([]Case, 0, count)
+	branch := func() map[string]any {
+		object := map[string]any{}
+		for _, field := range []string{"left", "right"} {
+			if random.Intn(2) == 0 {
+				object[field] = fmt.Sprintf("v%d", random.Intn(3))
+			}
+		}
+		return object
+	}
+	for i := 0; i < count; i++ {
+		c := Case{Name: fmt.Sprintf("structural-seed-%d-case-%d", seed, i), Schema: structuralYAML, Semantics: "current"}
+		for j := 0; j < steps; j++ {
+			object := map[string]any{}
+			if random.Intn(2) == 0 {
+				object["number"] = float64(random.Intn(5)) - 2.5
+			}
+			if random.Intn(2) == 0 {
+				object["flag"] = random.Intn(2) == 0
+			}
+			if random.Intn(2) == 0 {
+				object["nullable"] = nil
+			}
+			if random.Intn(2) == 0 {
+				foo := map[string]any{}
+				for _, name := range []string{"bar", "abc"} {
+					if random.Intn(2) == 0 {
+						foo[name] = branch()
+					}
+				}
+				object["foo"] = foo
+			}
+			if random.Intn(2) == 0 {
+				entries := map[string]any{}
+				for _, name := range []string{"one", "two"} {
+					if random.Intn(2) == 0 {
+						entries[name] = branch()
+					}
+				}
+				object["entries"] = entries
+			}
+			if random.Intn(2) == 0 {
+				tags := []any{}
+				for _, tag := range []string{"blue", "green"} {
+					if random.Intn(2) == 0 {
+						tags = append(tags, tag)
+					}
+				}
+				object["tags"] = tags
+			}
+			if random.Intn(2) == 0 {
+				object["atomicList"] = []any{float64(random.Intn(3)), float64(random.Intn(3))}
+			}
+			if random.Intn(2) == 0 {
+				object["atomicMap"] = branch()
+			}
+			if random.Intn(2) == 0 {
+				services := []any{}
+				for _, name := range []string{"a", "b"} {
+					if random.Intn(2) == 0 {
+						service := map[string]any{"name": name, "port": float64(80), "config": branch()}
+						if random.Intn(2) == 0 {
+							service["children"] = []any{map[string]any{"name": "c", "port": float64(443), "config": branch()}}
+						}
+						services = append(services, service)
+					}
+				}
+				object["services"] = services
+			}
+			operation := "apply"
+			if random.Intn(5) == 0 {
+				operation = "update"
+			}
+			c.Steps = append(c.Steps, Step{Operation: operation, Manager: []string{"A", "B", "C"}[random.Intn(3)], Force: random.Intn(3) == 0, Apply: object})
 		}
 		cases = append(cases, c)
 	}

@@ -3,7 +3,7 @@
     "title": "Accepted states satisfy the model invariant",
     "scope": "guard",
     "meaning": "Successful Apply implies the model's shape, required-value, and full-manager predicates.",
-    "limits": "This follows from acceptance guards. The current shape predicate is weaker than full object-tree validity."
+    "limits": "This is the proposed item-core policy. Structural well-formedness is strengthened and has separate ancestor/no-scalar-descendant theorems."
   },
   "SSA.accepted_complete": {
     "title": "Successful Apply leaves complete item ownership",
@@ -27,7 +27,7 @@
     "title": "One committed transition preserves validity",
     "scope": "guard",
     "meaning": "From a valid state, either a successful valid result is committed or a rejected request retains the valid original.",
-    "limits": "Validity means this model's predicates, with the gaps listed in this explorer."
+    "limits": "Validity is the stated item-core predicate, before external admission or the additional object-scope policy."
   },
   "SSA.key_only_full": {
     "title": "Key-only items: every membership claimant is full",
@@ -146,7 +146,7 @@
   "SSA.Contracts.handoff_preserves_full_successor": {
     "title": "An already-full successor stays full during release",
     "meaning": "Another actor's successful non-forced request preserves a full successor when none of the successor's claims is below a deletion root.",
-    "limits": "This is handoff safety after acquisition. General acquisition/release progress is still open."
+    "limits": "This proves release safety. Progress.unchanged_snapshot_acquisition separately proves fresh-manager acquisition under unchanged-snapshot preconditions."
   },
   "SSA.Contracts.finite_history_preserves_validity": {
     "title": "Every finite committed history preserves validity",
@@ -172,7 +172,7 @@
   "SSA.Contracts.accepted_apply_idempotent": {
     "title": "Repeating successful Apply succeeds with the same state",
     "meaning": "For every schema, state, and request: if the first Apply succeeds, the immediate repetition succeeds and returns exactly that result, even with force.",
-    "limits": "No intervening operation is allowed. Storage resourceVersion, defaulting, conversion, and admission are not modeled.",
+    "limits": "This proves the proposed item-core Apply, with no intervening operation. Scoped histories, Update and admission composition have separate theorems; arbitrary admission is not part of this idempotence result.",
     "sketch": "First prove that repeated writes are unchanged and cannot conflict. Exact actor claims eliminate releases and lifetime deletion. Stable list forms give the same candidate. That unchanged state is already valid, so every acceptance guard succeeds."
   },
   "SSA.Contracts.repeated_apply_observationally_equal": {
@@ -206,5 +206,130 @@
     "title": "A concrete repeated Apply is unchanged",
     "meaning": "The initial example request is idempotent in its concrete accepted state.",
     "limits": "The Contracts module also contains a separate general idempotence theorem."
+  },
+  "SSA.Contracts.nodup_of_eraseDups_length": {
+    "scope": "helper",
+    "title": "Nodup of erasedups length"
+  },
+  "SSA.Contracts.cells_unique_by_path": {
+    "scope": "helper",
+    "title": "Cells unique by path"
+  },
+  "SSA.Contracts.valid_unique_paths": {
+    "scope": "helper",
+    "title": "Valid unique paths"
+  },
+  "SSA.Contracts.scalar_has_no_descendants": {
+    "title": "Scalars cannot have descendants",
+    "meaning": "A well-shaped state cannot store both a scalar at a path and another cell below it.",
+    "limits": "General structural result at arbitrary path depth; the root is an implicit object."
+  },
+  "SSA.Progress.unchanged_snapshot_acquisition": {
+    "title": "A fresh manager can acquire unchanged data",
+    "meaning": "A fresh manager applying a normalized snapshot of the existing data succeeds without changing the data or losing any old claim.",
+    "limits": "The requested sparse footprint is unchanged data, the initial state is valid, and the actor is fresh. External validators may still forbid acquisition. The normalized cell-list order must match the state; no arbitrary admission policy is included."
+  },
+  "SSA.Locality.full_manager_is_item_local": {
+    "title": "Full ownership is local to one item",
+    "meaning": "Agreement of all claims below an item gives the same full classification for that item.",
+    "limits": "The required core stays inside the item; arbitrary request commutativity is not asserted."
+  },
+  "SSA.accepted_objects_have_full_owner": {
+    "title": "Required-bearing objects retain a whole owner",
+    "meaning": "Successful scoped writes leave each existing required-bearing ordinary object with an individual full manager.",
+    "limits": "An acceptance-guard consequence; the separate sibling execution demonstrates successful progress and rejection.",
+    "scope": "guard"
+  },
+  "SSA.no_required_transition_equivalence": {
+    "title": "No required metadata means unchanged behavior",
+    "meaning": "For arbitrary finite states and requests, the PR and current wire transitions are equal if every item has an empty additional required core.",
+    "limits": "This concerns the modeled single-version wire modes; the bounded upstream comparisons check their implementation correspondence."
+  },
+  "SSA.explicit_map_shortcuts_required_children": {
+    "title": "The PR map-member shortcut bypasses required children",
+    "meaning": "Whenever an explicit map member exists but required-child coverage is missing, the PR classifier returns true while the strict classifier returns false.",
+    "limits": "This general classifier counterexample is also instantiated and run against the actual pinned upstream code.",
+    "scope": "definition"
+  },
+  "SSA.Boundary.accepted_satisfies_validator": {
+    "title": "Final states satisfy the selected validator",
+    "meaning": "Any accepted boundary result satisfies its old/new-state predicate after the mutator runs.",
+    "limits": "The validator is a function parameter. This is not a proof of the CEL or webhook interpreter.",
+    "scope": "guard"
+  },
+  "SSA.Boundary.validator_can_block_any_handoff": {
+    "title": "Arbitrary admission can forbid every handoff",
+    "meaning": "A validator returning false rejects any proposed handoff.",
+    "limits": "Full-owner invariants cannot alone guarantee liveness under arbitrary admission constraints."
+  },
+  "SSA.Counterexamples.pr_accepts_fragment_without_full_owner": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_map_shortcut_retains_invalid_item": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_required_list_owner_is_misclassified": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_objects_have_independent_roles": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_fragmentation_rejects_entire_request": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_lifetime_deletion_preserves_other_full_owner": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.check_objects_valid": {
+    "scope": "helper"
+  },
+  "SSA.checked_proposal": {
+    "scope": "helper"
+  },
+  "SSA.scoped_history_preserves_invariants": {
+    "title": "Mixed scoped histories preserve both invariants",
+    "meaning": "Every committed finite history of scoped Apply and Update retains valid item ownership and valid ordinary-object ownership.",
+    "limits": "A safety induction over the guarded operation; it includes rejections, but not storage concurrency or eventual success."
+  },
+  "SSA.Boundary.accepted_scoped_boundary": {
+    "title": "Post-admission state passes all three checks",
+    "meaning": "After mutation and validation, successful boundary results satisfy the item invariant, object-scope invariant, and the old/new validator.",
+    "limits": "This composes explicit function stages and a final guard. It does not verify interpreter implementations or Kubernetes stage wiring.",
+    "scope": "guard"
+  },
+  "SSA.accepted_scoped_valid": {
+    "scope": "guard"
+  },
+  "SSA.accepted_full_update_valid": {
+    "scope": "guard"
+  },
+  "SSA.Boundary.accepted_final_valid": {
+    "scope": "guard"
+  },
+  "SSA.Boundary.validation_rejection_is_atomic": {
+    "scope": "guard"
+  },
+  "SSA.granular_list_without_member_is_partial": {
+    "scope": "definition"
+  },
+  "SSA.current_key_only_last_claimant": {
+    "scope": "definition"
+  },
+  "SSA.no_required_retains_same_key": {
+    "scope": "definition"
+  },
+  "SSA.updater_keeps_membership": {
+    "scope": "definition",
+    "limits": "This is membership eligibility in the modeled PR classifier; the actual pruning passes and pinned Go comparisons are separate evidence."
   }
 }
