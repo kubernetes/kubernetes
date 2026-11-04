@@ -99,6 +99,84 @@ func ContainerIter(podSpec *api.PodSpec, mask ContainerType) iter.Seq2[*api.Cont
 	}
 }
 
+// ContainerPair is a container in two versions of a pod, matched by name. Old is nil for a
+// container that is only in the new pod (added), and New is nil for one that is only in the old
+// pod (removed).
+type ContainerPair struct {
+	New, Old *api.Container
+}
+
+// ContainerPairs yields the containers of pod and oldPod of the types in mask, paired by name,
+// with their type. Containers are only matched within their type, and are assumed not to be
+// reordered, which validation enforces. The iteration order is InitContainers, then main
+// Containers, then EphemeralContainers.
+func ContainerPairs(pod, oldPod *api.Pod, mask ContainerType) iter.Seq2[ContainerPair, ContainerType] {
+	return func(yield func(ContainerPair, ContainerType) bool) {
+		for _, containerType := range []ContainerType{InitContainers, Containers, EphemeralContainers} {
+			if mask&containerType == 0 {
+				continue
+			}
+			if !pairContainers(containersOfType(&pod.Spec, containerType), containersOfType(&oldPod.Spec, containerType), containerType, yield) {
+				return
+			}
+		}
+	}
+}
+
+func containersOfType(podSpec *api.PodSpec, containerType ContainerType) []*api.Container {
+	var containers []*api.Container
+	for c := range ContainerIter(podSpec, containerType) {
+		containers = append(containers, c)
+	}
+	return containers
+}
+
+// pairContainers walks two container lists in parallel, yielding matched, added and removed
+// containers in order. It returns false if yield did.
+func pairContainers(containers, oldContainers []*api.Container, containerType ContainerType, yield func(ContainerPair, ContainerType) bool) bool {
+	i, j := 0, 0
+	for i < len(containers) && j < len(oldContainers) {
+		c := containers[i]
+		if c.Name == oldContainers[j].Name {
+			if !yield(ContainerPair{New: c, Old: oldContainers[j]}, containerType) {
+				return false
+			}
+			i++
+			j++
+			continue
+		}
+		// Containers aren't reordered, so if c isn't further on in the old list it was added,
+		// and otherwise everything before it there was removed.
+		k := j + 1
+		for k < len(oldContainers) && oldContainers[k].Name != c.Name {
+			k++
+		}
+		if k == len(oldContainers) {
+			if !yield(ContainerPair{New: c}, containerType) {
+				return false
+			}
+			i++
+			continue
+		}
+		for ; j < k; j++ {
+			if !yield(ContainerPair{Old: oldContainers[j]}, containerType) {
+				return false
+			}
+		}
+	}
+	for ; i < len(containers); i++ {
+		if !yield(ContainerPair{New: containers[i]}, containerType) {
+			return false
+		}
+	}
+	for ; j < len(oldContainers); j++ {
+		if !yield(ContainerPair{Old: oldContainers[j]}, containerType) {
+			return false
+		}
+	}
+	return true
+}
+
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
 
