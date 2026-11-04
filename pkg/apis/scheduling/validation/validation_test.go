@@ -414,6 +414,31 @@ func TestValidateWorkload(t *testing.T) {
 				}},
 			}}
 		}),
+		"all templates share matching preemptionPolicy": mkWorkload(func(w *scheduling.Workload) {
+			w.Spec.CompositePodGroupTemplates[0].CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{{
+				Name: "nestedcpg",
+				SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+					Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+				},
+				PreemptionPolicy: new(scheduling.PreemptNever),
+				PodGroupTemplates: []scheduling.PodGroupTemplate{{
+					Name: "nestedleaf",
+					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+						Basic: &scheduling.BasicSchedulingPolicy{},
+					},
+					PreemptionPolicy: new(scheduling.PreemptNever),
+				}},
+			}}
+			for i := range w.Spec.PodGroupTemplates {
+				w.Spec.PodGroupTemplates[i].PreemptionPolicy = new(scheduling.PreemptNever)
+			}
+			for i := range w.Spec.CompositePodGroupTemplates {
+				w.Spec.CompositePodGroupTemplates[i].PreemptionPolicy = new(scheduling.PreemptNever)
+				for j := range w.Spec.CompositePodGroupTemplates[i].PodGroupTemplates {
+					w.Spec.CompositePodGroupTemplates[i].PodGroupTemplates[j].PreemptionPolicy = new(scheduling.PreemptNever)
+				}
+			}
+		}),
 	}
 	for name, workload := range successCases {
 		errs := ValidateWorkload(workload)
@@ -1083,6 +1108,74 @@ func TestValidateWorkload(t *testing.T) {
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 		},
+		"pod group templates with mismatched preemptionPolicy": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.CompositePodGroupTemplates = nil
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptLowerPriority)
+				w.Spec.PodGroupTemplates[1].PreemptionPolicy = new(scheduling.PreemptNever)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), nil, "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values"),
+			},
+		},
+		"pod group templates with unset and set preemptionPolicy": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.CompositePodGroupTemplates = nil
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = nil
+				w.Spec.PodGroupTemplates[1].PreemptionPolicy = new(scheduling.PreemptNever)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), nil, "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values"),
+			},
+		},
+		"composite pod group hierarchy with mismatched preemptionPolicy": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = w.Spec.CompositePodGroupTemplates[:1]
+				w.Spec.CompositePodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptLowerPriority)
+				w.Spec.CompositePodGroupTemplates[0].PodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptNever)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), nil, "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values"),
+			},
+		},
+		"composite pod group hierarchy with child composite pod group template having mismatched preemptionPolicy": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = w.Spec.CompositePodGroupTemplates[:1]
+				w.Spec.CompositePodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptLowerPriority)
+				w.Spec.CompositePodGroupTemplates[0].PodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptLowerPriority)
+				w.Spec.CompositePodGroupTemplates[0].CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{{
+					Name: "nestedcpg",
+					SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+						Basic: &scheduling.CompositeBasicSchedulingPolicy{},
+					},
+					PreemptionPolicy: new(scheduling.PreemptNever),
+					PodGroupTemplates: []scheduling.PodGroupTemplate{{
+						Name: "nestedleaf",
+						SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+							Basic: &scheduling.BasicSchedulingPolicy{},
+						},
+						PreemptionPolicy: new(scheduling.PreemptLowerPriority),
+					}},
+				}}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), nil, "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values"),
+			},
+		},
+		"composite pod group hierarchy with unset and set preemptionPolicy": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates = nil
+				w.Spec.CompositePodGroupTemplates = w.Spec.CompositePodGroupTemplates[:1]
+				w.Spec.CompositePodGroupTemplates[0].PreemptionPolicy = nil
+				// Unset is resolved from the PriorityClass, so it doesn't equal PreemptLowerPriority.
+				w.Spec.CompositePodGroupTemplates[0].PodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptLowerPriority)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), nil, "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values"),
+			},
+		},
 	}
 
 	for name, tc := range failureCases {
@@ -1110,6 +1203,17 @@ func TestValidateWorkloadUpdate(t *testing.T) {
 		"no change": {
 			old:    mkWorkload(),
 			update: mkWorkload(),
+		},
+		"stored templates with mismatched preemptionPolicy": {
+			old: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptLowerPriority)
+				w.Spec.PodGroupTemplates[1].PreemptionPolicy = new(scheduling.PreemptNever)
+			}),
+			update: mkWorkload(func(w *scheduling.Workload) {
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = new(scheduling.PreemptLowerPriority)
+				w.Spec.PodGroupTemplates[1].PreemptionPolicy = new(scheduling.PreemptNever)
+				w.Labels = map[string]string{"foo": "bar"}
+			}),
 		},
 	}
 	for name, tc := range successCases {
