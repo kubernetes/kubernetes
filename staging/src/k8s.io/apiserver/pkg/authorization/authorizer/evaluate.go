@@ -280,3 +280,58 @@ func PartiallyEvaluateConditionsAwareDecision(ctx context.Context, unevaluatedDe
 		return unevaluatedDecision
 	}
 }
+
+// CouldBenefitFromBuiltinEvaluation reports whether PartiallyEvaluateConditionsAwareDecision with a builtin
+// evaluator whose Recognizes function is recognizes could possibly return a different decision than d.
+// It mirrors the evaluation order: unions are walked depth-first, skipping NoOpinion leaves and stopping
+// at Allow/Deny leaves, up to the first ConditionsMap. Of that ConditionsMap, only the highest-priority
+// non-empty effect (Deny > NoOpinion > Allow) is inspected first; if none of those conditions is recognized,
+// the ConditionsMap is returned unrefined, and the rest of the chain is left untouched.
+//
+// TODO(luxas): Conditions that can evaluate themselves through Condition.Evaluate() could make progress too,
+// but there is currently no way of telling whether a condition can do that without calling Evaluate. Taking
+// them into account requires adding such a capability signal to the Condition interface.
+func CouldBenefitFromBuiltinEvaluation(d ConditionsAwareDecision, recognizes func(Condition) bool) bool {
+	if recognizes == nil {
+		return false
+	}
+	cm, ok := firstConditionsMapToEvaluate(d)
+	if !ok {
+		return false
+	}
+	conditions := cm.AllowConditions()
+	switch {
+	case len(cm.denyConditions) != 0:
+		conditions = cm.DenyConditions()
+	case len(cm.noOpinionConditions) != 0:
+		conditions = cm.NoOpinionConditions()
+	}
+	for cond := range conditions {
+		if recognizes(cond) {
+			return true
+		}
+	}
+	return false
+}
+
+// firstConditionsMapToEvaluate returns the first ConditionsMap that PartiallyEvaluateConditionsAwareDecision
+// would evaluate, if any.
+func firstConditionsMapToEvaluate(d ConditionsAwareDecision) (ConditionsMap, bool) {
+	switch {
+	case d.IsConditionsMap():
+		return d.ConditionsMap(), true
+	case d.IsUnion():
+		for _, subDecision := range d.UnionedDecisions() {
+			if subDecision.IsNoOpinion() {
+				continue
+			}
+			if subDecision.IsUnconditional() {
+				// Allow or Deny; the walk returns before evaluating anything after it.
+				return ConditionsMap{}, false
+			}
+			// The walk never proceeds past a sub-decision that stays conditional.
+			return firstConditionsMapToEvaluate(subDecision)
+		}
+	}
+	return ConditionsMap{}, false
+}

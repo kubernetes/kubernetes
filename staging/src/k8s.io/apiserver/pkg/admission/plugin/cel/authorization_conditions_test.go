@@ -430,3 +430,24 @@ func TestAuthorizationConditionsEvaluator_AggregateCostBudget(t *testing.T) {
 		t.Errorf("fresh evaluator: got %s, want True", got)
 	}
 }
+
+func TestAuthorizationConditionsEvaluatorBuilder_Recognizes(t *testing.T) {
+	builder := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget)
+	tests := []struct {
+		name      string
+		condition authorizer.Condition
+		want      bool
+	}{
+		{name: "CEL condition", condition: celCond("c", "true"), want: true},
+		{name: "empty CEL condition", condition: celCond("c", "")},
+		{name: "other type", condition: authorizer.GenericCondition{ID: "c", Type: "example.com/opaque", Condition: "true"}},
+		{name: "nil", condition: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := builder.Recognizes(tc.condition); got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
@@ -1401,13 +1402,21 @@ func TestConditionalResponseCaching(t *testing.T) {
 }
 
 // fakeBuiltinConditionsEvaluatorBuilder resolves conditions by ID; unknown IDs are Unevaluatable.
+// All conditions are recognized, except the IDs in unrecognized.
 type fakeBuiltinConditionsEvaluatorBuilder struct {
-	results map[string]authorizer.ConditionEvaluationResult
-	err     error
-	authz   authorizer.Authorizer
+	results      map[string]authorizer.ConditionEvaluationResult
+	unrecognized sets.Set[string]
+	err          error
+	authz        authorizer.Authorizer
+	builds       int
+}
+
+func (f *fakeBuiltinConditionsEvaluatorBuilder) Recognizes(condition authorizer.Condition) bool {
+	return !f.unrecognized.Has(condition.GetID())
 }
 
 func (f *fakeBuiltinConditionsEvaluatorBuilder) EvaluatorForData(_ context.Context, _ authorizer.ConditionsData, authz authorizer.Authorizer) (authorizer.BuiltinConditionsEvaluator, error) {
+	f.builds++
 	f.authz = authz
 	if f.err != nil {
 		return nil, f.err
@@ -1445,6 +1454,7 @@ func TestEvaluateConditions_Builtins(t *testing.T) {
 		builder      *fakeBuiltinConditionsEvaluatorBuilder
 		wantDecision authorizer.Decision
 		wantWebhook  bool
+		wantNoBuild  bool
 		// wantSentDenyIDs are the deny condition IDs that are left for the webhook to evaluate.
 		wantSentDenyIDs []string
 	}{
@@ -1480,6 +1490,18 @@ func TestEvaluateConditions_Builtins(t *testing.T) {
 			wantWebhook:     true,
 			wantSentDenyIDs: []string{denyCond.ID},
 		},
+		{
+			// The deny conditions are evaluated first, so a recognized allow condition cannot make progress.
+			name: "highest-priority conditions unrecognized: evaluator not built, webhook gets the original decision",
+			builder: &fakeBuiltinConditionsEvaluatorBuilder{
+				unrecognized: sets.New(denyCond.ID),
+				results:      map[string]authorizer.ConditionEvaluationResult{allowCond.ID: authorizer.ConditionEvaluationResultBoolean(true)},
+			},
+			wantDecision:    authorizer.DecisionAllow,
+			wantWebhook:     true,
+			wantNoBuild:     true,
+			wantSentDenyIDs: []string{denyCond.ID},
+		},
 	}
 
 	for _, tc := range tests {
@@ -1503,7 +1525,10 @@ func TestEvaluateConditions_Builtins(t *testing.T) {
 			if d != tc.wantDecision {
 				t.Errorf("got decision %s, want %s", d, tc.wantDecision)
 			}
-			if tc.builder.authz != rootAuthz {
+			if gotNoBuild := tc.builder.builds == 0; gotNoBuild != tc.wantNoBuild {
+				t.Errorf("evaluator not built: got %v, want %v", gotNoBuild, tc.wantNoBuild)
+			}
+			if !tc.wantNoBuild && tc.builder.authz != rootAuthz {
 				t.Errorf("expected the authorizer from the request context to be passed to the builder, got %v", tc.builder.authz)
 			}
 			if gotWebhook := acr.received != nil; gotWebhook != tc.wantWebhook {

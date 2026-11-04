@@ -352,12 +352,12 @@ const ConditionTypeAuthorizationCEL = "authorizer.kubernetes.io/cel"
 // BuiltinConditionsEvaluatorBuilder builds an in-process conditions evaluator for the given data.
 // This means authorizers (e.g. the webhook authorizer) may try cheaper ways of evaluating a condition
 // (e.g. in-process CEL evaluation) before more expensive ways (sending the webhook).
-//
-// TODO(luxas): Add a RecognizesCondition(Condition) bool method to the builder, and a function in this package
-// that walks a ConditionsAwareDecision and tells whether there is any point in trying in-process evaluation at all,
-// i.e. whether any condition is recognized. Then callers can skip EvaluatorForData, and thus e.g. the namespace
-// lookup and activation setup, when only opaque condition types are used.
 type BuiltinConditionsEvaluatorBuilder interface {
+	// Recognizes returns whether evaluators built by this builder may be able to evaluate the condition,
+	// that is, not return ConditionsEvaluationResultUnevaluatable. It must be cheap and independent of
+	// ConditionsData, so that callers can use it to skip EvaluatorForData when it cannot make progress.
+	Recognizes(condition Condition) bool
+
 	// EvaluatorForData returns a BuiltinConditionsEvaluator from the given ConditionsData,
 	// in order to initialize an evaluation environment only once.
 	// apiServerAuthorizer is the API server's authorizer (not the authorizer that authored the condition), which

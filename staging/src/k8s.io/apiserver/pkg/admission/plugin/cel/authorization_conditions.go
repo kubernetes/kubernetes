@@ -78,6 +78,13 @@ type celAuthorizationConditionsEvaluatorBuilder struct {
 	runtimeCELCostBudget int64
 }
 
+// Recognizes returns true for non-empty conditions of type authorizer.ConditionTypeAuthorizationCEL.
+// It's generally valid for condition strings to be empty, if the semantics of the condition is
+// clear from its (required) ID. However, the CEL evaluator cannot evaluate empty condition strings.
+func (b *celAuthorizationConditionsEvaluatorBuilder) Recognizes(condition authorizer.Condition) bool {
+	return condition != nil && condition.GetType() == authorizer.ConditionTypeAuthorizationCEL && len(condition.GetCondition()) != 0
+}
+
 func (b *celAuthorizationConditionsEvaluatorBuilder) EvaluatorForData(ctx context.Context, data authorizer.ConditionsData, apiServerAuthorizer authorizer.Authorizer) (authorizer.BuiltinConditionsEvaluator, error) {
 	if data == nil {
 		return nil, fmt.Errorf("programmer error: data is required")
@@ -152,17 +159,7 @@ type celAuthorizationConditionsEvaluator struct {
 }
 
 func (e *celAuthorizationConditionsEvaluator) EvaluateCondition(ctx context.Context, condition authorizer.Condition) authorizer.ConditionEvaluationResult {
-	// First, check all the essentials, that the condition type is correct, and there is some admission data to evaluate
-	if condition == nil {
-		return authorizer.ConditionsEvaluationResultUnevaluatable()
-	}
-	if condition.GetType() != authorizer.ConditionTypeAuthorizationCEL {
-		return authorizer.ConditionsEvaluationResultUnevaluatable()
-	}
-	// It's generally valid for condition strings to be empty, if the semantics of the condition is
-	// clear from its (required) ID. However, the CEL evaluator cannot evaluate empty condition strings.
-	condStr := condition.GetCondition()
-	if len(condStr) == 0 {
+	if !e.builder.Recognizes(condition) {
 		return authorizer.ConditionsEvaluationResultUnevaluatable()
 	}
 
@@ -175,7 +172,7 @@ func (e *celAuthorizationConditionsEvaluator) EvaluateCondition(ctx context.Cont
 		})
 	}
 
-	compiledExpr := e.builder.compiler.CompileCELExpression(validationCondition(condStr), e.optionalVarsDecls, environment.StoredExpressions)
+	compiledExpr := e.builder.compiler.CompileCELExpression(validationCondition(condition.GetCondition()), e.optionalVarsDecls, environment.StoredExpressions)
 
 	// if this activation supports composition, we will need the compositionCtx. It may be nil.
 	compositionCtx, _ := ctx.(CompositionContext)

@@ -952,6 +952,10 @@ func (w *WebhookAuthorizer) tryEvaluateUsingBuiltins(ctx context.Context, uneval
 	if w.builtinConditionsEvaluatorBuilder == nil {
 		return unevaluatedDecision // no simplification possible, perform webhook
 	}
+	// Skip building the evaluator (e.g. namespace lookup and CEL activation setup) when it cannot make progress.
+	if !authorizer.CouldBenefitFromBuiltinEvaluation(unevaluatedDecision, w.builtinConditionsEvaluatorBuilder.Recognizes) {
+		return unevaluatedDecision
+	}
 	// The API server's authorizer, as set by WithConditionsAwareAuthorization, not w itself.
 	authz, _, _ := request.ConditionallyAuthorizedDecisionFrom(ctx)
 	builtinConditionsEvaluator, err := w.builtinConditionsEvaluatorBuilder.EvaluatorForData(ctx, data, authz)
