@@ -589,7 +589,9 @@ func TestGracefulTerminationWatchShutdownOrdering(t *testing.T) {
 		// After observing draining, a positive Add should be rejected.
 		// Success means the watch wait group has not yet entered waiting mode.
 		if err := s.WatchRequestWaitGroup.Add(1); err == nil {
-			s.WatchRequestWaitGroup.Add(-1)
+			if err := s.WatchRequestWaitGroup.Add(-1); err != nil {
+				t.Errorf("unexpected error undoing watch wait group Add: %v", err)
+			}
 			lock.Lock()
 			shutdownBeforeWait++
 			lock.Unlock()
@@ -620,7 +622,7 @@ func TestGracefulTerminationWatchShutdownOrdering(t *testing.T) {
 	waitForAPIServerStarted(t, doer)
 
 	resultCh := make(chan result, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		go func() {
 			resultCh <- doer.Do(client, func(httptrace.GotConnInfo) {}, "/apis/watches.group/v1/namespaces/foo/bar?watch=true", 0)
 		}()
@@ -633,7 +635,7 @@ func TestGracefulTerminationWatchShutdownOrdering(t *testing.T) {
 	waitForeverUntil(t, startedCh, "in-flight watch requests did not reach the server")
 
 	stop(errors.New("shutting down"))
-	for i := 0; i < n; i++ {
+	for range n {
 		resultGot := <-resultCh
 		if err := assertResponseStatusCode(resultGot, http.StatusOK); err != nil {
 			t.Errorf("%s", err.Error())

@@ -265,7 +265,7 @@ func TestRateLimitedSafeWaitGroupSignalFromFactory(t *testing.T) {
 		RateLimitedSafeWaitGroup: &RateLimitedSafeWaitGroup{},
 	}
 	n := 100
-	for i := 0; i < n; i++ {
+	for range n {
 		if err := target.Add(1); err != nil {
 			t.Fatalf("unexpected error from Add: %v", err)
 		}
@@ -276,7 +276,7 @@ func TestRateLimitedSafeWaitGroupSignalFromFactory(t *testing.T) {
 	doneWG := sync.WaitGroup{}
 	doneWG.Add(n)
 	addErrCh := make(chan error, 1)
-	for i := 0; i < n; i++ {
+	for range n {
 		go func() {
 			defer doneWG.Done()
 			<-signalCh
