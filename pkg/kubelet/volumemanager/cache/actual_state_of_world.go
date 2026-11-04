@@ -184,6 +184,12 @@ type ActualStateOfWorld interface {
 	// Add the specified volume to ASW as uncertainly attached.
 	AddAttachUncertainReconstructedVolume(logger klog.Logger, volumeName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string) error
 
+	// MarkDeviceAsUncertainViaReconstruction marks the device of a volume that
+	// reconstruction found staged with no pod as uncertain, and records it as
+	// found during reconstruction, the same way a pod's volume is. A failed
+	// MountDevice then leaves it uncertain instead of marking it unmounted.
+	MarkDeviceAsUncertainViaReconstruction(volumeName v1.UniqueVolumeName, deviceMountPath, seLinuxMountContext string) error
+
 	// UpdateReconstructedDevicePath updates devicePath of a reconstructed volume
 	// from Node.Status.VolumesAttached. The ASW is updated only when the volume is still
 	// uncertain. If the volume got mounted in the meantime, its devicePath must have
@@ -567,6 +573,18 @@ func (asw *actualStateOfWorld) MarkDeviceAsMounted(
 func (asw *actualStateOfWorld) MarkDeviceAsUncertain(
 	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error {
 	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceMountUncertain, devicePath, deviceMountPath, seLinuxMountContext)
+}
+
+func (asw *actualStateOfWorld) MarkDeviceAsUncertainViaReconstruction(volumeName v1.UniqueVolumeName, deviceMountPath, seLinuxMountContext string) error {
+	if err := asw.MarkDeviceAsUncertain(volumeName, "", deviceMountPath, seLinuxMountContext); err != nil {
+		return err
+	}
+	asw.Lock()
+	defer asw.Unlock()
+	if _, ok := asw.foundDuringReconstruction[volumeName]; !ok {
+		asw.foundDuringReconstruction[volumeName] = map[volumetypes.UniquePodName]types.UID{}
+	}
+	return nil
 }
 
 func (asw *actualStateOfWorld) MarkVolumeMountAsUncertain(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
