@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission_test
+package admission
 
 import (
 	"bytes"
@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-helpers/auth/admission"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 )
@@ -51,7 +50,7 @@ func TestAllowsAPIGroup(t *testing.T) {
 		{name: "multiple unrelated", groups: []string{"extensions", "batch"}, group: "apps"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := admission.AllowsAPIGroupForTest(tc.groups, tc.group); got != tc.want {
+			if got := AllowsAPIGroupForTest(tc.groups, tc.group); got != tc.want {
 				t.Fatalf("allowsAPIGroup(%q, %q) = %t, want %t", tc.groups, tc.group, got, tc.want)
 			}
 		})
@@ -119,7 +118,7 @@ func TestVerifierRequiresCompactJWT(t *testing.T) {
 					t.Fatalf("Verify accepted non-compact JWS: %v", err)
 				}
 				spy := newSpyHandler()
-				h := admission.NewHandlerForTest(v, spy.serve)
+				h := NewHandlerForTest(v, spy.serve)
 				rec := httptest.NewRecorder()
 				h.ServeHTTP(rec, newRequest(t, admissionReviewBody(t, testGroup), token))
 				if rec.Code != http.StatusUnauthorized || spy.wasReached() {
@@ -161,8 +160,8 @@ func TestLibraryKeyRotationAndAvailability(t *testing.T) {
 		_, _ = w.Write(keys.Load().([]byte))
 	}))
 	defer server.Close()
-	newVerifier := func() (*admission.VerifierForTest, error) {
-		return admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client()))
+	newVerifier := func() (*VerifierForTest, error) {
+		return NewVerifierForTest(context.Background(), WithIssuer(server.URL, testAudience, server.Client()))
 	}
 	v, err := newVerifier()
 	if err != nil {
@@ -305,7 +304,7 @@ func TestNewVerifier_InClusterExplicitAudience(t *testing.T) {
 
 func TestVerifier_SubresourceKindAndObjectGroups(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := NewVerifierForTest(context.Background(), WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}
@@ -388,7 +387,7 @@ func TestVerifier_SubresourceKindAndObjectGroups(t *testing.T) {
 
 func TestVerifier_DecodedObjectsMatchAdmittedKind(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := NewVerifierForTest(context.Background(), WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}
@@ -435,7 +434,7 @@ func TestVerifier_DecodedObjectsMatchAdmittedKind(t *testing.T) {
 
 func TestVerifier_CoreCrossGroupSubresources(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := NewVerifierForTest(context.Background(), WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}
@@ -505,7 +504,7 @@ func TestVerifier_CoreCrossGroupSubresources(t *testing.T) {
 
 func TestVerifier_RejectsMissingObjectTypeMetaForCoreGroup(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	verifier, err := NewVerifierForTest(context.Background(), WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("construct token verifier: %v", err)
 	}
@@ -574,7 +573,7 @@ func TestVerifierOperationShapes(t *testing.T) {
 				t.Fatal(err)
 			}
 			spy := newSpyHandler()
-			h := admission.NewHandlerForTest(v, spy.serve)
+			h := NewHandlerForTest(v, spy.serve)
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, newRequest(t, raw, token))
 			var result admissionv1.AdmissionReview
@@ -678,7 +677,7 @@ func TestAdmissionRequestKindDiagnostics(t *testing.T) {
 		Object:  runtime.RawExtension{Raw: []byte(`{"apiVersion":"batch/v1","kind":"Job","spec":{"credential":"private-payload-credential"}}`)},
 		Options: runtime.RawExtension{Raw: []byte(`{"credential":"private-option-credential"}`)},
 	}
-	err := (&admission.VerifierForTest{}).CheckDecodedRequestForTest(ctx, req, []string{"apps"})
+	err := (&VerifierForTest{}).CheckDecodedRequestForTest(ctx, req, []string{"apps"})
 	if err == nil || err.Error() != "webhook token verification failed" {
 		t.Fatalf("caller error = %v, want generic verification failure", err)
 	}
