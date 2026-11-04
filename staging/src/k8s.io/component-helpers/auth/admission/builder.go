@@ -47,6 +47,8 @@ type builder struct {
 	audience         string
 	remoteHTTPClient *http.Client
 
+	// serviceAudienceSet records whether WithServiceAudience was supplied so
+	// buildVerifier can reject missing or conflicting audience options.
 	serviceAudienceSet bool
 	serviceName        string
 	servicePath        string
