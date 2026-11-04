@@ -611,8 +611,9 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	if s.NodeManager != nil {
 		nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
 		nodeConfig.RegisterEventHandler(s.NodeManager)
-		nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
-		nodeTopologyConfig.RegisterEventHandler(s.Proxier)
+		// NodeManager has already started and synced the node informer, so the handler must be attached in one step
+		// Ref: https://issues.k8s.io/143275
+		config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration, s.Proxier)
 
 		go nodeConfig.Run(wait.NeverStop)
 	}
