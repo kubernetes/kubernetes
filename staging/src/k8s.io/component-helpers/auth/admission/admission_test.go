@@ -16,7 +16,7 @@ limitations under the License.
 
 // These tests use signed tokens and a TLS issuer so HTTP failures also exercise
 // token verification.
-package admission_test
+package admission
 
 import (
 	"bytes"
@@ -51,7 +51,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/component-helpers/auth/admission"
 )
 
 // TestWithTokenVerification_EndToEnd checks that failed requests cannot reach
@@ -145,7 +144,7 @@ func TestWithTokenVerification_EndToEnd(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			spy := newSpyHandler()
-			adapter := admission.NewHandlerForTest(v, spy.serve)
+			adapter := NewHandlerForTest(v, spy.serve)
 
 			var token string
 			if tc.token != nil {
@@ -200,7 +199,7 @@ func TestWithTokenVerification_ForwardsRequestAndEchoesUID(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(v, spy.serve)
+	adapter := NewHandlerForTest(v, spy.serve)
 
 	body := admissionReviewBody(t, testGroup)
 	token := ts.sign(t, ts.baseClaims())
@@ -238,7 +237,7 @@ func TestWithTokenVerification_ForwardsRequestAndEchoesUID(t *testing.T) {
 func TestWithTokenVerification_DoesNotMutateSharedDownstreamResponse(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	shared := &admissionv1.AdmissionResponse{Allowed: false}
-	handler := admission.NewHandlerForTest(ts.verifier(t),
+	handler := NewHandlerForTest(ts.verifier(t),
 		func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 			return shared
 		})
@@ -276,7 +275,7 @@ func TestWithTokenVerification_OverHTTPServer(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	srv := httptest.NewServer(admission.NewHandlerForTest(v, spy.serve))
+	srv := httptest.NewServer(NewHandlerForTest(v, spy.serve))
 	defer srv.Close()
 
 	body := admissionReviewBody(t, testGroup)
@@ -323,7 +322,7 @@ func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(v, spy.serve)
+	adapter := NewHandlerForTest(v, spy.serve)
 
 	rec := httptest.NewRecorder()
 	adapter.ServeHTTP(rec, newRequest(t, undecodable, token))
@@ -340,7 +339,7 @@ func TestWithTokenVerification_UndecodableBodyFailsClosed(t *testing.T) {
 func TestWithTokenVerification_LargeUpdateReview(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	spy := newSpyHandler()
-	handler := admission.NewHandlerForTest(ts.verifier(t), spy.serve)
+	handler := NewHandlerForTest(ts.verifier(t), spy.serve)
 	body := configMapUpdateReviewBody(t, strings.Repeat(`\`, 600<<10))
 	if len(body) <= 2<<20 || len(body) >= 3<<20 {
 		t.Fatalf("review body = %d bytes, want between 2 and 3 MiB", len(body))
@@ -373,7 +372,7 @@ func TestWithTokenVerification_LargeUpdateReview(t *testing.T) {
 func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(ts.verifier(t), spy.serve, admission.WithMaxBodyBytesForTest(16))
+	adapter := NewHandlerForTest(ts.verifier(t), spy.serve, WithMaxBodyBytesForTest(16))
 	body := admissionReviewBody(t, testGroup)
 	if len(body) <= 16 {
 		t.Fatalf("test body must exceed the limit, got %d bytes", len(body))
@@ -390,10 +389,10 @@ func TestWithTokenVerification_OverLimitBodyRejected(t *testing.T) {
 }
 
 var (
-	_ http.Handler                                                                                       = (*admission.Handler)(nil)
-	_ func(context.Context, admission.AdmissionHandler, ...admission.Option) (*admission.Handler, error) = admission.WithTokenVerification
-	_ func(string, string, uint16) admission.Option                                                      = admission.WithServiceAudience
-	_ func(string, string, *http.Client) admission.Option                                                = admission.WithIssuer
+	_ http.Handler                                                         = (*Handler)(nil)
+	_ func(context.Context, AdmissionHandler, ...Option) (*Handler, error) = WithTokenVerification
+	_ func(string, string, uint16) Option                                  = WithServiceAudience
+	_ func(string, string, *http.Client) Option                            = WithIssuer
 )
 
 func TestAuthenticationBeforeBodyRead(t *testing.T) {
@@ -441,7 +440,7 @@ func TestAuthenticationBeforeBodyRead(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			spy := newSpyHandler()
-			h := admission.NewHandlerForTest(v, spy.serve, admission.WithMaxBodyBytesForTest(16))
+			h := NewHandlerForTest(v, spy.serve, WithMaxBodyBytesForTest(16))
 			body := &observedBody{reader: bytes.NewReader(bytes.Repeat([]byte("x"), 8192))}
 			r := newRequest(t, nil, tc.token())
 			r.Body = body
@@ -472,7 +471,7 @@ func TestAuthenticatedBodyBoundaries(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spy := newSpyHandler()
-			h := admission.NewHandlerForTest(v, spy.serve, admission.WithMaxBodyBytesForTest(tc.limit))
+			h := NewHandlerForTest(v, spy.serve, WithMaxBodyBytesForTest(tc.limit))
 			body := &observedBody{reader: bytes.NewReader(raw)}
 			r := newRequest(t, nil, token)
 			r.Body = body
@@ -514,7 +513,7 @@ func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
 
 	t.Run("object group matches resource group -> allowed", func(t *testing.T) {
 		spy := newSpyHandler()
-		adapter := admission.NewHandlerForTest(v, spy.serve)
+		adapter := NewHandlerForTest(v, spy.serve)
 		rec := httptest.NewRecorder()
 		adapter.ServeHTTP(rec, newRequest(t, reviewWithObject(testGroup, "apps/v1"), token))
 		if !spy.wasReached() {
@@ -524,7 +523,7 @@ func TestWithTokenVerification_InnerObjectGroupChecked(t *testing.T) {
 
 	t.Run("object group differs from resource group -> denied", func(t *testing.T) {
 		spy := newSpyHandler()
-		adapter := admission.NewHandlerForTest(v, spy.serve)
+		adapter := NewHandlerForTest(v, spy.serve)
 		rec := httptest.NewRecorder()
 		adapter.ServeHTTP(rec, newRequest(t, reviewWithObject(testGroup, "batch/v1"), token))
 		if spy.wasReached() {
@@ -569,7 +568,7 @@ func TestWithTokenVerification_InnerObjectGroupChecksBothObjects(t *testing.T) {
 	// Checking only Object would let an unauthorized OldObject through.
 	t.Run("oldObject group mismatch is denied even when object matches", func(t *testing.T) {
 		spy := newSpyHandler()
-		adapter := admission.NewHandlerForTest(v, spy.serve)
+		adapter := NewHandlerForTest(v, spy.serve)
 		rec := httptest.NewRecorder()
 		adapter.ServeHTTP(rec, newRequest(t, updateReview("apps/v1", "batch/v1"), token))
 		if spy.wasReached() {
@@ -586,7 +585,7 @@ func TestWithTokenVerification_InnerObjectGroupChecksBothObjects(t *testing.T) {
 
 	t.Run("object group mismatch is denied even when oldObject matches", func(t *testing.T) {
 		spy := newSpyHandler()
-		adapter := admission.NewHandlerForTest(v, spy.serve)
+		adapter := NewHandlerForTest(v, spy.serve)
 		rec := httptest.NewRecorder()
 		adapter.ServeHTTP(rec, newRequest(t, updateReview("batch/v1", "apps/v1"), token))
 		if spy.wasReached() {
@@ -596,7 +595,7 @@ func TestWithTokenVerification_InnerObjectGroupChecksBothObjects(t *testing.T) {
 
 	t.Run("both objects matching is allowed", func(t *testing.T) {
 		spy := newSpyHandler()
-		adapter := admission.NewHandlerForTest(v, spy.serve)
+		adapter := NewHandlerForTest(v, spy.serve)
 		rec := httptest.NewRecorder()
 		adapter.ServeHTTP(rec, newRequest(t, updateReview("apps/v1", "apps/v1"), token))
 		if !spy.wasReached() {
@@ -670,8 +669,8 @@ func Example_rawHTTPWebhook() {
 	}
 
 	// Bind the expected audience to the issuer, not to the inbound request.
-	h, err := admission.WithTokenVerification(context.Background(), admit,
-		admission.WithIssuer(issuer.issuer, exampleAudience, issuer.client()))
+	h, err := WithTokenVerification(context.Background(), admit,
+		WithIssuer(issuer.issuer, exampleAudience, issuer.client()))
 	if err != nil {
 		panic(err)
 	}
@@ -705,8 +704,8 @@ func Example_inClusterWebhook() {
 		return &admissionv1.AdmissionResponse{UID: req.UID, Allowed: true}
 	}
 	// Use the webhook configuration's Service reference, never a value from the request.
-	handler, err := admission.WithTokenVerification(context.Background(), admit,
-		admission.WithServiceAudience("hook", "/validate", 443))
+	handler, err := WithTokenVerification(context.Background(), admit,
+		WithServiceAudience("hook", "/validate", 443))
 	if err != nil {
 		panic(err)
 	}
@@ -725,8 +724,8 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 		reached = true
 		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
-	h, err := admission.WithTokenVerification(context.Background(), admit,
-		admission.WithIssuer(ts.issuer, exampleAudience, ts.client()))
+	h, err := WithTokenVerification(context.Background(), admit,
+		WithIssuer(ts.issuer, exampleAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("WithTokenVerification: %v", err)
 	}
@@ -914,7 +913,7 @@ func TestWithTokenVerification_NilRequestBody(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(v, spy.serve)
+	adapter := NewHandlerForTest(v, spy.serve)
 
 	r := httptest.NewRequest(http.MethodPost, "/validate", nil)
 	r.Body = nil // an explicitly bodyless request
@@ -940,7 +939,7 @@ func TestWithTokenVerification_ValidJSONNoRequest(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(v, spy.serve)
+	adapter := NewHandlerForTest(v, spy.serve)
 
 	// A syntactically valid AdmissionReview envelope with Request omitted.
 	body := []byte(`{"apiVersion":"admission.k8s.io/v1","kind":"AdmissionReview"}`)
@@ -963,7 +962,7 @@ func TestWithTokenVerification_ValidJSONNoRequest(t *testing.T) {
 func TestWithTokenVerification_HugeBodyDefaultLimit(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(ts.verifier(t), spy.serve)
+	adapter := NewHandlerForTest(ts.verifier(t), spy.serve)
 	body := configMapUpdateReviewBody(t, strings.Repeat("a", 5<<20))
 	if len(body) <= 7<<20 {
 		t.Fatalf("review body = %d bytes, want more than 7 MiB", len(body))
@@ -986,7 +985,7 @@ func TestWithTokenVerification_EmptyBearerRejected(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(v, spy.serve)
+	adapter := NewHandlerForTest(v, spy.serve)
 
 	r := newRequest(t, admissionReviewBody(t, testGroup), "")
 	r.Header.Set("Authorization", "Bearer ") // present but empty
@@ -1021,7 +1020,7 @@ func TestWithTokenVerification_RemoteConfigValidation(t *testing.T) {
 	}
 	for _, tc := range partials {
 		t.Run(tc.name, func(t *testing.T) {
-			h, err := admission.WithTokenVerification(context.Background(), admit, admission.WithIssuer(tc.issuer, tc.audience, nil))
+			h, err := WithTokenVerification(context.Background(), admit, WithIssuer(tc.issuer, tc.audience, nil))
 			if err == nil {
 				t.Fatalf("expected a construction error for a partial remote config, got nil error (handler=%v)", h)
 			}
@@ -1039,8 +1038,8 @@ func TestWithTokenVerification_RemoteConfigValidation(t *testing.T) {
 	// builds a handler with no error (mirrors the Example_rawHTTPWebhook setup).
 	t.Run("complete remote config builds", func(t *testing.T) {
 		ts := newOIDCTestServer(t)
-		h, err := admission.WithTokenVerification(context.Background(), admit,
-			admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+		h, err := WithTokenVerification(context.Background(), admit,
+			WithIssuer(ts.issuer, testAudience, ts.client()))
 		if err != nil {
 			t.Fatalf("complete remote config: unexpected error: %v", err)
 		}
@@ -1077,7 +1076,7 @@ func TestWithTokenVerification_BodyReadErrorFailsClosed(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	v := ts.verifier(t)
 	spy := newSpyHandler()
-	adapter := admission.NewHandlerForTest(v, spy.serve)
+	adapter := NewHandlerForTest(v, spy.serve)
 
 	r := httptest.NewRequest(http.MethodPost, "/validate", http.NoBody)
 	r.Body = erroringBody{}
@@ -1148,7 +1147,7 @@ func TestWithTokenVerification_DecodeOnce_BodyConsumedExactlyOnce(t *testing.T) 
 		gotRequest = req
 		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
-	adapter := admission.NewHandlerForTest(v, next)
+	adapter := NewHandlerForTest(v, next)
 
 	body := admissionReviewBody(t, testGroup)
 	cb := newCloseOnceBody(body)
@@ -1319,11 +1318,11 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 
 	modes := []struct {
 		name        string
-		newVerifier func(string) (*admission.VerifierForTest, error)
+		newVerifier func(string) (*VerifierForTest, error)
 	}{
 		{
 			name: "in-cluster",
-			newVerifier: func(audience string) (*admission.VerifierForTest, error) {
+			newVerifier: func(audience string) (*VerifierForTest, error) {
 				projected := issuer.sign(t, map[string]any{
 					"iss": issuer.issuer,
 					"sub": "system:serviceaccount:webhook-system:receiver",
@@ -1341,13 +1340,13 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 						CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: issuer.server.Certificate().Raw}),
 					},
 				}
-				return admission.NewLocalVerifierForTest(context.Background(), config, audience)
+				return NewLocalVerifierForTest(context.Background(), config, audience)
 			},
 		},
 		{
 			name: "remote-issuer",
-			newVerifier: func(audience string) (*admission.VerifierForTest, error) {
-				return admission.NewVerifierForTest(context.Background(), admission.WithIssuer(issuer.issuer, audience, issuer.server.Client()))
+			newVerifier: func(audience string) (*VerifierForTest, error) {
+				return NewVerifierForTest(context.Background(), WithIssuer(issuer.issuer, audience, issuer.server.Client()))
 			},
 		},
 	}
@@ -1357,7 +1356,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 			var validateCalls, mutateCalls atomic.Int32
 
 			validateVerifier, err := mode.newVerifier(validateAudience)
-			validateHandler := admission.NewHandlerForTest(
+			validateHandler := NewHandlerForTest(
 				validateVerifier,
 				func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 					validateCalls.Add(1)
@@ -1366,7 +1365,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 						Result:  &metav1.Status{Status: metav1.StatusSuccess, Message: "validated:" + req.Resource.Resource},
 					}
 				},
-				admission.WithMaxBodyBytesForTest(4096),
+				WithMaxBodyBytesForTest(4096),
 			)
 			if err != nil {
 				t.Fatalf("construct /validate handler: %v", err)
@@ -1374,7 +1373,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 
 			patchType := admissionv1.PatchTypeJSONPatch
 			mutateVerifier, err := mode.newVerifier(mutateAudience)
-			mutateHandler := admission.NewHandlerForTest(
+			mutateHandler := NewHandlerForTest(
 				mutateVerifier,
 				func(_ context.Context, _ *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 					mutateCalls.Add(1)
@@ -1384,7 +1383,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 						Patch:     []byte(`[{"op":"add","path":"/metadata/annotations","value":{"kep6060":"verified"}}]`),
 					}
 				},
-				admission.WithMaxBodyBytesForTest(4096),
+				WithMaxBodyBytesForTest(4096),
 			)
 			if err != nil {
 				t.Fatalf("construct /mutate handler: %v", err)
@@ -1920,13 +1919,13 @@ func TestTokenReuseDoesNotSkipRequestChecks(t *testing.T) {
 	const audience = "https://dummy-webhook.webhook-system.svc:443/validate"
 
 	var admitted atomic.Int32
-	handler, err := admission.WithTokenVerification(
+	handler, err := WithTokenVerification(
 		context.Background(),
 		func(_ context.Context, _ *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 			admitted.Add(1)
 			return &admissionv1.AdmissionResponse{Allowed: true}
 		},
-		admission.WithIssuer(issuer.issuer, audience, issuer.server.Client()),
+		WithIssuer(issuer.issuer, audience, issuer.server.Client()),
 	)
 	if err != nil {
 		t.Fatalf("construct handler: %v", err)
@@ -2036,7 +2035,7 @@ func TestBearerToken_Table(t *testing.T) {
 			if tc.header != "" {
 				r.Header.Set("Authorization", tc.header)
 			}
-			token, ok := admission.BearerTokenForTest(r)
+			token, ok := BearerTokenForTest(r)
 			if ok != tc.wantOK {
 				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
 			}
@@ -2133,16 +2132,16 @@ func (ts *oidcTestServer) close()               { ts.server.Close() }
 func (ts *oidcTestServer) client() *http.Client { return ts.server.Client() }
 
 // verifier builds a fixed-audience Verifier via full OIDC discovery over TLS.
-func (ts *oidcTestServer) verifier(t *testing.T) *admission.VerifierForTest {
+func (ts *oidcTestServer) verifier(t *testing.T) *VerifierForTest {
 	t.Helper()
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(ts.issuer, testAudience, ts.client()))
+	v, err := NewVerifierForTest(context.Background(), WithIssuer(ts.issuer, testAudience, ts.client()))
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
 	return v
 }
 
-func (ts *oidcTestServer) localVerifier(audience string) (*admission.VerifierForTest, error) {
+func (ts *oidcTestServer) localVerifier(audience string) (*VerifierForTest, error) {
 	claims := ts.baseClaims()
 	claims["sub"] = "system:serviceaccount:webhooks:receiver"
 	claims["aud"] = []string{"https://kubernetes.default.svc"}
@@ -2165,15 +2164,15 @@ func (ts *oidcTestServer) localVerifier(audience string) (*admission.VerifierFor
 			CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ts.server.Certificate().Raw}),
 		},
 	}
-	return admission.NewLocalVerifierForTest(context.Background(), config, audience)
+	return NewLocalVerifierForTest(context.Background(), config, audience)
 }
 
-func (ts *oidcTestServer) localHandler(next admission.AdmissionHandler, audience string) (*admission.Handler, error) {
+func (ts *oidcTestServer) localHandler(next AdmissionHandler, audience string) (*Handler, error) {
 	v, err := ts.localVerifier(audience)
 	if err != nil {
 		return nil, err
 	}
-	return admission.NewHandlerForTest(v, next), nil
+	return NewHandlerForTest(v, next), nil
 }
 
 // signClaims mints a compact RS256 JWS over claims using the server's advertised
@@ -2312,7 +2311,7 @@ func configMapUpdateReviewBody(t *testing.T, value string) []byte {
 }
 
 // spyHandler is the downstream admission webhook the adapter forwards to. It is
-// an admission.AdmissionHandler: it receives the AdmissionRequest the
+// an AdmissionHandler: it receives the AdmissionRequest the
 // adapter already decoded and verified, records what it observed, and returns a
 // canned allow response (the adapter wraps and writes it).
 type spyHandler struct {
@@ -2326,7 +2325,7 @@ func newSpyHandler() *spyHandler {
 	return &spyHandler{allowVal: true}
 }
 
-// serve matches admission.AdmissionHandler.
+// serve matches AdmissionHandler.
 func (s *spyHandler) serve(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	s.mu.Lock()
 	s.reached = true
@@ -2396,4 +2395,61 @@ type requestTransportFunc func(*http.Request) (*http.Response, error)
 
 func (f requestTransportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 	return f(r)
+}
+
+// VerifierForTest aliases the unexported verifier so unit tests can construct
+// and exercise token and request verification directly.
+type VerifierForTest = verifier
+
+func NewVerifierForTest(ctx context.Context, opts ...Option) (*VerifierForTest, error) {
+	return newVerifier(ctx, opts...)
+}
+
+func (v *verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest, token string) error {
+	return v.verify(ctx, req, token)
+}
+
+func (v *verifier) CheckDecodedRequestForTest(ctx context.Context, req *admissionv1.AdmissionRequest, groups []string) error {
+	return v.checkDecodedRequest(ctx, req, groups)
+}
+
+func NewHandlerForTest(v *VerifierForTest, delegate AdmissionHandler, opts ...func(*Handler)) *Handler {
+	h := newHandler(v, delegate, defaultMaxBodyBytes)
+	for _, opt := range opts {
+		opt(h)
+	}
+	return h
+}
+
+func NewLocalVerifierForTest(ctx context.Context, config *rest.Config, audience string) (*VerifierForTest, error) {
+	return newLocalVerifier(ctx, config, audience)
+}
+
+func WithMaxBodyBytesForTest(n int64) func(*Handler) {
+	return func(h *Handler) {
+		if n > 0 {
+			h.maxBody = n
+		}
+	}
+}
+
+// BearerTokenForTest exposes the unexported Authorization header parser for
+// direct table-driven unit testing.
+func BearerTokenForTest(r *http.Request) (string, bool) {
+	return bearerToken(r)
+}
+
+func AllowsAPIGroupForTest(groups []string, group string) bool {
+	return allowsAPIGroup(groups, group)
+}
+
+func BuildInClusterServiceAudienceForTest(name, path string, port uint16, namespaceFile string) (string, error) {
+	return buildInClusterServiceAudience(name, path, port, namespaceFile)
+}
+
+func OptionForTest(fn func(issuer, audience *string, client **http.Client)) Option {
+	return func(b *builder) {
+		b.remoteSet = true
+		fn(&b.issuer, &b.audience, &b.remoteHTTPClient)
+	}
 }

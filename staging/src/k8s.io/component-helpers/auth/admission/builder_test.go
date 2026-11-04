@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package admission_test
+package admission
 
 import (
 	"context"
@@ -31,7 +31,6 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/component-helpers/auth/admission"
 )
 
 func TestWithTokenVerificationConstruction(t *testing.T) {
@@ -52,19 +51,19 @@ func TestWithTokenVerificationConstruction(t *testing.T) {
 	}))
 	defer server.Close()
 	var optionsApplied int
-	option := admission.OptionForTest(func(issuer, audience *string, client **http.Client) {
+	option := OptionForTest(func(issuer, audience *string, client **http.Client) {
 		optionsApplied++
 		*issuer = server.URL
 		*audience = "https://webhook.example/validate"
 		*client = server.Client()
 	})
-	if h, err := admission.WithTokenVerification(context.Background(), nil, option); h != nil || err == nil {
+	if h, err := WithTokenVerification(context.Background(), nil, option); h != nil || err == nil {
 		t.Fatalf("nil callback = (%v, %v), want (nil, error)", h, err)
 	}
 	if optionsApplied != 0 || requests.Load() != 0 {
 		t.Fatal("nil callback applied options or performed I/O")
 	}
-	h, err := admission.WithTokenVerification(context.Background(), func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+	h, err := WithTokenVerification(context.Background(), func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		return &admissionv1.AdmissionResponse{Allowed: true}
 	}, option)
 	if err != nil || h == nil {
@@ -106,7 +105,7 @@ func TestBuildInClusterServiceAudience(t *testing.T) {
 		{name: "empty fragment", svc: "hook", path: "/validate#", port: 443, wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := admission.BuildInClusterServiceAudienceForTest(tc.svc, tc.path, tc.port, namespaceFile)
+			got, err := BuildInClusterServiceAudienceForTest(tc.svc, tc.path, tc.port, namespaceFile)
 			if tc.wantErr {
 				if err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 					t.Fatalf("validation = (%q, %v), want a helpful WithServiceAudience error", got, err)
@@ -135,7 +134,7 @@ func TestBuildInClusterServiceAudience(t *testing.T) {
 				}
 			}
 			// A missing projection must not silently become the default namespace.
-			if _, err := admission.BuildInClusterServiceAudienceForTest("hook", "/validate", 443, path); err == nil || !strings.Contains(err.Error(), "projected Pod namespace") {
+			if _, err := BuildInClusterServiceAudienceForTest("hook", "/validate", 443, path); err == nil || !strings.Contains(err.Error(), "projected Pod namespace") {
 				t.Fatalf("namespace validation = %v, want projected namespace error", err)
 			}
 		})
@@ -143,13 +142,13 @@ func TestBuildInClusterServiceAudience(t *testing.T) {
 }
 
 func TestInClusterAudienceValidationPrecedesBootstrap(t *testing.T) {
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithServiceAudience("hook", "/validate", 0))
+	v, err := NewVerifierForTest(context.Background(), WithServiceAudience("hook", "/validate", 0))
 	if v != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 		t.Fatalf("newVerifier invalid audience = (%v, %v), want an audience error", v, err)
 	}
-	h, err := admission.WithTokenVerification(context.Background(), func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
+	h, err := WithTokenVerification(context.Background(), func(context.Context, *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		return &admissionv1.AdmissionResponse{Allowed: true}
-	}, admission.WithServiceAudience("hook", "/validate", 0))
+	}, WithServiceAudience("hook", "/validate", 0))
 	if h != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 		t.Fatalf("WithTokenVerification invalid audience = (%v, %v), want an audience error", h, err)
 	}
@@ -161,9 +160,9 @@ func TestInClusterAudienceValidationPrecedesBootstrap(t *testing.T) {
 func TestWithServiceAudience_ConflictsWithIssuer(t *testing.T) {
 	ts := newOIDCTestServer(t)
 
-	v, err := admission.NewVerifierForTest(context.Background(),
-		admission.WithIssuer(ts.issuer, testAudience, ts.client()),
-		admission.WithServiceAudience("hook", "/validate", 443))
+	v, err := NewVerifierForTest(context.Background(),
+		WithIssuer(ts.issuer, testAudience, ts.client()),
+		WithServiceAudience("hook", "/validate", 443))
 	if err == nil {
 		t.Fatalf("expected a construction error combining WithServiceAudience and WithIssuer, got verifier %v", v)
 	}
@@ -179,7 +178,7 @@ func TestWithServiceAudience_ConflictsWithIssuer(t *testing.T) {
 // audience is a hard construction error, never a verifier built with an
 // audience-skipping audience.
 func TestWithServiceAudience_EmptyIsError(t *testing.T) {
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithServiceAudience("", "", 0))
+	v, err := NewVerifierForTest(context.Background(), WithServiceAudience("", "", 0))
 	if err == nil || v != nil {
 		t.Fatalf("NewVerifier with empty Service audience = (%v, %v), want (nil, error)", v, err)
 	}
@@ -191,17 +190,17 @@ func TestInClusterRequiresTrustedAudienceBeforeBootstrap(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name string
-		opts []admission.Option
+		opts []Option
 	}{
 		{name: "no options"},
-		{name: "empty audience", opts: []admission.Option{admission.WithServiceAudience("", "", 0)}},
+		{name: "empty audience", opts: []Option{WithServiceAudience("", "", 0)}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h, err := admission.WithTokenVerification(context.Background(), admit, tc.opts...)
+			h, err := WithTokenVerification(context.Background(), admit, tc.opts...)
 			if h != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 				t.Fatalf("WithTokenVerification = (%v, %v), want audience error", h, err)
 			}
-			v, err := admission.NewVerifierForTest(context.Background(), tc.opts...)
+			v, err := NewVerifierForTest(context.Background(), tc.opts...)
 			if v != nil || err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 				t.Fatalf("NewVerifier = (%v, %v), want audience error", v, err)
 			}
@@ -241,7 +240,7 @@ func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
 			})
 		},
 	}
-	v, err := admission.NewLocalVerifierForTest(context.Background(), config, testAudience)
+	v, err := NewLocalVerifierForTest(context.Background(), config, testAudience)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +263,7 @@ func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
 		staticOnly.BearerToken = projected
 		staticOnly.BearerTokenFile = ""
 		before := requests.Load()
-		if verifier, err := admission.NewLocalVerifierForTest(context.Background(), staticOnly, testAudience); err == nil || verifier != nil {
+		if verifier, err := NewLocalVerifierForTest(context.Background(), staticOnly, testAudience); err == nil || verifier != nil {
 			t.Fatalf("static BearerToken bootstrap = (%v, %v), want error requiring BearerTokenFile", verifier, err)
 		}
 		if requests.Load() != before {
@@ -279,7 +278,7 @@ func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
 		bad := rest.CopyConfig(config)
 		bad.BearerTokenFile = badFile
 		before := requests.Load()
-		if verifier, err := admission.NewLocalVerifierForTest(context.Background(), bad, testAudience); err == nil || verifier != nil {
+		if verifier, err := NewLocalVerifierForTest(context.Background(), bad, testAudience); err == nil || verifier != nil {
 			t.Fatalf("local bootstrap = (%v, %v)", verifier, err)
 		}
 		if requests.Load() != before {
@@ -288,7 +287,7 @@ func TestLocalVerificationUsesProjectedIssuerAndTransport(t *testing.T) {
 	})
 	badCA := rest.CopyConfig(config)
 	badCA.CAData = []byte("not a certificate")
-	if verifier, err := admission.NewLocalVerifierForTest(context.Background(), badCA, testAudience); err == nil || verifier != nil {
+	if verifier, err := NewLocalVerifierForTest(context.Background(), badCA, testAudience); err == nil || verifier != nil {
 		t.Fatalf("invalid client-go CA configuration = (%v, %v)", verifier, err)
 	}
 }
@@ -298,7 +297,7 @@ func TestRemoteIssuerConfiguration(t *testing.T) {
 		"http://issuer.example", "https://user:password@issuer.example", "https://issuer.example?query=value", "https://issuer.example#fragment",
 	} {
 		t.Run(issuer, func(t *testing.T) {
-			if verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(issuer, testAudience, nil)); err == nil || verifier != nil {
+			if verifier, err := NewVerifierForTest(context.Background(), WithIssuer(issuer, testAudience, nil)); err == nil || verifier != nil {
 				t.Fatalf("invalid remote issuer = (%v, %v)", verifier, err)
 			}
 		})
@@ -315,7 +314,7 @@ func TestRemoteIssuerConfiguration(t *testing.T) {
 		_, _ = w.Write([]byte(`{"keys":[]}`))
 	}))
 	defer server.Close()
-	if verifier, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, server.Client())); err == nil || verifier != nil {
+	if verifier, err := NewVerifierForTest(context.Background(), WithIssuer(server.URL, testAudience, server.Client())); err == nil || verifier != nil {
 		t.Fatalf("mismatched discovery issuer = (%v, %v)", verifier, err)
 	}
 	if keysRequested.Load() != 0 {
@@ -347,7 +346,7 @@ func TestRemoteVerificationBoundsBackgroundFetch(t *testing.T) {
 	defer server.Close()
 	client := server.Client()
 	client.Timeout = 200 * time.Millisecond
-	v, err := admission.NewVerifierForTest(context.Background(), admission.WithIssuer(server.URL, testAudience, client))
+	v, err := NewVerifierForTest(context.Background(), WithIssuer(server.URL, testAudience, client))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,4 +415,3 @@ func TestGoModOIDCDependenciesMatchAPIServer(t *testing.T) {
 		}
 	}
 }
-
