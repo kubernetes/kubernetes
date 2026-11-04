@@ -34,7 +34,6 @@ type defaultPreemptionManager struct {
 	snapshot  fwk.SharedLister
 	executor  fwk.PreemptionExecutor
 	pdbLister policylisters.PodDisruptionBudgetLister
-	fts       feature.Features
 }
 
 var _ fwk.PreemptionManager = &defaultPreemptionManager{}
@@ -47,7 +46,6 @@ func NewPreemptionManager(fh fwk.Handle, fts feature.Features) fwk.PreemptionMan
 		snapshot:  fh.SnapshotSharedLister(),
 		executor:  NewExecutor(fh, fts),
 		pdbLister: fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		fts:       fts,
 	}
 }
 
@@ -55,7 +53,7 @@ func NewPreemptionManager(fh fwk.Handle, fts feature.Features) fwk.PreemptionMan
 func (m *defaultPreemptionManager) GenerateVictims(ctx context.Context, pgInfo fwk.PodGroupInfo) ([]fwk.PreemptionVictim, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
-	if getPreemptionPolicy(pgInfo, m.fts.EnablePodGroupPreemptionPolicy) == v1.PreemptNever {
+	if getPreemptionPolicy(pgInfo) == v1.PreemptNever {
 		msg := "not eligible due to preemptionPolicy=Never."
 		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", klog.KObj(pgInfo), "type", pgInfo.GetType(), "reason", msg)
 		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
@@ -90,9 +88,9 @@ func (m *defaultPreemptionManager) OnVictimReprieved(_ context.Context, _ fwk.Pr
 	return nil
 }
 
-func getPreemptionPolicy(pgInfo fwk.PodGroupInfo, enablePodGroupPreemptionPolicy bool) v1.PreemptionPolicy {
-	if enablePodGroupPreemptionPolicy {
-		return pgInfo.GetPreemptionPolicy()
+func getPreemptionPolicy(pgInfo fwk.PodGroupInfo) v1.PreemptionPolicy {
+	if policy := pgInfo.GetPreemptionPolicy(); policy != "" {
+		return policy
 	}
 	for _, pod := range pgInfo.GetAllUnscheduledPods() {
 		if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {

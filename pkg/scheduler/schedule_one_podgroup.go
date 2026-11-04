@@ -190,23 +190,20 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 // - no parent group with All disruption mode has a child group with Single disruption mode,
 // - all Pods in a group hierarchy have matching scheduler name,
 // - all entities in a group hierarchy have the same priority as the root group,
-// - all entities in a group hierarchy have the same preemption policy.
+// - all groups with a non-nil preemption policy and all pods in a group hierarchy must agree on the policy.
 func (sched *Scheduler) validatePodGroupHierarchy(rootInfo *framework.QueuedPodGroupInfo) error {
 	rootPriority := rootInfo.GetPriority()
 	rootWorkloadName := rootInfo.GetWorkloadName()
+	expectedPreemptionPolicy := rootInfo.GetPreemptionPolicy()
 
-	var rootPreemptionPolicy v1.PreemptionPolicy
-	if sched.podGroupPreemptionPolicyEnabled {
-		rootPreemptionPolicy = rootInfo.GetPreemptionPolicy()
-	}
 	schedulerName := ""
 	firstPodName := ""
 	for pInfo := range rootInfo.ForEachPodInfo() {
 		schedulerName = pInfo.Pod.Spec.SchedulerName
-		if !sched.podGroupPreemptionPolicyEnabled {
-			rootPreemptionPolicy = util.PodPreemptionPolicy(pInfo.Pod)
-		}
 		firstPodName = pInfo.Pod.Name
+		if expectedPreemptionPolicy == "" {
+			expectedPreemptionPolicy = util.PodPreemptionPolicy(pInfo.Pod)
+		}
 		break
 	}
 
@@ -227,12 +224,9 @@ func (sched *Scheduler) validatePodGroupHierarchy(rootInfo *framework.QueuedPodG
 				pgPriority, pgi.GetKey(), rootPriority, rootInfo.GetKey())
 		}
 
-		if sched.podGroupPreemptionPolicyEnabled {
-			pgPreemptionPolicy := pgi.GetPreemptionPolicy()
-			if pgPreemptionPolicy != rootPreemptionPolicy {
-				return newValidationErrorf("all pod groups in a hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v (%q) and %v (%q)",
-					pgPreemptionPolicy, pgi.GetKey(), rootPreemptionPolicy, rootInfo.GetKey())
-			}
+		if pgPreemptionPolicy := pgi.GetPreemptionPolicy(); pgPreemptionPolicy != "" && pgPreemptionPolicy != expectedPreemptionPolicy {
+			return newValidationErrorf("all pod groups in a hierarchy should have the same preemption policy, got %v (%q) and %v",
+				pgPreemptionPolicy, pgi.GetKey(), expectedPreemptionPolicy)
 		}
 
 		if parent.IsGang() && pgi.IsBasic() {
@@ -257,18 +251,9 @@ func (sched *Scheduler) validatePodGroupHierarchy(rootInfo *framework.QueuedPodG
 		}
 
 		podPreemptionPolicy := util.PodPreemptionPolicy(pod)
-		if podPreemptionPolicy != rootPreemptionPolicy {
-			if sched.podGroupPreemptionPolicyEnabled {
-				// If the PodGroupPreemptionPolicy feature is enabled, validate that the pod's preemption policy
-				// matches the root group's preemption policy.
-				return newValidationErrorf("all pods in a pod group hierarchy should have the same preemption policy as the root pod group's preemption policy, got %v (%q) and %v (%q)",
-					podPreemptionPolicy, pod.Name, rootPreemptionPolicy, rootInfo.GetKey())
-			} else {
-				// If the PodGroupPreemptionPolicy feature is disabled, the preemption policy is determined by the first pod in the group.
-				// Validate that preemption policy is the same across all pods in the pod group.
-				return newValidationErrorf("all pods in a pod group hierarchy should have the same preemption policy, got %v (%q) and %v (%q)",
-					podPreemptionPolicy, pod.Name, rootPreemptionPolicy, firstPodName)
-			}
+		if podPreemptionPolicy != expectedPreemptionPolicy {
+			return newValidationErrorf("all pods in a pod group hierarchy should have the same preemption policy, got %v (%q) and %v",
+				podPreemptionPolicy, pod.Name, expectedPreemptionPolicy)
 		}
 		return nil
 	}

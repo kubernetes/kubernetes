@@ -76,7 +76,6 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.preemptionPolicy": {
-				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueNotSupported"},
 			},

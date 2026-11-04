@@ -23,10 +23,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -64,54 +61,40 @@ func TestSetDefaultPreempting(t *testing.T) {
 
 func TestSetDefaultsPodGroup(t *testing.T) {
 	preemptNever := v1beta1.PreemptNever
+	preemptLowerPriority := v1beta1.PreemptLowerPriority
 
 	tests := []struct {
-		name                           string
-		enablePodGroupPreemptionPolicy bool
-		podGroup                       *v1beta1.PodGroup
-		expectedPolicy                 *v1beta1.PreemptionPolicy
+		name           string
+		podGroup       *v1beta1.PodGroup
+		expectedPolicy *v1beta1.PreemptionPolicy
 	}{
 		{
-			name:                           "feature gate disabled, policy is nil",
-			podGroup:                       &v1beta1.PodGroup{},
-			enablePodGroupPreemptionPolicy: false,
-			expectedPolicy:                 nil,
+			name:           "nil policy is left for priority admission",
+			podGroup:       &v1beta1.PodGroup{},
+			expectedPolicy: nil,
 		},
 		{
-			name: "feature gate disabled, policy is set",
+			name: "policy is set to PreemptNever",
 			podGroup: &v1beta1.PodGroup{
 				Spec: v1beta1.PodGroupSpec{
 					PreemptionPolicy: &preemptNever,
 				},
 			},
-			enablePodGroupPreemptionPolicy: false,
-			expectedPolicy:                 &preemptNever,
+			expectedPolicy: &preemptNever,
 		},
 		{
-			name:                           "feature gate enabled, nil policy is left for priority admission",
-			podGroup:                       &v1beta1.PodGroup{},
-			enablePodGroupPreemptionPolicy: true,
-			expectedPolicy:                 nil,
-		},
-		{
-			name: "feature gate enabled, policy is set",
+			name: "policy is set to PreemptLowerPriority",
 			podGroup: &v1beta1.PodGroup{
 				Spec: v1beta1.PodGroupSpec{
-					PreemptionPolicy: &preemptNever,
+					PreemptionPolicy: &preemptLowerPriority,
 				},
 			},
-			enablePodGroupPreemptionPolicy: true,
-			expectedPolicy:                 &preemptNever,
+			expectedPolicy: &preemptLowerPriority,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:          tc.enablePodGroupPreemptionPolicy,
-				features.PodGroupPreemptionPolicy: tc.enablePodGroupPreemptionPolicy,
-			})
-
 			output := roundTrip(t, runtime.Object(tc.podGroup)).(*v1beta1.PodGroup)
 			if !reflect.DeepEqual(output.Spec.PreemptionPolicy, tc.expectedPolicy) {
 				t.Errorf("Expected PreemptionPolicy: %v, got: %v", tc.expectedPolicy, output.Spec.PreemptionPolicy)
@@ -122,54 +105,40 @@ func TestSetDefaultsPodGroup(t *testing.T) {
 
 func TestSetDefaultsCompositePodGroup(t *testing.T) {
 	preemptNever := v1beta1.PreemptNever
+	preemptLowerPriority := v1beta1.PreemptLowerPriority
 
 	tests := []struct {
-		name                           string
-		enablePodGroupPreemptionPolicy bool
-		cpg                            *v1beta1.CompositePodGroup
-		expectedPolicy                 *v1beta1.PreemptionPolicy
+		name           string
+		cpg            *v1beta1.CompositePodGroup
+		expectedPolicy *v1beta1.PreemptionPolicy
 	}{
 		{
-			name:                           "feature gate disabled, policy is nil",
-			cpg:                            &v1beta1.CompositePodGroup{},
-			enablePodGroupPreemptionPolicy: false,
-			expectedPolicy:                 nil,
+			name:           "nil policy is left for priority admission",
+			cpg:            &v1beta1.CompositePodGroup{},
+			expectedPolicy: nil,
 		},
 		{
-			name: "feature gate disabled, policy is set",
+			name: "policy is set to PreemptNever",
 			cpg: &v1beta1.CompositePodGroup{
 				Spec: v1beta1.CompositePodGroupSpec{
 					PreemptionPolicy: &preemptNever,
 				},
 			},
-			enablePodGroupPreemptionPolicy: false,
-			expectedPolicy:                 &preemptNever,
+			expectedPolicy: &preemptNever,
 		},
 		{
-			name:                           "feature gate enabled, nil policy is left for priority admission",
-			cpg:                            &v1beta1.CompositePodGroup{},
-			enablePodGroupPreemptionPolicy: true,
-			expectedPolicy:                 nil,
-		},
-		{
-			name: "feature gate enabled, policy is set",
+			name: "policy is set to PreemptLowerPriority",
 			cpg: &v1beta1.CompositePodGroup{
 				Spec: v1beta1.CompositePodGroupSpec{
-					PreemptionPolicy: &preemptNever,
+					PreemptionPolicy: &preemptLowerPriority,
 				},
 			},
-			enablePodGroupPreemptionPolicy: true,
-			expectedPolicy:                 &preemptNever,
+			expectedPolicy: &preemptLowerPriority,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:          tc.enablePodGroupPreemptionPolicy,
-				features.PodGroupPreemptionPolicy: tc.enablePodGroupPreemptionPolicy,
-			})
-
 			output := roundTrip(t, runtime.Object(tc.cpg)).(*v1beta1.CompositePodGroup)
 			if !reflect.DeepEqual(output.Spec.PreemptionPolicy, tc.expectedPolicy) {
 				t.Errorf("Expected PreemptionPolicy: %v, got: %v", tc.expectedPolicy, output.Spec.PreemptionPolicy)
