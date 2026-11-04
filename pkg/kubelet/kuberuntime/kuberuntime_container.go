@@ -75,6 +75,8 @@ var (
 	ErrPreStartHook = errors.New("PreStartHookError")
 	// ErrPostStartHook - failed to execute PostStartHook
 	ErrPostStartHook = errors.New("PostStartHookError")
+	// ErrCreateContainerBackOff - backing off retries after the container repeatedly failed before ever running
+	ErrCreateContainerBackOff = errors.New("CreateContainerBackOff")
 )
 
 // recordContainerEvent should be used by the runtime manager for all container related events.

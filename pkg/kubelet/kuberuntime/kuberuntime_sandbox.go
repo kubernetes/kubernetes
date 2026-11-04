@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"runtime"
@@ -37,6 +38,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	netutils "k8s.io/utils/net"
 )
+
+// ErrRunPodSandbox - the RunPodSandbox CRI call itself failed, as opposed to the local,
+// pre-CRI steps in createPodSandbox (config generation, log directory creation, runtime
+// class lookup). Only this failure reaches the runtime and forks conmon; the others are
+// free to retry and shouldn't be penalized the same way.
+var ErrRunPodSandbox = errors.New("RunPodSandboxError")
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
 func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
@@ -72,7 +79,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 	if err != nil {
 		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
 		logger.Error(err, "Failed to create sandbox for pod", "pod", klog.KObj(pod))
-		return "", message, err
+		return "", message, fmt.Errorf("%w: %w", ErrRunPodSandbox, err)
 	}
 
 	return podSandBoxID, "", nil
