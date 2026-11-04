@@ -13,6 +13,8 @@ SSA tests. Human review of the definitions remains necessary.
 
 ![Full-manager scopes, PR counterexamples, and admission boundary](docs/ssa-ownership-full-manager-slide.png)
 
+Additional slides: [verification plumbing](docs/ssa-lean-plumbing-slide.png), [SSA core theorems](docs/ssa-core-theorems-slide.png), and [PR #336 results](docs/ssa-predrag-theorems-slide.png).
+
 ## Full-manager definition and scope
 
 For each associative-list item, a full manager owns membership plus its entire
