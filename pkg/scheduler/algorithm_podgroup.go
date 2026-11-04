@@ -431,6 +431,8 @@ func (p *PodGroupSchedulingAlgorithm) schedulePod(
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
 		}
 
+		// Leave nominatingInfo nil until the group-level outcome is known: applyPodGroupPostFilterResult
+		// and submitPodGroupResult decide whether to set, preserve, or clear nominations.
 		return ScheduleResult{nominatingInfo: nil}, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 	}
 

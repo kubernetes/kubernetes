@@ -505,7 +505,8 @@ func applyPodGroupPostFilterResult(completePGResults map[fwk.EntityKey]*PodGroup
 	if status.IsSuccess() {
 		// Post-filter plugins successfully identified preemption candidates.
 		// Mark all pod groups in the hierarchy as waiting on preemption.
-		// Also associate nominated nodes with individual pods in the leaf groups to preserve placement decisions.
+		// Associate nominated nodes with placed pods in the leaf groups and clear stale
+		// nominations on unplaced pods in case of partial preemption.
 		for _, pgResult := range completePGResults {
 			pgResult.waitingOnPreemption = true
 			if pgResult.podGroupInfo.CompositePodGroup != nil {
@@ -514,9 +515,17 @@ func applyPodGroupPostFilterResult(completePGResults map[fwk.EntityKey]*PodGroup
 			for j := range pgResult.podResults {
 				pod := pgResult.podResults[j].podInfo.Pod
 				namespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-				if nodeNameInfo, ok := pgPostFilterResult.NominatingInfos[namespacedName]; ok {
-					pgResult.podResults[j].scheduleResult.nominatingInfo = nodeNameInfo
+				var ni *fwk.NominatingInfo
+				if pgPostFilterResult != nil {
+					ni = pgPostFilterResult.NominatingInfos[namespacedName]
 				}
+				// Unlike single-pod PostFilter, a nil result or an absent/nil pod entry clears
+				// any existing nomination (e.g. unplaced pods in partial preemption); plugins
+				// must return ModeNoop or the current node explicitly to preserve nominations.
+				if ni == nil {
+					ni = clearNominatedNode
+				}
+				pgResult.podResults[j].scheduleResult.nominatingInfo = ni
 			}
 		}
 	}
@@ -551,7 +560,7 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			continue
 		}
 		queuedPodInfos := rootPodGroupInfo.PodInfosForGroup(pgi.GetKey())
-		sched.submitPodGroupResult(ctx, schedFwk, podGroupState, queuedPodInfos, podGroupResult)
+		sched.submitPodGroupResult(ctx, schedFwk, podGroupState, queuedPodInfos, podGroupResult, rootStatus)
 	}
 
 	entityType := metrics.EntityTypeToLabel(rootPodGroupInfo.Type())
@@ -617,7 +626,9 @@ func (sched *Scheduler) submitCompositePodGroupResult(ctx context.Context, podGr
 // submitPodGroupResult processes scheduling results for a leaf PodGroup and its member pods.
 // Schedulable pods proceed to their binding cycles if the PodGroup succeeded, while unschedulable,
 // preempting, or errored pods are passed to the FailureHandler for requeueing.
-func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, queuedPodInfos []*framework.QueuedPodInfo, podGroupResult *PodGroupScheduledResult) {
+// rootStatus is the root hierarchy status returned by the scheduling algorithm before
+// PodGroupPostFilter runs; when rootStatus.IsSuccess() is true, PodGroupPostFilter did not run.
+func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, queuedPodInfos []*framework.QueuedPodInfo, podGroupResult *PodGroupScheduledResult, rootStatus *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	pgi := podGroupResult.podGroupInfo
 
@@ -664,10 +675,16 @@ func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk frame
 				go sched.runBindingCycle(ctx, podCtx.state, schedFwk, podResult.scheduleResult, assumedPodInfo, podSchedulingStart, podCtx.podsToActivate)
 				scheduledPods++
 			case podGroupResult.status.IsRejected():
-				if podGroupResult.waitingOnPreemption {
+				switch {
+				case podGroupResult.waitingOnPreemption:
 					// Pod has to come back to the scheduling queue as unschedulable, waiting for preemption to complete.
 					sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status.Clone(), podResult.scheduleResult.nominatingInfo, podSchedulingStart)
-				} else {
+				case rootStatus.IsSuccess():
+					// A parent CompositePodGroup succeeded without this child, so PodGroupPostFilter did not run in this cycle.
+					// Existing nominations may still be waiting for preemption victims to terminate; preserve them until a
+					// subsequent cycle where PodGroupPostFilter evaluates the remaining pods.
+					sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status.Clone(), nil, podSchedulingStart)
+				default:
 					// Pod group is unschedulable, so the pod has to be marked as unschedulable.
 					// Its rejection status is set to the pod group's status message.
 					sched.FailureHandler(ctx, schedFwk, pInfo, podGroupResult.status.Clone(), clearNominatedNode, podSchedulingStart)
@@ -681,8 +698,16 @@ func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk frame
 		} else {
 			// TBD: Add a message to status if the pod used features for which finding a placement cannot be guaranteed,
 			// such as heterogeneous pod group or using inter-pod dependencies.
-			// When a pod is unschedulable or preemption is required, just call the FailureHandler.
-			sched.FailureHandler(ctx, schedFwk, pInfo, podResult.status, podResult.scheduleResult.nominatingInfo, podSchedulingStart)
+			nominatingInfo := podResult.scheduleResult.nominatingInfo
+			// Single-pod PostFilter is skipped during a pod group cycle, leaving nominatingInfo nil on FitError
+			// and on skipped pods. When rootStatus succeeded, PodGroupPostFilter did not run and existing
+			// nominations may still be waiting for preemption victims to terminate, so preserve them (ModeNoop)
+			// until a subsequent cycle where PodGroupPostFilter evaluates the remaining pods. Otherwise the
+			// group is unschedulable and PodGroupPostFilter either failed or was not applicable, so clear stale nominations.
+			if nominatingInfo == nil && !rootStatus.IsSuccess() {
+				nominatingInfo = clearNominatedNode
+			}
+			sched.FailureHandler(ctx, schedFwk, pInfo, podResult.status, nominatingInfo, podSchedulingStart)
 			unschedulablePods++
 		}
 	}

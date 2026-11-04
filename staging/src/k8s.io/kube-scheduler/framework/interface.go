@@ -606,7 +606,10 @@ type PodGroupSchedulingFunc func(ctx context.Context) (*PodGroupAssignments, *St
 
 // PodGroupPostFilterResult stores information about nominated nodes for a pod group.
 type PodGroupPostFilterResult struct {
-	// NominatingInfos maps pods in the pod group to their nominated node info. It only contains pods that have a nominated node.
+	// NominatingInfos maps pods in the pod group to their nominated node info.
+	// When PodGroupPostFilter returns Success, pods absent from NominatingInfos (or mapped to nil,
+	// including when PodGroupPostFilterResult itself is nil) have their existing nomination cleared;
+	// plugins can specify ModeNoop to leave a pod's existing nomination unchanged.
 	NominatingInfos map[types.NamespacedName]*NominatingInfo
 }
 
