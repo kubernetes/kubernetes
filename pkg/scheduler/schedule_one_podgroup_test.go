@@ -124,6 +124,8 @@ func (mp *fakePodGroupPlugin) PodGroupPostFilter(ctx context.Context, state fwk.
 type fakePlacementFeasiblePlugin struct {
 	placementFeasibleStatuses [][]fwk.Code
 	placementCount            int
+	rejectEmpty               bool
+	requireAllChildren        bool
 }
 
 const fakePlacementFeasiblePluginDataKey = "fakePlacementFeasiblePluginDataKey"
@@ -147,6 +149,12 @@ func (mp *fakePlacementFeasiblePlugin) Name() string {
 // - The outer slice represents distinct placements (e.g., when evaluating multiple topology placements).
 // - The inner slice represents the pod-by-pod evaluation within a single placement.
 func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, args fwk.PlacementProgress) *fwk.Status {
+	if mp.requireAllChildren && args.Remaining == 0 && args.Unschedulable > 0 {
+		return fwk.NewStatus(fwk.Unschedulable, "a child was not scheduled")
+	}
+	if mp.rejectEmpty && args.Remaining == 0 && args.Scheduled == 0 {
+		return fwk.NewStatus(fwk.Unschedulable, "no child was scheduled")
+	}
 	// If no mock statuses are configured, always succeed.
 	if len(mp.placementFeasibleStatuses) == 0 {
 		return nil

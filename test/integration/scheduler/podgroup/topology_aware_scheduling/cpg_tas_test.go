@@ -29,6 +29,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
+	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 func makeNodeWithLabels(nodeName string, labels map[string]string) *v1.Node {
@@ -2674,6 +2675,199 @@ func TestCPGTopologyAwareSchedulingWorkloadAwarePreemption(t *testing.T) {
 	}
 }
 
+// TestCPGTopologyAwareSchedulingNominatedNode covers NominatedNodeName handling for a
+// CompositePodGroup hierarchy, where a placement qualifies only when it contains every
+// nominated node in the subtree.
+//
+// The last scenario is not a fast path case: pg1's assigned pod pins the hierarchy to rack-2
+// (requiredDomain in TopologyPlacement.GeneratePlacements), leaving a single candidate
+// placement and nothing for a nomination to steer. It covers the quorum half of the change
+// instead - a satisfied child still counts towards minGroupCount when it schedules nothing -
+// which the in-tree generator cannot combine with a real placement choice; the unit case
+// "sibling without queued pods does not block the fast path" covers that combination.
+func TestCPGTopologyAwareSchedulingNominatedNode(t *testing.T) {
+	tests := []scenario{
+		{
+			name: "composite hierarchy prefers the rack matching the nominated node",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create one node per rack. rack-1's node is smaller so MostAllocated scores it higher; rack-2 (nominated) fits the hierarchy but scores lower, so without the NNN support the hierarchy deterministically lands on rack-1",
+					CreateNodes: []*v1.Node{
+						makeNode("node-rack1", "rack-1", "zone-1"),
+						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+					},
+				},
+				{
+					Name: "Create one pod per child group before the groups exist, so both wait gated in the queue",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg2"),
+					},
+				},
+				{
+					Name: "Nominate rack-2 for p1 via its status",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p1",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name: "Nominate rack-2 for p2 via its status",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p2",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name: "Wait until both queued pods carry the nominated node before opening the gate",
+					WaitForPodsNominated: map[string]string{
+						"p1": "node-rack2",
+						"p2": "node-rack2",
+					},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup (Gang with minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1, opening the gate",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 1),
+				},
+				{
+					Name:           "Create child PodGroup pg2",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 1),
+				},
+				{
+					Name:                 "Verify both children are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name: "Verify the whole hierarchy landed on rack-2, the nominated rack",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2"},
+						Nodes: sets.New("node-rack2"),
+					},
+				},
+			},
+		},
+		{
+			name: "nominations spanning a rack that cannot host the hierarchy fall back to scoring",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create a one-CPU node in rack-2 and a four-CPU node in rack-1: rack-2 can host only one of the two children, so it cannot satisfy minGroupCount=2",
+					CreateNodes: []*v1.Node{
+						st.MakeNode().Name("node-rack1").Label("rack", "rack-1").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+					},
+				},
+				{
+					Name: "Create one pod per child group before the groups exist, so both wait gated",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg2"),
+					},
+				},
+				{
+					Name: "Nominate the infeasible rack-2 node for p1",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p1",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name: "Nominate the infeasible rack-2 node for p2",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p2",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name: "Wait until both queued pods carry the nominated node before opening the gate",
+					WaitForPodsNominated: map[string]string{
+						"p1": "node-rack2",
+						"p2": "node-rack2",
+					},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup (Gang with minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1, opening the gate",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 1),
+				},
+				{
+					Name:           "Create child PodGroup pg2",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 1),
+				},
+				{
+					Name:                 "Verify both children are scheduled despite the unusable nomination",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name: "Verify the hierarchy fell back to rack-1, the only rack that can host it",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2"},
+						Nodes: sets.New("node-rack1"),
+					},
+				},
+			},
+		},
+		{
+			name: "child that already meets minCount does not stop its sibling from being evaluated",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create one node per rack",
+					CreateNodes: []*v1.Node{
+						makeNode("node-rack1", "rack-1", "zone-1"),
+						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+					},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup (Gang with minGroupCount=2, TopologyKey=rack)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang with minCount=1)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "", 1),
+				},
+				{
+					Name:       "pg1's only pod is already assigned on rack-2, so pg1 is satisfied and has nothing pending",
+					CreatePods: []*v1.Pod{makeAssignedGroupPod("p1", "pg1", "node-rack2", "1")},
+				},
+				{
+					Name:       "Create pg2's pod while pg2 does not exist yet, so it waits gated",
+					CreatePods: []*v1.Pod{makePod("p2", "pg2")},
+				},
+				{
+					Name:           "Create child PodGroup pg2, opening the gate",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "", 1),
+				},
+				{
+					Name:                 "Verify the pending sibling is scheduled even though pg1 contributed no new pod: pg1's Success with no progress still counts towards minGroupCount=2",
+					WaitForPodsScheduled: []string{"p2"},
+				},
+				{
+					Name: "Verify both children end up on rack-2, the only candidate placement once pg1's assigned pod pins the hierarchy there",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2"},
+						Nodes: sets.New("node-rack2"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runCPGTestScenario(t, tt)
+		})
+	}
+}
 func TestCPGTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
 	tests := []scenario{
 		{
@@ -2856,6 +3050,330 @@ func TestCPGTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
 	}
 }
 
+// TestCPGTopologyAwareSchedulingChildNominatedNode covers NominatedNodeName handling for the
+// child PodGroups of a CompositePodGroup. The root's placement is a zone and each child picks a
+// rack inside it, so the rack a previous preemption nominated a member group's pods for is
+// decided by the child's own placement selection. See TestTopologyAwareSchedulingNominatedNode
+// for the standalone gang equivalent.
+//
+// The cluster has a single zone on purpose: it leaves the root with one candidate placement so
+// the only placement decision under test is the child's rack.
+func TestCPGTopologyAwareSchedulingChildNominatedNode(t *testing.T) {
+	tests := []scenario{
+		{
+			name: "satisfied child keeps its quorum when a nominated pending pod cannot fit",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create two racks in one zone, with rack-2 reserved for the already running pods",
+					CreateNodes: []*v1.Node{
+						makeNode("node-rack1", "rack-1", "zone-1"),
+						makeNode("node-rack2", "rack-2", "zone-1"),
+					},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup with both children required",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
+				},
+				{
+					Name: "Fill rack-2 while pg1 already satisfies minCount=1",
+					CreatePods: []*v1.Pod{
+						makeAssignedGroupPod("p1-running", "pg1", "node-rack2", "1"),
+						makeAssignedPod("rack2-filler", "node-rack2", "1"),
+					},
+				},
+				{
+					Name: "Create both pending pods while their groups are still gated",
+					CreatePods: []*v1.Pod{
+						makePod("p1-pending", "pg1"),
+						makePod("p2", "pg2"),
+					},
+				},
+				{
+					Name: "Nominate the full node for pg1's pending pod",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p1-pending",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name:                 "Wait until the nomination reaches the scheduling queue",
+					WaitForPodsNominated: map[string]string{"p1-pending": "node-rack2"},
+				},
+				{
+					Name:           "Create pg1 with minCount=1 and rack topology",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "rack", 1),
+				},
+				{
+					Name:           "Create pg2 with minCount=1 and rack topology, opening the hierarchy gate",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "rack", 1),
+				},
+				{
+					Name:                 "The sibling schedules even though pg1's nominated pod cannot fit",
+					WaitForPodsScheduled: []string{"p2"},
+				},
+				{
+					Name:                     "pg1's pending pod remains unschedulable on the full rack",
+					WaitForPodsUnschedulable: []string{"p1-pending"},
+				},
+				{
+					Name: "The sibling uses rack-1 while the already running pg1 pod stays on rack-2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1-running", "p2"},
+						Nodes: sets.New("node-rack1", "node-rack2"),
+					},
+				},
+			},
+		},
+		{
+			name: "child pod group prefers the rack matching its pods' nominated node",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create one node per rack in zone-1. rack-1's node is smaller so MostAllocated scores it higher; rack-2 (nominated for pg1's pod) fits but scores lower, so without child-level NNN support pg1 deterministically lands on rack-1",
+					CreateNodes: []*v1.Node{
+						makeNode("node-rack1", "rack-1", "zone-1"),
+						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8"}).Obj(),
+					},
+				},
+				{
+					Name: "Create one pod per child group before the groups exist, so both wait gated in the queue",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg2"),
+					},
+				},
+				{
+					Name: "Nominate rack-2 for pg1's pod only, leaving pg2 to be placed by score",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p1",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name:                 "Wait until the gated pod carries the nominated node before opening the gate",
+					WaitForPodsNominated: map[string]string{"p1": "node-rack2"},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup (Gang with minGroupCount=2, TopologyKey=zone)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
+				},
+				{
+					Name:           "Create child PodGroup pg1 (Gang with minCount=1, TopologyKey=rack), opening the gate",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "rack", 1),
+				},
+				{
+					Name:           "Create child PodGroup pg2 (Gang with minCount=1, TopologyKey=rack)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "rack", 1),
+				},
+				{
+					Name:                 "Verify both children are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name: "Verify pg1's pod landed on rack-2, the nominated rack, rather than the higher scoring rack-1",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1"},
+						Nodes: sets.New("node-rack2"),
+					},
+				},
+				{
+					Name: "Verify the un-nominated sibling is unaffected and still takes the higher scoring rack",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p2"},
+						Nodes: sets.New("node-rack1"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runCPGTestScenario(t, tt)
+		})
+	}
+}
+
+// TestCPGTopologyAwareSchedulingChildNominationStarvesSibling shows how a child nomination can
+// make a sibling infeasible for one cycle. The failed cycle clears the
+// nomination, allowing the next cycle to choose placements that fit both children.
+func TestCPGTopologyAwareSchedulingChildNominationStarvesSibling(t *testing.T) {
+	tt := scenario{
+		name: "retry after child nomination starves its sibling",
+		steps: []stepsframework.Step{
+			{
+				Name: "Create two racks; only rack-1 has capacity for pg2",
+				CreateNodes: []*v1.Node{
+					makeNode("node-rack1", "rack-1", "zone-1"),
+					st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+						Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			{
+				Name: "Create both pending pods while their groups are gated",
+				CreatePods: []*v1.Pod{
+					makePod("p1", "pg1"),
+					st.MakePod().Name("p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").
+						PodGroupName("pg2").Priority(100).ZeroTerminationGracePeriod().Obj(),
+				},
+			},
+			{
+				Name: "Nominate rack-1 for pg1, leaving too little room there for pg2",
+				UpdatePodStatus: &stepsframework.UpdatePod{
+					PodName:  "p1",
+					ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack1" },
+				},
+			},
+			{
+				Name:                 "Wait until the nomination reaches the scheduling queue",
+				WaitForPodsNominated: map[string]string{"p1": "node-rack1"},
+			},
+			{
+				Name:                    "Create a single-zone root requiring both children",
+				CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
+			},
+			{
+				Name:           "Create pg1 with rack placement",
+				CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-root", "rack", 1),
+			},
+			{
+				Name:           "Create pg2 with rack placement, opening the hierarchy gate",
+				CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-root", "rack", 1),
+			},
+			{
+				Name:                 "Wait for both pods to become schedulable",
+				WaitForPodsInActiveQ: []string{"p1", "p2"},
+			},
+			{
+				Name:           "Run the first scheduling cycle",
+				RunScheduleOne: true,
+			},
+			{
+				Name:                     "The first cycle fails because the nominated rack starves pg2",
+				WaitForPodsUnschedulable: []string{"p1", "p2"},
+			},
+			{
+				Name:                 "Wait until the cleared nomination reaches the queue",
+				WaitForPodsNominated: map[string]string{"p1": ""},
+			},
+			{
+				Name:                 "Wait for both pods to become active again",
+				WaitForPodsInActiveQ: []string{"p1", "p2"},
+			},
+			{
+				Name:           "Run the second scheduling cycle",
+				RunScheduleOne: true,
+			},
+			{
+				Name:                 "A later cycle schedules both after the nomination is cleared",
+				WaitForPodsScheduled: []string{"p1", "p2"},
+			},
+			{
+				Name: "The retry places pg1 on rack-2 and pg2 on rack-1",
+				VerifyAssignments: &stepsframework.VerifyAssignments{
+					Pods:  []string{"p1"},
+					Nodes: sets.New("node-rack2"),
+				},
+			},
+			{
+				Name: "The sibling receives the rack it needs",
+				VerifyAssignments: &stepsframework.VerifyAssignments{
+					Pods:  []string{"p2"},
+					Nodes: sets.New("node-rack1"),
+				},
+			},
+		},
+	}
+	runCPGTestScenarioManually(t, tt)
+}
+
+// TestCPGTopologyAwareSchedulingNestedNominatedNode covers NominatedNodeName handling at the
+// middle level of a CompositePodGroup hierarchy: a nested CompositePodGroup choosing the block
+// its own descendants land in. The cluster has a single zone on purpose, so the root is left with
+// one candidate placement and the only decision under test is the nested group's block.
+//
+// Only one of the two nested groups has a nominated pod, and the other one must keep scoring
+// normally: had the nested group matched against the whole hierarchy's nominations instead of its
+// own subtree, it would have followed its sibling's nomination into block-2 as well.
+func TestCPGTopologyAwareSchedulingNestedNominatedNode(t *testing.T) {
+	tests := []scenario{
+		{
+			name: "nested composite pod group prefers the block matching its own subtree's nominated node",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create one node per block in zone-1. block-1's node is smaller so MostAllocated scores it higher; block-2 (nominated for pg1's pod) fits but scores lower, so without nested-level NNN support pg1 deterministically lands in block-1",
+					CreateNodes: []*v1.Node{
+						makeNodeWithLabels("node-b1", map[string]string{"zone": "zone-1", "block": "block-1", "rack": "rack-1"}),
+						st.MakeNode().Name("node-b2").Label("zone", "zone-1").Label("block", "block-2").Label("rack", "rack-2").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "8"}).Obj(),
+					},
+				},
+				{
+					Name: "Create one pod per leaf group before any group exists, so both wait gated in the queue",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg2"),
+					},
+				},
+				{
+					Name: "Nominate block-2 for pg1's pod only, leaving pg2's pod to be placed by score",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p1",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-b2" },
+					},
+				},
+				{
+					Name:                 "Wait until the gated pod carries the nominated node before opening the gate",
+					WaitForPodsNominated: map[string]string{"p1": "node-b2"},
+				},
+				{
+					Name:                    "Create the root CompositePodGroup (Gang with minGroupCount=2, TopologyKey=zone)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "zone", 2),
+				},
+				{
+					Name:                    "Create nested CompositePodGroup cpg-sub1 (Gang with minGroupCount=1, TopologyKey=block)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub1", "cpg-root", "block", 1),
+				},
+				{
+					Name:                    "Create nested CompositePodGroup cpg-sub2 (Gang with minGroupCount=1, TopologyKey=block)",
+					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-sub2", "cpg-root", "block", 1),
+				},
+				{
+					Name:           "Create leaf PodGroup pg1 under cpg-sub1 (Gang with minCount=1, TopologyKey=rack)",
+					CreatePodGroup: makeGangPodGroupWithParent("pg1", "cpg-sub1", "rack", 1),
+				},
+				{
+					Name:           "Create leaf PodGroup pg2 under cpg-sub2, opening the gate",
+					CreatePodGroup: makeGangPodGroupWithParent("pg2", "cpg-sub2", "rack", 1),
+				},
+				{
+					Name:                 "Verify both leaves are scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name: "Verify cpg-sub1's pod landed in block-2, the nominated block, rather than the higher scoring block-1",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1"},
+						Nodes: sets.New("node-b2"),
+					},
+				},
+				{
+					Name: "Verify cpg-sub2 has no nomination in its own subtree and still takes the higher scoring block",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p2"},
+						Nodes: sets.New("node-b1"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runCPGTestScenario(t, tt)
+		})
+	}
+}
 func runCPGTestScenario(t *testing.T, tt scenario, opts ...scheduler.Option) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CompositePodGroup:               true,
@@ -2871,6 +3389,26 @@ func runCPGTestScenario(t *testing.T, tt scenario, opts ...scheduler.Option) {
 	ns := testCtx.NS.Name
 
 	if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runCPGTestScenarioManually(t *testing.T, tt scenario) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.CompositePodGroup:               true,
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+
+	testCtx := testutils.InitTestSchedulerWithOptions(
+		t,
+		testutils.InitTestAPIServer(t, "cpg-tas", nil),
+		0,
+		scheduler.WithPodInitialBackoffSeconds(0),
+		scheduler.WithPodMaxBackoffSeconds(0),
+	)
+	testutils.SyncSchedulerInformerFactory(testCtx)
+	if err := stepsframework.RunSteps(testCtx, t, testCtx.NS.Name, tt.steps); err != nil {
 		t.Fatal(err)
 	}
 }
