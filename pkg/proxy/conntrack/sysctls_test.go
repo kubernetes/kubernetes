@@ -324,3 +324,60 @@ func TestGetConntrackMax_Capped(t *testing.T) {
 		t.Errorf("Expected capped value %d, got %d", expected, val)
 	}
 }
+
+func TestGetConntrackMax_MinOverridesCap(t *testing.T) {
+	const maxLimit = 1048576
+	testCases := []struct {
+		name       string
+		numCPU     int
+		maxPerCore int32
+		min        int32
+		expected   int
+	}{
+		{
+			name:       "min above cap, scaled above cap",
+			numCPU:     128,
+			maxPerCore: 32768,
+			min:        8 * maxLimit,
+			expected:   8 * maxLimit,
+		},
+		{
+			name:       "min above cap, scaled below cap",
+			numCPU:     8,
+			maxPerCore: 32768,
+			min:        8 * maxLimit,
+			expected:   8 * maxLimit,
+		},
+		{
+			name:       "min below cap, scaled above cap",
+			numCPU:     128,
+			maxPerCore: 32768,
+			min:        131072,
+			expected:   maxLimit,
+		},
+		{
+			name:       "min between scaled and cap",
+			numCPU:     8,
+			maxPerCore: 32768,
+			min:        524288,
+			expected:   524288,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore: ptr.To(tc.maxPerCore),
+				Min:        ptr.To(tc.min),
+			}
+			_, ctx := ktesting.NewTestContext(t)
+			val, err := getConntrackMax(ctx, &cfg, tc.numCPU)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if val != tc.expected {
+				t.Errorf("Expected %d, got %d", tc.expected, val)
+			}
+		})
+	}
+}
