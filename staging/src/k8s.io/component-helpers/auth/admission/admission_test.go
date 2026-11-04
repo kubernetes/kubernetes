@@ -53,7 +53,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-helpers/auth/admission"
-	"k8s.io/component-helpers/auth/admission/internal/verify"
 )
 
 const (
@@ -1523,7 +1522,7 @@ func TestExampleEndToEnd_MinimalWebhook(t *testing.T) {
 func TestExampleEndToEnd_InClusterExplicitAudience(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	const svcName, svcNamespace = "webhook", "default"
-	audience := verify.AudienceForService(svcName, svcNamespace, 443, "/validate")
+	const audience = "https://webhook.default.svc:443/validate"
 	claims := ts.baseClaims()
 	claims["aud"] = []string{audience}
 	token := ts.sign(t, claims)
@@ -1583,8 +1582,8 @@ func TestExampleEndToEnd_InClusterExplicitAudience(t *testing.T) {
 // receiver-owned expected audience against a first request for another Service.
 func TestExampleEndToEnd_InClusterSpoofedHostCannotChooseAudience(t *testing.T) {
 	ts := newOIDCTestServer(t)
-	trustedAudience := verify.AudienceForService("webhook", "default", 443, "/validate")
-	otherAudience := verify.AudienceForService("other", "default", 443, "/validate")
+	const trustedAudience = "https://webhook.default.svc:443/validate"
+	const otherAudience = "https://other.default.svc:443/validate"
 	var reached bool
 	h, err := ts.localHandler(func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 		reached = true
@@ -2141,8 +2140,8 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 	issuer := newECDSAOIDCIssuer(t)
 	otherIssuer := newECDSAOIDCIssuer(t)
 
-	validateAudience := verify.AudienceForService("dummy-webhook", "webhook-system", 443, "/validate")
-	mutateAudience := verify.AudienceForService("dummy-webhook", "webhook-system", 443, "/mutate")
+	const validateAudience = "https://dummy-webhook.webhook-system.svc:443/validate"
+	const mutateAudience = "https://dummy-webhook.webhook-system.svc:443/mutate"
 
 	modes := []struct {
 		name        string
@@ -2437,7 +2436,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 					name: "spoofed HTTP Host header attempting to match wrong token audience",
 					host: "other-webhook.webhook-system.svc:443",
 					token: func() string {
-						otherAud := verify.AudienceForService("other-webhook", "webhook-system", 443, "/validate")
+						const otherAud = "https://other-webhook.webhook-system.svc:443/validate"
 						return issuer.sign(t, issuer.validWebhookClaims(otherAud, "validatingwebhookconfiguration", "vwc", "uid-1", []string{"apps"}))
 					},
 					req: defaultAppsRequest,
@@ -2813,7 +2812,7 @@ func TestDummyWebhookEndToEnd(t *testing.T) {
 // TestTokenReuseDoesNotSkipRequestChecks covers policy after library key-cache reuse.
 func TestTokenReuseDoesNotSkipRequestChecks(t *testing.T) {
 	issuer := newECDSAOIDCIssuer(t)
-	audience := verify.AudienceForService("dummy-webhook", "webhook-system", 443, "/validate")
+	const audience = "https://dummy-webhook.webhook-system.svc:443/validate"
 
 	var admitted atomic.Int32
 	handler, err := admission.WithTokenVerification(
