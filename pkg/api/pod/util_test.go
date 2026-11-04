@@ -2395,12 +2395,110 @@ func TestDropAtomicWriteVolumeUserFields(t *testing.T) {
 		}
 	}
 
+	volumesWithoutUserFields := func() *[]api.Volume {
+		return &[]api.Volume{
+			{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						Items: []api.KeyToPath{
+							{
+								Key:  "key",
+								Path: "filename",
+							},
+						},
+					},
+				},
+			},
+			{
+				Name: "downwardapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{
+							{
+								FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"},
+								Path:     "filename",
+							},
+						},
+					},
+				},
+			},
+			{
+				Name: "configmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						Items: []api.KeyToPath{
+							{
+								Key:  "key",
+								Path: "filename",
+							},
+						},
+					},
+				},
+			},
+			{
+				Name: "projected",
+				VolumeSource: api.VolumeSource{
+					Projected: &api.ProjectedVolumeSource{
+						Sources: []api.VolumeProjection{
+							{
+								Secret: &api.SecretProjection{
+									Items: []api.KeyToPath{
+										{
+											Key:  "key",
+											Path: "filename",
+										},
+									},
+								},
+							},
+							{
+								DownwardAPI: &api.DownwardAPIProjection{
+									Items: []api.DownwardAPIVolumeFile{
+										{
+											FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"},
+											Path:     "filename",
+										},
+									},
+								},
+							},
+							{
+								ConfigMap: &api.ConfigMapProjection{
+									Items: []api.KeyToPath{
+										{
+											Key:  "key",
+											Path: "filename",
+										},
+									},
+								},
+							},
+							{
+								ServiceAccountToken: &api.ServiceAccountTokenProjection{
+									Path: "foo",
+								},
+							},
+							{
+								ClusterTrustBundle: &api.ClusterTrustBundleProjection{
+									Name: new("foo"),
+								},
+							},
+							{
+								PodCertificate: &api.PodCertificateProjection{
+									SignerName: "foo.example.com/bar",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
 	testCases := []struct {
-		description                        string
-		atomicWriteVolumeUserFieldsEnabled bool
-		oldPod                             *api.PodSpec
-		newPod                             *api.PodSpec
-		wantPod                            *api.PodSpec
+		description    string
+		featureEnabled bool
+		oldPod         *api.PodSpec
+		newPod         *api.PodSpec
+		wantPod        *api.PodSpec
 	}{
 		{
 			description: "feature gate disabled, cannot add user fields to volumes",
@@ -2411,106 +2509,12 @@ func TestDropAtomicWriteVolumeUserFields(t *testing.T) {
 				Volumes: *volumesWithUserFields(),
 			},
 			wantPod: &api.PodSpec{
-				Volumes: []api.Volume{
-					{
-						Name: "secret",
-						VolumeSource: api.VolumeSource{
-							Secret: &api.SecretVolumeSource{
-								Items: []api.KeyToPath{
-									{
-										Key:  "key",
-										Path: "filename",
-									},
-								},
-							},
-						},
-					},
-					{
-						Name: "downwardapi",
-						VolumeSource: api.VolumeSource{
-							DownwardAPI: &api.DownwardAPIVolumeSource{
-								Items: []api.DownwardAPIVolumeFile{
-									{
-										FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"},
-										Path:     "filename",
-									},
-								},
-							},
-						},
-					},
-					{
-						Name: "configmap",
-						VolumeSource: api.VolumeSource{
-							ConfigMap: &api.ConfigMapVolumeSource{
-								Items: []api.KeyToPath{
-									{
-										Key:  "key",
-										Path: "filename",
-									},
-								},
-							},
-						},
-					},
-					{
-						Name: "projected",
-						VolumeSource: api.VolumeSource{
-							Projected: &api.ProjectedVolumeSource{
-								Sources: []api.VolumeProjection{
-									{
-										Secret: &api.SecretProjection{
-											Items: []api.KeyToPath{
-												{
-													Key:  "key",
-													Path: "filename",
-												},
-											},
-										},
-									},
-									{
-										DownwardAPI: &api.DownwardAPIProjection{
-											Items: []api.DownwardAPIVolumeFile{
-												{
-													FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"},
-													Path:     "filename",
-												},
-											},
-										},
-									},
-									{
-										ConfigMap: &api.ConfigMapProjection{
-											Items: []api.KeyToPath{
-												{
-													Key:  "key",
-													Path: "filename",
-												},
-											},
-										},
-									},
-									{
-										ServiceAccountToken: &api.ServiceAccountTokenProjection{
-											Path: "foo",
-										},
-									},
-									{
-										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: new("foo"),
-										},
-									},
-									{
-										PodCertificate: &api.PodCertificateProjection{
-											SignerName: "foo.example.com/bar",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
+				Volumes: *volumesWithoutUserFields(),
 			},
 		},
 		{
-			description:                        "feature gate enabled, can keep user fields on volumes",
-			atomicWriteVolumeUserFieldsEnabled: true,
+			description:    "feature gate enabled, can keep user fields on volumes",
+			featureEnabled: true,
 			oldPod: &api.PodSpec{
 				Volumes: *volumesWithUserFields(),
 			},
@@ -2522,8 +2526,8 @@ func TestDropAtomicWriteVolumeUserFields(t *testing.T) {
 			},
 		},
 		{
-			description:                        "feature gate enabled, can add user fields to volumes",
-			atomicWriteVolumeUserFieldsEnabled: true,
+			description:    "feature gate enabled, can add user fields to volumes",
+			featureEnabled: true,
 			oldPod: &api.PodSpec{
 				Volumes: []api.Volume{},
 			},
@@ -2538,7 +2542,7 @@ func TestDropAtomicWriteVolumeUserFields(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AtomicWriteVolumeUserFields, tc.atomicWriteVolumeUserFieldsEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AtomicWriteVolumeUserFields, tc.featureEnabled)
 
 			dropDisabledAtomicWriteVolumeUserFields(tc.newPod, tc.oldPod)
 			if diff := cmp.Diff(tc.newPod, tc.wantPod); diff != "" {
