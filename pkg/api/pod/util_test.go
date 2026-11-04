@@ -2501,6 +2501,18 @@ func TestDropAtomicWriteVolumeUserFields(t *testing.T) {
 		wantPod        *api.PodSpec
 	}{
 		{
+			description: "feature gate disabled, can keep user fields on volumes",
+			oldPod: &api.PodSpec{
+				Volumes: *volumesWithUserFields(),
+			},
+			newPod: &api.PodSpec{
+				Volumes: *volumesWithUserFields(),
+			},
+			wantPod: &api.PodSpec{
+				Volumes: *volumesWithUserFields(),
+			},
+		},
+		{
 			description: "feature gate disabled, cannot add user fields to volumes",
 			oldPod: &api.PodSpec{
 				Volumes: []api.Volume{},
