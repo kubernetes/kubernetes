@@ -811,6 +811,7 @@ func NewMainKubelet(ctx context.Context,
 		}
 	}
 
+	imageUseTracker := images.NewUseTracker()
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
@@ -849,6 +850,7 @@ func NewMainKubelet(ctx context.Context,
 		kubeCfg.MemoryThrottlingFactor,
 		kubeCfg.MemoryReservationPolicy,
 		klet.podStartupLatencyTracker,
+		imageUseTracker,
 		kubeDeps.TracerProvider,
 		tokenManager,
 		getServiceAccount,
@@ -926,7 +928,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerDeletor = newPodContainerDeletor(logger, klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider, imageUseTracker)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}

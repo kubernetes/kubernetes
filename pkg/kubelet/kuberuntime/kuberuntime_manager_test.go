@@ -4502,7 +4502,8 @@ func TestGetImageVolumes(t *testing.T) {
 		},
 	} {
 
-		imageVolumePulls, err := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, nil)
+		imageVolumePulls, releaseImageVolumes, err := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, nil)
+		releaseImageVolumes()
 		if tc.expectedError != nil {
 			require.EqualError(t, err, tc.expectedError.Error())
 		} else {
