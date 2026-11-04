@@ -109,8 +109,10 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		}
 
 		// Create a pod to check the conntrack entries on the host node. We need
-		// a privileged pod because /proc/net/nf_conntrack is not world-readable.
+		// a privileged pod because /proc/net/nf_conntrack is not world-readable,
+		// and it must run on clientNodeInfo.name where the client connection originates.
 		hostExecPod := e2epod.NewExecPodSpec(fr.Namespace.Name, "e2e-net-exec", true)
+		hostExecPod.Spec.NodeName = clientNodeInfo.name
 		hostExecPod.Spec.Containers[0].SecurityContext.Privileged = new(true)
 		e2epod.NewPodClient(fr).CreateSync(ctx, hostExecPod)
 
