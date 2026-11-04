@@ -24841,6 +24841,7 @@ func TestValidateOSFields(t *testing.T) {
 		"AutomountServiceAccountToken",
 		"Containers[*].Args",
 		"Containers[*].Command",
+		"Containers[*].DynamicVolumePolicy.RestartPolicy",
 		"Containers[*].Env",
 		"Containers[*].EnvFrom",
 		"Containers[*].Image",
@@ -24872,6 +24873,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EnableServiceLinks",
 		"EphemeralContainers[*].EphemeralContainerCommon.Args",
 		"EphemeralContainers[*].EphemeralContainerCommon.Command",
+		"EphemeralContainers[*].EphemeralContainerCommon.DynamicVolumePolicy.RestartPolicy",
 		"EphemeralContainers[*].EphemeralContainerCommon.Env",
 		"EphemeralContainers[*].EphemeralContainerCommon.EnvFrom",
 		"EphemeralContainers[*].EphemeralContainerCommon.Image",
@@ -24907,6 +24909,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ImagePullSecrets",
 		"InitContainers[*].Args",
 		"InitContainers[*].Command",
+		"InitContainers[*].DynamicVolumePolicy.RestartPolicy",
 		"InitContainers[*].Env",
 		"InitContainers[*].EnvFrom",
 		"InitContainers[*].Image",
@@ -34075,5 +34078,678 @@ func TestValidatePodDynamicUpdateDRACoverage(t *testing.T) {
 	errs := ValidatePodDynamicUpdate(exceeds, oldPod, opts)
 	if want := "insufficient to cover the aggregated container and node-allocatable DRA requests"; !strings.Contains(errs.ToAggregate().Error(), want) {
 		t.Errorf("expected error containing %q, got: %v", want, errs)
+	}
+}
+
+func TestValidateDynamicNodeLocalEphemeralVolumes(t *testing.T) {
+	baseRunningPod := func() *core.Pod {
+		p := podtest.MakePod("test-pod",
+			podtest.SetVolumes(core.Volume{
+				Name: "vol-1",
+				VolumeSource: core.VolumeSource{
+					EmptyDir: &core.EmptyDirVolumeSource{},
+				},
+			}),
+			podtest.SetContainers(core.Container{
+				Name:                     "c1",
+				Image:                    "image",
+				TerminationMessagePolicy: core.TerminationMessageReadFile,
+				ImagePullPolicy:          core.PullAlways,
+				DynamicVolumePolicy: &core.ContainerDynamicVolumePolicy{
+					RestartPolicy: core.DynamicVolumeRestartContainer,
+				},
+				VolumeMounts: []core.VolumeMount{
+					{Name: "vol-1", MountPath: "/mnt/vol-1"},
+				},
+			}),
+		)
+		p.ObjectMeta.ResourceVersion = "1"
+		p.Status.Phase = core.PodRunning
+		p.Status.Conditions = []core.PodCondition{
+			{Type: core.PodInitialized, Status: core.ConditionTrue},
+		}
+		return p
+	}
+
+	defaultMode := int32(0644)
+	hostPathType := core.HostPathDirectory
+	size64Mi := resource.MustParse("64Mi")
+	size128Mi := resource.MustParse("128Mi")
+	tests := []struct {
+		name                   string
+		oldPod                 *core.Pod
+		newPod                 *core.Pod
+		dynamicSubres          bool
+		featureEnabled         bool
+		memBackedResizeEnabled bool
+		wantErr                string
+	}{
+		{
+			name:   "valid dynamic emptyDir addition and container volumeMount addition",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "vol-2",
+					MountPath: "/mnt/vol-2",
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name:   "valid dynamic configMap, secret, projected, and image volume additions",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes,
+					core.Volume{
+						Name: "cm-vol",
+						VolumeSource: core.VolumeSource{
+							ConfigMap: &core.ConfigMapVolumeSource{
+								LocalObjectReference: core.LocalObjectReference{Name: "my-cm"},
+								DefaultMode:          &defaultMode,
+							},
+						},
+					},
+					core.Volume{
+						Name: "secret-vol",
+						VolumeSource: core.VolumeSource{
+							Secret: &core.SecretVolumeSource{
+								SecretName:  "my-secret",
+								DefaultMode: &defaultMode,
+							},
+						},
+					},
+					core.Volume{
+						Name: "proj-vol",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{
+								DefaultMode: &defaultMode,
+								Sources: []core.VolumeProjection{
+									{
+										ConfigMap: &core.ConfigMapProjection{
+											LocalObjectReference: core.LocalObjectReference{Name: "my-cm"},
+										},
+									},
+								},
+							},
+						},
+					},
+				)
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name:   "valid dynamic volume and volumeMount removal",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = nil
+				p.Spec.Containers[0].VolumeMounts = nil
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name: "valid dynamic volumeMount addition when container also has unchanged static PVC volumeMount",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "pvc-vol",
+					VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "pvc-vol",
+					MountPath: "/mnt/pvc",
+				})
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes,
+					core.Volume{
+						Name:         "pvc-vol",
+						VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+					},
+					core.Volume{
+						Name:         "vol-2",
+						VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+					},
+				)
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts,
+					core.VolumeMount{Name: "pvc-vol", MountPath: "/mnt/pvc"},
+					core.VolumeMount{Name: "vol-2", MountPath: "/mnt/vol-2"},
+				)
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name: "valid joint dynamic volume addition and memory-backed emptyDir sizeLimit resize",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.NodeName = "node-1"
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size64Mi,
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.NodeName = "node-1"
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size128Mi,
+				}
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "vol-2",
+					MountPath: "/mnt/vol-2",
+				})
+				return p
+			}(),
+			dynamicSubres:          true,
+			featureEnabled:         true,
+			memBackedResizeEnabled: true,
+		},
+		{
+			name: "valid standalone memory-backed emptyDir sizeLimit resize on Pending pod",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size64Mi,
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size128Mi,
+				}
+				return p
+			}(),
+			dynamicSubres:          true,
+			featureEnabled:         true,
+			memBackedResizeEnabled: true,
+		},
+		{
+			name:   "rejected when not using /dynamic subresource",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  false,
+			featureEnabled: true,
+			wantErr:        "pod updates may not change fields other than",
+		},
+		{
+			name:   "rejected when feature gate is disabled",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: false,
+			wantErr:        "pod updates may not change fields other than",
+		},
+		{
+			name: "rejected when container lacks RestartContainer dynamicVolumePolicy",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].DynamicVolumePolicy = nil
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].DynamicVolumePolicy = nil
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "vol-2",
+					MountPath: "/mnt/vol-2",
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts may only be mutated on containers with dynamicVolumePolicy.restartPolicy set to 'RestartContainer'",
+		},
+		{
+			name:   "rejected when adding unsupported volume type (hostPath)",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name: "hp-vol",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/tmp",
+							Type: &hostPathType,
+						},
+					},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "only configMap, secret, projected, emptyDir, and image volumes may be dynamically added",
+		},
+		{
+			name: "rejected when adding volumeMount referencing existing static hostPath volume",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name: "hp-vol",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/tmp",
+							Type: &hostPathType,
+						},
+					},
+				})
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name: "hp-vol",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/tmp",
+							Type: &hostPathType,
+						},
+					},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "hp-vol",
+					MountPath: "/mnt/hp",
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts referencing unsupported volume \"hp-vol\" may not be dynamically added, removed, or mutated",
+		},
+		{
+			name: "rejected when removing volumeMount referencing existing static PVC volume",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "pvc-vol",
+					VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "pvc-vol",
+					MountPath: "/mnt/pvc",
+				})
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "pvc-vol",
+					VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts referencing unsupported volume \"pvc-vol\" may not be dynamically added, removed, or mutated",
+		},
+		{
+			name: "rejected when re-adding volume name that is still Unmounting in VolumeStatuses",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.VolumeStatuses = []core.PodVolumeStatus{
+					{Name: "vol-unmounting", HostPhase: core.PodVolumeHostUnmounting},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-unmounting",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "cannot be re-added while previous volume with the same name is still pending, mounted, or unmounting in pod status",
+		},
+		{
+			name: "rejected when pod is not in Running phase",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "dynamic volume updates are only allowed when pod is in Running phase",
+		},
+		{
+			name:   "rejected when removing a volume still mounted by a container",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = nil
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "spec.containers[0].volumeMounts[0].name: Not found: \"vol-1\"",
+		},
+		{
+			name: "rejected when removing a volume still mounted by an initContainer",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol-1", MountPath: "/mnt/vol-1"},
+						},
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.Volumes = nil
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol-1", MountPath: "/mnt/vol-1"},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "spec.initContainers[0].volumeMounts[0].name: Not found: \"vol-1\"",
+		},
+		{
+			name: "rejected when removing a volume still mounted by an ephemeralContainer",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							VolumeMounts: []core.VolumeMount{
+								{Name: "vol-1", MountPath: "/mnt/vol-1"},
+							},
+						},
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.Volumes = nil
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							VolumeMounts: []core.VolumeMount{
+								{Name: "vol-1", MountPath: "/mnt/vol-1"},
+							},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "spec.ephemeralContainers[0].volumeMounts[0].name: Not found: \"vol-1\"",
+		},
+		{
+			name: "rejected when mutating volumeMounts on initContainers",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol-1", MountPath: "/mnt/vol-1"},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts for initContainers may not be mutated",
+		},
+		{
+			name: "rejected when mutating volumeMounts on ephemeralContainers",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+						},
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							VolumeMounts: []core.VolumeMount{
+								{Name: "vol-1", MountPath: "/mnt/vol-1"},
+							},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts for ephemeralContainers may not be mutated",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := PodValidationOptions{
+				DynamicNodeLocalEphemeralVolumesEnabled:             tc.featureEnabled,
+				InPlacePodVerticalScalingMemoryBackedVolumesEnabled: tc.memBackedResizeEnabled,
+			}
+			var errs field.ErrorList
+			if tc.dynamicSubres {
+				errs = ValidatePodDynamicUpdate(tc.newPod, tc.oldPod, opts)
+			} else {
+				errs = ValidatePodUpdate(tc.newPod, tc.oldPod, opts)
+			}
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected validation errors: %v", errs)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Fatalf("expected error containing %q, got none", tc.wantErr)
+				}
+				if !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, errs)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateDynamicVolumePolicy(t *testing.T) {
+	basePod := func() *core.Pod {
+		return podtest.MakePod("test-pod",
+			podtest.SetContainers(core.Container{
+				Name:                     "c1",
+				Image:                    "image",
+				TerminationMessagePolicy: core.TerminationMessageReadFile,
+				ImagePullPolicy:          core.PullAlways,
+			}),
+		)
+	}
+
+	tests := []struct {
+		name    string
+		tweak   func(*core.Pod)
+		wantErr string
+	}{
+		{
+			name: "valid RestartContainer policy on regular container",
+			tweak: func(p *core.Pod) {
+				p.Spec.Containers[0].DynamicVolumePolicy = &core.ContainerDynamicVolumePolicy{
+					RestartPolicy: core.DynamicVolumeRestartContainer,
+				}
+			},
+		},
+		{
+			name: "unsupported restartPolicy on regular container",
+			tweak: func(p *core.Pod) {
+				p.Spec.Containers[0].DynamicVolumePolicy = &core.ContainerDynamicVolumePolicy{
+					RestartPolicy: "InvalidPolicy",
+				}
+			},
+			wantErr: "spec.containers[0].dynamicVolumePolicy.restartPolicy: Unsupported value: \"InvalidPolicy\"",
+		},
+		{
+			name: "dynamicVolumePolicy forbidden on initContainer",
+			tweak: func(p *core.Pod) {
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						DynamicVolumePolicy: &core.ContainerDynamicVolumePolicy{
+							RestartPolicy: core.DynamicVolumeRestartContainer,
+						},
+					},
+				}
+			},
+			wantErr: "spec.initContainers[0].dynamicVolumePolicy: Forbidden: may not be set for init containers",
+		},
+		{
+			name: "dynamicVolumePolicy forbidden on ephemeralContainer",
+			tweak: func(p *core.Pod) {
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							DynamicVolumePolicy: &core.ContainerDynamicVolumePolicy{
+								RestartPolicy: core.DynamicVolumeRestartContainer,
+							},
+						},
+					},
+				}
+			},
+			wantErr: "spec.ephemeralContainers[0].dynamicVolumePolicy: Forbidden: cannot be set for an Ephemeral Container",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := basePod()
+			tc.tweak(p)
+			errs := ValidatePodCreate(p, PodValidationOptions{})
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected validation errors: %v", errs)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Fatalf("expected error containing %q, got none", tc.wantErr)
+				}
+				if !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, errs)
+				}
+			}
+		})
 	}
 }

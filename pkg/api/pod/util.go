@@ -404,6 +404,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
 		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		InPlacePodVerticalScalingMemoryBackedVolumesEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes),
+		DynamicNodeLocalEphemeralVolumesEnabled:             utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
@@ -763,6 +764,12 @@ func dropDisabledFields(
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && !dynamicVolumePolicyInUse(oldPodSpec) {
+		for i := range podSpec.Containers {
+			podSpec.Containers[i].DynamicVolumePolicy = nil
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) && !containerRestartRulesInUse(oldPodSpec) {
 		dropContainerRestartRules(podSpec)
 	}
@@ -1102,6 +1109,10 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
 		podStatus.VolumeHealth = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && !volumeStatusesInUse(oldPodStatus) {
+		podStatus.VolumeStatuses = nil
+	}
 }
 
 func draExendedResourceInUse(podStatus *api.PodStatus) bool {
@@ -1130,6 +1141,25 @@ func volumeHealthInUse(podStatus *api.PodStatus) bool {
 		return false
 	}
 	return len(podStatus.VolumeHealth) > 0
+}
+
+func dynamicVolumePolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].DynamicVolumePolicy != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func volumeStatusesInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.VolumeStatuses) > 0
 }
 
 func resourceHealthStatusInUse(podStatus *api.PodStatus) bool {

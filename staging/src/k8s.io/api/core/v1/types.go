@@ -3139,6 +3139,27 @@ type ContainerResizePolicy struct {
 	RestartPolicy ResourceResizeRestartPolicy `json:"restartPolicy" protobuf:"bytes,2,opt,name=restartPolicy,casttype=ResourceResizeRestartPolicy"`
 }
 
+// DynamicVolumeRestartPolicy defines the restart behavior applied to a container
+// when its volume mounts are dynamically mutated.
+// +enum
+// +k8s:validation-gen-nolint
+type DynamicVolumeRestartPolicy string
+
+const (
+	// DynamicVolumeRestartContainer indicates that Kubelet must restart the container
+	// in-place to actuate volume mount additions or removals on a running container.
+	DynamicVolumeRestartContainer DynamicVolumeRestartPolicy = "RestartContainer"
+)
+
+// ContainerDynamicVolumePolicy defines dynamic volume mutation behavior for a container.
+type ContainerDynamicVolumePolicy struct {
+	// restartPolicy defines whether dynamic volume mount additions or removals
+	// require restarting the container. Supported values: RestartContainer, "".
+	// Defaults to "".
+	// +optional
+	RestartPolicy DynamicVolumeRestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,1,opt,name=restartPolicy,casttype=DynamicVolumeRestartPolicy"`
+}
+
 // PreemptionPolicy describes a policy for if/when to preempt a pod.
 // +enum
 // +k8s:validation-gen-nolint
@@ -3331,6 +3352,10 @@ type Container struct {
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
+	// dynamicVolumePolicy defines dynamic volume mutation behavior for this container.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	DynamicVolumePolicy *ContainerDynamicVolumePolicy `json:"dynamicVolumePolicy,omitempty" protobuf:"bytes,26,opt,name=dynamicVolumePolicy"`
 	// restartPolicy defines the restart behavior of individual containers in a pod.
 	// This overrides the pod-level restart policy. When this field is not specified,
 	// the restart behavior is defined by the Pod's restart policy and the container type.
@@ -5660,6 +5685,11 @@ type EphemeralContainerCommon struct {
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
+	// dynamicVolumePolicy defines dynamic volume mutation behavior for this container.
+	// This field cannot be set on ephemeral containers.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	DynamicVolumePolicy *ContainerDynamicVolumePolicy `json:"dynamicVolumePolicy,omitempty" protobuf:"bytes,26,opt,name=dynamicVolumePolicy"`
 	// restartPolicy is the restart policy for the container to manage the restart behavior of each
 	// container within a pod.
 	// You cannot set this field on ephemeral containers.
@@ -6014,6 +6044,55 @@ type PodStatus struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	VolumeHealth []PodVolumeHealth `json:"volumeHealth,omitempty" protobuf:"bytes,22,rep,name=volumeHealth"`
+
+	// volumeStatuses contains the status of volumes in the pod, tracking whether
+	// volumes are allocated and prepared on the host node. Currently, only
+	// node-local ephemeral volume types supported for dynamic updates (configMap,
+	// secret, projected, emptyDir, and image) are reported.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	VolumeStatuses []PodVolumeStatus `json:"volumeStatuses,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,23,rep,name=volumeStatuses"`
+}
+
+// PodVolumeHostPhase represents the host preparation phase of a volume mounted to a pod.
+// +enum
+// +k8s:enum
+type PodVolumeHostPhase string
+
+const (
+	// PodVolumeHostPending indicates that the volume has been added to pod.Spec.Volumes,
+	// and is waiting node allocation or host preparation/mounting by VolumeManager.
+	PodVolumeHostPending PodVolumeHostPhase = "Pending"
+
+	// PodVolumeHostMounted indicates that VolumeManager has successfully prepared and
+	// mounted the volume on the node host (marked ready in ActualStateOfWorld).
+	PodVolumeHostMounted PodVolumeHostPhase = "HostMounted"
+
+	// PodVolumeHostUnmounting indicates that volume removal has been admitted and allocated
+	// by Kubelet, and Kubelet is actively unmounting container bind mounts and executing host TearDownAt.
+	PodVolumeHostUnmounting PodVolumeHostPhase = "Unmounting"
+)
+
+// PodVolumeStatus represents the status of an individual volume in a pod.
+type PodVolumeStatus struct {
+	// name is the name of the volume matching pod.Spec.Volumes.
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// hostPhase represents the host-level preparation phase of the volume:
+	// Pending, HostMounted, Unmounting.
+	// +optional
+	// +k8s:optional
+	HostPhase PodVolumeHostPhase `json:"hostPhase,omitempty" protobuf:"bytes,2,opt,name=hostPhase,casttype=PodVolumeHostPhase"`
 }
 
 // +genclient

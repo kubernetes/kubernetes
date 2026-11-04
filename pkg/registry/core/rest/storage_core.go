@@ -248,7 +248,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			storage[resource+"/resize"] = podStorage.Resize
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) || utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
 			storage[resource+"/dynamic"] = podStorage.Dynamic
 		}
 	}
