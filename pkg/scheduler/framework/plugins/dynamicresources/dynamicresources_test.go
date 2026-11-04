@@ -4484,7 +4484,7 @@ func testPlugin(tCtx ktesting.TContext) {
 						GenericPodGroup: fwk.NewGenericPodGroup(tc.podGroups[0]),
 						UnscheduledPods: []*v1.Pod{tc.pod},
 					}
-					mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+					mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 						return nil, fwk.NewStatus(fwk.Unschedulable)
 					}
 					podGroupCycleState := testCtx.state.GetPodGroupCycleState()
@@ -6409,7 +6409,7 @@ func TestPodGroupPostFilter(t *testing.T) {
 				UnscheduledPods: tc.unscheduledPods,
 			}
 
-			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			mockSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 				return nil, fwk.NewStatus(fwk.Unschedulable)
 			}
 
