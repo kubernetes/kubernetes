@@ -99,6 +99,81 @@ func ContainerIter(podSpec *api.PodSpec, mask ContainerType) iter.Seq2[*api.Cont
 	}
 }
 
+// ContainerPair is a container in two versions of a pod, matched by name. Old is nil for a
+// container that is only in the new pod (added), and New is nil for one that is only in the old
+// pod (removed).
+type ContainerPair struct {
+	New, Old *api.Container
+}
+
+// ContainerPairs yields the containers of pod and oldPod of the types in mask, paired by name,
+// with their type. Containers are only matched within their type, where names are assumed to be
+// unique. The iteration order is InitContainers, then main Containers, then EphemeralContainers;
+// within each type, the containers of pod are yielded in order, followed by removed containers
+// from oldPod in order.
+func ContainerPairs(pod, oldPod *api.Pod, mask ContainerType) iter.Seq2[ContainerPair, ContainerType] {
+	return func(yield func(ContainerPair, ContainerType) bool) {
+		containerPairs(pod, oldPod, mask, yield)
+	}
+}
+
+// containerPairs implements ContainerPairs. It keeps the calls to the generic pairContainers out
+// of the iterator, which is inlined into callers: called from another package, a generic function
+// makes the closures passed to it escape, and allocate.
+func containerPairs(pod, oldPod *api.Pod, mask ContainerType, yield func(ContainerPair, ContainerType) bool) {
+	if mask&InitContainers != 0 && !pairContainers(pod.Spec.InitContainers, oldPod.Spec.InitContainers, identityContainer, func(p ContainerPair) bool {
+		return yield(p, InitContainers)
+	}) {
+		return
+	}
+	if mask&Containers != 0 && !pairContainers(pod.Spec.Containers, oldPod.Spec.Containers, identityContainer, func(p ContainerPair) bool {
+		return yield(p, Containers)
+	}) {
+		return
+	}
+	if mask&EphemeralContainers != 0 {
+		pairContainers(pod.Spec.EphemeralContainers, oldPod.Spec.EphemeralContainers, ephemeralAsContainer, func(p ContainerPair) bool {
+			return yield(p, EphemeralContainers)
+		})
+	}
+}
+
+func identityContainer(c *api.Container) *api.Container {
+	return c
+}
+
+func ephemeralAsContainer(ec *api.EphemeralContainer) *api.Container {
+	return (*api.Container)(&ec.EphemeralContainerCommon)
+}
+
+// pairContainers pairs containers and oldContainers by name, and calls yield for each container in
+// containers (matched or added) followed by each removed container in oldContainers, in order.
+// unwrap returns the container of a slice element. It returns false if yield did.
+func pairContainers[E any](containers, oldContainers []E, unwrap func(*E) *api.Container, yield func(ContainerPair) bool) bool {
+	for i := range containers {
+		c := unwrap(&containers[i])
+		if !yield(ContainerPair{New: c, Old: findContainer(oldContainers, unwrap, c.Name)}) {
+			return false
+		}
+	}
+	for j := range oldContainers {
+		old := unwrap(&oldContainers[j])
+		if findContainer(containers, unwrap, old.Name) == nil && !yield(ContainerPair{Old: old}) {
+			return false
+		}
+	}
+	return true
+}
+
+func findContainer[E any](containers []E, unwrap func(*E) *api.Container, name string) *api.Container {
+	for i := range containers {
+		if c := unwrap(&containers[i]); c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
 
