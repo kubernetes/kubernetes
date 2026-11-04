@@ -32,6 +32,7 @@ import (
 	"golang.org/x/tools/internal/event"
 	"golang.org/x/tools/internal/gocommand"
 	"golang.org/x/tools/internal/gopathwalk"
+	"golang.org/x/tools/internal/modindex"
 	"golang.org/x/tools/internal/stdlib"
 )
 
@@ -320,6 +321,7 @@ func (p *pass) importIdentifier(imp *ImportInfo) string {
 // load reads in everything necessary to run a pass, and reports whether the
 // file already has all the imports it needs. It fills in p.missingRefs with the
 // file's missing symbols, if any, or removes unused imports if not.
+// This is called 3(!) times: self, otherFiles, loadRealPackageNames
 func (p *pass) load(ctx context.Context) ([]*ImportFix, bool) {
 	p.knownPackages = map[string]*PackageInfo{}
 	p.missingRefs = References{}
@@ -461,6 +463,15 @@ func sortFixes(fixes []*ImportFix) {
 	})
 }
 
+func hasDeleteFix(fixes []*ImportFix) bool {
+	for _, fix := range fixes {
+		if fix.FixType == DeleteImport {
+			return true
+		}
+	}
+	return false
+}
+
 // importSpecName gets the import name of imp in the import spec.
 //
 // When the import identifier matches the assumed import name, the import name does
@@ -577,6 +588,87 @@ func getFixes(ctx context.Context, fset *token.FileSet, f *ast.File, filename st
 }
 
 func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, filename string, goroot string, logf func(string, ...any), source Source) ([]*ImportFix, error) {
+	fixes, err := computeFixesWithSource(ctx, fset, f, filename, goroot, logf, source)
+	if err != nil {
+		return nil, err
+	}
+	return ensureEmbedImport(f, fixes), nil
+}
+
+// ensureEmbedImport makes sure a file containing a //go:embed directive
+// imports "embed" once fixes are applied. The compiler requires the import
+// whenever a //go:embed directive is present, even when the embedded
+// variable's type (string or []byte) means the package is never referenced by
+// name. Any import of "embed" (renamed or blank) satisfies it.
+func ensureEmbedImport(f *ast.File, fixes []*ImportFix) []*ImportFix {
+	if !hasEmbedDirective(f) {
+		return fixes
+	}
+	// Work out the state of the "embed" import once fixes are applied. It may
+	// already be imported (under any name), be added by normal resolution (as
+	// for an embed.FS variable), or be deleted as an unused import.
+	imported := importsEmbed(f)
+	deleteFix := -1
+	for i, fix := range fixes {
+		if fix.StmtInfo.ImportPath != "embed" {
+			continue
+		}
+		switch fix.FixType {
+		case AddImport:
+			imported = true
+		case DeleteImport:
+			imported = false
+			deleteFix = i
+		}
+	}
+	if imported {
+		return fixes
+	}
+	blankEmbed := &ImportFix{
+		StmtInfo:  ImportInfo{ImportPath: "embed", Name: "_"},
+		IdentName: "_",
+		Relevance: MaxRelevance,
+	}
+	if deleteFix >= 0 {
+		// The file imports "embed" but the import is about to be removed as
+		// unused. Keep it as a blank import instead of deleting it and adding
+		// a new one back.
+		blankEmbed.FixType = SetImportName
+		fixes[deleteFix] = blankEmbed
+		return fixes
+	}
+	blankEmbed.FixType = AddImport
+	return append(fixes, blankEmbed)
+}
+
+// hasEmbedDirective reports whether f contains a //go:embed directive.
+func hasEmbedDirective(f *ast.File) bool {
+	for _, cg := range f.Comments {
+		for _, c := range cg.List {
+			// A //go:embed directive is the text "//go:embed" followed by
+			// whitespace and the patterns (see go/build.parseGoEmbed). The
+			// whitespace is what distinguishes it from an ordinary comment
+			// such as "//go:embedded".
+			if rest, ok := strings.CutPrefix(c.Text, "//go:embed"); ok &&
+				len(rest) > 0 && (rest[0] == ' ' || rest[0] == '\t') {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// importsEmbed reports whether f imports the "embed" package under any name.
+func importsEmbed(f *ast.File) bool {
+	for _, imp := range f.Imports {
+		if imp.Path.Value == `"embed"` {
+			return true
+		}
+	}
+	return false
+}
+
+func computeFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, filename string, goroot string, logf func(string, ...any), source Source) ([]*ImportFix, error) {
 	// This logic is defensively duplicated from getFixes.
 	abs, err := filepath.Abs(filename)
 	if err != nil {
@@ -619,7 +711,7 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 	// Now we can try adding imports from the stdlib.
 	p.assumeSiblingImportsValid()
 	addStdlibCandidates(p, p.missingRefs)
-	if fixes, done := p.fix(); done {
+	if fixes, done := p.fix(); done && !hasDeleteFix(fixes) {
 		return fixes, nil
 	}
 
@@ -635,6 +727,31 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 	}
 	p.loadRealPackageNames = true
 	p.otherFiles = otherFiles
+
+	// If there is an Index for the GOMODCACHE, remember that, and later make it so that the
+	// directory walk doesn't go into the module cache, since we already have all the information.
+	var ix *modindex.Index
+	if src, ok := source.(*ProcessEnvSource); ok {
+		var err error
+		if ix, err = modindex.Read(src.env.Env["GOMODCACHE"]); err != nil {
+			ix = nil // don't use it if there was an error
+		}
+	}
+
+	if ix != nil {
+		src, ok := p.source.(*ProcessEnvSource)
+		if ok {
+			// For safety, clone the env so that we don't modify the caller's env.
+			env := *src.env
+			env.Env = maps.Clone(src.env.Env)
+			src.env = &env
+			// avoid looking in the module cache, as we have the index instead:
+			// This makes a later call to newModuleresolver (from
+			// LoadPackageNames) produce a resolver that will not look
+			// in the module cache
+			src.env.Env["GOMODCACHE"] = ""
+		}
+	}
 	if fixes, done := p.load(ctx); done {
 		return fixes, nil
 	}
@@ -649,7 +766,7 @@ func getFixesWithSource(ctx context.Context, fset *token.FileSet, f *ast.File, f
 
 	// Go look for candidates in $GOPATH, etc. We don't necessarily load
 	// the real exports of sibling imports, so keep assuming their contents.
-	if err := addExternalCandidates(ctx, p, p.missingRefs, filename); err != nil {
+	if err := addExternalCandidates(ctx, p, p.missingRefs, filename, ix); err != nil {
 		return nil, err
 	}
 
@@ -1184,13 +1301,31 @@ type scanCallback struct {
 	exportsLoaded func(pkg *pkg, exports []stdlib.Symbol)
 }
 
-func addExternalCandidates(ctx context.Context, pass *pass, refs References, filename string) error {
+func addExternalCandidates(ctx context.Context, pass *pass, refs References, filename string, ix *modindex.Index) error {
 	ctx, done := event.Start(ctx, "imports.addExternalCandidates")
 	defer done()
 
 	results, err := pass.source.ResolveReferences(ctx, filename, refs)
 	if err != nil {
 		return err
+	}
+
+	// Add candidates from the module cache.
+	if ix != nil {
+		for k, v := range refs {
+			for n := range v {
+				cands := ix.Lookup(k, n, false)
+				for _, cand := range cands {
+					x := &Result{
+						&ImportInfo{ImportPath: cand.ImportPath},
+						&PackageInfo{Name: cand.PkgName,
+							Exports: map[string]bool{cand.Name: true},
+						},
+					}
+					results = append(results, x)
+				}
+			}
+		}
 	}
 
 	for _, result := range results {

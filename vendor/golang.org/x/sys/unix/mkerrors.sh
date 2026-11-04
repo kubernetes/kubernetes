@@ -290,14 +290,7 @@ struct ltchars {
 #include <mtd/mtd-user.h>
 #include <net/route.h>
 
-#if defined(__sparc__)
-// On sparc{,64}, the kernel defines struct termios2 itself which clashes with the
-// definition in glibc. As only the error constants are needed here, include the
-// generic termibits.h (which is included by termbits.h on sparc).
-#include <asm-generic/termbits.h>
-#else
 #include <asm/termbits.h>
-#endif
 
 #ifndef PTRACE_GETREGS
 #define PTRACE_GETREGS	0xc
@@ -544,7 +537,7 @@ ccflags="$@"
 		$2 ~ /^LO_(KEY|NAME)_SIZE$/ ||
 		$2 ~ /^LOOP_(CLR|CTL|GET|SET)_/ ||
 		$2 == "LOOP_CONFIGURE" ||
-		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|TCP|MCAST|EVFILT|NOTE|SHUT|PROT|MAP|MREMAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR|LOCAL|TCPOPT|UDP)_/ ||
+		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|TCP|MCAST|EVFILT|NOTE|SHUT|PROT|MAP|MREMAP|MFD|MLOCK|T?PACKET|MSG|SCM|MCL|DT|MADV|PR|LOCAL|TCPOPT|UDP)_/ ||
 		$2 ~ /^NFC_(GENL|PROTO|COMM|RF|SE|DIRECTION|LLCP|SOCKPROTO)_/ ||
 		$2 ~ /^NFC_.*_(MAX)?SIZE$/ ||
 		$2 ~ /^PTP_/ ||
@@ -586,7 +579,7 @@ ccflags="$@"
 		$2 ~ /^DIOC/ ||
 		$2 ~ /^RUSAGE_(SELF|CHILDREN|THREAD)/ ||
 		$2 ~ /^RLIMIT_(AS|CORE|CPU|DATA|FSIZE|LOCKS|MEMLOCK|MSGQUEUE|NICE|NOFILE|NPROC|RSS|RTPRIO|RTTIME|SIGPENDING|STACK)|RLIM_INFINITY/ ||
-		$2 ~ /^PRIO_(PROCESS|PGRP|USER)/ ||
+		$2 ~ /^PRIO_(PROCESS|PGRP|USER|DARWIN_(THREAD|PROCESS|BG|NONUI))/ ||
 		$2 ~ /^CLONE_[A-Z_]+/ ||
 		$2 !~ /^(BPF_TIMEVAL|BPF_FIB_LOOKUP_[A-Z]+|BPF_F_LINK)$/ &&
 		$2 ~ /^(BPF|DLT)_/ ||

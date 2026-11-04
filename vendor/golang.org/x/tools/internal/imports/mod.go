@@ -166,10 +166,7 @@ func newModuleResolver(e *ProcessEnv, moduleCacheCache *DirInfoCache) (*ModuleRe
 		}
 	}
 
-	r.moduleCacheDir = gomodcacheForEnv(goenv)
-	if r.moduleCacheDir == "" {
-		return nil, fmt.Errorf("cannot resolve GOMODCACHE")
-	}
+	r.moduleCacheDir = goenv["GOMODCACHE"]
 
 	sort.Slice(r.modsByModPath, func(i, j int) bool {
 		count := func(x int) int {
@@ -236,26 +233,6 @@ func newModuleResolver(e *ProcessEnv, moduleCacheCache *DirInfoCache) (*ModuleRe
 	}
 	r.otherCache = NewDirInfoCache()
 	return r, nil
-}
-
-// gomodcacheForEnv returns the GOMODCACHE value to use based on the given env
-// map, which must have GOMODCACHE and GOPATH populated.
-//
-// TODO(rfindley): this is defensive refactoring.
-//  1. Is this even relevant anymore? Can't we just read GOMODCACHE.
-//  2. Use this to separate module cache scanning from other scanning.
-func gomodcacheForEnv(goenv map[string]string) string {
-	if gmc := goenv["GOMODCACHE"]; gmc != "" {
-		// golang/go#67156: ensure that the module cache is clean, since it is
-		// assumed as a prefix to directories scanned by gopathwalk, which are
-		// themselves clean.
-		return filepath.Clean(gmc)
-	}
-	gopaths := filepath.SplitList(goenv["GOPATH"])
-	if len(gopaths) == 0 {
-		return ""
-	}
-	return filepath.Join(gopaths[0], "/pkg/mod")
 }
 
 func (r *ModuleResolver) initAllMods() error {
@@ -744,7 +721,16 @@ func (r *ModuleResolver) loadExports(ctx context.Context, pkg *pkg, includeTest 
 
 func (r *ModuleResolver) scanDirForPackage(root gopathwalk.Root, dir string) directoryPackageInfo {
 	subdir := ""
-	if prefix := root.Path + string(filepath.Separator); strings.HasPrefix(dir, prefix) {
+	base := root.Path
+	if root.Type == gopathwalk.RootModuleCache && r.dirInModuleCache(root.Path) {
+		// A RootModuleCache root may be either the module cache itself or
+		// a dependency's module directory within it (see addDep in
+		// newModuleResolver). In both cases, subdir must be relative to
+		// the module cache so that it contains the module@version
+		// component that modCacheRegexp expects.
+		base = r.moduleCacheDir
+	}
+	if prefix := base + string(filepath.Separator); strings.HasPrefix(dir, prefix) {
 		subdir = dir[len(prefix):]
 	}
 	importPath := filepath.ToSlash(subdir)
