@@ -958,14 +958,14 @@ func TestWithTokenVerification_ValidJSONNoRequest(t *testing.T) {
 }
 
 // TestWithTokenVerification_HugeBodyDefaultLimit rejects a decodable review
-// above the default limit before it reaches admission logic.
+// above the default 3MB limit before it reaches admission logic.
 func TestWithTokenVerification_HugeBodyDefaultLimit(t *testing.T) {
 	ts := newOIDCTestServer(t)
 	spy := newSpyHandler()
 	adapter := NewHandlerForTest(ts.verifier(t), spy.serve)
-	body := configMapUpdateReviewBody(t, strings.Repeat("a", 5<<20))
-	if len(body) <= 7<<20 {
-		t.Fatalf("review body = %d bytes, want more than 7 MiB", len(body))
+	body := configMapUpdateReviewBody(t, strings.Repeat("a", 2<<20))
+	if len(body) <= 3<<20 {
+		t.Fatalf("review body = %d bytes, want more than 3 MiB", len(body))
 	}
 	rec := httptest.NewRecorder()
 	adapter.ServeHTTP(rec, newRequest(t, body, ts.sign(t, ts.baseClaims())))
@@ -2409,10 +2409,6 @@ func (v *verifier) Verify(ctx context.Context, req *admissionv1.AdmissionRequest
 	return v.verify(ctx, req, token)
 }
 
-func (v *verifier) CheckDecodedRequestForTest(ctx context.Context, req *admissionv1.AdmissionRequest, groups []string) error {
-	return v.checkDecodedRequest(ctx, req, groups)
-}
-
 func NewHandlerForTest(v *VerifierForTest, delegate AdmissionHandler, opts ...func(*Handler)) *Handler {
 	h := newHandler(v, delegate, defaultMaxBodyBytes)
 	for _, opt := range opts {
@@ -2437,19 +2433,4 @@ func WithMaxBodyBytesForTest(n int64) func(*Handler) {
 // direct table-driven unit testing.
 func BearerTokenForTest(r *http.Request) (string, bool) {
 	return bearerToken(r)
-}
-
-func AllowsAPIGroupForTest(groups []string, group string) bool {
-	return allowsAPIGroup(groups, group)
-}
-
-func BuildInClusterServiceAudienceForTest(name, path string, port uint16, namespaceFile string) (string, error) {
-	return buildInClusterServiceAudience(name, path, port, namespaceFile)
-}
-
-func OptionForTest(fn func(issuer, audience *string, client **http.Client)) Option {
-	return func(b *builder) {
-		b.remoteSet = true
-		fn(&b.issuer, &b.audience, &b.remoteHTTPClient)
-	}
 }

@@ -51,12 +51,13 @@ func TestWithTokenVerificationConstruction(t *testing.T) {
 	}))
 	defer server.Close()
 	var optionsApplied int
-	option := OptionForTest(func(issuer, audience *string, client **http.Client) {
+	option := func(b *builder) {
 		optionsApplied++
-		*issuer = server.URL
-		*audience = "https://webhook.example/validate"
-		*client = server.Client()
-	})
+		b.remoteSet = true
+		b.issuer = server.URL
+		b.audience = "https://webhook.example/validate"
+		b.remoteHTTPClient = server.Client()
+	}
 	if h, err := WithTokenVerification(context.Background(), nil, option); h != nil || err == nil {
 		t.Fatalf("nil callback = (%v, %v), want (nil, error)", h, err)
 	}
@@ -105,7 +106,10 @@ func TestBuildInClusterServiceAudience(t *testing.T) {
 		{name: "empty fragment", svc: "hook", path: "/validate#", port: 443, wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := BuildInClusterServiceAudienceForTest(tc.svc, tc.path, tc.port, namespaceFile)
+			b := newBuilder()
+			WithServiceAudience(tc.svc, tc.path, tc.port)(b)
+			b.namespaceFile = namespaceFile
+			got, err := b.buildInClusterServiceAudience()
 			if tc.wantErr {
 				if err == nil || !strings.Contains(err.Error(), "WithServiceAudience") {
 					t.Fatalf("validation = (%q, %v), want a helpful WithServiceAudience error", got, err)
@@ -134,7 +138,10 @@ func TestBuildInClusterServiceAudience(t *testing.T) {
 				}
 			}
 			// A missing projection must not silently become the default namespace.
-			if _, err := BuildInClusterServiceAudienceForTest("hook", "/validate", 443, path); err == nil || !strings.Contains(err.Error(), "projected Pod namespace") {
+			b := newBuilder()
+			WithServiceAudience("hook", "/validate", 443)(b)
+			b.namespaceFile = path
+			if _, err := b.buildInClusterServiceAudience(); err == nil || !strings.Contains(err.Error(), "projected Pod namespace") {
 				t.Fatalf("namespace validation = %v, want projected namespace error", err)
 			}
 		})

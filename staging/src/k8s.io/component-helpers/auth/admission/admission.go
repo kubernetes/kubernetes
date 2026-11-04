@@ -103,7 +103,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	groups, err := h.verifier.authenticateToken(ctx, token)
 	if err != nil {
-		http.Error(w, genericDenyMessage, http.StatusUnauthorized)
+		denyPreDecode(ctx, w, err.Error())
 		return
 	}
 	review, err := h.decodeReview(r)

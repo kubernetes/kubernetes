@@ -50,7 +50,7 @@ func TestAllowsAPIGroup(t *testing.T) {
 		{name: "multiple unrelated", groups: []string{"extensions", "batch"}, group: "apps"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := AllowsAPIGroupForTest(tc.groups, tc.group); got != tc.want {
+			if got := allowsAPIGroup(tc.groups, tc.group); got != tc.want {
 				t.Fatalf("allowsAPIGroup(%q, %q) = %t, want %t", tc.groups, tc.group, got, tc.want)
 			}
 		})
@@ -677,7 +677,7 @@ func TestAdmissionRequestKindDiagnostics(t *testing.T) {
 		Object:  runtime.RawExtension{Raw: []byte(`{"apiVersion":"batch/v1","kind":"Job","spec":{"credential":"private-payload-credential"}}`)},
 		Options: runtime.RawExtension{Raw: []byte(`{"credential":"private-option-credential"}`)},
 	}
-	err := (&VerifierForTest{}).CheckDecodedRequestForTest(ctx, req, []string{"apps"})
+	err := (&verifier{}).checkDecodedRequest(ctx, req, []string{"apps"})
 	if err == nil || err.Error() != "webhook token verification failed" {
 		t.Fatalf("caller error = %v, want generic verification failure", err)
 	}

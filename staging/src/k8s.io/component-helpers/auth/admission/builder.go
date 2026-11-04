@@ -53,10 +53,13 @@ type builder struct {
 	serviceName        string
 	servicePath        string
 	servicePort        uint16
+	// namespaceFile is the projected ServiceAccount namespace file path,
+	// defaulted by newBuilder to projectedServiceAccountNamespace.
+	namespaceFile string
 }
 
 func newBuilder() *builder {
-	return &builder{}
+	return &builder{namespaceFile: projectedServiceAccountNamespace}
 }
 
 // WithIssuer uses the issuer URL for OIDC discovery and as the expected
@@ -114,7 +117,7 @@ func (b *builder) buildVerifier(ctx context.Context) (*verifier, error) {
 }
 
 func (b *builder) localVerifier(ctx context.Context) (*verifier, error) {
-	audience, err := buildInClusterServiceAudience(b.serviceName, b.servicePath, b.servicePort, projectedServiceAccountNamespace)
+	audience, err := b.buildInClusterServiceAudience()
 	if err != nil {
 		return nil, err
 	}
@@ -127,26 +130,26 @@ func (b *builder) localVerifier(ctx context.Context) (*verifier, error) {
 
 // buildInClusterServiceAudience validates the Service name, path, port, and
 // projected Pod namespace file and formats the expected Service URL audience.
-func buildInClusterServiceAudience(name, path string, port uint16, namespaceFile string) (string, error) {
+func (b *builder) buildInClusterServiceAudience() (string, error) {
 	var errs []error
-	if len(validation.IsDNS1123Label(name)) != 0 {
+	if len(validation.IsDNS1123Label(b.serviceName)) != 0 {
 		errs = append(errs, errors.New("service name must be a valid DNS-1123 label"))
 	}
-	if port == 0 {
+	if b.servicePort == 0 {
 		errs = append(errs, errors.New("service port must be non-zero"))
 	}
-	if path == "" || !strings.HasPrefix(path, "/") {
+	if b.servicePath == "" || !strings.HasPrefix(b.servicePath, "/") {
 		errs = append(errs, errors.New("service path must be non-empty and start with \"/\""))
 	} else {
-		u, err := url.Parse(path)
-		if err != nil || u.Scheme != "" || u.Opaque != "" || u.Host != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(path, "#") || !strings.HasPrefix(u.EscapedPath(), "/") {
+		u, err := url.Parse(b.servicePath)
+		if err != nil || u.Scheme != "" || u.Opaque != "" || u.Host != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(b.servicePath, "#") || !strings.HasPrefix(u.EscapedPath(), "/") {
 			errs = append(errs, errors.New("service path must be a relative URL path without query or fragment"))
 		}
 	}
 	if len(errs) != 0 {
 		return "", fmt.Errorf("admission: invalid WithServiceAudience: %w", errors.Join(errs...))
 	}
-	data, err := os.ReadFile(namespaceFile)
+	data, err := os.ReadFile(b.namespaceFile)
 	if err != nil {
 		return "", fmt.Errorf("admission: reading projected Pod namespace for WithServiceAudience: %w", err)
 	}
@@ -156,8 +159,8 @@ func buildInClusterServiceAudience(name, path string, port uint16, namespaceFile
 	}
 	u := url.URL{
 		Scheme: "https",
-		Host:   fmt.Sprintf("%s.%s.svc:%d", name, podNamespace, port),
-		Path:   path,
+		Host:   fmt.Sprintf("%s.%s.svc:%d", b.serviceName, podNamespace, b.servicePort),
+		Path:   b.servicePath,
 	}
 	return u.String(), nil
 }
