@@ -194,7 +194,7 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 	}, nil
 }
 
-func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
+func getScorer(strategy *config.ScoringStrategy, fts feature.Features) (*resourceAllocationScorer, error) {
 	if strategy == nil {
 		return nil, fmt.Errorf("scoring strategy not specified")
 	}
@@ -202,7 +202,11 @@ func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, err
 	if !exists {
 		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy.Type)
 	}
-	return scorerFactory(strategy), nil
+	scorer := scorerFactory(strategy)
+	scorer.enableInPlacePodVerticalScaling = fts.EnableInPlacePodVerticalScaling
+	scorer.enablePodLevelResources = fts.EnablePodLevelResources
+	scorer.enableInPlacePodLevelResourcesVerticalScaling = fts.EnableInPlacePodLevelResourcesVerticalScaling
+	return scorer, nil
 }
 
 // NewFit initializes a new plugin and returns it.
@@ -215,7 +219,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, err
 	}
 
-	scorer, err := getScorer(args.ScoringStrategy)
+	scorer, err := getScorer(args.ScoringStrategy, fts)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +254,7 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		placementScorer, err := getScorer(&config.ScoringStrategy{
 			Type:      config.MostAllocated,
 			Resources: args.ScoringStrategy.Resources,
-		})
+		}, fts)
 		if err != nil {
 			return nil, err
 		}
