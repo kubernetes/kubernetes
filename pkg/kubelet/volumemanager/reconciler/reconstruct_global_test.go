@@ -47,7 +47,7 @@ func stagedVolume(name, pdName string) volume.GlobalVolume {
 				ObjectMeta: metav1.ObjectMeta{UID: "001", Name: name},
 				Spec: v1.PersistentVolumeSpec{
 					PersistentVolumeSource: v1.PersistentVolumeSource{
-						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: pdName},
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: pdName}, //nolint:staticcheck // SA1019 FakeVolumePlugin names a PV by its GCE PD name
 					},
 				},
 			}, false),
