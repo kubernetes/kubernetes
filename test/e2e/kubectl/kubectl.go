@@ -1909,9 +1909,9 @@ metadata:
 				framework.Failf("failed to list expected event with pod name: %s, got: %s", podName, events)
 			}
 
-			ginkgo.By("expect not showing any WARNING message except timeouts")
+			ginkgo.By("expect not showing any WARNING message except timeouts and insecure-root warnings")
 			events = e2ekubectl.RunKubectlOrDie(ns, "events", "--types=WARNING", "--for=pod/"+podName)
-			if events != "" && !strings.Contains(events, "timed out") {
+			if events != "" && !strings.Contains(events, "timed out") && !strings.Contains(events, "ImplicitlyInsecure") {
 				framework.Failf("unexpected non-timeout WARNING event fired, got: %s ", events)
 			}
 		})

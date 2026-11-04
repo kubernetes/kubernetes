@@ -2142,26 +2142,27 @@ func (kl *Kubelet) updateInsecurePodCountMetric(activePods []*v1.Pod) {
 		if !ok {
 			continue
 		}
-		if _, condition := podutil.GetPodConditionFromList(podStatus.Conditions, v1.InsecureImplicitUserID); condition != nil && condition.Status == v1.ConditionTrue {
-			insecureUIDPodCount++
-		}
 		containerStatuses := make([]v1.ContainerStatus, 0, len(podStatus.InitContainerStatuses)+len(podStatus.ContainerStatuses)+len(podStatus.EphemeralContainerStatuses))
 		containerStatuses = append(containerStatuses, podStatus.InitContainerStatuses...)
 		containerStatuses = append(containerStatuses, podStatus.ContainerStatuses...)
 		containerStatuses = append(containerStatuses, podStatus.EphemeralContainerStatuses...)
-		if status.IsPodImplicitlyInsecurePrimaryGroupID(pod, containerStatuses) {
+		counts := status.FindInsecureIDPodCounts(pod, containerStatuses)
+		if counts.ImplicitUserID {
+			insecureUIDPodCount++
+		}
+		if counts.ImplicitGroupID {
 			insecureGIDPodCount++
 		}
-		if status.IsPodImplicitlyInsecureSupplementalGroups(pod, containerStatuses) {
+		if counts.ImplicitSupplementalGroups {
 			insecureSupplementalGroupsPodCount++
 		}
-		if status.IsPodExplicitlyInsecureUserID(pod, containerStatuses) {
+		if counts.ExplicitUserID {
 			explicitUIDPodCount++
 		}
-		if status.IsPodExplicitlyInsecureGroupID(pod, containerStatuses) {
+		if counts.ExplicitGroupID {
 			explicitGIDPodCount++
 		}
-		if status.IsPodExplicitlyInsecureSupplementalGroups(pod, containerStatuses) {
+		if counts.ExplicitSupplementalGroups {
 			explicitSupplementalGroupsPodCount++
 		}
 	}
