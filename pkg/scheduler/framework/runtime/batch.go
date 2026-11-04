@@ -81,6 +81,11 @@ func (b *OpportunisticBatch) SetDisabled(disabled bool) {
 	b.lastCycle = schedulingCycle{}
 }
 
+// IsDisabled reports whether opportunistic batching is currently disabled.
+func (b *OpportunisticBatch) IsDisabled() bool {
+	return b == nil || b.disabled
+}
+
 // GetNodeHint provides a hint for the pod based on the filtering and scoring results of previous cycles. Caching works
 // only for consecutive pods with the same signature (pods of one PodGroup scheduling cycle also qualify). The node
 // chosen for the previous pod is re-checked first: if it is still feasible it is rescored and competes with the cached
