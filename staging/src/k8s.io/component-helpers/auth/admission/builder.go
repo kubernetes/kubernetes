@@ -130,17 +130,17 @@ func (b *builder) localVerifier(ctx context.Context) (*verifier, error) {
 func buildInClusterServiceAudience(name, path string, port uint16, namespaceFile string) (string, error) {
 	var errs []error
 	if len(validation.IsDNS1123Label(name)) != 0 {
-		errs = append(errs, errors.New("Service name must be a valid DNS-1123 label"))
+		errs = append(errs, errors.New("service name must be a valid DNS-1123 label"))
 	}
 	if port == 0 {
-		errs = append(errs, errors.New("Service port must be non-zero"))
+		errs = append(errs, errors.New("service port must be non-zero"))
 	}
 	if path == "" || !strings.HasPrefix(path, "/") {
-		errs = append(errs, errors.New("Service path must be non-empty and start with \"/\""))
+		errs = append(errs, errors.New("service path must be non-empty and start with \"/\""))
 	} else {
 		u, err := url.Parse(path)
 		if err != nil || u.Scheme != "" || u.Opaque != "" || u.Host != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || strings.Contains(path, "#") || !strings.HasPrefix(u.EscapedPath(), "/") {
-			errs = append(errs, errors.New("Service path must be a relative URL path without query or fragment"))
+			errs = append(errs, errors.New("service path must be a relative URL path without query or fragment"))
 		}
 	}
 	if len(errs) != 0 {
