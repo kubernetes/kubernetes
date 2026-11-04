@@ -166,8 +166,11 @@ func NewController(
 		c.taintRuleSynced = taintRuleInformer.Informer().HasSynced
 	}
 
-	if err := sliceInformer.Informer().AddIndexers(cache.Indexers{sliceDriverIndex: sliceDriverIndexFunc}); err != nil {
-		return nil, fmt.Errorf("adding ResourceSlice driver index: %w", err)
+	// The informer is shared, so the index may already be registered.
+	if _, exists := sliceInformer.Informer().GetIndexer().GetIndexers()[sliceDriverIndex]; !exists {
+		if err := sliceInformer.Informer().AddIndexers(cache.Indexers{sliceDriverIndex: sliceDriverIndexFunc}); err != nil {
+			return nil, fmt.Errorf("adding ResourceSlice driver index: %w", err)
+		}
 	}
 
 	// Register metrics
@@ -384,7 +387,7 @@ const sliceDriverIndex = "resourcepoolstatusrequest-driver"
 
 func sliceDriverIndexFunc(obj interface{}) ([]string, error) {
 	slice, ok := obj.(*resourcev1.ResourceSlice)
-	if !ok {
+	if !ok || slice.Spec.Driver == "" {
 		return nil, nil
 	}
 	return []string{slice.Spec.Driver}, nil

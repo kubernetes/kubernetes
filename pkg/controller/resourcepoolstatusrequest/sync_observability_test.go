@@ -292,6 +292,28 @@ func TestDeleteForgetsRetries(t *testing.T) {
 	}
 }
 
+// Another user of the shared informer may have registered the index first.
+func TestNewControllerToleratesExistingIndex(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	client := fake.NewClientset()
+	_, informerFactory := newObservabilityController(t, ctx, client)
+	if _, err := NewController(ctx, client,
+		informerFactory.Resource().V1alpha3().ResourcePoolStatusRequests(),
+		informerFactory.Resource().V1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().DeviceTaintRules(),
+	); err != nil {
+		t.Fatalf("Second NewController on the same informer: %v", err)
+	}
+}
+
+func TestSliceDriverIndexSkipsEmptyDriver(t *testing.T) {
+	keys, err := sliceDriverIndexFunc(&resourcev1.ResourceSlice{})
+	if err != nil || len(keys) != 0 {
+		t.Errorf("sliceDriverIndexFunc(empty driver) = %q, %v; want no keys", keys, err)
+	}
+}
+
 func newObservabilityController(t *testing.T, ctx context.Context, client *fake.Clientset) (*Controller, informers.SharedInformerFactory) {
 	t.Helper()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)

@@ -2486,7 +2486,7 @@ type ResourcePoolStatusRequestStatus struct {
 
 	// Conditions provide information about the state of the request.
 	// The final status always has a condition with type=Complete or
-	// type=Failed. A status with only a WaitingForPools condition means the
+	// type=Failed. A status with only a type=WaitingForPools,status=True condition means the
 	// controller is waiting for incomplete pools.
 	// +optional
 	Conditions []metav1.Condition
