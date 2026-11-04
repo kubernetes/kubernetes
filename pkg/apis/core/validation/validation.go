@@ -5786,15 +5786,22 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 
 	// validate updated container images
 	for i, ctr := range newContainers {
-		if len(ctr.Image) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("image"), ""))
-		}
-		// this is only called from ValidatePodUpdate so its safe to check leading/trailing whitespace.
-		if len(strings.TrimSpace(ctr.Image)) != len(ctr.Image) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
-		}
+		allErrs = append(allErrs, validateContainerImage(ctr.Image, fldPath.Index(i).Child("image"))...)
 	}
 	return allErrs, false
+}
+
+// validateContainerImage validates a container image on pod update. This is
+// stricter than on create, which is shared with pod templates.
+func validateContainerImage(image string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(image) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+	if len(strings.TrimSpace(image)) != len(image) {
+		allErrs = append(allErrs, field.Invalid(fldPath, image, "must not have leading or trailing whitespace"))
+	}
+	return allErrs
 }
 
 // ValidatePodCreate validates a pod in the context of its initial create
@@ -5904,6 +5911,14 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod.Annotations, fldPath.Child("annotations"), opts)...)
+	allErrs = append(allErrs, validatePodSpecUpdate(newPod, oldPod, opts)...)
+	return allErrs
+}
+
+// validatePodSpecUpdate validates that only the fields that are mutable through
+// a regular pod update differ between newPod.Spec and oldPod.Spec.
+func validatePodSpecUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
 	specPath := field.NewPath("spec")
 
 	// validate updateable fields:
@@ -6544,7 +6559,6 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 // newPod and oldPod must only differ in their Containers[*].Resources and
 // Containers[*].ResizePolicy field.
 func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
-	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
@@ -6564,16 +6578,6 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
 	}
 
-	// Part 2: Validate that changes between pod-level resources in oldPod.Spec.Resources and
-	// newPod.Spec.Resources are allowed.
-
-	isPodLevelResourcesSet := func(pod *core.Pod) bool {
-		return pod.Spec.Resources != nil &&
-			(len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) > 0)
-	}
-
-	newPodSpecCopy := *newPod.Spec.DeepCopy()
-
 	if isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod) {
 		// pods with pod-level resources cannot be resized without
 		// InPlacePodLevelResourcesVerticalScaling feature gate being enabled.
@@ -6581,145 +6585,143 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 			allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "resize of pods with pod-level resources is forbidden when InPlacePodLevelResourcesVerticalScalingEnabled feature gate is disabled"))
 			return allErrs
 		}
-
-		// newPodSpecCopy is passed by reference to allow
-		// newPodSpecCopy.Resources to be mutated which is required for an
-		// intermediate validation step.
-		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, &newPodSpecCopy, specPath, opts)...)
 	}
 
-	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
-	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
-	// newPod.Spec.InitContainers[].Resources are allowed.
+	resizeErrs, mungedPodSpec := validateResizableSpecChanges(newPod, oldPod, specPath, opts)
+	allErrs = append(allErrs, resizeErrs...)
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+
+	// Validate that nothing other than the resizable fields changed.
+	for ix := range mungedPodSpec.Containers {
+		if !apiequality.Semantic.DeepEqual(mungedPodSpec.Containers[ix], oldPod.Spec.Containers[ix]) {
+			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
+			allErrs = append(allErrs, field.Forbidden(specPath, "only cpu and memory resources are mutable"))
+		}
+	}
+	for ix := range mungedPodSpec.InitContainers {
+		if apiequality.Semantic.DeepEqual(mungedPodSpec.InitContainers[ix], oldPod.Spec.InitContainers[ix]) {
+			continue
+		}
+		if isInitContainerResizable(&oldPod.Spec.InitContainers[ix]) {
+			// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable"))
+		} else {
+			// This likely means that the user has modified resources of non-sidecar init container.
+			allErrs = append(allErrs, field.Forbidden(specPath, "resources for non-sidecar init containers are immutable"))
+		}
+	}
+	volumesPath := specPath.Child("volumes")
+	if !opts.InPlacePodVerticalScalingMemoryBackedVolumesEnabled {
+		if !apiequality.Semantic.DeepEqual(newPod.Spec.Volumes, oldPod.Spec.Volumes) {
+			allErrs = append(allErrs, field.Forbidden(volumesPath, "volumes are immutable on resize when InPlacePodVerticalScalingMemoryBackedVolumes feature gate is disabled"))
+		}
+	} else if len(mungedPodSpec.Volumes) != len(oldPod.Spec.Volumes) {
+		allErrs = append(allErrs, field.Forbidden(volumesPath, "volumes may not be added or removed on resize"))
+	} else {
+		for i := range mungedPodSpec.Volumes {
+			if mungedPodSpec.Volumes[i].Name != oldPod.Spec.Volumes[i].Name {
+				allErrs = append(allErrs, field.Forbidden(volumesPath.Index(i).Child("name"), "volumes may not be renamed or reordered on resize"))
+			} else if !apiequality.Semantic.DeepEqual(mungedPodSpec.Volumes[i], oldPod.Spec.Volumes[i]) {
+				allErrs = append(allErrs, field.Forbidden(volumesPath.Index(i), "only sizeLimit of memory-backed emptyDir volumes is mutable on resize"))
+			}
+		}
+	}
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+
+	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
+		// This likely means that the user has made changes to resources other than CPU and Memory.
+		errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
+		allErrs = append(allErrs, errs)
+	}
+	return allErrs
+}
+
+func isPodLevelResourcesSet(pod *core.Pod) bool {
+	return pod.Spec.Resources != nil &&
+		(len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) > 0)
+}
+
+func isInitContainerResizable(ctr *core.Container) bool {
+	return isRestartableInitContainer(ctr) || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)
+}
+
+// validateResizableSpecChanges validates changes to the in-place resizable
+// fields, and returns a copy of newPod.Spec with the valid changes reverted.
+// Changes to any other fields are left for the caller.
+func validateResizableSpecChanges(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) (field.ErrorList, core.PodSpec) {
+	var allErrs field.ErrorList
+
+	var mungedPodSpec core.PodSpec
+	if opts.InPlacePodLevelResourcesVerticalScalingEnabled && (isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod)) {
+		var errs field.ErrorList
+		errs, mungedPodSpec = validatePodLevelResourcesResize(newPod, oldPod, specPath, opts)
+		allErrs = append(allErrs, errs...)
+	} else {
+		mungedPodSpec = *newPod.Spec.DeepCopy()
+	}
 
 	// The rest of the validation assumes that the containers are in the same order,
 	// so we proceed only if that assumption is true.
 	containerOrderErrs := validatePodResizeContainerOrdering(newPod, oldPod, specPath)
 	allErrs = append(allErrs, containerOrderErrs...)
 	if containerOrderErrs != nil {
-		return allErrs
+		return allErrs, mungedPodSpec
 	}
 
-	// Do not allow removing resource requests/limits on resize.
-	for ix, ctr := range oldPod.Spec.InitContainers {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) && !isRestartableInitContainer(&ctr) {
-			continue
-		}
-		allErrs = append(allErrs, validateContainerResize(
-			&newPod.Spec.InitContainers[ix].Resources,
-			&oldPod.Spec.InitContainers[ix].Resources,
-			newPod.Spec.InitContainers[ix].ResizePolicy,
-			specPath.Child("initContainers").Index(ix).Child("resources"))...)
-	}
-	for ix := range oldPod.Spec.Containers {
+	for ix := range mungedPodSpec.Containers {
 		allErrs = append(allErrs, validateContainerResize(
 			&newPod.Spec.Containers[ix].Resources,
 			&oldPod.Spec.Containers[ix].Resources,
 			newPod.Spec.Containers[ix].ResizePolicy,
 			specPath.Child("containers").Index(ix).Child("resources"))...)
+		dropResizableResourcesFromContainer(&mungedPodSpec.Containers[ix], &oldPod.Spec.Containers[ix])
 	}
 
-	// Ensure that only CPU and memory resources are mutable for regular containers.
-	var newContainers []core.Container
-	for ix, container := range newPodSpecCopy.Containers {
-		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
-		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.Containers[ix]) {
-			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
-			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
-			allErrs = append(allErrs, errs)
+	for ix := range mungedPodSpec.InitContainers {
+		oldCtr := &oldPod.Spec.InitContainers[ix]
+		if !isInitContainerResizable(oldCtr) {
+			continue
 		}
-		newContainers = append(newContainers, container)
-	}
-	newPodSpecCopy.Containers = newContainers
-
-	// Ensure that only CPU and memory resources are mutable for restartable init containers.
-	var newInitContainers []core.Container
-	for ix, container := range newPodSpecCopy.InitContainers {
-		isRestartable := isRestartableInitContainer(&container)
-		canResize := isRestartable || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)
-		modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
-
-		if canResize {
-			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
-			if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
-				// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
-				errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
-				allErrs = append(allErrs, errs)
-			}
-			if modifiedContainer && !isRestartable {
-				for _, resizePolicy := range container.ResizePolicy {
-					if resizePolicy.RestartPolicy == core.RestartContainer {
-						// TODO: This validation check can eventually be removed in 1.40,
-						// as https://github.com/kubernetes/kubernetes/pull/137458 prohibits
-						// the ability to set RestartContainer resize policy for non-sidecar init containers.
-						errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "non-sidecar init containers with a resize policy of RestartContainer cannot be resized")
-						allErrs = append(allErrs, errs)
-					}
-				}
-			}
-		} else if modifiedContainer { // modified non-resizable init container
-			// This likely means that the user has modified resources of non-sidecar init container.
-			errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
-			allErrs = append(allErrs, errs)
-		}
-		newInitContainers = append(newInitContainers, container)
-	}
-	newPodSpecCopy.InitContainers = newInitContainers
-
-	// Part 5: Validate that the changes between oldPod.Spec.Volumes and
-	// newPod.Spec.Volumes are allowed. Only sizeLimit of memory-backed emptyDir volumes is mutable on resize.
-	if opts.InPlacePodVerticalScalingMemoryBackedVolumesEnabled {
-		if len(newPod.Spec.Volumes) != len(oldPod.Spec.Volumes) {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("volumes"), "volumes may not be added or removed on resize"))
-		} else {
-			for i, newVol := range newPod.Spec.Volumes {
-				oldVol := oldPod.Spec.Volumes[i]
-				volPath := field.NewPath("spec").Child("volumes").Index(i)
-				if newVol.Name != oldVol.Name {
-					allErrs = append(allErrs, field.Forbidden(volPath.Child("name"), "volumes may not be renamed or reordered on resize"))
-					continue
-				}
-				newVolToCompare := &newVol
-				if newVol.EmptyDir != nil && oldVol.EmptyDir != nil {
-					newVolCopy := newVol.DeepCopy()
-					newVolCopy.EmptyDir.SizeLimit = oldVol.EmptyDir.SizeLimit // +k8s:verify-mutation:reason=clone
-					newVolToCompare = newVolCopy
-				}
-				if !apiequality.Semantic.DeepEqual(newVolToCompare, &oldVol) {
-					allErrs = append(allErrs, field.Forbidden(volPath, "only sizeLimit of memory-backed emptyDir volumes is mutable on resize"))
-					continue
-				}
-				// If it is emptyDir, check mutable constraints
-				if newVol.EmptyDir != nil && oldVol.EmptyDir != nil {
-					hasOldLimit := oldVol.EmptyDir.SizeLimit != nil && !oldVol.EmptyDir.SizeLimit.IsZero()
-					hasNewLimit := newVol.EmptyDir.SizeLimit != nil && !newVol.EmptyDir.SizeLimit.IsZero()
-					if hasOldLimit != hasNewLimit {
-						allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "adding or removing sizeLimit on an existing volume is not allowed"))
-					} else if oldVol.EmptyDir.SizeLimit != nil && newVol.EmptyDir.SizeLimit != nil {
-						if oldVol.EmptyDir.SizeLimit.Cmp(*newVol.EmptyDir.SizeLimit) != 0 {
-							if newVol.EmptyDir.Medium != core.StorageMediumMemory {
-								allErrs = append(allErrs, field.Forbidden(volPath.Child("emptyDir").Child("sizeLimit"), "sizeLimit is only mutable for memory-backed emptyDir volumes"))
-							}
-						}
-					}
+		newCtr := &newPod.Spec.InitContainers[ix]
+		ctrPath := specPath.Child("initContainers").Index(ix)
+		allErrs = append(allErrs, validateContainerResize(&newCtr.Resources, &oldCtr.Resources, newCtr.ResizePolicy, ctrPath.Child("resources"))...)
+		if !isRestartableInitContainer(oldCtr) && !apiequality.Semantic.DeepEqual(newCtr.Resources, oldCtr.Resources) {
+			for _, resizePolicy := range newCtr.ResizePolicy {
+				if resizePolicy.RestartPolicy == core.RestartContainer {
+					// TODO: This validation check can eventually be removed in 1.40,
+					// as https://github.com/kubernetes/kubernetes/pull/137458 prohibits
+					// the ability to set RestartContainer resize policy for non-sidecar init containers.
+					allErrs = append(allErrs, field.Forbidden(ctrPath, "non-sidecar init containers with a resize policy of RestartContainer cannot be resized"))
 				}
 			}
 		}
-		newPodSpecCopy.Volumes = oldPod.Spec.Volumes // +k8s:verify-mutation:reason=clone
-	} else if !apiequality.Semantic.DeepEqual(newPod.Spec.Volumes, oldPod.Spec.Volumes) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec").Child("volumes"), "volumes are immutable on resize when InPlacePodVerticalScalingMemoryBackedVolumes feature gate is disabled"))
+		dropResizableResourcesFromContainer(&mungedPodSpec.InitContainers[ix], oldCtr)
 	}
 
-	if len(allErrs) > 0 {
-		return allErrs
+	// Only sizeLimit of memory-backed emptyDir volumes is mutable on resize.
+	if opts.InPlacePodVerticalScalingMemoryBackedVolumesEnabled && len(newPod.Spec.Volumes) == len(oldPod.Spec.Volumes) {
+		for i := range mungedPodSpec.Volumes {
+			newVol, oldVol := &mungedPodSpec.Volumes[i], &oldPod.Spec.Volumes[i]
+			if newVol.Name != oldVol.Name || newVol.EmptyDir == nil || oldVol.EmptyDir == nil {
+				continue
+			}
+			sizeLimitPath := specPath.Child("volumes").Index(i).Child("emptyDir", "sizeLimit")
+			hasOldLimit := oldVol.EmptyDir.SizeLimit != nil && !oldVol.EmptyDir.SizeLimit.IsZero()
+			hasNewLimit := newVol.EmptyDir.SizeLimit != nil && !newVol.EmptyDir.SizeLimit.IsZero()
+			if hasOldLimit != hasNewLimit {
+				allErrs = append(allErrs, field.Forbidden(sizeLimitPath, "adding or removing sizeLimit on an existing volume is not allowed"))
+			} else if hasOldLimit && oldVol.EmptyDir.SizeLimit.Cmp(*newVol.EmptyDir.SizeLimit) != 0 && newVol.EmptyDir.Medium != core.StorageMediumMemory {
+				allErrs = append(allErrs, field.Forbidden(sizeLimitPath, "sizeLimit is only mutable for memory-backed emptyDir volumes"))
+			}
+			newVol.EmptyDir.SizeLimit = oldVol.EmptyDir.SizeLimit // +k8s:verify-mutation:reason=clone
+		}
 	}
 
-	if !apiequality.Semantic.DeepEqual(newPodSpecCopy, oldPod.Spec) {
-		// This likely means that the user has made changes to resources other than CPU and Memory.
-		errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
-		allErrs = append(allErrs, errs)
-	}
-	return allErrs
+	return allErrs, mungedPodSpec
 }
 
 // validatePodResizeContainerOrdering validates container ordering for a resize request.
@@ -6748,23 +6750,24 @@ func validatePodResizeContainerOrdering(newPod, oldPod *core.Pod, specPath *fiel
 }
 
 // validatePodLevelResourcesResize validates updates to pod-level resource requests/limits
-// for in-place resizing, and is intentionally designed to mutate the
-// podSpecToMutate, which is a deep copy of newPod.Spec
+// for in-place resizing, and returns a copy of newPod.Spec with the valid pod-level resource
+// changes reverted.
 //
-// The function performs a masking operation on its .Resources field:
+// The function performs a masking operation on the copy's .Resources field:
 //
 // 1. Masking/Equalization: It modifies .Resources by dropping CPU/Memory
-// resource values in podSpecToMutate, and then copying specific CPU/Memory resource
+// resource values in the copy, and then copying specific CPU/Memory resource
 // values to match oldPod.Spec.Resources.
 // 2. Integrity Check: The resulting mutated spec is used to perform an equality
 // comparison (DeepEqual) against oldPod.Spec. If the specs match after masking,
 // it guarantees that no changes were made other than the allowed resource modifications
 // needed for the resize.
-func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *core.PodSpec, specPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) (field.ErrorList, core.PodSpec) {
 	var allErrs field.ErrorList
+	mungedPodSpec := *newPod.Spec.DeepCopy()
 
 	if oldPod.Spec.Resources != nil && newPod.Spec.Resources == nil {
-		return append(allErrs, field.Forbidden(specPath.Child("resources"), "pod-level resources cannot be removed"))
+		return append(allErrs, field.Forbidden(specPath.Child("resources"), "pod-level resources cannot be removed")), mungedPodSpec
 	}
 
 	if oldPod.Spec.Resources != nil {
@@ -6778,9 +6781,9 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 
 	}
 
-	podSpecToMutate.Resources = dropCPUMemoryResourceRequirementsUpdates(podSpecToMutate.Resources, oldPod.Spec.Resources)
+	mungedPodSpec.Resources = dropResizableResourceRequirementsUpdates(mungedPodSpec.Resources, oldPod.Spec.Resources)
 
-	if !apiequality.Semantic.DeepEqual(podSpecToMutate.Resources, oldPod.Spec.Resources) {
+	if !apiequality.Semantic.DeepEqual(mungedPodSpec.Resources, oldPod.Spec.Resources) {
 		// This likely means that the user has made changes to pod-level resources other
 		// than CPU and memory.
 		errs := field.Forbidden(specPath, "only cpu and memory resources are mutable at pod-level")
@@ -6800,10 +6803,10 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		}
 	}
 
-	return allErrs
+	return allErrs, mungedPodSpec
 }
 
-func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
 	var mungedResourceList core.ResourceList
 	if resourceList == nil {
 		if oldResourceList == nil {
@@ -6813,31 +6816,28 @@ func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.
 	} else {
 		mungedResourceList = resourceList.DeepCopy()
 	}
-	delete(mungedResourceList, core.ResourceCPU)
-	delete(mungedResourceList, core.ResourceMemory)
-	if cpu, found := oldResourceList[core.ResourceCPU]; found {
-		mungedResourceList[core.ResourceCPU] = cpu
-	}
-	if mem, found := oldResourceList[core.ResourceMemory]; found {
-		mungedResourceList[core.ResourceMemory] = mem
+	for r := range supportedResizeResources {
+		delete(mungedResourceList, r)
+		if quantity, found := oldResourceList[r]; found {
+			mungedResourceList[r] = quantity
+		}
 	}
 	return mungedResourceList
 }
 
-// dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the
-// container, and copies them from the old pod container resources if present.
-// TODO(ndixita): refactor to reuse dropCPUMemoryResourceRequirementsUpdates
-func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
-	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
-	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
+// dropResizableResourcesFromContainer reverts the updates to resizable resources from the
+// container.
+// TODO(ndixita): refactor to reuse dropResizableResourceRequirementsUpdates
+func dropResizableResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
+	lim := dropResizableResourceUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
+	req := dropResizableResourceUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
 	// Resource claims are immutable during pod resize and the original configuration must be preserved.
 	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req, Claims: container.Resources.Claims}
 }
 
-// dropCPUMemoryResourceRequirementsUpdates deletes the cpu and memory resources
-// from the `resources` field, and copies them from old Pod spec's resources field
-// if present.
-func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements) *core.ResourceRequirements {
+// dropResizableResourceRequirementsUpdates reverts the updates to resizable resources
+// from the `resources` field.
+func dropResizableResourceRequirementsUpdates(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements) *core.ResourceRequirements {
 	if resources == nil {
 		return resources
 	}
@@ -6851,8 +6851,8 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		oldLims = oldPodResources.Limits // +k8s:verify-mutation:reason=clone'
 	}
 
-	resources.Requests = dropCPUMemoryUpdates(resources.Requests, oldReqs)
-	resources.Limits = dropCPUMemoryUpdates(resources.Limits, oldLims)
+	resources.Requests = dropResizableResourceUpdates(resources.Requests, oldReqs)
+	resources.Limits = dropResizableResourceUpdates(resources.Limits, oldLims)
 
 	// Set the entire Resources block to nil if two conditions are met:
 	// 1. The old PodSpec Resources lacked any Resources
