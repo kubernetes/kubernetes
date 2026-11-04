@@ -1566,6 +1566,63 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 		},
 		{
+			name:   "test List with indexed field selector and inconsistent continue returning single matching item, ensure only a single page returned",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field:       fields.OneTermEqualSelector("spec.nodeName", "fakeNode"),
+				Label:       labels.Everything(),
+				IndexFields: []string{"spec.nodeName"},
+				Limit:       1,
+				Continue:    encodeContinueOrDie("a", -1),
+			},
+			expectedOut:    []example.Pod{*updatedPod},
+			expectRV:       currentRV,
+			expectContinue: !watchCacheEnabled || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot),
+			expectContinueExact: func() string {
+				if watchCacheEnabled && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return ""
+				}
+				return encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(mustAtoi(currentRV)))
+			}(),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:   "/registry/pods/a",
+						Limit: 1,
+					},
+				}
+			},
+		},
+		{
+			name:   "test List with indexed field selector and inconsistent continue skipping first match, more pages in index",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Field:       fields.OneTermEqualSelector("spec.nodeName", ""),
+				Label:       labels.Everything(),
+				IndexFields: []string{"spec.nodeName"},
+				Limit:       1,
+				Continue:    encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", -1),
+			},
+			expectedOut:         []example.Pod{*createdPods[2]},
+			expectRV:            currentRV,
+			expectContinue:      true,
+			expectContinueExact: encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(currentRV))),
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:   "/registry/pods/" + createdPods[1].Namespace + "/" + createdPods[1].Name + "\x00",
+						Limit: 1,
+					},
+				}
+			},
+		},
+		{
 			name:   "verify list does not return deleted object; filter for deleted object, page size equal to total list size with current resource version and match=NotOlderThan",
 			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
