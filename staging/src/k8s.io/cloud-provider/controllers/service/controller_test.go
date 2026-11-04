@@ -209,6 +209,20 @@ func newController(ctx context.Context, objects ...runtime.Object) (*Controller,
 	return controller, cloud, kubeClient
 }
 
+// filterOutInformerActions filters list and watch actions on services from the informer.
+// The informer runs in the background and performs list/watch - these are expected
+// and not from the code under test. See https://github.com/kubernetes/client-go/issues/607
+func filterOutInformerActions(actions []core.Action) []core.Action {
+	var filtered []core.Action
+	for _, a := range actions {
+		if a.Matches("list", "services") || a.Matches("watch", "services") {
+			continue
+		}
+		filtered = append(filtered, a)
+	}
+	return filtered
+}
+
 // TODO(@MrHohn): Verify the end state when below issue is resolved:
 // https://github.com/kubernetes/client-go/issues/607
 func TestSyncLoadBalancerIfNeeded(t *testing.T) {
@@ -302,6 +316,9 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			}
 			// Capture actions from test so it won't be messed up.
 			actions := client.Actions()
+			// Filter out list/watch actions from the informer - they run in the background
+			// and are not from syncLoadBalancerIfNeeded. See https://github.com/kubernetes/client-go/issues/607
+			actions = filterOutInformerActions(actions)
 
 			if !tc.expectCreateAttempt && !tc.expectDeleteAttempt {
 				if len(cloud.Calls) > 0 {
