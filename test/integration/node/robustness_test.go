@@ -86,21 +86,20 @@ func TestLeaseReconcileRobustnessMatrix(t *testing.T) {
 		leaseInformer := informerFactory.Coordination().V1().Leases()
 		dsInformer := fixture.WrapDaemonSetInformer(informerFactory.Apps().V1().DaemonSets())
 
-		nc, err := nodelifecycle.NewNodeLifecycleController(
-			fixture.Context(),
-			leaseInformer,
-			podInformer,
-			nodeInformer,
-			dsInformer,
-			fixture.ClientSet(),
-			100*time.Millisecond,   // node monitor period
-			time.Minute,            // node startup grace period
-			nodeMonitorGracePeriod, // node monitor grace period
-			100,                    // Eviction limiter QPS
-			100,                    // Secondary eviction limiter QPS
-			50,                     // Large cluster threshold
-			0.55,                   // Unhealthy zone threshold
-		)
+		nc, err := nodelifecycle.NewNodeLifecycleController(fixture.Context(), nodelifecycle.ControllerOptions{
+			LeaseInformer:               leaseInformer,
+			PodInformer:                 podInformer,
+			NodeInformer:                nodeInformer,
+			DaemonSetInformer:           dsInformer,
+			KubeClient:                  fixture.ClientSet(),
+			NodeMonitorPeriod:           100 * time.Millisecond,
+			NodeStartupGracePeriod:      time.Minute,
+			NodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+			EvictionLimiterQPS:          100,
+			SecondaryEvictionLimiterQPS: 100,
+			LargeClusterThreshold:       50,
+			UnhealthyZoneThreshold:      0.55,
+		})
 		if err != nil {
 			tCtx.Fatalf("Failed to create NodeLifecycle controller: %v", err)
 		}
