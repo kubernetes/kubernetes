@@ -50,6 +50,8 @@ type AcceptObjectFunc[T metav1.Object] func(obj runtime.Object) ([]T, error)
 // and deterministic sorting by name. The decoder should be created by the caller
 // with whatever scheme is appropriate (e.g., with full internal type install for
 // kube-apiserver, or a minimal v1-only scheme for other consumers).
+// Errors caused by the manifest content, rather than by reading it, are
+// returned as *manifest.InvalidContentError.
 func LoadPolicyManifests[P, B metav1.Object](
 	dir string,
 	decoder runtime.Decoder,
@@ -70,19 +72,19 @@ func LoadPolicyManifests[P, B metav1.Object](
 	for _, fd := range fileDocs {
 		obj, _, err := decoder.Decode(fd.Doc, nil, nil)
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("error loading %s: %w", fd.FilePath, err)
+			return nil, nil, "", &manifest.InvalidContentError{Hash: hash, Err: fmt.Errorf("error loading %s: %w", fd.FilePath, err)}
 		}
 
 		newPolicies, newBindings, err := acceptFileObject(obj, fd.FilePath, seenPolicyNames, seenBindingNames, decoder, acceptPolicy, acceptBinding)
 		if err != nil {
-			return nil, nil, "", fmt.Errorf("error loading %s: %w", fd.FilePath, err)
+			return nil, nil, "", &manifest.InvalidContentError{Hash: hash, Err: fmt.Errorf("error loading %s: %w", fd.FilePath, err)}
 		}
 		policies = append(policies, newPolicies...)
 		bindings = append(bindings, newBindings...)
 	}
 
 	if err := validateBindingReferences(policies, bindings, getBindingPolicyName); err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", &manifest.InvalidContentError{Hash: hash, Err: err}
 	}
 
 	sort.Slice(policies, func(i, j int) bool {

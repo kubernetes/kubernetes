@@ -17,6 +17,7 @@ limitations under the License.
 package loader
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 var (
@@ -294,6 +296,21 @@ spec:
 			wantErr:        true,
 			wantErrContain: "must end with",
 		},
+		{
+			name: "strict decoding error",
+			files: map[string]string{
+				"policy.yaml": `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: test-policy.static.k8s.io
+spec:
+  unknownField: true
+`,
+			},
+			wantErr:        true,
+			wantErrContain: "unknown field",
+		},
 	}
 
 	for _, tt := range tests {
@@ -317,10 +334,12 @@ spec:
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error but got none")
-				} else if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Fatal("expected error but got none")
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
 					t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
 				}
+				assertInvalidContentError(t, dir, err)
 				return
 			}
 			if err != nil {
@@ -359,5 +378,22 @@ func TestValidateBindingReferences(t *testing.T) {
 
 	if err := validateBindingReferences(policies, badBindings, getBindPolicy); err == nil {
 		t.Error("expected error for binding referencing non-existent policy")
+	}
+}
+
+// assertInvalidContentError checks that err carries the hash of the manifest
+// content in dir, so that reload callers can skip the same invalid content.
+func assertInvalidContentError(t *testing.T, dir string, err error) {
+	t.Helper()
+	contentErr, ok := errors.AsType[*manifest.InvalidContentError](err)
+	if !ok {
+		t.Fatalf("expected InvalidContentError, got %T: %v", err, err)
+	}
+	_, wantHash, loadErr := manifest.LoadFiles(dir)
+	if loadErr != nil {
+		t.Fatalf("LoadFiles() unexpected error: %v", loadErr)
+	}
+	if contentErr.Hash != wantHash {
+		t.Errorf("InvalidContentError hash = %q, want %q", contentErr.Hash, wantHash)
 	}
 }
