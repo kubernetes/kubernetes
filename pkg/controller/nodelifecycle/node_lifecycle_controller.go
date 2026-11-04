@@ -308,24 +308,26 @@ type Controller struct {
 	podUpdateQueue  workqueue.TypedRateLimitingInterface[podUpdateItem]
 }
 
+// ControllerOptions holds options for creating a node lifecycle controller.
+type ControllerOptions struct {
+	LeaseInformer               coordinformers.LeaseInformer
+	PodInformer                 coreinformers.PodInformer
+	NodeInformer                coreinformers.NodeInformer
+	DaemonSetInformer           appsv1informers.DaemonSetInformer
+	KubeClient                  clientset.Interface
+	NodeMonitorPeriod           time.Duration
+	NodeStartupGracePeriod      time.Duration
+	NodeMonitorGracePeriod      time.Duration
+	EvictionLimiterQPS          float32
+	SecondaryEvictionLimiterQPS float32
+	LargeClusterThreshold       int32
+	UnhealthyZoneThreshold      float32
+}
+
 // NewNodeLifecycleController returns a new taint controller.
-func NewNodeLifecycleController(
-	ctx context.Context,
-	leaseInformer coordinformers.LeaseInformer,
-	podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer,
-	daemonSetInformer appsv1informers.DaemonSetInformer,
-	kubeClient clientset.Interface,
-	nodeMonitorPeriod time.Duration,
-	nodeStartupGracePeriod time.Duration,
-	nodeMonitorGracePeriod time.Duration,
-	evictionLimiterQPS float32,
-	secondaryEvictionLimiterQPS float32,
-	largeClusterThreshold int32,
-	unhealthyZoneThreshold float32,
-) (*Controller, error) {
+func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*Controller, error) {
 	logger := klog.FromContext(ctx)
-	if kubeClient == nil {
+	if opts.KubeClient == nil {
 		logger.Error(nil, "kubeClient is nil when starting nodelifecycle Controller")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
@@ -334,23 +336,23 @@ func NewNodeLifecycleController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 
 	nc := &Controller{
-		kubeClient:                  kubeClient,
+		kubeClient:                  opts.KubeClient,
 		now:                         metav1.Now,
 		knownNodeSet:                make(map[string]*v1.Node),
 		nodeHealthMap:               newNodeHealthMap(),
 		broadcaster:                 eventBroadcaster,
 		recorder:                    recorder,
-		nodeMonitorPeriod:           nodeMonitorPeriod,
-		nodeStartupGracePeriod:      nodeStartupGracePeriod,
-		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		nodeMonitorPeriod:           opts.NodeMonitorPeriod,
+		nodeStartupGracePeriod:      opts.NodeStartupGracePeriod,
+		nodeMonitorGracePeriod:      opts.NodeMonitorGracePeriod,
 		nodeUpdateWorkerSize:        nodeUpdateWorkerSize,
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
 		nodesToRetry:                sync.Map{},
 		zoneStates:                  make(map[string]ZoneState),
-		evictionLimiterQPS:          evictionLimiterQPS,
-		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
-		largeClusterThreshold:       largeClusterThreshold,
-		unhealthyZoneThreshold:      unhealthyZoneThreshold,
+		evictionLimiterQPS:          opts.EvictionLimiterQPS,
+		secondaryEvictionLimiterQPS: opts.SecondaryEvictionLimiterQPS,
+		largeClusterThreshold:       opts.LargeClusterThreshold,
+		unhealthyZoneThreshold:      opts.UnhealthyZoneThreshold,
 		nodeUpdateQueue:             workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node_lifecycle_controller"}),
 		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
@@ -365,7 +367,7 @@ func NewNodeLifecycleController(
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
-	_, _ = podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, _ = opts.PodInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*v1.Pod)
 			nc.podUpdated(nil, pod)
@@ -376,9 +378,9 @@ func NewNodeLifecycleController(
 			nc.podUpdated(prevPod, newPod)
 		},
 	}, cache.HandlerOptions{Logger: &logger})
-	nc.podInformerSynced = podInformer.Informer().HasSynced
-	controller.AddPodNodeNameIndexer(podInformer.Informer())
-	podIndexer := podInformer.Informer().GetIndexer()
+	nc.podInformerSynced = opts.PodInformer.Informer().HasSynced
+	_ = controller.AddPodNodeNameIndexer(opts.PodInformer.Informer())
+	podIndexer := opts.PodInformer.Informer().GetIndexer()
 	nc.getPodsAssignedToNode = func(nodeName string) ([]*v1.Pod, error) {
 		objs, err := podIndexer.ByIndex(controller.PodNodeNameKeyIndex, nodeName)
 		if err != nil {
@@ -394,11 +396,11 @@ func NewNodeLifecycleController(
 		}
 		return pods, nil
 	}
-	nc.podLister = podInformer.Lister()
-	nc.nodeLister = nodeInformer.Lister()
+	nc.podLister = opts.PodInformer.Lister()
+	nc.nodeLister = opts.NodeInformer.Lister()
 
 	logger.Info("Controller will reconcile labels")
-	_, _ = nodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
+	_, _ = opts.NodeInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
 			return nil
@@ -413,17 +415,17 @@ func NewNodeLifecycleController(
 		}),
 	}, cache.HandlerOptions{Logger: &logger})
 
-	nc.leaseLister = leaseInformer.Lister()
-	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
+	nc.leaseLister = opts.LeaseInformer.Lister()
+	nc.leaseInformerSynced = opts.LeaseInformer.Informer().HasSynced
 
-	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
+	nc.nodeInformerSynced = opts.NodeInformer.Informer().HasSynced
 
-	nc.daemonSetStore = daemonSetInformer.Lister()
-	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
+	nc.daemonSetStore = opts.DaemonSetInformer.Lister()
+	nc.daemonSetInformerSynced = opts.DaemonSetInformer.Informer().HasSynced
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
 		nc.consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
-			leaseResource: leaseInformer.Informer().GetStore(),
+			leaseResource: opts.LeaseInformer.Informer().GetStore(),
 		})
 	} else {
 		nc.consistencyStore = consistencyutil.NewNoopConsistencyStore()

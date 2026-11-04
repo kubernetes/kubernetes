@@ -153,21 +153,20 @@ func newNodeLifecycleControllerFromClient(
 	daemonSetInformer := factory.Apps().V1().DaemonSets()
 	podInformer := factory.Core().V1().Pods()
 
-	nc, err := NewNodeLifecycleController(
-		ctx,
-		leaseInformer,
-		podInformer,
-		nodeInformer,
-		daemonSetInformer,
-		kubeClient,
-		nodeMonitorPeriod,
-		nodeStartupGracePeriod,
-		nodeMonitorGracePeriod,
-		evictionLimiterQPS,
-		secondaryEvictionLimiterQPS,
-		largeClusterThreshold,
-		unhealthyZoneThreshold,
-	)
+	nc, err := NewNodeLifecycleController(ctx, ControllerOptions{
+		LeaseInformer:               leaseInformer,
+		PodInformer:                 podInformer,
+		NodeInformer:                nodeInformer,
+		DaemonSetInformer:           daemonSetInformer,
+		KubeClient:                  kubeClient,
+		NodeMonitorPeriod:           nodeMonitorPeriod,
+		NodeStartupGracePeriod:      nodeStartupGracePeriod,
+		NodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		EvictionLimiterQPS:          evictionLimiterQPS,
+		SecondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
+		LargeClusterThreshold:       largeClusterThreshold,
+		UnhealthyZoneThreshold:      unhealthyZoneThreshold,
+	})
 	if err != nil {
 		return nil, err
 	}

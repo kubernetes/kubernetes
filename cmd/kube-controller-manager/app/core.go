@@ -172,22 +172,21 @@ func newNodeLifecycleController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	nlc, err := lifecyclecontroller.NewNodeLifecycleController(
-		ctx,
-		controllerContext.InformerFactory.Coordination().V1().Leases(),
-		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Core().V1().Nodes(),
-		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
+	nlc, err := lifecyclecontroller.NewNodeLifecycleController(ctx, lifecyclecontroller.ControllerOptions{
+		LeaseInformer:     controllerContext.InformerFactory.Coordination().V1().Leases(),
+		PodInformer:       controllerContext.InformerFactory.Core().V1().Pods(),
+		NodeInformer:      controllerContext.InformerFactory.Core().V1().Nodes(),
+		DaemonSetInformer: controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		// node lifecycle controller uses existing cluster role from node-controller
-		client,
-		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorPeriod.Duration,
-		controllerContext.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
-		controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,
-		controllerContext.ComponentConfig.NodeLifecycleController.NodeEvictionRate,
-		controllerContext.ComponentConfig.NodeLifecycleController.SecondaryNodeEvictionRate,
-		controllerContext.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
-		controllerContext.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
-	)
+		KubeClient:                  client,
+		NodeMonitorPeriod:           controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorPeriod.Duration,
+		NodeStartupGracePeriod:      controllerContext.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
+		NodeMonitorGracePeriod:      controllerContext.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,
+		EvictionLimiterQPS:          controllerContext.ComponentConfig.NodeLifecycleController.NodeEvictionRate,
+		SecondaryEvictionLimiterQPS: controllerContext.ComponentConfig.NodeLifecycleController.SecondaryNodeEvictionRate,
+		LargeClusterThreshold:       controllerContext.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
+		UnhealthyZoneThreshold:      controllerContext.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
+	})
 	if err != nil {
 		return nil, err
 	}
