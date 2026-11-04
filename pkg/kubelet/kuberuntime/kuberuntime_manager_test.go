@@ -5267,12 +5267,12 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 			expectDownsize: false,
 		},
 		{
-			testName:       "Force sync: new limit specified, no actuated limit",
+			testName:       "Unmounted volume: new limit specified, no actuated limit",
 			enableGate:     true,
 			actuatedLimit:  nil,
 			newLimit:       resource.NewQuantity(100, resource.BinarySI),
 			volMedium:      v1.StorageMediumMemory,
-			expectUpsize:   true,
+			expectUpsize:   false,
 			expectDownsize: false,
 		},
 		{
@@ -7168,4 +7168,107 @@ func TestSyncResultErrorsMetric(t *testing.T) {
 			))
 		})
 	}
+}
+
+func TestInitializeActuatedPod_PreservesActuatedVolumes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.InPlacePodVerticalScaling:                    true,
+		features.InPlacePodLevelResourcesVerticalScaling:      true,
+		features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
+	})
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	memLimit := resource.MustParse("100Mi")
+	cmVol := v1.Volume{
+		Name: "cm-vol",
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				LocalObjectReference: v1.LocalObjectReference{Name: "my-cm"},
+			},
+		},
+	}
+	memVol := v1.Volume{
+		Name: "mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &memLimit,
+			},
+		},
+	}
+	unmountedMemVol := v1.Volume{
+		Name: "unmounted-mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &memLimit,
+			},
+		},
+	}
+
+	podRes := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-uid-1",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Resources: podRes,
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					},
+				},
+			},
+			Volumes: []v1.Volume{cmVol, memVol, unmountedMemVol},
+		},
+	}
+
+	// Simulate VolumeManager recording mounted volumes during WaitForAttachAndMount (before InitializeActuatedPod),
+	// without UpdateActuatedPodLevelResources having run (e.g. cgroupsPerQOS: false).
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, cmVol))
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, memVol))
+
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	actuatedPod, ok := m.actuatedState.GetPod(pod.UID)
+	require.True(t, ok)
+	require.Equal(t, "pod1", actuatedPod.Name)
+	require.Equal(t, "ns1", actuatedPod.Namespace)
+	require.Equal(t, podRes, actuatedPod.Spec.Resources, "pod-level resources should be preserved when SetPodVolume runs before InitializeActuatedPod")
+
+	// Only mounted volumes recorded via SetPodVolume are in actuatedState (unmountedMemVol is excluded).
+	actuatedVols, ok := m.actuatedState.GetPodVolumes(pod.UID)
+	require.True(t, ok)
+	require.Equal(t, []v1.Volume{cmVol, memVol}, actuatedVols)
+
+	// Mark the pod content as removable; GarbageCollect should keep the pod in actuatedState while volumes remain mounted.
+	m.podStateProvider.(*fakePodStateProvider).removed[pod.UID] = struct{}{}
+	require.NoError(t, m.GarbageCollect(tCtx, kubecontainer.GCPolicy{}, true, false))
+	require.True(t, m.actuatedState.HasPod(pod.UID))
+
+	// Once all disk-mounted volumes are unmounted and removed from actuatedState, GarbageCollect
+	// removes the pod entry even if a HostPath volume remains (e.g. if the pod was deleted while
+	// the kubelet was stopped and reconstructVolumes skipped the HostPath volume).
+	hpVol := v1.Volume{
+		Name: "hp-vol",
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{Path: "/tmp"},
+		},
+	}
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, hpVol))
+	require.NoError(t, m.actuatedState.RemovePodVolume(tCtx.Logger(), pod.UID, cmVol.Name))
+	require.NoError(t, m.actuatedState.RemovePodVolume(tCtx.Logger(), pod.UID, memVol.Name))
+	require.NoError(t, m.GarbageCollect(tCtx, kubecontainer.GCPolicy{}, true, false))
+	require.False(t, m.actuatedState.HasPod(pod.UID))
 }

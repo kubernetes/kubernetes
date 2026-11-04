@@ -27,7 +27,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
@@ -269,6 +271,12 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 			UID: types.UID(volume.podName),
 		},
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && rc.actuatedState != nil {
+		if actuatedPod, ok := rc.actuatedState.GetPod(pod.UID); ok {
+			pod.Name = actuatedPod.Name
+			pod.Namespace = actuatedPod.Namespace
+		}
+	}
 	mapperPlugin, err := rc.volumePluginMgr.FindMapperPluginByName(volume.pluginName)
 	if err != nil {
 		return nil, err
@@ -292,6 +300,19 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 	volumeSpec := reconstructed.Spec
 	if volumeSpec == nil {
 		return nil, fmt.Errorf("failed to reconstruct volume for plugin %q (spec.Name: %q) pod %q (UID: %q): got nil", volume.pluginName, volume.volumeSpecName, volume.podName, pod.UID)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && volumeSpec.Volume != nil && rc.actuatedState != nil {
+		if actuatedVolumes, ok := rc.actuatedState.GetPodVolumes(pod.UID); ok {
+			for i := range actuatedVolumes {
+				if actuatedVolumes[i].Name == volume.volumeSpecName {
+					actuatedSpec := volumepkg.NewSpecFromVolume(&actuatedVolumes[i])
+					if plugin.CanSupport(actuatedSpec) {
+						volumeSpec = actuatedSpec
+					}
+					break
+				}
+			}
+		}
 	}
 
 	// We have to find the plugins by volume spec (NOT by plugin name) here

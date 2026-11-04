@@ -87,6 +87,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
@@ -238,6 +239,8 @@ const (
 
 	// instrumentationScope is the name of OpenTelemetry instrumentation scope
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet"
+
+	actuatedPodsStateFile = "actuated_pods_state"
 )
 
 var (
@@ -812,6 +815,11 @@ func NewMainKubelet(ctx context.Context,
 		}
 	}
 
+	actuatedState, err := state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile, kuberuntime.KeepOnlyResourceValues)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
+	}
+
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
@@ -854,6 +862,7 @@ func NewMainKubelet(ctx context.Context,
 		tokenManager,
 		getServiceAccount,
 		klet.podStartupLatencyTracker,
+		actuatedState,
 	)
 	if err != nil {
 		return nil, err
@@ -1094,7 +1103,8 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 		volumepathhandler.NewBlockVolumePathHandler(),
 		klet.statusManager,
-		kubeCfg.VolumeStatsAggPeriod.Duration)
+		kubeCfg.VolumeStatsAggPeriod.Duration,
+		actuatedState)
 
 	boMax, base := newCrashLoopBackOff(kubeCfg)
 
