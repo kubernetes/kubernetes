@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package verify
+package admission
 
 import (
 	"fmt"
@@ -31,8 +31,8 @@ type webhookPrivateClaims struct {
 	} `json:"kubernetes.io"`
 }
 
-// TokenGroups checks the Kubernetes claims of an authenticated token.
-func TokenGroups(token *oidc.IDToken) ([]string, error) {
+// tokenGroups checks the Kubernetes claims of an authenticated token.
+func tokenGroups(token *oidc.IDToken) ([]string, error) {
 	var claims webhookPrivateClaims
 	if err := token.Claims(&claims); err != nil {
 		return nil, fmt.Errorf("decoding Kubernetes token claims: %w", err)
@@ -44,7 +44,7 @@ func TokenGroups(token *oidc.IDToken) ([]string, error) {
 	return groups, nil
 }
 
-// AllowsAPIGroup checks the token's attestation against the admitted API group.
-func AllowsAPIGroup(groups []string, group string) bool {
+// allowsAPIGroup checks the token's attestation against the admitted API group.
+func allowsAPIGroup(groups []string, group string) bool {
 	return slices.Contains(groups, group) || slices.Contains(groups, "*")
 }

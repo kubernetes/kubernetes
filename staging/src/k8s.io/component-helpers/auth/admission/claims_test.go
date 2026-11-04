@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package verify
+package admission
 
 import "testing"
 
@@ -33,8 +33,8 @@ func TestAllowsAPIGroup(t *testing.T) {
 		{name: "multiple unrelated", groups: []string{"extensions", "batch"}, group: "apps"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := AllowsAPIGroup(tc.groups, tc.group); got != tc.want {
-				t.Fatalf("AllowsAPIGroup(%q, %q) = %t, want %t", tc.groups, tc.group, got, tc.want)
+			if got := allowsAPIGroup(tc.groups, tc.group); got != tc.want {
+				t.Fatalf("allowsAPIGroup(%q, %q) = %t, want %t", tc.groups, tc.group, got, tc.want)
 			}
 		})
 	}
