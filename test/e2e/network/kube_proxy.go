@@ -112,6 +112,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		// a privileged pod because /proc/net/nf_conntrack is not world-readable.
 		hostExecPod := e2epod.NewExecPodSpec(fr.Namespace.Name, "e2e-net-exec", true)
 		hostExecPod.Spec.Containers[0].SecurityContext.Privileged = new(true)
+		hostExecPod.Spec.NodeName = clientNodeInfo.name
 		e2epod.NewPodClient(fr).CreateSync(ctx, hostExecPod)
 
 		// Create the client and server pods
