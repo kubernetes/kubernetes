@@ -1027,6 +1027,7 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 				{Name: "c1", User: linuxUser(0, 0)},
 			},
 			expectedStatus: v1.ConditionFalse,
+			expectedReason: NoImplicitRootUserID,
 		},
 		"UID: explicitly-root: pod sets runAsUser=0": {
 			generate:     GenerateInsecureImplicitUserIDCondition,
@@ -1041,6 +1042,7 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 				{Name: "c1", User: linuxUser(0, 0)},
 			},
 			expectedStatus: v1.ConditionFalse,
+			expectedReason: NoImplicitRootUserID,
 		},
 		"UID: non-root: actual UID is non-zero": {
 			generate:     GenerateInsecureImplicitUserIDCondition,
@@ -1054,6 +1056,7 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 				{Name: "c1", User: linuxUser(1000, 1000)},
 			},
 			expectedStatus: v1.ConditionFalse,
+			expectedReason: NoImplicitRootUserID,
 		},
 		"UID: user namespaces: hostUsers=false exempts pod even if reported UID is 0": {
 			generate:     GenerateInsecureImplicitUserIDCondition,
@@ -1068,6 +1071,7 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 				{Name: "c1", User: linuxUser(0, 0)},
 			},
 			expectedStatus: v1.ConditionFalse,
+			expectedReason: NoImplicitRootUserID,
 		},
 		"UID: container not started yet: no User reported": {
 			generate:     GenerateInsecureImplicitUserIDCondition,
@@ -1149,6 +1153,7 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 				{Name: "c1", User: linuxUser(1000, 0)},
 			},
 			expectedStatus: v1.ConditionFalse,
+			expectedReason: NoImplicitRootGroupID,
 		},
 		"GID: explicitly-root: pod sets runAsGroup=0": {
 			generate:     GenerateInsecureImplicitGroupIDCondition,
@@ -1163,6 +1168,7 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 				{Name: "c1", User: linuxUser(1000, 0)},
 			},
 			expectedStatus: v1.ConditionFalse,
+			expectedReason: NoImplicitRootGroupID,
 		},
 		"GID: supplementalGroups: implicitly-root via supplementalGroupsPolicy=Merge": {
 			generate:     GenerateInsecureImplicitGroupIDCondition,
@@ -1198,6 +1204,7 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 				{Name: "c1", User: linuxUser(1000, 1000, 0, 1000)},
 			},
 			expectedStatus: v1.ConditionFalse,
+			expectedReason: NoImplicitRootGroupID,
 		},
 		"GID: supplementalGroups: primary GID mirroring is not double-reported": {
 			generate:     GenerateInsecureImplicitGroupIDCondition,
@@ -1304,15 +1311,15 @@ func TestGenerateInsecureIDCondition(t *testing.T) {
 	}
 }
 
-func TestIsPodExplicitlyInsecureID(t *testing.T) {
+func TestFindInsecureIDPodCounts(t *testing.T) {
 	for desc, test := range map[string]struct {
-		check             func(pod *v1.Pod, containerStatuses []v1.ContainerStatus) bool
+		check             func(InsecureIDPodCounts) bool
 		pod               *v1.Pod
 		containerStatuses []v1.ContainerStatus
 		want              bool
 	}{
 		"UID: explicit: container sets runAsUser=0": {
-			check: IsPodExplicitlyInsecureUserID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitUserID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -1325,7 +1332,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              true,
 		},
 		"UID: implicit: no runAsUser set": {
-			check: IsPodExplicitlyInsecureUserID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitUserID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "c1"}},
@@ -1335,7 +1342,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              false,
 		},
 		"UID: requested a different UID than observed": {
-			check: IsPodExplicitlyInsecureUserID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitUserID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -1348,7 +1355,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              false,
 		},
 		"UID: ephemeral container: explicitly requests runAsUser=0": {
-			check: IsPodExplicitlyInsecureUserID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitUserID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "c1"}},
@@ -1365,7 +1372,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want: true,
 		},
 		"UID: user namespaces: hostUsers=false exempts pod": {
-			check: IsPodExplicitlyInsecureUserID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitUserID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					HostUsers: new(bool),
@@ -1379,7 +1386,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              false,
 		},
 		"GID: explicit: container sets runAsGroup=0": {
-			check: IsPodExplicitlyInsecureGroupID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitGroupID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -1392,7 +1399,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              true,
 		},
 		"GID: implicit: no runAsGroup set": {
-			check: IsPodExplicitlyInsecureGroupID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitGroupID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "c1"}},
@@ -1402,7 +1409,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              false,
 		},
 		"GID: requested a different GID than observed": {
-			check: IsPodExplicitlyInsecureGroupID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitGroupID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -1415,7 +1422,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              false,
 		},
 		"GID: ephemeral container: explicitly requests runAsGroup=0": {
-			check: IsPodExplicitlyInsecureGroupID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitGroupID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "c1"}},
@@ -1432,7 +1439,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want: true,
 		},
 		"GID: user namespaces: hostUsers=false exempts pod": {
-			check: IsPodExplicitlyInsecureGroupID,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitGroupID },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					HostUsers: new(bool),
@@ -1446,7 +1453,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              false,
 		},
 		"supplementalGroups: implicit: supplementalGroupsPolicy=Merge pulls in GID 0": {
-			check: IsPodImplicitlyInsecureSupplementalGroups,
+			check: func(c InsecureIDPodCounts) bool { return c.ImplicitSupplementalGroups },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{
@@ -1459,7 +1466,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              true,
 		},
 		"supplementalGroups: explicit: pod sets fsGroup=0": {
-			check: IsPodExplicitlyInsecureSupplementalGroups,
+			check: func(c InsecureIDPodCounts) bool { return c.ExplicitSupplementalGroups },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					SecurityContext: &v1.PodSecurityContext{FSGroup: ptr.To[int64](0)},
@@ -1473,7 +1480,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              true,
 		},
 		"supplementalGroups: primary GID mirroring is excluded from the supplementalGroups check": {
-			check: IsPodImplicitlyInsecureSupplementalGroups,
+			check: func(c InsecureIDPodCounts) bool { return c.ImplicitSupplementalGroups },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{Name: "c1"}},
@@ -1483,7 +1490,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 			want:              false,
 		},
 		"supplementalGroups: user namespaces: hostUsers=false exempts pod": {
-			check: IsPodImplicitlyInsecureSupplementalGroups,
+			check: func(c InsecureIDPodCounts) bool { return c.ImplicitSupplementalGroups },
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					HostUsers:  new(bool),
@@ -1495,7 +1502,7 @@ func TestIsPodExplicitlyInsecureID(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			require.Equal(t, test.want, test.check(test.pod, test.containerStatuses))
+			require.Equal(t, test.want, test.check(FindInsecureIDPodCounts(test.pod, test.containerStatuses)))
 		})
 	}
 }

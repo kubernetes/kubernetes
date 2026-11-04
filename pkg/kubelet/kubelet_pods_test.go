@@ -11138,7 +11138,7 @@ func TestUpdateInsecurePodCountMetric(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
-	metrics.Register()
+	metrics.InsecurePodCount.Create(nil)
 	metrics.InsecurePodCount.Reset()
 
 	linuxUser := func(uid, gid int64, supplementalGroups ...int64) *v1.ContainerUser {
@@ -11243,5 +11243,7 @@ func TestUpdateInsecurePodCountMetric(t *testing.T) {
 		kubelet_insecure_pods{declaration="implicit",id_type="supplementalgroups"} 1
 		kubelet_insecure_pods{declaration="implicit",id_type="uid"} 2
 	`
-	testMetric(t, metrics.InsecurePodCount.FQName(), want)
+	if err := testutil.CollectAndCompare(metrics.InsecurePodCount, strings.NewReader(want)); err != nil {
+		t.Error(err)
+	}
 }

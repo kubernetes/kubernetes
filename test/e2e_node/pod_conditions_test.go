@@ -139,6 +139,22 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 		})
 
 		ginkgo.It("should report implicitly and explicitly insecure pod counts in kubelet metrics", func(ctx context.Context) {
+			insecurePodCountCases := []struct{ declaration, idType string }{
+				{"implicit", "uid"},
+				{"implicit", "gid"},
+				{"explicit", "uid"},
+				{"explicit", "gid"},
+			}
+
+			metricsBefore, err := getKubeletMetrics(ctx)
+			framework.ExpectNoError(err)
+			countsBefore := make(map[string]float64, len(insecurePodCountCases))
+			for _, tc := range insecurePodCountCases {
+				value, err := getCounterMetricValue(metricsBefore, "kubelet_insecure_pods", map[string]string{"declaration": tc.declaration, "id_type": tc.idType})
+				framework.ExpectNoError(err)
+				countsBefore[tc.declaration+"/"+tc.idType] = value
+			}
+
 			zero := int64(0)
 			implicit := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("metrics-implicitly-insecure", nil, nil))
 			explicit := e2epod.NewPodClient(f).Create(ctx, insecureIDTestPod("metrics-explicitly-insecure", &zero, &zero))
@@ -151,18 +167,14 @@ var _ = SIGDescribe("Pod conditions managed by Kubelet", func() {
 				if err != nil {
 					return err
 				}
-				for _, tc := range []struct{ declaration, idType string }{
-					{"implicit", "uid"},
-					{"implicit", "gid"},
-					{"explicit", "uid"},
-					{"explicit", "gid"},
-				} {
+				for _, tc := range insecurePodCountCases {
 					value, err := getCounterMetricValue(m, "kubelet_insecure_pods", map[string]string{"declaration": tc.declaration, "id_type": tc.idType})
 					if err != nil {
 						return err
 					}
-					if value < 1 {
-						return fmt.Errorf("expected kubelet_insecure_pods{declaration=%q,id_type=%q} to be >= 1, got %v", tc.declaration, tc.idType, value)
+					want := countsBefore[tc.declaration+"/"+tc.idType] + 1
+					if value != want {
+						return fmt.Errorf("expected kubelet_insecure_pods{declaration=%q,id_type=%q} to be %v, got %v", tc.declaration, tc.idType, want, value)
 					}
 				}
 				return nil

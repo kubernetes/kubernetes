@@ -1604,7 +1604,6 @@ func Register() {
 		legacyregistry.MustRegister(ActivePodCount)
 		legacyregistry.MustRegister(MirrorPodCount)
 		legacyregistry.MustRegister(WorkingPodCount)
-		legacyregistry.MustRegister(InsecurePodCount)
 		legacyregistry.MustRegister(OrphanedRuntimePodTotal)
 		legacyregistry.MustRegister(RestartedPodTotal)
 		legacyregistry.MustRegister(ManagedEphemeralContainers)
@@ -1676,6 +1675,10 @@ func Register() {
 			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedSucceedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodImplicitRootWarnings) {
+			legacyregistry.MustRegister(InsecurePodCount)
 		}
 
 		legacyregistry.MustRegister(ContainerRequestedResizes)
