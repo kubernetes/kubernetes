@@ -29,6 +29,7 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
 func TestWorkloadForest_AddPodGroup(t *testing.T) {
@@ -726,26 +727,18 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 		isCompositePodGroupEnabled bool
 	}{
 		{
-			name:             "pod belongs to existing standalone pod group",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			pod:              podWithPG1,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-				},
-			},
+			name:                       "pod belongs to existing standalone pod group",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			pod:                        podWithPG1,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg1)),
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "pod belongs to pod group with parent cpg",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1beta1.CompositePodGroup{cpg1},
-			pod:              podWithPG2,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
-				},
-			},
+			name:                       "pod belongs to pod group with parent cpg",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1beta1.CompositePodGroup{cpg1},
+			pod:                        podWithPG2,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewCompositePodGroupInfo(cpg1)),
 			isCompositePodGroupEnabled: true,
 		},
 		{
@@ -756,26 +749,18 @@ func TestWorkloadForest_GetRootLookupInfoForPod(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "pod belongs to existing standalone pod group (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			pod:              podWithPG1,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-				},
-			},
+			name:                       "pod belongs to existing standalone pod group (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			pod:                        podWithPG1,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg1)),
 			isCompositePodGroupEnabled: false,
 		},
 		{
-			name:             "pod belongs to pod group with parent cpg (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1beta1.CompositePodGroup{cpg1},
-			pod:              podWithPG2,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg2WithParent),
-				},
-			},
+			name:                       "pod belongs to pod group with parent cpg (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1beta1.CompositePodGroup{cpg1},
+			pod:                        podWithPG2,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg2WithParent)),
 			isCompositePodGroupEnabled: false,
 		},
 		{
@@ -825,26 +810,18 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 		isCompositePodGroupEnabled bool
 	}{
 		{
-			name:             "standalone pod group",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			podGroup:         pg1,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-				},
-			},
+			name:                       "standalone pod group",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			podGroup:                   pg1,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg1)),
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "pod group with existing parent cpg",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1beta1.CompositePodGroup{cpg1},
-			podGroup:         pg2WithParent,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
-				},
-			},
+			name:                       "pod group with existing parent cpg",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1beta1.CompositePodGroup{cpg1},
+			podGroup:                   pg2WithParent,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewCompositePodGroupInfo(cpg1)),
 			isCompositePodGroupEnabled: true,
 		},
 		{
@@ -862,37 +839,25 @@ func TestWorkloadForest_GetRootLookupInfoForPodGroup(t *testing.T) {
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "standalone pod group (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			podGroup:         pg1,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-				},
-			},
+			name:                       "standalone pod group (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			podGroup:                   pg1,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg1)),
 			isCompositePodGroupEnabled: false,
 		},
 		{
-			name:             "pod group with existing parent cpg (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg2WithParent},
-			initialCPGs:      []*schedulingv1beta1.CompositePodGroup{cpg1},
-			podGroup:         pg2WithParent,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg2WithParent),
-				},
-			},
+			name:                       "pod group with existing parent cpg (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg2WithParent},
+			initialCPGs:                []*schedulingv1beta1.CompositePodGroup{cpg1},
+			podGroup:                   pg2WithParent,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg2WithParent)),
 			isCompositePodGroupEnabled: false,
 		},
 		{
-			name:             "pod group with non-existent parent cpg (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg3WithNonExistentParent},
-			podGroup:         pg3WithNonExistentParent,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg3WithNonExistentParent),
-				},
-			},
+			name:                       "pod group with non-existent parent cpg (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg3WithNonExistentParent},
+			podGroup:                   pg3WithNonExistentParent,
+			wantInfo:                   tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(pg3WithNonExistentParent)),
 			isCompositePodGroupEnabled: false,
 		},
 		{
@@ -942,21 +907,13 @@ func TestWorkloadForest_GetRootLookupInfoForCPG(t *testing.T) {
 			name:        "standalone cpg",
 			initialCPGs: []*schedulingv1beta1.CompositePodGroup{cpg1},
 			cpg:         cpg1,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
-				},
-			},
+			wantInfo:    tf.NewQueuedPodGroupInfo(tf.NewCompositePodGroupInfo(cpg1)),
 		},
 		{
 			name:        "cpg with parent",
 			initialCPGs: []*schedulingv1beta1.CompositePodGroup{cpg1, cpg2WithParent},
 			cpg:         cpg2WithParent,
-			wantInfo: &framework.QueuedPodGroupInfo{
-				PodGroupInfo: &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg1),
-				},
-			},
+			wantInfo:    tf.NewQueuedPodGroupInfo(tf.NewCompositePodGroupInfo(cpg1)),
 		},
 		{
 			name:        "cpg with parent missing",
@@ -1101,21 +1058,17 @@ func TestWorkloadForest_BuildPodGroupInfoForPG(t *testing.T) {
 		isCompositePodGroupEnabled bool
 	}{
 		{
-			name:             "build info for existing pod group",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			pg:               pg1,
-			wantInfo: &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-			},
+			name:                       "build info for existing pod group",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			pg:                         pg1,
+			wantInfo:                   tf.NewLeafPodGroupInfo(pg1),
 			isCompositePodGroupEnabled: true,
 		},
 		{
-			name:             "build info for existing pod group (CPG=false)",
-			initialPodGroups: []*schedulingv1beta1.PodGroup{pg1},
-			pg:               pg1,
-			wantInfo: &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericPodGroup(pg1),
-			},
+			name:                       "build info for existing pod group (CPG=false)",
+			initialPodGroups:           []*schedulingv1beta1.PodGroup{pg1},
+			pg:                         pg1,
+			wantInfo:                   tf.NewLeafPodGroupInfo(pg1),
 			isCompositePodGroupEnabled: false,
 		},
 	}
@@ -1159,7 +1112,7 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			initialCPGs:      []*schedulingv1beta1.CompositePodGroup{rootCPG},
 			cpg:              rootCPG,
 			wantChildren: []*framework.PodGroupInfo{
-				{GenericPodGroup: fwk.NewGenericPodGroup(childPG1)},
+				tf.NewLeafPodGroupInfo(childPG1),
 			},
 			isCompositePodGroupEnabled: true,
 		},
@@ -1169,9 +1122,9 @@ func TestWorkloadForest_BuildPodGroupInfoForCPG(t *testing.T) {
 			initialCPGs:      []*schedulingv1beta1.CompositePodGroup{rootCPG, childCPG1WithSameName},
 			cpg:              rootCPG,
 			wantChildren: []*framework.PodGroupInfo{
-				{GenericPodGroup: fwk.NewGenericPodGroup(childPG2)},
-				{GenericPodGroup: fwk.NewGenericCompositePodGroup(childCPG1WithSameName)},
-				{GenericPodGroup: fwk.NewGenericPodGroup(childPG1)},
+				tf.NewLeafPodGroupInfo(childPG2),
+				tf.NewCompositePodGroupInfo(childCPG1WithSameName),
+				tf.NewLeafPodGroupInfo(childPG1),
 			},
 			isCompositePodGroupEnabled: true,
 		},

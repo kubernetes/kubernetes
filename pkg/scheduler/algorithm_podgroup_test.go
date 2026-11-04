@@ -79,16 +79,14 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 	p2 := st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 	p3 := st.MakePod().Namespace("default").Name("p3").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
 
-	testPodGroup := &schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-	}
+	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 
 	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
 	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
 	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
 	queuedPodInfos := []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3}
 
-	podGroupInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, queuedPodInfos...)
+	podGroupInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), queuedPodInfos...)
 
 	tests := []struct {
 		name                     string
@@ -449,9 +447,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 		st.MakeNode().Name("node2").Obj(),
 	}
 	podGroupPod := st.MakePod().Namespace("default").Name("foo").UID("foo").PodGroupName("pg").Obj()
-	testPodGroup := &schedulingv1beta1.PodGroup{
-		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-	}
+	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 
 	podInfo, err := framework.NewPodInfo(st.MakePod().Namespace("default").Name("foo").UID("foo").PodGroupName("pg").Obj())
 	if err != nil {
@@ -461,7 +457,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 
 	pgKeyVal := fwk.PodGroupKey("default", "pg")
 	queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: podGroupPod}}}
-	pgInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, queuedPodInfos...)
+	pgInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), queuedPodInfos...)
 
 	tests := map[string]struct {
 		placementPlugin               fakePlacementPlugin
@@ -890,9 +886,7 @@ func podGroupWithNominations(nominated ...string) *framework.QueuedPodGroupInfo 
 			PodInfo: &framework.PodInfo{Pod: pod},
 		})
 	}
-	return newQueuedPodGroupInfo(&framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg").Namespace("default").Obj()),
-	}, infos...)
+	return tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg").Namespace("default").Obj()), infos...)
 }
 
 func TestNominatedPlacement(t *testing.T) {
@@ -1176,9 +1170,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			for _, node := range nodes {
 				cache.AddNode(logger, node)
 			}
-			testPodGroup := &schedulingv1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-			}
+			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(testPodGroup))
 
 			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
@@ -1187,21 +1179,14 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 
 			pod := st.MakePod().Namespace("default").Name("foo").UID("foo").PodGroupName("pg").NominatedNodeName(tt.nominatedNodeName).Obj()
 			queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: pod}}}
-			childPodGroupInfo := &framework.PodGroupInfo{
-				GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
-			}
+			childPodGroupInfo := tf.NewLeafPodGroupInfo(testPodGroup)
 			// The root is normally the pod group itself, but for the CPG case it is a separate
 			// CompositePodGroup wrapping the child, which is what gates off the NNN fast path.
 			rootPodGroupInfo := childPodGroupInfo
 			if tt.rootIsCPG {
-				rootPodGroupInfo = framework.NewPodGroupInfo(
-					fwk.NewGenericCompositePodGroup(
-						st.MakeCompositePodGroup().Name("pg").Namespace("default").Obj(),
-					),
-					childPodGroupInfo,
-				)
+				rootPodGroupInfo = tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name("pg").Namespace("default").Obj(), childPodGroupInfo)
 			}
-			pgInfo := newQueuedPodGroupInfo(rootPodGroupInfo, queuedPodInfos...)
+			pgInfo := tf.NewQueuedPodGroupInfo(rootPodGroupInfo, queuedPodInfos...)
 
 			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue)
 			result := podGroupAlgorithm.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), childPodGroupInfo, pgInfo)
@@ -1311,7 +1296,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				pgKeyVal := fwk.PodGroupKey("default", "pg")
 				queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: podGroupPod}}}
 				testPodGroup := st.MakePodGroup().Namespace("default").Name("pg").Obj()
-				pgInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, queuedPodInfos...)
+				pgInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), queuedPodInfos...)
 
 				placementPlugin := fakePlacementPlugin{
 					name: "FakeGeneratorPlugin",
@@ -1671,9 +1656,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 			for _, node := range nodes {
 				cache.AddNode(logger, node)
 			}
-			testPodGroup := &schedulingv1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
-			}
+			testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(testPodGroup))
 
 			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
@@ -1681,7 +1664,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 			}
 
 			queuedPodInfos := []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: podGroupPod}}}
-			pgInfo := newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup)}, queuedPodInfos...)
+			pgInfo := tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(testPodGroup), queuedPodInfos...)
 			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue)
 			result := podGroupAlgorithm.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
 			if !result.status.IsSuccess() {
@@ -1722,9 +1705,9 @@ func TestPlacementCycleStateLifecycle_MultiLevel(t *testing.T) {
 	}
 	queuedPodInfo1 := &framework.QueuedPodInfo{PodInfo: podInfo1}
 
-	leafPGInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg)}
-	midPGInfo := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(midcpg), leafPGInfo)
-	rootPGInfo := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(rootcpg), midPGInfo)
+	leafPGInfo := tf.NewLeafPodGroupInfo(pg)
+	midPGInfo := tf.NewCompositePodGroupInfo(midcpg, leafPGInfo)
+	rootPGInfo := tf.NewCompositePodGroupInfo(rootcpg, midPGInfo)
 
 	logger, ctx := ktesting.NewTestContext(t)
 
@@ -1790,7 +1773,7 @@ func TestPlacementCycleStateLifecycle_MultiLevel(t *testing.T) {
 		t.Fatalf("Failed to update snapshot: %v", err)
 	}
 
-	cpgQueuedInfo := newQueuedPodGroupInfo(rootPGInfo, queuedPodInfo1)
+	cpgQueuedInfo := tf.NewQueuedPodGroupInfo(rootPGInfo, queuedPodInfo1)
 
 	podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue)
 	results := podGroupAlgorithm.RunRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgQueuedInfo)
@@ -1879,10 +1862,10 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 	queuedPodInfo1 := &framework.QueuedPodInfo{PodInfo: podInfo1}
 	queuedPodInfo2 := &framework.QueuedPodInfo{PodInfo: podInfo2}
 
-	childPGInfo1 := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)}
-	childPGInfo2 := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)}
+	childPGInfo1 := tf.NewLeafPodGroupInfo(pg1)
+	childPGInfo2 := tf.NewLeafPodGroupInfo(pg2)
 
-	rootPGInfo := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), childPGInfo1, childPGInfo2)
+	rootPGInfo := tf.NewCompositePodGroupInfo(cpg, childPGInfo1, childPGInfo2)
 
 	defaultPlacementResults := map[fwk.EntityKey]map[string][]string{
 		rootPGInfo.GetKey(): {
@@ -2391,11 +2374,11 @@ func TestCPGSchedulingPlacementAlgorithm(t *testing.T) {
 			metrics.PlacementEvaluations.Reset()
 			metrics.PlacementEvaluationDuration.Reset()
 
-			rootPGInfo := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg),
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
+			rootPGInfo := tf.NewCompositePodGroupInfo(cpg,
+				tf.NewLeafPodGroupInfo(pg1),
+				tf.NewLeafPodGroupInfo(pg2),
 			)
-			cpgInfo := newQueuedPodGroupInfo(rootPGInfo, queuedPodInfo1, queuedPodInfo2)
+			cpgInfo := tf.NewQueuedPodGroupInfo(rootPGInfo, queuedPodInfo1, queuedPodInfo2)
 
 			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue)
 			results := podGroupAlgorithm.RunRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgInfo)
@@ -2474,10 +2457,10 @@ func TestCPGSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 	queuedPodInfo1 := &framework.QueuedPodInfo{PodInfo: podInfo1}
 	queuedPodInfo2 := &framework.QueuedPodInfo{PodInfo: podInfo2}
 
-	childPGInfo1 := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)}
-	childPGInfo2 := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)}
+	childPGInfo1 := tf.NewLeafPodGroupInfo(pg1)
+	childPGInfo2 := tf.NewLeafPodGroupInfo(pg2)
 
-	rootPGInfo := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), childPGInfo1, childPGInfo2)
+	rootPGInfo := tf.NewCompositePodGroupInfo(cpg, childPGInfo1, childPGInfo2)
 
 	placements := map[fwk.EntityKey]map[string][]string{
 		rootPGInfo.GetKey(): {
@@ -2679,11 +2662,11 @@ func TestCPGSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
-			rootPGInfo := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg),
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
-				&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
+			rootPGInfo := tf.NewCompositePodGroupInfo(cpg,
+				tf.NewLeafPodGroupInfo(pg1),
+				tf.NewLeafPodGroupInfo(pg2),
 			)
-			cpgInfo := newQueuedPodGroupInfo(rootPGInfo, queuedPodInfo1, queuedPodInfo2)
+			cpgInfo := tf.NewQueuedPodGroupInfo(rootPGInfo, queuedPodInfo1, queuedPodInfo2)
 
 			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue)
 			results := podGroupAlgorithm.RunRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgInfo)
@@ -2982,15 +2965,12 @@ func TestScorePlacementPodGroupAssignments(t *testing.T) {
 				for _, ch := range node.children {
 					children = append(children, buildTree(ch))
 				}
-				var gpg *fwk.GenericPodGroup
+				var pgi *framework.PodGroupInfo
 				if len(children) > 0 {
-					cpg := st.MakeCompositePodGroup().Name(node.name).Namespace("default").Obj()
-					gpg = fwk.NewGenericCompositePodGroup(cpg)
+					pgi = tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Name(node.name).Obj(), children...)
 				} else {
-					pg := st.MakePodGroup().Name(node.name).Namespace("default").Obj()
-					gpg = fwk.NewGenericPodGroup(pg)
+					pgi = tf.NewLeafPodGroupInfo(st.MakePodGroup().Name(node.name).Obj())
 				}
-				pgi := framework.NewPodGroupInfo(gpg, children...)
 				nameToKey[node.name] = pgi.GetKey()
 				return pgi
 			}
@@ -3303,12 +3283,10 @@ func TestPodGroupPotentiallyFeasible(t *testing.T) {
 			}
 
 			placementCycleState := framework.NewCycleState()
-			podGroupInfo := &framework.PodGroupInfo{
-				UnscheduledPods: []*v1.Pod{
-					st.MakePod().Namespace("default").Name("pod").UID("pod").PodGroupName("pg").Obj(),
-				},
-				GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg").Obj()),
-			}
+			podGroupInfo := tf.NewLeafPodGroupInfo(
+				st.MakePodGroup().Name("pg").Namespace("default").Obj(),
+				st.MakePod().Namespace("default").Name("pod").UID("pod").PodGroupName("pg").Obj(),
+			)
 			placementProgress := fwk.PlacementProgress{
 				Remaining: 1,
 				Scheduled: 0,
@@ -3692,16 +3670,16 @@ func TestPodGroupSchedulingPlacementAlgorithm_PlacementLimit(t *testing.T) {
 // podGroup as its only child when compositePodGroup is true.
 func runPlacementAlgorithm(ctx context.Context, t *testing.T, podGroupAlgorithm *PodGroupSchedulingAlgorithm, schedFwk framework.Framework, podGroup *schedulingv1beta1.PodGroup, cpg *schedulingv1beta1.CompositePodGroup, compositePodGroup bool, pod *v1.Pod) *PodGroupScheduledResult {
 	t.Helper()
-	podGroupInfo := &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(podGroup)}
+	podGroupInfo := tf.NewLeafPodGroupInfo(podGroup)
 	podInfo := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}}
 	if compositePodGroup {
-		cpgInfo := newQueuedPodGroupInfo(
-			framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), podGroupInfo),
+		cpgInfo := tf.NewQueuedPodGroupInfo(
+			tf.NewCompositePodGroupInfo(cpg, podGroupInfo),
 			podInfo,
 		)
 		return podGroupAlgorithm.compositePodGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgInfo, cpgInfo.PodGroupInfo, map[fwk.EntityKey]*PodGroupScheduledResult{})
 	}
-	pgInfo := newQueuedPodGroupInfo(podGroupInfo, podInfo)
+	pgInfo := tf.NewQueuedPodGroupInfo(podGroupInfo, podInfo)
 	return podGroupAlgorithm.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo.PodGroupInfo, pgInfo)
 }
 
@@ -4160,7 +4138,7 @@ func TestRunRootSchedulingAlgorithm_AssumeSubtrees(t *testing.T) {
 			if rootCPG := tt.root.GetCompositePodGroup(); rootCPG != nil {
 				root = buildHierarchicalQueuedPodGroupInfo(rootCPG, tt.cpgs, tt.pgs, tt.pods)
 			} else {
-				root = newQueuedPodGroupInfo(&framework.PodGroupInfo{GenericPodGroup: tt.root}, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: tt.pods[0]}})
+				root = tf.NewQueuedPodGroupInfo(tf.NewLeafPodGroupInfo(tt.root.GetPodGroup()), &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: tt.pods[0]}})
 			}
 			nodes := []*v1.Node{st.MakeNode().Name("node1").Obj(), st.MakeNode().Name("node2").Obj()}
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nodes, tt.pgs, tt.cpgs)

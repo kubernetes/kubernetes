@@ -20,6 +20,7 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -198,4 +199,29 @@ func BuildNodeInfos(nodes []*v1.Node) []fwk.NodeInfo {
 		res[i].SetNode(nodes[i])
 	}
 	return res
+}
+
+// NewLeafPodGroupInfo creates a leaf PodGroupInfo from an existing PodGroup
+// and populates its UnscheduledPods with the given pods.
+func NewLeafPodGroupInfo(pg *schedulingv1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
+	return &framework.PodGroupInfo{
+		GenericPodGroup: fwk.NewGenericPodGroup(pg),
+		UnscheduledPods: pods,
+	}
+}
+
+// NewCompositePodGroupInfo creates a PodGroupInfo from an existing CompositePodGroup
+// and the given children PodGroupInfos, sorted by creation timestamp, name, and entity type.
+func NewCompositePodGroupInfo(cpg *schedulingv1beta1.CompositePodGroup, children ...*framework.PodGroupInfo) *framework.PodGroupInfo {
+	return framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), children...)
+}
+
+// NewQueuedPodGroupInfo creates a QueuedPodGroupInfo for the given root PodGroupInfo and adds all given QueuedPodInfos to it.
+// The tree must not carry UnscheduledPods, as AddPod fills them in for the leaf each pod belongs to.
+func NewQueuedPodGroupInfo(root *framework.PodGroupInfo, pInfos ...*framework.QueuedPodInfo) *framework.QueuedPodGroupInfo {
+	qpgi := &framework.QueuedPodGroupInfo{PodGroupInfo: root}
+	for _, pInfo := range pInfos {
+		qpgi.AddPod(pInfo)
+	}
+	return qpgi
 }

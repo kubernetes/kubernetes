@@ -3608,7 +3608,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "GenericWorkload enabled, pod in same PodGroup, returns UnschedulableAndUnresolvable",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup1,
-			pgInfo:                 newPGInfo(pg1, podPGroup1),
+			pgInfo:                 tf.NewLeafPodGroupInfo(pg1, podPGroup1),
 			features:               feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true},
 			wantStatus:             fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished"),
 		},
@@ -3616,7 +3616,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "GenericWorkload disabled, pod in same PodGroup, returns nil",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup1,
-			pgInfo:                 newPGInfo(st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Obj(), podPGroup1),
+			pgInfo:                 tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("pg1").UID("pg1").Namespace(v1.NamespaceDefault).Obj(), podPGroup1),
 			features:               feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: false},
 			wantStatus:             nil,
 		},
@@ -3624,8 +3624,8 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "GenericWorkload enabled, pod in different PodGroup, returns nil",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup2,
-			pgInfo:                 newPGInfo(pg1, podPGroup1),
-			extraPgInfos:           []*framework.PodGroupInfo{newPGInfo(pg2)},
+			pgInfo:                 tf.NewLeafPodGroupInfo(pg1, podPGroup1),
+			extraPgInfos:           []*framework.PodGroupInfo{tf.NewLeafPodGroupInfo(pg2)},
 			features:               feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true},
 			wantStatus:             nil,
 		},
@@ -3633,7 +3633,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "GenericWorkload enabled, pod group not found, returns nil",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroupMissing,
-			pgInfo:                 newPGInfo(pg1, podPGroup1),
+			pgInfo:                 tf.NewLeafPodGroupInfo(pg1, podPGroup1),
 			features:               feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true},
 			wantStatus:             nil,
 		},
@@ -3641,10 +3641,10 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "CompositePodGroup enabled, pod in different leaf PodGroup but same root CompositePodGroup, returns UnschedulableAndUnresolvable",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup2,
-			pgInfo: newCPGInfo(cpg1, []*framework.PodGroupInfo{
-				newPGInfo(pg1WithParentCpg1, podPGroup1),
-				newPGInfo(pg2WithParentCpg1),
-			}, podPGroup1),
+			pgInfo: tf.NewCompositePodGroupInfo(cpg1,
+				tf.NewLeafPodGroupInfo(pg1WithParentCpg1, podPGroup1),
+				tf.NewLeafPodGroupInfo(pg2WithParentCpg1),
+			),
 			features:   feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished"),
 		},
@@ -3652,13 +3652,13 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "CompositePodGroup enabled, pod in different leaf PodGroup and different root CompositePodGroup, returns nil",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup2,
-			pgInfo: newCPGInfo(cpg1, []*framework.PodGroupInfo{
-				newPGInfo(pg1WithParentCpg1, podPGroup1),
-			}, podPGroup1),
+			pgInfo: tf.NewCompositePodGroupInfo(cpg1,
+				tf.NewLeafPodGroupInfo(pg1WithParentCpg1, podPGroup1),
+			),
 			extraPgInfos: []*framework.PodGroupInfo{
-				newCPGInfo(cpg2, []*framework.PodGroupInfo{
-					newPGInfo(pg2WithParentCpg2),
-				}),
+				tf.NewCompositePodGroupInfo(cpg2,
+					tf.NewLeafPodGroupInfo(pg2WithParentCpg2),
+				),
 			},
 			features:   feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			wantStatus: nil,
@@ -3667,10 +3667,10 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "CompositePodGroup disabled, pod in different leaf PodGroup but same root CompositePodGroup, returns nil",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup2,
-			pgInfo: newCPGInfo(cpg1, []*framework.PodGroupInfo{
-				newPGInfo(pg1WithParentCpg1, podPGroup1),
-				newPGInfo(pg2WithParentCpg1),
-			}, podPGroup1),
+			pgInfo: tf.NewCompositePodGroupInfo(cpg1,
+				tf.NewLeafPodGroupInfo(pg1WithParentCpg1, podPGroup1),
+				tf.NewLeafPodGroupInfo(pg2WithParentCpg1),
+			),
 			features:   feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true, EnableCompositePodGroup: false},
 			wantStatus: nil,
 		},
@@ -3678,7 +3678,7 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "CompositePodGroup enabled, parent CompositePodGroup is missing, returns nil",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup1,
-			pgInfo:                 newPGInfo(pg1WithParentMissing, podPGroup1),
+			pgInfo:                 tf.NewLeafPodGroupInfo(pg1WithParentMissing, podPGroup1),
 			features:               feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			wantStatus:             nil,
 		},
@@ -3686,14 +3686,14 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "CompositePodGroup enabled, pod in different leaf PodGroup under multi-level CompositePodGroup hierarchy, returns UnschedulableAndUnresolvable",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup2,
-			pgInfo: newCPGInfo(rootCpg, []*framework.PodGroupInfo{
-				newCPGInfo(childCpg1, []*framework.PodGroupInfo{
-					newPGInfo(pg1WithNestedCpg, podPGroup1),
-				}, podPGroup1),
-				newCPGInfo(childCpg2, []*framework.PodGroupInfo{
-					newPGInfo(pg2WithNestedCpg),
-				}),
-			}, podPGroup1),
+			pgInfo: tf.NewCompositePodGroupInfo(rootCpg,
+				tf.NewCompositePodGroupInfo(childCpg1,
+					tf.NewLeafPodGroupInfo(pg1WithNestedCpg, podPGroup1),
+				),
+				tf.NewCompositePodGroupInfo(childCpg2,
+					tf.NewLeafPodGroupInfo(pg2WithNestedCpg),
+				),
+			),
 			features:   feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod group to be finished"),
 		},
@@ -3701,9 +3701,9 @@ func TestPreEnqueue(t *testing.T) {
 			name:                   "CompositePodGroup enabled, intermediate parent CompositePodGroup missing, returns nil",
 			podToTriggerPreemption: podPGroup1,
 			podToCheck:             podPOtherGroup1,
-			pgInfo: newCPGInfo(childCpgMissingRoot, []*framework.PodGroupInfo{
-				newPGInfo(pgWithIntermediateMissing, podPGroup1),
-			}, podPGroup1),
+			pgInfo: tf.NewCompositePodGroupInfo(childCpgMissingRoot,
+				tf.NewLeafPodGroupInfo(pgWithIntermediateMissing, podPGroup1),
+			),
 			features:   feature.Features{EnableAsyncPreemption: true, EnableGenericWorkload: true, EnableCompositePodGroup: true},
 			wantStatus: nil,
 		},
@@ -3877,17 +3877,14 @@ func TestDefaultPreemption_PodGroupPostFilter_ErrorWrapping(t *testing.T) {
 		{
 			name:                    "PodGroup preemptor",
 			enableCompositePodGroup: false,
-			pgInfo:                  newPGInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), preemptorPods...),
+			pgInfo:                  tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), preemptorPods...),
 		},
 		{
 			name:                    "CompositePodGroup preemptor",
 			enableCompositePodGroup: true,
-			pgInfo: newCPGInfo(
+			pgInfo: tf.NewCompositePodGroupInfo(
 				st.MakeCompositePodGroup().Name("cpg").Priority(highPriority).Obj(),
-				[]*framework.PodGroupInfo{
-					newPGInfo(st.MakePodGroup().Name("leaf-pg").ParentCompositePodGroup("cpg").Priority(highPriority).Obj(), preemptorPods...),
-				},
-				preemptorPods...,
+				tf.NewLeafPodGroupInfo(st.MakePodGroup().Name("leaf-pg").ParentCompositePodGroup("cpg").Priority(highPriority).Obj(), preemptorPods...),
 			),
 		},
 	}
@@ -4042,16 +4039,8 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				cache.AddGenericPodGroup(fwk.NewGenericPodGroup(pg))
 				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, []*v1beta1.PodGroup{pg}, nil)
 			} else {
-				priorityVal := highPriority
-				cpg = &v1beta1.CompositePodGroup{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "cpg",
-						Namespace: "default",
-					},
-					Spec: v1beta1.CompositePodGroupSpec{
-						Priority: &priorityVal,
-					},
-				}
+				cpg = st.MakeCompositePodGroup().Name("cpg").Priority(highPriority).Obj()
+				pg = st.MakePodGroup().Name("preemptor-pg-ok").ParentCompositePodGroup(cpg.Name).Priority(highPriority).Obj()
 				client = clientsetfake.NewClientset(pod)
 				cache = internalcache.New(ctx, nil, true, true /* compositePodGroupEnabled */)
 				snapshot = internalcache.NewTestSnapshotWithPodGroups(testPods, nodes, nil, []*v1beta1.CompositePodGroup{cpg})
@@ -4088,22 +4077,16 @@ func TestDefaultPreemption_PodGroupPostFilter_InvalidSnapshot(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
+			preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").PodGroupName(pg.Name).Priority(highPriority).Obj()}
 			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 				return nil, fwk.NewStatus(fwk.Unschedulable)
 			}
 
 			var pgInfo *framework.PodGroupInfo
 			if !tt.isCPG {
-				pgInfo = &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericPodGroup(pg),
-					UnscheduledPods: preemptorPods,
-				}
+				pgInfo = tf.NewLeafPodGroupInfo(pg, preemptorPods...)
 			} else {
-				pgInfo = &framework.PodGroupInfo{
-					GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
-					UnscheduledPods: preemptorPods,
-				}
+				pgInfo = tf.NewCompositePodGroupInfo(cpg, tf.NewLeafPodGroupInfo(pg, preemptorPods...))
 			}
 			state := framework.NewCycleState()
 			_, gotStatus := pl.PodGroupPostFilter(ctx, state, pgInfo, mockSchedulingFunc)
@@ -4122,7 +4105,8 @@ func TestDefaultPreemption_PodGroupPostFilter_CompositePodGroup(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	pgOk := st.MakePodGroup().Name("preemptor-pg-ok").Priority(highPriority).Obj()
+	cpg := st.MakeCompositePodGroup().Name("cpg").Priority(highPriority).Obj()
+	pgOk := st.MakePodGroup().Name("preemptor-pg-ok").ParentCompositePodGroup(cpg.Name).Priority(highPriority).Obj()
 	client := clientsetfake.NewClientset(pgOk)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	registeredPlugins := []tf.RegisterPluginFunc{
@@ -4159,21 +4143,12 @@ func TestDefaultPreemption_PodGroupPostFilter_CompositePodGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()}
+	preemptorPods := []*v1.Pod{st.MakePod().Name("p").UID("p").PodGroupName(pgOk.Name).Priority(highPriority).Obj()}
 	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 		return nil, nil
 	}
 
-	cpg := &v1beta1.CompositePodGroup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cpg",
-			Namespace: "default",
-		},
-	}
-	pgInfo := &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
-		UnscheduledPods: preemptorPods,
-	}
+	pgInfo := tf.NewCompositePodGroupInfo(cpg, tf.NewLeafPodGroupInfo(pgOk, preemptorPods...))
 
 	_, gotStatus := pl.PodGroupPostFilter(ctx, framework.NewCycleState(), pgInfo, mockSchedulingFunc)
 	if gotStatus.Code() != fwk.Unschedulable {
@@ -4284,9 +4259,9 @@ func TestDefaultPreemption_PodGroupPostFilter_WorkloadPreemptionAttempts(t *test
 
 			var pgInfo *framework.PodGroupInfo
 			if tt.isCPG {
-				pgInfo = &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Obj())}
+				pgInfo = tf.NewCompositePodGroupInfo(st.MakeCompositePodGroup().Obj())
 			} else {
-				pgInfo = &framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Obj())}
+				pgInfo = tf.NewLeafPodGroupInfo(st.MakePodGroup().Obj())
 			}
 			pl.PodGroupPostFilter(ctx, nil, pgInfo, nil)
 
@@ -4318,20 +4293,6 @@ func getCounterFromGatherer(g componentmetrics.Gatherer, name string, resultLabe
 		return 0, err
 	}
 	return uint64(vals[resultLabelValue]), nil
-}
-
-func newPGInfo(pg *v1beta1.PodGroup, pods ...*v1.Pod) *framework.PodGroupInfo {
-	return &framework.PodGroupInfo{
-		GenericPodGroup: fwk.NewGenericPodGroup(pg),
-		UnscheduledPods: pods,
-	}
-}
-
-// newCPGInfo creates a PodGroupInfo representing a CompositePodGroup hierarchy.
-func newCPGInfo(cpg *v1beta1.CompositePodGroup, children []*framework.PodGroupInfo, pods ...*v1.Pod) *framework.PodGroupInfo {
-	pgi := framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(cpg), children...)
-	pgi.UnscheduledPods = pods
-	return pgi
 }
 
 // extractGroups is an auxiliary method to extract all PodGroups and CompositePodGroups
@@ -4571,7 +4532,7 @@ func TestDefaultPreemption_PodGroupPostFilter_CustomPreemptionManager(t *testing
 			}
 
 			pg := st.MakePodGroup().Name("preemptor-pg").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj()
-			pgInfo := newPGInfo(pg, preemptorPods...)
+			pgInfo := tf.NewLeafPodGroupInfo(pg, preemptorPods...)
 
 			clientObjs := make([]runtime.Object, 0, len(allPods)+1)
 			clientObjs = append(clientObjs, pg)
