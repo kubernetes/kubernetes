@@ -417,37 +417,25 @@ func kindOrResourceIncomplete(req *admissionv1.AdmissionRequest) bool {
 	return req.Kind.Version == "" || req.Kind.Kind == "" || req.Resource.Version == "" || req.Resource.Resource == ""
 }
 
-// Tokens attest the parent resource group; these subresources have cross-group kinds.
+// allowedKindResourceGroupMismatch reports whether req is a known subresource
+// whose admitted object Kind is in a different API group than the parent
+// resource attested by the token.
 func allowedKindResourceGroupMismatch(req *admissionv1.AdmissionRequest) bool {
-	type subresourceTarget struct {
-		group       string
-		resource    string
-		subresource string
-		kind        metav1.GroupVersionKind
-	}
-	if req.SubResource == "scale" && req.Kind == (metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}) {
-		return true
-	}
-	switch (subresourceTarget{
-		group:       req.Resource.Group,
-		resource:    req.Resource.Resource,
-		subresource: req.SubResource,
-		kind:        req.Kind,
-	}) {
-	case subresourceTarget{
-		group:       "",
-		resource:    "pods",
-		subresource: "eviction",
-		kind:        metav1.GroupVersionKind{Group: "policy", Version: "v1", Kind: "Eviction"},
-	}:
-		return true
-	case subresourceTarget{
-		group:       "",
-		resource:    "serviceaccounts",
-		subresource: "token",
-		kind:        metav1.GroupVersionKind{Group: "authentication.k8s.io", Version: "v1", Kind: "TokenRequest"},
-	}:
-		return true
+	switch req.Kind {
+	case metav1.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "Scale"}:
+		return req.SubResource == "scale"
+	case metav1.GroupVersionKind{Group: "policy", Version: "v1", Kind: "Eviction"}:
+		return req.Resource == metav1.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "pods",
+		} && req.SubResource == "eviction"
+	case metav1.GroupVersionKind{Group: "authentication.k8s.io", Version: "v1", Kind: "TokenRequest"}:
+		return req.Resource == metav1.GroupVersionResource{
+			Group:    "",
+			Version:  "v1",
+			Resource: "serviceaccounts",
+		} && req.SubResource == "token"
 	default:
 		return false
 	}

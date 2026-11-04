@@ -2927,6 +2927,11 @@ func TestVerifier_SubresourceKindAndObjectGroups(t *testing.T) {
 			kind: scaleKind, sub: "scale", object: `{"apiVersion":"autoscaling/v1","kind":"Scale"}`,
 		},
 		{
+			name: "scale subresource rejects unsupported kind version",
+			kind: metav1.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "Scale"},
+			sub:  "scale", object: `{"apiVersion":"autoscaling/v2","kind":"Scale"}`, wantDeny: true,
+		},
+		{
 			name: "ordinary resource cannot switch kind groups",
 			kind: scaleKind, object: `{"apiVersion":"autoscaling/v1","kind":"Scale"}`, wantDeny: true,
 		},
@@ -3041,30 +3046,49 @@ func TestVerifier_CoreCrossGroupSubresources(t *testing.T) {
 	}
 	token := ts.sign(t, claims)
 	for _, tc := range []struct {
-		name, resource, subresource, group, kind, object string
-		wantDeny                                         bool
+		name                                   string
+		resource, resourceVersion, subresource string
+		group, kindVersion, kind               string
+		object                                 string
+		wantDeny                               bool
 	}{
 		{
-			name: "Pod eviction", resource: "pods", subresource: "eviction", group: "policy", kind: "Eviction",
+			name: "Pod eviction", resource: "pods", resourceVersion: "v1", subresource: "eviction", group: "policy", kindVersion: "v1", kind: "Eviction",
 			object: `{"apiVersion":"policy/v1","kind":"Eviction"}`,
 		},
 		{
-			name: "ServiceAccount token", resource: "serviceaccounts", subresource: "token", group: "authentication.k8s.io", kind: "TokenRequest",
+			name: "ServiceAccount token", resource: "serviceaccounts", resourceVersion: "v1", subresource: "token", group: "authentication.k8s.io", kindVersion: "v1", kind: "TokenRequest",
 			object: `{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest"}`,
 		},
 		{
-			name: "Pod eviction cannot claim a TokenRequest Kind", resource: "pods", subresource: "eviction", group: "authentication.k8s.io", kind: "TokenRequest",
+			name: "Pod eviction rejects unsupported resource version", resource: "pods", resourceVersion: "v2", subresource: "eviction", group: "policy", kindVersion: "v1", kind: "Eviction",
+			object: `{"apiVersion":"policy/v1","kind":"Eviction"}`, wantDeny: true,
+		},
+		{
+			name: "ServiceAccount token rejects unsupported resource version", resource: "serviceaccounts", resourceVersion: "v2", subresource: "token", group: "authentication.k8s.io", kindVersion: "v1", kind: "TokenRequest",
 			object: `{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest"}`, wantDeny: true,
 		},
 		{
-			name: "Secret cannot spoof a Pod eviction", resource: "secrets", subresource: "eviction", group: "policy", kind: "Eviction",
+			name: "Pod eviction rejects unsupported kind version", resource: "pods", resourceVersion: "v1", subresource: "eviction", group: "policy", kindVersion: "v2", kind: "Eviction",
+			object: `{"apiVersion":"policy/v2","kind":"Eviction"}`, wantDeny: true,
+		},
+		{
+			name: "ServiceAccount token rejects unsupported kind version", resource: "serviceaccounts", resourceVersion: "v1", subresource: "token", group: "authentication.k8s.io", kindVersion: "v2", kind: "TokenRequest",
+			object: `{"apiVersion":"authentication.k8s.io/v2","kind":"TokenRequest"}`, wantDeny: true,
+		},
+		{
+			name: "Pod eviction cannot claim a TokenRequest Kind", resource: "pods", resourceVersion: "v1", subresource: "eviction", group: "authentication.k8s.io", kindVersion: "v1", kind: "TokenRequest",
+			object: `{"apiVersion":"authentication.k8s.io/v1","kind":"TokenRequest"}`, wantDeny: true,
+		},
+		{
+			name: "Secret cannot spoof a Pod eviction", resource: "secrets", resourceVersion: "v1", subresource: "eviction", group: "policy", kindVersion: "v1", kind: "Eviction",
 			object: `{"apiVersion":"policy/v1","kind":"Eviction"}`, wantDeny: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			request := admissionRequest(
-				metav1.GroupVersionKind{Group: tc.group, Version: "v1", Kind: tc.kind},
-				metav1.GroupVersionResource{Version: "v1", Resource: tc.resource},
+				metav1.GroupVersionKind{Group: tc.group, Version: tc.kindVersion, Kind: tc.kind},
+				metav1.GroupVersionResource{Version: tc.resourceVersion, Resource: tc.resource},
 				tc.subresource, admissionv1.Create,
 			)
 			request.Object.Raw = []byte(tc.object)
