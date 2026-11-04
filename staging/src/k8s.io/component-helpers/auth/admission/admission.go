@@ -54,9 +54,9 @@ func init() {
 	utilruntime.Must(admissionv1.AddToScheme(scheme))
 }
 
-// Match controller-runtime's admission request limit:
-// https://github.com/kubernetes-sigs/controller-runtime/blob/2e312096f4555f330939cfd5e30a0ae2436829c0/pkg/webhook/admission/http.go#L37-L55
-const defaultMaxBodyBytes int64 = 7 << 20
+// Match API server's 3MB limit:
+// https://github.com/kubernetes/kubernetes/blob/2a794afb5edcff2f21f8010d2508329479884be2/staging/src/k8s.io/apiserver/pkg/server/config.go#L485-L494
+const defaultMaxBodyBytes int64 = int64(3 * 1024 * 1024)
 
 const (
 	localJWKSPath                    = "/openid/v1/jwks"
