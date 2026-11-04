@@ -1019,6 +1019,7 @@ func TestBatchSetDisabled(t *testing.T) {
 
 type podGroupPostFilterCallbackPlugin struct {
 	name string
+	fh   fwk.Handle
 }
 
 func (pl *podGroupPostFilterCallbackPlugin) Name() string {
@@ -1026,7 +1027,7 @@ func (pl *podGroupPostFilterCallbackPlugin) Name() string {
 }
 
 func (pl *podGroupPostFilterCallbackPlugin) PodGroupPostFilter(ctx context.Context, _ fwk.PodGroupCycleState, _ fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
-	if _, status := pgSchedulingFunc(ctx); !status.IsSuccess() {
+	if _, status := pgSchedulingFunc(ctx, pl.fh.NewPodGroupCycleState()); !status.IsSuccess() {
 		return nil, status
 	}
 	return &fwk.PodGroupPostFilterResult{}, fwk.NewStatus(fwk.Success)
@@ -1056,8 +1057,8 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 				"batchTest":     newBatchTestPlugin,
 				queueSortPlugin: newQueueSortPlugin,
 				bindPlugin:      newBindPlugin,
-				pgPostFilterPluginName: func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-					return &podGroupPostFilterCallbackPlugin{name: pgPostFilterPluginName}, nil
+				pgPostFilterPluginName: func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
+					return &podGroupPostFilterCallbackPlugin{name: pgPostFilterPluginName, fh: fh}, nil
 				},
 			}
 			profile := config.KubeSchedulerProfile{
@@ -1092,7 +1093,7 @@ func TestRunPodGroupPostFilterPluginsBatching(t *testing.T) {
 			}
 
 			schedulingFuncCalled := false
-			pgSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			pgSchedulingFunc := func(ctx context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 				schedulingFuncCalled = true
 				if opportunisticBatchingEnabled {
 					if !fwkImpl.batch.disabled {

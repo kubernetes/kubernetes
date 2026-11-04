@@ -602,7 +602,10 @@ type PostFilterPlugin interface {
 }
 
 // PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group scheduling.
-type PodGroupSchedulingFunc func(ctx context.Context) (*PodGroupAssignments, *Status)
+// Callers should pass a fresh PodGroupCycleState from Handle.NewPodGroupCycleState() (or nil when no
+// pre-populated state is needed) rather than the outer cycle's PodGroupCycleState so inner per-pod
+// plugins do not overwrite state from the initial cycle.
+type PodGroupSchedulingFunc func(ctx context.Context, state PodGroupCycleState) (*PodGroupAssignments, *Status)
 
 // PodGroupPostFilterResult stores information about nominated nodes for a pod group.
 type PodGroupPostFilterResult struct {
@@ -912,6 +915,10 @@ type Handle interface {
 	// It extends SharedLister interface.
 	// Only PodGroupPostFilter extension point can use this.
 	MutableSnapshotSharedLister() MutableSnapshotSharedLister
+
+	// NewPodGroupCycleState returns a fresh, empty PodGroupCycleState that can be populated
+	// and passed to PodGroupSchedulingFunc during PodGroupPostFilter evaluation.
+	NewPodGroupCycleState() PodGroupCycleState
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))

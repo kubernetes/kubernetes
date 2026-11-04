@@ -3035,6 +3035,54 @@ func TestScorePlacementPodGroupAssignments(t *testing.T) {
 	}
 }
 
+type stateInspectingFilterPlugin struct {
+	fakePodGroupPlugin
+	mu             sync.Mutex
+	observedValues map[string]string
+	observedPGMode map[string]bool
+}
+
+type unsupportedPodGroupCycleState struct {
+	fwk.PodGroupCycleState
+}
+
+const testInnerStateKey fwk.StateKey = "testInnerStateKey"
+
+type testInnerStateData struct {
+	val string
+}
+
+func (d *testInnerStateData) Clone() fwk.StateData {
+	return &testInnerStateData{val: d.val}
+}
+
+func (p *stateInspectingFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	var observedVal string
+	var hasVal bool
+	for pgState := state.GetPodGroupCycleState(); pgState != nil; {
+		if data, err := pgState.Read(testInnerStateKey); err == nil {
+			observedVal = data.(*testInnerStateData).val
+			hasVal = true
+			break
+		}
+		parentPlacement := pgState.GetParentPlacementCycleState()
+		if parentPlacement == nil {
+			break
+		}
+		pgState = parentPlacement.GetPodGroupCycleState()
+	}
+
+	p.mu.Lock()
+	if p.observedPGMode != nil {
+		p.observedPGMode[pod.Name] = state.IsPodGroupSchedulingCycle()
+	}
+	if p.observedValues != nil && hasVal {
+		p.observedValues[pod.Name] = observedVal
+	}
+	p.mu.Unlock()
+	return p.fakePodGroupPlugin.Filter(ctx, state, pod, nodeInfo)
+}
+
 func TestBuildPodGroupSchedulingFunc(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.TopologyAwareWorkloadScheduling: true,
@@ -3138,8 +3186,10 @@ func TestBuildPodGroupSchedulingFunc(t *testing.T) {
 
 			podGroupInfo := buildHierarchicalQueuedPodGroupInfo(rootCPG, allCPGs, allPGs, allPods)
 
-			fakePlugin := &fakePodGroupPlugin{
-				filterStatus: tc.filterStatus,
+			fakePlugin := &stateInspectingFilterPlugin{
+				fakePodGroupPlugin: fakePodGroupPlugin{
+					filterStatus: tc.filterStatus,
+				},
 			}
 			gangPluginFactory := func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 				return gangscheduling.New(ctx, obj, handle, feature.Features{
@@ -3186,13 +3236,67 @@ func TestBuildPodGroupSchedulingFunc(t *testing.T) {
 			}
 
 			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue)
-			pgSchedulingFunc := podGroupAlgorithm.BuildPodGroupSchedulingFunc(schedFwk, framework.NewCycleState(), podGroupInfo)
+			pgSchedulingFunc := podGroupAlgorithm.BuildPodGroupSchedulingFunc(schedFwk, podGroupInfo)
+
+			for _, badState := range []fwk.PodGroupCycleState{
+				&unsupportedPodGroupCycleState{},
+				(*unsupportedPodGroupCycleState)(nil),
+			} {
+				assignments, status := pgSchedulingFunc(ctx, badState)
+				if status.Code() != fwk.Error {
+					t.Fatalf("pgSchedulingFunc(%T) status code = %v, want %v (status: %v)", badState, status.Code(), fwk.Error, status)
+				}
+				if assignments != nil {
+					t.Fatalf("pgSchedulingFunc(%T) assignments = %v, want nil", badState, assignments)
+				}
+			}
+
 			// Run pgSchedulingFunc multiple times to verify that ProposedAssignments
-			// returns pods in deterministic tree-walk order instead of random map order.
-			for range 20 {
-				assignments, status := pgSchedulingFunc(ctx)
+			// returns pods in deterministic tree-walk order instead of random map order,
+			// and that caller-provided PodGroupCycleState entries are visible across the hierarchy
+			// and preserved after the call.
+			for i := range 20 {
+				fakePlugin.observedValues = make(map[string]string)
+				fakePlugin.observedPGMode = make(map[string]bool)
+
+				var callState fwk.PodGroupCycleState
+				expectInnerVal := false
+				switch i {
+				case 0:
+					callState = nil
+				case 1:
+					var typedNil *framework.CycleState
+					callState = typedNil
+				case 2:
+					cs := framework.NewCycleState()
+					cs.Write(testInnerStateKey, &testInnerStateData{val: "forwarded"})
+					callState = cs
+					expectInnerVal = true
+				default:
+					cs := schedFwk.NewPodGroupCycleState()
+					cs.Write(testInnerStateKey, &testInnerStateData{val: "forwarded"})
+					callState = cs
+					expectInnerVal = true
+				}
+
+				assignments, status := pgSchedulingFunc(ctx, callState)
 				if status.Code() != tc.wantStatusCode {
 					t.Fatalf("pgSchedulingFunc status code = %v, want %v (status: %v)", status.Code(), tc.wantStatusCode, status)
+				}
+				for podName, isPG := range fakePlugin.observedPGMode {
+					if !isPG {
+						t.Fatalf("pod %s observed IsPodGroupSchedulingCycle() = false on iteration %d", podName, i)
+					}
+				}
+				if expectInnerVal {
+					if _, err := callState.Read(testInnerStateKey); err != nil {
+						t.Fatalf("expected caller key to remain in inner PodGroupCycleState after pgSchedulingFunc, got err: %v", err)
+					}
+					for _, podName := range tc.wantAssignedPods {
+						if got := fakePlugin.observedValues[podName]; got != "forwarded" {
+							t.Fatalf("pod %s observed inner state value %q, want %q", podName, got, "forwarded")
+						}
+					}
 				}
 				if tc.wantAssignedPods == nil {
 					if assignments != nil {

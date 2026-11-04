@@ -35,7 +35,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -187,6 +186,9 @@ func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, placementCycleSt
 // and eventually cleans up the tentative reservations that the algorithm makes during its execution.
 // The returned map aggregates scheduling results across the entire pod group hierarchy.
 func (p *PodGroupSchedulingAlgorithm) RunRootSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, rootPodGroupInfo *framework.QueuedPodGroupInfo) map[fwk.EntityKey]*PodGroupScheduledResult {
+	if podGroupCycleState == nil {
+		podGroupCycleState = framework.NewCycleState()
+	}
 	var revertFns revertFns
 	defer revertFns.revert()
 
@@ -297,29 +299,23 @@ func (p *PodGroupSchedulingAlgorithm) podGroupSchedulingDefaultAlgorithm(ctx con
 
 // BuildPodGroupSchedulingFunc returns a PodGroupSchedulingFunc that evaluates the root pod group
 // hierarchy and collects proposed assignments from successful leaf pod groups in tree-walk order.
+// If state is nil, a fresh CycleState is allocated for the evaluation.
 // If the root pod group evaluation does not succeed, the returned PodGroupAssignments is nil;
 // if no pods are assigned across the successful leaf groups, ProposedAssignments may be nil.
 func (p *PodGroupSchedulingAlgorithm) BuildPodGroupSchedulingFunc(
 	schedFwk framework.Framework,
-	podGroupCycleState *framework.CycleState,
 	rootPodGroupInfo *framework.QueuedPodGroupInfo,
 ) fwk.PodGroupSchedulingFunc {
-	return func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
-		// Run the scheduling algorithm with a clean PodGroupCycleState so per-pod plugins do not
-		// overwrite state recorded on podGroupCycleState during the initial scheduling cycle, while
-		// still forwarding PodGroupPreemptionState when set by a PodGroupPostFilter plugin.
-		// TODO(#142718): Accept an inner PodGroupCycleState parameter in fwk.PodGroupSchedulingFunc
-		// so BuildPodGroupSchedulingFunc does not need to copy plugin-specific keys.
-		state := framework.NewCycleState()
-		if podGroupCycleState != nil {
-			if preemptionState, err := podGroupCycleState.Read(preemption.PodGroupPreemptionStateKey); err == nil {
-				state.Write(preemption.PodGroupPreemptionStateKey, preemptionState)
+	return func(ctx context.Context, state fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
+		var cycleState *framework.CycleState
+		if state != nil {
+			var ok bool
+			cycleState, ok = state.(*framework.CycleState)
+			if !ok {
+				return nil, fwk.AsStatus(fmt.Errorf("unexpected PodGroupCycleState type %T, expected *framework.CycleState", state))
 			}
 		}
-		results := p.RunRootSchedulingAlgorithm(ctx, schedFwk, state, rootPodGroupInfo)
-		// ProposedAssignments retains per-pod CycleStates that reference state during reprieveVictim,
-		// so delete PodGroupPreemptionStateKey once the inner scheduling pass completes to release it.
-		state.Delete(preemption.PodGroupPreemptionStateKey)
+		results := p.RunRootSchedulingAlgorithm(ctx, schedFwk, cycleState, rootPodGroupInfo)
 		rootResult := results[rootPodGroupInfo.PodGroupInfo.GetKey()]
 		if !rootResult.status.IsSuccess() {
 			return nil, rootResult.status

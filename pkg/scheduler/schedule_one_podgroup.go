@@ -364,7 +364,7 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	// Run pod group post filter plugins if scheduling failed. If any of the plugins is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
 	if rootStatus.Code() == fwk.Unschedulable {
-		pgSchedulingFunc := sched.podGroupAlgorithm.BuildPodGroupSchedulingFunc(schedFwk, podGroupCycleState, rootPodGroupInfo)
+		pgSchedulingFunc := sched.podGroupAlgorithm.BuildPodGroupSchedulingFunc(schedFwk, rootPodGroupInfo)
 		pgPostFilterResult, status := schedFwk.RunPodGroupPostFilterPlugins(ctx, podGroupCycleState, rootPodGroupInfo.PodGroupInfo, pgSchedulingFunc)
 		applyPodGroupPostFilterResult(completePGResults, pgPostFilterResult, status)
 	}
