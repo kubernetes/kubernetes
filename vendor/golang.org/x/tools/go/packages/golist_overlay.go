@@ -31,8 +31,8 @@ func (state *golistState) determineRootDirs() (map[string]string, error) {
 }
 
 func (state *golistState) determineRootDirsModules() (map[string]string, error) {
-	// List all of the modules--the first will be the directory for the main
-	// module. Any replaced modules will also need to be treated as roots.
+	// List all of the modules. Main modules and replaced modules need to be
+	// treated as roots.
 	// Editing files in the module cache isn't a great idea, so we don't
 	// plan to ever support that.
 	out, err := state.invokeGo("list", "-m", "-json", "all")
@@ -46,8 +46,6 @@ func (state *golistState) determineRootDirsModules() (map[string]string, error) 
 		}
 	}
 	roots := map[string]string{}
-	modules := map[string]string{}
-	var i int
 	for dec := json.NewDecoder(out); dec.More(); {
 		mod := new(gocommand.ModuleJSON)
 		if err := dec.Decode(mod); err != nil {
@@ -59,13 +57,10 @@ func (state *golistState) determineRootDirsModules() (map[string]string, error) 
 			if err != nil {
 				return nil, err
 			}
-			modules[absDir] = mod.Path
-			// The first result is the main module.
-			if i == 0 || mod.Replace != nil && mod.Replace.Path != "" {
+			if mod.Main || mod.Replace != nil && mod.Replace.Path != "" {
 				roots[absDir] = mod.Path
 			}
 		}
-		i++
 	}
 	return roots, nil
 }
