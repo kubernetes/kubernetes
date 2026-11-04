@@ -360,6 +360,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsappsv1beta1.DeploymentApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &applyconfigurationsappsv1beta1.DeploymentConditionApplyConfiguration{}
+	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &applyconfigurationsappsv1beta1.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &applyconfigurationsappsv1beta1.DeploymentSpecApplyConfiguration{}
 	case appsv1beta1.SchemeGroupVersion.WithKind("DeploymentStatus"):
@@ -404,6 +406,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &appsv1beta2.DeploymentApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &appsv1beta2.DeploymentConditionApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &appsv1beta2.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &appsv1beta2.DeploymentSpecApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("DeploymentStatus"):
@@ -1114,6 +1118,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.DeploymentApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentCondition"):
 		return &applyconfigurationsextensionsv1beta1.DeploymentConditionApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentSchedulingConfiguration"):
+		return &applyconfigurationsextensionsv1beta1.DeploymentSchedulingConfigurationApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentSpec"):
 		return &applyconfigurationsextensionsv1beta1.DeploymentSpecApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DeploymentStatus"):
