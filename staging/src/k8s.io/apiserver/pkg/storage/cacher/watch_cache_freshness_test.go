@@ -184,6 +184,7 @@ func TestWaitUntilFreshLocked(t *testing.T) {
 			t.Cleanup(metrics.WatchCacheReadWait.Reset)
 			synctest.Test(t, func(t *testing.T) {
 				fw := newTestFreshnessWaiter()
+				go fw.w.Run(t.Context().Done())
 				start := time.Now()
 				outcomes := make([]outcome, len(tc.steps))
 				wg := sync.WaitGroup{}
@@ -233,29 +234,27 @@ func TestWaitUntilFreshLocked(t *testing.T) {
 type testFreshnessWaiter struct {
 	mu sync.RWMutex
 	w  *freshnessWaiter
-	rv uint64
 }
 
 func newTestFreshnessWaiter() *testFreshnessWaiter {
 	c := clock.RealClock{}
 	pr := progress.NewConditionalProgressRequester(func(context.Context) error { return nil }, c, nil)
 	tw := &testFreshnessWaiter{}
-	tw.w = newFreshnessWaiter(tw.mu.RLocker(), &tw.rv, c, schema.GroupResource{Resource: "pods"}, pr)
+	tw.w = newFreshnessWaiter(c, schema.GroupResource{Resource: "pods"}, pr)
 	return tw
 }
 
 func (tw *testFreshnessWaiter) waitUntilFresh(ctx context.Context, resourceVersion uint64) (uint64, error) {
 	tw.mu.RLock()
 	defer tw.mu.RUnlock()
-	err := tw.w.waitUntilFreshLocked(ctx, resourceVersion)
-	return tw.rv, err
+	err := tw.w.waitUntilFreshLockedWithLocker(ctx, resourceVersion, tw.mu.RLocker())
+	return tw.w.latestRV, err
 }
 
 func (tw *testFreshnessWaiter) updateRV(rv uint64) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
-	tw.rv = rv
-	tw.w.broadcast()
+	tw.w.broadcast(rv)
 }
 
 func BenchmarkWaitUntilFreshLocked(b *testing.B) {
@@ -282,6 +281,7 @@ func runBenchmarkWaitUntilFresh(b *testing.B, waiterResourceVersions, resourceVe
 	b.ReportAllocs()
 	ctx := b.Context()
 	fw := newTestFreshnessWaiter()
+	go fw.w.Run(ctx.Done())
 
 	var stopWaiters atomic.Bool
 	var remainingWaiters atomic.Int64
