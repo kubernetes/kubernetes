@@ -342,13 +342,14 @@ func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFram
 		nodeHint = schedFramework.GetNodeHint(ctx, pod, podInfo.PodSignature, state, a.cycleProvider())
 	}
 
-	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
+	// A pod's nominated node can be set in a previous scheduling cycle as a result of preemption.
 	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
 	// We take the same tack for hinted nodes from the batch module.
-	if len(pod.Status.NominatedNodeName) > 0 || len(nodeHint) > 0 {
-		feasibleNodes, err := a.evaluateNominatedNode(ctx, pod, schedFramework, state, nodeHint, diagnosis)
+	nominatedNode := schedFramework.NominatedNodeForPod(pod.UID)
+	if len(nominatedNode) > 0 || len(nodeHint) > 0 {
+		feasibleNodes, err := a.evaluateNominatedNode(ctx, pod, schedFramework, state, nominatedNode, nodeHint, diagnosis)
 		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
+			utilruntime.HandleErrorWithContext(ctx, err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", nominatedNode)
 		}
 		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
 		if len(feasibleNodes) != 0 {
@@ -382,10 +383,10 @@ func (a *SchedulingAlgorithm) findNodesThatFitPod(ctx context.Context, schedFram
 	return feasibleNodes, diagnosis, nodeHint, nil
 }
 
-func (a *SchedulingAlgorithm) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, nodeHint string, diagnosis *framework.Diagnosis) ([]framework.NodeWithRank, error) {
+func (a *SchedulingAlgorithm) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, nominatedNode, nodeHint string, diagnosis *framework.Diagnosis) ([]framework.NodeWithRank, error) {
 	// In the future we could potentially use the hint if the nominated node failed.
 	// https://github.com/kubernetes/kubernetes/issues/135163
-	nnn := pod.Status.NominatedNodeName
+	nnn := nominatedNode
 	if len(nnn) == 0 {
 		nnn = nodeHint
 	}
@@ -398,7 +399,7 @@ func (a *SchedulingAlgorithm) evaluateNominatedNode(ctx context.Context, pod *v1
 		// It's not an error if NNN is in the cluster but not in the placement.
 		// This can happen during the pod group placement scheduling cycle, where we simulate multiple potential placements.
 		logger := klog.FromContext(ctx)
-		logger.V(4).Info("Pod's nominated node is present in the cluster but not available in the current placement", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
+		logger.V(4).Info("Pod's nominated node is present in the cluster but not available in the current placement", "pod", klog.KObj(pod), "node", nominatedNode)
 		return nil, nil
 	}
 	node := []fwk.NodeInfo{nodeInfo}
@@ -652,49 +653,40 @@ func (a *SchedulingAlgorithm) FindAllNodesThatFitPod(ctx context.Context, state 
 }
 
 // AssumeAndReserveInCache assumes the pod into the scheduler cache and runs Reserve plugins.
-// If Reserve plugins fail, the assumption is rolled back from the cache.
-//
-// The returned events come from AllocationExtensions. The caller lets pods
-// retry with them, after the pod itself went back to the queue if it failed.
+// If Reserve plugins fail, the assumption is rolled back from the cache and any
+// UnreserveExtensions events are returned so the caller can wake waiting pods after requeueing.
 func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state fwk.CycleState,
 	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
-	scheduleResult ScheduleResult) (*framework.QueuedPodInfo, []framework.AllocationEvent, *fwk.Status) {
+	scheduleResult ScheduleResult) (*framework.QueuedPodInfo, []framework.ResourceEvent, *fwk.Status) {
 
 	logger := klog.FromContext(ctx)
 	host := scheduleResult.SuggestedHost
 	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
-	schedFramework.RunAllocationExtensionsPrepareAllocation(ctx, state, assumedPodInfo.Pod, host)
 	if err := a.cache.AssumePod(logger, assumedPodInfo.Pod); err != nil {
 		logger.Error(err, "Scheduler cache AssumePod failed")
 		return assumedPodInfo, nil, fwk.AsStatus(err)
 	}
-	// Before the nomination ends, so that resources which the pod keeps
-	// never look released.
-	events := schedFramework.RunAllocationExtensionsAddAllocation(ctx, assumedPodInfo.Pod, host)
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
 
 	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); !status.IsSuccess() {
 		forgetEvents, err := a.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, host)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "UnreserveAndForgetFromCache failed")
 		}
-		return assumedPodInfo, append(events, forgetEvents...), status
+		return assumedPodInfo, forgetEvents, status
 	}
-	return assumedPodInfo, events, nil
+	return assumedPodInfo, nil, nil
 }
 
-// UnreserveAndForgetFromCache runs Unreserve plugins, forgets the pod from the scheduler cache
-// and returns the events of AllocationExtensions for the allocation which the assumed pod held.
+// UnreserveAndForgetFromCache runs Unreserve plugins, collects UnreserveExtensions events,
+// and forgets the pod from the scheduler cache.
 func (a *SchedulingAlgorithm) UnreserveAndForgetFromCache(ctx context.Context, state fwk.CycleState,
-	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) ([]framework.AllocationEvent, error) {
+	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) ([]framework.ResourceEvent, error) {
 
 	logger := klog.FromContext(ctx)
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
-	// No nomination restore here: a pod that fails after a cache assume goes back
-	// through handleSchedulingFailure, which re-adds the nomination itself.
+	events := schedFramework.RunUnreserveExtensions(ctx, state, assumedPodInfo.Pod, nodeName)
 	err := a.cache.ForgetPod(logger, assumedPodInfo.Pod)
-	// Unreserve released what the pod held, also if forgetting it failed.
-	return schedFramework.RunAllocationExtensionsRemoveAllocation(ctx, assumedPodInfo.Pod, nodeName), err
+	return events, err
 }
 
 // AssumeAndReserveInSnapshot assumes the pod into the transient node snapshot and runs Reserve plugins.
@@ -715,7 +707,6 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 		logger.Error(err, "Scheduler snapshot AssumePod failed")
 		return fwk.AsStatus(err), nil
 	}
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
 
 	revert := func() {
 		if err := a.unreserveAndForgetFromSnapshot(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
@@ -729,8 +720,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 	return nil, revert
 }
 
-// unreserveAndForgetFromSnapshot runs Unreserve plugins, forgets the pod from the node snapshot,
-// and restores any existing pod nomination.
+// unreserveAndForgetFromSnapshot runs Unreserve plugins and forgets the pod from the node snapshot.
 //
 // This method mutates shared snapshot structures (nodeInfoSnapshot) without internal mutex locks.
 // It is not thread-safe; concurrent calls on the same snapshot are unsupported.
@@ -739,15 +729,5 @@ func (a *SchedulingAlgorithm) unreserveAndForgetFromSnapshot(ctx context.Context
 
 	logger := klog.FromContext(ctx)
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
-	if err := a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod); err != nil {
-		return err
-	}
-	if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
-		// The assume removed the nomination; reverting a tentative assume restores it.
-		schedFramework.AddNominatedPod(logger, assumedPodInfo.PodInfo, &fwk.NominatingInfo{
-			NominatedNodeName: assumedPodInfo.Pod.Status.NominatedNodeName,
-			NominatingMode:    fwk.ModeOverride,
-		})
-	}
-	return nil
+	return a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod)
 }

@@ -2170,7 +2170,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 						continue
 					}
 
-					if d := cmp.Diff(tt.expectedInFlightEvent, event, cmpopts.EquateComparable(clusterEvent{})); d != "" {
+					if d := cmp.Diff(tt.expectedInFlightEvent, event, cmp.AllowUnexported(clusterEvent{}), cmpopts.EquateComparable(fwk.ClusterEvent{})); d != "" {
 						t.Fatalf("Unexpected in-flight event (-want, +got):\n%s", d)
 					}
 					found = true
@@ -7984,7 +7984,7 @@ func TestUpdatePodGroupMember(t *testing.T) {
 				t.Errorf("Expected no pods in incompletePodGroupPods, got %v", incompleteLen)
 			}
 
-			if diff := cmp.Diff(tt.expectedNominatedPods, q.nominatedPodToNode, cmpopts.EquateEmpty()); diff != "" {
+			if diff := cmp.Diff(tt.expectedNominatedPods, q.nominator.nominatedPodToNode, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Unexpected nominated pods (-want +got):\n%s", diff)
 			}
 		})

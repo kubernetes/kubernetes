@@ -164,9 +164,9 @@ type ScheduleResult struct {
 	FeasibleNodes int
 	// The nominating info for scheduling cycle.
 	nominatingInfo *fwk.NominatingInfo
-	// Events of AllocationExtensions for a pod which failed after it got
+	// Events of UnreserveExtensions for a pod which failed after it got
 	// assumed, to be moved after the pod went back to the queue.
-	allocationEvents []framework.AllocationEvent
+	unreserveEvents []framework.ResourceEvent
 }
 
 // WithComponentConfigVersion sets the component config version to the
@@ -585,7 +585,7 @@ func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profi
 	return fExtenders, nil
 }
 
-type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time)
+type FailureHandlerFn func(ctx context.Context, state fwk.CycleState, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time)
 
 func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[fwk.EventResource]fwk.ActionType {
 	gvkMap := make(map[fwk.EventResource]fwk.ActionType)
@@ -654,29 +654,27 @@ func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) error {
 }
 
 // newNominationChangeHandler forwards changes of nominated nodes in the
-// PodNominator to the AllocationExtensions of the pod's profile, as the
-// removal of the old nomination followed by the addition of the new one. It
-// gets called while the scheduling queue is locked.
+// PodNominator to the NominationExtensions of the pod's profile, as the
+// removal of the old nomination followed by the addition of the new one.
+// PriorityQueue invokes this outside PriorityQueue.lock in FIFO causal order.
 func newNominationChangeHandler(profiles profile.Map) internalqueue.NominationChangeHandler {
-	return func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.AllocationEvent {
+	return func(logger klog.Logger, state fwk.CycleState, pod *v1.Pod, oldNodeName, newNodeName string) []framework.ResourceEvent {
 		schedFramework, err := profiles.FrameworkForPod(pod)
 		if err != nil {
 			return nil
 		}
 		ctx := klog.NewContext(context.Background(), logger)
-		// Nominations are for pods without a node. A pod whose nomination
-		// ended because it got assumed or bound is passed without its node,
-		// so that plugins can tell these calls from those of the assumed pod.
+		// Strip Spec.NodeName when a nomination ends because the pod got assumed or bound.
 		if pod.Spec.NodeName != "" {
 			pod = pod.DeepCopy()
 			pod.Spec.NodeName = ""
 		}
-		var events []framework.AllocationEvent
+		var events []framework.ResourceEvent
 		if oldNodeName != "" {
-			events = append(events, schedFramework.RunAllocationExtensionsRemoveAllocation(ctx, pod, oldNodeName)...)
+			events = append(events, schedFramework.RunNominationExtensionsRemoveNomination(ctx, pod, oldNodeName)...)
 		}
 		if newNodeName != "" {
-			events = append(events, schedFramework.RunAllocationExtensionsAddAllocation(ctx, pod, newNodeName)...)
+			events = append(events, schedFramework.RunNominationExtensionsAddNomination(ctx, state, pod, newNodeName)...)
 		}
 		return events
 	}

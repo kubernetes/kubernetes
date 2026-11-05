@@ -22,10 +22,20 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// RunVictimExtensionsAssumeVictim calls AssumeVictim of all plugins.
-func (f *frameworkImpl) RunVictimExtensionsAssumeVictim(ctx context.Context, victim *v1.Pod) {
+// RunVictimExtensionsAssumeVictims calls AssumeVictims of all plugins.
+func (f *frameworkImpl) RunVictimExtensionsAssumeVictims(ctx context.Context, nodeName string, victims []*v1.Pod) {
+	if len(victims) == 0 {
+		return
+	}
 	for _, ext := range f.victimExtensions {
-		ext.AssumeVictim(f.extensionsContext(ctx, "VictimExtensions", ext), victim)
+		ext.AssumeVictims(f.extensionsContext(ctx, "VictimExtensions", ext), nodeName, victims)
+	}
+}
+
+// RunVictimExtensionsForgetVictim calls ForgetVictim of all plugins.
+func (f *frameworkImpl) RunVictimExtensionsForgetVictim(ctx context.Context, nodeName string, victim *v1.Pod) {
+	for _, ext := range f.victimExtensions {
+		ext.ForgetVictim(f.extensionsContext(ctx, "VictimExtensions", ext), nodeName, victim)
 	}
 }
 

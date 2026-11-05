@@ -663,6 +663,21 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	return nil
 }
 
+// IsPodAssumed reports whether pod is currently tentatively assumed in the
+// snapshot during a pod group scheduling cycle. This function is not thread
+// safe and shares the concurrency contract of AssumePod and ForgetPod.
+func (s *Snapshot) IsPodAssumed(pod *v1.Pod) bool {
+	if len(s.assumedPodStates) == 0 {
+		return false
+	}
+	key, err := framework.GetPodKey(pod)
+	if err != nil {
+		return false
+	}
+	state, ok := s.assumedPodStates[key]
+	return ok && state.pod.UID == pod.UID
+}
+
 // forgetAllAssumedPods forgets all assumed pods from the snapshot.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {

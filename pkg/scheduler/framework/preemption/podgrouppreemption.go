@@ -74,7 +74,7 @@ func (ev *PodGroupEvaluator) Preempt(ctx context.Context, state fwk.PodGroupCycl
 	preemptionManager := ev.Handle.PreemptionManager()
 
 	if preemptionManager.Executor().IsPodGroupWaitingForVictims(pgInfo) {
-		return &fwk.PodGroupPostFilterResult{NominatingInfos: buildCurrentNominatingInfos(pgInfo)}, fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes")
+		return &fwk.PodGroupPostFilterResult{NominatingInfos: ev.buildCurrentNominatingInfos(pgInfo)}, fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes")
 	}
 
 	victims, status := preemptionManager.GenerateVictims(ctx, pgInfo)
@@ -327,15 +327,16 @@ func toPodNames(pods []fwk.PodInfo) string {
 	return strings.Join(names, ",")
 }
 
-// buildCurrentNominatingInfos builds a map of nominating infos based on
-// currently set NNN for the preemptor pods
-func buildCurrentNominatingInfos(preemptor fwk.PodGroupInfo) map[types.NamespacedName]*fwk.NominatingInfo {
+// buildCurrentNominatingInfos builds a map of ModeNoop nominating infos based on
+// the active nominations in PodNominator so ongoing preemption preserves existing
+// nominations without triggering re-nomination side effects.
+func (ev *PodGroupEvaluator) buildCurrentNominatingInfos(preemptor fwk.PodGroupInfo) map[types.NamespacedName]*fwk.NominatingInfo {
 	n := make(map[types.NamespacedName]*fwk.NominatingInfo)
 	for _, pod := range preemptor.GetAllUnscheduledPods() {
 		podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 		n[podKey] = &fwk.NominatingInfo{
-			NominatingMode:    fwk.ModeOverride,
-			NominatedNodeName: pod.Status.NominatedNodeName,
+			NominatingMode:    fwk.ModeNoop,
+			NominatedNodeName: ev.Handle.NominatedNodeForPod(pod.UID),
 		}
 	}
 	return n

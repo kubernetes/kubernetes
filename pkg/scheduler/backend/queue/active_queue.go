@@ -58,12 +58,13 @@ type activeQueuer interface {
 	listInFlightPods() []*v1.Pod
 	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error)
 	addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool
-	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool
+	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent, preCheck PreEnqueueCheck) bool
 
 	isLastPoppedEntity(entityLookup framework.QueuedEntityInfo) bool
 	clearPoppedEntity()
 
 	schedulingCycle() int64
+	hasNewerInFlightCycle(pod types.UID, podSchedulingCycle int64) bool
 	done(pod types.UID)
 	close()
 	broadcast()
@@ -186,6 +187,8 @@ type activeQueue struct {
 	// The value of that entry is the *v1.Pod at the time that scheduling of that
 	// pod started, which can be useful for logging or debugging.
 	inFlightPods map[types.UID]*list.Element
+	// inFlightCycles records the schedCycle at which each in-flight pod was popped.
+	inFlightCycles map[types.UID]int64
 
 	// inFlightEvents holds the events received by the scheduling queue
 	// (entry value is clusterEvent) together with in-flight pods (entry
@@ -226,6 +229,7 @@ func newActiveQueue(queue *heap.Heap[framework.QueuedEntityInfo], metricRecorder
 	aq := &activeQueue{
 		queue:           queue,
 		inFlightPods:    make(map[types.UID]*list.Element),
+		inFlightCycles:  make(map[types.UID]int64),
 		inFlightEvents:  list.New(),
 		metricsRecorder: metricRecorder,
 		backoffQPopper:  backoffQPopper,
@@ -298,8 +302,9 @@ func (aq *activeQueue) unlockedMoveEntityToInFlight(logger klog.Logger, entity f
 	}
 	aq.schedCycle++
 
-	// Update metrics for unschedulable plugins.
+	// Update metrics for unschedulable plugins and record the pop cycle.
 	for pInfo := range entity.ForEachPodInfo() {
+		aq.inFlightCycles[pInfo.Pod.UID] = aq.schedCycle
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
@@ -480,16 +485,17 @@ func (aq *activeQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []f
 
 // addEventIfAnyInFlight adds clusterEvent to inFlightEvents if any pod is in inFlightPods.
 // It returns true if pushed the event to the inFlightEvents.
-func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool {
+func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent, preCheck PreEnqueueCheck) bool {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
 	if len(aq.inFlightPods) != 0 {
 		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label(), 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
-			event:  event,
-			oldObj: oldObj,
-			newObj: newObj,
+			event:    event,
+			oldObj:   oldObj,
+			newObj:   newObj,
+			preCheck: preCheck,
 		})
 		return true
 	}
@@ -500,6 +506,13 @@ func (aq *activeQueue) schedulingCycle() int64 {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
 	return aq.schedCycle
+}
+
+func (aq *activeQueue) hasNewerInFlightCycle(podUID types.UID, podSchedulingCycle int64) bool {
+	aq.lock.RLock()
+	defer aq.lock.RUnlock()
+	cycle, ok := aq.inFlightCycles[podUID]
+	return ok && cycle > podSchedulingCycle
 }
 
 // done must be called for pod returned by Pop. This allows the queue to
@@ -520,6 +533,7 @@ func (aq *activeQueue) unlockedDone(podUID types.UID) {
 		return
 	}
 	delete(aq.inFlightPods, podUID)
+	delete(aq.inFlightCycles, podUID)
 
 	// Remove the entity from the list.
 	aq.inFlightEvents.Remove(inFlightEntity)

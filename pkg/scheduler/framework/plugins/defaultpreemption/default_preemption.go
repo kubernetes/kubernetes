@@ -442,7 +442,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(ctx context.Context, pod
 	}
 
 	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
-	nomNodeName := pod.Status.NominatedNodeName
+	nomNodeName := pl.fh.NominatedNodeForPod(pod.UID)
 	if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
 		// then the pod should be considered for preempting again.

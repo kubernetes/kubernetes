@@ -108,7 +108,7 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
-	nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)
+	nominatedNodeStatus := m.Get(ev.Handler.NominatedNodeForPod(pod.UID))
 	if ok, msg := ev.PodEligibleToPreemptOthers(ctx, pod, nominatedNodeStatus); !ok {
 		logger.V(5).Info("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
 		return nil, nil, fwk.NewStatus(fwk.Unschedulable, msg)

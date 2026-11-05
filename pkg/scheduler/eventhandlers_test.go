@@ -117,8 +117,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			// The pod itself does not retry because its nomination changed.
-			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a nominated node name should trigger rescheduling of lower priority pods",
@@ -128,7 +127,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a pod that had nominated node name should trigger rescheduling of lower priority pods",

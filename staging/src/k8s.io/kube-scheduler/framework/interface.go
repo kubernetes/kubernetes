@@ -1094,6 +1094,8 @@ type PodNominator interface {
 	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
 	NominatedPodsForNode(logger klog.Logger, nodeName string) []PodInfo
+	// NominatedNodeForPod returns the node nominated for the given pod UID, or "" if none.
+	NominatedNodeForPod(podUID types.UID) string
 }
 
 // PluginsRunner abstracts operations to run some plugins.

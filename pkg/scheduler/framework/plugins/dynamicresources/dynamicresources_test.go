@@ -6746,3 +6746,158 @@ func TestNew_PodResourceClaimIndex(t *testing.T) {
 		})
 	}
 }
+
+func TestFilterPreservesPass1AllocationAcrossPasses(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	node := st.MakeNode().Name("node1").Obj()
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(node)
+
+	driver := "driver.example.com"
+	className := "gpu-class"
+	devClass := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{Name: className},
+	}
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1-slice"},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:   driver,
+			NodeName: ptr.To("node1"),
+			Pool:     resourceapi.ResourcePool{Name: "node1", ResourceSliceCount: 1},
+			Devices: []resourceapi.Device{
+				{Name: "gpu-0"},
+				{Name: "gpu-1"},
+			},
+		},
+	}
+	claim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "claim-1", Namespace: "ns1"},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name: "req-1",
+					Exactly: &resourceapi.ExactDeviceRequest{
+						DeviceClassName: className,
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				}},
+			},
+		},
+	}
+	pod := st.MakePod().Name("pod-1").Namespace("ns1").UID("pod-1").
+		PodResourceClaims(v1.PodResourceClaim{Name: "claim", ResourceClaimName: ptr.To(claim.Name)}).
+		Obj()
+
+	tc := setup(tCtx, &config.DynamicResourcesArgs{}, []*v1.Node{node}, []*resourceapi.ResourceClaim{claim}, []*resourceapi.DeviceClass{devClass}, nil, []apiruntime.Object{slice}, feature.Features{}, false, nil)
+	baseState := framework.NewCycleState()
+	_, preFilterStatus := tc.p.PreFilter(tCtx, baseState, pod, []fwk.NodeInfo{nodeInfo})
+	require.True(t, preFilterStatus.IsSuccess(), "PreFilter failed: %v", preFilterStatus.AsError())
+
+	// Pass 1 runs on a cloned CycleState where gpu-0 is occupied by a nominated pod.
+	pass1State := baseState.Clone()
+	pass1Data, err := getStateData(pass1State)
+	require.NoError(t, err)
+	baseData, err := getStateData(baseState)
+	require.NoError(t, err)
+	require.NotSame(t, baseData, pass1Data, "Clone() must return an independent stateData instance")
+
+	occupiedByNominated := structured.AllocatedState{
+		AllocatedDevices:         sets.New(structured.MakeDeviceID(driver, "node1", "gpu-0")),
+		AllocatedSharedDeviceIDs: sets.New[structured.DeviceID](),
+		AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
+	}
+	slices, err := tc.p.draManager.ResourceSlices().ListWithDeviceTaintRules()
+	require.NoError(t, err)
+	pass1Alloc, err := structured.NewAllocator(tCtx, AllocatorFeatures(tc.p.fts), occupiedByNominated, tc.p.draManager.DeviceClasses(), slices, tc.p.celCache)
+	require.NoError(t, err)
+	pass1Data.allocator = pass1Alloc
+
+	status := tc.p.Filter(tCtx, pass1State, pod, nodeInfo)
+	require.True(t, status.IsSuccess(), "Pass 1 Filter failed: %v", status.AsError())
+	require.Equal(t, "gpu-1", pass1Data.nodeAllocations["node1"].allocationResults[0].Devices.Results[0].Device)
+	require.Empty(t, baseData.nodeAllocations, "Pass 1 clone must not write directly to parent nodeAllocations")
+
+	// Pass 2 runs on baseState (where gpu-0 appears free because nominated pods are omitted).
+	// It must preserve Pass 1's conflict-free gpu-1 choice instead of overwriting it with gpu-0.
+	status = tc.p.Filter(tCtx, baseState, pod, nodeInfo)
+	require.True(t, status.IsSuccess(), "Pass 2 Filter failed: %v", status.AsError())
+	require.Equal(t, "gpu-1", baseData.nodeAllocations["node1"].allocationResults[0].Devices.Results[0].Device)
+
+	// A clone mutated via PreFilterExtensions.RemovePod (dry-run preemption) must not propagate to parent,
+	// while a nested Pass 1 clone created from dryRunState still preserves its device choice for Pass 2 on dryRunState.
+	ext := tc.p.PreFilterExtensions()
+	require.NotNil(t, ext, "PreFilterExtensions() must be non-nil")
+	dryRunState := baseState.Clone()
+	dryRunData, err := getStateData(dryRunState)
+	require.NoError(t, err)
+	removeStatus := ext.RemovePod(tCtx, dryRunState, pod, nil, nodeInfo)
+	require.True(t, removeStatus.IsSuccess(), "RemovePod failed: %v", removeStatus.AsError())
+
+	nestedPass1 := dryRunState.Clone()
+	nestedPass1Data, err := getStateData(nestedPass1)
+	require.NoError(t, err)
+	nestedPass1Data.allocator = pass1Alloc
+	status = tc.p.Filter(tCtx, nestedPass1, pod, nodeInfo)
+	require.True(t, status.IsSuccess(), "nested dry-run Pass 1 Filter failed: %v", status.AsError())
+	require.Equal(t, "gpu-1", nestedPass1Data.nodeAllocations["node1"].allocationResults[0].Devices.Results[0].Device)
+
+	// Pass 2 on dryRunState (whose allocator still sees gpu-0 as free) must reuse nestedPass1's gpu-1 choice,
+	// and must not leak pass1AllocationResult onto baseData.
+	status = tc.p.Filter(tCtx, dryRunState, pod, nodeInfo)
+	require.True(t, status.IsSuccess(), "dry-run Pass 2 Filter failed: %v", status.AsError())
+	require.Equal(t, "gpu-1", dryRunData.nodeAllocations["node1"].allocationResults[0].Devices.Results[0].Device)
+	_, hasRecorded := baseData.takePass1AllocationResult("node1")
+	require.False(t, hasRecorded, "RemovePod clone must not record pass1AllocationResult on parent")
+
+	// unavailableClaims discovered during Pass 1 (when Pass 2 never runs because Pass 1 returned
+	// Unschedulable) must propagate to baseState so PostFilter/PodGroupPostFilter can deallocate,
+	// whereas a RemovePod dry-run clone must not mutate parent unavailableClaims.
+	wrongNodeClaim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "claim-wrong-node",
+			Namespace: "ns1",
+		},
+		Spec: claim.Spec,
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				NodeSelector: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"other-node"},
+						}},
+					}},
+				},
+			},
+		},
+	}
+	podWrongNode := st.MakePod().Name("pod-wrong-node").Namespace("ns1").UID("pod-wrong-node").
+		PodResourceClaims(v1.PodResourceClaim{Name: "claim", ResourceClaimName: ptr.To(wrongNodeClaim.Name)}).
+		Obj()
+	tcUnavailable := setup(tCtx, &config.DynamicResourcesArgs{}, []*v1.Node{node}, []*resourceapi.ResourceClaim{wrongNodeClaim}, []*resourceapi.DeviceClass{devClass}, nil, []apiruntime.Object{slice}, feature.Features{}, false, nil)
+
+	// Dry-run clone with RemovePod must not propagate unavailableClaims to parent.
+	dryBaseState := framework.NewCycleState()
+	_, preFilterStatus = tcUnavailable.p.PreFilter(tCtx, dryBaseState, podWrongNode, []fwk.NodeInfo{nodeInfo})
+	require.True(t, preFilterStatus.IsSuccess(), "PreFilter failed: %v", preFilterStatus.AsError())
+	dryClone := dryBaseState.Clone()
+	require.True(t, tcUnavailable.p.PreFilterExtensions().RemovePod(tCtx, dryClone, podWrongNode, nil, nodeInfo).IsSuccess())
+	status = tcUnavailable.p.Filter(tCtx, dryClone, podWrongNode, nodeInfo)
+	require.True(t, status.IsRejected())
+	dryBaseData, err := getStateData(dryBaseState)
+	require.NoError(t, err)
+	require.False(t, dryBaseData.unavailableClaims.Has(0), "RemovePod clone must not propagate unavailableClaims to parent")
+
+	// Non-removal Pass 1 clone must propagate unavailableClaims to parent even without Pass 2.
+	pass1UnavailableBase := framework.NewCycleState()
+	_, preFilterStatus = tcUnavailable.p.PreFilter(tCtx, pass1UnavailableBase, podWrongNode, []fwk.NodeInfo{nodeInfo})
+	require.True(t, preFilterStatus.IsSuccess(), "PreFilter failed: %v", preFilterStatus.AsError())
+	pass1UnavailableClone := pass1UnavailableBase.Clone()
+	status = tcUnavailable.p.Filter(tCtx, pass1UnavailableClone, podWrongNode, nodeInfo)
+	require.True(t, status.IsRejected())
+	pass1UnavailableBaseData, err := getStateData(pass1UnavailableBase)
+	require.NoError(t, err)
+	require.True(t, pass1UnavailableBaseData.unavailableClaims.Has(0), "Pass 1 clone must propagate unavailableClaims to parent")
+}

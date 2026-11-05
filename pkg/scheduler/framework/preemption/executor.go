@@ -164,11 +164,42 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 	return e
 }
 
-// assumeVictim lets plugins track what the victim releases asynchronously,
-// once its preemption is under way.
-func (e *Executor) assumeVictim(ctx context.Context, victim *v1.Pod) {
+func victimNodeName(victim *v1.Pod, fallbackNodeName string) string {
+	if victim.Spec.NodeName != "" {
+		return victim.Spec.NodeName
+	}
+	return fallbackNodeName
+}
+
+// assumeVictims lets plugins track what the victims on each node will release
+// before victim eviction API calls begin. PodGroup preemption uses a cluster-wide
+// candidate whose victims may span multiple nodes, so group by Spec.NodeName.
+func (e *Executor) assumeVictims(ctx context.Context, candidateNodeName string, victims []*v1.Pod) {
+	if len(victims) == 0 {
+		return
+	}
+	runner, ok := e.fh.(framework.VictimExtensionsRunner)
+	if !ok {
+		return
+	}
+	var nodeOrder []string
+	byNode := make(map[string][]*v1.Pod)
+	for _, victim := range victims {
+		nodeName := victimNodeName(victim, candidateNodeName)
+		if _, exists := byNode[nodeName]; !exists {
+			nodeOrder = append(nodeOrder, nodeName)
+		}
+		byNode[nodeName] = append(byNode[nodeName], victim)
+	}
+	for _, nodeName := range nodeOrder {
+		runner.RunVictimExtensionsAssumeVictims(ctx, nodeName, byNode[nodeName])
+	}
+}
+
+// forgetVictim rolls back an assumed victim whose eviction API call failed or was cancelled.
+func (e *Executor) forgetVictim(ctx context.Context, candidateNodeName string, victim *v1.Pod) {
 	if runner, ok := e.fh.(framework.VictimExtensionsRunner); ok {
-		runner.RunVictimExtensionsAssumeVictim(ctx, victim)
+		runner.RunVictimExtensionsForgetVictim(ctx, victimNodeName(victim, candidateNodeName), victim)
 	}
 }
 
@@ -207,12 +238,13 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 	ctx, cancel := context.WithCancel(context.Background())
 	logger := klog.FromContext(ctx)
 
+	e.assumeVictims(ctx, c.Name(), c.Victims().Pods)
+
 	victimPods := make([]*v1.Pod, 0, len(c.Victims().Pods))
 	for _, victim := range c.Victims().Pods {
 		if victim.DeletionTimestamp != nil {
 			// Graceful pod deletion has already started. Sending another API call is unnecessary.
 			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(preemptor), "node", c.Name(), "victim", klog.KObj(victim))
-			e.assumeVictim(ctx, victim)
 			continue
 		}
 		victimPods = append(victimPods, victim)
@@ -225,13 +257,14 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 	errCh := parallelize.NewResultChannel[error]()
 	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
 	preemptedLastVictimInMemory := false
+	preempted := make([]bool, len(victimPods))
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
 			return
 		}
-		e.assumeVictim(ctx, victim)
+		preempted[index] = true
 	}
 
 	e.mu.Lock()
@@ -306,8 +339,14 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
 			} else {
-				e.assumeVictim(ctx, lastVictim)
+				preempted[len(victimPods)-1] = true
 				preemptedLastVictimInMemory = preemptedInMemory
+			}
+		}
+		forgetCtx := klog.NewContext(context.Background(), logger)
+		for i, victim := range victimPods {
+			if !preempted[i] {
+				e.forgetVictim(forgetCtx, c.Name(), victim)
 			}
 		}
 		e.mu.Lock()
@@ -337,22 +376,31 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	logger := klog.FromContext(ctx)
+	e.assumeVictims(ctx, c.Name(), c.Victims().Pods)
+
+	preempted := make([]bool, len(c.Victims().Pods))
 	errCh := parallelize.NewResultChannel[error]()
 	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), func(index int) {
 		victim := c.Victims().Pods[index]
 		if victim.DeletionTimestamp != nil {
 			// Graceful pod deletion has already started. Sending another API call is unnecessary.
 			logger.V(2).Info("Victim Pod is already being deleted, skipping the API call for it", "preemptor", klog.KObj(preemptor), "node", c.Name(), "victim", klog.KObj(victim))
-			e.assumeVictim(ctx, victim)
+			preempted[index] = true
 			return
 		}
 		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
 			return
 		}
-		e.assumeVictim(ctx, victim)
+		preempted[index] = true
 	}, pluginName)
 	if err := errCh.Receive(); err != nil {
+		forgetCtx := klog.NewContext(context.WithoutCancel(ctx), logger)
+		for i, victim := range c.Victims().Pods {
+			if !preempted[i] {
+				e.forgetVictim(forgetCtx, c.Name(), victim)
+			}
+		}
 		metricsResult = metrics.GoroutineResultError
 		return fwk.AsStatus(err)
 	}
@@ -395,8 +443,8 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
 	nominatedNodes := sets.New[string]()
 	for _, pod := range pgInfo.GetAllUnscheduledPods() {
-		if len(pod.Status.NominatedNodeName) > 0 {
-			nominatedNodes.Insert(pod.Status.NominatedNodeName)
+		if nomNode := e.fh.NominatedNodeForPod(pod.UID); len(nomNode) > 0 {
+			nominatedNodes.Insert(nomNode)
 		}
 	}
 

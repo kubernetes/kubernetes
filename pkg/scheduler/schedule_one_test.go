@@ -1178,12 +1178,12 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 			return item.mockScheduleResult, item.injectSchedulingError
 		}
-		sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+		sched.FailureHandler = func(ctx context.Context, state fwk.CycleState, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 			gotPod = p.Pod
 			gotError = status.AsError()
 			gotNominatingInfo = ni
 
-			sched.handleSchedulingFailure(ctx, fwk, p, status, ni, start)
+			sched.handleSchedulingFailure(ctx, state, fwk, p, status, ni, start)
 		}
 		called := make(chan struct{})
 		stopFunc, err := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -1344,25 +1344,27 @@ func (q *allocationRecordingQueue) MoveAllToActiveOrBackoffQueue(logger klog.Log
 	q.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck)
 }
 
-// TestAllocationsOfAssumedPods checks that the allocation of an assumed pod
-// ends when it got bound or forgotten, and that the events go to all other
-// pods, after the pod itself went back to the queue if it got rejected.
+// TestAllocationsOfAssumedPods checks that UnreserveExtensions is queried only
+// when an assumed pod is rolled back (not after a successful Bind), and that
+// rollback events go to all other pods after the pod itself went back to the
+// queue if it got rejected.
 func TestAllocationsOfAssumedPods(t *testing.T) {
-	released := framework.AllocationEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
+	released := framework.ResourceEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
 	claimMove := "move " + released.Event.Label() + " self=false other=true"
 	tests := []struct {
 		name string
 		// bindingStatus is the binding cycle's failure, nil if the pod gets bound.
 		bindingStatus *fwk.Status
+		wantCalls     []string
 		wantLog       []string
 	}{
 		{
-			name:    "bound",
-			wantLog: []string{claimMove},
+			name: "bound",
 		},
 		{
 			name:          "binding error",
 			bindingStatus: fwk.AsStatus(errors.New("fake bind error")),
+			wantCalls:     []string{"UnreserveEvents ns/foo node1"},
 			wantLog: []string{
 				claimMove,
 				"move " + framework.EventAssignedPodDelete.Label() + " self=true other=true",
@@ -1372,6 +1374,7 @@ func TestAllocationsOfAssumedPods(t *testing.T) {
 		{
 			name:          "rejected while waiting on permit",
 			bindingStatus: fwk.NewStatus(fwk.Unschedulable, "fake rejection"),
+			wantCalls:     []string{"UnreserveEvents ns/foo node1"},
 			wantLog: []string{
 				"FailureHandler",
 				"move " + framework.EventAssignedPodDelete.Label() + " self=false other=true",
@@ -1399,12 +1402,12 @@ func TestAllocationsOfAssumedPods(t *testing.T) {
 				other:           &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, other)},
 				log:             &log,
 			}
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{ReleaseEvents: []framework.AllocationEvent{released}}
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{ReleaseEvents: []framework.ResourceEvent{released}}
 			schedFramework, err := tf.NewFramework(ctx,
 				[]tf.RegisterPluginFunc{
 					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-					tf.RegisterPreFilterPlugin(allocationExtensions.Name(), tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)),
+					tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)),
 				},
 				testSchedulerName,
 				frameworkruntime.WithClientSet(client),
@@ -1431,7 +1434,7 @@ func TestAllocationsOfAssumedPods(t *testing.T) {
 			if err := sched.initAlgorithm(); err != nil {
 				t.Fatal(err)
 			}
-			sched.FailureHandler = func(context.Context, framework.Framework, *framework.QueuedPodInfo, *fwk.Status, *fwk.NominatingInfo, time.Time) {
+			sched.FailureHandler = func(context.Context, fwk.CycleState, framework.Framework, *framework.QueuedPodInfo, *fwk.Status, *fwk.NominatingInfo, time.Time) {
 				log = append(log, "FailureHandler")
 			}
 
@@ -1446,13 +1449,233 @@ func TestAllocationsOfAssumedPods(t *testing.T) {
 				sched.handleBindingCycleError(ctx, state, schedFramework, assumedPodInfo, time.Now(), result, tt.bindingStatus)
 			}
 
-			if diff := cmp.Diff([]string{"RemoveAllocation ns/foo node1 assigned=node1"}, allocationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			if diff := cmp.Diff(tt.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected UnreserveExtensions calls (-want,+got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.wantLog, log); diff != "" {
 				t.Errorf("Unexpected moves (-want,+got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestSyncReserveOrPermitFailureClearsNominationAndWakesPods(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		failReserve bool
+		failPermit  bool
+	}{
+		{name: "sync Reserve failure", failReserve: true},
+		{name: "sync Permit failure", failPermit: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, false)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU: "1",
+			}).Obj()
+			highPod := st.MakePod().Name("high").Namespace("ns").UID("high").Priority(highPriority).SchedulerName(testSchedulerName).Obj()
+			lowPod := st.MakePod().Name("low").Namespace("ns").UID("low").Priority(lowPriority).SchedulerName(testSchedulerName).Obj()
+
+			client := clientsetfake.NewClientset(node, highPod, lowPod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			hintMap := internalqueue.QueueingHintMapPerProfile{
+				testSchedulerName: {
+					framework.EventAssignedPodDelete: {{
+						PluginName: "TrueFilter",
+						QueueingHintFn: func(klog.Logger, *v1.Pod, interface{}, interface{}) (fwk.QueueingHint, error) {
+							return fwk.Queue, nil
+						},
+					}},
+				},
+			}
+			qs, err := queuesort.New(ctx, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			queue := internalqueue.NewTestQueueWithInformerFactory(ctx, qs.(fwk.QueueSortPlugin).Less, informerFactory,
+				internalqueue.WithMetricsRecorder(ar),
+				internalqueue.WithQueueingHintMapPerProfile(hintMap),
+			)
+			snapshot := internalcache.NewEmptySnapshot()
+			cache := internalcache.New(ctx, nil, true, false)
+			cache.AddNode(logger, node)
+
+			var regs []tf.RegisterPluginFunc
+			regs = append(regs,
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			)
+			if tc.failReserve {
+				regs = append(regs, tf.RegisterReservePlugin("FailReserve", tf.NewFakeReservePlugin(fwk.NewStatus(fwk.Unschedulable, "reserve rejected"))))
+			}
+			if tc.failPermit {
+				regs = append(regs, tf.RegisterPermitPlugin("FailPermit", tf.NewFakePermitPlugin(fwk.NewStatus(fwk.Unschedulable, "permit rejected"), time.Minute)))
+			}
+
+			schedFramework, err := tf.NewFramework(ctx, regs, testSchedulerName,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(queue),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			sched := &Scheduler{
+				client:           client,
+				Cache:            cache,
+				SchedulingQueue:  queue,
+				Profiles:         profile.Map{testSchedulerName: schedFramework},
+				nodeInfoSnapshot: snapshot,
+				NextEntity:       queue.Pop,
+			}
+			if err := sched.initAlgorithm(); err != nil {
+				t.Fatal(err)
+			}
+			sched.applyDefaultHandlers()
+
+			// Nominate highPod on node1 and park lowPod in unschedulablePods blocked by TrueFilter.
+			queue.Add(ctx, highPod)
+			poppedHigh, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatal(err)
+			}
+			highQInfo := poppedHigh.(*framework.QueuedPodInfo)
+			if err := queue.AddUnschedulablePodWithNomination(ctx, nil, highQInfo, queue.SchedulingCycle(),
+				&fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: node.Name}); err != nil {
+				t.Fatal(err)
+			}
+			queue.Add(ctx, lowPod)
+			poppedLow, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatal(err)
+			}
+			lowQInfo := poppedLow.(*framework.QueuedPodInfo)
+			lowQInfo.UnschedulablePlugins = sets.New("TrueFilter")
+			if err := queue.AddUnschedulablePodIfNotPresent(ctx, lowQInfo, queue.SchedulingCycle()); err != nil {
+				t.Fatal(err)
+			}
+			if got := queue.UnschedulablePods(); !podListContainsPod(got, lowPod) {
+				t.Fatalf("expected lowPod in unschedulablePods before highPod cycle, got %v", got)
+			}
+
+			// Move highPod to activeQ and run ScheduleOne; Reserve or sync Permit fails.
+			queue.Activate(logger, map[string]*v1.Pod{highPod.Name: highPod})
+			sched.ScheduleOne(ctx)
+
+			if got := queue.NominatedNodeForPod(highPod.UID); got != "" {
+				t.Errorf("expected highPod nomination to be cleared, got %q", got)
+			}
+			if got := queue.UnschedulablePods(); podListContainsPod(got, lowPod) {
+				t.Errorf("expected lowPod to be woken from unschedulablePods when highPod nomination cleared, still unschedulable: %v", got)
+			}
+		})
+	}
+}
+
+func TestConcurrentBindingCycleErrorDoesNotWipeNewerNomination(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	node := st.MakeNode().Name("node1").Obj()
+	pod := st.MakePod().Name("foo").Namespace("ns").UID("pod-uid").SchedulerName(testSchedulerName).Obj()
+	client := clientsetfake.NewClientset(node, pod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+	cache := internalcache.New(ctx, nil, true, false)
+	cache.AddNode(logger, node)
+
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(queue),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
+
+	sched := &Scheduler{
+		client:           client,
+		Cache:            cache,
+		SchedulingQueue:  queue,
+		Profiles:         profile.Map{testSchedulerName: schedFramework},
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+	}
+	if err := sched.initAlgorithm(); err != nil {
+		t.Fatal(err)
+	}
+	sched.applyDefaultHandlers()
+
+	// Cycle 1: pop pod, assume it in cache, and mark queue.Done(pod.UID) as bindingCycle does.
+	queue.Add(ctx, pod)
+	popped1, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pInfo1 := popped1.(*framework.QueuedPodInfo)
+	assumedPod := pInfo1.Pod.DeepCopy()
+	assumedPod.Spec.NodeName = node.Name
+	if err := cache.AssumePod(logger, assumedPod); err != nil {
+		t.Fatal(err)
+	}
+	queue.Done(pod.UID)
+
+	// Cycle 1 fails in PreBind/Bind: record bindingErrorCycleState before ForgetPod, then ForgetPod.
+	state1 := framework.NewCycleState()
+	state1.Write(bindingErrorCycleStateKey, &bindingErrorCycleState{cycle: queue.SchedulingCycle()})
+	if err := cache.ForgetPod(logger, assumedPod); err != nil {
+		t.Fatal(err)
+	}
+
+	// Before Cycle 1's goroutine reaches handleSchedulingFailure, an informer event re-adds pod
+	// and Cycle 2 pops it and nominates node1.
+	queue.Add(ctx, pod)
+	popped2, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pInfo2 := popped2.(*framework.QueuedPodInfo)
+	state2 := framework.NewCycleState()
+	sched.handleSchedulingFailure(ctx, state2, schedFramework, pInfo2,
+		fwk.NewStatus(fwk.Unschedulable, "preempting on node1"),
+		&fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: node.Name},
+		time.Now())
+
+	if got := queue.NominatedNodeForPod(pod.UID); got != node.Name {
+		t.Fatalf("expected Cycle 2 nomination %q, got %q", node.Name, got)
+	}
+
+	// Now Cycle 1's stale handleSchedulingFailure runs with clearNominatedNode; it must not wipe Cycle 2's nomination.
+	assumedPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, assumedPod)}
+	sched.handleSchedulingFailure(ctx, state1, schedFramework, assumedPodInfo,
+		fwk.AsStatus(errors.New("bind failed")),
+		clearNominatedNode,
+		time.Now())
+
+	if got := queue.NominatedNodeForPod(pod.UID); got != node.Name {
+		t.Errorf("Cycle 1 binding failure wiped Cycle 2 nomination: got %q, want %q", got, node.Name)
 	}
 }
 
@@ -1504,7 +1727,7 @@ func TestHandleSchedulingFailureSkipsRecreatedPod(t *testing.T) {
 
 	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
 	poppedPod := popped.(*framework.QueuedPodInfo)
-	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+	sched.handleSchedulingFailure(ctx, nil, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
 
 	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
 		return len(queue.InFlightPods()) == 0, nil
@@ -1592,7 +1815,7 @@ func TestHandleSchedulingFailureForDeferredResizePod(t *testing.T) {
 	poppedPod := popped.(*framework.QueuedPodInfo)
 
 	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
-	sched.handleSchedulingFailure(ctx, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+	sched.handleSchedulingFailure(ctx, nil, schedFramework, poppedPod, fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
 
 	// Assert queue status: pod should be added back to the queue
 	_, found := queue.GetPod(ctx, pod.Name, pod.Namespace, nil)
@@ -1687,7 +1910,7 @@ func TestHandleSchedulingFailure_PodGroupFitErrorCloned(t *testing.T) {
 	status := fwk.NewStatus(fwk.Unschedulable, "gang unschedulable").WithError(fitError)
 
 	for _, pInfo := range poppedPods {
-		sched.handleSchedulingFailure(ctx, schedFramework, pInfo, status.Clone(), nil, time.Now())
+		sched.handleSchedulingFailure(ctx, nil, schedFramework, pInfo, status.Clone(), nil, time.Now())
 	}
 
 	queuedPod1, ok := queue.GetPod(ctx, pod1.Name, pod1.Namespace, pod1.Spec.SchedulingGroup)
@@ -2216,7 +2439,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
 					return item.mockScheduleResult, item.injectSchedulingError
 				}
-				sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
+				sched.FailureHandler = func(ctx context.Context, _ fwk.CycleState, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 					gotCallsToFailureHandler++
 					gotPodIsInFlightAtFailureHandler = podListContainsPod(queue.InFlightPods(), p.Pod)
 
@@ -5011,12 +5234,21 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
+			podNominator := internalqueue.NewSchedulingQueue(nil, informerFactory)
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+			if test.pod.Status.NominatedNodeName != "" {
+				podNominator.AddNominatedPod(logger, mustNewPodInfo(t, test.pod), &fwk.NominatingInfo{
+					NominatingMode:    fwk.ModeOverride,
+					NominatedNodeName: test.pod.Status.NominatedNodeName,
+				})
+			}
 			snapshot := internalcache.NewSnapshot(nil, nodes)
 			fwk, err := tf.NewFramework(
 				ctx,
 				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithPodNominator(podNominator),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
 			if err != nil {
@@ -5221,7 +5453,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, client clientset.Inte
 	}
 
 	initTestAlgorithm(t, sched)
-	sched.FailureHandler = func(ctx context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
+	sched.FailureHandler = func(ctx context.Context, _ fwk.CycleState, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 		err := status.AsError()
 		errChan <- err
 
@@ -5329,7 +5561,7 @@ func TestEvaluateNominatedNode(t *testing.T) {
 				st.MakeNode().Name("n2").Obj(),
 			},
 			placementNodes: []string{"n1"},
-			pod:            st.MakePod().NominatedNodeName("n1").Obj(),
+			pod:            st.MakePod().Name("p").UID("p").NominatedNodeName("n1").Obj(),
 			wantNodeList:   []string{"n1"},
 		},
 		"When NNN is present in snapshot but not in placement, returns success": {
@@ -5338,7 +5570,7 @@ func TestEvaluateNominatedNode(t *testing.T) {
 				st.MakeNode().Name("n2").Obj(),
 			},
 			placementNodes: []string{"n1"},
-			pod:            st.MakePod().NominatedNodeName("n2").Obj(),
+			pod:            st.MakePod().Name("p").UID("p").NominatedNodeName("n2").Obj(),
 			wantError:      false,
 		},
 		"When NNN is not present in snapshot, returns error": {
@@ -5347,14 +5579,14 @@ func TestEvaluateNominatedNode(t *testing.T) {
 				st.MakeNode().Name("n2").Obj(),
 			},
 			placementNodes: []string{"n1"},
-			pod:            st.MakePod().NominatedNodeName("n3").Obj(),
+			pod:            st.MakePod().Name("p").UID("p").NominatedNodeName("n3").Obj(),
 			wantError:      true,
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			snapshot := internalcache.NewSnapshot(nil, tt.allNodes)
 			placement := &fwk.Placement{}
 			for _, nodeName := range tt.placementNodes {
@@ -5368,6 +5600,13 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			if err != nil {
 				t.Fatalf("AssumePlacement failed: %v", err)
 			}
+			podNominator := internalqueue.NewTestQueueWithObjects(ctx, nil, []runtime.Object{tt.pod})
+			if tt.pod.Status.NominatedNodeName != "" {
+				podNominator.AddNominatedPod(logger, mustNewPodInfo(t, tt.pod), &fwk.NominatingInfo{
+					NominatingMode:    fwk.ModeOverride,
+					NominatedNodeName: tt.pod.Status.NominatedNodeName,
+				})
+			}
 			fw, err := tf.NewFramework(
 				ctx,
 				[]tf.RegisterPluginFunc{
@@ -5375,6 +5614,7 @@ func TestEvaluateNominatedNode(t *testing.T) {
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
+				frameworkruntime.WithPodNominator(podNominator),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
 			if err != nil {
@@ -5386,7 +5626,7 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			}
 			initTestAlgorithm(t, sched)
 
-			gotNodes, err := sched.algorithm.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), "", &framework.Diagnosis{})
+			gotNodes, err := sched.algorithm.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), fw.NominatedNodeForPod(tt.pod.UID), "", &framework.Diagnosis{})
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("Unexpected error, want error: %v, got: %v", tt.wantError, err)

@@ -78,7 +78,8 @@ type frameworkImpl struct {
 	batchablePlugins          []fwk.SignPlugin
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 	rankNodesPlugins          []framework.RankNodesPlugin
-	allocationExtensions      []framework.AllocationExtensions
+	nominationExtensions      []framework.NominationExtensions
+	unreserveExtensions       []framework.UnreserveExtensions
 	victimExtensions          []framework.VictimExtensions
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
@@ -472,7 +473,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 		f.fillEnqueueExtensions(p)
 	}
-	f.fillAllocationExtensions()
+	f.fillResourceExtensions()
 
 	// initialize plugins per individual extension points
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
@@ -603,8 +604,31 @@ func (f *frameworkImpl) setInstrumentedPlugins() {
 	}
 }
 
+type snapshotAssumedPodChecker interface {
+	IsPodAssumed(pod *v1.Pod) bool
+}
+
 func (f *frameworkImpl) SetPodNominator(n fwk.PodNominator) {
 	f.PodNominator = n
+}
+
+func (f *frameworkImpl) NominatedNodeForPod(podUID types.UID) string {
+	if f.PodNominator == nil {
+		return ""
+	}
+	return f.PodNominator.NominatedNodeForPod(podUID)
+}
+
+func (f *frameworkImpl) NominatedPodsForNode(logger klog.Logger, nodeName string) []fwk.PodInfo {
+	if f.PodNominator == nil {
+		return nil
+	}
+	return f.PodNominator.NominatedPodsForNode(logger, nodeName)
+}
+
+func (f *frameworkImpl) isPodAssumedInSnapshot(pod *v1.Pod) bool {
+	checker, ok := f.snapshotSharedLister.(snapshotAssumedPodChecker)
+	return ok && checker.IsPodAssumed(pod)
 }
 
 func (f *frameworkImpl) SetPodActivator(a fwk.PodActivator) {
@@ -1432,17 +1456,27 @@ func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state f
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
-	nodeInfoOut := nodeInfo.Snapshot()
-	stateOut := state.Clone()
+	fhImpl, _ := fh.(*frameworkImpl)
+	nodeInfoOut := nodeInfo
+	stateOut := state
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
-		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID {
+		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) &&
+			pi.GetPod().UID != pod.UID &&
+			(fhImpl == nil || !fhImpl.isPodAssumedInSnapshot(pi.GetPod())) &&
+			!slices.ContainsFunc(nodeInfo.GetPods(), func(existing fwk.PodInfo) bool {
+				return existing.GetPod().UID == pi.GetPod().UID
+			}) {
+			if !podsAdded {
+				nodeInfoOut = nodeInfo.Snapshot()
+				stateOut = state.Clone()
+				podsAdded = true
+			}
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {
 				return false, state, nodeInfo, status.AsError()
 			}
-			podsAdded = true
 		}
 	}
 	return podsAdded, stateOut, nodeInfoOut, nil

@@ -1610,10 +1610,11 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				reprieveFilter:          tt.reprieveFilter,
 				returnNilReprieveFilter: tt.returnNilReprieveFilter,
 			}
+			podNominator := internalqueue.NewSchedulingQueue(nil, informerFactory)
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithPodNominator(podNominator),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
@@ -1632,6 +1633,18 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 
 			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSyncWithContext(ctx)
+			for _, p := range tt.preemptor.GetAllUnscheduledPods() {
+				if p.Status.NominatedNodeName != "" {
+					pInfo, err := framework.NewPodInfo(p)
+					if err != nil {
+						t.Fatal(err)
+					}
+					podNominator.AddNominatedPod(logger, pInfo, &fwk.NominatingInfo{
+						NominatingMode:    fwk.ModeOverride,
+						NominatedNodeName: p.Status.NominatedNodeName,
+					})
+				}
+			}
 
 			// mockSchedulingFunc is used to simulate the scheduling of the preemptor pod group.
 			// For each of the Pod it goes through each node and if there is enough capacity it assigns the pod to the node.
@@ -1848,8 +1861,8 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 			},
 			expectedStatus: fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes"),
 			expectedNominating: map[types.NamespacedName]*fwk.NominatingInfo{
-				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: ""},
-				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeNoop, NominatedNodeName: ""},
+				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeNoop, NominatedNodeName: "node1"},
 			},
 		},
 		{
@@ -1870,8 +1883,8 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 			},
 			expectedStatus: fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes"),
 			expectedNominating: map[types.NamespacedName]*fwk.NominatingInfo{
-				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: ""},
-				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeNoop, NominatedNodeName: ""},
+				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeNoop, NominatedNodeName: "node1"},
 			},
 		},
 		{
@@ -1892,8 +1905,8 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 			},
 			expectedStatus: fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes"),
 			expectedNominating: map[types.NamespacedName]*fwk.NominatingInfo{
-				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: ""},
-				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeNoop, NominatedNodeName: ""},
+				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeNoop, NominatedNodeName: "node1"},
 			},
 		},
 		{
@@ -1959,10 +1972,11 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
+			podNominator := internalqueue.NewSchedulingQueue(nil, informerFactory)
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithPodNominator(podNominator),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
@@ -1977,6 +1991,18 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 
 			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSyncWithContext(ctx)
+			for _, p := range tt.preemptorPods {
+				if p.Status.NominatedNodeName != "" {
+					pInfo, err := framework.NewPodInfo(p)
+					if err != nil {
+						t.Fatal(err)
+					}
+					podNominator.AddNominatedPod(logger, pInfo, &fwk.NominatingInfo{
+						NominatingMode:    fwk.ModeOverride,
+						NominatedNodeName: p.Status.NominatedNodeName,
+					})
+				}
+			}
 
 			podGroups := make(map[string]*schedulingv1beta1.PodGroup)
 			for _, pg := range tt.initPodGroups {

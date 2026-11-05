@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -63,10 +64,10 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 }
 
 // newAssumeReserveFixtureWithAllocations additionally enables
-// allocationExtensions, if not nil, and reports nomination changes to it
+// nominationExtensions, if not nil, and reports nomination changes to it
 // like the scheduler does.
 func newAssumeReserveFixtureWithAllocations(t *testing.T, ctx context.Context, node *v1.Node,
-	plugin *assumeReserveTestPlugin, allocationExtensions *tf.FakeAllocationExtensionsPlugin, pods ...*v1.Pod) *assumeReserveFixture {
+	plugin *assumeReserveTestPlugin, nominationExtensions *tf.FakeNominationExtensionsPlugin, pods ...*v1.Pod) *assumeReserveFixture {
 	t.Helper()
 
 	logger := klog.FromContext(ctx)
@@ -102,9 +103,9 @@ func newAssumeReserveFixtureWithAllocations(t *testing.T, ctx context.Context, n
 			Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
 		},
 	}
-	if allocationExtensions != nil {
-		registry[allocationExtensions.Name()] = tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)
-		profileCfg.Plugins.PreFilter = schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: allocationExtensions.Name()}}}
+	if nominationExtensions != nil {
+		registry[nominationExtensions.Name()] = tf.NewFakeNominationExtensionsPlugin(nominationExtensions)
+		profileCfg.Plugins.PreFilter = schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: nominationExtensions.Name()}}}
 	}
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
@@ -234,49 +235,39 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 	}
 }
 
-// TestAssumeAndReserveInCacheAllocations checks how a cache assume reports the
-// allocation of the assumed pod: the assumed pod gets its allocation before the
-// nomination ends, and a Reserve failure ends it again and returns its events.
+// TestAssumeAndReserveInCacheAllocations checks that AssumeAndReserveInCache
+// preserves any existing nomination until synchronous Permit succeeds, and
+// queries UnreserveExtensions for rollback events if Reserve fails.
 func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
-	released := framework.AllocationEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
+	released := framework.ResourceEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
 
 	tests := []struct {
 		name          string
 		nominated     bool
 		reserveStatus *fwk.Status
 		wantCalls     []string
-		wantEvents    []framework.AllocationEvent
+		wantEvents    []framework.ResourceEvent
 	}{
 		{
 			name: "not nominated",
-			wantCalls: []string{
-				"PrepareAllocation default/pod1 node1 assigned=node1",
-				"AddAllocation default/pod1 node1 assigned=node1",
-			},
 		},
 		{
-			name:      "nominated: the assumed pod's allocation comes before the end of the nomination",
+			name:      "nominated: nomination remains intact until synchronous Permit succeeds",
 			nominated: true,
 			wantCalls: []string{
-				"AddAllocation default/pod1 node1 assigned=",
-				"PrepareAllocation default/pod1 node1 assigned=node1",
-				"AddAllocation default/pod1 node1 assigned=node1",
-				"RemoveAllocation default/pod1 node1 assigned=",
+				"AddNomination default/pod1 node1 hasState=false",
 			},
 		},
 		{
-			name:          "nominated, reserve failure: the assumed pod's allocation ends after Unreserve",
+			name:          "nominated, reserve failure: UnreserveExtensions returns events after Unreserve while nomination stays until FailureHandler clears it",
 			nominated:     true,
 			reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"),
 			wantCalls: []string{
-				"AddAllocation default/pod1 node1 assigned=",
-				"PrepareAllocation default/pod1 node1 assigned=node1",
-				"AddAllocation default/pod1 node1 assigned=node1",
-				"RemoveAllocation default/pod1 node1 assigned=",
-				"RemoveAllocation default/pod1 node1 assigned=node1",
+				"AddNomination default/pod1 node1 hasState=false",
+				"UnreserveEvents default/pod1 node1",
 			},
-			wantEvents: []framework.AllocationEvent{released},
+			wantEvents: []framework.ResourceEvent{released},
 		},
 	}
 
@@ -292,8 +283,8 @@ func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
 				},
 				reserveStatus: tt.reserveStatus,
 			}
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{ReleaseEvents: []framework.AllocationEvent{released}}
-			f := newAssumeReserveFixtureWithAllocations(t, ctx, node1, plugin, allocationExtensions, pod1)
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{ReleaseEvents: []framework.ResourceEvent{released}}
+			f := newAssumeReserveFixtureWithAllocations(t, ctx, node1, plugin, nominationExtensions, pod1)
 
 			podInfo, err := framework.NewPodInfo(pod1)
 			if err != nil {
@@ -310,11 +301,14 @@ func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
 			}
 
 			_, events, _ := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
-			if diff := cmp.Diff(tt.wantCalls, allocationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			if diff := cmp.Diff(tt.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected NominationExtensions/UnreserveExtensions calls (-want,+got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.wantEvents, events); diff != "" {
 				t.Errorf("Unexpected events (-want,+got):\n%s", diff)
+			}
+			if tt.nominated && f.fwk.NominatedNodeForPod(pod1.UID) != node1.Name {
+				t.Errorf("NominatedNodeForPod = %q, want %q", f.fwk.NominatedNodeForPod(pod1.UID), node1.Name)
 			}
 		})
 	}
@@ -337,7 +331,7 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			pod:  pod1,
 		},
 		{
-			name: "pod group cycle: nomination is dropped on assume and restored on revert",
+			name: "pod group cycle: live nomination stays untouched while snapshot marks pod assumed until revert",
 			pod:  podWithNomination,
 		},
 	}
@@ -396,8 +390,11 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			if tt.pod.Spec.NodeName != "" {
 				t.Errorf("input pod Spec.NodeName mutated = %q, want empty", tt.pod.Spec.NodeName)
 			}
-			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) != 0 {
-				t.Error("expected the nomination to be dropped once the pod was assumed")
+			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) != 1 {
+				t.Error("expected live queue nomination to remain untouched during tentative snapshot assume")
+			}
+			if !f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod) {
+				t.Error("expected pod to be marked assumed in the snapshot")
 			}
 
 			revertFn()
@@ -405,13 +402,105 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			if isPodInSnapshot(f.algorithm.nodeInfoSnapshot, node1.Name, tt.pod.Name) {
 				t.Error("pod still in the snapshot after revert")
 			}
+			if f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod) {
+				t.Error("pod still marked assumed in the snapshot after revert")
+			}
 			if !plugin.unreserved {
 				t.Error("expected Unreserve to be called on revert")
 			}
-			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) == 0 {
-				t.Error("expected the nomination to be restored on revert")
+			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) != 1 {
+				t.Error("expected live queue nomination to remain intact after revert")
 			}
 		})
+	}
+}
+
+type podCountRecorderPlugin struct {
+	podCounts []int
+}
+
+func (p *podCountRecorderPlugin) Name() string { return "PodCountRecorder" }
+
+func (p *podCountRecorderPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.podCounts = append(p.podCounts, len(nodeInfo.GetPods()))
+	return nil
+}
+
+func TestRunFilterPluginsWithNominatedPodsSkipsSnapshotAssumedPod(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	node1 := st.MakeNode().Name("node1").Obj()
+	nominatedPod := st.MakePod().Name("nominated").Namespace("default").UID("nominated").Priority(100).NominatedNodeName("node1").Obj()
+	peerPod := st.MakePod().Name("peer").Namespace("default").UID("peer").Priority(50).Obj()
+
+	recorder := &podCountRecorderPlugin{}
+	client := clientsetfake.NewSimpleClientset(node1, nominatedPod, peerPod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	snapshot := internalcache.NewSnapshot([]*v1.Pod{}, []*v1.Node{node1})
+	nominator := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+	fwkInst, err := tf.NewFramework(
+		ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterFilterPlugin(recorder.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+				return recorder, nil
+			}),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		"",
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(nominator),
+	)
+	if err != nil {
+		t.Fatalf("NewFramework: %v", err)
+	}
+	informerFactory.StartWithContext(ctx)
+	informerFactory.WaitForCacheSyncWithContext(ctx)
+
+	nominator.Add(ctx, nominatedPod)
+
+	emptyNodeInfo := framework.NewNodeInfo()
+	emptyNodeInfo.SetNode(node1)
+
+	// Before snapshot assume: Pass 1 adds nominatedPod (count=1, fails), Pass 2 runs without it (count=0).
+	recorder.podCounts = nil
+	fwkInst.RunFilterPluginsWithNominatedPods(ctx, framework.NewCycleState(), peerPod, emptyNodeInfo)
+	if diff := cmp.Diff([]int{1, 0}, recorder.podCounts); diff != "" {
+		t.Fatalf("pod counts before snapshot assume (-want,+got):\n%s", diff)
+	}
+
+	// Tentatively assume nominatedPod in snapshot: live NominatedPodsForNode still returns it,
+	// while addGENominatedPods skips it so it is not double-counted during PodGroup Filter.
+	assumedCopy := nominatedPod.DeepCopy()
+	assumedCopy.Spec.NodeName = node1.Name
+	assumedPodInfo, err := framework.NewPodInfo(assumedCopy)
+	if err != nil {
+		t.Fatalf("NewPodInfo: %v", err)
+	}
+	if err := snapshot.AssumePod(assumedPodInfo); err != nil {
+		t.Fatalf("snapshot.AssumePod: %v", err)
+	}
+	if got := len(fwkInst.NominatedPodsForNode(logger, node1.Name)); got != 1 {
+		t.Fatalf("NominatedPodsForNode while assumed in snapshot = %d, want 1", got)
+	}
+	recorder.podCounts = nil
+	status := fwkInst.RunFilterPluginsWithNominatedPods(ctx, framework.NewCycleState(), peerPod, emptyNodeInfo)
+	if !status.IsSuccess() {
+		t.Fatalf("Filter status while nominatedPod is snapshot-assumed = %v, want success", status)
+	}
+	if diff := cmp.Diff([]int{0}, recorder.podCounts); diff != "" {
+		t.Fatalf("pod counts while snapshot-assumed (-want,+got):\n%s", diff)
+	}
+
+	// Revert snapshot assumption: addGENominatedPods includes nominatedPod again.
+	if err := snapshot.ForgetPod(logger, assumedCopy); err != nil {
+		t.Fatalf("snapshot.ForgetPod: %v", err)
+	}
+	recorder.podCounts = nil
+	fwkInst.RunFilterPluginsWithNominatedPods(ctx, framework.NewCycleState(), peerPod, emptyNodeInfo)
+	if diff := cmp.Diff([]int{1, 0}, recorder.podCounts); diff != "" {
+		t.Fatalf("pod counts after snapshot ForgetPod (-want,+got):\n%s", diff)
 	}
 }
 
@@ -509,13 +598,13 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		wantStatusCode       fwk.Code
 		wantNominatingInfo   *fwk.NominatingInfo
 		wantPostFilterCalled bool
-		// wantNominationCalls are the calls of AllocationExtensions.
+		// wantNominationCalls are the calls of NominationExtensions after FailureHandler requeues the pod.
 		wantNominationCalls []string
 	}{
 		{
 			name:                 "failure: algorithm finds no nodes",
 			filterStatus:         fwk.NewStatus(fwk.Unschedulable, "fake failure"),
-			postFilterStatus:     fwk.NewStatus(fwk.Unschedulable),
+			postFilterStatus:     fwk.NewStatus(fwk.Success),
 			wantStatusCode:       fwk.Unschedulable,
 			wantPostFilterCalled: true,
 		},
@@ -544,7 +633,7 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				NominatingMode:    fwk.ModeOverride,
 			},
 			wantPostFilterCalled: true,
-			wantNominationCalls:  []string{"PrepareAllocation default/pod1 node1 assigned="},
+			wantNominationCalls:  []string{"AddNomination default/pod1 node1 hasState=true"},
 		},
 	}
 
@@ -552,18 +641,19 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
 			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			client := clientsetfake.NewClientset(node1, pod1)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			_ = informerFactory.Core().V1().Pods().Informer()
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
 			cache := internalcache.New(ctx, nil, true, false)
 			cache.AddNode(logger, node1)
 			snapshot := internalcache.NewEmptySnapshot()
-			queue := internalqueue.NewTestQueueWithObjects(ctx, nil, []runtime.Object{pod1})
-
-			podInfo, err := framework.NewPodInfo(pod1)
-			if err != nil {
-				t.Fatalf("Failed to create PodInfo: %v", err)
-			}
-			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+			profiles := profile.Map{}
+			queue := internalqueue.NewTestQueueWithObjects(ctx, nil, []runtime.Object{pod1},
+				internalqueue.WithNominationChangeHandler(newNominationChangeHandler(profiles)))
 
 			fakePlugin := &assumeReserveTestPlugin{
 				fakePodGroupPlugin: &fakePodGroupPlugin{
@@ -573,20 +663,20 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				},
 			}
 
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
 			registry := frameworkruntime.Registry{
 				queuesort.Name:     queuesort.New,
 				defaultbinder.Name: defaultbinder.New,
 				"AssumeReserveTestPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					return fakePlugin, nil
 				},
-				allocationExtensions.Name(): tf.NewFakeAllocationExtensionsPlugin(allocationExtensions),
+				nominationExtensions.Name(): tf.NewFakeNominationExtensionsPlugin(nominationExtensions),
 			}
 			profileCfg := schedulerapi.KubeSchedulerProfile{
 				SchedulerName: "default-scheduler",
 				Plugins: &schedulerapi.Plugins{
 					QueueSort:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
-					PreFilter:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: allocationExtensions.Name()}}},
+					PreFilter:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: nominationExtensions.Name()}}},
 					Filter:     schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					Bind:       schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
@@ -597,17 +687,29 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithPodNominator(queue),
+				frameworkruntime.WithEventRecorder(events.NewFakeRecorder(10)),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
+			profiles[profileCfg.SchedulerName] = schedFwk
 
 			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
 				t.Fatalf("Failed to update snapshot: %v", err)
 			}
 
+			queue.Add(ctx, pod1)
+			popped, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Failed to pop pod: %v", err)
+			}
+			queuedPodInfo := popped.(*framework.QueuedPodInfo)
+
 			sched := &Scheduler{
+				client:           client,
 				Cache:            cache,
+				SchedulingQueue:  queue,
+				Profiles:         profiles,
 				nodeInfoSnapshot: snapshot,
 			}
 			if err := sched.initAlgorithm(); err != nil {
@@ -631,8 +733,14 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			if diff := cmp.Diff(tt.wantNominatingInfo, scheduleResult.nominatingInfo); diff != "" {
 				t.Errorf("Unexpected nominatingInfo (-want,+got):\n%s", diff)
 			}
-			if diff := cmp.Diff(tt.wantNominationCalls, allocationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			if len(nominationExtensions.Calls()) != 0 {
+				t.Errorf("Expected NominationExtensions not to be called before FailureHandler, got %v", nominationExtensions.Calls())
+			}
+			if !tt.podGroupCycle {
+				sched.FailureHandler(ctx, state, schedFwk, queuedPodInfo, status, scheduleResult.nominatingInfo, time.Now())
+			}
+			if diff := cmp.Diff(tt.wantNominationCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected NominationExtensions calls (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -1362,7 +1470,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 
 			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
-				frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestQueueWithObjects(ctx, nil, []runtime.Object{pod})),
 				frameworkruntime.WithParallelism(1),
 			)
 			if err != nil {
@@ -1380,6 +1488,12 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			podInfo, err := framework.NewPodInfo(testPod)
 			if err != nil {
 				t.Fatalf("Failed to create PodInfo: %v", err)
+			}
+			if tt.nominatedNodeName != "" {
+				schedFwk.AddNominatedPod(klog.FromContext(ctx), podInfo, &fwk.NominatingInfo{
+					NominatingMode:    fwk.ModeOverride,
+					NominatedNodeName: tt.nominatedNodeName,
+				})
 			}
 			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
 
