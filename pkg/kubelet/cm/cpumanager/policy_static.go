@@ -1732,10 +1732,8 @@ func (p *staticPolicy) getPodTopologyHintsForAdd(logger klog.Logger, s state.Sta
 }
 
 // getPodTopologyHintsForResize generates CPU topology hint of pod scope for container-level resize
-// For a scale-up container, the whole allocated CPU set will be retained, so the hint must include it.
-// For a scale-down container, if the NUMA nodes of the baseline CPUs hold enough CPUs for the new request,
-// the hint only needs to include the baseline CPUs; otherwise the hint must include all allocated CPUs,
-// or there would not be enough CPUs inside the hint.
+// Known limitation: Only one container can resize per operation.
+// Will consider multi-containers resize in Beta stage.
 func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "podUID", pod.UID)
 
@@ -1761,10 +1759,10 @@ func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, s state.
 		return nil
 	}
 
-	// Get a list of available CPUs.
-	available := p.GetAvailableCPUs(s)
-
+	available := cpuset.New()
 	retainedCPUs := cpuset.New()
+	freeCPUs := cpuset.New()
+	hasContainerResize := false
 	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		logger_ := klog.LoggerWithValues(logger, "containerName", container.Name)
 
@@ -1777,19 +1775,34 @@ func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, s state.
 				return nil
 			}
 
-			if allocated.Size() > requestedByContainer { // scale down
-				// Get the NUMA nodes of the baseline CPUs
-				baselineCPUs, _ := s.GetBaselineCPUSet(string(pod.UID), container.Name)
-				baselineCPUsNUMANodes := p.topology.CPUDetails.KeepOnly(baselineCPUs).NUMANodes()
-				// Get the allocated CPUs on the NUMA nodes of the baseline CPUs
-				allocatedOnBaselineNUMANodes := p.topology.CPUDetails.CPUsInNUMANodes(baselineCPUsNUMANodes.List()...).Intersection(allocated)
-				if allocatedOnBaselineNUMANodes.Size() >= requestedByContainer {
-					retainedCPUs = retainedCPUs.Union(baselineCPUs)
-					available = available.Union(allocated.Difference(baselineCPUs))
-					continue
+			if allocated.Size() != requestedByContainer {
+				// Known limitation: Only one container can resize per operation; anything beyond
+				// that is not supported and gets no pod-level preference.
+				if hasContainerResize {
+					logger_.V(2).Info("CPU Manager pod hint generation skipped, resizing more than one container in a single operation is not supported")
+					return nil
 				}
+				hasContainerResize = true
+				if allocated.Size() > requestedByContainer { // scale down
+					baselineCPUs, _ := s.GetBaselineCPUSet(string(pod.UID), container.Name)
+					retainedCPUs = retainedCPUs.Union(baselineCPUs)
+					freeCPUs = p.GetAvailableCPUs(s).Union(allocated.Difference(baselineCPUs))
+					available = available.Union(allocated.Difference(baselineCPUs))
+				} else { // scale up
+					retainedCPUs = retainedCPUs.Union(allocated)
+					available = p.GetAvailableCPUs(s)
+					freeCPUs = available
+				}
+			} else {
+				retainedCPUs = retainedCPUs.Union(allocated)
 			}
-			retainedCPUs = retainedCPUs.Union(allocated)
+		}
+	}
+
+	if !hasContainerResize {
+		logger.Info("Regenerating TopologyHints for CPUs already allocated")
+		return map[string][]topologymanager.TopologyHint{
+			string(v1.ResourceCPU): p.generateCPUTopologyHintsForResize(retainedCPUs, cpuset.New(), retainedCPUs, p.GetAvailableCPUs(s), requested),
 		}
 	}
 
@@ -1802,7 +1815,7 @@ func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, s state.
 
 	// Generate hints. Outside of regeneration the usable CPUs are exactly the
 	// free ones, so the same set drives both feasibility and the Score.
-	cpuHints := p.generateCPUTopologyHintsForResize(available, reusable, retainedCPUs, available, requested)
+	cpuHints := p.generateCPUTopologyHintsForResize(available, reusable, retainedCPUs, freeCPUs, requested)
 	logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
