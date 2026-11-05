@@ -51,6 +51,7 @@ type Features struct {
 	EnableAsyncPreemption                              bool
 	EnablePodLevelResources                            bool
 	EnablePodLevelResourcesFixInitContainerLimits      bool
+	EnablePodLevelResourcesEphemeralStorage            bool
 	EnableStorageCapacityScoring                       bool
 	EnableNodeDeclaredFeatures                         bool
 	EnableGenericWorkload                              bool
@@ -89,6 +90,7 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableAsyncPreemption:                              featureGate.Enabled(features.SchedulerAsyncPreemption),
 		EnablePodLevelResources:                            featureGate.Enabled(features.PodLevelResources),
 		EnablePodLevelResourcesFixInitContainerLimits:      featureGate.Enabled(features.PodLevelResourcesFixInitContainerLimits),
+		EnablePodLevelResourcesEphemeralStorage:            featureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 		EnableDRAPartitionableDevices:                      featureGate.Enabled(features.DRAPartitionableDevices),
 		EnableDRAPreemption:                                featureGate.Enabled(features.DRAPreemption),
 		EnableStorageCapacityScoring:                       featureGate.Enabled(features.StorageCapacityScoring),

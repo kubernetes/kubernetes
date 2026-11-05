@@ -54,6 +54,7 @@ type DRACaches struct {
 type resourceAllocationScorer struct {
 	Name                                          string
 	enablePodLevelResources                       bool
+	enablePodLevelResourcesEphemeralStorage       bool
 	enableDRAExtendedResource                     bool
 	enableInPlacePodLevelResourcesVerticalScaling bool
 	enableDRANodeAllocatableResources             bool
@@ -233,27 +234,32 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 	return 0, 0
 }
 
-// calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod
-// the Overhead is added to the result.
-func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName, useExtraNodeAllocatable bool) int64 {
+// defaultNonMissingContainerRequests provides the fallback CPU and memory
+// requests substituted for missing container requests in non-useRequested scorers.
+// Treated as read-only by resourcehelper.PodRequests.
+var defaultNonMissingContainerRequests = v1.ResourceList{
+	v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+	v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
+}
 
+func (r *resourceAllocationScorer) podResourceRequests(pod *v1.Pod, useExtraNodeAllocatable bool) v1.ResourceList {
 	opts := resourcehelper.PodResourcesOptions{
 		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources:            !r.enablePodLevelResources,
-		UseExtraNodeAllocatableResources: useExtraNodeAllocatable,
+		SkipPodLevelResources:                    !r.enablePodLevelResources,
+		PodLevelResourcesEphemeralStorageEnabled: r.enablePodLevelResourcesEphemeralStorage,
+		UseExtraNodeAllocatableResources:         useExtraNodeAllocatable,
 	}
 
 	if !r.useRequested {
-		opts.NonMissingContainerRequests = v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
-		}
+		opts.NonMissingContainerRequests = defaultNonMissingContainerRequests
 	}
 
-	requests := resourcehelper.PodRequests(pod, opts)
+	return resourcehelper.PodRequests(pod, opts)
+}
 
+func resourceRequestValue(requests v1.ResourceList, resourceName v1.ResourceName) int64 {
 	quantity := requests[resourceName]
 	if resourceName == v1.ResourceCPU {
 		return quantity.MilliValue()
@@ -261,12 +267,26 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 	return quantity.Value()
 }
 
+// calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod
+// the Overhead is added to the result.
+func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName, useExtraNodeAllocatable bool) int64 {
+	return resourceRequestValue(r.podResourceRequests(pod, useExtraNodeAllocatable), resourceName)
+}
+
 func (r *resourceAllocationScorer) calculatePodResourceRequestList(pod *v1.Pod, resources []config.ResourceSpec) []int64 {
-	podRequests := make([]int64, len(resources))
 	// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
 	useExtraNodeAllocatable := r.enableDRANodeAllocatableResources && pod.Spec.NodeName != ""
+	return r.calculatePodResourceRequestListWithExtra(pod, resources, useExtraNodeAllocatable)
+}
+
+func (r *resourceAllocationScorer) calculatePodResourceRequestListWithExtra(pod *v1.Pod, resources []config.ResourceSpec, useExtraNodeAllocatable bool) []int64 {
+	podRequests := make([]int64, len(resources))
+	if len(resources) == 0 {
+		return podRequests
+	}
+	requests := r.podResourceRequests(pod, useExtraNodeAllocatable)
 	for i := range resources {
-		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name), useExtraNodeAllocatable)
+		podRequests[i] = resourceRequestValue(requests, v1.ResourceName(resources[i].Name))
 	}
 	return podRequests
 }
@@ -289,11 +309,7 @@ func (r *resourceAllocationScorer) calculatePodRequestWithExtraNodeAllocatable(c
 	}
 	podCopy := *pod
 	podCopy.Status.ExtraNodeAllocatableResources = extraResources
-	res := make([]int64, len(r.resources))
-	for i := range r.resources {
-		res[i] = r.calculatePodResourceRequest(&podCopy, v1.ResourceName(r.resources[i].Name), r.enableDRANodeAllocatableResources)
-	}
-	return res
+	return r.calculatePodResourceRequestListWithExtra(&podCopy, r.resources, r.enableDRANodeAllocatableResources)
 }
 
 func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {

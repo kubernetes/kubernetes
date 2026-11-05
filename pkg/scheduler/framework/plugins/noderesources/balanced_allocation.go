@@ -124,11 +124,12 @@ func (ba *BalancedAllocation) Name() string {
 // Filtering and scoring based on the container resources and overheads.
 func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:   pl.enablePodLevelResources,
-		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
+		EnablePodLevelResources:                 pl.enablePodLevelResources,
+		EnablePodLevelResourcesEphemeralStorage: pl.enablePodLevelResourcesEphemeralStorage,
+		EnableDRAExtendedResource:               pl.enableDRAExtendedResource,
 	}
+	podRequest := computePodResourceRequest(pod, opts)
 	if pl.enableDRAExtendedResource {
-		podRequest := computePodResourceRequest(pod, opts)
 		for rName, rQuant := range podRequest.ScalarResources {
 			// Skip in case request quantity is zero
 			if rQuant == 0 {
@@ -142,7 +143,7 @@ func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.S
 	}
 
 	return []fwk.SignFragment{
-		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
+		{Key: fwk.ResourcesSignerName, Value: podRequest},
 	}, nil
 }
 
@@ -211,12 +212,13 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                      BalancedAllocationName,
-			enablePodLevelResources:   fts.EnablePodLevelResources,
-			enableDRAExtendedResource: fts.EnableDRAExtendedResource,
-			scorer:                    balancedResourceScorer,
-			useRequested:              true,
-			resources:                 args.Resources,
+			Name:                                    BalancedAllocationName,
+			enablePodLevelResources:                 fts.EnablePodLevelResources,
+			enablePodLevelResourcesEphemeralStorage: fts.EnablePodLevelResourcesEphemeralStorage,
+			enableDRAExtendedResource:               fts.EnableDRAExtendedResource,
+			scorer:                                  balancedResourceScorer,
+			useRequested:                            true,
+			resources:                               args.Resources,
 			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 			enableDRANodeAllocatableResources:             fts.EnableDRANodeAllocatableResources,
 			draManager:                                    h.SharedDRAManager(),

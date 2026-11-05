@@ -470,29 +470,48 @@ func otherPodOnNodeUsesClaim(nodeInfo fwk.NodeInfo, pod *v1.Pod, claim *resource
 	return false
 }
 
+func (pl *DynamicResources) isSupportedPodLevelResource(name v1.ResourceName) bool {
+	return resourcehelper.IsSupportedPodLevelResource(name) && (name != v1.ResourceEphemeralStorage || pl.fts.EnablePodLevelResourcesEphemeralStorage)
+}
+
+func hasHugePageLimit(limits v1.ResourceList) bool {
+	for resourceName := range limits {
+		if v1helper.IsHugePageResourceName(resourceName) {
+			return true
+		}
+	}
+	return false
+}
+
 // validatePodLevelResourcesCoverDRA checks if
 // 1. pod-level requests is not less than the AGGREGATE container level requests including DRA
 // 2. pod-level limits is not less than the INDIVIDUAL container level limits including DRA
 // This follows the same pattern as in validatePodResourceConsistency() in pkg/apis/core/validation/validation.go
 func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.Status {
+	_, status := pl.validateAndAggregatePodLevelResourcesCoverDRA(pod)
+	return status
+}
+
+func (pl *DynamicResources) validateAndAggregatePodLevelResourcesCoverDRA(pod *v1.Pod) (v1.ResourceList, *fwk.Status) {
 	if !pl.fts.EnablePodLevelResources || pod.Spec.Resources == nil {
-		return nil
+		return nil, nil
 	}
 	if len(pod.Status.ExtraNodeAllocatableResources) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	if pod.Spec.Resources.Requests != nil {
-		// Calculate Sum(Containers) + DRA + overhead resources. Skip pod level resources for this sum
+	var requestWithoutPodLevel v1.ResourceList
+	if len(pod.Spec.Resources.Requests) > 0 {
+		// Calculate Sum(Containers) + DRA resources, skipping pod-level resources.
 		opts := resourcehelper.PodResourcesOptions{
 			SkipPodLevelResources:            true,
 			UseExtraNodeAllocatableResources: true,
 		}
-		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
+		requestWithoutPodLevel = resourcehelper.AggregateContainerRequests(pod, opts)
 
 		// For resources specified at pod level, check if container and DRA aggregates do not exceed pod level budget.
 		for resName, podLevelReq := range pod.Spec.Resources.Requests {
-			if !resourcehelper.IsSupportedPodLevelResource(resName) {
+			if !pl.isSupportedPodLevelResource(resName) {
 				continue
 			}
 			val, ok := requestWithoutPodLevel[resName]
@@ -500,32 +519,34 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 				continue
 			}
 			if val.Cmp(podLevelReq) > 0 {
-				return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level request for %s is insufficient to cover the aggregated container and node-allocatable DRA requests", resName))
+				return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level request for %s is insufficient to cover the aggregated container and node-allocatable DRA requests", resName))
 			}
 		}
 	}
 
-	if pod.Spec.Resources.Limits != nil {
-		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:            true,
-			UseExtraNodeAllocatableResources: true,
-		}
-		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
-
+	if len(pod.Spec.Resources.Limits) > 0 {
 		// Pod level hugepage limits must be always equal or greater than the aggregated
-		// container level hugepage limits + DRA limits
-		for resourceName, ctrLims := range limitsWithoutPodLevel {
-			if !v1helper.IsHugePageResourceName(resourceName) {
-				continue
+		// container level hugepage limits + DRA limits.
+		if hasHugePageLimit(pod.Spec.Resources.Limits) {
+			opts := resourcehelper.PodResourcesOptions{
+				SkipPodLevelResources:            true,
+				UseExtraNodeAllocatableResources: true,
 			}
+			limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
 
-			podLevelResLimit, hasLimit := pod.Spec.Resources.Limits[resourceName]
-			if !hasLimit {
-				continue
-			}
+			for resourceName, ctrLims := range limitsWithoutPodLevel {
+				if !v1helper.IsHugePageResourceName(resourceName) {
+					continue
+				}
 
-			if ctrLims.Cmp(podLevelResLimit) > 0 {
-				return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the aggregated container and node-allocatable DRA limits", resourceName))
+				podLevelResLimit, hasLimit := pod.Spec.Resources.Limits[resourceName]
+				if !hasLimit {
+					continue
+				}
+
+				if ctrLims.Cmp(podLevelResLimit) > 0 {
+					return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the aggregated container and node-allocatable DRA limits", resourceName))
+				}
 			}
 		}
 
@@ -541,7 +562,7 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 			}
 			extraNodeAllocatableLimits := resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, ctr.Name)
 			for resourceName, ctrLimit := range ctr.Resources.Limits {
-				if v1helper.IsHugePageResourceName(resourceName) {
+				if v1helper.IsHugePageResourceName(resourceName) || !pl.isSupportedPodLevelResource(resourceName) {
 					continue
 				}
 
@@ -552,17 +573,17 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 				}
 
 				extraNodeAllocatableLimit := extraNodeAllocatableLimits[resourceName]
-				effectiveLimit := ctrLimit.DeepCopy()
+				effectiveLimit := ctrLimit
 				effectiveLimit.Add(extraNodeAllocatableLimit)
 
 				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
-					return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name))
+					return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name))
 				}
 			}
 		}
 	}
 
-	return nil
+	return requestWithoutPodLevel, nil
 }
 
 // getPodNodeAllocatableResourceFootprint determines the total nodeAllocatable resource demand of a pod.
@@ -596,20 +617,33 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 		return nil, nil, statusError(logger, err)
 	}
 
-	// Calculate the final totalPodDemand to be used for node fitting
-	optsTotal := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources:            !pl.fts.EnablePodLevelResources,
-		UseExtraNodeAllocatableResources: true,
-	}
-	// Perform shallow copy - we only use the resource information from container and pod spec to calculatate the resource foot print.
+	// Perform shallow copy - we only use the resource information from container and pod spec to calculate the resource footprint.
 	podCopy := *pod
 	podCopy.Status.ExtraNodeAllocatableResources = framework.MergeExtraNodeAllocatableResources(otherEntries, extraNodeAllocatableResources)
-	totalPodDemandRes := resourcehelper.PodRequests(&podCopy, optsTotal)
 
 	// The API validation in pkg/apis/core/validation/validation.go only checks pod.Spec.Resources against container
 	// requests within the Spec. It cannot account for DRA-derived resources, which are determined after device allocation.
-	if status := pl.validatePodLevelResourcesCoverDRA(&podCopy); status != nil {
+	requestWithoutPodLevel, status := pl.validateAndAggregatePodLevelResourcesCoverDRA(&podCopy)
+	if status != nil {
 		return nil, nil, status
+	}
+
+	var totalPodDemandRes v1.ResourceList
+	if requestWithoutPodLevel != nil {
+		// Reuse the container+DRA aggregate already computed during validation instead of running a second pass.
+		totalPodDemandRes = requestWithoutPodLevel
+		for resName, qty := range podCopy.Spec.Resources.Requests {
+			if pl.isSupportedPodLevelResource(resName) {
+				totalPodDemandRes[resName] = qty
+			}
+		}
+		addResourceList(totalPodDemandRes, podCopy.Spec.Overhead)
+	} else {
+		totalPodDemandRes = resourcehelper.PodRequests(&podCopy, resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources:                    !pl.fts.EnablePodLevelResources,
+			PodLevelResourcesEphemeralStorageEnabled: pl.fts.EnablePodLevelResourcesEphemeralStorage,
+			UseExtraNodeAllocatableResources:         true,
+		})
 	}
 
 	totalPodDemand := framework.NewResource(totalPodDemandRes)

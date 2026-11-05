@@ -198,14 +198,20 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 		return
 	}
 
+	skipPodLevelResources := !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEphemeralStorageEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage)
 	useExtraNodeAllocatableResources := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
 	reqs = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		Reuse:                            reuseReqs,
-		UseExtraNodeAllocatableResources: useExtraNodeAllocatableResources,
+		Reuse:                                    reuseReqs,
+		SkipPodLevelResources:                    skipPodLevelResources,
+		PodLevelResourcesEphemeralStorageEnabled: podLevelResourcesEphemeralStorageEnabled,
+		UseExtraNodeAllocatableResources:         useExtraNodeAllocatableResources,
 	})
 	limits = resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
-		Reuse:                            reuseLimits,
-		UseExtraNodeAllocatableResources: useExtraNodeAllocatableResources,
+		Reuse:                                    reuseLimits,
+		SkipPodLevelResources:                    skipPodLevelResources,
+		PodLevelResourcesEphemeralStorageEnabled: podLevelResourcesEphemeralStorageEnabled,
+		UseExtraNodeAllocatableResources:         useExtraNodeAllocatableResources,
 	})
 	return
 }
