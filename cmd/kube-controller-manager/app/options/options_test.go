@@ -395,6 +395,7 @@ func TestAddFlags(t *testing.T) {
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
 				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
+				NodeLivenessSource:        nodelifecycleconfig.NodeLivenessSourceKubelet,
 			},
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
@@ -750,6 +751,7 @@ func TestApplyTo(t *testing.T) {
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
 				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
+				NodeLivenessSource:        nodelifecycleconfig.NodeLivenessSourceKubelet,
 			},
 			PersistentVolumeBinderController: persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
 				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
@@ -1483,6 +1485,7 @@ func TestValidateControllersOptions(t *testing.T) {
 					NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 					LargeClusterSizeThreshold: 100,
 					UnhealthyZoneThreshold:    0.6,
+					NodeLivenessSource:        nodelifecycleconfig.NodeLivenessSourceKubelet,
 				},
 			},
 		},

@@ -51,4 +51,7 @@ func RecommendedDefaultNodeLifecycleControllerConfiguration(obj *kubectrlmgrconf
 	if obj.NodeMonitorPeriod == zero {
 		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
 	}
+	if obj.NodeLivenessSource == "" {
+		obj.NodeLivenessSource = kubectrlmgrconfigv1alpha1.NodeLivenessSourceKubelet
+	}
 }
