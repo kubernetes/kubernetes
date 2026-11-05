@@ -34,6 +34,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
+	cacherdelegator "k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -151,5 +152,6 @@ func setupCacher(tCtx ktesting.TContext, s storage.Interface) storage.Interface 
 		c.Stop()
 	})
 	tCtx.Eventually(delegator.ReadinessCheck).WithPolling(10*time.Millisecond).WithTimeout(5*time.Second).Should(gomega.Succeed(), "storage ready")
+	tCtx.Eventually(cacherdelegator.ConsistentReadSupported).WithPolling(10*time.Millisecond).WithTimeout(5*time.Second).Should(gomega.BeTrue(), "RequestWatchProgress supported")
 	return delegator
 }

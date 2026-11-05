@@ -293,6 +293,14 @@ func TestCorrectness(t *testing.T) {
 			},
 		},
 		{
+			name: "cacher with ConsistentGetFromCache",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
 			name: "cacher with prefix transformer",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
 				store, prefix := setupStore(tCtx, prefixTransformer{})

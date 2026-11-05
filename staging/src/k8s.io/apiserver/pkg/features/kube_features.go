@@ -99,6 +99,12 @@ const (
 	// conditions are enforced during the validating admission phase.
 	ConditionalAuthorization featuregate.Feature = "ConditionalAuthorization"
 
+	// owner: @serathius
+	// kep: https://kep.k8s.io/6404
+	//
+	// Enables serving consistent GET requests from watch cache.
+	ConsistentGetFromCache featuregate.Feature = "ConsistentGetFromCache"
+
 	// owner: @yedou37
 	//
 	// Skip the timeout fallback to storage when a consistent LIST from cache cannot be served,
@@ -402,6 +408,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	ConditionalAuthorization: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	ConsistentGetFromCache: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
