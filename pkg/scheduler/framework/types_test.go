@@ -2701,6 +2701,36 @@ func TestPodInfoCalculateResources(t *testing.T) {
 			},
 		},
 		{
+			name:                     "pod-level memory requests and 1X container missing cpu request",
+			podLevelResourcesEnabled: true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: cpu500m,
+						},
+					},
+				},
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: mem1200M,
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue(),
+					Memory:   mem1200M.Value(),
+				},
+				// cpu falls back to containers, so the requestless one gets the default.
+				Non0CPU: cpu500m.MilliValue() + schedutil.DefaultMilliCPURequest,
+				Non0Mem: mem1200M.Value(),
+			},
+		},
+		{
 			name:                     "1X container unsupported resources and pod-level supported resources",
 			podLevelResourcesEnabled: true,
 			initContainers: []v1.Container{
