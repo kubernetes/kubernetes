@@ -156,7 +156,9 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 		}
 
 		// for each enumerated huge page size, the qos tiers are unbounded
-		m.setHugePagesUnbounded(containerConfig)
+		if err := setHugePagesUnbounded(containerConfig); err != nil {
+			return fmt.Errorf("failed to set huge page limits for top level %v QOS cgroup: %w", qosClass, err)
+		}
 
 		// check if it exists
 		if !cm.Exists(containerName) {
@@ -214,7 +216,7 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 }
 
 // setHugePagesUnbounded ensures hugetlb is effectively unbounded
-func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
+func setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
 	hugePageLimit := map[int64]int64{}
 	for _, pageSize := range libcontainercgroups.HugePageSizes() {
 		pageSizeBytes, err := hugePageSizeBytes(pageSize)
@@ -252,7 +254,7 @@ func hugePageSizeBytes(pageSize string) (int64, error) {
 
 func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
 	for _, v := range configs {
-		if err := m.setHugePagesUnbounded(v); err != nil {
+		if err := setHugePagesUnbounded(v); err != nil {
 			return err
 		}
 	}
