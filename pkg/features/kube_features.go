@@ -1789,7 +1789,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	PodCertificateRequest: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA}, // LockToDefault in 1.38
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.41
 	},
 
 	PodDeletionCost: {
