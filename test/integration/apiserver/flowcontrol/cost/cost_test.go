@@ -668,6 +668,10 @@ func benchmarkScenario(b *testing.B, tCtx ktesting.TContext, server http.Handler
 	optionsLabel := fmt.Sprintf("%s %s", sc.method, sc.options)
 
 	for _, wf := range sc.acceptContentTypes {
+		// b.Run invokes its callback multiple times while calibrating b.N;
+		// overwrite formatItems on each pass so only the final calibrated
+		// run is appended to the report.
+		var formatItems []dataItem
 		b.Run(fmt.Sprintf("Format=%s", wf.name), func(b *testing.B) {
 			framework.FixBenchmarkJSONOutput(b)
 			b.ReportAllocs()
@@ -707,11 +711,12 @@ func benchmarkScenario(b *testing.B, tCtx ktesting.TContext, server http.Handler
 				{"heap-frag-B", "Heap span fragmentation bytes", "B", float64(postGCMem.HeapInuse - postGCMem.HeapAlloc)},
 			}
 
+			formatItems = make([]dataItem, 0, len(metrics))
 			for _, m := range metrics {
 				if m.benchUnit != "" {
 					b.ReportMetric(m.val, m.benchUnit)
 				}
-				items = append(items, dataItem{
+				formatItems = append(formatItems, dataItem{
 					Labels: map[string]string{
 						"DryRun":  dryRunLabel,
 						"Options": optionsLabel,
@@ -723,6 +728,7 @@ func benchmarkScenario(b *testing.B, tCtx ktesting.TContext, server http.Handler
 				})
 			}
 		})
+		items = append(items, formatItems...)
 	}
 
 	return items
@@ -791,16 +797,18 @@ func runScenarioCommitted(b *testing.B, tCtx ktesting.TContext, server http.Hand
 		informer.resetEvents()
 	}
 
-	var totalResponseBytes int64
+	var totalRequestBytes, totalResponseBytes int64
 	runtime.ReadMemStats(startMem)
 	b.ResetTimer()
 	for i := range b.N {
-		totalResponseBytes += int64(runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payloads[i%2]))
+		payload := payloads[i%2]
+		totalRequestBytes += int64(len(payload))
+		totalResponseBytes += int64(runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload))
 	}
 	informer.wait(ctx, b, int64(b.N))
 	b.StopTimer()
 	runtime.ReadMemStats(endMem)
-	return float64(len(payloads[0])), totalResponseBytes
+	return float64(totalRequestBytes) / float64(b.N), totalResponseBytes
 }
 
 func writePerfData(tb testing.TB, artifactsDir, metricName string, data perfData) {
