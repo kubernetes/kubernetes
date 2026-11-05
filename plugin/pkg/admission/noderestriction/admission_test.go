@@ -608,11 +608,11 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	extendedResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
 	extendedResourceClaimPod.Status.ExtendedResourceClaimStatus = &api.PodExtendedResourceClaimStatus{ResourceClaimName: "myclaim"}
 
-	nodeAllocatableResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	nodeAllocatableResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+	extraNodeAllocatableResourcesPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
+	extraNodeAllocatableResourcesPod.Status.ExtraNodeAllocatableResources = []api.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: "myclaim",
-			Containers:        []string{"mycontainer"},
+			Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "myclaim"},
+			Containers: []string{"mycontainer"},
 			Mapping: []api.NodeAllocatableMappedResources{{
 				Name:     api.ResourceCPU,
 				Quantity: new(resource.MustParse("1")),
@@ -620,11 +620,11 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		},
 	}
 
-	nodeAllocatableOverheadResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	nodeAllocatableOverheadResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+	extraNodeAllocatableOverheadPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
+	extraNodeAllocatableOverheadPod.Status.ExtraNodeAllocatableResources = []api.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: "myclaim",
-			Containers:        []string{"mycontainer"},
+			Source:     api.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "myclaim"},
+			Containers: []string{"mycontainer"},
 			Overhead: []api.NodeAllocatableOverheadResources{{
 				Name:         api.ResourceMemory,
 				PerPod:       new(resource.MustParse("1Gi")),
@@ -1193,16 +1193,16 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "annot update extended resource claim status",
 		},
 		{
-			name:       "forbid update of pod's node allocatable resource claim status",
+			name:       "forbid update of pod's extra node allocatable resources",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update node allocatable resource claim statuses",
+			attributes: admission.NewAttributesRecord(extraNodeAllocatableResourcesPod, claimpod, podKind, extraNodeAllocatableResourcesPod.Namespace, extraNodeAllocatableResourcesPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update extra node allocatable resources",
 		},
 		{
-			name:       "forbid update of pod's node allocatable overhead resource claim status",
+			name:       "forbid update of pod's extra node allocatable overhead resources",
 			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nodeAllocatableOverheadResourceClaimPod, claimpod, podKind, nodeAllocatableOverheadResourceClaimPod.Namespace, nodeAllocatableOverheadResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update node allocatable resource claim statuses",
+			attributes: admission.NewAttributesRecord(extraNodeAllocatableOverheadPod, claimpod, podKind, extraNodeAllocatableOverheadPod.Namespace, extraNodeAllocatableOverheadPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update extra node allocatable resources",
 		},
 
 		// My node object

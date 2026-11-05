@@ -6875,6 +6875,34 @@ func TestDescribeNodeResource(t *testing.T) {
 				"cpu\t500m (50%)\t500m (50%)\n",
 			},
 		},
+		{
+			name: "pod with extraNodeAllocatableResources",
+			node: &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
+				Status:     corev1.NodeStatus{Allocatable: getResourceList("1", "1Gi")},
+			},
+			pods: func() []corev1.Pod {
+				p := newPod(getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi"), nil)
+				p.Status.ExtraNodeAllocatableResources = []corev1.ExtraNodeAllocatableResource{
+					{
+						Source:     corev1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"container-1"},
+						Mapping: []corev1.NodeAllocatableMappedResources{
+							{Name: corev1.ResourceCPU, Quantity: resource.NewMilliQuantity(400, resource.DecimalSI)},
+						},
+						Overhead: []corev1.NodeAllocatableOverheadResources{
+							{Name: corev1.ResourceMemory, PerPod: new(resource.MustParse("128Mi")), PerContainer: new(resource.MustParse("256Mi"))},
+						},
+					},
+				}
+				return []corev1.Pod{p}
+			}(),
+			expected: []string{
+				"foo\tpod-1\t\t500m (50%)\t600m (60%)\t512Mi (50%)\t640Mi (62%)\t",
+				"cpu\t500m (50%)\t600m (60%)\n",
+				"memory\t512Mi (50%)\t640Mi (62%)\n",
+			},
+		},
 	}
 
 	for _, tt := range tests {

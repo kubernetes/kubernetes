@@ -98,7 +98,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Con
 
 // getCPULimit returns the CPU limit for the container to be used to calculate
 // Linux Container Resources.
-func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
+func getCPULimit(pod *v1.Pod, container *v1.Container, extraNodeAllocatableRes v1.ResourceList) *resource.Quantity {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		// When container-level CPU limit is not set, the pod-level
 		// limit is used in the calculation for components relying on linux resource limits
@@ -108,23 +108,23 @@ func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.Resourc
 		}
 	}
 	limit := container.Resources.Limits.Cpu()
-	draCPU, exists := draAllocations[v1.ResourceCPU]
-	if limit.IsZero() || !exists || draCPU.IsZero() {
+	extraNodeAllocatableCPU, exists := extraNodeAllocatableRes[v1.ResourceCPU]
+	if limit.IsZero() || !exists || extraNodeAllocatableCPU.IsZero() {
 		return limit
 	}
-	// Only add DRA values to limits if limits are explicitly specified in the container spec.
+	// Only add extra node allocatable resources (like DRA allocations) to limits if limits are explicitly specified in the container spec.
 	// If not, we retain the current defaults which is setting to pod-level limits if specified, or unlimited.
 	if origContainer := getContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Cpu().IsZero() {
 		return limit
 	}
 	q := limit.DeepCopy()
-	q.Add(draCPU)
+	q.Add(extraNodeAllocatableCPU)
 	return &q
 }
 
 // getMemoryLimit returns the memory limit for the container to be used to calculate
 // Linux Container Resources.
-func getMemoryLimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
+func getMemoryLimit(pod *v1.Pod, container *v1.Container, extraNodeAllocatableRes v1.ResourceList) *resource.Quantity {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
 		// When container-level memory limit is not set, the pod-level
 		// limit is used in the calculation for components relying on linux resource limits
@@ -134,17 +134,17 @@ func getMemoryLimit(pod *v1.Pod, container *v1.Container, draAllocations v1.Reso
 		}
 	}
 	limit := container.Resources.Limits.Memory()
-	draMemory, exists := draAllocations[v1.ResourceMemory]
-	if limit.IsZero() || !exists || draMemory.IsZero() {
+	extraNodeAllocatableMemory, exists := extraNodeAllocatableRes[v1.ResourceMemory]
+	if limit.IsZero() || !exists || extraNodeAllocatableMemory.IsZero() {
 		return limit
 	}
-	// Only add DRA values to limits if limits are explicitly specified in the container spec.
+	// Only add extra node allocatable resources (like DRA allocations) to limits if limits are explicitly specified in the container spec.
 	// If not, we retain the current defaults which is setting to pod-level limits if specified, or unlimited.
 	if origContainer := getContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Memory().IsZero() {
 		return limit
 	}
 	q := limit.DeepCopy()
-	q.Add(draMemory)
+	q.Add(extraNodeAllocatableMemory)
 	return &q
 }
 
@@ -172,15 +172,15 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
 
-	draAllocations := make(v1.ResourceList)
+	extraNodeAllocatableRes := make(v1.ResourceList)
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
-		draAllocations = resourcehelper.GetContainerDRAAllocations(pod, container.Name)
+		extraNodeAllocatableRes = resourcehelper.GetContainerExtraNodeAllocatableResources(pod, container.Name)
 	}
-	memoryLimit := getMemoryLimit(pod, container, draAllocations)
-	cpuLimit := getCPULimit(pod, container, draAllocations)
+	memoryLimit := getMemoryLimit(pod, container, extraNodeAllocatableRes)
+	cpuLimit := getCPULimit(pod, container, extraNodeAllocatableRes)
 
-	// If request is not specified, default it to CPU limit without DRA allocations to prevent
-	// calculateLinuxResources from falling back to the DRA-inflated cpuLimit.
+	// If request is not specified, default it to CPU limit without extra node allocatable resources (like DRA allocations) to prevent
+	// calculateLinuxResources from falling back to the inflated cpuLimit.
 	if cpuRequest == nil {
 		cpuRequest = getCPULimit(pod, container, nil)
 	}
@@ -194,7 +194,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 
-	lcr.HugepageLimits = GetHugepageLimitsFromResources(ctx, pod, container.Resources, draAllocations)
+	lcr.HugepageLimits = GetHugepageLimitsFromResources(ctx, pod, container.Resources, extraNodeAllocatableRes)
 
 	// Configure swap for the container
 	m.configureContainerSwapResources(ctx, lcr, pod, container)
@@ -225,12 +225,12 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			!pod.Spec.Resources.Limits.Memory().IsZero()
 		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitSpec || memoryRequest == 0) {
 			memoryLimitVal := memoryLimitSpec
-			if _, exists := draAllocations[v1.ResourceMemory]; exists && memoryLimit != nil && memoryLimitSpec != 0 {
-				// memoryLimit computed above should include DRA already.
-				// We use the DRA-inflated memory limit to calculate the throttling threshold (memory.high)
+			if _, exists := extraNodeAllocatableRes[v1.ResourceMemory]; exists && memoryLimit != nil && memoryLimitSpec != 0 {
+				// memoryLimit computed above already includes extra node allocatable resources (like DRA allocations).
+				// We use the inflated memory limit to calculate the throttling threshold (memory.high)
 				// so that Burstable pods are not throttled early at their standard Spec limit.
 				// However, the QoS classification remains strictly based on the pure spec requests and limits
-				// and does not consider DRA. With DRA node allocatable claims, we continue to
+				// and does not consider them. With extra node allocatable resources, we continue to
 				// 1. Skip setting memory.high for guaranteed pods.
 				// 2. Set memory.high based on node memory capacity for besteffort pods.
 				memoryLimitVal = memoryLimit.Value()
@@ -404,7 +404,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 }
 
 // GetHugepageLimitsFromResources returns limits of each hugepages from resources.
-func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerResources v1.ResourceRequirements, draAllocations v1.ResourceList) []*runtimeapi.HugepageLimit {
+func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerResources v1.ResourceRequirements, extraNodeAllocatableRes v1.ResourceList) []*runtimeapi.HugepageLimit {
 	var hugepageLimits []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
@@ -432,12 +432,12 @@ func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerR
 		readAndDefineRequiredHugepageLimit(ctx, requiredHugepageLimits, resourceObj, amountObj)
 	}
 
-	// Apply DRA hugepage allocations, even if container spec limits are omitted.
+	// Apply extra node allocatable hugepages (like DRA allocations), even if container spec limits are omitted.
 	// Unlike CPU/Memory (which default to unlimited), hugepages default to 0 (disallowed)
 	// when its not specified in the spec.
-	// We must explicitly set the limit to the DRA allocation to allow container processes
+	// We must explicitly set the limit to the extra node allocatable amount to allow container processes
 	// to allocate hugepages when pod-level limits are absent.
-	for resourceObj, amountObj := range draAllocations {
+	for resourceObj, amountObj := range extraNodeAllocatableRes {
 		if v1helper.IsHugePageResourceName(resourceObj) {
 			pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
 			if err != nil {
@@ -456,10 +456,10 @@ func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerR
 			_, containerSpecLimitsSet := containerResources.Limits[resourceObj]
 
 			if containerSpecLimitsSet {
-				// Case A: Container limit is explicitly specified -> inflate it with DRA.
+				// Case A: Container limit is explicitly specified -> inflate it with the extra node allocatable amount.
 				requiredHugepageLimits[sizeString] += uint64(amountObj.Value())
 			} else if !podLevelLimitsSet {
-				// Case B: No pod-level limit is set for this hugepage size, and container limit is omitted -> set limit to DRA allocation.
+				// Case B: No pod-level limit is set for this hugepage size, and container limit is omitted -> set limit to the extra node allocatable amount.
 				requiredHugepageLimits[sizeString] = uint64(amountObj.Value())
 			}
 			// Case C: Pod-level limit for this hugepage size is set, but container limit is omitted -> retain the inherited pod-level limit already set in requiredHugepageLimits.

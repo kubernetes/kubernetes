@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -79,7 +80,15 @@ func (m *mockFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod
 			break
 		}
 	}
-	currentNodeSize := 0
+	for _, extra := range framework.GetExtraNodeAllocatableResources(state, nodeInfo.Node().Name) {
+		for _, m := range extra.Mapping {
+			// The mock has one dimension, so mapped CPU cores stand in for extra node allocatable resources.
+			if m.Name == v1.ResourceCPU {
+				newPodCapacity += int(m.Quantity.Value())
+			}
+		}
+	}
+	currentNodeSize := int(nodeInfo.GetRequested().GetMilliCPU() / 1000)
 	for _, p := range nodeInfo.GetPods() {
 		currentNodeSize += getCapacity(p.GetPod())
 	}
@@ -181,8 +190,9 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 		expectedVictims         []string
 		expectedStatus          *fwk.Status
 		// expectedDisruptions is the number of evicted preemption units per victim type.
-		expectedDisruptions      map[fwk.EntityKeyType]int
-		expectedNumPDBViolations int
+		expectedDisruptions          map[fwk.EntityKeyType]int
+		expectedNumPDBViolations     int
+		extraNodeAllocatableMappings map[string][]v1.NodeAllocatableMappedResources
 	}{
 		{
 			name: "Priority: pods from a group with disruption mode single rank as individual pods",
@@ -1596,12 +1606,43 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 			returnNilReprieveFilter: true,
 			expectedStatus:          fwk.NewStatus(fwk.Error, "got nil reprieve filter"),
 		},
+		{
+			name: "Extra node allocatable resources: reprieved preemptors count the resources mapped by DRA",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(),
+					st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj(),
+				},
+			),
+			extraNodeAllocatableMappings: map[string][]v1.NodeAllocatableMappedResources{
+				"p1": {{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))}},
+				"p2": {{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))}},
+			},
+			nodeCapacities: []nodeCapacity{
+				{
+					nodeName: "node1",
+					capacity: 4,
+				},
+			},
+			// v1 fits next to p1 and p2 only if their extra sizes are not counted.
+			expectedVictims:     []string{"v1"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodKeyType: 1},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gates := featuregatetesting.FeatureOverrides{
-				features.GenericWorkload: true,
+				features.GenericWorkload:             true,
+				features.DRANodeAllocatableResources: true,
 			}
 			if len(tt.initCompositePodGroups) > 0 {
 				gates[features.TopologyAwareWorkloadScheduling] = true
@@ -1694,16 +1735,32 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				numNodes := len(tt.nodes)
 				for _, p := range tt.preemptor.GetAllUnscheduledPods() {
 					pSize := getCapacity(p)
+					var extraResources []v1.ExtraNodeAllocatableResource
+					if mapping := tt.extraNodeAllocatableMappings[p.Name]; len(mapping) > 0 {
+						extraResources = []v1.ExtraNodeAllocatableResource{{
+							Source:  v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim1"},
+							Mapping: mapping,
+						}}
+						for _, m := range mapping {
+							if m.Name == v1.ResourceCPU {
+								pSize += int(m.Quantity.Value())
+							}
+						}
+					}
 					for step := range numNodes {
 						i := (nodeIdx + step) % numNodes
 						n := tt.nodes[i]
 						nodeCapacity := tt.nodeCapacities[i].capacity
 						nodeSize := assignedSizes[n.GetName()]
 						if nodeSize+pSize <= nodeCapacity {
+							cycleState := framework.NewCycleState()
+							if len(extraResources) > 0 {
+								framework.GetOrCreateExtraNodeAllocatableResourcesState(cycleState).Set(n.GetName(), "DynamicResources", extraResources)
+							}
 							assignments = append(assignments, &mockProposedAssignment{
 								pod:        p,
 								nodeName:   n.GetName(),
-								cycleState: framework.NewCycleState(),
+								cycleState: cycleState,
 							})
 							assignedSizes[n.GetName()] += pSize
 							nodeIdx = (i + 1) % numNodes

@@ -140,12 +140,24 @@ type PodStatusApplyConfiguration struct {
 	// applied at the pod level if pod-level requests or limits are set in
 	// PodSpec.Resources
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
-	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
-	// that were allocated for this pod through DRA claims. This includes resources currently
-	// reported in v1.Node `status.allocatable` that are not extended resources
-	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
-	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
-	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatusApplyConfiguration `json:"nodeAllocatableResourceClaimStatuses,omitempty"`
+	// extraNodeAllocatableResources lists node allocatable resources that were
+	// allocated to this pod outside of its spec requests, for example through DRA
+	// claims. These are resources reported in v1.Node `status.allocatable` that are
+	// not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources),
+	// such as "cpu", "memory", "ephemeral-storage", and "hugepages-<size>".
+	//
+	// The kubelet uses these extra resources for cgroup configuration as follows:
+	// - Pod level cgroup:
+	// - If pod level resources are explicitly specified (in `spec.resources`) for
+	// a resource, that value is used as is and must encompass these extra resources.
+	// - If pod level resources are not specified, the extra resources are added
+	// to the container level aggregates to update the pod level cgroup (both request, and limit when set).
+	// - Container level cgroup (for each container in `extraNodeAllocatableResources[*].containers`):
+	// - Extra node allocatable resources are added to the container's limit.
+	// - For cpu and memory, they are added only when a spec limit is explicitly set; otherwise the container limit is unchanged.
+	// - For hugepages, extra resources are added even when no container spec limit is set (unless a pod level hugepages limit is set in `spec.resources`).
+	// - Ephemeral-storage limits are not enforced via cgroups. Extra resources add to spec based container and pod level eviction bounds.
+	ExtraNodeAllocatableResources []ExtraNodeAllocatableResourceApplyConfiguration `json:"extraNodeAllocatableResources,omitempty"`
 	// volumeHealth contains node-reported health for each volume the pod is using.
 	// Populated by the kubelet on the pod's node.
 	VolumeHealth []PodVolumeHealthApplyConfiguration `json:"volumeHealth,omitempty"`
@@ -352,15 +364,15 @@ func (b *PodStatusApplyConfiguration) WithResources(value *ResourceRequirementsA
 	return b
 }
 
-// WithNodeAllocatableResourceClaimStatuses adds the given value to the NodeAllocatableResourceClaimStatuses field in the declarative configuration
+// WithExtraNodeAllocatableResources adds the given value to the ExtraNodeAllocatableResources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the NodeAllocatableResourceClaimStatuses field.
-func (b *PodStatusApplyConfiguration) WithNodeAllocatableResourceClaimStatuses(values ...*NodeAllocatableResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the ExtraNodeAllocatableResources field.
+func (b *PodStatusApplyConfiguration) WithExtraNodeAllocatableResources(values ...*ExtraNodeAllocatableResourceApplyConfiguration) *PodStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithNodeAllocatableResourceClaimStatuses")
+			panic("nil value passed to WithExtraNodeAllocatableResources")
 		}
-		b.NodeAllocatableResourceClaimStatuses = append(b.NodeAllocatableResourceClaimStatuses, *values[i])
+		b.ExtraNodeAllocatableResources = append(b.ExtraNodeAllocatableResources, *values[i])
 	}
 	return b
 }

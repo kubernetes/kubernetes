@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -25,12 +26,15 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -264,6 +268,53 @@ var _ = SIGDescribe("MemoryAllocatableEvictionPodLevelResources", framework.With
 			{
 				evictionPriority: 0,
 				pod:              innocentPod(),
+			},
+		})
+	})
+})
+
+// MemoryAllocatableEvictionDRANodeAllocatableResources tests that memory recorded for a DRA claim in
+// pod.status.extraNodeAllocatableResources counts towards the pod's request when ranking pods for eviction.
+var _ = SIGDescribe("MemoryAllocatableEvictionDRANodeAllocatableResources", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, feature.DynamicResourceAllocation, framework.WithLabel("DRA"), framework.WithFeatureGate(features.DRANodeAllocatableResources), func() {
+	f := framework.NewDefaultFramework("memory-allocatable-eviction-test-dra")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	const expectedNodeCondition = v1.NodeMemoryPressure
+	const expectedStarvedResource = v1.ResourceMemory
+	const pressureTimeout = 10 * time.Minute
+	ginkgo.BeforeEach(func() {
+		// Focus-regex jobs select this test even without the gate.
+		e2eskipper.SkipUnlessFeatureGateEnabled(features.DRANodeAllocatableResources)
+	})
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
+			// We want Allocatable = 250Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 500Mb
+			kubeReserved := getNodeCPUAndMemoryCapacity(ctx, f)[v1.ResourceMemory]
+			kubeReserved.Sub(resource.MustParse("500Mi"))
+			initialConfig.KubeReserved = map[string]string{
+				string(v1.ResourceMemory): kubeReserved.String(),
+			}
+			initialConfig.EnforceNodeAllocatable = []string{kubetypes.NodeAllocatableEnforcementKey}
+			initialConfig.CgroupsPerQOS = true
+		})
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			newKubeletPlugin(ctx, f.ClientSet, f.Namespace.Name, getNodeName(ctx, f), driverName)
+		})
+		draPod := getMemhogPod("dra-pod", "dra-container", v1.ResourceRequirements{})
+		// Allocate all memory at once, so that without the DRA memory this pod would be the bigger offender.
+		draPod.Spec.Containers[0].Args = []string{"stress", "--mem-alloc-size", "150Mi", "--mem-alloc-sleep", "1s", "--mem-total", strconv.Itoa(150 * 1024 * 1024)}
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logMemoryMetrics, []podEvictSpec{
+			{
+				evictionPriority: 1,
+				pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod:              draPod,
+				createPodFunc: func(ctx context.Context, pod *v1.Pod) {
+					// The 150Mi it uses is within its 200Mi DRA memory.
+					createPodWithDRAMemory(ctx, f, pod, resource.MustParse("200Mi"))
+				},
 			},
 		})
 	})
@@ -766,6 +817,10 @@ type podEvictSpec struct {
 	// When set, the pod's container is expected to handle SIGTERM by exiting
 	// 0 and the published status is expected to still report the eviction.
 	wantEvictionAfterCleanExit *cleanExitEviction
+
+	// Can be used to create the pod and wait for it to run, for pods that can only
+	// start after objects referencing them exist. These pods start before the rest.
+	createPodFunc func(ctx context.Context, pod *v1.Pod)
 }
 
 // cleanExitEviction describes the status expected on the API object for a
@@ -803,7 +858,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					podsToSucceed = append(podsToSucceed, spec.pod)
 					continue
 				}
-				pods = append(pods, spec.pod)
+				if spec.createPodFunc == nil {
+					pods = append(pods, spec.pod)
+				}
 			}
 
 			e2ePodClient := e2epod.NewPodClient(f)
@@ -822,6 +879,11 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			}
 
 			// Create all other pods after expected to succeed pods terminated
+			for _, spec := range testSpecs {
+				if spec.createPodFunc != nil {
+					spec.createPodFunc(ctx, spec.pod)
+				}
+			}
 			e2ePodClient.CreateBatch(ctx, pods)
 		})
 
@@ -1509,4 +1571,57 @@ func getMemhogPodWithPodLevelResources(podName string, podLevelRes v1.ResourceRe
 	pod.Spec.Resources = &podLevelRes
 
 	return pod
+}
+
+// createPodWithDRAMemory creates a pod with a resource claim on the DRA test kubelet plugin's device
+// and waits for it to run. It records memory as the claim's node allocatable memory in the pod
+// status, as the scheduler would. The kubelet only reads the pod status, so the DRA device need not
+// define node allocatable resource mapping/overhead in the ResourceSlice.
+func createPodWithDRAMemory(ctx context.Context, f *framework.Framework, pod *v1.Pod, memory resource.Quantity) {
+	ginkgo.GinkgoHelper()
+	claim, err := f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: pod.Name},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name: "device",
+					// Only the scheduler looks up the class, so it need not exist.
+					Exactly: &resourceapi.ExactDeviceRequest{DeviceClassName: driverName},
+				}},
+			},
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	pod.Spec.ResourceClaims = []v1.PodResourceClaim{{Name: "memory", ResourceClaimName: &claim.Name}}
+	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "memory"}}
+	created := e2epod.NewPodClient(f).Create(ctx, pod)
+
+	claim.Status = resourceapi.ResourceClaimStatus{
+		ReservedFor: []resourceapi.ResourceClaimConsumerReference{{Resource: "pods", Name: created.Name, UID: created.UID}},
+		Allocation: &resourceapi.AllocationResult{
+			Devices: resourceapi.DeviceAllocationResult{
+				Results: []resourceapi.DeviceRequestAllocationResult{{
+					Driver:  driverName,
+					Pool:    created.Spec.NodeName,
+					Device:  "device-00",
+					Request: "device",
+				}},
+			},
+		},
+	}
+	_, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+	framework.ExpectNoError(err)
+
+	patch, err := json.Marshal(v1.Pod{Status: v1.PodStatus{ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{{
+		Source:     v1.ExtraNodeAllocatableReference{APIGroup: resourceapi.GroupName, Kind: "ResourceClaim", Name: claim.Name},
+		Containers: []string{created.Spec.Containers[0].Name},
+		Mapping:    []v1.NodeAllocatableMappedResources{{Name: v1.ResourceMemory, Quantity: &memory}},
+	}}}})
+	framework.ExpectNoError(err)
+	patched, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Patch(ctx, created.Name, apitypes.StrategicMergePatchType, patch, metav1.PatchOptions{}, "status")
+	framework.ExpectNoError(err)
+	gomega.Expect(patched.Status.ExtraNodeAllocatableResources).NotTo(gomega.BeEmpty(), "the API server dropped extraNodeAllocatableResources: enable DRANodeAllocatableResources with --service-feature-gates")
+
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, created))
 }

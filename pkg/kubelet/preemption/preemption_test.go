@@ -266,6 +266,17 @@ func TestGetPodsToPreempt(t *testing.T) {
 		expectedOutput        []*v1.Pod
 	}
 	allPods := getTestPods()
+	podWithDRARes := allPods[burstable].DeepCopy()
+	podWithDRARes.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+		{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+			Containers: []string{podWithDRARes.Spec.Containers[0].Name},
+			Overhead: []v1.NodeAllocatableOverheadResources{
+				{Name: v1.ResourceCPU, PerContainer: new(resource.MustParse("200m"))},
+				{Name: v1.ResourceMemory, PerPod: new(resource.MustParse("200Mi"))},
+			},
+		},
+	}
 	runs := []testRun{
 		{
 			testName:              "no requirements",
@@ -363,8 +374,16 @@ func TestGetPodsToPreempt(t *testing.T) {
 			expectErr:             true,
 			expectedOutput:        nil,
 		},
+		{
+			testName:              "pod with extra node allocatable overhead meets requirements",
+			preemptor:             allPods[clusterCritical],
+			inputPods:             []*v1.Pod{podWithDRARes, allPods[guaranteed]},
+			insufficientResources: getAdmissionRequirementList(250, 250, 0),
+			expectErr:             false,
+			expectedOutput:        []*v1.Pod{podWithDRARes},
+		},
 	}
-
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	for _, r := range runs {
 		t.Run(r.testName, func(t *testing.T) {
 			outputPods, outErr := getPodsToPreempt(r.preemptor, r.inputPods, r.insufficientResources)

@@ -5591,10 +5591,10 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			name: "requests decreasing due to DRA claim mapping reduction",
 			oldPod: func() *v1.Pod {
 				p := makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU}, v1.ResourceList{v1.ResourceCPU: lowCPU})
-				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
-						Containers:        []string{"c1"},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
 						Mapping: []v1.NodeAllocatableMappedResources{
 							{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("500m"))},
 						},
@@ -5604,10 +5604,10 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			}(),
 			newPod: func() *v1.Pod {
 				p := makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU}, v1.ResourceList{v1.ResourceCPU: lowCPU})
-				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+				p.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim-1",
-						Containers:        []string{"c1"},
+						Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+						Containers: []string{"c1"},
 						Mapping: []v1.NodeAllocatableMappedResources{
 							{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("100m"))},
 						},

@@ -1012,6 +1012,7 @@ func TestOrderedbyInodes(t *testing.T) {
 
 // TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityDisk(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -1068,6 +1069,22 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
+	pod9 := newPod("below-requests-with-dra-high-priority-low-usage", highPriority, []v1.Container{
+		newContainer("c1", newResourceList("", "", "100Mi"), newResourceList("", "", "")),
+	}, []v1.Volume{
+		newVolume("local-volume", v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		}),
+	})
+	pod9.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+		{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "disk-claim"},
+			Containers: []string{"c1"},
+			Overhead: []v1.NodeAllocatableOverheadResources{
+				{Name: v1.ResourceEphemeralStorage, PerPod: quantityMustParse("1Gi")},
+			},
+		},
+	}
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodDiskStats(pod1, resource.MustParse("200Mi"), resource.MustParse("100Mi"), resource.MustParse("200Mi")), // 500 relative to request
 		pod2: newPodDiskStats(pod2, resource.MustParse("10Mi"), resource.MustParse("10Mi"), resource.MustParse("30Mi")),    // 50 relative to request
@@ -1077,13 +1094,14 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 		pod6: newPodDiskStats(pod6, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),   // -800 relative to request
 		pod7: newPodDiskStats(pod7, resource.MustParse("250Mi"), resource.MustParse("500Mi"), resource.MustParse("50Mi")),  // -200 relative to request
 		pod8: newPodDiskStats(pod8, resource.MustParse("100Mi"), resource.MustParse("60Mi"), resource.MustParse("40Mi")),   // -800 relative to request
+		pod9: newPodDiskStats(pod9, resource.MustParse("100Mi"), resource.MustParse("60Mi"), resource.MustParse("40Mi")),   // -900 relative to request (100Mi spec + 1Gi DRA)
 	}
 	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
-	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
+	pods := []*v1.Pod{pod9, pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
+	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8, pod9}
 	fsStatsToMeasure := []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
 	orderedBy(exceedDiskRequests(statsFn, fsStatsToMeasure, v1.ResourceEphemeralStorage), priority, disk(statsFn, fsStatsToMeasure, v1.ResourceEphemeralStorage)).Sort(pods)
 	for i := range expected {
@@ -1187,6 +1205,7 @@ func TestOrderedByMemory(t *testing.T) {
 
 // TestOrderedByPriorityMemory ensures we order by priority and then memory consumption relative to request.
 func TestOrderedByPriorityMemory(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
@@ -1211,6 +1230,18 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 	pod8 := newPod("below-requests-high-priority-low-usage", highPriority, []v1.Container{
 		newContainer("below-requests-high-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
 	}, nil)
+	pod9 := newPod("below-requests-with-dra-high-priority-low-usage", highPriority, []v1.Container{
+		newContainer("c1", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+	}, nil)
+	pod9.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+		{
+			Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "mem-claim"},
+			Containers: []string{"c1"},
+			Mapping: []v1.NodeAllocatableMappedResources{
+				{Name: v1.ResourceMemory, Quantity: quantityMustParse("1Gi")},
+			},
+		},
+	}
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
 		pod2: newPodMemoryStats(pod2, resource.MustParse("50Mi")),  // 50 relative to request
@@ -1220,13 +1251,14 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 		pod6: newPodMemoryStats(pod6, resource.MustParse("200Mi")), // -800 relative to request
 		pod7: newPodMemoryStats(pod7, resource.MustParse("800Mi")), // -200 relative to request
 		pod8: newPodMemoryStats(pod8, resource.MustParse("200Mi")), // -800 relative to request
+		pod9: newPodMemoryStats(pod9, resource.MustParse("200Mi")), // -900 relative to request (100Mi spec + 1Gi DRA)
 	}
 	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		result, found := stats[pod]
 		return result, found
 	}
-	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
-	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
+	pods := []*v1.Pod{pod9, pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
+	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8, pod9}
 	orderedBy(exceedMemoryRequests(statsFn), priority, memory(statsFn)).Sort(pods)
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -3456,16 +3488,18 @@ func TestEvictionMessage(t *testing.T) {
 	)
 
 	testcase := []struct {
-		name                     string
-		podResources             v1.ResourceRequirements
-		initContainers           []v1.Container
-		containers               []v1.Container
-		ephemeralContainers      []v1.EphemeralContainer
-		podMemoryStats           string
-		containerMemoryStats     []containerMemoryStat
-		expectedContainerMessage []memoryExceededContainer
-		expectedAnnotations      map[string]string
-		podLevelResourcesEnabled bool
+		name                               string
+		podResources                       v1.ResourceRequirements
+		initContainers                     []v1.Container
+		containers                         []v1.Container
+		ephemeralContainers                []v1.EphemeralContainer
+		extraNodeAllocatableResources      []v1.ExtraNodeAllocatableResource
+		podMemoryStats                     string
+		containerMemoryStats               []containerMemoryStat
+		expectedContainerMessage           []memoryExceededContainer
+		expectedAnnotations                map[string]string
+		podLevelResourcesEnabled           bool
+		draNodeAllocatableResourcesEnabled bool
 	}{
 		{
 			name: "No container exceeds memory usage",
@@ -3660,6 +3694,34 @@ func TestEvictionMessage(t *testing.T) {
 			},
 			podLevelResourcesEnabled: true,
 		},
+		{
+			name: "Container with ExtraNodeAllocatableResources only exceeds effective request when usage exceeds spec + DRA",
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newContainer(regular2, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+			},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					Source:     v1.ExtraNodeAllocatableReference{APIGroup: "resource.k8s.io", Kind: "ResourceClaim", Name: "claim-1"},
+					Containers: []string{regular1, regular2},
+					Mapping: []v1.NodeAllocatableMappedResources{
+						{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("200Mi"))},
+					},
+				},
+			},
+			containerMemoryStats: []containerMemoryStat{
+				{name: regular1, usage: "250Mi"}, // <= 100Mi + 200Mi (not offending)
+				{name: regular2, usage: "350Mi"}, // > 100Mi + 200Mi (offending, effective request 300Mi)
+			},
+			expectedContainerMessage: []memoryExceededContainer{
+				{name: regular2, request: "300Mi", usage: "350Mi"},
+			},
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      regular2,
+				OffendingContainersUsageKey: "350Mi",
+			},
+			draNodeAllocatableResourcesEnabled: true,
+		},
 	}
 
 	threshold := []evictionapi.Threshold{}
@@ -3668,6 +3730,9 @@ func TestEvictionMessage(t *testing.T) {
 		pod := newPodWithInitContainers(podName, 1, tc.podResources, tc.initContainers, tc.containers, nil)
 		if len(tc.ephemeralContainers) > 0 {
 			pod.Spec.EphemeralContainers = tc.ephemeralContainers
+		}
+		if len(tc.extraNodeAllocatableResources) > 0 {
+			pod.Status.ExtraNodeAllocatableResources = tc.extraNodeAllocatableResources
 		}
 		// Create PodMemoryStats with dummy container memory
 		// and override container stats with the provided values.
@@ -3702,6 +3767,9 @@ func TestEvictionMessage(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 				podMessage = fmt.Sprintf(podMessageFmt, pod.Name, tc.podMemoryStats, tc.podResources.Requests.Memory(), v1.ResourceMemory)
 				annotationsKeys = append(annotationsKeys, OffendingPodKey, OffendingPodUsageKey)
+			}
+			if tc.draNodeAllocatableResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 			}
 
 			msg, annotations := evictionMessage(v1.ResourceMemory, pod, statsFn, threshold, observations)
