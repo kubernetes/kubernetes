@@ -328,6 +328,11 @@ type ResourcePool struct {
 }
 
 const ResourceSliceMaxSharedCapacity = 128
+
+// The object size budget behind the ResourceSlice limits in this file is
+// documented in k8s.io/kubernetes/test/integration/dra/objects.go, together
+// with the measured sizes of the largest valid ResourceSlices and how to
+// re-measure them.
 const ResourceSliceMaxDevices = 128
 
 // ResourceSliceMaxDevicesWithAdvancedFeatures defines the maximum number of devices in a ResourceSlice
@@ -801,6 +806,7 @@ type CapacityRequestPolicyRange struct {
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
+// See the object size budget in k8s.io/kubernetes/test/integration/dra/objects.go.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
 // Limit per device for the total number of string, version, bool or int values

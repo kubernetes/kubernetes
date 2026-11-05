@@ -30,6 +30,72 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// Object size budget for ResourceSlice
+//
+// All limits in the resource.k8s.io API together have to fit into 1.5 MiB, the
+// default maximum object size in etcd.
+//
+// What the limits cap, following the structure of a slice:
+//
+//	spec.devices             ResourceSliceMaxDevices (128), or
+//	                         ResourceSliceMaxDevicesWithAdvancedFeatures (64) when any
+//	                         device uses taints, consumesCounters or list attributes
+//	  .attributes/.capacity  ResourceSliceMaxAttributesAndCapacitiesPerDevice (32)
+//	                         entries combined, of which the attributes contribute at
+//	                         most ResourceSliceMaxAttributeValuesPerDevice (48) values
+//	  .taints                DeviceTaintsMaxLength (16)
+//	  .consumesCounters      ResourceSliceMaxDeviceCounterConsumptionsPerDevice (2), each
+//	                         with ResourceSliceMaxCountersPerDeviceCounterConsumption (32)
+//	                         counters and DeviceCompatibilityGroupsMaxSize (2) groups
+//	  .bindingConditions     BindingConditionsMaxSize (4), and
+//	                         BindingFailureConditionsMaxSize (4)
+//	spec.sharedCounters      ResourceSliceMaxCounterSets (8), each with
+//	                         ResourceSliceMaxCountersPerCounterSet (32) counters
+//	                         (a slice has either devices or sharedCounters)
+//
+// Why the device limit is conditional and why attributes are capped twice:
+//
+//   - The device limit is halved as soon as one device uses a feature which adds
+//     a significant number of bytes, instead of giving each feature a limit of its
+//     own. A table of limits per feature combination would be more precise, but
+//     harder to reason about.
+//
+//   - Attributes are capped twice so that list values cannot multiply the size of
+//     a device: the first limit counts entries, the second the values in them,
+//     with each item of a list attribute counting separately. 48 rather than 64
+//     leaves headroom for future features.
+//
+// Only the largest valid slices are built here, not every feature combination:
+// what has to fit into the budget is the maximum.
+//
+// Sizes measured with the command at the end of this comment:
+//
+//	variant            devices    spec size    total size    % of budget
+//	basic                  128      729,946       744,798             47
+//	advanced                64    1,192,410     1,207,262             77
+//	shared-counters          0       20,856        35,700              2
+//
+// Total size minus spec size is almost entirely ManagedFields. The total varies
+// by a byte or two between runs because the encoded timestamps differ in length.
+//
+// These fields are not at their maximum:
+//
+//   - capacity: its entries share the limit of 32 with the attributes, and
+//     attributes encode to more bytes, so the maximum uses attributes only.
+//   - nodeSelector: devices set nodeName instead. A node selector term has no
+//     size limit of its own, so a slice using per-device node selectors can be
+//     larger than anything measured here.
+//   - bindingConditions and bindingFailureConditions: 4 + 4 qualified names per
+//     device are allowed, but not covered here yet.
+//
+// To re-measure after changing a limit or adding a field:
+//
+//	go test -v -run='TestDRA/all/MaxResourceSlice' ./test/integration/dra/all -args -v=0
+
+// maxObjectSize is the 1.5 MiB budget described above. testMaxResourceSlice
+// asserts it for each of the objects built here.
+const maxObjectSize = 1536 * 1024
+
 // NewMaxResourceSlices creates slices that are as large as possible given the current validation constraints.
 func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 	slices := map[string]*resourceapi.ResourceSlice{
