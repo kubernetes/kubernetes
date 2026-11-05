@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"gopkg.in/inf.v0"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/environment"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/dynamic-resource-allocation/structured"
 	core "k8s.io/kubernetes/pkg/apis/core"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/helper"
@@ -917,8 +919,20 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			"exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"))
 	}
 
-	if spec.SharedCounters != nil && spec.Devices != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "only one of `sharedCounters` or `devices` is allowed"))
+	resourceSliceTypeFields := make([]string, 0, 3)
+	if spec.Devices != nil {
+		resourceSliceTypeFields = append(resourceSliceTypeFields, "`devices`")
+	}
+	if spec.SharedCounters != nil {
+		resourceSliceTypeFields = append(resourceSliceTypeFields, "`sharedCounters`")
+	}
+	if spec.SharingAffinity != nil {
+		resourceSliceTypeFields = append(resourceSliceTypeFields, "`sharingAffinity`")
+	}
+	if len(resourceSliceTypeFields) > 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath,
+			fmt.Sprintf("{%s}", strings.Join(resourceSliceTypeFields, ", ")),
+			"only one of `devices`, `sharedCounters`, `sharingAffinity` is allowed"))
 	}
 
 	// An unchanged device list is accepted as it is stored. Validation which
@@ -958,7 +972,143 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 
 	allErrs = append(allErrs, validateSkipNodeOperations(spec.SkipNodeOperations, fldPath.Child("skipNodeOperations"))...)
 
+	var oldSharingAffinity []resource.SharingAffinityExtractor
+	if oldSpec != nil {
+		oldSharingAffinity = oldSpec.SharingAffinity
+	}
+	allErrs = append(allErrs, validateSharingAffinity(spec.SharingAffinity, oldSharingAffinity, fldPath.Child("sharingAffinity"))...)
+
 	return allErrs
+}
+
+// validateSharingAffinity validates a slice's extractors, enforcing entry count,
+// unique names, and the combined estimated CEL cost limit.
+func validateSharingAffinity(extractors, oldExtractors []resource.SharingAffinityExtractor, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Ratcheting: leave an already-persisted value untouched so updates that
+	// don't modify SharingAffinity are not rejected by tightened limits.
+	if oldExtractors != nil && apiequality.Semantic.DeepEqual(extractors, oldExtractors) {
+		return allErrs
+	}
+
+	if len(extractors) > resource.SharingAffinityMaxEntries {
+		allErrs = append(allErrs, field.TooMany(fldPath, len(extractors), resource.SharingAffinityMaxEntries).WithOrigin("maxItems").MarkCoveredByDeclarative())
+		return allErrs
+	}
+
+	oldByName := make(map[string]*resource.SharingAffinityExtractor, len(oldExtractors))
+	for i := range oldExtractors {
+		oldByName[oldExtractors[i].Name] = &oldExtractors[i]
+	}
+
+	seen := sets.New[string]()
+	var totalCost uint64
+	for i, extractor := range extractors {
+		cost, errs := validateSharingAffinityExtractor(extractor, oldByName[extractor.Name], fldPath.Index(i))
+		allErrs = append(allErrs, errs...)
+		if cost > math.MaxUint64-totalCost {
+			totalCost = math.MaxUint64
+		} else {
+			totalCost += cost
+		}
+		if seen.Has(extractor.Name) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), extractor).MarkCoveredByDeclarative())
+		}
+		seen.Insert(extractor.Name)
+	}
+	if totalCost > resource.SharingAffinityCELMaxCost {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "too complex, total cost of sharing affinity CEL expressions in the slice exceeds cost limit"))
+	}
+
+	return allErrs
+}
+
+// validateSharingAffinityExtractor validates new or changed fields and returns
+// the estimated CEL cost. old is the stored extractor with the same name, if any.
+func validateSharingAffinityExtractor(extractor resource.SharingAffinityExtractor, old *resource.SharingAffinityExtractor, fldPath *field.Path) (uint64, field.ErrorList) {
+	var allErrs field.ErrorList
+
+	if old == nil {
+		if extractor.Name == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+		} else {
+			allErrs = append(allErrs, corevalidation.ValidateDNS1123Label(extractor.Name, fldPath.Child("name")).MarkCoveredByDeclarative()...)
+		}
+	}
+
+	// Validate new or changed matchers.
+	if old == nil || old.APIGroup != extractor.APIGroup {
+		allErrs = append(allErrs, validateSharingAffinityAPIGroupMatcher(extractor.APIGroup, fldPath.Child("apiGroup"))...)
+	}
+	if old == nil || old.Kind != extractor.Kind {
+		allErrs = append(allErrs, validateSharingAffinityKindMatcher(extractor.Kind, fldPath.Child("kind"))...)
+	}
+
+	expressionPath := fldPath.Child("expression")
+	stored := old != nil && old.Expression == extractor.Expression
+	envType := environment.NewExpressions
+	if stored {
+		envType = environment.StoredExpressions
+	} else {
+		if extractor.Expression == "" {
+			return 0, append(allErrs, field.Required(expressionPath, "").MarkCoveredByDeclarative())
+		}
+		if len(extractor.Expression) > resource.SharingAffinityCELExpressionMaxLength {
+			return 0, append(allErrs, field.TooLong(expressionPath, "", resource.SharingAffinityCELExpressionMaxLength).WithOrigin("maxBytes").MarkCoveredByDeclarative())
+		}
+	}
+	// Compile unchanged expressions too, because their estimated costs count
+	// toward the updated list's combined cost limit.
+	result := sharingaffinity.ValidateExpression(extractor.Expression, envType)
+	if result.Error != nil {
+		if !stored {
+			allErrs = append(allErrs, convertCELErrorToValidationError(expressionPath, extractor.Expression, result.Error))
+		}
+		return 0, allErrs
+	}
+	if !stored && result.MaxCost > resource.SharingAffinityCELMaxCost {
+		allErrs = append(allErrs, field.Forbidden(expressionPath, "too complex, exceeds cost limit"))
+	}
+	return result.MaxCost, allErrs
+}
+
+// validateSharingAffinityAPIGroupMatcher validates an API group matcher, allowing
+// "*" as a wildcard or a lowercase DNS subdomain.
+func validateSharingAffinityAPIGroupMatcher(apiGroup string, fldPath *field.Path) field.ErrorList {
+	if apiGroup == "" {
+		return field.ErrorList{field.Required(fldPath, "").MarkCoveredByDeclarative()}
+	}
+	if apiGroup == "*" {
+		return nil
+	}
+	const maxLength = validation.DNS1123SubdomainMaxLength
+	if utf8.RuneCountInString(apiGroup) > maxLength {
+		return field.ErrorList{field.TooLongCharacters(fldPath, "", maxLength).WithOrigin("maxLength").MarkCoveredByDeclarative()}
+	}
+	if errs := validation.IsDNS1123Subdomain(apiGroup); len(errs) != 0 {
+		return field.ErrorList{field.Invalid(fldPath, apiGroup, strings.Join(errs, ", "))}
+	}
+	return nil
+}
+
+// validateSharingAffinityKindMatcher validates a kind matcher, allowing "*" as a
+// wildcard or a DNS1035 label with uppercase letters allowed.
+func validateSharingAffinityKindMatcher(kind string, fldPath *field.Path) field.ErrorList {
+	if kind == "" {
+		return field.ErrorList{field.Required(fldPath, "").MarkCoveredByDeclarative()}
+	}
+	if kind == "*" {
+		return nil
+	}
+	const maxLength = validation.DNS1035LabelMaxLength
+	if utf8.RuneCountInString(kind) > maxLength {
+		return field.ErrorList{field.TooLongCharacters(fldPath, "", maxLength).WithOrigin("maxLength").MarkCoveredByDeclarative()}
+	}
+	if errs := validation.IsDNS1035Label(strings.ToLower(kind)); len(errs) != 0 {
+		return field.ErrorList{field.Invalid(fldPath, kind, strings.Join(errs, ", "))}
+	}
+	return nil
 }
 
 // validatePartitionTypeAttribute checks that a slice naming a partition type

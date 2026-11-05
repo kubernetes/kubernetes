@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
@@ -70,6 +71,10 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 		// allocating the pool's other devices, too.
 		if !features.CompatibilityGroups && sliceUsesCompatibilityGroups(slice) {
 			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses compatibility groups while the DRADeviceCompatibilityGroups feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
+			continue
+		}
+		if !features.SharingAffinity && sliceUsesSharingAffinity(slice) {
+			klog.FromContext(ctx).V(5).Info("Ignoring resource slice because it uses sharing affinity while the DRASharingAffinity feature is disabled; its pool will be treated as incomplete", "resourceslice", klog.KObj(slice))
 			continue
 		}
 
@@ -159,6 +164,9 @@ func GatherPools(ctx context.Context, slicesForNode []*draapi.ResourceSlice, nod
 			// considered complete even though its devices with compatibility
 			// groups are not visible to the allocator.
 			allSlicesForPool = slicesWithoutCompatibilityGroups(allSlicesForPool)
+		}
+		if !features.SharingAffinity {
+			allSlicesForPool = slicesWithoutSharingAffinity(allSlicesForPool)
 		}
 		// Use the more complete number of slices to check for "incomplete pool".
 		//
@@ -440,6 +448,7 @@ type Pool struct {
 	DeviceSlicesTargetingNode    []*draapi.ResourceSlice
 	DeviceSlicesNotTargetingNode []*draapi.ResourceSlice
 	CounterSets                  map[draapi.UniqueString]*draapi.CounterSet
+	sharingAffinity              sharingaffinity.PoolExtractors
 }
 
 type PoolID struct {
@@ -525,4 +534,18 @@ func (p *poolsLogger) addDevicesInSlices(devices []string, poolID PoolID, slices
 		}
 	}
 	return devices
+}
+
+func sliceUsesSharingAffinity(slice *draapi.ResourceSlice) bool {
+	return len(slice.Spec.SharingAffinity) > 0
+}
+
+func slicesWithoutSharingAffinity(slices []*draapi.ResourceSlice) []*draapi.ResourceSlice {
+	var filtered []*draapi.ResourceSlice
+	for _, slice := range slices {
+		if !sliceUsesSharingAffinity(slice) {
+			filtered = append(filtered, slice)
+		}
+	}
+	return filtered
 }

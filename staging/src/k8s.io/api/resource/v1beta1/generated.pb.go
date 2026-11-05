@@ -132,6 +132,8 @@ func (m *ResourceSliceList) Reset() { *m = ResourceSliceList{} }
 
 func (m *ResourceSliceSpec) Reset() { *m = ResourceSliceSpec{} }
 
+func (m *SharingAffinityExtractor) Reset() { *m = SharingAffinityExtractor{} }
+
 func (m *AllocatedDeviceStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -2728,6 +2730,20 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.SharingAffinity) > 0 {
+		for iNdEx := len(m.SharingAffinity) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.SharingAffinity[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x5a
+		}
+	}
 	if len(m.SkipNodeOperations) > 0 {
 		for iNdEx := len(m.SkipNodeOperations) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.SkipNodeOperations[iNdEx])
@@ -2820,6 +2836,49 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= len(m.Driver)
 	copy(dAtA[i:], m.Driver)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Driver)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *SharingAffinityExtractor) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SharingAffinityExtractor) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SharingAffinityExtractor) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Expression)
+	copy(dAtA[i:], m.Expression)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Expression)))
+	i--
+	dAtA[i] = 0x22
+	i -= len(m.Kind)
+	copy(dAtA[i:], m.Kind)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Kind)))
+	i--
+	dAtA[i] = 0x1a
+	i -= len(m.APIGroup)
+	copy(dAtA[i:], m.APIGroup)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.APIGroup)))
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -3861,6 +3920,29 @@ func (m *ResourceSliceSpec) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	if len(m.SharingAffinity) > 0 {
+		for _, e := range m.SharingAffinity {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *SharingAffinityExtractor) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.APIGroup)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Kind)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Expression)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -4629,6 +4711,11 @@ func (this *ResourceSliceSpec) String() string {
 		repeatedStringForSharedCounters += strings.Replace(strings.Replace(f.String(), "CounterSet", "CounterSet", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForSharedCounters += "}"
+	repeatedStringForSharingAffinity := "[]SharingAffinityExtractor{"
+	for _, f := range this.SharingAffinity {
+		repeatedStringForSharingAffinity += strings.Replace(strings.Replace(f.String(), "SharingAffinityExtractor", "SharingAffinityExtractor", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForSharingAffinity += "}"
 	s := strings.Join([]string{`&ResourceSliceSpec{`,
 		`Driver:` + fmt.Sprintf("%v", this.Driver) + `,`,
 		`Pool:` + strings.Replace(strings.Replace(this.Pool.String(), "ResourcePool", "ResourcePool", 1), `&`, ``, 1) + `,`,
@@ -4640,6 +4727,20 @@ func (this *ResourceSliceSpec) String() string {
 		`SharedCounters:` + repeatedStringForSharedCounters + `,`,
 		`PartitionTypeAttribute:` + valueToStringGenerated(this.PartitionTypeAttribute) + `,`,
 		`SkipNodeOperations:` + fmt.Sprintf("%v", this.SkipNodeOperations) + `,`,
+		`SharingAffinity:` + repeatedStringForSharingAffinity + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SharingAffinityExtractor) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SharingAffinityExtractor{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`APIGroup:` + fmt.Sprintf("%v", this.APIGroup) + `,`,
+		`Kind:` + fmt.Sprintf("%v", this.Kind) + `,`,
+		`Expression:` + fmt.Sprintf("%v", this.Expression) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -12852,6 +12953,218 @@ func (m *ResourceSliceSpec) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.SkipNodeOperations = append(m.SkipNodeOperations, SkipNodeOperation(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SharingAffinity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SharingAffinity = append(m.SharingAffinity, SharingAffinityExtractor{})
+			if err := m.SharingAffinity[len(m.SharingAffinity)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SharingAffinityExtractor) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SharingAffinityExtractor: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SharingAffinityExtractor: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field APIGroup", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.APIGroup = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Kind", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Kind = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Expression", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Expression = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

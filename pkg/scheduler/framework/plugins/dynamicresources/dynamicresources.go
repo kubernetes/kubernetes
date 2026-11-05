@@ -45,6 +45,7 @@ import (
 	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -113,6 +114,8 @@ type stateData struct {
 	// nodeAllocations caches the result of Filter for the nodes, its key is node name.
 	nodeAllocations map[string]nodeAllocation
 
+	reservedClaims sets.Set[types.UID]
+
 	// claimHasNodeAllocatableMappedDevice stores whether a claim's allocation is mapped.
 	// A claim is mapped if it is allocated a device that models a node-allocatable
 	// resource (like cpu, memory) via the NodeAllocatableResources.Mapping field in the
@@ -164,6 +167,7 @@ type nodeAllocation struct {
 	// allocationResults has the allocation results, matching the order of
 	// claims which had to be allocated.
 	allocationResults []resourceapi.AllocationResult
+	affinityByClaim   map[int]*structured.ClaimAffinity
 	// extendedResourceClaim has the special claim for extended resource backed by DRA
 	// created during Filter for the nodes.
 	extendedResourceClaim *resourceapi.ResourceClaim
@@ -173,6 +177,10 @@ type nodeAllocation struct {
 	// nodeAllocatableResourceClaimStatuses stores the calculated node allocatable resource allocations through DRA.
 	// This is populated during Filter stage and passed to PreBind.
 	nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
+}
+
+func (pl *DynamicResources) sharingAffinityEnabled() bool {
+	return pl.fts.EnableDRASharingAffinity && pl.fts.EnableDRAConsumableCapacity
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
@@ -208,6 +216,15 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		return nil, err
 	}
 
+	draManager := fh.SharedDRAManager()
+	// This is a LRU cache for compiled CEL expressions. The most
+	// recent 10 of them get reused across different scheduling
+	// cycles.
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: fts.EnableDRAConsumableCapacity,
+		EnableListTypeAttributes: fts.EnableDRAListTypeAttributes,
+	})
+
 	pl := &DynamicResources{
 		fts:           fts,
 		filterTimeout: ptr.Deref(args.FilterTimeout, metav1.Duration{}).Duration,
@@ -215,16 +232,13 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 			args.BindingTimeout,
 			metav1.Duration{Duration: config.DynamicResourcesBindingTimeoutDefault},
 		).Duration,
-		fh:        fh,
-		clientset: fh.ClientSet(),
-		// This is a LRU cache for compiled CEL expressions. The most
-		// recent 10 of them get reused across different scheduling
-		// cycles.
-		celCache: cel.NewCache(10, cel.Features{
-			EnableConsumableCapacity: fts.EnableDRAConsumableCapacity,
-			EnableListTypeAttributes: fts.EnableDRAListTypeAttributes,
-		}),
-		draManager: fh.SharedDRAManager(),
+		fh:         fh,
+		clientset:  fh.ClientSet(),
+		celCache:   celCache,
+		draManager: draManager,
+	}
+	if pl.sharingAffinityEnabled() {
+		pl.celCache.SharingAffinityExtractor().SetMetricsRecorder(sharingAffinityMetricsRecorder())
 	}
 
 	if fts.EnableSchedulerPreQueueingHints {
@@ -287,8 +301,8 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
-		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
+		// Deletion can also expose an older, complete pool generation.
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.All}},
 	}
 
 	return events, nil
@@ -840,6 +854,7 @@ func AllocatorFeatures(fts feature.Features) structured.Features {
 		DeviceTaints:            fts.EnableDRADeviceTaints,
 		DeviceBindingAndStatus:  fts.EnableDRADeviceBindingConditions && fts.EnableDRAResourceClaimDeviceStatus,
 		ConsumableCapacity:      fts.EnableDRAConsumableCapacity,
+		SharingAffinity:         fts.EnableDRASharingAffinity && fts.EnableDRAConsumableCapacity,
 		FractionalCapacityRange: fts.EnableDRAFractionalCapacityRange,
 		ListTypeAttributes:      fts.EnableDRAListTypeAttributes,
 		OptionalNodeOperations:  fts.EnableDRAOptionalNodeOperations,
@@ -1018,12 +1033,16 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
+	var affinityByClaim map[int]*structured.ClaimAffinity
+	if pl.sharingAffinityEnabled() {
+		affinityByClaim = make(map[int]*structured.ClaimAffinity)
+	}
 	var nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
 	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
-			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
+			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.KObj(node)))
 		}
 
 		// Apply timeout to the operation?
@@ -1038,6 +1057,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		// This replaces the special ResourceClaim for extended resources with one
 		// matching the node.
 		claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, state.claims.len())
+		var claimIndices []int
 		// pendingResult holds pending allocations that were made for a previous
 		// Pod in Reserve, but before that allocation is recorded in the status
 		// by PreBind.
@@ -1057,8 +1077,20 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 				continue
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
+			claimIndices = append(claimIndices, index)
 		}
-		allocationResult, err := state.allocator.Allocate(allocCtx, node, claimsToAllocate)
+		var allocationResult []resourceapi.AllocationResult
+		var affinityResult []structured.ClaimAffinity
+		var err error
+		if pl.sharingAffinityEnabled() {
+			allocator, ok := state.allocator.(structured.AffinityAllocator)
+			if !ok {
+				return statusError(logger, errors.New("allocator does not support sharing affinity results"))
+			}
+			allocationResult, affinityResult, err = allocator.AllocateWithAffinity(allocCtx, node, claimsToAllocate)
+		} else {
+			allocationResult, err = state.allocator.Allocate(allocCtx, node, claimsToAllocate)
+		}
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
@@ -1074,6 +1106,8 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			return statusUnschedulable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
 		case ctx.Err() != nil:
 			return statusUnschedulable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+		case err != nil && sharingaffinity.Classify(err) == sharingaffinity.OutcomeClaimInconsistent:
+			return statusUnschedulable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		case err != nil:
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
@@ -1090,6 +1124,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
 			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
+		}
+		if pl.sharingAffinityEnabled() {
+			for i := range affinityResult {
+				affinityByClaim[claimIndices[i]] = &affinityResult[i]
+			}
 		}
 
 		// Reserve uses this information.
@@ -1134,6 +1173,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	if state.allocator != nil || len(nodeAllocatableClaimStatus) > 0 {
 		state.nodeAllocations[node.Name] = nodeAllocation{
 			allocationResults:                    allocations,
+			affinityByClaim:                      affinityByClaim,
 			extendedResourceClaim:                nodeExtendedResourceClaim,
 			containerResourceRequestMappings:     containerResourceRequestMappings,
 			nodeAllocatableResourceClaimStatuses: nodeAllocatableClaimStatus,
@@ -1491,6 +1531,27 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 		// Nothing left to do.
 		return nil
 	}
+	state.mutex.Lock()
+	if state.reservedClaims == nil {
+		state.reservedClaims = sets.New[types.UID]()
+	}
+	state.mutex.Unlock()
+	var acquired []types.UID
+	defer func() {
+		if status.IsSuccess() {
+			return
+		}
+		for i := len(acquired) - 1; i >= 0; i-- {
+			uid := acquired[i]
+			pl.releasePendingAllocation(state, uid)
+			if podGroupState != nil {
+				podGroupState.pendingAllocations[uid].Delete(pod.UID)
+				if len(podGroupState.pendingAllocations[uid]) == 0 {
+					delete(podGroupState.pendingAllocations, uid)
+				}
+			}
+		}
+	}()
 	extendedResourceClaim := state.claims.extendedResourceClaim()
 	numClaimsToAllocate := 0
 	needToAllocateUserClaims := false
@@ -1544,10 +1605,24 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
 			}
 			claim.Status.Allocation = allocation
-			err := pl.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim)
+			state.mutex.Lock()
+			alreadyReserved := state.reservedClaims.Has(claim.UID)
+			state.mutex.Unlock()
+			if alreadyReserved {
+				allocIndex++
+				continue
+			}
+			err := pl.signalClaimPendingAllocation(claim.UID, claim, allocations.affinityByClaim[index])
 			if err != nil {
+				if errors.Is(err, errSharingAffinityStale) || errors.Is(err, errSharingAffinityConflict) {
+					return fwk.NewStatus(fwk.Unschedulable, err.Error()).WithError(err)
+				}
 				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s: %w", claim.Name, err))
 			}
+			state.mutex.Lock()
+			state.reservedClaims.Insert(claim.UID)
+			state.mutex.Unlock()
+			acquired = append(acquired, claim.UID)
 			logger.V(5).Info("Reserved resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(allocation))
 			allocIndex++
 
@@ -1561,6 +1636,20 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 	}
 
 	return nil
+}
+
+// A failed attempt must not release a pending allocation owned by another pod.
+func (pl *DynamicResources) releasePendingAllocation(state *stateData, uid types.UID) bool {
+	state.mutex.Lock()
+	ok := state.reservedClaims.Has(uid)
+	if ok {
+		state.reservedClaims.Delete(uid)
+	}
+	state.mutex.Unlock()
+	if !ok {
+		return false
+	}
+	return pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(uid, false)
 }
 
 // Unreserve clears the ReservedFor field for all claims.
@@ -1592,7 +1681,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 		// informer events whose ResourceVersion is not newer than the assumed
 		// claim, so restoring could drop an allocation stored by PreBind of
 		// this or another Pod sharing the claim and make its devices look free.
-		if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, false); deleted {
+		if deleted := pl.releasePendingAllocation(state, claim.UID); deleted {
 			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(claim.Status.Allocation))
 
 			// If we are currently asynchronously Binding Pods in a PodGroup,

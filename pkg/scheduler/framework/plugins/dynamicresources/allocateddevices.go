@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -126,17 +127,43 @@ type allocatedDevices struct {
 	shareIDs                  sets.Set[structured.SharedDeviceID]
 	capacities                structured.ConsumedCapacityCollection
 	invalidCapacities         map[types.UID]error
+	claims                    map[types.UID]*resourceapi.ResourceClaim
 	enabledConsumableCapacity bool
+	enabledSharingAffinity    bool
+	onClaimChanged            func()
 }
 
 func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
+	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
 	return &allocatedDevices{
 		logger:                    logger,
 		ids:                       sets.New[structured.DeviceID](),
 		shareIDs:                  sets.New[structured.SharedDeviceID](),
 		capacities:                structured.NewConsumedCapacityCollection(),
 		invalidCapacities:         make(map[types.UID]error),
-		enabledConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		claims:                    make(map[types.UID]*resourceapi.ResourceClaim),
+		enabledConsumableCapacity: enabledConsumableCapacity,
+		enabledSharingAffinity:    enabledConsumableCapacity && utilfeature.DefaultFeatureGate.Enabled(features.DRASharingAffinity),
+	}
+}
+
+func claimMapKey(claim *resourceapi.ResourceClaim) types.UID {
+	if claim.UID != "" {
+		return claim.UID
+	}
+	return types.UID(claim.Namespace + "/" + claim.Name)
+}
+
+func (a *allocatedDevices) Claims() (map[types.UID]*resourceapi.ResourceClaim, int64) {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	return maps.Clone(a.claims), a.revision
+}
+
+func (a *allocatedDevices) notifyClaimChanged() {
+	if a.onClaimChanged != nil {
+		a.onClaimChanged()
 	}
 }
 
@@ -218,9 +245,26 @@ func (a *allocatedDevices) onUpdate(oldObj, newObj any) {
 		a.addDevices(modifiedClaim)
 	case originalClaim.Status.Allocation != nil && modifiedClaim.Status.Allocation == nil:
 		a.removeDevices(originalClaim)
+	case originalClaim.Status.Allocation != nil && modifiedClaim.Status.Allocation != nil:
+		if originalClaim.UID != modifiedClaim.UID {
+			a.removeDevices(originalClaim)
+			a.addDevices(modifiedClaim)
+			return
+		}
+		if !a.enabledSharingAffinity {
+			return
+		}
+		if apiequality.Semantic.DeepEqual(originalClaim.Status.Allocation, modifiedClaim.Status.Allocation) &&
+			apiequality.Semantic.DeepEqual(originalClaim.Spec.Devices, modifiedClaim.Spec.Devices) {
+			return
+		}
+		a.mutex.Lock()
+		a.claims[claimMapKey(modifiedClaim)] = modifiedClaim
+		a.revision++
+		a.mutex.Unlock()
+		a.notifyClaimChanged()
 	default:
-		// Nothing to do. Either both nil or both non-nil, in which case the content
-		// also must be the same (immutable!).
+		// Nothing to do. Both nil.
 	}
 }
 
@@ -273,9 +317,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
 		return
 	}
-
 	a.mutex.Lock()
-	defer a.mutex.Unlock()
 	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Insert(deviceID)
@@ -289,6 +331,11 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	if capacityErr != nil {
 		a.invalidCapacities[claim.UID] = capacityErr
 	}
+	if a.enabledSharingAffinity {
+		a.claims[claimMapKey(claim)] = claim
+	}
+	a.mutex.Unlock()
+	a.notifyClaimChanged()
 }
 
 func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
@@ -328,9 +375,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	if len(deviceIDs) == 0 && len(shareIDs) == 0 && len(deviceCapacities) == 0 && capacityErr == nil {
 		return
 	}
-
 	a.mutex.Lock()
-	defer a.mutex.Unlock()
 	a.revision++
 	for _, deviceID := range deviceIDs {
 		a.ids.Delete(deviceID)
@@ -342,4 +387,9 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		a.capacities.Remove(capacity)
 	}
 	delete(a.invalidCapacities, claim.UID)
+	if a.enabledSharingAffinity {
+		delete(a.claims, claimMapKey(claim))
+	}
+	a.mutex.Unlock()
+	a.notifyClaimChanged()
 }

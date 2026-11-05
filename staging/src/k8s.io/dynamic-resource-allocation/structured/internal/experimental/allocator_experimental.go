@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -36,8 +37,10 @@ import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
+	"k8s.io/dynamic-resource-allocation/structured/schedulerapi"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
@@ -55,6 +58,10 @@ type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
 type ConsumedCapacityCollection = internal.ConsumedCapacityCollection
 type ConsumedCapacity = internal.ConsumedCapacity
 type AllocatedState = internal.AllocatedState
+
+type ClaimAffinity = internal.ClaimAffinity
+type DeviceAffinity = internal.DeviceAffinity
+type PoolMetadataView = internal.PoolMetadataView
 
 func GenerateNewShareID() *types.UID {
 	return internal.GenerateShareID()
@@ -83,6 +90,7 @@ var SupportedFeatures = internal.Features{
 	OptionalNodeOperations:  true,
 	DerivedAttributes:       true,
 	CompatibilityGroups:     true,
+	SharingAffinity:         true,
 }
 
 type Allocator struct {
@@ -93,6 +101,9 @@ type Allocator struct {
 	slicesShared   []*draapi.ResourceSlice
 	allSlices      []*draapi.ResourceSlice
 	celCache       *cel.Cache
+	// poolsAffinityExtractors holds the precomputed sharing affinity metadata
+	// and compiled extractors for each resource pool across allSlices.
+	poolsAffinityExtractors map[PoolID]poolAffinityExtractors
 	// availableCounters contains the available counters for each
 	// resource pool. It acts as a cache that is updated the first time
 	// the available counters are needed for each pool. The information
@@ -153,6 +164,9 @@ func NewAllocator(ctx context.Context,
 
 		compatibilityGroupsBaseline: make(map[PoolID]map[string]compatibilityGroupIntersection),
 	}
+	if features.SharingAffinity {
+		a.poolsAffinityExtractors = buildPoolsAffinityExtractors(ctx, slices, celCache.SharingAffinityExtractor())
+	}
 	return a, nil
 }
 
@@ -161,6 +175,18 @@ func (a *Allocator) Channel() internal.AllocatorChannel {
 }
 
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
+	return a.allocate(ctx, node, claims, nil)
+}
+
+// AllocateWithAffinity allocates claims on node and returns both the AllocationResults
+// and the per-claim sharing affinity metadata evaluated during allocation.
+func (a *Allocator) AllocateWithAffinity(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) ([]resourceapi.AllocationResult, []ClaimAffinity, error) {
+	var claimAffinities []ClaimAffinity
+	results, err := a.allocate(ctx, node, claims, &claimAffinities)
+	return results, claimAffinities, err
+}
+
+func (a *Allocator) allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim, claimAffinities *[]ClaimAffinity) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
 		Allocator:              a,
 		ctx:                    ctx, // all methods share the same a and thus ctx
@@ -174,9 +200,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 
 		consumedCompatibilityGroups: make(map[PoolID]map[string]compatibilityGroupIntersection),
 
-		requestData:        make(map[requestIndices]requestData),
-		result:             make([]internalAllocationResult, len(claims)),
-		allocatingCapacity: NewConsumedCapacityCollection(),
+		requestData:          make(map[requestIndices]requestData),
+		result:               make([]internalAllocationResult, len(claims)),
+		allocatingCapacity:   NewConsumedCapacityCollection(),
+		requestAffinityCache: make(map[requestAffinityKey]sharingaffinity.RequestAffinity),
+		allocatingAffinity:   make(map[DeviceID]map[string]string),
 	}
 	slicesForNode := slices.Concat(alloc.slicesOnNode[node.Name], alloc.slicesShared)
 	if loggerV6 := alloc.logger.V(6); loggerV6.Enabled() {
@@ -195,7 +223,40 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 	if err != nil {
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
-	alloc.pools = pools
+	// GatherPools only inspects slices that match node selection on this node,
+	// so it can miss pool-level SharingAffinity metadata slices that do not
+	// set node selection (or belong to a newer pool generation whose node
+	// slices have not arrived yet). Apply the cluster-wide pool sharing
+	// affinity state precomputed in NewAllocator to each candidate pool.
+	if a.features.SharingAffinity {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		alloc.pools = make([]*Pool, 0, len(pools))
+		for _, pool := range pools {
+			info := a.poolsAffinityExtractors[pool.PoolID]
+			if len(pool.DeviceSlicesTargetingNode) > 0 && pool.DeviceSlicesTargetingNode[0].Spec.Pool.Generation < info.generation {
+				// The driver is replacing this generation and the newer one has no
+				// slices for this node, so the old devices are obsolete. Drop the pool
+				// instead of marking it incomplete, which would block "All" requests.
+				alloc.logger.V(5).Info("Ignoring obsolete pool generation", "driver", pool.Driver, "pool", pool.Pool, "generation", pool.DeviceSlicesTargetingNode[0].Spec.Pool.Generation, "newestGeneration", info.generation)
+				continue
+			}
+			alloc.pools = append(alloc.pools, pool)
+			if info.isIncomplete || (len(pool.DeviceSlicesTargetingNode) > 0 && pool.DeviceSlicesTargetingNode[0].Spec.Pool.Generation != info.generation) {
+				pool.IsIncomplete = true
+				continue
+			}
+			if info.isInvalid {
+				pool.IsInvalid, pool.InvalidReason = true, "sharingAffinity"
+				continue
+			}
+			pool.sharingAffinity = info.extractors
+		}
+		pools = alloc.pools
+	} else {
+		alloc.pools = pools
+	}
 	alloc.logger.V(5).Info("Gathered pool information", "pools", logPools(alloc.logger, pools))
 
 	// We allocate one claim after the other and for each claim, all of
@@ -385,12 +446,17 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		// invalid pools, return an error here. We didn't do it during
 		// allocation since there might be valid pools from which the
 		// claims could be satisfied.
+		anyInvalid := false
 		for _, pool := range pools {
 			if pool.IsInvalid {
-				// Not a fatal error, allocation on other nodes may proceed.
-				// The error is only surfaced if allocation fails on all nodes.
-				return nil, fmt.Errorf("invalid resource pools were encountered%w", internal.ErrFailedAllocationOnNode)
+				anyInvalid = true
+				break
 			}
+		}
+		if anyInvalid {
+			// Not a fatal error, allocation on other nodes may proceed.
+			// The error is only surfaced if allocation fails on all nodes.
+			return nil, fmt.Errorf("invalid resource pools were encountered%w", internal.ErrFailedAllocationOnNode)
 		}
 		return nil, nil
 	}
@@ -547,6 +613,17 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		allocationResult.NodeSelector = nodeSelector
 	}
 
+	if claimAffinities != nil && a.features.SharingAffinity {
+		*claimAffinities = make([]ClaimAffinity, len(alloc.result))
+		for claimIndex, claimResult := range alloc.result {
+			for resultIndex, device := range claimResult.devices {
+				entry := device.affinity
+				entry.ResultIndex = resultIndex
+				entry.Values = maps.Clone(entry.Values)
+				(*claimAffinities)[claimIndex].Devices = append((*claimAffinities)[claimIndex].Devices, entry)
+			}
+		}
+	}
 	return result, nil
 }
 
@@ -724,6 +801,12 @@ type allocator struct {
 	// requested by all allocations targeting that device.
 	allocatingCapacity ConsumedCapacityCollection
 	result             []internalAllocationResult
+	// requestAffinityCache caches extracted sharing affinity results per pool
+	// and request so CEL is evaluated at most once per (pool, request) pair.
+	requestAffinityCache map[requestAffinityKey]sharingaffinity.RequestAffinity
+	// allocatingAffinity tracks the sharing affinity locks established on devices
+	// by in-progress allocations during the current backtracking search.
+	allocatingAffinity map[DeviceID]map[string]string
 }
 
 // counterSets is a map with the name of counter sets to the counters in
@@ -821,6 +904,7 @@ type internalDeviceResult struct {
 	slice            *draapi.ResourceSlice
 	consumedCapacity ConsumedCapacity
 	adminAccess      *bool
+	affinity         DeviceAffinity
 }
 
 func (idr internalDeviceResult) requestName() string {
@@ -1853,6 +1937,24 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		}
 	}
 
+	var deviceAffinity DeviceAffinity
+	if alloc.features.SharingAffinity {
+		var ok bool
+		var err error
+		deviceAffinity, ok, err = alloc.evaluateDeviceAffinity(requestKey, requestData, device)
+		if err != nil || !ok {
+			alloc.rollbackDevice(r, device, &requestData, state)
+			return false, nil, err
+		}
+		deviceAffinity.Contributes = deviceAffinity.HasSharingAffinity && shareID != nil && !request.adminAccess()
+		if deviceAffinity.HasSharingAffinity {
+			if _, exists := alloc.allocatingAffinity[device.id]; !exists {
+				alloc.allocatingAffinity[device.id] = deviceAffinity.Values
+				state.affinityAdded = true
+			}
+		}
+	}
+
 	result := internalDeviceResult{
 		request:       request.name(),
 		parentRequest: parentRequestName,
@@ -1860,6 +1962,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		Device:        device.Device,
 		slice:         device.slice,
 		shareID:       shareID,
+		affinity:      deviceAffinity,
 	}
 	if request.adminAccess() {
 		result.adminAccess = ptr.To(request.adminAccess())
@@ -1895,6 +1998,7 @@ type deviceRollbackState struct {
 	resultAdded                bool
 	previousNumResults         int
 	consumedCapacity           ConsumedCapacity
+	affinityAdded              bool
 }
 
 // rollbackDevice reverses the mutations recorded in state, in the opposite order
@@ -1903,6 +2007,9 @@ type deviceRollbackState struct {
 func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, requestData *requestData, state deviceRollbackState) {
 	if state.resultAdded {
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:state.previousNumResults]
+	}
+	if state.affinityAdded {
+		delete(alloc.allocatingAffinity, device.id)
 	}
 	if state.capacityInserted {
 		alloc.allocatingCapacity.Remove(DeviceConsumedCapacity{DeviceID: device.id, ConsumedCapacity: state.consumedCapacity})
@@ -2412,4 +2519,147 @@ func containsNodeSelectorRequirement(requirements []v1.NodeSelectorRequirement, 
 		return true
 	}
 	return false
+}
+
+// affinityRejectionReason classifies why a candidate device was rejected by
+// sharing affinity during allocation.
+type affinityRejectionReason string
+
+const (
+	affinityRejectionUnreconstructable affinityRejectionReason = "unreconstructable"
+	affinityRejectionMissingExtractors affinityRejectionReason = "missingExtractors"
+	affinityRejectionMismatch          affinityRejectionReason = "mismatch"
+)
+
+// requestAffinityKey identifies a resource pool and request pair for caching
+// extracted sharing affinity values within an Allocate call.
+type requestAffinityKey struct {
+	pool sharingaffinity.PoolKey
+	requestIndices
+}
+
+// recordAffinityRejection records a candidate device rejection by sharing
+// affinity, updates scheduler metrics, and logs details at V(7).
+func (alloc *allocator) recordAffinityRejection(device DeviceID, requestName string, reason affinityRejectionReason, missingExtractors []string) {
+	switch reason {
+	case affinityRejectionUnreconstructable:
+		// Unreconstructable devices are tracked by the state-tracker gauge
+		// (sharing_affinity_unreconstructable_devices) rather than a per-candidate
+		// filter counter.
+	case affinityRejectionMissingExtractors:
+		alloc.celCache.SharingAffinityExtractor().RecordNoKeysExtracted()
+	case affinityRejectionMismatch:
+		alloc.celCache.SharingAffinityExtractor().RecordLockConflict()
+	}
+	if alloc.loggerV7 != nil {
+		alloc.loggerV7.Info("Device rejected by sharing affinity", "device", device, "request", requestName, "reason", string(reason), "missingExtractors", missingExtractors)
+	}
+}
+
+// evaluateDeviceAffinity extracts the request's sharing affinity values for the
+// candidate device's pool (caching the result per pool and request), verifies
+// compatibility with the device's existing and in-progress locks, and returns
+// the resulting DeviceAffinity. It returns (DeviceAffinity{}, false, nil) when
+// the device is rejected so the caller can try other candidates, and a non-nil
+// error only on fatal CEL evaluation failure.
+func (alloc *allocator) evaluateDeviceAffinity(r requestIndices, request requestData, device deviceWithID) (DeviceAffinity, bool, error) {
+	poolExtractors := device.pool.sharingAffinity
+	deviceAffinity := DeviceAffinity{
+		Request: request.requestName(), Device: device.id, Pool: poolExtractors.Key,
+		Digest: internal.ExtractorDigest(poolExtractors.Extractors), HasSharingAffinity: len(poolExtractors.Extractors) > 0,
+	}
+	deviceState := alloc.allocatedState.DeviceSharingAffinity[device.id]
+	if deviceState.Status == schedulerapi.AffinityStatusUnreconstructable {
+		alloc.recordAffinityRejection(device.id, deviceAffinity.Request, affinityRejectionUnreconstructable, nil)
+		return DeviceAffinity{}, false, nil
+	}
+	if !deviceAffinity.HasSharingAffinity {
+		return deviceAffinity, true, nil
+	}
+	key := requestAffinityKey{pool: poolExtractors.Key, requestIndices: r}
+	requestAffinity, found := alloc.requestAffinityCache[key]
+	if !found {
+		req := sharingaffinity.Request{Name: request.request.name()}
+		if request.parentRequest != nil {
+			req.ParentName = request.parentRequest.name()
+		}
+		claim := alloc.claimsToAllocate[r.claimIndex]
+		var err error
+		requestAffinity, err = alloc.celCache.SharingAffinityExtractor().ExtractRequestAffinity(alloc.ctx, poolExtractors, req, claim.Spec.Devices.Config)
+		if err != nil {
+			return DeviceAffinity{}, false, fmt.Errorf("sharing affinity extraction for claim %s request %q in pool %s/%s generation %d: %w", klog.KObj(claim), req.QualifiedName(), poolExtractors.Key.Driver, poolExtractors.Key.Name, poolExtractors.Key.Generation, err)
+		}
+		alloc.requestAffinityCache[key] = requestAffinity
+	}
+	if !requestAffinity.AllExtracted {
+		alloc.recordAffinityRejection(device.id, deviceAffinity.Request, affinityRejectionMissingExtractors, requestAffinity.MissingExtractors)
+		return DeviceAffinity{}, false, nil
+	}
+	if deviceState.Status == schedulerapi.AffinityStatusLocked && !maps.Equal(deviceState.LockedAffinity, requestAffinity.Values) {
+		alloc.recordAffinityRejection(device.id, deviceAffinity.Request, affinityRejectionMismatch, nil)
+		return DeviceAffinity{}, false, nil
+	}
+	if allocatingValues := alloc.allocatingAffinity[device.id]; allocatingValues != nil && !maps.Equal(allocatingValues, requestAffinity.Values) {
+		alloc.recordAffinityRejection(device.id, deviceAffinity.Request, affinityRejectionMismatch, nil)
+		return DeviceAffinity{}, false, nil
+	}
+	deviceAffinity.Values = requestAffinity.Values
+	return deviceAffinity, true, nil
+}
+
+type poolAffinityExtractors struct {
+	generation   int64
+	isIncomplete bool
+	isInvalid    bool
+	extractors   sharingaffinity.PoolExtractors
+}
+
+// buildPoolsAffinityExtractors computes the cluster-wide sharing affinity
+// extractor metadata and pre-compiles CEL extractors once per pool during NewAllocator.
+func buildPoolsAffinityExtractors(
+	ctx context.Context,
+	slices []*draapi.ResourceSlice,
+	affinityExtractor *sharingaffinity.Extractor,
+) map[PoolID]poolAffinityExtractors {
+	logger := klog.FromContext(ctx)
+	slicesByPool := make(map[PoolID][]*draapi.ResourceSlice)
+	for _, slice := range slices {
+		poolID := PoolID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name}
+		slicesByPool[poolID] = append(slicesByPool[poolID], slice)
+	}
+	pools := make(map[PoolID]poolAffinityExtractors, len(slicesByPool))
+	for poolID, poolSlices := range slicesByPool {
+		driver, poolName := poolID.Driver.String(), poolID.Pool.String()
+		view := internal.ComputePoolMetadataView(poolSlices, driver, poolName)
+		info := poolAffinityExtractors{generation: view.Generation}
+		if !view.Complete {
+			info.isIncomplete = true
+			pools[poolID] = info
+			continue
+		}
+		extractors := sharingaffinity.PoolExtractors{
+			Key:        sharingaffinity.PoolKey{Driver: driver, Name: poolName, Generation: view.Generation},
+			Extractors: view.Extractors,
+		}
+		names := sets.New[string]()
+		var validationErr error
+		for _, extractor := range view.Extractors {
+			if names.Has(extractor.Name) {
+				validationErr = fmt.Errorf("duplicate sharing affinity key %q", extractor.Name)
+				break
+			}
+			names.Insert(extractor.Name)
+		}
+		if validationErr == nil {
+			extractors, validationErr = affinityExtractor.CompilePoolExtractors(context.Background(), extractors)
+		}
+		if validationErr != nil {
+			info.isInvalid = true
+			logger.V(3).Info("Invalid sharing affinity pool", "driver", poolID.Driver, "pool", poolID.Pool, "generation", view.Generation, "err", validationErr)
+		} else {
+			info.extractors = extractors
+		}
+		pools[poolID] = info
+	}
+	return pools
 }

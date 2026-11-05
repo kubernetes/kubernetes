@@ -128,5 +128,10 @@ spec:
       countersKey:
         value: "0"
     name: nameValue
+  sharingAffinity:
+  - apiGroup: apiGroupValue
+    expression: expressionValue
+    kind: kindValue
+    name: nameValue
   skipNodeOperations:
   - skipNodeOperationsValue

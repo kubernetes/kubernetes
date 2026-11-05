@@ -19,9 +19,13 @@ package resourceslice
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	resourceapi "k8s.io/api/resource/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/dynamic-resource-allocation/cel/sharingaffinity"
 )
 
 // validateDriverResources identifies problems that cannot be caught by
@@ -58,6 +62,10 @@ func validatePool(driverName, name string, pool Pool) error {
 		}
 	}
 
+	if err := validatePoolSharingAffinity(name, pool); err != nil {
+		return err
+	}
+
 	devices := sets.New[string]()
 	for _, slice := range pool.Slices {
 		for _, device := range slice.Devices {
@@ -91,6 +99,121 @@ func validatePool(driverName, name string, pool Pool) error {
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// Per-slice field validation runs separately against the matched stored objects.
+// Pool validation uses the allocator's compilation environment and cost checks.
+func validatePoolSharingAffinity(poolName string, pool Pool) error {
+	var all []resourceapi.SharingAffinityExtractor
+	names := sets.New[string]()
+	for _, slice := range pool.Slices {
+		for _, extractor := range slice.SharingAffinity {
+			if names.Has(extractor.Name) {
+				return fmt.Errorf("pool %q: duplicate sharing affinity key %q", poolName, extractor.Name)
+			}
+			names.Insert(extractor.Name)
+		}
+		all = append(all, slice.SharingAffinity...)
+	}
+	if err := sharingaffinity.ValidateExpressions(all); err != nil {
+		return fmt.Errorf("pool %q: sharing affinity: %w", poolName, err)
+	}
+	return nil
+}
+
+// Ratcheting applies only to unchanged values stored on the ResourceSlice being updated.
+func validateSliceSharingAffinity(slice Slice, old *resourceapi.ResourceSlice) error {
+	if slice.SharingAffinity != nil && (slice.Devices != nil || slice.SharedCounters != nil) {
+		return fmt.Errorf("sharingAffinity cannot be combined with devices or sharedCounters in one slice")
+	}
+	var oldExtractors []resourceapi.SharingAffinityExtractor
+	if old != nil {
+		oldExtractors = old.Spec.SharingAffinity
+	}
+	if oldExtractors != nil && apiequality.Semantic.DeepEqual(slice.SharingAffinity, oldExtractors) {
+		return nil
+	}
+	if len(slice.SharingAffinity) > resourceapi.SharingAffinityMaxEntries {
+		return fmt.Errorf("sharing affinity entries %d exceeds %d", len(slice.SharingAffinity), resourceapi.SharingAffinityMaxEntries)
+	}
+	oldByName := make(map[string]*resourceapi.SharingAffinityExtractor, len(oldExtractors))
+	for i := range oldExtractors {
+		oldByName[oldExtractors[i].Name] = &oldExtractors[i]
+	}
+	for i, entry := range slice.SharingAffinity {
+		if err := validateSharingAffinityDeclaration(entry, oldByName[entry.Name]); err != nil {
+			return fmt.Errorf("sharing affinity #%d (%q): %w", i, entry.Name, err)
+		}
+	}
+	return nil
+}
+
+// validateSharingAffinityDeclaration validates new or changed fields without
+// compiling CEL. For ratcheting, old must be the same-name extractor from the
+// ResourceSlice being updated.
+func validateSharingAffinityDeclaration(entry resourceapi.SharingAffinityExtractor, old *resourceapi.SharingAffinityExtractor) error {
+	if old == nil {
+		if errs := validation.IsDNS1123Label(entry.Name); len(errs) > 0 {
+			return fmt.Errorf("invalid name: %s", strings.Join(errs, ", "))
+		}
+	}
+	if old == nil || old.APIGroup != entry.APIGroup {
+		if err := validateSharingAffinityAPIGroupMatcher(entry.APIGroup); err != nil {
+			return fmt.Errorf("invalid apiGroup: %w", err)
+		}
+	}
+	if old == nil || old.Kind != entry.Kind {
+		if err := validateSharingAffinityKindMatcher(entry.Kind); err != nil {
+			return fmt.Errorf("invalid kind: %w", err)
+		}
+	}
+	if old == nil || old.Expression != entry.Expression {
+		if entry.Expression == "" {
+			return fmt.Errorf("expression is required")
+		}
+		if len(entry.Expression) > resourceapi.SharingAffinityCELExpressionMaxLength {
+			return fmt.Errorf("expression length %d exceeds %d bytes", len(entry.Expression), resourceapi.SharingAffinityCELExpressionMaxLength)
+		}
+	}
+	return nil
+}
+
+// validateSharingAffinityAPIGroupMatcher validates an API group matcher, allowing
+// "*" as a wildcard or a lowercase DNS subdomain.
+func validateSharingAffinityAPIGroupMatcher(apiGroup string) error {
+	if apiGroup == "" {
+		return fmt.Errorf("value is required")
+	}
+	if apiGroup == "*" {
+		return nil
+	}
+	const maxLength = validation.DNS1123SubdomainMaxLength
+	if utf8.RuneCountInString(apiGroup) > maxLength {
+		return fmt.Errorf("value exceeds %d characters", maxLength)
+	}
+	if errs := validation.IsDNS1123Subdomain(apiGroup); len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, ", "))
+	}
+	return nil
+}
+
+// validateSharingAffinityKindMatcher validates a kind matcher, allowing "*" as a
+// wildcard or a DNS1035 label with uppercase letters allowed.
+func validateSharingAffinityKindMatcher(kind string) error {
+	if kind == "" {
+		return fmt.Errorf("value is required")
+	}
+	if kind == "*" {
+		return nil
+	}
+	const maxLength = validation.DNS1035LabelMaxLength
+	if utf8.RuneCountInString(kind) > maxLength {
+		return fmt.Errorf("value exceeds %d characters", maxLength)
+	}
+	if errs := validation.IsDNS1035Label(strings.ToLower(kind)); len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, ", "))
 	}
 	return nil
 }

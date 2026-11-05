@@ -96,7 +96,135 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 		timeAddedEarlierSubSecond = metav1.Time{Time: timeAddedEarlier.Add(100 * time.Millisecond)}
 	)
 
-	testCases := map[string]struct {
+	affinity := sharingAffinityEntry("subnet", `"blue"`)
+	invalidAffinity := affinity
+	invalidAffinity.APIGroup = ""
+	affinitySlice := MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("10").
+		Driver(driverName).AllNodes(true).SharingAffinity(affinity).
+		Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj()
+	affinitySlice.Labels = map[string]string{"preserved": "yes"}
+	emptyAffinitySlice := affinitySlice.DeepCopy()
+	emptyAffinitySlice.Spec.SharingAffinity = nil
+	clearedAffinitySlice := emptyAffinitySlice.DeepCopy()
+	clearedAffinitySlice.ResourceVersion = "11"
+	createdAffinitySlice := affinitySlice.DeepCopy()
+	createdAffinitySlice.ObjectMeta = MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
+		ResourceVersion("1").AppOwnerReferences(ownerName).Obj().ObjectMeta
+	createdEmptyAffinitySlice := createdAffinitySlice.DeepCopy()
+	createdEmptyAffinitySlice.Spec.SharingAffinity = nil
+
+	mixedPool := poolWithSharingAffinities(affinity, sharingAffinityEntry("zone", `"west"`))
+	mixedPool.Slices = append(mixedPool.Slices,
+		Slice{Devices: []resourceapi.Device{{Name: "device"}}},
+		Slice{SharedCounters: []resourceapi.CounterSet{{
+			Name: "counter", Counters: map[string]resourceapi.Counter{"memory": {Value: resource.MustParse("1Gi")}},
+		}}},
+	)
+	oneChangedMixedPool := *mixedPool.DeepCopy()
+	oneChangedMixedPool.Slices[0].SharingAffinity[0].Expression = `"red"`
+	twoChangedMixedPool := *oneChangedMixedPool.DeepCopy()
+	twoChangedMixedPool.Slices[1].SharingAffinity[0].Expression = `"red"`
+	var mixedInitialObjects []runtime.Object
+	var unchangedMixedSlices, oneChangedMixedSlices, twoChangedMixedSlices, createdMixedSlices []resourceapi.ResourceSlice
+	for i, slice := range mixedPool.Slices {
+		generateName := encodeIndex(i, resourceSliceIndexMinLength) + "-" + driverName + "-"
+		stored := MakeResourceSlice().Name(generateName + "stored").UID(generateName + "stored").ResourceVersion("10").
+			Driver(driverName).AllNodes(true).Devices(slice.Devices).SharedCounters(slice.SharedCounters).SharingAffinity(slice.SharingAffinity...).
+			Pool(resourceapi.ResourcePool{Name: poolName, Generation: 7, ResourceSliceCount: int64(len(mixedPool.Slices))}).Obj()
+		stored.Labels = map[string]string{"preserved": "yes"}
+		mixedInitialObjects = append(mixedInitialObjects, stored)
+		unchangedMixedSlices = append(unchangedMixedSlices, *stored.DeepCopy())
+
+		oneChanged := stored.DeepCopy()
+		oneChanged.Spec.SharingAffinity = oneChangedMixedPool.Slices[i].SharingAffinity
+		if i == 0 {
+			oneChanged.ResourceVersion = "11"
+		}
+		oneChangedMixedSlices = append(oneChangedMixedSlices, *oneChanged)
+
+		twoChanged := stored.DeepCopy()
+		twoChanged.Spec.SharingAffinity = twoChangedMixedPool.Slices[i].SharingAffinity
+		twoChanged.Spec.Pool.Generation = 8
+		twoChanged.ResourceVersion = "11"
+		twoChangedMixedSlices = append(twoChangedMixedSlices, *twoChanged)
+
+		created := stored.DeepCopy()
+		created.Spec.Pool.Generation = 1
+		createdGenerateName := generateName + ownerName + "-"
+		created.ObjectMeta = MakeResourceSlice().Name(createdGenerateName + strconv.Itoa(i)).GenerateName(createdGenerateName).
+			ResourceVersion("1").AppOwnerReferences(ownerName).Obj().ObjectMeta
+		createdMixedSlices = append(createdMixedSlices, *created)
+	}
+
+	duplicateAffinityPool := poolWithSharingAffinities(affinity, affinity)
+	invalidCELPool := poolWithSharingAffinities(sharingAffinityEntry("subnet", "parameters["))
+	for _, pool := range []*Pool{&duplicateAffinityPool, &invalidCELPool} {
+		pool.Slices = append([]Slice{{Devices: []resourceapi.Device{{Name: "prefix"}}}}, pool.Slices...)
+		pool.Slices = append(pool.Slices, Slice{Devices: []resourceapi.Device{{Name: "suffix"}}})
+	}
+	// Reconciliation would otherwise update index 0, create missing slices,
+	// and delete the obsolete object.
+	oldDeviceSlice := emptyAffinitySlice.DeepCopy()
+	oldDeviceSlice.Spec.Devices = []resourceapi.Device{{Name: "old"}}
+	obsoleteDeviceSlice := oldDeviceSlice.DeepCopy()
+	obsoleteDeviceSlice.Name = "obsolete-with-invalid-prefix"
+
+	invalidDeclarationPool := poolWithSharingAffinities(invalidAffinity)
+	invalidDeclarationPool.Slices = append([]Slice{{Devices: []resourceapi.Device{{Name: "prefix"}}}}, invalidDeclarationPool.Slices...)
+	invalidDeclarationPool.Slices = append(invalidDeclarationPool.Slices, Slice{Devices: []resourceapi.Device{{Name: "suffix"}}})
+	invalidDeclarationPool.Generation = 2
+	var validDeclarationObjects, invalidDeclarationObjects []runtime.Object
+	var validDeclarationSlices, updatedInvalidDeclarationSlices []resourceapi.ResourceSlice
+	for i, slice := range invalidDeclarationPool.Slices {
+		name := encodeIndex(i, resourceSliceIndexMinLength) + "-" + driverName + "-stored"
+		stored := MakeResourceSlice().Name(name).UID(name).ResourceVersion("10").
+			Driver(driverName).AllNodes(true).Devices(slice.Devices).SharingAffinity(slice.SharingAffinity...).
+			Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: int64(len(invalidDeclarationPool.Slices))}).Obj().DeepCopy()
+		invalidDeclarationObjects = append(invalidDeclarationObjects, stored)
+		updated := stored.DeepCopy()
+		updated.Spec.Pool.Generation = 2
+		updated.ResourceVersion = "11"
+		updatedInvalidDeclarationSlices = append(updatedInvalidDeclarationSlices, *updated)
+
+		valid := stored.DeepCopy()
+		if i == 1 {
+			valid.Spec.SharingAffinity[0].APIGroup = "*"
+		}
+		validDeclarationObjects = append(validDeclarationObjects, valid)
+		validDeclarationSlices = append(validDeclarationSlices, *valid.DeepCopy())
+	}
+	obsoleteDeclarationSlice := invalidDeclarationObjects[0].(*resourceapi.ResourceSlice).DeepCopy()
+	obsoleteDeclarationSlice.Name = "obsolete-with-invalid-prefix"
+	invalidDeclarationObjects = append(invalidDeclarationObjects, obsoleteDeclarationSlice)
+	validDeclarationObjects = append(validDeclarationObjects, obsoleteDeclarationSlice.DeepCopy())
+	validDeclarationSlices = append(validDeclarationSlices, *obsoleteDeclarationSlice.DeepCopy())
+
+	oversizedAffinity := sharingAffinityEntry("subnet", `"`+strings.Repeat("a", resourceapi.SharingAffinityCELExpressionMaxLength-1)+`"`)
+	oversizedAffinityPool := poolWithSharingAffinities(oversizedAffinity)
+	oversizedAffinityPool.Slices = append(oversizedAffinityPool.Slices, Slice{Devices: []resourceapi.Device{{Name: "device"}}})
+	reorderedOversizedAffinityPool := *oversizedAffinityPool.DeepCopy()
+	reorderedOversizedAffinityPool.Slices[0], reorderedOversizedAffinityPool.Slices[1] = reorderedOversizedAffinityPool.Slices[1], reorderedOversizedAffinityPool.Slices[0]
+	oversizedAffinitySlice := affinitySlice.DeepCopy()
+	oversizedAffinitySlice.Spec.Pool.ResourceSliceCount = 2
+	oversizedAffinitySlice.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{oversizedAffinity}
+	obsoleteOversizedAffinitySlice := oversizedAffinitySlice.DeepCopy()
+	obsoleteOversizedAffinitySlice.Name = "obsolete-with-invalid-prefix"
+	otherPoolOversizedAffinitySlice := oversizedAffinitySlice.DeepCopy()
+	otherPoolOversizedAffinitySlice.Spec.Pool.Name = "other"
+	deviceSlice := MakeResourceSlice().Name(resourceSlice2).UID(resourceSlice2).ResourceVersion("10").
+		Driver(driverName).AllNodes(true).Devices([]resourceapi.Device{{Name: "device"}}).
+		Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).Obj()
+	newerDeviceSlice := deviceSlice.DeepCopy()
+	newerDeviceSlice.Spec.Pool.Generation = 2
+
+	storedInvalidOtherSlice := affinitySlice.DeepCopy()
+	storedInvalidOtherSlice.Name += "-other"
+	storedInvalidOtherSlice.Spec.Pool.Name = "other"
+	storedInvalidOtherSlice.Spec.SharingAffinity = []resourceapi.SharingAffinityExtractor{invalidAffinity}
+	obsoleteInvalidOtherSlice := storedInvalidOtherSlice.DeepCopy()
+	obsoleteInvalidOtherSlice.Name = "obsolete-with-invalid-prefix"
+
+	type testCase struct {
 		features  features
 		syncDelay *time.Duration
 		// nodeUID is empty if not a node-local.
@@ -105,7 +233,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 		noOwner bool
 		// reconcilePoolWithName limits reconciliation to a single pool (issue #137011).
 		// When set, NodeName is not set on slices even for Node owner.
-		reconcilePoolWithName string
+		reconcilePoolWithName  string
+		validateQualifiedNames *bool
 		// initialObjects is a list of initial resource slices to be used in the test.
 		initialObjects         []runtime.Object
 		initialOtherObjects    []runtime.Object
@@ -113,7 +242,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 		expectedResourceSlices []resourceapi.ResourceSlice
 		expectedStats          Stats
 		expectedErrors         []string
-	}{
+	}
+	testCases := map[string]testCase{
 		"create-slice": {
 			nodeUID:        nodeUID,
 			initialObjects: []runtime.Object{},
@@ -1751,7 +1881,151 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 			},
 			expectedErrors: []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRANodeAllocatableResources`},
 		},
+		"sharing-affinity/unchanged-sharing-affinity-does-not-update-slices": {
+			initialObjects:         mixedInitialObjects,
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: mixedPool}},
+			expectedResourceSlices: unchangedMixedSlices,
+		},
+		"sharing-affinity/changed-sharing-affinity-updates-only-its-slice": {
+			initialObjects:         mixedInitialObjects,
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: oneChangedMixedPool}},
+			expectedResourceSlices: oneChangedMixedSlices,
+			expectedStats:          Stats{NumUpdates: 1},
+		},
+		"sharing-affinity/changes-in-two-affinity-slices-bump-pool-generation": {
+			initialObjects:         mixedInitialObjects,
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: twoChangedMixedPool}},
+			expectedResourceSlices: twoChangedMixedSlices,
+			expectedStats:          Stats{NumUpdates: 4},
+		},
+		"sharing-affinity/create-affinity-device-and-counter-slices": {
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: mixedPool}},
+			expectedResourceSlices: createdMixedSlices,
+			expectedStats:          Stats{NumCreates: 4},
+		},
+		"sharing-affinity/report-sharing-affinity-dropped-during-create": {
+			features: features{disableSharingAffinity: true},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				poolName: poolWithSharingAffinities(affinity),
+			}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*createdEmptyAffinitySlice},
+			expectedStats:          Stats{NumCreates: 1},
+			expectedErrors:         []string{`create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRASharingAffinity`},
+		},
+		"sharing-affinity/report-sharing-affinity-dropped-during-update": {
+			features:       features{disableSharingAffinity: true},
+			initialObjects: []runtime.Object{emptyAffinitySlice},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				poolName: poolWithSharingAffinities(affinity),
+			}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*clearedAffinitySlice.DeepCopy()},
+			expectedStats:          Stats{NumUpdates: 1},
+			expectedErrors:         []string{`update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRASharingAffinity`},
+		},
+		"sharing-affinity/reject-invalid-pool-before-any-writes/duplicate-extractor-names": {
+			initialObjects:         []runtime.Object{oldDeviceSlice, obsoleteDeviceSlice},
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: duplicateAffinityPool}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*oldDeviceSlice.DeepCopy(), *obsoleteDeviceSlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "pool": duplicate sharing affinity key "subnet"`},
+		},
+		"sharing-affinity/reject-invalid-pool-before-any-writes/invalid-cel-expression": {
+			initialObjects:         []runtime.Object{oldDeviceSlice, obsoleteDeviceSlice},
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: invalidCELPool}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*oldDeviceSlice.DeepCopy(), *obsoleteDeviceSlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "pool": sharing affinity: invalid sharing affinity definition, extractor "subnet": CEL expression could not be compiled`},
+		},
+		"sharing-affinity/reject-invalid-declaration-on-create": {
+			validateQualifiedNames: ptr.To(false),
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: invalidDeclarationPool}},
+			expectedErrors:         []string{`pool validation failed: pool "pool": slice #1: sharing affinity #0 ("subnet"): invalid apiGroup: value is required`},
+		},
+		"sharing-affinity/reject-invalid-declaration-on-update": {
+			validateQualifiedNames: ptr.To(false),
+			initialObjects:         validDeclarationObjects,
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: invalidDeclarationPool}},
+			expectedResourceSlices: validDeclarationSlices,
+			expectedErrors:         []string{`pool validation failed: pool "pool": slice #1: sharing affinity #0 ("subnet"): invalid apiGroup: value is required`},
+		},
+		"sharing-affinity/allow-unchanged-invalid-declaration-on-update": {
+			validateQualifiedNames: ptr.To(false),
+			initialObjects:         invalidDeclarationObjects,
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: invalidDeclarationPool}},
+			expectedResourceSlices: updatedInvalidDeclarationSlices,
+			expectedStats:          Stats{NumUpdates: 3, NumDeletes: 1},
+		},
+		"sharing-affinity/reject-ratcheting-from-another-slice": {
+			initialObjects:         []runtime.Object{oversizedAffinitySlice, deviceSlice},
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: reorderedOversizedAffinityPool}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*oversizedAffinitySlice.DeepCopy(), *deviceSlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "pool": slice #1: sharing affinity #0 ("subnet"): expression length 10241 exceeds 10240 bytes`},
+		},
+		"sharing-affinity/reject-ratcheting-from-slice-with-invalid-name": {
+			initialObjects:         []runtime.Object{obsoleteOversizedAffinitySlice, deviceSlice},
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: oversizedAffinityPool}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*obsoleteOversizedAffinitySlice.DeepCopy(), *deviceSlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "pool": slice #0: sharing affinity #0 ("subnet"): expression length 10241 exceeds 10240 bytes`},
+		},
+		"sharing-affinity/reject-ratcheting-from-older-generation": {
+			initialObjects:         []runtime.Object{oversizedAffinitySlice, newerDeviceSlice},
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: oversizedAffinityPool}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*oversizedAffinitySlice.DeepCopy(), *newerDeviceSlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "pool": slice #0: sharing affinity #0 ("subnet"): expression length 10241 exceeds 10240 bytes`},
+		},
+		"sharing-affinity/reject-ratcheting-from-another-pool": {
+			initialObjects:         []runtime.Object{otherPoolOversizedAffinitySlice, deviceSlice},
+			inputDriverResources:   &DriverResources{Pools: map[string]Pool{poolName: oversizedAffinityPool}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*otherPoolOversizedAffinitySlice.DeepCopy(), *deviceSlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "pool": slice #0: sharing affinity #0 ("subnet"): expression length 10241 exceeds 10240 bytes`},
+		},
+		"sharing-affinity/clear-sharing-affinity-on-existing-slice": {
+			initialObjects: []runtime.Object{affinitySlice},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				poolName: {AllNodes: true, Slices: []Slice{{}}},
+			}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*clearedAffinitySlice.DeepCopy()},
+			expectedStats:          Stats{NumUpdates: 1},
+		},
+		"sharing-affinity/invalid-other-pool-blocks-current-pool-publication": {
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				poolName: poolWithSharingAffinities(affinity), "other": poolWithSharingAffinities(invalidAffinity),
+			}},
+			expectedErrors: []string{`pool validation failed: pool "other": slice #0: sharing affinity #0 ("subnet"): invalid apiGroup: value is required`},
+		},
+		"sharing-affinity/unchanged-invalid-other-pool-allows-current-pool-publication": {
+			initialObjects: []runtime.Object{storedInvalidOtherSlice},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				poolName: poolWithSharingAffinities(affinity), "other": poolWithSharingAffinities(invalidAffinity),
+			}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*storedInvalidOtherSlice.DeepCopy(), *createdAffinitySlice.DeepCopy()},
+			expectedStats:          Stats{NumCreates: 1},
+		},
+		"sharing-affinity/obsolete-other-pool-slice-does-not-allow-ratcheting": {
+			initialObjects: []runtime.Object{obsoleteInvalidOtherSlice},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				poolName: poolWithSharingAffinities(affinity), "other": poolWithSharingAffinities(invalidAffinity),
+			}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*obsoleteInvalidOtherSlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "other": slice #0: sharing affinity #0 ("subnet"): invalid apiGroup: value is required`},
+		},
+		"sharing-affinity/scoped-controller-ignores-invalid-other-pool": {
+			reconcilePoolWithName: poolName,
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				poolName: poolWithSharingAffinities(affinity), "other": poolWithSharingAffinities(invalidAffinity),
+			}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*createdAffinitySlice.DeepCopy()},
+			expectedStats:          Stats{NumCreates: 1},
+			expectedErrors:         []string{`pool validation failed: found pool "other", but ReconcilePoolWithName only allows pool "pool"`},
+		},
+		"sharing-affinity/invalid-other-pool-blocks-current-pool-deletion": {
+			initialObjects: []runtime.Object{affinitySlice},
+			inputDriverResources: &DriverResources{Pools: map[string]Pool{
+				"other": poolWithSharingAffinities(invalidAffinity),
+			}},
+			expectedResourceSlices: []resourceapi.ResourceSlice{*affinitySlice.DeepCopy()},
+			expectedErrors:         []string{`pool validation failed: pool "other": slice #0: sharing affinity #0 ("subnet"): invalid apiGroup: value is required`},
+		},
 	}
+
 	for name, test := range testCases {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			inputObjects := make([]runtime.Object, 0, len(test.initialObjects)+len(test.initialOtherObjects))
@@ -1794,7 +2068,8 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 				ErrorHandler: func(ctx context.Context, err error, msg string) {
 					controllerErrors = append(controllerErrors, fmt.Errorf("%s: %w", msg, err))
 				},
-				ReconcilePoolWithName: test.reconcilePoolWithName,
+				ReconcilePoolWithName:  test.reconcilePoolWithName,
+				ValidateQualifiedNames: test.validateQualifiedNames,
 			})
 			defer ctrl.Stop()
 			tCtx.ExpectNoError(err, "unexpected controller creation error")
@@ -1813,6 +2088,13 @@ func testControllerSyncPool(tCtx ktesting.TContext) {
 			sortResourceSlices(resourceSlices.Items)
 			tCtx.Assert(resourceSlices.Items).To(g.HaveExactElements(test.expectedResourceSlices))
 			tCtx.Assert(ctrl.GetStats()).To(g.Equal(test.expectedStats))
+			if test.expectedStats == (Stats{}) {
+				for _, action := range kubeClient.Actions() {
+					if action.Matches("create", "resourceslices") || action.Matches("update", "resourceslices") || action.Matches("delete", "resourceslices") {
+						tCtx.Errorf("unexpected %s on ResourceSlices", action.GetVerb())
+					}
+				}
+			}
 
 			// The informer might have added a work item before or after ctrl.run returned,
 			// therefore we cannot compare the `Later` field. It's either defaultMutationCacheTTL
@@ -2194,6 +2476,7 @@ type features struct {
 	disableOptionalNodeOperations   bool
 	disableCompatibilityGroups      bool
 	disableNodeAllocatableResources bool
+	disableSharingAffinity          bool
 }
 
 func createTestClient(features features, timeAdded metav1.Time, objects ...runtime.Object) *fake.Clientset {
@@ -2249,6 +2532,9 @@ func createResourceSliceUpdateReactor(features features, timeAdded metav1.Time) 
 }
 
 func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSlice) {
+	if features.disableSharingAffinity {
+		resourceslice.Spec.SharingAffinity = nil
+	}
 	if features.disableDeviceTaints {
 		for i := range resourceslice.Spec.Devices {
 			resourceslice.Spec.Devices[i].Taints = nil
@@ -2430,6 +2716,12 @@ func (r *ResourceSliceWrapper) SharedCounters(counters []resourceapi.CounterSet)
 	return r
 }
 
+// SharingAffinity sets ResourceSlice.Spec.SharingAffinity.
+func (r *ResourceSliceWrapper) SharingAffinity(entries ...resourceapi.SharingAffinityExtractor) *ResourceSliceWrapper {
+	r.Spec.SharingAffinity = entries
+	return r
+}
+
 // SkipNodeOperations sets ResourceSlice.Spec.SkipNodeOperations.
 func (r *ResourceSliceWrapper) SkipNodeOperations(skip ...resourceapi.SkipNodeOperation) *ResourceSliceWrapper {
 	r.Spec.SkipNodeOperations = skip
@@ -2590,6 +2882,58 @@ func deepCopyDevices(devices []resourceapi.Device) []resourceapi.Device {
 		out[i] = *devices[i].DeepCopy()
 	}
 	return out
+}
+
+func TestClassifyPoolSlices(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	old := []*resourceapi.ResourceSlice{
+		MakeResourceSlice().Name("00000-driver-stored").Pool(resourceapi.ResourcePool{Generation: 3}).Obj(),
+		MakeResourceSlice().Name("00001-driver-stored").Pool(resourceapi.ResourcePool{Generation: 3}).Obj(),
+	}
+	duplicate := old[0].DeepCopy()
+	duplicate.Name += "-duplicate"
+	invalid := old[0].DeepCopy()
+	invalid.Name = "invalid"
+	invalidHighest := invalid.DeepCopy()
+	invalidHighest.Spec.Pool.Generation = 4
+	lower := old[0].DeepCopy()
+	lower.Spec.Pool.Generation = 2
+	for _, tc := range []struct {
+		name       string
+		slices     []*resourceapi.ResourceSlice
+		desired    int
+		generation int64
+		current    map[int]*resourceapi.ResourceSlice
+		obsolete   []*resourceapi.ResourceSlice
+	}{
+		{"no-existing-slices-produce-no-matches", nil, 2, 0, map[int]*resourceapi.ResourceSlice{}, nil},
+		{"no-desired-slices-makes-all-existing-slices-obsolete", old, 0, 3, map[int]*resourceapi.ResourceSlice{}, old},
+		{"match-existing-slices-by-name-index", old, 2, 3, map[int]*resourceapi.ResourceSlice{0: old[0], 1: old[1]}, nil},
+		{"duplicate-index-keeps-first-slice", []*resourceapi.ResourceSlice{old[0], duplicate}, 2, 3, map[int]*resourceapi.ResourceSlice{0: old[0]}, []*resourceapi.ResourceSlice{duplicate}},
+		{"duplicate-index-keeps-first-slice-after-reordering", []*resourceapi.ResourceSlice{duplicate, old[0]}, 2, 3, map[int]*resourceapi.ResourceSlice{0: duplicate}, []*resourceapi.ResourceSlice{old[0]}},
+		{"invalid-name-makes-slice-obsolete", []*resourceapi.ResourceSlice{invalid}, 2, 3, map[int]*resourceapi.ResourceSlice{}, []*resourceapi.ResourceSlice{invalid}},
+		{"highest-generation-with-invalid-name-does-not-reuse-older-slices", []*resourceapi.ResourceSlice{old[0], invalidHighest}, 2, 4, map[int]*resourceapi.ResourceSlice{}, []*resourceapi.ResourceSlice{old[0], invalidHighest}},
+		{"older-generation-makes-slice-obsolete", []*resourceapi.ResourceSlice{lower, old[1]}, 2, 3, map[int]*resourceapi.ResourceSlice{1: old[1]}, []*resourceapi.ResourceSlice{lower}},
+		{"index-outside-desired-range-makes-slice-obsolete", old, 1, 3, map[int]*resourceapi.ResourceSlice{0: old[0]}, []*resourceapi.ResourceSlice{old[1]}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := classifyPoolSlices(logger, tc.slices, tc.desired)
+			if got.generation != tc.generation {
+				t.Errorf("generation = %d, want %d", got.generation, tc.generation)
+			}
+			if diff := cmp.Diff(tc.current, got.current); diff != "" {
+				t.Errorf("matches (-want,+got): %s", diff)
+			}
+			if len(got.obsolete) != len(tc.obsolete) {
+				t.Fatalf("obsolete count = %d, want %d", len(got.obsolete), len(tc.obsolete))
+			}
+			for i := range tc.obsolete {
+				if got.obsolete[i] != tc.obsolete[i] {
+					t.Errorf("obsolete[%d] = %s, want %s", i, got.obsolete[i].Name, tc.obsolete[i].Name)
+				}
+			}
+		})
+	}
 }
 
 func TestCopyTaintTimeAdded(t *testing.T) { testCopyTaintTimeAdded(ktesting.Init(t)) }

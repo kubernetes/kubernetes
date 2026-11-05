@@ -33,6 +33,15 @@ type AllocatedState = schedulerapi.AllocatedState
 type ConsumedCapacity = schedulerapi.ConsumedCapacity
 type ConsumedCapacityCollection = schedulerapi.ConsumedCapacityCollection
 type DeviceConsumedCapacity = schedulerapi.DeviceConsumedCapacity
+type AffinityStatus = schedulerapi.AffinityStatus
+type DeviceAffinityState = schedulerapi.DeviceAffinityState
+type DeviceAffinityStateCollection = schedulerapi.DeviceAffinityStateCollection
+
+const (
+	AffinityStatusClean             = schedulerapi.AffinityStatusClean
+	AffinityStatusLocked            = schedulerapi.AffinityStatusLocked
+	AffinityStatusUnreconstructable = schedulerapi.AffinityStatusUnreconstructable
+)
 
 // Wrapper functions that delegate to the schedulerapi package
 func MakeDeviceID(driver, pool, device string) DeviceID {

@@ -3901,6 +3901,189 @@ func Validate_ResourceSliceSpec(
 		errs = append(errs, fn(fldPath.Child("skipNodeOperations"), obj.SkipNodeOperations, oldVal, oldObj != nil)...)
 	}
 
+	{ // field resourcev1.ResourceSliceSpec.SharingAffinity
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []resourcev1.SharingAffinityExtractor,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,
+				func(a *resourcev1.SharingAffinityExtractor, b *resourcev1.SharingAffinityExtractor) bool {
+					return a.Name == b.Name
+				}).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a *resourcev1.SharingAffinityExtractor, b *resourcev1.SharingAffinityExtractor) bool {
+					return a.Name == b.Name
+				}, validate.DirectEqual, Validate_SharingAffinityExtractor); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.ResourceSliceSpec) []resourcev1.SharingAffinityExtractor {
+				return oldObj.SharingAffinity
+			})
+		errs = append(errs, fn(fldPath.Child("sharingAffinity"), obj.SharingAffinity, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_SharingAffinityExtractor validates an instance of SharingAffinityExtractor according
+// to declarative validation rules in the API schema.
+func Validate_SharingAffinityExtractor(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *resourcev1.SharingAffinityExtractor) (errs field.ErrorList) {
+
+	{ // field resourcev1.SharingAffinityExtractor.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.SharingAffinityExtractor) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1.SharingAffinityExtractor.APIGroup
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 253).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.SharingAffinityExtractor) *string {
+				return &oldObj.APIGroup
+			})
+		errs = append(errs, fn(fldPath.Child("apiGroup"), &obj.APIGroup, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1.SharingAffinityExtractor.Kind
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.SharingAffinityExtractor) *string {
+				return &oldObj.Kind
+			})
+		errs = append(errs, fn(fldPath.Child("kind"), &obj.Kind, oldVal, oldObj != nil)...)
+	}
+
+	{ // field resourcev1.SharingAffinityExtractor.Expression
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 10240).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *resourcev1.SharingAffinityExtractor) *string {
+				return &oldObj.Expression
+			})
+		errs = append(errs, fn(fldPath.Child("expression"), &obj.Expression, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
