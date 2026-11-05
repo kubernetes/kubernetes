@@ -334,9 +334,17 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	if previousCondition == nil {
 		m.observePendingResizeCount()
 		return true
-	} else {
-		return previousCondition.Reason != reason || previousCondition.ObservedGeneration != observedGeneration
 	}
+	reasonChanged := previousCondition.Reason != reason
+	if reasonChanged {
+		// The reason changed, so the gauge must be refreshed to move the count from the old label to the new one.
+		m.observePendingResizeCount()
+		// Record how long the pod spent Deferred before transitioning to Infeasible.
+		if previousCondition.Reason == v1.PodReasonDeferred && reason == v1.PodReasonInfeasible {
+			m.observeDeferredResizeDuration(podUID, previousCondition, metrics.DeferredResizeResolutionInfeasible)
+		}
+	}
+	return reasonChanged || previousCondition.ObservedGeneration != observedGeneration
 }
 
 // This function does not update observedGeneration if the condition already exists, nor does
