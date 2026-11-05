@@ -107,15 +107,20 @@ type stateData struct {
 	// and PreBind must patch the field: with the entries of this attempt, or by clearing it.
 	staleExtraNodeAllocatableResources bool
 
-	// preemption holds the PreFilter snapshot used to simulate pod removal
-	// during preemption (KEP-5690). Nil unless DRAPreemption is enabled and
-	// the pod has claims.
+	// preemption holds the cycle-wide DRA preemption state (KEP-5690),
+	// including the PreFilter snapshot and cached Filter results. Nil unless
+	// DRAPreemption is enabled and the pod has claims.
 	preemption *preemptionData
 
 	// preBindSucceeded records that PreBind succeeded when DRAPreemption is
 	// enabled. When true, Unreserve leaves claims allocated because a failed
 	// Bind call may still have bound the pod on the API server.
 	preBindSucceeded bool
+
+	// claimBeingAllocated records that PreFilter rejected the pod because
+	// another pod is allocating one of its claims when DRAPreemption is
+	// enabled. PostFilter uses it to skip DefaultPreemption.
+	claimBeingAllocated bool
 
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
@@ -342,8 +347,8 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		})
 	}
 	if pl.fts.EnableDRAPreemption {
-		// Wake nominated preemptors once preempted pods on their node are deleted;
-		// see isSchedulableAfterAssignedPodDeleted.
+		// Wake nominated preemptors on victim deletion and pods waiting on
+		// forgotten assumed pods; see isSchedulableAfterAssignedPodDeleted.
 		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted})
 	}
 
@@ -764,6 +769,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			// to finish, see inFlightAllocations
 			// documentation for details.
 			if pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID) != nil {
+				if pl.fts.EnableDRAPreemption {
+					s.claimBeingAllocated = true
+				}
 				return nil, statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("resource claim %s is in the process of being allocated", klog.KObj(claim)))
 			}
 
@@ -1046,6 +1054,12 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return nil
 	}
 
+	var sim *preemptionSimulationState
+	var holds *nodeHolds
+	if state.preemption != nil {
+		sim = getPreemptionSimulationState(cs)
+		holds = pl.holdsOnNode(sim, node.Name)
+	}
 	var unavailableClaims []int
 	numDeallocating := 0
 	for index, claim := range state.claims.all() {
@@ -1113,6 +1127,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	var allocations []resourceapi.AllocationResult
 	var extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
+	var simulated *simulatedResult
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -1160,14 +1175,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			claimsToAllocate = append(claimsToAllocate, claim)
 			freshPositions = append(freshPositions, position)
 		}
-		// In a preemption simulation, RemovePod may have released victim
-		// claims on this node in cs, so build or reuse an allocator reflecting
-		// that state.
-		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, getPreemptionSimulationState(cs), node.Name)
-		if err != nil {
-			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
-		}
-		allocationResult, err := allocator.Allocate(allocCtx, node, claimsToAllocate)
+		// Allocate against cs's simulated victim releases and device holds,
+		// reusing pass 1's cached result when holds is nil so Reserve keeps it.
+		allocationResult, allocatedState, err := pl.allocate(allocCtx, state, sim, holds, node, claimsToAllocate)
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
@@ -1212,6 +1222,13 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			return statusUnschedulableAndUnresolvable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 		}
 
+		if sim != nil {
+			simulated = &simulatedResult{
+				allocationResults: allocationResult,
+				heldClaims:        newHeldClaims(claimsToAllocate, allocationResult, extendedResourceClaim, nodeExtendedResourceClaim),
+			}
+		}
+
 		// Reserve and Score consume these results by claim position, so they
 		// must be stored in claim order. Grouping fresh and pending results
 		// instead would assign them to the wrong claims when the two kinds
@@ -1232,6 +1249,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		if status != nil {
 			return status
 		}
+	}
+
+	// Only record results when Filter succeeds on this node.
+	if simulated != nil && len(unavailableClaims) == 0 {
+		state.preemption.simulatedResults.store(sim, node.Name, simulated)
 	}
 
 	// Store information in state while holding the mutex.
@@ -1291,6 +1313,14 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 	state, err := getStateData(cs)
 	if err != nil {
 		return nil, statusError(logger, err)
+	}
+	if state.claimBeingAllocated {
+		// Return UnschedulableAndUnresolvable to skip DefaultPreemption.
+		// Preemption cannot help while another pod is allocating the claim,
+		// and DefaultPreemption would clear any existing nomination, dropping
+		// its hold and PodEligibleToPreempt gating. The claim update or the
+		// other pod's deletion will requeue this pod.
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "ResourceClaim is being allocated for another pod")
 	}
 	// If a Pod doesn't have any resource claims attached to it, there is no need for further processing.
 	// Thus we provide a fast path for this case to avoid unnecessary computations.

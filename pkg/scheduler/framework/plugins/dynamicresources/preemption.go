@@ -21,6 +21,7 @@ import (
 	"iter"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,21 +40,22 @@ import (
 
 // This file implements PreFilterExtensions for DRA preemption (KEP-5690,
 // gated by DRAPreemption), simulating device release when candidate victims
-// are removed without mutating the shared DRAManager.
+// are removed and applying device holds for nominated pods (see holds.go)
+// without mutating the shared DRAManager.
 //
 // DefaultPreemption simulates preemption (DryRunPreemption) on a clone of
-// CycleState per candidate node. Read-only data from PreFilter lives on the
-// shared stateData.preemption, while per-clone changes from RemovePod and
-// AddPod live in a separate preemptionSimulationState CycleState entry that
-// Clone copies.
+// CycleState per candidate node. The PreFilter inputs and the cached Filter
+// results live in stateData.preemption, which all clones share. Per-clone
+// changes from RemovePod and AddPod live in a separate
+// preemptionSimulationState CycleState entry that Clone copies.
 
 var _ fwk.PreFilterExtensions = &DynamicResources{}
 
 const preemptionSimulationStateKey fwk.StateKey = Name + "/simulation"
 
-// preemptionData holds the read-only PreFilter inputs shared across the
-// CycleState clones of preemption simulations. Only slices mutates after
-// PreFilter, via its own synchronization.
+// preemptionData holds the cycle-wide preemption state shared across
+// CycleState clones via stateData. Only slices and simulatedResults mutate
+// after PreFilter, each with its own synchronization.
 type preemptionData struct {
 	// canPreemptDevices reports whether preempting pods can free devices for
 	// the pod being scheduled. It is false when the pod has no claims to
@@ -62,12 +64,15 @@ type preemptionData struct {
 	// resources (unsupported by KEP-5690), or belongs to a PodGroup (handled
 	// by workload-aware preemption).
 	canPreemptDevices bool
-	// allocatedState and slices are the PreFilter inputs of state.allocator,
-	// which can't be changed in place. allocatorForNode builds allocators
-	// from them for nodes whose state the simulation changed. allocatedState
-	// is nil when the pod has no claims to allocate.
+	// allocatedState and slices snapshot the inputs PreFilter passed to
+	// state.allocator. Because state.allocator is immutable and shared across
+	// Filter calls, allocatorForNode builds a per-node allocator from these
+	// whenever victim releases or holds affect a node. allocatedState is nil
+	// when the pod has no claims to allocate.
 	allocatedState *structured.AllocatedState
 	slices         nodeSlices
+	// simulatedResults caches the Filter results of this cycle.
+	simulatedResults simulatedResults
 }
 
 func (pl *DynamicResources) newPreemptionData(pod *v1.Pod, claims *claimStore, allocatedState *structured.AllocatedState, resourceSlices []*draapi.ResourceSlice) *preemptionData {
@@ -84,9 +89,9 @@ func (pl *DynamicResources) newPreemptionData(pod *v1.Pod, claims *claimStore, a
 }
 
 // ownsClaimsToAllocate reports whether pod owns every claim it needs to
-// allocate (as with ResourceClaimTemplate-generated claims). Alpha only
-// preempts for such pods; a claim referenced by name may be shared by
-// pending pods that could each preempt for it.
+// allocate, such as ResourceClaimTemplate-generated claims. In alpha, unowned
+// claims are excluded because multiple pending pods referencing the same claim
+// by name could each preempt and hold devices for it.
 func ownsClaimsToAllocate(pod *v1.Pod, claims *claimStore) bool {
 	for _, claim := range claims.toAllocate() {
 		if !metav1.IsControlledBy(claim, pod) {
@@ -265,12 +270,14 @@ func (s *nodeSlices) localDevices(nodeName string) sets.Set[structured.DeviceID]
 	return s.localDevicesByNode[nodeName]
 }
 
-// preemptionSimulationState tracks the pod removals simulated in a single
-// CycleState clone.
+// preemptionSimulationState tracks the pod removals and nominated-pod holds
+// simulated in a single CycleState clone.
 type preemptionSimulationState struct {
 	// released maps claim UIDs to claims that will be deallocated once their
 	// removed owning pods are gone.
 	released map[types.UID]*releasedClaim
+	// holds maps UIDs of nominated pods added via AddPod to their device holds.
+	holds map[types.UID]*podHold
 }
 
 // getPreemptionSimulationState returns nil when DRAPreemption is disabled or
@@ -284,11 +291,12 @@ func getPreemptionSimulationState(cs fwk.CycleState) *preemptionSimulationState 
 	return sim
 }
 
-// Clone shallow-copies the map; *releasedClaim values are immutable and safe
-// to share across clones.
+// Clone shallow-copies the maps; *releasedClaim and *podHold values are
+// immutable and safe to share across clones.
 func (sim *preemptionSimulationState) Clone() fwk.StateData {
 	return &preemptionSimulationState{
 		released: maps.Clone(sim.released),
+		holds:    maps.Clone(sim.holds),
 	}
 }
 
@@ -308,6 +316,21 @@ func (sim *preemptionSimulationState) changesNode(nodeName string) bool {
 		}
 	}
 	return false
+}
+
+func (sim *preemptionSimulationState) releasedClaimsKey(nodeName string) releasedClaimsKey {
+	var uids []string
+	for uid, released := range sim.released {
+		if released.nodeName == nodeName {
+			uids = append(uids, string(uid))
+		}
+	}
+	slices.Sort(uids)
+	return releasedClaimsKey(strings.Join(uids, ","))
+}
+
+func (sim *preemptionSimulationState) resultKey(nodeName string) simulatedResultKey {
+	return simulatedResultKey{nodeName: nodeName, releasedClaims: sim.releasedClaimsKey(nodeName)}
 }
 
 // applyTo frees sim's released claims in allocatedState. In alpha, only
@@ -341,6 +364,114 @@ func exclusiveDevices(devices *resourceapi.DeviceAllocationResult) iter.Seq[stru
 	}
 }
 
+// releasedClaimsKey is the sorted, comma-joined UIDs of claims released on a
+// node, or "" if none.
+type releasedClaimsKey string
+
+// simulatedResultKey identifies a Filter result in simulatedResults. A result
+// can only be reused for the same released claims. Holds are omitted from the
+// key so pass 2 without holds hits pass 1's cached entry.
+type simulatedResultKey struct {
+	nodeName       string
+	releasedClaims releasedClaimsKey
+}
+
+type simulatedResult struct {
+	// allocationResults holds Filter's newly computed allocations in
+	// claimsToAllocate order (excluding PodGroup pending allocations, so
+	// reusable can sanity-check the slice length).
+	allocationResults []resourceapi.AllocationResult
+	// heldClaims is used as PrepareNomination's hold if the simulation ends
+	// in this state, so it must not be mutated.
+	heldClaims map[types.UID]heldClaim
+}
+
+// newHeldClaims pairs unallocated user claims with their Filter allocation
+// results, skipping synthetic extended-resource claims.
+func newHeldClaims(claimsToAllocate []*resourceapi.ResourceClaim, results []resourceapi.AllocationResult, extendedResourceClaims ...*resourceapi.ResourceClaim) map[types.UID]heldClaim {
+	claims := make(map[types.UID]heldClaim, len(claimsToAllocate))
+	for i, claim := range claimsToAllocate {
+		if slices.Contains(extendedResourceClaims, claim) {
+			continue
+		}
+		result := results[i]
+		claims[claim.UID] = heldClaim{
+			claim:            types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+			allocatedDevices: &result.Devices,
+		}
+	}
+	return claims
+}
+
+// simulatedResults caches successful Filter allocations across CycleState
+// clones within a single scheduling cycle for two purposes:
+//
+//  1. Hold-aware result reuse: RunFilterPluginsWithNominatedPods runs pass 1 on
+//     a clone with holds (via AddPod) and pass 2 on the base state without
+//     holds. Because holds only restrict availability, a Filter call with no
+//     holds can reuse an earlier allocation for the same node and released-claim
+//     set, ensuring pass 2 and Reserve pick the devices chosen in pass 1.
+//  2. Final simulation lookup: PrepareNomination needs the allocation from the
+//     victim set that DefaultPreemption's simulation settled on for a node,
+//     which need not be the last Filter call on that node (for example, if a
+//     plugin after DynamicResources rejected a reprieved victim).
+type simulatedResults struct {
+	mutex sync.Mutex
+	// results stores Filter results by node and released-claim key. Entries are
+	// replaced, never mutated.
+	results map[simulatedResultKey]*simulatedResult
+	// lastReleasedClaimsKeyByNode has the releasedClaimsKey of each node after
+	// the latest victim RemovePod or reprieve AddPod for it. The simulation for
+	// a node ends with the chosen victims removed because a failed reprieve
+	// removes the victim again without calling Filter, so the key identifies
+	// the final victim set even when Filter didn't run for it last.
+	lastReleasedClaimsKeyByNode map[string]releasedClaimsKey
+}
+
+// record saves nodeName's latest releasedClaimsKey. Only the simulation for
+// nodeName calls record for it (cross-node removals only happen for PodGroup
+// victims, which RemovePod skips), so simulations for other nodes never
+// overwrite it.
+func (r *simulatedResults) record(sim *preemptionSimulationState, nodeName string) {
+	key := sim.releasedClaimsKey(nodeName)
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.lastReleasedClaimsKeyByNode == nil {
+		r.lastReleasedClaimsKeyByNode = make(map[string]releasedClaimsKey)
+	}
+	r.lastReleasedClaimsKeyByNode[nodeName] = key
+}
+
+func (r *simulatedResults) reusable(sim *preemptionSimulationState, nodeName string, numClaims int) ([]resourceapi.AllocationResult, bool) {
+	key := sim.resultKey(nodeName)
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	result := r.results[key]
+	if result == nil || len(result.allocationResults) != numClaims {
+		return nil, false
+	}
+	return result.allocationResults, true
+}
+
+func (r *simulatedResults) store(sim *preemptionSimulationState, nodeName string, result *simulatedResult) {
+	key := sim.resultKey(nodeName)
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	if r.results == nil {
+		r.results = make(map[simulatedResultKey]*simulatedResult)
+	}
+	r.results[key] = result
+}
+
+// final returns the Filter result matching the final victim set of the
+// simulation for nodeName, or nil if none. Callers must not mutate the
+// returned value.
+func (r *simulatedResults) final(nodeName string) *simulatedResult {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	return r.results[simulatedResultKey{nodeName: nodeName, releasedClaims: r.lastReleasedClaimsKeyByNode[nodeName]}]
+}
+
 // PreFilterExtensions returns the plugin itself when DRAPreemption is enabled.
 func (pl *DynamicResources) PreFilterExtensions() fwk.PreFilterExtensions {
 	if !pl.fts.EnableDRAPreemption {
@@ -349,23 +480,30 @@ func (pl *DynamicResources) PreFilterExtensions() fwk.PreFilterExtensions {
 	return pl
 }
 
-// RemovePod simulates removing podInfoToRemove from nodeInfo, marking its
-// node-local claims that will be deallocated as released in cs.
+// RemovePod either drops a nominated pod's hold added by AddPod, or simulates
+// removing podInfoToRemove from nodeInfo by marking its node-local claims that
+// will be deallocated as released in cs.
 func (pl *DynamicResources) RemovePod(ctx context.Context, cs fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
 	}
 	data, sim := state.preemption, getPreemptionSimulationState(cs)
-	if data == nil || sim == nil || !data.canPreemptDevices {
-		// Nothing to simulate: DRAPreemption is off, the pod being
-		// scheduled has no claims, or it can't use devices of victims.
+	if data == nil || sim == nil || nodeInfo.Node() == nil {
+		// DRAPreemption is off, the pod being scheduled has no claims, or
+		// the node is gone.
 		return nil
 	}
 	pod := podInfoToRemove.GetPod()
-	if len(pod.Spec.ResourceClaims) == 0 || nodeInfo.Node() == nil {
-		// Nothing to release: the removed pod has no claims, or its node is
-		// gone.
+	if _, ok := sim.holds[pod.UID]; ok {
+		// Undo AddPod of a nominated pod so its devices are no longer held.
+		// It isn't running, so removing it releases nothing.
+		delete(sim.holds, pod.UID)
+		return nil
+	}
+	if len(pod.Spec.ResourceClaims) == 0 || !data.canPreemptDevices {
+		// Nothing to release when the removed pod has no claims or
+		// podToSchedule cannot use victims' devices.
 		return nil
 	}
 	if pl.inPodGroup(pod) {
@@ -394,20 +532,49 @@ func (pl *DynamicResources) RemovePod(ctx context.Context, cs fwk.CycleState, po
 		logger.V(5).Info("Removing pod releases claim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim), "node", nodeName)
 		sim.released[claim.UID] = released
 	}
+	data.simulatedResults.record(sim, nodeName)
 	return nil
 }
 
-// AddPod undoes a prior RemovePod in cs, restoring any claims that the pod
-// would keep allocated. It is a no-op if the pod was not removed.
+// AddPod either undoes a prior RemovePod in cs, or records the device hold of
+// an unassigned pod nominated to nodeInfo so Filter reserves those devices.
+// The framework only invokes AddPod for nominated pods with priority >=
+// podToSchedule.
 func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
-	sim := getPreemptionSimulationState(cs)
-	if sim == nil {
-		// DRAPreemption is off or the pod being scheduled has no claims.
+	state, err := getStateData(cs)
+	if err != nil {
+		return statusError(klog.FromContext(ctx), err)
+	}
+	data, sim := state.preemption, getPreemptionSimulationState(cs)
+	if data == nil || sim == nil || nodeInfo.Node() == nil {
+		// DRAPreemption is off, the pod being scheduled has no claims, or
+		// the node is gone.
 		return nil
 	}
-	// Undo RemovePod, as when the simulation reprieves a victim: its claims
-	// are in use again.
-	sim.unrelease(podInfoToAdd.GetPod().UID)
+	pod := podInfoToAdd.GetPod()
+	nodeName := nodeInfo.Node().Name
+	if sim.unrelease(pod.UID) {
+		// Undo RemovePod when the simulation reprieves a victim so its claims
+		// are in use again.
+		data.simulatedResults.record(sim, nodeName)
+		return nil
+	}
+	if pl.preemptionTracker == nil || pod.Spec.NodeName != "" || pod.UID == podToSchedule.UID {
+		// No hold applies when preemptionTracker is nil, pod is already
+		// assigned (for example, reprieving a victim that released nothing),
+		// or pod is podToSchedule itself.
+		return nil
+	}
+	hold := pl.preemptionTracker.hold(pod.UID)
+	if hold == nil || hold.nodeName != nodeName {
+		// No devices held for the pod on this node.
+		return nil
+	}
+	if sim.holds == nil {
+		sim.holds = make(map[types.UID]*podHold)
+	}
+	sim.holds[pod.UID] = hold
+	klog.FromContext(ctx).V(5).Info("Devices held for nominated pod", "pod", klog.KObj(podToSchedule), "nominatedPod", klog.KObj(pod), "node", nodeName, "numClaims", len(hold.heldClaims))
 	return nil
 }
 
@@ -484,25 +651,48 @@ func (pl *DynamicResources) inPodGroup(pod *v1.Pod) bool {
 	return pl.fts.EnableGenericWorkload && pod.Spec.SchedulingGroup != nil
 }
 
+// allocate runs device allocation on node, reusing a cached result from
+// state.preemption.simulatedResults when holds is nil and a matching result
+// exists. The returned AllocatedState is nil when a cached result was reused
+// or DRAPreemption is disabled.
+func (pl *DynamicResources) allocate(ctx context.Context, state *stateData, sim *preemptionSimulationState, holds *nodeHolds, node *v1.Node, claims []*resourceapi.ResourceClaim) ([]resourceapi.AllocationResult, *structured.AllocatedState, error) {
+	if sim != nil && holds == nil {
+		if results, ok := state.preemption.simulatedResults.reusable(sim, node.Name, len(claims)); ok {
+			return results, nil, nil
+		}
+	}
+	allocator, allocatedState, err := pl.allocatorForNode(ctx, state, sim, node.Name, holds)
+	if err != nil {
+		return nil, nil, err
+	}
+	results, err := allocator.Allocate(ctx, node, claims)
+	return results, allocatedState, err
+}
+
 // allocatorForNode returns state.allocator unless sim released devices on
-// nodeName, in which case it builds a node-scoped allocator with those devices
-// freed. When DRAPreemption is enabled, it also returns the AllocatedState
-// backing the allocator.
-func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, sim *preemptionSimulationState, nodeName string) (structured.Allocator, *structured.AllocatedState, error) {
+// nodeName or holds reserves devices there, in which case it builds a
+// node-scoped allocator reflecting both. When DRAPreemption is enabled, it
+// also returns the AllocatedState backing the allocator.
+func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateData, sim *preemptionSimulationState, nodeName string, holds *nodeHolds) (structured.Allocator, *structured.AllocatedState, error) {
 	data := state.preemption
 	if data == nil || sim == nil {
 		return state.allocator, nil, nil
 	}
-	if !sim.changesNode(nodeName) {
+	if holds == nil && !sim.changesNode(nodeName) {
 		return state.allocator, data.allocatedState, nil
 	}
-	// structured.NewAllocator precomputes consumed counters from
-	// AllocatedState, so state.allocator cannot be mutated in place. Scope
-	// the new allocator to slices relevant to nodeName to keep simulations
-	// fast.
+	// TODO(https://github.com/kubernetes/enhancements/issues/5690): Before
+	// beta, avoid rebuilding the allocator (whose slices include all shared
+	// pools) on every Filter call with holds and for released claims that
+	// already failed, for example by caching failures.
 	resourceSlices := data.slices.forNode(nodeName)
 	allocatedState := data.allocatedStateForSlices(resourceSlices)
 	sim.applyTo(allocatedState)
+	if holds != nil {
+		// Apply holds after sim.applyTo because a held device may be one of
+		// the devices just freed from a removed victim.
+		holds.applyTo(allocatedState)
+	}
 	allocator, err := structured.NewAllocator(ctx, AllocatorFeatures(pl.fts), *allocatedState, pl.draManager.DeviceClasses(), resourceSlices, pl.celCache)
 	if err != nil {
 		return nil, nil, err

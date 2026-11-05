@@ -5853,32 +5853,41 @@ func update(objects []metav1.Object, updates change) []metav1.Object {
 	return updated
 }
 
-func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
+// draTestEnv holds the client, informer factory, and DefaultDRAManager shared
+// across test setups that build their own Framework (such as DefaultPreemption
+// tests) without constructing a throwaway Framework and plugin instance.
+type draTestEnv struct {
+	client          *fake.Clientset
+	informerFactory informers.SharedInformerFactory
+	draManager      *DefaultDRAManager
+	doneCheckers    []cache.DoneChecker
+}
+
+func setupDRAManager(tCtx ktesting.TContext, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) *draTestEnv {
 	tCtx.Helper()
 
-	tc := &testContext{}
-	tc.client = fake.NewSimpleClientset(objs...)
-	reactor := createReactor(tc.client.Tracker(), failPatch)
-	tc.client.PrependReactor("*", "*", reactor)
+	env := &draTestEnv{}
+	env.client = fake.NewSimpleClientset(objs...)
+	reactor := createReactor(env.client.Tracker(), failPatch)
+	env.client.PrependReactor("*", "*", reactor)
 	// Prepends reactors to the client.
-	tc.client.ReactionChain = append(apiReactors, tc.client.ReactionChain...)
+	env.client.ReactionChain = append(apiReactors, env.client.ReactionChain...)
 
-	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-	sliceInformer := draapi.NewInformerForResourceSlice(tc.informerFactory)
+	env.informerFactory = informers.NewSharedInformerFactory(env.client, 0)
+	sliceInformer := draapi.NewInformerForResourceSlice(env.informerFactory)
 
-	var doneCheckers []cache.DoneChecker
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaintRules: true,
 		SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
 		SliceInformer:          sliceInformer,
-		TaintInformer:          tc.informerFactory.Resource().V1().DeviceTaintRules(),
-		KubeClient:             tc.client,
+		TaintInformer:          env.informerFactory.Resource().V1().DeviceTaintRules(),
+		KubeClient:             env.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	require.NoError(tCtx, err, "couldn't start resource slice tracker")
-	doneCheckers = append(doneCheckers, resourceSliceTracker.HasSyncedChecker())
+	env.doneCheckers = append(env.doneCheckers, resourceSliceTracker.HasSyncedChecker())
 
-	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
+	claimsCache := assumecache.NewAssumeCache(tCtx.Logger(), env.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil)
 	// NewAssumeCache calls the informer's AddEventHandler method to register
 	// a handler in order to stay in sync with the informer's store, but
 	// NewAssumeCache does not return the ResourceEventHandlerRegistration.
@@ -5889,19 +5898,60 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	// This is not the registered handler that is used by the DRA
 	// manager, but it is close enough because the assume cache
 	// uses a single boolean for "is synced" for all handlers.
-	doneCheckers = append(doneCheckers, claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{}).HasSyncedChecker())
+	env.doneCheckers = append(env.doneCheckers, claimsCache.AddEventHandler(cache.ResourceEventHandlerFuncs{}).HasSyncedChecker())
 
-	tc.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, tc.informerFactory)
+	env.draManager = NewDRAManager(tCtx, claimsCache, resourceSliceTracker, env.informerFactory)
 	if features.EnableDRAExtendedResource {
 		logger := tCtx.Logger()
 		handlerOptions := cache.HandlerOptions{Logger: &logger}
-		cache := tc.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-		deviceClassHandlerRegistration, err := tc.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(cache, handlerOptions)
+		extCache := env.draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
+		deviceClassHandlerRegistration, err := env.informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(extCache, handlerOptions)
 		require.NoError(tCtx, err, "failed to add device class informer event handler")
-		doneCheckers = append(doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
+		env.doneCheckers = append(env.doneCheckers, deviceClassHandlerRegistration.HasSyncedChecker())
 	}
 
-	tc.podGroupManager = internalcache.New(tCtx, nil, true, false)
+	// The tests use the API to create the objects because then reactors
+	// get triggered.
+	for _, claim := range claims {
+		_, err := env.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource claim")
+	}
+	for _, class := range classes {
+		_, err := env.client.ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create resource class")
+	}
+	for _, podGroup := range podGroups {
+		_, err := env.client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create pod group")
+	}
+
+	return env
+}
+
+func (e *draTestEnv) startAndSync(tCtx ktesting.TContext) {
+	tCtx.Helper()
+	e.informerFactory.StartWithContext(tCtx)
+	tCtx.Cleanup(e.informerFactory.Shutdown)
+
+	e.informerFactory.WaitForCacheSyncWithContext(tCtx)
+	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
+	// are synced, we need to wait until the event handlers confirm that they are synced.
+	// This ensures that the assume cache is in sync with the informer's
+	// store which has been informed by at least one full LIST of the underlying storage.
+	cache.WaitFor(tCtx, "event handlers", e.doneCheckers...)
+}
+
+func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, podGroups []*schedulingapi.PodGroup, objs []apiruntime.Object, features feature.Features, failPatch bool, apiReactors []cgotesting.Reactor) (result *testContext) {
+	tCtx.Helper()
+
+	env := setupDRAManager(tCtx, claims, classes, podGroups, objs, features, failPatch, apiReactors)
+	tc := &testContext{
+		client:          env.client,
+		informerFactory: env.informerFactory,
+		draManager:      env.draManager,
+	}
+
+	tc.podGroupManager = internalcache.New(tCtx, nil, true /* genericWorkloadEnabled */, false /* compositePodGroupEnabled */)
 	for _, obj := range objs {
 		if pod, ok := obj.(*v1.Pod); ok {
 			tc.podGroupManager.AddPodGroupMember(pod)
@@ -5933,30 +5983,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 	tCtx.ExpectNoError(err, "create plugin")
 	tc.p = pl.(*DynamicResources)
 
-	// The tests use the API to create the objects because then reactors
-	// get triggered.
-	for _, claim := range claims {
-		_, err := tc.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tCtx, claim, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create resource claim")
-	}
-	for _, class := range classes {
-		_, err := tc.client.ResourceV1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create resource class")
-	}
-	for _, podGroup := range podGroups {
-		_, err := tc.client.SchedulingV1beta1().PodGroups(podGroup.Namespace).Create(tCtx, podGroup, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create pod group")
-	}
-
-	tc.informerFactory.StartWithContext(tCtx)
-	tCtx.Cleanup(tc.informerFactory.Shutdown)
-
-	tc.informerFactory.WaitForCacheSyncWithContext(tCtx)
-	// The above does not tell us if the registered handlers (e.g. from NewAssumeCache)
-	// are synced, we need to wait until the event handlers confirm that they are synced.
-	// This ensures that the assume cache is in sync with the informer's
-	// store which has been informed by at least one full LIST of the underlying storage.
-	cache.WaitFor(tCtx, "event handlers", doneCheckers...)
+	env.startAndSync(tCtx)
 
 	for _, node := range nodes {
 		nodeInfo := framework.NewNodeInfo()

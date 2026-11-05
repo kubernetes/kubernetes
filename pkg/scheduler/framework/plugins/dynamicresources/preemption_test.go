@@ -477,11 +477,13 @@ func testPreemptionSimulation(tCtx ktesting.TContext) {
 }
 
 // TestPreemptionSimulationStateClone verifies that cloning CycleState shares stateData
-// while isolating preemptionSimulationState mutations.
+// while isolating preemptionSimulationState mutations (both released claims and holds).
 func TestPreemptionSimulationStateClone(t *testing.T) {
 	claim := &releasedClaim{uid: "claim", podUID: "victim"}
+	hold := &podHold{nodeName: nodeName}
 	original := &preemptionSimulationState{
 		released: map[types.UID]*releasedClaim{"claim": claim},
+		holds:    map[types.UID]*podHold{"holder": hold},
 	}
 	state := &stateData{preemption: &preemptionData{}}
 	cs := framework.NewCycleState()
@@ -494,6 +496,9 @@ func TestPreemptionSimulationStateClone(t *testing.T) {
 	sim.released["other"] = &releasedClaim{uid: "other"}
 	delete(sim.released, "claim")
 	require.Equal(t, map[types.UID]*releasedClaim{"claim": claim}, original.released, "released claims of the original")
+	sim.holds["other"] = &podHold{nodeName: nodeName}
+	delete(sim.holds, "holder")
+	require.Equal(t, map[types.UID]*podHold{"holder": hold}, original.holds, "holds of the original")
 
 	copiedState, err := getStateData(copied)
 	require.NoError(t, err)
@@ -816,6 +821,38 @@ func testPreemptionPostFilter(tCtx ktesting.TContext) {
 			_, status = testCtx.p.PostFilter(tCtx, testCtx.state, pod, nil)
 			require.Equal(tCtx, tc.want, status.Code(), "PostFilter: %v", status)
 			require.Equal(tCtx, []string{"deallocation of ResourceClaim completed"}, status.Reasons(), "PostFilter reasons")
+		})
+	}
+}
+
+func TestPostFilterClaimBeingAllocated(t *testing.T) {
+	testPostFilterClaimBeingAllocated(ktesting.Init(t))
+}
+
+// testPostFilterClaimBeingAllocated verifies that under DRAPreemption,
+// PostFilter stops DefaultPreemption while another pod is allocating one of
+// the pod's claims, preserving any existing nomination and hold.
+func testPostFilterClaimBeingAllocated(tCtx ktesting.TContext) {
+	pod := preemptionPod("pod", "pod-claim").Obj()
+	for name, tc := range map[string]struct {
+		features feature.Features
+		want     fwk.Code
+	}{
+		"enabled":  {features: feature.Features{EnableDRAPreemption: true}, want: fwk.UnschedulableAndUnresolvable},
+		"disabled": {want: fwk.Unschedulable},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			testCtx := setupPreemption(tCtx, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{preemptionClaim("pod-claim").Obj()}, nil, tc.features)
+			claim, err := testCtx.draManager.ResourceClaims().Get(namespace, "pod-claim")
+			tCtx.ExpectNoError(err)
+			claim = claim.DeepCopy()
+			claim.Status.Allocation = preemptionAllocation("gpu-0")
+			tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
+
+			_, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, testCtx.nodeInfos)
+			require.Equal(tCtx, fwk.UnschedulableAndUnresolvable, status.Code(), "PreFilter: %v", status)
+			_, status = testCtx.p.PostFilter(tCtx, testCtx.state, pod, nil)
+			require.Equal(tCtx, tc.want, status.Code(), "PostFilter: %v", status)
 		})
 	}
 }

@@ -26,21 +26,38 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// preemptionTracker tracks cross-cycle DRA preemption state (KEP-5690), owned by
-// DefaultDRAManager and shared across scheduler profiles when DRAPreemption is
-// enabled.
+// preemptionTracker tracks cross-cycle DRA preemption state (KEP-5690): device
+// holds for nominated preemptors and victim claims awaiting deallocation.
+// Owned by DefaultDRAManager and shared across scheduler profiles when
+// DRAPreemption is enabled.
 //
-// Lock ordering: queueing hints acquire mutex while holding the scheduling
-// queue lock, so callers holding mutex must never call into the scheduling
-// queue.
+// Lock ordering: the scheduling queue invokes AddNomination, RemoveNomination,
+// and queueing hints while holding its own lock, so callers holding mutex must
+// never call into the scheduling queue or make API calls.
 type preemptionTracker struct {
 	mutex sync.RWMutex
+	// holds maps nominated pod UIDs to their device holds on the nominated node.
+	holds map[types.UID]*podHold
 	// victimClaims tracks claims of preempted pods awaiting deallocation,
 	// indexed by node name and claim UID. Entries are replaced, never mutated.
 	victimClaims map[string]map[types.UID]*releasedClaim
 	// victimClaimNodes is the reverse index from claim UID to node name in
 	// victimClaims.
 	victimClaimNodes map[types.UID]string
+}
+
+// podHold records the devices selected for a pod on nodeName and held while
+// the pod remains nominated there. Instances are immutable and replaced atomically.
+type podHold struct {
+	nodeName string
+	// heldClaims maps UIDs of unallocated user claims to the allocations
+	// chosen by Filter.
+	heldClaims map[types.UID]heldClaim
+}
+
+type heldClaim struct {
+	claim            types.NamespacedName
+	allocatedDevices *resourceapi.DeviceAllocationResult
 }
 
 // releasedClaim describes a claim whose devices become free once its removed
@@ -60,9 +77,32 @@ type releasedClaim struct {
 
 func newPreemptionTracker() *preemptionTracker {
 	return &preemptionTracker{
+		holds:            make(map[types.UID]*podHold),
 		victimClaims:     make(map[string]map[types.UID]*releasedClaim),
 		victimClaimNodes: make(map[types.UID]string),
 	}
+}
+
+func (s *preemptionTracker) nominate(podUID types.UID, hold *podHold) *podHold {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	replaced := s.holds[podUID]
+	s.holds[podUID] = hold
+	return replaced
+}
+
+func (s *preemptionTracker) release(podUID types.UID) *podHold {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	hold := s.holds[podUID]
+	delete(s.holds, podUID)
+	return hold
+}
+
+func (s *preemptionTracker) hold(podUID types.UID) *podHold {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.holds[podUID]
 }
 
 func (s *preemptionTracker) assumeVictimClaim(claim *releasedClaim) {

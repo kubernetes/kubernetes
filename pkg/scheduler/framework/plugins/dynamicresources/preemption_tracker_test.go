@@ -33,6 +33,70 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
+func TestPreemptionTrackerHolds(t *testing.T) {
+	holdA1 := &podHold{nodeName: nodeName, heldClaims: map[types.UID]heldClaim{"claim-a": {allocatedDevices: &preemptionAllocation("gpu-0").Devices}}}
+	holdA2 := &podHold{nodeName: nodeName, heldClaims: map[types.UID]heldClaim{"claim-a": {allocatedDevices: &preemptionAllocation("gpu-1").Devices}}}
+	holdB := &podHold{nodeName: node2Name, heldClaims: map[types.UID]heldClaim{"claim-b": {allocatedDevices: &poolAllocation(node2Name, "gpu-0").Devices}}}
+
+	type op struct {
+		podUID       types.UID
+		nominate     *podHold // nil means release
+		wantReturned *podHold
+	}
+	testcases := map[string]struct {
+		ops       []op
+		wantHolds map[types.UID]*podHold
+	}{
+		"nominate-and-release": {
+			ops: []op{
+				{podUID: "p1", nominate: holdA1, wantReturned: nil},
+				{podUID: "p1", wantReturned: holdA1},
+				{podUID: "p1", wantReturned: nil},
+			},
+			wantHolds: map[types.UID]*podHold{"p1": nil},
+		},
+		"replace-existing-hold": {
+			ops: []op{
+				{podUID: "p1", nominate: holdA1, wantReturned: nil},
+				{podUID: "p1", nominate: holdA2, wantReturned: holdA1},
+			},
+			wantHolds: map[types.UID]*podHold{"p1": holdA2},
+		},
+		"independent-pods": {
+			ops: []op{
+				{podUID: "p1", nominate: holdA1, wantReturned: nil},
+				{podUID: "p2", nominate: holdB, wantReturned: nil},
+				{podUID: "p1", wantReturned: holdA1},
+			},
+			wantHolds: map[types.UID]*podHold{"p1": nil, "p2": holdB},
+		},
+		"release-missing": {
+			ops: []op{
+				{podUID: "missing", wantReturned: nil},
+			},
+			wantHolds: map[types.UID]*podHold{"missing": nil},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			s := newPreemptionTracker()
+			for i, step := range tc.ops {
+				var got *podHold
+				if step.nominate != nil {
+					got = s.nominate(step.podUID, step.nominate)
+				} else {
+					got = s.release(step.podUID)
+				}
+				require.Same(t, step.wantReturned, got, "op %d returned hold", i)
+			}
+			for podUID, want := range tc.wantHolds {
+				require.Same(t, want, s.hold(podUID), "hold of %s", podUID)
+			}
+		})
+	}
+}
+
 func TestPreemptionTrackerVictimClaims(t *testing.T) {
 	newClaim := func(nodeName, device string, podUID types.UID) *releasedClaim {
 		return &releasedClaim{

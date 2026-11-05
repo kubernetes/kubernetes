@@ -834,11 +834,16 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 	completed := preemptionPod("completed", "victim-claim").Node(nodeName).Obj()
 	completed.Status.Phase = v1.PodSucceeded
 
-	testCtx := setupVictims(tCtx, nil, nil)
+	// The deleted pods share an allocated claim; a missing or unallocated one
+	// would wake pods for another reason (see hasUnallocatedClaim).
+	testCtx := setupVictims(tCtx, []*resourceapi.ResourceClaim{
+		preemptionClaim("victim-claim").Allocation(preemptionAllocation("gpu-0")).Obj(),
+	}, nil)
 	logger := klog.FromContext(tCtx)
 
 	for name, tc := range map[string]struct {
 		pod      *v1.Pod
+		holdNode string
 		oldObj   any
 		wantHint fwk.QueueingHint
 		wantErr  bool
@@ -878,6 +883,25 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 			oldObj:   preemptionPod("unassigned", "victim-claim").Obj(),
 			wantHint: fwk.QueueSkip,
 		},
+		"unassigned-pod-for-waiting": {
+			pod:      waiting,
+			oldObj:   preemptionPod("unassigned", "victim-claim").Obj(),
+			wantHint: fwk.QueueSkip,
+		},
+		// Pod status updates can lag behind in-memory nominations, so nominatedTo
+		// also checks preemptionTracker holds.
+		"hold-on-other-node": {
+			pod:      waiting,
+			holdNode: node2Name,
+			oldObj:   preemptionPod("victim", "victim-claim").Node(nodeName).Obj(),
+			wantHint: fwk.QueueSkip,
+		},
+		"hold-on-nominated-node": {
+			pod:      waiting,
+			holdNode: nodeName,
+			oldObj:   preemptionPod("victim", "victim-claim").Node(nodeName).Obj(),
+			wantHint: fwk.Queue,
+		},
 		"unexpected-object": {
 			pod:      preemptor,
 			oldObj:   &v1.Node{},
@@ -886,7 +910,91 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 		},
 	} {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			if tc.holdNode != "" {
+				testCtx.p.preemptionTracker.nominate(tc.pod.UID, &podHold{nodeName: tc.holdNode})
+				tCtx.Cleanup(func() { testCtx.p.preemptionTracker.release(tc.pod.UID) })
+			}
 			hint, err := testCtx.p.isSchedulableAfterAssignedPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			if tc.wantErr {
+				require.Error(tCtx, err)
+			} else {
+				tCtx.ExpectNoError(err)
+			}
+			require.Equal(tCtx, tc.wantHint, hint)
+		})
+	}
+}
+
+func TestIsSchedulableAfterAssumedPodForgotten(t *testing.T) {
+	testIsSchedulableAfterAssumedPodForgotten(ktesting.Init(t))
+}
+
+// testIsSchedulableAfterAssumedPodForgotten verifies that AssignedPod/Delete
+// wakes waiting pods when an assumed pod is forgotten after Unreserve dropped
+// its pending claim allocation.
+func testIsSchedulableAfterAssumedPodForgotten(tCtx ktesting.TContext) {
+	waiting := preemptionPod("waiting", "waiting-claim").Obj()
+	running := preemptionPod("running", "allocated-claim").Node(node2Name).Obj()
+	completed := preemptionPod("completed", "forgotten-claim").Node(node2Name).Obj()
+	completed.Status.Phase = v1.PodSucceeded
+
+	testCtx := setupVictims(tCtx, []*resourceapi.ResourceClaim{
+		preemptionClaim("forgotten-claim").Obj(),
+		preemptionClaim("pending-claim").Obj(),
+		reserve(preemptionClaim("allocated-claim").Allocation(poolAllocation(node2Name, "gpu-0")).Obj(), running),
+	}, nil)
+	logger := klog.FromContext(tCtx)
+	pending, err := testCtx.draManager.ResourceClaims().Get(namespace, "pending-claim")
+	tCtx.ExpectNoError(err)
+	pending = pending.DeepCopy()
+	pending.Status.Allocation = poolAllocation(node2Name, "gpu-1")
+	tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(pending.UID, pending))
+
+	for name, tc := range map[string]struct {
+		oldObj   any
+		wantHint fwk.QueueingHint
+		wantErr  bool
+	}{
+		"pending-allocation-dropped": {
+			oldObj:   preemptionPod("forgotten", "forgotten-claim").Node(node2Name).Obj(),
+			wantHint: fwk.Queue,
+		},
+		"allocated-and-dropped-claim": {
+			oldObj:   preemptionPod("forgotten-sharer", "allocated-claim", "forgotten-claim").Node(node2Name).Obj(),
+			wantHint: fwk.Queue,
+		},
+		"claim-already-deleted": {
+			// The garbage collector deletes an unallocated claim together with
+			// its pod, so it may be gone already.
+			oldObj:   preemptionPod("forgotten-gone", "gone-claim").Node(node2Name).Obj(),
+			wantHint: fwk.Queue,
+		},
+		"claim-still-pending": {
+			oldObj:   preemptionPod("binding", "pending-claim").Node(node2Name).Obj(),
+			wantHint: fwk.QueueSkip,
+		},
+		"claim-still-allocated": {
+			oldObj:   running,
+			wantHint: fwk.QueueSkip,
+		},
+		"unassigned-pod": {
+			// Clearing an unassigned pod's nomination also fires AssignedPod/Delete
+			// with Spec.NodeName == "" and unallocated claims; it must be skipped.
+			oldObj:   preemptionPod("unassigned", "forgotten-claim").Obj(),
+			wantHint: fwk.QueueSkip,
+		},
+		"completed-pod": {
+			oldObj:   completed,
+			wantHint: fwk.QueueSkip,
+		},
+		"unexpected-object": {
+			oldObj:   &v1.Node{},
+			wantHint: fwk.Queue,
+			wantErr:  true,
+		},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			hint, err := testCtx.p.isSchedulableAfterAssignedPodDeleted(logger, waiting, tc.oldObj, nil)
 			if tc.wantErr {
 				require.Error(tCtx, err)
 			} else {

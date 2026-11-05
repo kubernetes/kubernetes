@@ -18,6 +18,7 @@ package dynamicresources
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -32,6 +33,7 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 // This file implements framework.VictimExtensions (KEP-5690). Because a
@@ -208,16 +210,17 @@ func (pl *DynamicResources) deallocateVictimClaims(ctx context.Context, pod *v1.
 	return false, fwk.NewStatus(fwk.Unschedulable)
 }
 
-// isSchedulableAfterAssignedPodDeleted wakes a nominated preemptor when a pod
-// with claims is deleted from its nominated node.
+// isSchedulableAfterAssignedPodDeleted wakes waiting pods on AssignedPod/Delete
+// in two cases:
 //
-// While asynchronous preemption is in flight, DefaultPreemption blocks the
-// preemptor in PreEnqueue and the queue ignores ResourceClaim events for it,
-// consulting only AssignedPod/Delete hints on plugins that rejected the pod.
-// Returning Queue here lets the pod pass PreEnqueue once its victims are
-// deleted (even if their claims are still deallocating). Because victims are
-// not tracked per preemptor, any pod with claims deleted from the nominated
-// node triggers a wakeup.
+//  1. Preemptor gated in DefaultPreemption.PreEnqueue during async preemption:
+//     while gated, the queue ignores ResourceClaim events for the pod and only
+//     checks AssignedPod/Delete hints, so deleting any pod with claims from
+//     the preemptor's nominated node wakes it to pass PreEnqueue.
+//  2. Forgotten assumed pod: if an assumed pod fails in Permit, PreBind, or
+//     Bind, Unreserve drops its pending claim allocations without emitting a
+//     ResourceClaim event, so AssignedPod/Delete is the only signal that those
+//     in-flight devices are free again.
 func (pl *DynamicResources) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := schedutil.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
@@ -231,13 +234,50 @@ func (pl *DynamicResources) isSchedulableAfterAssignedPodDeleted(logger klog.Log
 		deletedPod.Status.Phase == v1.PodSucceeded || deletedPod.Status.Phase == v1.PodFailed {
 		return fwk.QueueSkip, nil
 	}
-	if !pl.nominatedTo(pod, deletedPod.Spec.NodeName) {
-		return fwk.QueueSkip, nil
+	if pl.nominatedTo(pod, deletedPod.Spec.NodeName) {
+		logger.V(5).Info("pod with claims got deleted from the nominated node", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod), "node", deletedPod.Spec.NodeName)
+		return fwk.Queue, nil
 	}
-	logger.V(5).Info("pod with claims got deleted from the nominated node", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod), "node", deletedPod.Spec.NodeName)
-	return fwk.Queue, nil
+	if pl.hasUnallocatedClaim(deletedPod) {
+		logger.V(5).Info("deleted pod has a claim without allocation", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod), "node", deletedPod.Spec.NodeName)
+		return fwk.Queue, nil
+	}
+	return fwk.QueueSkip, nil
 }
 
+// hasUnallocatedClaim reports whether pod references a claim with no committed
+// or pending allocation — the state Unreserve leaves after an assumed pod fails
+// before binding. Missing claims also count because if the pod was deleted
+// before PreBind committed the allocation, GC may have deleted the unallocated
+// claim, whose Delete event does not wake waiting pods.
+func (pl *DynamicResources) hasUnallocatedClaim(pod *v1.Pod) bool {
+	for _, podClaim := range pod.Spec.ResourceClaims {
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &podClaim)
+		if err != nil || claimName == nil {
+			continue
+		}
+		claim, err := pl.draManager.ResourceClaims().Get(pod.Namespace, *claimName)
+		switch {
+		case errors.Is(err, assumecache.ErrNotFound):
+			return true
+		case err != nil, mustCheckOwner && resourceclaim.IsForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) != nil:
+			continue
+		case pl.allocationOrPending(claim) == nil:
+			return true
+		}
+	}
+	return false
+}
+
+// nominatedTo checks both pod.Status.NominatedNodeName and any active hold in
+// preemptionTracker, since pod.Status updates lag behind in-memory nominations.
 func (pl *DynamicResources) nominatedTo(pod *v1.Pod, nodeName string) bool {
-	return pod.Status.NominatedNodeName == nodeName
+	if pod.Status.NominatedNodeName == nodeName {
+		return true
+	}
+	if pl.preemptionTracker == nil {
+		return false
+	}
+	hold := pl.preemptionTracker.hold(pod.UID)
+	return hold != nil && hold.nodeName == nodeName
 }
