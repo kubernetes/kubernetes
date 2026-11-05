@@ -1302,6 +1302,10 @@ type want struct {
 	// after PreBind, as if the actual Bind had failed.
 	unreserveAfterBindFailure *result
 
+	// unreserveAfterBindFailureWithPreemption, if set, overrides
+	// unreserveAfterBindFailure in TestPluginWithPreemption.
+	unreserveAfterBindFailureWithPreemption *result
+
 	// unreserveBeforePreBind, if set, triggers a call to Unreserve
 	// before PreBind, as if the some other PreBind plugin had failed.
 	unreserveBeforePreBind *result
@@ -1589,7 +1593,7 @@ func TestPlugin(t *testing.T) {
 }
 
 // TestPluginWithPreemption re-runs TestPlugin cases with DRAPreemption enabled,
-// verifying behavior stays identical apart from preemption-related status codes.
+// verifying identical behavior apart from expected DRAPreemption differences.
 func TestPluginWithPreemption(t *testing.T) {
 	testPlugin(ktesting.Init(t), true /* preemption */)
 }
@@ -2722,6 +2726,83 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 				},
 			},
 		},
+		"bind-failure-after-allocation": {
+			// PreBind stores the allocation made in this cycle, then binding
+			// fails. Unreserve only removes the pod from ReservedFor, even under
+			// DRAPreemption, because Bind may have bound the pod despite failing.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithClaimName)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
+				},
+			},
+		},
+		"bind-failure-after-allocation-in-podgroup": {
+			// PreBind succeeds for a PodGroup member, then binding fails.
+			// Unreserve only removes the pod from ReservedFor.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: false, features.GenericWorkload: true},
+			pod:              groupedPodWithClaimName,
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{pendingPodGroupClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedPodGroupClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedPodGroupClaim, groupedPodWithClaimName)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+					},
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedPodGroupClaim, groupedPodWithClaimName)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
+				},
+			},
+		},
 		"bind-podgroup-failure": {
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAWorkloadResourceClaims: true, features.GenericWorkload: true},
 			pod:              groupedPodWithClaimName,
@@ -3517,10 +3598,11 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 			},
 		},
 		"unreserve-after-allocation-in-prebind-other-claim-fails": {
-			// PreBind stores the allocation of the first claim, then fails
-			// for the second one. Unreserve cannot remove the reservation,
-			// so the allocation of the first claim must stay in the assume
-			// cache.
+			// PreBind stores the first claim's allocation, then fails on the
+			// second. Without DRAPreemption, Unreserve's ReservedFor patch
+			// fails (failPatch) and the first claim's allocation stays in the
+			// assume cache; with DRAPreemption, Unreserve deallocates it via
+			// UpdateStatus instead.
 			pod:       podWithTwoClaimNames,
 			claims:    []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
 			classes:   []*resourceapi.DeviceClass{deviceClass},
@@ -3567,6 +3649,86 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 				},
 				unreserveAfterBindFailure: &result{
 					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+				},
+				unreserveAfterBindFailureWithPreemption: &result{
+					assumedClaim: st.FromResourceClaim(allocatedClaim).Allocation(nil).Obj(),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = resourceapi.ResourceClaimStatus{}
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
+		"unreserve-after-allocation-in-prebind-deallocation-conflict": {
+			// Like unreserve-after-allocation-in-prebind-other-claim-fails,
+			// but deallocating the first claim conflicts, so Unreserve falls
+			// back to removing the pod from ReservedFor.
+			pod:     podWithTwoClaimNames,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice},
+			reactors: []cgotesting.Reactor{
+				&cgotesting.SimpleReactor{
+					Verb:     "update",
+					Resource: "resourceclaims",
+					Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+						claim, ok := action.(cgotesting.UpdateAction).GetObject().(*resourceapi.ResourceClaim)
+						if !ok || action.GetSubresource() != "status" {
+							return false, nil, nil
+						}
+						switch {
+						case claim.Name == claimName2:
+							return true, nil, apierrors.NewBadRequest("claim status update error")
+						case claim.Status.Allocation == nil:
+							return true, nil, apierrors.NewConflict(resourceapi.Resource("resourceclaims"), claim.Name, errors.New("claim changed"))
+						}
+						return false, nil, nil
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{
+						allocatedClaim,
+						st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj(),
+					},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{
+						addAllocationTimestamp(allocatedClaim),
+						addAllocationTimestamp(st.FromResourceClaim(pendingClaim2).Allocation(allocationResult).Obj()),
+					},
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if in.Name == claimName2 {
+								// Only the finalizer got added before the status update failed.
+								out := in.DeepCopy()
+								out.Finalizers = append(out.Finalizers, resourceapi.Finalizer)
+								return out
+							}
+							return addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames))
+						},
+					},
+					status: fwk.AsStatus(errors.New("claim status update error")),
+				},
+				unreserveAfterBindFailure: &result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithTwoClaimNames)),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if in.Name != claimName {
+								return in
+							}
+							out := in.DeepCopy()
+							out.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{}
+							return out
+						},
+					},
 				},
 			},
 		},
@@ -5350,11 +5512,15 @@ func testPlugin(tCtx ktesting.TContext, preemption bool) {
 					tCtx.Run("prebind", func(tCtx ktesting.TContext) {
 						testCtx.verify(tCtx, tc.want.prebind, initialObjects, tc.pod, nil, preBindStatus)
 					})
-					if tc.want.unreserveAfterBindFailure != nil {
+					wantUnreserve := tc.want.unreserveAfterBindFailure
+					if preemption && tc.want.unreserveAfterBindFailureWithPreemption != nil {
+						wantUnreserve = tc.want.unreserveAfterBindFailureWithPreemption
+					}
+					if wantUnreserve != nil {
 						initialObjects = testCtx.listAll(tCtx)
 						testCtx.p.Unreserve(tCtx, testCtx.state, tc.pod, selectedNodeName)
 						tCtx.Run("unreserverAfterBindFailure", func(tCtx ktesting.TContext) {
-							testCtx.verify(tCtx, *tc.want.unreserveAfterBindFailure, initialObjects, tc.pod, nil, status)
+							testCtx.verify(tCtx, *wantUnreserve, initialObjects, tc.pod, nil, status)
 						})
 					} else if status.IsSuccess() {
 						initialObjects = testCtx.listAll(tCtx)

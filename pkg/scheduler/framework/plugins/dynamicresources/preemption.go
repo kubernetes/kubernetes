@@ -273,21 +273,6 @@ type preemptionSimulationState struct {
 	released map[types.UID]*releasedClaim
 }
 
-// releasedClaim describes a claim whose devices become free once its removed
-// owning pod is gone. Instances are immutable because CycleState clones
-// share them.
-type releasedClaim struct {
-	claim    types.NamespacedName
-	uid      types.UID
-	nodeName string
-	// allocatedDevices are from the claim's committed or in-flight
-	// allocation. Only they are kept: PreBind mutates other fields of an
-	// in-flight AllocationResult, which the claim tracker shares.
-	allocatedDevices *resourceapi.DeviceAllocationResult
-	// podUID is the UID of the owning pod.
-	podUID types.UID
-}
-
 // getPreemptionSimulationState returns nil when DRAPreemption is disabled or
 // the pod has no claims.
 func getPreemptionSimulationState(cs fwk.CycleState) *preemptionSimulationState {
@@ -527,26 +512,28 @@ func (pl *DynamicResources) allocatorForNode(ctx context.Context, state *stateDa
 
 // preemptionMightHelp reports whether Filter should return Unschedulable
 // instead of UnschedulableAndUnresolvable after device allocation fails on
-// nodeInfo, allowing DefaultPreemption to evaluate the node. Callers skip it
-// when a claim of the pod is unavailable on the node: removing pods with lower
-// priority doesn't change that, so the node fails anyway.
+// nodeInfo, allowing DefaultPreemption to evaluate the node.
 //
-// As a fast check without looking up each pod's ResourceClaims, it requires a
-// lower-priority pod with claims on the node, outside a PodGroup (RemovePod
-// releases nothing for those), and at least one node-local device allocated
-// exclusively in allocatedState.
+// As a fast check without looking up each pod's ResourceClaims, it requires
+// at least one exclusively allocated node-local device in allocatedState, plus
+// either a lower-priority non-PodGroup pod with claims on the node or a victim
+// claim on the node still awaiting deallocation. Checking settling victim
+// claims keeps a nominated node returning Unschedulable after its victim pods
+// are gone; otherwise DefaultPreemption would treat it as unusable and preempt
+// elsewhere without consulting PodEligibleToPreempt.
 func (pl *DynamicResources) preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
 	data := state.preemption
 	if data == nil || !data.canPreemptDevices || allocatedState == nil {
 		return false
 	}
+	nodeName := nodeInfo.Node().Name
 	priority := corev1helpers.PodPriority(pod)
 	hasLowerPriorityClaimPod := slices.ContainsFunc(nodeInfo.GetPods(), func(podInfo fwk.PodInfo) bool {
 		other := podInfo.GetPod()
 		return len(other.Spec.ResourceClaims) > 0 && !pl.inPodGroup(other) && corev1helpers.PodPriority(other) < priority
 	})
-	if !hasLowerPriorityClaimPod {
+	if !hasLowerPriorityClaimPod && len(pl.settlingVictimClaims(nodeName, true /* firstOnly */)) == 0 {
 		return false
 	}
-	return data.hasAllocatedNodeLocalDevice(nodeInfo.Node().Name, allocatedState)
+	return data.hasAllocatedNodeLocalDevice(nodeName, allocatedState)
 }

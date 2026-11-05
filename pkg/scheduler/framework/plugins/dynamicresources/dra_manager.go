@@ -54,6 +54,8 @@ type DefaultDRAManager struct {
 	resourceSliceLister   *resourceSliceLister
 	deviceClassLister     *deviceClassLister
 	extendedResourceCache *extendedresourcecache.ExtendedResourceCache
+	// preemptionTracker is only set if the DRAPreemption feature is enabled.
+	preemptionTracker *preemptionTracker
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -71,6 +73,11 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
 		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(logger)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		manager.preemptionTracker = newPreemptionTracker()
+		manager.resourceClaimTracker.cache.AddEventHandler(manager.preemptionTracker.claimHandlers(logger))
 	}
 
 	// Reacting to events is more efficient than iterating over the list
