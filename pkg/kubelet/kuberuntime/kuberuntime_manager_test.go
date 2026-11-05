@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -4465,20 +4466,17 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 	}
 }
 
-func TestGetImageVolumes(t *testing.T) {
-	tCtx := ktesting.Init(t)
-
-	_, _, manager, err := createTestRuntimeManager(tCtx)
-	require.NoError(t, err)
-
+func TestEnsureImageVolumes(t *testing.T) {
 	const (
 		volume1 = "volume-1"
 		volume2 = "volume-2"
+		volume3 = "volume-3"
 		image1  = "image-1:latest"
 		image2  = "image-2:latest"
 	)
 	imageSpec1 := runtimeapi.ImageSpec{Image: image1, UserSpecifiedImage: image1}
 	imageSpec2 := runtimeapi.ImageSpec{Image: image2, UserSpecifiedImage: image2}
+	alreadyPulledSpec := runtimeapi.ImageSpec{Image: "already-pulled"}
 
 	podSandboxConfig := &runtimeapi.PodSandboxConfig{
 		Metadata: &runtimeapi.PodSandboxMetadata{
@@ -4488,28 +4486,73 @@ func TestGetImageVolumes(t *testing.T) {
 		},
 	}
 
-	for _, tc := range map[string]struct {
+	imageVolumes := []v1.Volume{
+		{Name: volume1, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image1, PullPolicy: v1.PullAlways}}},
+		{Name: volume2, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image2, PullPolicy: v1.PullAlways}}},
+		{Name: volume3, VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{}}},
+	}
+
+	for desc, tc := range map[string]struct {
 		pod                      *v1.Pod
+		container                *v1.Container
+		existingPulls            imageVolumePulls
 		expectedImageVolumePulls imageVolumePulls
+		expectedPulledImages     []string
+		expectedNotPulledImages  []string
 	}{
 		"empty volumes": {
 			pod:                      &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{}}},
+			container:                &v1.Container{},
 			expectedImageVolumePulls: imageVolumePulls{},
 		},
+		"container without volume mounts": {
+			pod:                      &v1.Pod{Spec: v1.PodSpec{Volumes: imageVolumes}},
+			container:                &v1.Container{},
+			expectedImageVolumePulls: imageVolumePulls{},
+			expectedNotPulledImages:  []string{image1, image2},
+		},
 		"multiple volumes": {
-			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{
-				{Name: volume1, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image1, PullPolicy: v1.PullAlways}}},
-				{Name: volume2, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image2, PullPolicy: v1.PullAlways}}},
-			}}},
+			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: imageVolumes}},
+			container: &v1.Container{VolumeMounts: []v1.VolumeMount{
+				{Name: volume1}, {Name: volume2}, {Name: volume3},
+			}},
 			expectedImageVolumePulls: imageVolumePulls{
 				volume1: imageVolumePullResult{spec: &imageSpec1},
 				volume2: imageVolumePullResult{spec: &imageSpec2},
 			},
+			expectedPulledImages: []string{image1, image2},
+		},
+		"only volumes mounted by the container are pulled": {
+			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: imageVolumes}},
+			container: &v1.Container{VolumeMounts: []v1.VolumeMount{
+				{Name: volume2},
+			}},
+			expectedImageVolumePulls: imageVolumePulls{
+				volume2: imageVolumePullResult{spec: &imageSpec2},
+			},
+			expectedPulledImages:    []string{image2},
+			expectedNotPulledImages: []string{image1},
+		},
+		"already pulled volumes are not pulled again": {
+			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: imageVolumes}},
+			container: &v1.Container{VolumeMounts: []v1.VolumeMount{
+				{Name: volume1}, {Name: volume2},
+			}},
+			existingPulls: imageVolumePulls{
+				volume1: imageVolumePullResult{spec: &alreadyPulledSpec},
+			},
+			expectedImageVolumePulls: imageVolumePulls{
+				volume1: imageVolumePullResult{spec: &alreadyPulledSpec},
+				volume2: imageVolumePullResult{spec: &imageSpec2},
+			},
+			expectedPulledImages:    []string{image2},
+			expectedNotPulledImages: []string{image1},
 		},
 		"different than image volumes": {
 			pod: &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{
 				{Name: volume1, VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{}}},
 			}}},
+			container:                &v1.Container{VolumeMounts: []v1.VolumeMount{{Name: volume1}}},
 			expectedImageVolumePulls: imageVolumePulls{},
 		},
 		"multiple volumes but one failed to pull": {
@@ -4517,15 +4560,293 @@ func TestGetImageVolumes(t *testing.T) {
 				{Name: volume1, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: image1, PullPolicy: v1.PullAlways}}},
 				{Name: volume2, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "image", PullPolicy: v1.PullNever}}}, // fails
 			}}},
+			container: &v1.Container{VolumeMounts: []v1.VolumeMount{
+				{Name: volume1}, {Name: volume2},
+			}},
 			expectedImageVolumePulls: imageVolumePulls{
 				volume1: imageVolumePullResult{spec: &imageSpec1},
 				volume2: imageVolumePullResult{err: imagetypes.ErrImageNeverPull, msg: `Container image "image" is not present with pull policy of Never`},
 			},
+			expectedPulledImages: []string{image1},
 		},
 	} {
+		t.Run(desc, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			_, fakeImage, manager, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
 
-		imageVolumePulls := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, "", nil)
-		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
+			pulls := imageVolumePulls{}
+			maps.Copy(pulls, tc.existingPulls)
+
+			manager.ensureImageVolumes(tCtx, tc.pod, tc.container, podSandboxConfig, "", nil, pulls)
+			assert.Equal(t, tc.expectedImageVolumePulls, pulls)
+
+			for _, image := range tc.expectedPulledImages {
+				assert.Contains(t, fakeImage.Images, image, "expected image %q to be pulled", image)
+			}
+			for _, image := range tc.expectedNotPulledImages {
+				assert.NotContains(t, fakeImage.Images, image, "expected image %q not to be pulled", image)
+			}
+		})
+	}
+}
+
+// TestSyncPodPullsImageVolumesJustInTime verifies that image volumes are not
+// pulled before the init containers start, but rather just before the first
+// container which mounts them is started.
+func TestSyncPodPullsImageVolumesJustInTime(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	const (
+		initVolume      = "init-volume"
+		initVolumeImage = "init-volume-image:latest"
+		appVolume       = "app-volume"
+		appVolumeImage  = "app-volume-image:latest"
+		unusedVolume    = "unused-volume"
+		unusedImage     = "unused-volume-image:latest"
+	)
+
+	initContainers := []v1.Container{
+		{
+			Name:            "init1",
+			Image:           "init",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+		{
+			Name:            "init2",
+			Image:           "init",
+			ImagePullPolicy: v1.PullIfNotPresent,
+			VolumeMounts:    []v1.VolumeMount{{Name: initVolume, MountPath: "/init"}},
+		},
+	}
+	containers := []v1.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+			VolumeMounts: []v1.VolumeMount{
+				{Name: initVolume, MountPath: "/init"},
+				{Name: appVolume, MountPath: "/app"},
+			},
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers:     containers,
+			InitContainers: initContainers,
+			Volumes: []v1.Volume{
+				{Name: initVolume, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: initVolumeImage, PullPolicy: v1.PullIfNotPresent}}},
+				{Name: appVolume, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: appVolumeImage, PullPolicy: v1.PullIfNotPresent}}},
+				{Name: unusedVolume, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: unusedImage, PullPolicy: v1.PullIfNotPresent}}},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+
+	syncPod := func() {
+		t.Helper()
+		runtimePod, err := m.GetPod(tCtx, pod.UID)
+		if err != nil {
+			runtimePod = &kubecontainer.Pod{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			}
+		}
+		podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+		require.NoError(t, err)
+		result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+		require.NoError(t, result.Error())
+	}
+
+	stopInitContainer := func(name string) {
+		t.Helper()
+		sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID)
+		require.NoError(t, err)
+		id, err := fakeRuntime.GetContainerID(sandboxIDs[0], name, 0)
+		require.NoError(t, err)
+		require.NoError(t, fakeRuntime.StopContainer(tCtx, id, 0))
+	}
+
+	// 1. Only the first init container is started, which does not mount any
+	// image volume, so no image volume should be pulled.
+	syncPod()
+	verifyContainerStatuses(t, fakeRuntime, []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}, "start only the first init container")
+	assert.NotContains(t, fakeImage.Images, initVolumeImage)
+	assert.NotContains(t, fakeImage.Images, appVolumeImage)
+	assert.NotContains(t, fakeImage.Images, unusedImage)
+
+	// 2. The second init container mounts the init volume, which should be
+	// pulled now, but not the app volume.
+	stopInitContainer(initContainers[0].Name)
+	syncPod()
+	verifyContainerStatuses(t, fakeRuntime, []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: initContainers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}, "start the second init container")
+	assert.Contains(t, fakeImage.Images, initVolumeImage)
+	assert.NotContains(t, fakeImage.Images, appVolumeImage)
+	assert.NotContains(t, fakeImage.Images, unusedImage)
+
+	// 3. The app container mounts the app volume, which should be pulled now.
+	// The unused volume is never pulled since no container mounts it.
+	stopInitContainer(initContainers[1].Name)
+	syncPod()
+	verifyContainerStatuses(t, fakeRuntime, []*cRecord{
+		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: initContainers[1].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+		{name: containers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+	}, "start the app container")
+	assert.Contains(t, fakeImage.Images, initVolumeImage)
+	assert.Contains(t, fakeImage.Images, appVolumeImage)
+	assert.NotContains(t, fakeImage.Images, unusedImage)
+}
+
+// TestSyncPodImageVolumePullsWithCrashLoopingContainer verifies that a
+// crashlooping container does not cause image volumes to be re-pulled on
+// every sync. syncs in which the container is skipped because of backoff must
+// not pull any image volume, and a restart must only pull the image volumes
+// mounted by the restarted container.
+func TestSyncPodImageVolumePullsWithCrashLoopingContainer(t *testing.T) {
+	const (
+		volumeName  = "vol"
+		volumeImage = "volume-image:latest"
+	)
+
+	for desc, tc := range map[string]struct {
+		crasherMountsVolume bool
+		// expectedPullsOnRestart is the number of image volume pulls caused by
+		// a sync which actually restarts the crashing container.
+		expectedPullsOnRestart int
+	}{
+		"crashing container does not mount the image volume": {
+			crasherMountsVolume:    false,
+			expectedPullsOnRestart: 0,
+		},
+		"crashing container mounts the image volume": {
+			crasherMountsVolume:    true,
+			expectedPullsOnRestart: 1,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			// Set container images to be present on the node and and use IfNotPresent, so every
+			// PullImage call is an image volume pull.
+			fakeImage.SetFakeImages([]string{"healthy-image:latest", "crasher-image:latest"})
+
+			crasher := v1.Container{
+				Name:            "crasher",
+				Image:           "crasher-image:latest",
+				ImagePullPolicy: v1.PullIfNotPresent,
+			}
+			if tc.crasherMountsVolume {
+				crasher.VolumeMounts = []v1.VolumeMount{{Name: volumeName, MountPath: "/vol"}}
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:            "healthy",
+							Image:           "healthy-image:latest",
+							ImagePullPolicy: v1.PullIfNotPresent,
+							VolumeMounts:    []v1.VolumeMount{{Name: volumeName, MountPath: "/vol"}},
+						},
+						crasher,
+					},
+					Volumes: []v1.Volume{
+						{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: volumeImage, PullPolicy: v1.PullAlways}}},
+					},
+				},
+			}
+
+			// Use a long backoff so that the crashing container stays in
+			// backoff for the remainder of the test.
+			backOff := flowcontrol.NewBackOff(time.Hour, 2*time.Hour)
+
+			countPulls := func() int {
+				fakeImage.Lock()
+				defer fakeImage.Unlock()
+				n := 0
+				for _, c := range fakeImage.Called {
+					if c == "PullImage" {
+						n++
+					}
+				}
+				return n
+			}
+
+			syncPod := func() *kubecontainer.PodSyncResult {
+				t.Helper()
+				runtimePod, err := m.GetPod(tCtx, pod.UID)
+				if err != nil {
+					runtimePod = &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+				}
+				podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+				require.NoError(t, err)
+				result := m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+				return &result
+			}
+
+			crash := func(attempt uint32) {
+				t.Helper()
+				sandboxIDs, err := m.getSandboxIDByPodUID(tCtx, pod.UID)
+				require.NoError(t, err)
+				id, err := fakeRuntime.GetContainerID(sandboxIDs[0], crasher.Name, attempt)
+				require.NoError(t, err)
+				require.NoError(t, fakeRuntime.StopContainer(tCtx, id, 0))
+			}
+
+			// 1. Initial sync starts both containers and pulls the image volume once.
+			require.NoError(t, syncPod().Error())
+			require.Equal(t, 1, countPulls(), "initial sync should pull the image volume once")
+			pullsBeforeRestart := countPulls()
+
+			// 2. The crasher container exits for the first time. It is not in backoff
+			// yet, so it is restarted right away.
+			crash(0)
+			require.NoError(t, syncPod().Error())
+			verifyContainerStatuses(t, fakeRuntime, []*cRecord{
+				{name: "healthy", attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+				{name: crasher.Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+				{name: crasher.Name, attempt: 1, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+			}, "crasher should be restarted")
+			assert.Equal(t, tc.expectedPullsOnRestart, countPulls()-pullsBeforeRestart,
+				"restart should only pull image volumes mounted by the restarted container")
+			pullsAfterRestart := countPulls()
+
+			// 3. The crasher exits again and is now in backoff. Syncs in
+			// which it is skipped must not pull any image volume.
+			crash(1)
+			for i := range 3 {
+				result := syncPod()
+				require.Error(t, result.Error(), "sync %d: crasher should be in backoff", i)
+				verifyContainerStatuses(t, fakeRuntime, []*cRecord{
+					{name: "healthy", attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
+					{name: crasher.Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+					{name: crasher.Name, attempt: 1, state: runtimeapi.ContainerState_CONTAINER_EXITED},
+				}, "crasher should not be restarted while in backoff")
+				assert.Equal(t, 0, countPulls()-pullsAfterRestart,
+					"sync %d: no image volume should be pulled while the crasher is in backoff", i)
+			}
+		})
 	}
 }
 
