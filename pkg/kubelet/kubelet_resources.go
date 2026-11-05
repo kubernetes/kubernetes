@@ -51,6 +51,9 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(ctx context.Context, pod *core
 		allocatable = allocatable.DeepCopy()
 		// Resources supported by the Downward API
 		for _, resource := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage} {
+			if resource == corev1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourcesEphemeralStorage) {
+				continue
+			}
 			if val, exists := pod.Spec.Resources.Limits[resource]; exists && !val.IsZero() {
 				if _, exists := allocatable[resource]; exists {
 					allocatable[resource] = val.DeepCopy()

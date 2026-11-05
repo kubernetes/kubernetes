@@ -3692,3 +3692,35 @@ func TestStaticPolicyAdmissionRejectionType(t *testing.T) {
 		})
 	}
 }
+
+func TestStaticPolicyAllocatePodLevelEphemeralStorageOnly(t *testing.T) {
+	for _, podLevelResourceManagers := range []bool{false, true} {
+		t.Run(fmt.Sprintf("PodLevelResourceManagers=%v", podLevelResourceManagers), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				pkgfeatures.PodLevelResources:                 true,
+				pkgfeatures.PodLevelResourcesEphemeralStorage: true,
+				pkgfeatures.PodLevelResourceManagers:          podLevelResourceManagers,
+			})
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, topoDualSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(logger), map[string]string{})
+			require.NoError(t, err)
+
+			st := &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			}
+			// Static pods skip apiserver defaulting, so pod-level ephemeral-storage can be the only
+			// pod-level resource; it must not demote integer-CPU Guaranteed containers to the shared pool.
+			pod := makePod("es-only-pod", "gu-container", "2000m", "2000m")
+			pod.Spec.Resources = &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+			}
+			container := &pod.Spec.Containers[0]
+
+			require.NoError(t, policy.Allocate(logger, st, pod, container, lifecycle.AddOperation))
+			cset, ok := st.GetCPUSet(string(pod.UID), container.Name)
+			require.True(t, ok, "expected exclusive CPUs for container %s", container.Name)
+			require.Equal(t, 2, cset.Size(), "unexpected exclusive cpuset %s", cset)
+		})
+	}
+}

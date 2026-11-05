@@ -676,6 +676,50 @@ func TestGeneralPredicatesDRANodeAllocatableResources(t *testing.T) {
 	}
 }
 
+func TestGeneralPredicatesPodLevelEphemeralStorage(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := newResourcePod(v1.ResourceList{
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(5, resource.BinarySI),
+	})
+	pod.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(25, resource.BinarySI),
+		},
+	}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 20, 0), Allocatable: makeAllocatableResources(10, 20, 32, 0, 20, 0)},
+	}
+	for _, tt := range []struct {
+		name                            string
+		podLevelEphemeralStorageEnabled bool
+		want                            []PredicateFailureReason
+	}{
+		{name: "gate disabled uses container request"},
+		{
+			name:                            "gate enabled uses pod-level request",
+			podLevelEphemeralStorageEnabled: true,
+			want: []PredicateFailureReason{&InsufficientResourceError{
+				ResourceName: v1.ResourceEphemeralStorage,
+				Requested:    25,
+				Capacity:     20,
+			}},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResources:                 true,
+				features.PodLevelResourcesEphemeralStorage: tt.podLevelEphemeralStorageEnabled,
+			})
+			nodeInfo := schedulerframework.NewNodeInfo()
+			nodeInfo.SetNode(node)
+			if diff := cmp.Diff(tt.want, generalFilter(tCtx.Logger(), pod, nodeInfo)); diff != "" {
+				t.Errorf("unexpected failure reasons (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestRejectPodAdmissionBasedOnOSSelector(t *testing.T) {
 	tests := []struct {
 		name            string

@@ -54,6 +54,8 @@ const (
 	containerEphemeralStorageMessageFmt = "Container %s exceeded its local ephemeral storage limit %q. "
 	// podEphemeralStorageMessageFmt provides additional information for pods which have exceeded their ES limit
 	podEphemeralStorageMessageFmt = "Pod ephemeral local storage usage exceeds the total limit of containers %s. "
+	// podLevelEphemeralStorageMessageFmt provides additional information for pods which have exceeded their pod-level ES limit
+	podLevelEphemeralStorageMessageFmt = "Pod ephemeral local storage usage (%s) exceeds pod-level limit (%s). "
 	// emptyDirMessageFmt provides additional information for empty-dir volumes which have exceeded their size limit
 	emptyDirMessageFmt = "Usage of EmptyDir volume %q exceeds the limit %q. "
 	// inodes, number. internal to this module, used to account for local disk inode consumption.
@@ -1252,13 +1254,26 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 	}
 
 	// Pod level resources will be included in eviction message, along container resources
-	if resourceToReclaim == v1.ResourceMemory && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
-		if podRequest, ok := pod.Spec.Resources.Requests[resourceToReclaim]; ok && podStats.Memory != nil {
-			podUsage := memoryUsage(podStats.Memory)
-			message += fmt.Sprintf(podMessageFmt, pod.Name, podUsage.String(), podRequest.String(), resourceToReclaim)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
+		switch resourceToReclaim {
+		case v1.ResourceMemory:
+			if podRequest, ok := pod.Spec.Resources.Requests[resourceToReclaim]; ok && podStats.Memory != nil {
+				podUsage := memoryUsage(podStats.Memory)
+				message += fmt.Sprintf(podMessageFmt, pod.Name, podUsage.String(), podRequest.String(), resourceToReclaim)
 
-			annotations[OffendingPodKey] = pod.Name
-			annotations[OffendingPodUsageKey] = podUsage.String()
+				annotations[OffendingPodKey] = pod.Name
+				annotations[OffendingPodUsageKey] = podUsage.String()
+			}
+		case v1.ResourceEphemeralStorage:
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage) {
+				if podRequest, ok := pod.Spec.Resources.Requests[resourceToReclaim]; ok && podStats.EphemeralStorage != nil && podStats.EphemeralStorage.UsedBytes != nil {
+					podUsage := resource.NewQuantity(int64(*podStats.EphemeralStorage.UsedBytes), resource.BinarySI)
+					message += fmt.Sprintf(podMessageFmt, pod.Name, podUsage.String(), podRequest.String(), resourceToReclaim)
+
+					annotations[OffendingPodKey] = pod.Name
+					annotations[OffendingPodUsageKey] = podUsage.String()
+				}
+			}
 		}
 	}
 

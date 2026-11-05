@@ -2217,6 +2217,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		apiPodStatus.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
 		opts := resourcehelper.PodResourcesOptions{
 			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			PodLevelResourcesEphemeralStorageEnabled: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 		}
 		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
@@ -2232,6 +2233,7 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 	}
 	opts := resourcehelper.PodResourcesOptions{
 		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEphemeralStorageEnabled: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
@@ -2289,6 +2291,13 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		resources.Limits = make(v1.ResourceList)
 	}
 
+	// Pod-level ephemeral-storage persisted while the feature was enabled must not be reported
+	// once it is disabled, otherwise consumers reading pod status would keep honoring it.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage) {
+		delete(resources.Requests, v1.ResourceEphemeralStorage)
+		delete(resources.Limits, v1.ResourceEphemeralStorage)
+	}
+
 	if cpuRequest != nil {
 		// If both the allocated and actual values are at or below MinShares,
 		// preserve the allocated value in the API to avoid confusion and simplify
@@ -2317,6 +2326,7 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	if _, found := resources.Requests[v1.ResourceMemory]; !found {
 		opts := resourcehelper.PodResourcesOptions{
 			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			PodLevelResourcesEphemeralStorageEnabled: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 		}
 		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
@@ -3049,7 +3059,10 @@ func recordPodLevelResourcesAdmission(pod *v1.Pod) {
 		return false
 	}
 
-	hasPodLevel := resourcehelper.IsPodLevelResourcesSet(pod)
+	hasPodLevel := resourcehelper.IsPodLevelComputeResourcesSet(pod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage) {
+		hasPodLevel = resourcehelper.IsPodLevelResourcesSet(pod)
+	}
 	hasContainerLevel := hasResources(pod.Spec.Containers) || hasResources(pod.Spec.InitContainers)
 
 	var configMode string

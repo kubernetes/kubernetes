@@ -416,7 +416,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 }
 
 func (cm *containerManagerImpl) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 			if cm.cpuManager.GetResourceIsolationLevel(pod, container) != cmqos.ResourceIsolationContainer {
 				return false
