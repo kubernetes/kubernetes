@@ -157,6 +157,27 @@ func TestGetResourceRequest(t *testing.T) {
 			podLevelResourcesEnabled: true,
 		},
 		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: cpu",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceCPU,
+			expectedValue:            10000,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: mem",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceMemory,
+			expectedValue:            52428800,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: ephemeral-storage",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceEphemeralStorage,
+			expectedValue:            1073741824,
+			podLevelResourcesEnabled: true,
+		},
+		{
 			cName:                    "cpu pod without pod level resources but pod level resources feature enabled",
 			pod:                      getPod(containerName, resources{cpuRequest: "9"}),
 			resourceName:             v1.ResourceCPU,
@@ -336,6 +357,7 @@ func TestExtractResourceValue(t *testing.T) {
 
 type resources struct {
 	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
+	ephemeralStorageRequest                                                       string
 }
 
 func defineResources(resources resources) v1.ResourceRequirements {
@@ -355,6 +377,9 @@ func defineResources(resources resources) v1.ResourceRequirements {
 	}
 	if resources.memoryRequest != "" {
 		r.Requests[v1.ResourceMemory] = resource.MustParse(resources.memoryRequest)
+	}
+	if resources.ephemeralStorageRequest != "" {
+		r.Requests[v1.ResourceEphemeralStorage] = resource.MustParse(resources.ephemeralStorageRequest)
 	}
 
 	return r
