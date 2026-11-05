@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	resourcehelper "k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -422,7 +421,7 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	}
 
 	podLevelAndContainerLevelRequests := []v1.ResourceList{}
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
 		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, pod.Spec.Resources.Requests)
 	}
 
