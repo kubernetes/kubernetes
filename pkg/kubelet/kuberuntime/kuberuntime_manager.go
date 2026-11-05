@@ -961,8 +961,10 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 		// allocated resources will never be nil
 		actuatedPodResources, found := m.actuatedState.GetPodLevelResources(pod.UID)
-		if !found || actuatedPodResources == nil {
+		if !found {
 			logger.Error(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "pod", pod.Name)
+		}
+		if actuatedPodResources == nil {
 			// Proceed with the zero-value actuated resources.
 			actuatedPodResources = &v1.ResourceRequirements{}
 		}
