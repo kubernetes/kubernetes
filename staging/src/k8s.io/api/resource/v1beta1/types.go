@@ -524,6 +524,8 @@ type BasicDevice struct {
 	// can also be requested through claims and allocated by the DRA driver.
 	// For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory
 	// dependencies of an accelerator device.
+	// When the device is allocated for a pod's claim, the scheduler records these resources
+	// in the pod's `status.extraNodeAllocatableResources`, as described for mapping and overhead.
 	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
 	// Extended resource names are not permitted as keys.
 	// +optional
@@ -560,7 +562,10 @@ type NodeAllocatableResource struct {
 
 // NodeAllocatableMapping defines how a DRA allocation directly translates into a node allocatable resource quantity.
 // The mapping can be derived from either the count of allocated devices or the specific capacity consumed. These options are mutually exclusive.
-// Kubelet adds this mapped resource quantity from claim to both requests and limits at the pod-level cgroup, and to limits at the container-level cgroup for each container referencing the claim.
+// The scheduler records the mapped quantity in the pod's `status.extraNodeAllocatableResources`: once in the
+// requests and limits of the pod level entry, and in the limits of the container entry of each container
+// referencing the claim, so that each of these containers can use all of it while the pod level entry caps
+// their total usage.
 type NodeAllocatableMapping struct {
 	// capacityKey references a capacity name defined as a key in the
 	// `spec.devices[*].capacity` map. When this field is set, the value associated with
@@ -612,7 +617,7 @@ type NodeAllocatableMapping struct {
 
 // NodeAllocatableOverhead defines auxiliary resource overheads incurred when allocating a device.
 // Overheads can be specified as a fixed cost per pod referencing the claim, a variable cost per container reference, or both.
-// Kubelet accounts for this overhead by adding it to both the pod-level and container-level cgroups of referencing containers.
+// The scheduler records the overhead in the pod's `status.extraNodeAllocatableResources`, as described for perContainer.
 type NodeAllocatableOverhead struct {
 	// perPod is overhead applied once per pod referencing the claim on this node.
 	// This is a flat overhead incurred for every pod referencing the claim.
@@ -625,12 +630,14 @@ type NodeAllocatableOverhead struct {
 	// When both PerPod and PerContainer are specified, the total overhead allocated for each pod referencing
 	// the claim is computed as:
 	// Quantity = PerPod + (PerContainer * NumReferences)
-	// Kubelet accounts for this overhead in cgroups:
-	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
-	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
-	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
-	// PerContainer overhead of a claim referenced by a non-restartable init container is counted towards
-	// the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.
+	// The scheduler records this overhead in the pod's `status.extraNodeAllocatableResources`:
+	// - The pod level entry (requests and limits) gets PerPod + (PerContainer * NumReferences).
+	//   PerContainer of a non-restartable init container counts towards the pod's peak resource
+	//   calculation (see Pod `spec.initContainers`), not for the pod's entire duration.
+	// - The container entry of each referencing container gets PerContainer in its requests,
+	//   and PerPod + PerContainer in its limits.
+	// This allows any single container to use the pod level overhead, while the pod level entry caps
+	// the total usage to account for PerPod exactly once.
 	// +optional
 	// +k8s:optional
 	PerContainer *resource.Quantity `json:"perContainer,omitempty" protobuf:"bytes,2,opt,name=perContainer"`
