@@ -853,26 +853,11 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	}
 }
 
-// KeepOnlyResourceValues strips everything from pod.Spec except the resizable resources,
-// because those are all SetPod initializes in the actuated state (mounted volumes are
-// recorded via SetPodVolume and preserved by SetPod).
-func KeepOnlyResourceValues(pod *v1.Pod) {
-	var spec v1.PodSpec
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		spec.Resources = pod.Spec.Resources
-	}
-	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
-		if !allocation.IsResizableContainer(container, containerType) {
-			continue
-		}
-		actuated := v1.Container{Name: container.Name, Resources: container.Resources}
-		if containerType == podutil.InitContainers {
-			spec.InitContainers = append(spec.InitContainers, actuated)
-		} else {
-			spec.Containers = append(spec.Containers, actuated)
-		}
-	}
-	pod.Spec = spec
+// DropVolumes is the actuated state mask. The actuated state records the whole pod spec except
+// volumes, which the volume manager records as they are mounted (SetPodVolume). Only the
+// containers, pod-level resources and volumes are kept current.
+func DropVolumes(pod *v1.Pod) {
+	pod.Spec.Volumes = nil
 }
 
 // computeVolumeResizeAction determines the actions required (if any) to resize volumes.

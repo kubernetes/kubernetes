@@ -96,6 +96,22 @@ func (s *stateMemory) GetPodVolumes(podUID types.UID) ([]v1.Volume, bool) {
 	return volumes, true
 }
 
+func (s *stateMemory) GetContainer(podUID types.UID, containerName string, containerType podutil.ContainerType) (*v1.Container, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pod, ok := s.pods[podUID]
+	if !ok {
+		return nil, false
+	}
+	for c := range podutil.ContainerIter(&pod.Spec, containerType) {
+		if c.Name == containerName {
+			return c.DeepCopy(), true
+		}
+	}
+	return nil, false
+}
+
 // GetPodLevelResources returns current resources information at pod-level
 func (s *stateMemory) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
 	s.RLock()
@@ -182,7 +198,35 @@ func (s *stateMemory) updatePod(podUID types.UID, mutate func(pod *v1.Pod) error
 }
 
 func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error {
-	err := s.updatePod(podUID, func(pod *v1.Pod) error {
+	err := s.updateContainer(podUID, containerName, containerType, func(c *v1.Container) {
+		c.Resources = *resources.DeepCopy()
+	})
+	if err != nil {
+		return err
+	}
+
+	logger.V(3).Info("Updated container resource information", "podUID", podUID, "containerName", containerName, "resources", resources)
+	return nil
+}
+
+func (s *stateMemory) SetContainer(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, container *v1.Container) error {
+	err := s.updateContainer(podUID, container.Name, containerType, func(c *v1.Container) {
+		*c = *container.DeepCopy()
+	})
+	if err != nil {
+		return err
+	}
+	logger.V(3).Info("Updated container information", "podUID", podUID, "containerName", container.Name)
+	return nil
+}
+
+// updateContainer applies update to the stored container of the given name and type, or else to a
+// new container with only the name set, which it appends to the list for containerType. Only a pod
+// migrated from a V1 checkpoint can have the name under another type, since V1 didn't record
+// container types (see migrateV1ToV2), so the name is first removed from the other lists.
+func (s *stateMemory) updateContainer(podUID types.UID, containerName string, containerType podutil.ContainerType, update func(*v1.Container)) error {
+	return s.updatePod(podUID, func(pod *v1.Pod) error {
+		// Copy on write: storeState encodes the stored pods without holding the lock.
 		pod.Spec.InitContainers = slices.Clone(pod.Spec.InitContainers)
 		pod.Spec.Containers = slices.Clone(pod.Spec.Containers)
 		pod.Spec.EphemeralContainers = slices.Clone(pod.Spec.EphemeralContainers)
@@ -190,7 +234,7 @@ func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID
 		for c, existingType := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
 			if c.Name == containerName {
 				if existingType == containerType {
-					c.Resources = *resources.DeepCopy()
+					update(c)
 					return nil
 				}
 				break
@@ -198,6 +242,7 @@ func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID
 		}
 
 		// Remove the container from any other list before appending it to the list for containerType.
+		// TODO: Remove the move between lists in v1.39, with the V1 checkpoint format.
 		switch containerType {
 		case podutil.InitContainers, podutil.Containers, podutil.EphemeralContainers:
 			pod.Spec.InitContainers = slices.DeleteFunc(pod.Spec.InitContainers, func(c v1.Container) bool { return c.Name == containerName })
@@ -205,7 +250,8 @@ func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID
 			pod.Spec.EphemeralContainers = slices.DeleteFunc(pod.Spec.EphemeralContainers, func(c v1.EphemeralContainer) bool { return c.Name == containerName })
 		}
 
-		container := v1.Container{Name: containerName, Resources: *resources.DeepCopy()}
+		container := v1.Container{Name: containerName}
+		update(&container)
 		switch containerType {
 		case podutil.InitContainers:
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
@@ -219,11 +265,32 @@ func (s *stateMemory) SetContainerResources(logger klog.Logger, podUID types.UID
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
+}
 
-	logger.V(3).Info("Updated container resource information", "podUID", podUID, "containerName", containerName, "resources", resources)
+func (s *stateMemory) RemoveContainers(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, containerNames ...string) error {
+	s.Lock()
+	defer s.Unlock()
+
+	stored, ok := s.pods[podUID]
+	if !ok {
+		return nil
+	}
+	podCopy := *stored
+	remove := func(c v1.Container) bool { return slices.Contains(containerNames, c.Name) }
+	switch containerType {
+	case podutil.InitContainers:
+		podCopy.Spec.InitContainers = slices.DeleteFunc(slices.Clone(stored.Spec.InitContainers), remove)
+	case podutil.Containers:
+		podCopy.Spec.Containers = slices.DeleteFunc(slices.Clone(stored.Spec.Containers), remove)
+	case podutil.EphemeralContainers:
+		podCopy.Spec.EphemeralContainers = slices.DeleteFunc(slices.Clone(stored.Spec.EphemeralContainers), func(c v1.EphemeralContainer) bool {
+			return remove(v1.Container(c.EphemeralContainerCommon))
+		})
+	default:
+		return fmt.Errorf("cannot remove containers %q: unsupported container type %d", containerNames, containerType)
+	}
+	s.pods[podUID] = &podCopy
+	logger.V(3).Info("Removed container information", "podUID", podUID, "containerNames", containerNames)
 	return nil
 }
 

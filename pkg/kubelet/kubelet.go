@@ -815,7 +815,7 @@ func NewMainKubelet(ctx context.Context,
 		}
 	}
 
-	actuatedState, err := state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile, kuberuntime.KeepOnlyResourceValues)
+	actuatedState, err := state.NewStateCheckpoint(logger, rootDirectory, actuatedPodsStateFile, kuberuntime.DropVolumes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}

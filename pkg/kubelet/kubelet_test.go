@@ -556,7 +556,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		token.NewManager(kubelet.kubeClient),
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
 		kubelet.podStartupLatencyTracker,
-		state.NewStateMemory(klog.FromContext(ctx), nil, kuberuntime.KeepOnlyResourceValues),
+		state.NewStateMemory(klog.FromContext(ctx), nil, kuberuntime.DropVolumes),
 	)
 }
 
