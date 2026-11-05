@@ -5423,3 +5423,235 @@ func newQueuedPodGroupInfoForTest(root *PodGroupInfo, pods ...*v1.Pod) *QueuedPo
 	}
 	return pgqi
 }
+
+func TestPodInfoCalculateResourcePodLevelEphemeralStorage(t *testing.T) {
+	gi := int64(1024 * 1024 * 1024)
+	mi := int64(1024 * 1024)
+
+	tests := []struct {
+		name                                     string
+		podLevelResourcesEphemeralStorageEnabled bool
+		pod                                      *v1.Pod
+		wantEphemeralStorage                     int64
+		wantMilliCPU                             int64
+		wantNon0CPU                              int64
+		wantNon0Mem                              int64
+	}{
+		{
+			name:                                     "gate enabled uses pod-level ephemeral-storage request",
+			podLevelResourcesEphemeralStorageEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantEphemeralStorage: 10 * gi,
+			wantMilliCPU:         2000,
+			wantNon0CPU:          2000,
+			wantNon0Mem:          2 * 200 * mi,
+		},
+		{
+			name:                                     "gate disabled ignores pod-level ephemeral-storage while keeping pod-level cpu",
+			podLevelResourcesEphemeralStorageEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			wantEphemeralStorage: 3 * gi,
+			wantMilliCPU:         2000,
+			wantNon0CPU:          2000,
+			wantNon0Mem:          2 * 200 * mi,
+		},
+		{
+			name:                                     "gate disabled treats pod with only pod-level ephemeral-storage as non-PLR for non-zero defaults",
+			podLevelResourcesEphemeralStorageEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name:      "c2",
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			wantEphemeralStorage: 1 * gi,
+			wantMilliCPU:         500,
+			wantNon0CPU:          600,
+			wantNon0Mem:          2 * 200 * mi,
+		},
+		{
+			name:                                     "gate enabled treats pod with only pod-level ephemeral-storage as non-compute-PLR for non-zero defaults",
+			podLevelResourcesEphemeralStorageEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name:      "c2",
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			wantEphemeralStorage: 10 * gi,
+			wantMilliCPU:         500,
+			wantNon0CPU:          600,
+			wantNon0Mem:          2 * 200 * mi,
+		},
+		{
+			name:                                     "gate disabled ignores pod-level ephemeral-storage in status on assigned pod",
+			podLevelResourcesEphemeralStorageEnabled: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "node1",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("2"),
+						v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+				},
+			},
+			wantEphemeralStorage: 3 * gi,
+			wantMilliCPU:         2000,
+			wantNon0CPU:          2000,
+			wantNon0Mem:          2 * 200 * mi,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, tt.podLevelResourcesEphemeralStorageEnabled)
+
+			pi, err := NewPodInfo(tt.pod)
+			if err != nil {
+				t.Fatalf("NewPodInfo() error = %v", err)
+			}
+			got := pi.CalculateResource()
+			if got.Resource.GetEphemeralStorage() != tt.wantEphemeralStorage {
+				t.Errorf("EphemeralStorage = %d, want %d", got.Resource.GetEphemeralStorage(), tt.wantEphemeralStorage)
+			}
+			if got.Resource.GetMilliCPU() != tt.wantMilliCPU {
+				t.Errorf("MilliCPU = %d, want %d", got.Resource.GetMilliCPU(), tt.wantMilliCPU)
+			}
+			if got.Non0CPU != tt.wantNon0CPU {
+				t.Errorf("Non0CPU = %d, want %d", got.Non0CPU, tt.wantNon0CPU)
+			}
+			if got.Non0Mem != tt.wantNon0Mem {
+				t.Errorf("Non0Mem = %d, want %d", got.Non0Mem, tt.wantNon0Mem)
+			}
+		})
+	}
+}

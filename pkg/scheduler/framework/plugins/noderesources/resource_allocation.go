@@ -55,6 +55,7 @@ type resourceAllocationScorer struct {
 	Name                                          string
 	enableInPlacePodVerticalScaling               bool
 	enablePodLevelResources                       bool
+	enablePodLevelResourcesEphemeralStorage       bool
 	enableDRAExtendedResource                     bool
 	enableInPlacePodLevelResourcesVerticalScaling bool
 	// used to decide whether to use Requested or NonZeroRequested for
@@ -241,7 +242,8 @@ func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, reso
 		UseStatusResources: r.enableInPlacePodVerticalScaling,
 		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !r.enablePodLevelResources,
+		SkipPodLevelResources:        !r.enablePodLevelResources,
+		SkipPodLevelEphemeralStorage: !r.enablePodLevelResourcesEphemeralStorage,
 	}
 
 	if !r.useRequested {
