@@ -422,9 +422,10 @@ func (e *PredicateFailureError) GetReason() string {
 func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
 	var reasons []PredicateFailureReason
 	for _, r := range helper.Fits(pod, nodeInfo, nil, helper.ResourceRequestsOptions{
-		EnablePodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		EnableDRAExtendedResource:         utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
-		EnableDRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		EnablePodLevelResources:                 utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		EnablePodLevelResourcesEphemeralStorage: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
+		EnableDRAExtendedResource:               utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnableDRANodeAllocatableResources:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}) {
 		reasons = append(reasons, &InsufficientResourceError{
 			ResourceName: r.ResourceName,

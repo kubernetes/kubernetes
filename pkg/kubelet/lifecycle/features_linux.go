@@ -34,5 +34,25 @@ func isPodLevelResourcesSupported(pod *v1.Pod) PodAdmitResult {
 			Message: "PodLevelResources feature gate is disabled",
 		}
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage) && hasPodLevelEphemeralStorage(pod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  PodLevelResourcesNotAdmittedReason,
+			Message: "PodLevelResourcesEphemeralStorage feature gate is disabled",
+		}
+	}
 	return PodAdmitResult{Admit: true}
+}
+
+func hasPodLevelEphemeralStorage(pod *v1.Pod) bool {
+	if pod == nil || pod.Spec.Resources == nil {
+		return false
+	}
+	if _, ok := pod.Spec.Resources.Requests[v1.ResourceEphemeralStorage]; ok {
+		return true
+	}
+	if _, ok := pod.Spec.Resources.Limits[v1.ResourceEphemeralStorage]; ok {
+		return true
+	}
+	return false
 }

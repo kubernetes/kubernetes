@@ -10058,9 +10058,10 @@ func TestRecordPodLevelResourcesAdmission(t *testing.T) {
 `
 
 	testCases := []struct {
-		name           string
-		pod            *v1.Pod
-		expectedMetric string
+		name                            string
+		pod                             *v1.Pod
+		podLevelEphemeralStorageEnabled bool
+		expectedMetric                  string
 	}{
 		{
 			name: "pod and container level resources",
@@ -10132,10 +10133,37 @@ func TestRecordPodLevelResourcesAdmission(t *testing.T) {
 			},
 			expectedMetric: `kubelet_pod_level_resources_admission_total{config_mode="",qos_class="besteffort"} 1`,
 		},
+		{
+			name: "pod level ephemeral-storage only when gate enabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			podLevelEphemeralStorageEnabled: true,
+			expectedMetric:                  `kubelet_pod_level_resources_admission_total{config_mode="pod_level",qos_class="besteffort"} 1`,
+		},
+		{
+			name: "pod level ephemeral-storage only ignored when gate disabled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			podLevelEphemeralStorageEnabled: false,
+			expectedMetric:                  `kubelet_pod_level_resources_admission_total{config_mode="",qos_class="besteffort"} 1`,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, tc.podLevelEphemeralStorageEnabled)
 			metrics.PodLevelResourcesAdmissionTotal.Reset()
 			recordPodLevelResourcesAdmission(tc.pod)
 

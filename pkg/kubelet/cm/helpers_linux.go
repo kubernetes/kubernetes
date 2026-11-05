@@ -43,13 +43,16 @@ import (
 // (either pod-level or all containers). Skips Guaranteed-like pods where request == limit.
 func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor float64) {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
-	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
+	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		return
 	}
-	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelEphemeralStorage: !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourcesEphemeralStorage),
+	}
+	reqs := resourcehelper.PodRequests(pod, opts)
 	// PodLimits() omits the memory limit unless every container declares it or a pod-level
 	// limit is set, so memoryLimit stays 0 (and memory.high stays unset) otherwise.
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	limits := resourcehelper.PodLimits(pod, opts)
 	memoryRequest := int64(0)
 	memoryLimit := int64(0)
 	if req, found := reqs[v1.ResourceMemory]; found {

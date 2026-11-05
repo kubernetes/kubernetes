@@ -465,7 +465,7 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 		return nil
 	}
 
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		logger.V(2).Info("Allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "podUID", podUID)
 		return nil
 	}
@@ -759,7 +759,7 @@ func regenerateHints(logger klog.Logger, machineState state.NUMANodeMap, pod *v1
 
 func getPodRequestedResources(logger klog.Logger, pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	// If pod-level resources are set, use them directly.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		requestedResources := make(map[v1.ResourceName]uint64)
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
 			if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
@@ -861,7 +861,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 
 	// If the pod has pod-level resources but the feature gate is disabled,
 	// log it and return nil hints to admit the pod without alignment.
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		logger.V(3).Info("Memory Manager pod hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "podUID", pod.UID)
 		return nil
 	}
@@ -871,7 +871,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 	// exclusive allocations. If the sum of exclusive memory requests consumes the
 	// entire pod-level memory budget, no hints will be generated, causing the pod
 	// to be rejected by the Topology Manager.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		if err := p.validatePodScopeResources(logger, pod); err != nil {
 			logger.V(2).Info("Pod admission will fail", "error", err)
 			hints := make(map[string][]topologymanager.TopologyHint)
@@ -886,7 +886,7 @@ func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, po
 		return nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		podBlocks := s.GetPodMemoryBlocks(string(pod.UID))
 		if podBlocks != nil {
 			return regenerateHints(klog.LoggerWithValues(logger, "allocationScope", "pod"), s.GetMachineState(), pod, podBlocks, reqRsrcs)
@@ -937,7 +937,7 @@ func (p *staticPolicy) GetTopologyHints(logger klog.Logger, s state.State, pod *
 
 	// If the pod has pod-level resources but the feature gate is disabled,
 	// log it and return nil hints to admit the pod without alignment.
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		logger.V(3).Info("Memory Manager pod hint generation skipped, pod is using pod-level resources but the PodLevelResourceManagers feature gate is not enabled", "podUID", pod.UID)
 		return nil
 	}
@@ -958,7 +958,7 @@ func getContainerRequestedResources(logger klog.Logger, pod *v1.Pod, container *
 	// For pod-level resource management, a container is only considered for exclusive
 	// memory if its request equals its limit for both the CPU and Memory. This
 	// aligns with the Guaranteed QoS requirement for container-level resources.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) && !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) && !cmqos.IsContainerEquivalentQOSGuaranteed(container) {
 		logger.V(5).Info("Exclusive Memory allocation skipped, container is not eligible, request and limit are not equal", "pod", klog.KObj(pod), "containerName", container.Name)
 		return requestedResources, nil
 	}

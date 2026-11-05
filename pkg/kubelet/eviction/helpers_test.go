@@ -882,6 +882,49 @@ func TestOrderedByExceedsRequestDisk(t *testing.T) {
 	}
 }
 
+func TestRankDiskPressurePodLevelEphemeralStorage(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                 true,
+		features.PodLevelResourcesEphemeralStorage: true,
+	})
+	emptyDir := newVolume("shared", v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}})
+	withPodRequest := func(pod *v1.Pod, request string) *v1.Pod {
+		pod.Spec.Resources = &v1.ResourceRequirements{Requests: newResourceList("", "", request)}
+		return pod
+	}
+	// Two containers write to a shared emptyDir; only pod-level requests cover that usage.
+	below := withPodRequest(newPod("below-pod-request", 0, []v1.Container{
+		newContainer("c1", nil, nil), newContainer("c2", nil, nil),
+	}, []v1.Volume{emptyDir}), "500Mi")
+	exceeds := withPodRequest(newPod("exceeds-pod-request", 0, []v1.Container{
+		newContainer("c1", nil, nil), newContainer("c2", nil, nil),
+	}, []v1.Volume{emptyDir}), "100Mi")
+	exceedsMore := withPodRequest(newPod("exceeds-pod-request-more", 0, []v1.Container{
+		newContainer("c1", nil, nil), newContainer("c2", nil, nil),
+	}, []v1.Volume{emptyDir}), "50Mi")
+	stats := map[*v1.Pod]statsapi.PodStats{
+		// 2*10Mi + 2*5Mi + 200Mi = 230Mi; 270Mi below the pod-level request.
+		below: newPodDiskStats(below, resource.MustParse("10Mi"), resource.MustParse("5Mi"), resource.MustParse("200Mi")),
+		// 230Mi; 130Mi above the pod-level request.
+		exceeds: newPodDiskStats(exceeds, resource.MustParse("10Mi"), resource.MustParse("5Mi"), resource.MustParse("200Mi")),
+		// 230Mi; 180Mi above the pod-level request.
+		exceedsMore: newPodDiskStats(exceedsMore, resource.MustParse("10Mi"), resource.MustParse("5Mi"), resource.MustParse("200Mi")),
+	}
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*v1.Pod{below, exceeds, exceedsMore}
+	rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, v1.ResourceEphemeralStorage)(pods, statsFn)
+
+	expected := []*v1.Pod{exceedsMore, exceeds, below}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod %d: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
 func TestOrderedByPriority(t *testing.T) {
 	low := newPod("low-priority", -134, []v1.Container{
 		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
@@ -3716,6 +3759,117 @@ func TestEvictionMessage(t *testing.T) {
 				}
 				if val != tc.expectedAnnotations[key] {
 					t.Errorf("Unexpected annotation value for %s key found, got: %s, want: %s", key, val, tc.expectedAnnotations[key])
+				}
+			}
+		})
+	}
+}
+
+func TestEvictionMessagePodLevelEphemeralStorage(t *testing.T) {
+	podName := "test-pod"
+	regular1 := "regular1"
+	threshold := []evictionapi.Threshold{}
+	observations := signalObservations{}
+
+	testCases := []struct {
+		name                            string
+		podResources                    v1.ResourceRequirements
+		containerRequests               v1.ResourceList
+		podEphemeralUsed                string
+		containerRootfsUsed             string
+		containerLogsUsed               string
+		podLevelResourcesEnabled        bool
+		podLevelEphemeralStorageEnabled bool
+		wantMessage                     string
+		wantOffendingPodAnnotation      bool
+		wantOffendingPodUsage           string
+	}{
+		{
+			name: "pod-level ephemeral-storage included when gates enabled",
+			podResources: v1.ResourceRequirements{
+				Requests: newResourceList("", "", "250Mi"),
+				Limits:   newResourceList("", "", "1Gi"),
+			},
+			containerRequests:               newResourceList("", "", "100Mi"),
+			podEphemeralUsed:                "600Mi",
+			containerRootfsUsed:             "200Mi",
+			containerLogsUsed:               "50Mi",
+			podLevelResourcesEnabled:        true,
+			podLevelEphemeralStorageEnabled: true,
+			wantMessage: "The node was low on resource: ephemeral-storage. " +
+				"Pod test-pod was using 600Mi, request is 250Mi, has larger consumption of ephemeral-storage. " +
+				"Container regular1 was using 250Mi, request is 100Mi, has larger consumption of ephemeral-storage. ",
+			wantOffendingPodAnnotation: true,
+			wantOffendingPodUsage:      "600Mi",
+		},
+		{
+			name: "pod-level ephemeral-storage ignored in eviction message when feature gate disabled",
+			podResources: v1.ResourceRequirements{
+				Requests: newResourceList("100m", "", "250Mi"),
+				Limits:   newResourceList("200m", "", "1Gi"),
+			},
+			containerRequests:               newResourceList("", "", "100Mi"),
+			podEphemeralUsed:                "600Mi",
+			containerRootfsUsed:             "200Mi",
+			containerLogsUsed:               "50Mi",
+			podLevelResourcesEnabled:        true,
+			podLevelEphemeralStorageEnabled: false,
+			wantMessage: "The node was low on resource: ephemeral-storage. " +
+				"Container regular1 was using 250Mi, request is 100Mi, has larger consumption of ephemeral-storage. ",
+			wantOffendingPodAnnotation: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResources:                 tc.podLevelResourcesEnabled,
+				features.PodLevelResourcesEphemeralStorage: tc.podLevelResourcesEnabled && tc.podLevelEphemeralStorageEnabled,
+			})
+
+			pod := newPodWithInitContainers(podName, 1, tc.podResources, nil, []v1.Container{
+				newContainer(regular1, tc.containerRequests, nil),
+			}, nil)
+
+			podUsedQty := resource.MustParse(tc.podEphemeralUsed)
+			podUsedBytes := uint64(podUsedQty.Value())
+			rootfsQty := resource.MustParse(tc.containerRootfsUsed)
+			rootfsBytes := uint64(rootfsQty.Value())
+			logsQty := resource.MustParse(tc.containerLogsUsed)
+			logsBytes := uint64(logsQty.Value())
+
+			podStats := statsapi.PodStats{
+				PodRef:           statsapi.PodReference{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID)},
+				EphemeralStorage: &statsapi.FsStats{UsedBytes: &podUsedBytes},
+				Containers: []statsapi.ContainerStats{
+					{
+						Name:   regular1,
+						Rootfs: &statsapi.FsStats{UsedBytes: &rootfsBytes},
+						Logs:   &statsapi.FsStats{UsedBytes: &logsBytes},
+					},
+				},
+			}
+			statsFn := func(p *v1.Pod) (statsapi.PodStats, bool) {
+				if p == pod {
+					return podStats, true
+				}
+				return statsapi.PodStats{}, false
+			}
+
+			msg, annotations := evictionMessage(v1.ResourceEphemeralStorage, pod, statsFn, threshold, observations)
+			if msg != tc.wantMessage {
+				t.Errorf("evictionMessage() = %q, want %q", msg, tc.wantMessage)
+			}
+			_, hasOffendingPod := annotations[OffendingPodKey]
+			if hasOffendingPod != tc.wantOffendingPodAnnotation {
+				t.Errorf("OffendingPodKey present = %v, want %v (annotations: %v)", hasOffendingPod, tc.wantOffendingPodAnnotation, annotations)
+			}
+			if tc.wantOffendingPodAnnotation {
+				if annotations[OffendingPodKey] != podName {
+					t.Errorf("OffendingPodKey = %q, want %q", annotations[OffendingPodKey], podName)
+				}
+				if annotations[OffendingPodUsageKey] != tc.wantOffendingPodUsage {
+					t.Errorf("OffendingPodUsageKey = %q, want %q", annotations[OffendingPodUsageKey], tc.wantOffendingPodUsage)
 				}
 			}
 		})

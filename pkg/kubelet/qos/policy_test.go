@@ -1095,3 +1095,30 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 
 	}
 }
+
+func TestGetContainerOOMScoreAdjustPodLevelEphemeralStorageOnly(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                 true,
+		features.PodLevelResourcesEphemeralStorage: true,
+	})
+	// Static pods skip apiserver defaulting, so pod-level ephemeral-storage can be the only
+	// pod-level resource; the container memory request must still drive the score.
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+			},
+			Containers: []v1.Container{{
+				Name: "c1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1000000000")},
+				},
+			}},
+		},
+	}
+	// 1000 - 1000 * 1000000000 / 4000000000
+	const want = 750
+	if got := GetContainerOOMScoreAdjust(pod, &pod.Spec.Containers[0], 4000000000); got != want {
+		t.Errorf("GetContainerOOMScoreAdjust() = %d, want %d", got, want)
+	}
+}
