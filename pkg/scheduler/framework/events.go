@@ -44,6 +44,10 @@ const (
 	UnschedulableTimeout = "UnschedulableTimeout"
 	// AssignedPodResize is the event when an assigned pod with a deferred resize is added to the scheduling queue.
 	AssignedPodResize = "AssignedPodResize"
+	// ResourceClaimHoldReleased is the event emitted when devices held by the
+	// DynamicResources plugin for a nominated pod are released without a
+	// ResourceClaim API update.
+	ResourceClaimHoldReleased = "ResourceClaimHoldReleased"
 )
 
 var (
@@ -65,6 +69,9 @@ var (
 	EventUnschedulableTimeout = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: UnschedulableTimeout}
 	// EventForceActivate is the event when a pod is moved from unschedulableEntities/backoffQ to activeQ.
 	EventForceActivate = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: ForceActivate}
+	// EventResourceClaimHoldReleased uses ResourceClaim/Update so existing
+	// ResourceClaim queueing hints treat released holds like claim deallocations.
+	EventResourceClaimHoldReleased = fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: ResourceClaimHoldReleased}
 )
 
 // PodSchedulingPropertiesChange interprets the update of a pod and returns corresponding UpdatePodXYZ event(s).

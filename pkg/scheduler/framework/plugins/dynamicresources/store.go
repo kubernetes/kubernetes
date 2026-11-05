@@ -28,15 +28,18 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// preemptionStore tracks cross-cycle DRA preemption state (KEP-5690), owned by
-// DefaultDRAManager and shared across scheduler profiles when DRAPreemption is
-// enabled.
+// preemptionStore tracks cross-cycle DRA preemption state (KEP-5690): device
+// holds for nominated preemptors and victim claims awaiting deallocation.
+// Owned by DefaultDRAManager and shared across scheduler profiles when
+// DRAPreemption is enabled.
 //
-// Lock ordering: queueing hints acquire mutex while holding the scheduling
-// queue lock, so callers holding mutex must never call into the scheduling
-// queue.
+// Lock ordering: the scheduling queue invokes AddNomination, RemoveNomination,
+// and queueing hints while holding its own lock, so callers holding mutex must
+// never call into the scheduling queue or make API calls.
 type preemptionStore struct {
 	mutex sync.RWMutex
+	// holds maps nominated pod UIDs to their device holds on the nominated node.
+	holds map[types.UID]*allocation
 	// victimClaims tracks claims of preempted pods awaiting deallocation,
 	// indexed by node name and claim UID. Entries are replaced, never mutated.
 	victimClaims map[string]map[types.UID]*releasedClaim
@@ -45,10 +48,28 @@ type preemptionStore struct {
 	victimClaimNodes map[types.UID]string
 }
 
+// allocation records the devices selected for a pod on nodeName and held while
+// the pod remains nominated there. Instances are immutable and replaced atomically.
+type allocation struct {
+	nodeName string
+	// claims maps UIDs of unallocated user claims to the allocations chosen by Filter.
+	claims map[types.UID]heldClaim
+	// released maps UIDs of victim claims freed during the preemption dry run for
+	// this pod. While those claims are still settling, nodeHolds uses them to
+	// avoid double-counting shared capacity and Filter rejects other pods from
+	// reserving them.
+	released map[types.UID]*releasedClaim
+}
+
+type heldClaim struct {
+	claim      types.NamespacedName
+	allocation *resourceapi.AllocationResult
+}
+
 // releasedClaim describes a claim whose devices become free once the removed
 // or preempted pods using it are gone. Instances are immutable because
-// CycleState clones and preemptionStore share them; updates replace the map
-// entry instead of mutating in place.
+// CycleState clones, holds, and preemptionStore share them; updates replace
+// the map entry instead of mutating in place.
 type releasedClaim struct {
 	claim    types.NamespacedName
 	uid      types.UID
@@ -65,9 +86,37 @@ type releasedClaim struct {
 
 func newPreemptionStore() *preemptionStore {
 	return &preemptionStore{
+		holds:            make(map[types.UID]*allocation),
 		victimClaims:     make(map[string]map[types.UID]*releasedClaim),
 		victimClaimNodes: make(map[types.UID]string),
 	}
+}
+
+// nominate sets podUID's hold and returns any previous hold it replaced.
+func (s *preemptionStore) nominate(podUID types.UID, hold *allocation) *allocation {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	replaced := s.holds[podUID]
+	s.holds[podUID] = hold
+	return replaced
+}
+
+// release deletes and returns podUID's hold if it is on nodeName, or nil otherwise.
+func (s *preemptionStore) release(podUID types.UID, nodeName string) *allocation {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	hold := s.holds[podUID]
+	if hold == nil || hold.nodeName != nodeName {
+		return nil
+	}
+	delete(s.holds, podUID)
+	return hold
+}
+
+func (s *preemptionStore) nominatedAllocation(podUID types.UID) *allocation {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.holds[podUID]
 }
 
 // assumeVictimClaim records a victim's claim as awaiting deallocation. If an

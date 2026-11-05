@@ -645,6 +645,53 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 	completed.Status.Phase = v1.PodSucceeded
 	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, completed), "completed pod whose claim got deallocated")
 	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, preemptionPod("unassigned", "victim-claim").Obj()), "unassigned pod which lost its nomination")
+	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, preemptionPod("unassigned", "victim-claim").Obj()), "unassigned pod which lost its nomination, for a pod which is not nominated")
+
+	// Pod status updates can lag behind in-memory nominations, so nominatedTo
+	// also checks preemptionStore holds.
+	testCtx.p.store.nominate(waiting.UID, &allocation{nodeName: node2Name})
+	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, preemptionPod("victim", "victim-claim").Node(nodeName).Obj()), "pod with a hold on another node")
+	testCtx.p.store.nominate(waiting.UID, &allocation{nodeName: nodeName})
+	require.Equal(tCtx, fwk.Queue, hint(waiting, preemptionPod("victim", "victim-claim").Node(nodeName).Obj()), "pod with a hold on the node")
+}
+
+func TestIsSchedulableAfterAssumedPodForgotten(t *testing.T) {
+	testIsSchedulableAfterAssumedPodForgotten(ktesting.Init(t))
+}
+
+// testIsSchedulableAfterAssumedPodForgotten verifies that AssignedPod/Delete
+// wakes waiting pods when an assumed pod is forgotten after Unreserve dropped
+// its pending claim allocation.
+func testIsSchedulableAfterAssumedPodForgotten(tCtx ktesting.TContext) {
+	waiting := preemptionPod("waiting", "waiting-claim").Obj()
+	running := preemptionPod("running", "allocated-claim").Node(node2Name).Obj()
+	testCtx := setupVictims(tCtx, []*resourceapi.ResourceClaim{
+		preemptionClaim("forgotten-claim").Obj(),
+		preemptionClaim("pending-claim").Obj(),
+		reserve(preemptionClaim("allocated-claim").Allocation(poolAllocation(node2Name, "gpu-0")).Obj(), running),
+	}, nil)
+	logger := klog.FromContext(tCtx)
+	hint := func(deleted *v1.Pod) fwk.QueueingHint {
+		hint, err := testCtx.p.isSchedulableAfterAssignedPodDeleted(logger, waiting, deleted, nil)
+		tCtx.ExpectNoError(err)
+		return hint
+	}
+	pending, err := testCtx.draManager.ResourceClaims().Get(namespace, "pending-claim")
+	tCtx.ExpectNoError(err)
+	pending = pending.DeepCopy()
+	pending.Status.Allocation = poolAllocation(node2Name, "gpu-1")
+	tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(pending.UID, pending))
+
+	require.Equal(tCtx, fwk.Queue, hint(preemptionPod("forgotten", "forgotten-claim").Node(node2Name).Obj()), "pod whose claim lost the pending allocation")
+	require.Equal(tCtx, fwk.Queue, hint(preemptionPod("forgotten-sharer", "allocated-claim", "forgotten-claim").Node(node2Name).Obj()), "pod with an allocated claim and one which lost the pending allocation")
+	require.Equal(tCtx, fwk.QueueSkip, hint(preemptionPod("binding", "pending-claim").Node(node2Name).Obj()), "pod whose claim has a pending allocation")
+	require.Equal(tCtx, fwk.QueueSkip, hint(running), "pod whose claim is allocated")
+	// Clearing an unassigned pod's nomination also fires AssignedPod/Delete
+	// with Spec.NodeName == "" and unallocated claims; it must be skipped.
+	require.Equal(tCtx, fwk.QueueSkip, hint(preemptionPod("unassigned", "forgotten-claim").Obj()), "unassigned pod whose nomination ended")
+	completed := preemptionPod("completed", "forgotten-claim").Node(node2Name).Obj()
+	completed.Status.Phase = v1.PodSucceeded
+	require.Equal(tCtx, fwk.QueueSkip, hint(completed), "completed pod whose claim got deallocated")
 }
 
 func TestEventsToRegisterWithPreemption(t *testing.T) {

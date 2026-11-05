@@ -102,6 +102,10 @@ type stateData struct {
 	// the pod has claims.
 	preemption *preemptionData
 
+	// dryRuns caches per-node Filter results across passes in this cycle and
+	// supplies the device hold to PrepareNomination when DRAPreemption is enabled.
+	dryRuns dryRunResults
+
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
 
@@ -983,7 +987,12 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return nil
 	}
 
+	sim := getSimulationState(cs)
+	// Snapshot holds once so claim checks and the allocator below observe a
+	// consistent view despite concurrent claim and nomination updates.
+	holds := pl.holdsOnNode(state, sim, node.Name)
 	var unavailableClaims []int
+	numDeallocating := 0
 	for index, claim := range state.claims.all() {
 		logger.V(10).Info("filtering based on resource claims of the pod", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 
@@ -991,6 +1000,17 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		if nodeSelector := state.informationsForClaim[index].availableOnNodes; nodeSelector != nil && !nodeSelector.Match(node) {
 			logger.V(5).Info("allocation's node selector does not match", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 			unavailableClaims = append(unavailableClaims, index)
+			continue
+		}
+
+		// Reject claims that a nominated preemptor freed and is waiting to see
+		// deallocated; otherwise this pod would reserve the claim and block
+		// deallocation. Recording it in unavailableClaims also lets PostFilter
+		// deallocate it if unused.
+		if holds.deallocating(claim.UID) {
+			logger.V(5).Info("claim of preempted pods is being deallocated", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+			unavailableClaims = append(unavailableClaims, index)
+			numDeallocating++
 			continue
 		}
 
@@ -1037,6 +1057,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	var allocations []resourceapi.AllocationResult
 	var nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
 	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
+	var simulated *simulatedResult
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
@@ -1075,13 +1096,12 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
 		}
-		// In a preemption dry run, RemovePod may have released victim claims on
-		// this node in cs, so build or reuse an allocator reflecting that state.
-		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, getSimulationState(cs), node.Name)
-		if err != nil {
-			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
-		}
-		allocationResult, err := allocator.Allocate(allocCtx, node, claimsToAllocate)
+		// Allocate against cs's simulated state (victim claims freed by RemovePod
+		// and nominated-pod holds added by AddPod). When holds is nil (such as
+		// pass 2 of RunFilterPluginsWithNominatedPods), allocate reuses an
+		// earlier result for the same released claims so pass 2 and Reserve keep
+		// the devices chosen in pass 1.
+		allocationResult, allocatedState, err := pl.allocate(allocCtx, state, sim, holds, node, claimsToAllocate)
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
@@ -1128,6 +1148,14 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			return status
 		}
 
+		if sim != nil {
+			simulated = &simulatedResult{
+				allocationResults: allocationResult,
+				claims:            heldClaims(claimsToAllocate, allocationResult, extendedResourceClaim, nodeExtendedResourceClaim),
+				released:          sim.releasedOnNode(node.Name),
+			}
+		}
+
 		// Reserve uses this information.
 		allocations = append(allocationResult, pendingResult...)
 
@@ -1144,6 +1172,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		if status != nil {
 			return status
 		}
+	}
+
+	// Only record results when Filter succeeds on this node.
+	if simulated != nil && len(unavailableClaims) == 0 {
+		state.dryRuns.store(node.Name, sim, simulated)
 	}
 
 	// Store information in state while holding the mutex.
@@ -1164,6 +1197,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			state.unavailableClaims.Insert(index)
 		}
 
+		if numDeallocating == len(unavailableClaims) {
+			return statusUnschedulableAndUnresolvable(logger, "resourceclaim of preempted pods is being deallocated", "pod", klog.KObj(pod))
+		}
 		return statusUnschedulableAndUnresolvable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
 
