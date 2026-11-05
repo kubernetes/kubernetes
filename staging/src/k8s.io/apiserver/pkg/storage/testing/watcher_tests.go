@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -2461,6 +2462,19 @@ func RunWatchErrorIsBlockingFurtherEvents(ctx context.Context, t *testing.T, sto
 }
 
 func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interface, isCacher bool, compact Compaction, resync, triggerBookmarks func()) {
+	for i := range 3 {
+		t.Run(fmt.Sprintf("compact=%d", i), func(t *testing.T) {
+			testWatchResync(ctx, t, store, isCacher, compact, resync, triggerBookmarks, i, false)
+		})
+	}
+	for i := range 2 {
+		t.Run(fmt.Sprintf("stall,compact=%d", i), func(t *testing.T) {
+			testWatchResync(ctx, t, store, isCacher, compact, resync, triggerBookmarks, i, true)
+		})
+	}
+}
+
+func testWatchResync(ctx context.Context, t *testing.T, store storage.Interface, isCacher bool, compact Compaction, resync, triggerBookmarks func(), compactIdx int, stall bool) {
 	type testRV string
 	const (
 		rvUnset        testRV = ""
@@ -2470,7 +2484,11 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 		rvBeforeWatch  testRV = "beforeWatch"
 		rvBeforeResync testRV = "beforeResync"
 		rvAfterResync  testRV = "afterResync"
+		stallCount            = 25
 	)
+
+	ns := fmt.Sprintf("ns-%d-%t", compactIdx, stall)
+	otherNs := fmt.Sprintf("other-%d-%t", compactIdx, stall)
 
 	pod1, pod2, pod3 := makePod("1"), makePod("2"), makePod("3")
 	pod1.Labels = map[string]string{"foo": "bar"}
@@ -2481,6 +2499,19 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 	added := func(pod *example.Pod) watch.Event {
 		return watch.Event{Type: watch.Added, Object: pod}
 	}
+
+	stallPods := make([]*example.Pod, stallCount)
+	stallEvents := make([]watch.Event, stallCount)
+	for i := range stallPods {
+		pod := makePod(fmt.Sprintf("stall-%02d", i))
+		pod.Labels = map[string]string{"foo": "bar"}
+		pod.Spec.NodeName = "node-1"
+		stallPods[i] = pod
+		stallEvents[i] = added(pod)
+	}
+	otherNsPod := makePod("other-ns")
+	otherNsPod.Spec.NodeName = "node-2"
+
 	initialBookmarkWithPod1RV := watch.Event{Type: watch.Bookmark, Object: &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: pod1.ResourceVersion, Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}}}
 	initialBookmarkWithPod2RV := watch.Event{Type: watch.Bookmark, Object: &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: pod2.ResourceVersion, Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}}}
 	initialBookmarkWithPod3RV := watch.Event{Type: watch.Bookmark, Object: &example.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: pod3.ResourceVersion, Annotations: map[string]string{metav1.InitialEventsAnnotationKey: "true"}}}}
@@ -2497,6 +2528,8 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 		podsBeforeWatch     []*example.Pod
 		podsBeforeResync    []*example.Pod
 		compactBeforeResync *example.Pod
+		stall               bool
+		compactAfterResync  *example.Pod
 		podsAfterResync     []*example.Pod
 		expect              []watch.Event
 		expectEtcd          []watch.Event
@@ -2882,9 +2915,90 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			pred:              storage.SelectionPredicate{Field: fields.ParseSelectorOrDie("metadata.name=pod-2")},
 			expect:            []watch.Event{added(pod2)},
 		},
+		{
+			name:                "stalled, allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			stall:               true,
+			expectEtcd:          slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod2)}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod2)}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
+		{
+			name:                "stalled, allowWatchBookmarks=true, sendInitialEvents=false, RV=beforeWatch",
+			rv:                  rvBeforeWatch,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			stall:               true,
+			expectEtcd:          slices.Concat([]watch.Event{added(pod2)}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod2)}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
+		{
+			name:              "stalled, allowWatchBookmarks=false, sendInitialEvents=false, RV=beforeWatch",
+			rv:                rvBeforeWatch,
+			sendInitialEvents: ptr.To(false),
+			stall:             true,
+			expect:            slices.Concat([]watch.Event{added(pod2)}, stallEvents, []watch.Event{added(pod3)}),
+		},
+		{
+			name:                "stalled, namespace field selector, allowWatchBookmarks=true, sendInitialEvents=false, RV=beforeWatch",
+			rv:                  rvBeforeWatch,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			pred:                storage.SelectionPredicate{Field: fields.OneTermEqualSelector("metadata.namespace", ns)},
+			stall:               true,
+			expectEtcd:          slices.Concat([]watch.Event{added(pod2)}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod2)}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
+		{
+			name:                "stalled, label selector, allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			pred:                storage.SelectionPredicate{Label: labels.SelectorFromSet(labels.Set{"foo": "bar"})},
+			stall:               true,
+			expectEtcd:          slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
+		{
+			name:                "stalled, indexed field selector, allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			pred:                storage.SelectionPredicate{Field: fields.ParseSelectorOrDie("spec.nodeName=node-1"), IndexFields: []string{"spec.nodeName"}},
+			stall:               true,
+			expectEtcd:          slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
+		{
+			name:                "compacted after stall, allowWatchBookmarks=true, sendInitialEvents=false, RV=beforeWatch",
+			rv:                  rvBeforeWatch,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			stall:               true,
+			compactAfterResync:  stallPods[len(stallPods)-1],
+			expectEtcd:          slices.Concat([]watch.Event{added(pod2)}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod2)}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
+		{
+			name:                "compacted after stall, allowWatchBookmarks=true, sendInitialEvents=true, RV=unset",
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(true),
+			stall:               true,
+			compactAfterResync:  stallPods[len(stallPods)-1],
+			expectEtcd:          slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod2)}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod1), initialBookmarkWithPod1RV, added(pod2)}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
+		{
+			name:                "compacted after stall, indexed field selector, allowWatchBookmarks=true, sendInitialEvents=false, RV=beforeTest",
+			rv:                  rvBeforeTest,
+			allowWatchBookmarks: true,
+			sendInitialEvents:   ptr.To(false),
+			pred:                storage.SelectionPredicate{Field: fields.ParseSelectorOrDie("spec.nodeName=node-1"), IndexFields: []string{"spec.nodeName"}},
+			stall:               true,
+			compactAfterResync:  stallPods[len(stallPods)-1],
+			expectEtcd:          slices.Concat([]watch.Event{added(pod1)}, stallEvents, []watch.Event{added(pod3)}),
+			expectCacher:        slices.Concat([]watch.Event{added(pod1)}, stallEvents, []watch.Event{added(pod3), bookmarkWithPod3RV}),
+		},
 	}
 
-	ns := "ns"
 	createPods := func(pods []*example.Pod) {
 		for _, pod := range pods {
 			pod.Namespace = ns
@@ -2894,7 +3008,7 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 	}
 
 	pod0 := makePod("0")
-	pod0.Namespace = "other"
+	pod0.Namespace = otherNs
 	require.NoError(t, store.Create(ctx, computePodKey(pod0), pod0, pod0, 0))
 	require.NoError(t, store.Delete(ctx, computePodKey(pod0), pod0, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}))
 	compact(ctx, t, pod0.ResourceVersion)
@@ -2910,7 +3024,18 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 	beforeResyncRV := beforeWatchRV + 1
 	afterResyncRV := beforeResyncRV + 1
 
+	var compactBeforeResync, compactAfterResync *example.Pod
+	if !stall {
+		compactBeforeResync = []*example.Pod{nil, pod1, pod2}[compactIdx]
+	} else if compactIdx == 1 {
+		compactAfterResync = stallPods[len(stallPods)-1]
+	}
+
+	activeWatches := 0
 	for _, tt := range tests {
+		if tt.stall != stall || tt.compactBeforeResync != compactBeforeResync || tt.compactAfterResync != compactAfterResync {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			expectedOut := tt.expect
 			if isCacher && tt.expectCacher != nil {
@@ -2922,6 +3047,7 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			if expectedOut == nil {
 				t.Skip("scenario not supported")
 			}
+			activeWatches++
 
 			var rv string
 			switch tt.rv {
@@ -2970,19 +3096,70 @@ func RunTestWatchResync(ctx context.Context, t *testing.T, store storage.Interfa
 			require.NoError(t, watchErr)
 			defer w.Stop()
 
-			TestCheckResultsInStrictOrder(t, w, expectedOut)
+			if isCacher && tt.stall {
+				// Currently cacher drops stalled watcher.
+				matched := MatchWatchEventsPrefix(t, w, expectedOut)
+				require.GreaterOrEqual(t, matched, slices.Index(expectedOut, stallEvents[0]))
+				require.Less(t, matched, slices.Index(expectedOut, stallEvents[len(stallEvents)-1]))
+			} else {
+				TestCheckResultsInStrictOrder(t, w, expectedOut)
+			}
 		})
+	}
+	if activeWatches == 0 {
+		return
+	}
+	var (
+		otherWatch    watch.Interface
+		otherWatchErr error
+	)
+	otherWatchOpened := make(chan struct{})
+	if stall {
+		go func() {
+			defer close(otherWatchOpened)
+			otherWatch, otherWatchErr = store.Watch(ctx, fmt.Sprintf("/pods/%s", otherNs), storage.ListOptions{
+				ResourceVersion: strconv.FormatUint(beforeWatchRV, 10),
+				Predicate:       storage.Everything,
+				Recursive:       true,
+			})
+		}()
 	}
 	time.Sleep(100 * time.Millisecond)
 	if resync != nil {
 		resync()
 	}
+	if stall {
+		<-otherWatchOpened
+		require.NoError(t, otherWatchErr)
+		defer otherWatch.Stop()
+	}
 
 	createPods([]*example.Pod{pod2})
-	compact(ctx, t, pod2.ResourceVersion)
+	if compactBeforeResync != nil {
+		compact(ctx, t, compactBeforeResync.ResourceVersion)
+	}
 	if resync != nil {
 		resync()
 	}
+
+	if stall {
+		createPods(stallPods)
+		otherNsPod.Namespace = otherNs
+		otherNsPod.ResourceVersion = ""
+		require.NoError(t, store.Create(ctx, computePodKey(otherNsPod), otherNsPod, otherNsPod, 0))
+		otherNsEvent := added(otherNsPod)
+		testCheckResult(t, otherWatch, &otherNsEvent)
+		if resync != nil {
+			resync()
+		}
+		if compactAfterResync != nil {
+			compact(ctx, t, compactAfterResync.ResourceVersion)
+			if resync != nil {
+				resync()
+			}
+		}
+	}
+
 	createPods([]*example.Pod{pod3})
 	if triggerBookmarks != nil {
 		triggerBookmarks()

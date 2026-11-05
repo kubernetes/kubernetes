@@ -267,6 +267,29 @@ func TestCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEven
 	}
 }
 
+func MatchWatchEventsPrefix(t *testing.T, w watch.Interface, expectedEvents []watch.Event) (matched int) {
+	for i, expectedEvent := range expectedEvents {
+		select {
+		case res, ok := <-w.ResultChan():
+			if !ok {
+				return i
+			}
+			if co, ok := res.Object.(runtime.CacheableObject); ok {
+				res.Object = co.GetObject()
+			}
+			if withRecordTime, ok := res.Object.(storage.WatchEventWithRecordTime); ok {
+				res.Object = withRecordTime.Unwrap()
+			}
+			expectNoDiff(t, "incorrect event", expectedEvent, res)
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
+			return i
+		}
+	}
+	testCheckStop(t, w)
+	return len(expectedEvents)
+}
+
 func TestCheckNoMoreResultsWithIgnoreFunc(t *testing.T, w watch.Interface, ignore func(watch.Event) bool) {
 	select {
 	case e := <-w.ResultChan():
