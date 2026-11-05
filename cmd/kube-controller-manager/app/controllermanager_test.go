@@ -87,6 +87,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.VolumeAttributesClassProtectionController,
 		names.TTLAfterFinishedController,
 		names.RootCACertificatePublisherController,
+		names.ServiceServingSigner,
 		names.KubeAPIServerClusterTrustBundlePublisherController,
 		names.EphemeralVolumeController,
 		names.StorageVersionGarbageCollectorController,

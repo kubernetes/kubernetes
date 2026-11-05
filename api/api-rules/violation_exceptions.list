@@ -241,6 +241,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ResourceQuotaController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,SAController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ServiceController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ServiceServingSigner
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,StatefulSetController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,TTLAfterFinishedController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ValidatingAdmissionPolicyStatusController
@@ -278,6 +279,10 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,R
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ConcurrentSATokenSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,RootCAFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ServiceAccountKeyFile
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,CABundlePath
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,CACertPath
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,CAKeyPath
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ServiceServingSignerConfiguration,ClusterServiceDomain
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,StatefulSetControllerConfiguration,ConcurrentStatefulSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,TTLAfterFinishedControllerConfiguration,ConcurrentTTLSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ValidatingAdmissionPolicyStatusControllerConfiguration,ConcurrentPolicySyncs
