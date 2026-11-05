@@ -58,8 +58,9 @@ import (
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
@@ -3929,12 +3930,9 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 		// Apply the validation common to all container types
 		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
 
-		restartAlways := false
 		// Apply the validation specific to init containers
 		allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, ctr.RestartPolicyRules, idxPath, opts)...)
-		if ctr.RestartPolicy != nil {
-			restartAlways = *ctr.RestartPolicy == core.ContainerRestartPolicyAlways
-		}
+		restartAlways := podutil.IsRestartableInitContainer(&ctr)
 
 		// Names must be unique within regular and init containers. Collisions with ephemeral containers
 		// will be detected by validateEphemeralContainers().
@@ -5560,15 +5558,12 @@ func validateAppArmorAnnotationsAndFieldsMatchOnCreate(objectMeta metav1.ObjectM
 }
 
 func podSpecHasContainer(spec *core.PodSpec, containerName string) bool {
-	var hasContainer bool
-	podshelper.VisitContainersWithPath(spec, field.NewPath("spec"), func(c *core.Container, _ *field.Path) bool {
+	for c := range podutil.ContainerIter(spec, podutil.AllContainers) {
 		if c.Name == containerName {
-			hasContainer = true
-			return false
+			return true
 		}
-		return true
-	})
-	return hasContainer
+	}
+	return false
 }
 
 const (
@@ -5998,7 +5993,7 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 			// If any container has a restart rule action of RestartAllContainer, it means all container
 			// could be restarted, no matter their own restart policy. Therefore, all container could transition
 			// from terminated to non-terminated states.
-			if podutil.AllContainersCouldRestart(v1PodSpec) {
+			if podutilv1.AllContainersCouldRestart(v1PodSpec) {
 				return allErrs
 			}
 		}
@@ -6012,7 +6007,7 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 					allowed := false
 					for _, c := range v1PodSpec.Containers {
 						if c.Name == oldStatus.Name {
-							allowed = podutil.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
+							allowed = podutilv1.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
 							break
 						}
 					}
@@ -6063,7 +6058,7 @@ func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.Contai
 			// If any container has a restart rule action of RestartAllContainer, it means all container
 			// could be restarted, no matter their own restart policy. Therefore, all container could transition
 			// from terminated to non-terminated states.
-			if podutil.AllContainersCouldRestart(v1PodSpec) {
+			if podutilv1.AllContainersCouldRestart(v1PodSpec) {
 				return allErrs
 			}
 		}
@@ -6077,7 +6072,7 @@ func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.Contai
 					allowed := false
 					for _, c := range v1PodSpec.InitContainers {
 						if c.Name == oldStatus.Name {
-							allowed = podutil.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
+							allowed = podutilv1.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
 							break
 						}
 					}
@@ -6108,7 +6103,7 @@ func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.Contai
 		isRestartableInitCtr := false
 		for _, c := range podSpec.InitContainers {
 			if oldStatus.Name == c.Name {
-				if isRestartableInitContainer(&c) {
+				if podutil.IsRestartableInitContainer(&c) {
 					isRestartableInitCtr = true
 				}
 				break
@@ -6384,11 +6379,8 @@ func validatePodExtendedResourceClaimStatus(status *core.PodExtendedResourceClai
 	}
 
 	containers := make(map[string]*core.Container)
-	for _, c := range spec.InitContainers {
-		containers[c.Name] = &c
-	}
-	for _, c := range spec.Containers {
-		containers[c.Name] = &c
+	for c := range podutil.ContainerIter(spec, podutil.InitContainers|podutil.Containers) {
+		containers[c.Name] = c
 	}
 
 	var allErrs field.ErrorList
@@ -6537,7 +6529,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	// Do not allow removing resource requests/limits on resize.
 	for ix, ctr := range oldPod.Spec.InitContainers {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) && !isRestartableInitContainer(&ctr) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) && !podutil.IsRestartableInitContainer(&ctr) {
 			continue
 		}
 		allErrs = append(allErrs, validateContainerResize(
@@ -6570,7 +6562,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Ensure that only CPU and memory resources are mutable for restartable init containers.
 	var newInitContainers []core.Container
 	for ix, container := range newPodSpecCopy.InitContainers {
-		isRestartable := isRestartableInitContainer(&container)
+		isRestartable := podutil.IsRestartableInitContainer(&container)
 		canResize := isRestartable || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)
 		modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
 
@@ -10020,14 +10012,6 @@ func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *fie
 	}
 	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)
 	return allErrs
-}
-
-// isRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
-func isRestartableInitContainer(initContainer *core.Container) bool {
-	if initContainer == nil || initContainer.RestartPolicy == nil {
-		return false
-	}
-	return *initContainer.RestartPolicy == core.ContainerRestartPolicyAlways
 }
 
 // IsValidIPForLegacyField is a wrapper around validation.IsValidIPForLegacyField that
