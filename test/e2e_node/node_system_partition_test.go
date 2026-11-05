@@ -455,6 +455,60 @@ var _ = SIGDescribe("NodeSystemPartition", framework.WithSerial(), feature.NodeS
 			"only the pod of the configured namespace should be counted in the system partition")
 	})
 
+	ginkgo.It("lets a system pod allocate the huge pages it requests", func(ctx context.Context) {
+		hugepages := map[string]int{hugepagesResourceName2Mi: 5}
+		setHugepages(ctx, hugepages)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			releaseHugepages(ctx, hugepages)
+			// AfterEach has already restarted the kubelet, so restart it again
+			// to drop the released pages from the node capacity.
+			restartKubelet(ctx, true)
+			waitForHugepages(f, ctx, map[string]int{hugepagesResourceName2Mi: 0})
+		})
+		// The restart also makes the kubelet report the pre-allocated pages.
+		configureSystemPartition(ctx, f.Namespace.Name)
+		waitForHugepages(f, ctx, hugepages)
+
+		// fallocate fails if any ancestor cgroup, the partition root included,
+		// limits huge pages below the request, so the pod turns ready only once
+		// the pages are allocated.
+		var gracePeriod int64 = 1
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-in-partition", Namespace: f.Namespace.Name},
+			Spec: v1.PodSpec{
+				RestartPolicy:                 v1.RestartPolicyNever,
+				TerminationGracePeriodSeconds: &gracePeriod,
+				Containers: []v1.Container{
+					{
+						Name:    "busybox",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", "fallocate -l 4194304 /hugepages/pages && touch /tmp/allocated && exec sleep 3600"},
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:           resource.MustParse("100m"),
+								v1.ResourceMemory:        resource.MustParse("64Mi"),
+								hugepagesResourceName2Mi: resource.MustParse("4Mi"),
+							},
+						},
+						VolumeMounts: []v1.VolumeMount{{Name: "hugepages", MountPath: "/hugepages"}},
+						ReadinessProbe: &v1.Probe{
+							ProbeHandler:  v1.ProbeHandler{Exec: &v1.ExecAction{Command: []string{"cat", "/tmp/allocated"}}},
+							PeriodSeconds: 1,
+						},
+					},
+				},
+				Volumes: []v1.Volume{{
+					Name:         "hugepages",
+					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: mediumHugepages}},
+				}},
+			},
+		}
+		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+		expectPodRunsIn(systemPartitionPodCgroupPath(pod, cgroupDriver),
+			"the pod that allocated huge pages should run in the system partition")
+	})
+
 	ginkgo.It("evicts only a system pod when the partition runs low on memory", func(ctx context.Context) {
 		otherNs, err := f.CreateNamespace(ctx, "node-system-partition-eviction-user", nil)
 		framework.ExpectNoError(err)

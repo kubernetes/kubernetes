@@ -167,7 +167,7 @@ func (cm *containerManagerImpl) systemPartitionConfig() *SystemPartitionConfig {
 // partition root. The node allocatable cgroup derives its limits from node
 // capacity, but these are the fixed budget the administrator set aside for
 // system Pods.
-func (cm *containerManagerImpl) systemPartitionCgroupConfig() *CgroupConfig {
+func (cm *containerManagerImpl) systemPartitionCgroupConfig() (*CgroupConfig, error) {
 	spc := cm.NodeConfig.SystemPartition
 	// An unset limit is written out as unlimited rather than left alone, so
 	// that removing it from the config lifts the one a previous kubelet set.
@@ -182,20 +182,28 @@ func (cm *containerManagerImpl) systemPartitionCgroupConfig() *CgroupConfig {
 	if cpus.IsEmpty() {
 		cpus = cm.cpuManager.GetAllCPUs()
 	}
-	resourceParameters := &ResourceConfig{
-		Memory: &memoryLimit,
-		CPUSet: cpus,
+	config := &CgroupConfig{
+		Name: cm.systemPartitionRoot,
+		ResourceParameters: &ResourceConfig{
+			Memory: &memoryLimit,
+			CPUSet: cpus,
+		},
 	}
-	return &CgroupConfig{
-		Name:               cm.systemPartitionRoot,
-		ResourceParameters: resourceParameters,
+	// The partition has no budget for huge pages, so they are left unlimited
+	// here. Each pod is held to its own request, as in the default partition.
+	if err := setHugePagesUnbounded(config); err != nil {
+		return nil, err
 	}
+	return config, nil
 }
 
 // createSystemPartitionCgroups creates the system partition root cgroup so that
 // the partition's QoS hierarchy can be created underneath it.
 func (cm *containerManagerImpl) createSystemPartitionCgroups(logger klog.Logger) error {
-	cgroupConfig := cm.systemPartitionCgroupConfig()
+	cgroupConfig, err := cm.systemPartitionCgroupConfig()
+	if err != nil {
+		return fmt.Errorf("failed to build the system partition cgroup config: %w", err)
+	}
 	if cm.cgroupManager.Exists(cgroupConfig.Name) {
 		return nil
 	}
@@ -211,7 +219,10 @@ func (cm *containerManagerImpl) createSystemPartitionCgroups(logger klog.Logger)
 // system partition root. createSystemPartitionCgroups is a no-op once the cgroup
 // exists, so on a kubelet restart this is what applies them.
 func (cm *containerManagerImpl) enforceSystemPartitionCgroups(logger klog.Logger) error {
-	cgroupConfig := cm.systemPartitionCgroupConfig()
+	cgroupConfig, err := cm.systemPartitionCgroupConfig()
+	if err != nil {
+		return fmt.Errorf("failed to build the system partition cgroup config: %w", err)
+	}
 	spc := cm.NodeConfig.SystemPartition
 	logger.V(2).Info("Enforcing system partition limits", "cgroupName", cgroupConfig.Name,
 		"memoryLimit", spc.MemoryLimit, "cpuset", spc.CPUSet.String())
@@ -271,10 +282,15 @@ func (cm *containerManagerImpl) updateSystemPartitionCPUWeight(logger klog.Logge
 		return nil
 	}
 	cpuShares := MilliCPUToShares(sumPodCPURequests(cm.systemPartitionPods()))
-	return cm.cgroupManager.Update(logger, &CgroupConfig{
+	config := &CgroupConfig{
 		Name:               cm.systemPartitionRoot,
 		ResourceParameters: &ResourceConfig{CPUShares: &cpuShares},
-	})
+	}
+	// Huge pages are rewritten too, as leaving them out would zero them.
+	if err := setHugePagesUnbounded(config); err != nil {
+		return err
+	}
+	return cm.cgroupManager.Update(logger, config)
 }
 
 // sumPodCPURequests sums the CPU requests of the pods, in millicores.

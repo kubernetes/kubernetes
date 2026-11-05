@@ -559,10 +559,18 @@ func TestSystemPartitionCgroupConfig(t *testing.T) {
 				systemPartitionRoot: partitionRoot,
 				cpuManager:          &allCPUsManager{cpus: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)},
 			}
-			got := cm.systemPartitionCgroupConfig()
+			got, err := cm.systemPartitionCgroupConfig()
+			require.NoError(t, err)
 			require.Equal(t, partitionRoot, got.Name)
 			require.Equal(t, tc.wantMemory, *got.ResourceParameters.Memory)
 			require.Equal(t, tc.wantCPUs, got.ResourceParameters.CPUSet.String())
+
+			// The cgroup manager writes 0 for every huge page size missing from
+			// HugePageLimit, so the partition root must carry them all unbounded.
+			require.NotNil(t, got.ResourceParameters.HugePageLimit, "a nil HugePageLimit zeroes hugetlb on the partition root")
+			want := &CgroupConfig{ResourceParameters: &ResourceConfig{}}
+			require.NoError(t, setHugePagesUnbounded(want))
+			require.Equal(t, want.ResourceParameters.HugePageLimit, got.ResourceParameters.HugePageLimit)
 		})
 	}
 }
@@ -803,6 +811,14 @@ func TestUpdateSystemPartitionCPUWeight(t *testing.T) {
 			require.Equal(t, partitionRoot, fakeCM.updates[0].Name)
 			require.Equal(t, *tc.wantShares, *fakeCM.updates[0].ResourceParameters.CPUShares)
 			require.Nil(t, fakeCM.updates[0].ResourceParameters.Memory, "only the weight is written, the memory limit is left alone")
+
+			// Writing only the weight would still zero huge pages, as the cgroup
+			// manager writes 0 for every size missing from HugePageLimit.
+			rc := fakeCM.updates[0].ResourceParameters
+			require.NotNil(t, rc.HugePageLimit, "a nil HugePageLimit zeroes hugetlb on the partition root")
+			want := &CgroupConfig{ResourceParameters: &ResourceConfig{}}
+			require.NoError(t, setHugePagesUnbounded(want))
+			require.Equal(t, want.ResourceParameters.HugePageLimit, rc.HugePageLimit)
 		})
 	}
 }
