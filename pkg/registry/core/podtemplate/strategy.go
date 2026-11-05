@@ -55,7 +55,7 @@ func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 // Validate validates a new pod template.
 func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	template := obj.(*api.PodTemplate)
-	opts := pod.GetValidationOptionsFromPodTemplate(&template.Template, nil)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&template.Template, nil)
 	return corevalidation.ValidatePodTemplate(template, opts)
 }
 
@@ -95,7 +95,7 @@ func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	oldTemplate := old.(*api.PodTemplate)
 
 	// Allow downward api usage of hugepages on pod update if feature is enabled or if the old pod already had used them.
-	opts := pod.GetValidationOptionsFromPodTemplate(&template.Template, &oldTemplate.Template)
+	opts := corevalidation.GetValidationOptionsFromPodTemplate(&template.Template, &oldTemplate.Template)
 	return corevalidation.ValidatePodTemplateUpdate(template, oldTemplate, opts)
 }
 
