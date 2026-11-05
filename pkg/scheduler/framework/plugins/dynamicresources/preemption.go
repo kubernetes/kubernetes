@@ -106,23 +106,6 @@ func (s *simulationState) Clone() fwk.StateData {
 	}
 }
 
-// releasedClaim describes a claim whose devices become free once the removed
-// pods using it are gone. Instances are immutable because CycleState clones
-// share them; updates replace the map entry instead of mutating in place.
-type releasedClaim struct {
-	claim    types.NamespacedName
-	uid      types.UID
-	nodeName string
-	// allocation is the claim's committed or in-flight AllocationResult.
-	// Callers must only read allocation.Devices: an in-flight AllocationResult
-	// is shared with the claim tracker, where PreBind concurrently mutates
-	// AllocationTimestamp.
-	allocation *resourceapi.AllocationResult
-	// pods are the removed pods that use this claim. Re-adding any of them via
-	// AddPod keeps the claim in use and un-releases it.
-	pods map[types.UID]types.NamespacedName
-}
-
 // getSimulationState returns nil when DRAPreemption is disabled or the pod has
 // no claims.
 func getSimulationState(cs fwk.CycleState) *simulationState {
@@ -517,19 +500,25 @@ func (sim *simulationState) applyTo(state *structured.AllocatedState, consumable
 // As a fast check without looking up each pod's ResourceClaims, it requires a
 // lower-priority pod with claims on the node and at least one node-local device
 // allocated in allocatedState.
-func preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
+//
+// Nodes with victim claims still awaiting deallocation also return
+// Unschedulable even after the victim pods are gone: if a nominated node were
+// marked UnschedulableAndUnresolvable, DefaultPreemption would treat it as
+// unusable and preempt on another node without consulting PodEligibleToPreempt.
+func (pl *DynamicResources) preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
 	data := state.preemption
 	if data == nil || !data.canRelease || allocatedState == nil {
 		return false
 	}
+	nodeName := nodeInfo.Node().Name
 	priority := corev1helpers.PodPriority(pod)
 	if !slices.ContainsFunc(nodeInfo.GetPods(), func(podInfo fwk.PodInfo) bool {
 		other := podInfo.GetPod()
 		return len(other.Spec.ResourceClaims) > 0 && corev1helpers.PodPriority(other) < priority
-	}) {
+	}) && len(pl.settlingVictimClaims(nodeName, true)) == 0 {
 		return false
 	}
-	return data.hasAllocatedNodeLocalDevice(nodeInfo.Node().Name, allocatedState)
+	return data.hasAllocatedNodeLocalDevice(nodeName, allocatedState)
 }
 
 func (data *preemptionData) hasAllocatedNodeLocalDevice(nodeName string, state *structured.AllocatedState) bool {

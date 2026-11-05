@@ -195,6 +195,8 @@ type DynamicResources struct {
 	podIndexer     cache.Indexer
 	// podLister is only set if the DRAPreemption feature is enabled.
 	podLister corelisters.PodLister
+	// store is only set if the DRAPreemption feature is enabled.
+	store *preemptionStore
 }
 
 const (
@@ -251,6 +253,9 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	}
 	if fts.EnableDRAPreemption {
 		pl.podLister = fh.SharedInformerFactory().Core().V1().Pods().Lister()
+		if provider, ok := pl.draManager.(preemptionStoreProvider); ok {
+			pl.store = provider.sharedPreemptionStore()
+		}
 	}
 
 	return pl, nil
@@ -302,6 +307,11 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
+	}
+	if pl.fts.EnableDRAPreemption {
+		// Wake nominated preemptors once preempted pods on their node are deleted;
+		// see isSchedulableAfterAssignedPodDeleted.
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted})
 	}
 
 	return events, nil
@@ -1090,7 +1100,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			// incomplete, so preempting a victim in a healthy pool may still
 			// let the pod fit.
 			status := statusUnschedulableAndUnresolvable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
-			if preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+			if pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
 				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
 			}
 			return status
@@ -1112,7 +1122,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
 			status := statusUnschedulableAndUnresolvable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
-			if preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+			if pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
 				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
 			}
 			return status
@@ -1188,6 +1198,11 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, p
 	}
 
 	foundClaim, status := pl.deallocateOrDeletePodClaims(ctx, pod, state)
+	if !foundClaim {
+		if found, victimStatus := pl.deallocateVictimClaims(ctx, pod, state); found {
+			foundClaim, status = true, victimStatus
+		}
+	}
 	if foundClaim && status.Code() == fwk.Unschedulable && state.preemption != nil {
 		// Return UnschedulableAndUnresolvable to short-circuit later PostFilter
 		// plugins (DefaultPreemption) for this cycle: CycleState still reflects
@@ -1276,6 +1291,9 @@ func (pl *DynamicResources) PodGroupPostFilter(
 				continue
 			}
 			foundClaim, status := pl.deallocateOrDeletePodClaims(ctx, pod, podState)
+			if !foundClaim {
+				foundClaim, status = pl.deallocateVictimClaims(ctx, pod, podState)
+			}
 			if status.IsError() {
 				return nil, status
 			}

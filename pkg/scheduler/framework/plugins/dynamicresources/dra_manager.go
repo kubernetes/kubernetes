@@ -54,6 +54,8 @@ type DefaultDRAManager struct {
 	resourceSliceLister   *resourceSliceLister
 	deviceClassLister     *deviceClassLister
 	extendedResourceCache *extendedresourcecache.ExtendedResourceCache
+	// store is only set if the DRAPreemption feature is enabled.
+	store *preemptionStore
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -73,11 +75,29 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 		manager.extendedResourceCache = extendedresourcecache.NewExtendedResourceCache(logger)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		manager.store = newPreemptionStore()
+		manager.resourceClaimTracker.cache.AddEventHandler(manager.store.claimHandlers(logger))
+	}
+
 	// Reacting to events is more efficient than iterating over the list
 	// repeatedly in PreFilter.
 	manager.resourceClaimTracker.cache.AddEventHandler(manager.resourceClaimTracker.allocatedDevices.handlers())
 
 	return manager
+}
+
+// preemptionStoreProvider exposes DefaultDRAManager's preemptionStore without
+// adding package-internal types to fwk.SharedDRAManager; custom SharedDRAManager
+// implementations that omit it do not track DRA preemption state.
+type preemptionStoreProvider interface {
+	sharedPreemptionStore() *preemptionStore
+}
+
+var _ preemptionStoreProvider = &DefaultDRAManager{}
+
+func (s *DefaultDRAManager) sharedPreemptionStore() *preemptionStore {
+	return s.store
 }
 
 func (s *DefaultDRAManager) ResourceClaims() fwk.ResourceClaimTracker {
