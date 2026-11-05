@@ -42,14 +42,12 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
 	}
 
-	// Supported pod level resources will be used instead of container level ones when available
-	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
-
-	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		SkipContainerLevelResources:      hasPodLevelResources,
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		ExcludeOverhead:                  true,
 		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-	})[resourceName]; ok {
+	}
+	if rQuantity, ok := resourcehelper.PodRequests(pod, opts)[resourceName]; ok {
 		requestQuantity.Add(rQuantity)
 	}
 
