@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"slices"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -220,6 +222,13 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte) ([]byte, e
 // gvkSupportsPatchOpenAPIV3 checks if a particular GVK supports the patch operation.
 // It returns an error if the OpenAPI V3 could not be downloaded.
 func (p *Patcher) gvkSupportsPatchOpenAPIV3(gvk schema.GroupVersionKind) (bool, error) {
+	if res, ok := p.OpenAPIV3Root.(openapi3.Resources); ok {
+		consumes, err := res.GetConsumes(gvk, http.MethodPatch)
+		if err != nil {
+			return false, err
+		}
+		return slices.Contains(consumes, string(types.StrategicMergePatchType)), nil
+	}
 	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
 		Group:   p.Mapping.GroupVersionKind.Group,
 		Version: p.Mapping.GroupVersionKind.Version,
@@ -237,7 +246,7 @@ func (p *Patcher) gvkSupportsPatchOpenAPIV3(gvk schema.GroupVersionKind) (bool, 
 					// GVK exists but does not support requestBody. Indication of malformed OpenAPI.
 					return false, nil
 				}
-				if _, ok := path.Patch.RequestBody.Content["application/strategic-merge-patch+json"]; ok {
+				if _, ok := path.Patch.RequestBody.Content[string(types.StrategicMergePatchType)]; ok {
 					return true, nil
 				}
 				// GVK exists but strategic-merge-patch is not supported. Likely to be a CRD or aggregated resource.
@@ -275,7 +284,21 @@ func gvkMatchesSingle(targetGVK schema.GroupVersionKind, ext spec.Extensions) bo
 		gvkMap["kind"] == targetGVK.Kind
 }
 
+// buildStrategicMergePatchFromOpenAPIV3 calculates a three-way strategic merge
+// patch using the resource's OpenAPI V3 schema, using the cached GVK index when
+// p.OpenAPIV3Root implements openapi3.Resources.
 func (p *Patcher) buildStrategicMergePatchFromOpenAPIV3(original, modified, current []byte) ([]byte, error) {
+	if res, ok := p.OpenAPIV3Root.(openapi3.Resources); ok {
+		c, schemas, err := res.SchemaForGVK(p.Mapping.GroupVersionKind)
+		if err != nil {
+			return nil, err
+		}
+		if c == nil {
+			return nil, nil
+		}
+		lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPIV3{Schema: c, SchemaList: schemas}
+		return strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite)
+	}
 	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
 		Group:   p.Mapping.GroupVersionKind.Group,
 		Version: p.Mapping.GroupVersionKind.Version,

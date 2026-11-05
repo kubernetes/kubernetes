@@ -80,5 +80,5 @@ func (f FakeGroupVersion) Schema(contentType string) ([]byte, error) {
 
 // ServerRelativeURL returns an empty string.
 func (f FakeGroupVersion) ServerRelativeURL() string {
-	panic("unimplemented")
+	return ""
 }
