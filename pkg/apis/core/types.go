@@ -1299,7 +1299,7 @@ type SecretVolumeSource struct {
 	Optional *bool
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -1604,7 +1604,7 @@ type DownwardAPIVolumeSource struct {
 	DefaultMode *int32
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -1629,7 +1629,7 @@ type DownwardAPIVolumeFile struct {
 	Mode *int32
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -1913,7 +1913,7 @@ type ConfigMapVolumeSource struct {
 	Optional *bool
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -1965,7 +1965,7 @@ type ServiceAccountTokenProjection struct {
 	Path string
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -1995,7 +1995,7 @@ type ClusterTrustBundleProjection struct {
 
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -2074,7 +2074,7 @@ type PodCertificateProjection struct {
 
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
@@ -2093,7 +2093,7 @@ type ProjectedVolumeSource struct {
 	DefaultMode *int32
 	// The owner UID of the created files by default.
 	// The defaultUser field is only used as a fallback when the item-level user field is unset.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	DefaultUser *int64
@@ -2135,7 +2135,7 @@ type KeyToPath struct {
 	Mode *int32
 	// The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	// +featureGate=AtomicWriteVolumeUserFields
 	// +optional
 	User *int64
