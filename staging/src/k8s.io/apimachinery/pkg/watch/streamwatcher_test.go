@@ -17,6 +17,7 @@ limitations under the License.
 package watch_test
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -28,8 +29,9 @@ import (
 )
 
 type fakeDecoder struct {
-	items chan Event
-	err   error
+	items    chan Event
+	err      error
+	closeErr error
 }
 
 func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err error) {
@@ -38,6 +40,9 @@ func (f fakeDecoder) Decode() (action EventType, object runtime.Object, err erro
 	}
 	item, open := <-f.items
 	if !open {
+		if f.closeErr != nil {
+			return action, nil, f.closeErr
+		}
 		return action, nil, io.EOF
 	}
 	return item.Type, item.Object, nil
@@ -50,11 +55,9 @@ func (f fakeDecoder) Close() {
 }
 
 type fakeReporter struct {
-	err error
 }
 
 func (f *fakeReporter) AsObject(err error) runtime.Object {
-	f.err = err
 	return runtime.Unstructured(nil)
 }
 
@@ -120,5 +123,28 @@ func TestStreamWatcherRace(t *testing.T) {
 	_, ok := <-sw.ResultChan()
 	if ok {
 		t.Fatalf("unexpected pending send")
+	}
+}
+
+func TestStreamWatcherStopNoError(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		fd := fakeDecoder{
+			items:    make(chan Event),
+			closeErr: errors.New("stream closed"),
+		}
+		fr := &fakeReporter{}
+		//nolint:logcheck // Intentionally uses the old API.
+		sw := NewStreamWatcher(fd, fr)
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			if evt, ok := <-sw.ResultChan(); ok {
+				t.Errorf("iteration %d: unexpected event after Stop: %#v", i, evt)
+			}
+		}()
+
+		sw.Stop()
+		<-done
 	}
 }
