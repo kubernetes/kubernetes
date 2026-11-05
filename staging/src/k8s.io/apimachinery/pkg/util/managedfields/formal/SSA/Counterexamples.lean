@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -/
 import SSA.Fixtures
+import SSA.Boundary
 
 namespace SSA.Counterexamples
 
@@ -148,7 +149,82 @@ theorem required_root_creation_and_rejection_of_omission :
 theorem required_root_cannot_be_omitted :
     writeScoped rootScopes .full [] createdRoot (leave "A") = .error .orphanedItem := rfl
 
+def keyOnlySchema : Schema := [⟨item,.none⟩]
+def createList := request "A" [itemCell,hostCell] [listCell]
+def emptyList := request "A" [] [listCell]
+def populatedList := run .current keyOnlySchema {} [createList]
+def firstEmptyList := run .current keyOnlySchema populatedList [emptyList]
+def secondEmptyList := run .current keyOnlySchema firstEmptyList [emptyList]
+
+/-- Releasing the last item's old claims also removes the explicitly supplied empty list. -/
+theorem raw_empty_list_first_apply_loses_presence :
+    applyWith .current keyOnlySchema populatedList emptyList = .ok firstEmptyList ∧
+    firstEmptyList.cells = [] ∧ firstEmptyList.claims = [] := by
+  constructor
+  · rfl
+  · decide
+
+/-- The identical request then creates that list, without acquiring a list-presence claim. -/
+theorem raw_empty_list_second_apply_adds_presence :
+    applyWith .current keyOnlySchema firstEmptyList emptyList = .ok secondEmptyList ∧
+    secondEmptyList.cells = [listCell] ∧ secondEmptyList.claims = [] := by
+  constructor
+  · rfl
+  · decide
+
+/-- Presence is observable: this refutes exact and data-level immediate raw idempotence. -/
+theorem raw_apply_is_not_unconditionally_idempotent :
+    ¬ (∀ before after : State, ∀ r : Request,
+      applyWith .current keyOnlySchema before r = .ok after →
+      applyWith .current keyOnlySchema after r = .ok after) := by
+  intro idempotent
+  have repeated := idempotent populatedList firstEmptyList emptyList
+    raw_empty_list_first_apply_loses_presence.1
+  have cells := congrArg (fun result => (commit firstEmptyList result).cells) repeated
+  have different : secondEmptyList.cells ≠ firstEmptyList.cells := by decide
+  exact different cells
+
+/-- No additional required metadata means the PR has exactly the same counterexample. -/
+theorem pr_has_same_empty_list_counterexample :
+    applyWith .predrag keyOnlySchema populatedList emptyList = .ok firstEmptyList ∧
+    applyWith .predrag keyOnlySchema firstEmptyList emptyList = .ok secondEmptyList ∧
+    firstEmptyList.cells ≠ secondEmptyList.cells := by
+  exact ⟨rfl,rfl,by decide⟩
+
+/-- OpenAPI required or CEL has(self.items) accepts an empty list but rejects absence. -/
+def requiresList : Boundary.Policy := ⟨id, fun _ after => after.hasContainer items⟩
+
+def validatedEmptyList (before : State) : State :=
+  commit before (Boundary.finish keyOnlySchema requiresList before
+    (applyWith .current keyOnlySchema before emptyList))
+
+/-- The original populated value and the requested empty value both satisfy list presence. -/
+theorem required_list_request_is_valid_but_proposal_is_rejected :
+    requiresList.validate populatedList populatedList = true ∧
+    requiresList.validate populatedList ⟨emptyList.cells,[]⟩ = true ∧
+    Boundary.finish keyOnlySchema requiresList populatedList
+      (applyWith .current keyOnlySchema populatedList emptyList) = .error .invalidResult := by
+  exact ⟨rfl,rfl,rfl⟩
+
+def retryEmptyList : Nat → State
+  | 0 => populatedList
+  | attempts + 1 => validatedEmptyList (retryEmptyList attempts)
+
+/-- Rejection prevents reaching the second raw state, regardless of the finite retry count. -/
+theorem required_list_retries_never_empty_the_list (attempts : Nat) :
+    retryEmptyList attempts = populatedList := by
+  induction attempts with
+  | zero => rfl
+  | succ attempts ih =>
+      change validatedEmptyList (retryEmptyList attempts) = _
+      rw [ih]
+      rfl
+
 def fixtures : List Fixture := [
+  { name := "raw-empty-list-repetition-changes-presence",schema := keyOnlySchema,semantics := .current
+    steps := [⟨createList,{present := [itemCell,hostCell]}⟩,
+      ⟨emptyList,{absent := [items,item,host]}⟩,
+      ⟨emptyList,{present := [listCell],absent := [item,host]}⟩] },
   { name := "required-root-creation-and-protected-omission",schema := [],objects := rootScopes
     steps := [⟨createRoot,{present := [valueAt rootField]}⟩,
       ⟨leave "A",{error := some .orphanedItem,present := [valueAt rootField]}⟩] },

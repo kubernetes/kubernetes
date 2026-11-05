@@ -46,7 +46,7 @@ guarantees.
 | BASE-05 | Asserting the same values cannot alone cause an ownership conflict. | Shared-ownership cases; KEP cooperative-management goal. | `Contracts.equal_writes_do_not_conflict`. Other guards may still reject the request. |
 | BASE-06 | Force transfers conflicting value claims, while equal-value claims may remain shared. | [Apply/Update/force test][conflict]. | `Contracts.force_transfers_changed_claim` and `Contracts.unchanged_foreign_claim_preserved` concern `updatedClaims`; subsequent lifetime deletion can still remove a subtree, and acceptance requires valid values and complete item ownership. |
 | BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | `Contracts.shared_omission_preserves_value` and `Contracts.handoff_preserves_full_successor` prove safety under explicit ownership and lifetime assumptions. `Progress.unchanged_snapshot_acquisition` proves fresh-manager acquisition; Update now has its own transition. Arbitrary validator-constrained release progress remains conditional. |
-| BASE-08 | Repeating the same intent by the same manager without intervening writes is observationally idempotent. | [Semantic no-op test][noop], [defaulted CRD no-op test][default-noop]. | `Contracts.accepted_apply_idempotent` proves immediate repetition succeeds with exactly the same model state, including force. `Contracts.repeated_apply_observationally_equal` exposes the weaker observation-level result. Defaulting, resourceVersion, and persistence are outside the model. |
+| BASE-08 | Repeating the same intent by the same manager without intervening writes is observationally idempotent. | [Semantic no-op test][noop], [defaulted CRD no-op test][default-noop]. | **Refuted as an unrestricted baseline law.** `Counterexamples.raw_apply_is_not_unconditionally_idempotent` supplies an empty-associative-list witness, reproduced through CRD HTTP and both pinned SMD revisions. `Contracts.accepted_apply_idempotent` proves the stronger proposed item-core transition only. See [the counterexample](docs/baseline-empty-list.md). |
 | BASE-09 | Atomic units cannot be partially overwritten; granular sibling fields can be independently managed. | [KEP topology][topology]. | Atoms are opaque scalar cells. The independent bridge corpus exercises both topologies against managedfields. General topology mapping and independent-request commutativity remain unproved. |
 | BASE-10 | Field sets and paths survive serialization round trips. | [Fields round trip][roundtrip], KEP testing plan. | `FieldsV1.root_roundtrip` and `root_membership_roundtrip` prove arbitrary-depth canonical trie/object-grammar round trips, including `{}` and `"."` membership. JSON bytes and path-element parsing remain unproved. The Go bridge additionally checks the real FieldsV1 round trip after every request, including API version and operation. |
 | BASE-11 | API-version conversion preserves the intended correspondence of values and claims. | [ManagedFields version conversion test][conversion]. | Outside the model; no theorem assumes that all schema conversions are invertible. |
@@ -56,7 +56,7 @@ No unrestricted commutativity or confluence is asserted. Conflicting requests,
 force transfers, shared lifetime boundaries, and cross-field validation can make
 request order observable.
 
-## General transition theorems
+## General proposed-core transition theorems
 
 The public contract theorems are in [SSA/Contracts.lean](SSA/Contracts.lean).
 They quantify over arbitrary finite model states, schemas, and requests, rather
@@ -152,6 +152,9 @@ In particular:
 | Source orchestration | `PruneSource.imported_prune_matches_spec` | Complete Go AST of `prune`; nil/empty early exits, initial conversion, both restoration phases, errors and final conversion. Callees are explicit contracts. |
 | Pruning composition | `PruningRefinement.single_version_pruning_refinement` | Realizes all three callee contracts from imported helpers and equates source pruning to the three-pass model, for arbitrary states/field sets and any finite nonempty same-version manager map. Typed/set primitive implementations remain obligations. |
 | Field-set normalization | `FieldPathSet.paths_membership`, `flat_difference_refines_trie`, `flat_intersection_refines_trie` | Arbitrary finite trie depth. Ordinary membership difference is distinct from subtree removal. Raw selection may retain empty structural nodes, so this is not a JSON codec theorem. |
+| Baseline idempotence counterexample | `Counterexamples.raw_apply_is_not_unconditionally_idempotent`, `pr_has_same_empty_list_counterexample` | Explicit accepted raw transitions change field presence on immediate repetition. The universal baseline proposition is therefore false, independently of the PR. |
+| Source counterexample | `RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list` | Imported pruning AST with all callees realized, normalized primitives and every lawful iteration schedule; checked against actual Go and API execution. |
+| Required-list retry failure | `Counterexamples.required_list_retries_never_empty_the_list` | Every finite retry count under the explicit presence validator; the real OpenAPI and CEL implementations reproduce the rejection through HTTP. |
 
 `SSA/Counterexamples.lean` kernel-checks the raw PR fragmentation, partial-owner
 deletion, required-map shortcut, required-list failure, and opposite roles in
@@ -192,7 +195,12 @@ the actual PR modes expose that problem instead of assuming it solved.
 
 The general exact idempotence theorem concerns the proposed item-core `apply`,
 not arbitrary admission policies, Update, or the entire added object-scope
-operation. The original history theorem is a core safety induction; `scoped_history_preserves_invariants` also covers mixed scoped Apply/Update histories. The boundary
+operation. The unrestricted current-SSA version is false: an explicitly applied
+empty list can disappear on the first request and reappear on the second.
+The Kubernetes HTTP regression additionally observes a later synthetic Update
+owner from `skipNonAppliedManager`, outside the inner SMD bridge. These are
+documented counterexamples, not suppressed comparison discrepancies.
+The original history theorem is a core safety induction; `scoped_history_preserves_invariants` also covers mixed scoped Apply/Update histories. The boundary
 composition theorems and bounded implementation comparisons are additional,
 different forms of evidence.
 

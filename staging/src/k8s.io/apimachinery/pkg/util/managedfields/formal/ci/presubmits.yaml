@@ -13,13 +13,16 @@ presubmits:
     path_alias: k8s.io/kubernetes
     always_run: false
     optional: false
-    run_if_changed: '^(staging/src/k8s.io/apimachinery/|vendor/sigs.k8s.io/structured-merge-diff/|vendor/modules.txt|go.mod|go.work)'
+    run_if_changed: '^(staging/src/k8s.io/(apimachinery|apiextensions-apiserver)/|vendor/sigs.k8s.io/structured-merge-diff/|vendor/modules.txt|go.mod|go.work)'
     spec:
       containers:
       - image: gcr.io/k8s-staging-test-infra/kubekins-e2e:v20261102-7f9e993948-master
         command:
         - bash
-        - staging/src/k8s.io/apimachinery/pkg/util/managedfields/formal/ci/verify.sh
+        - -c
+        - >-
+          bash staging/src/k8s.io/apimachinery/pkg/util/managedfields/formal/ci/verify.sh &&
+          bash staging/src/k8s.io/apimachinery/pkg/util/managedfields/formal/ci/verify-apiserver.sh
         resources:
           requests:
             cpu: "4"

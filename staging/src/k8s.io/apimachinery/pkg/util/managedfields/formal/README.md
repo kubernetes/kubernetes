@@ -77,6 +77,18 @@ this case. Its synthetic required-list examples do not establish compatibility
 with the current implementation. The actual-wire modes preserve the missing
 marker and demonstrate the PR's resulting misclassification.
 
+## Baseline counterexample
+
+Unconditional immediate idempotence is false for current SSA: after A owns a
+nonempty associative list, the first Apply of `endpoints: []` removes the field;
+the second identical request creates `[]`. OpenAPI `required` or CEL
+`has(self.endpoints)` rejects the first transition and every identical retry,
+although empty-list creation is valid. The counterexample is kernel-checked,
+connected to the imported pruning source with normalized primitives, and
+reproduced through actual CRD HTTP requests and etcd. The default pipeline also
+bootstraps an Update owner on a later retry. See the
+[requests, cause, exact proof boundaries and checks](docs/baseline-empty-list.md).
+
 ## What is checked
 
 - General core laws: scalar conflicts, equal-value co-ownership, force transfer,
@@ -95,6 +107,8 @@ marker and demonstrate the PR's resulting misclassification.
   block a handoff; no unconditional availability claim is made.
 - Exact finite counterexamples for PR #336: ownership fragmentation followed by
   partial deletion, required-map member shortcut, and required granular lists.
+- Baseline counterexample: empty-list Apply changes data on repetition; a
+  presence validator makes every finite number of identical retries fail.
 - General PR compatibility: with no additional required metadata, `predrag` and
   `current` transitions are equal for every finite state and normalized request.
 
@@ -148,6 +162,11 @@ remain explicit primitive contracts. Their Go implementations and the remaining
 updater/request pipeline are further proof obligations. The multi-version
 source orchestration contract does not establish semantic correctness of API
 conversions. No generated AST digest substitutes for those proofs.
+
+`RawSourceCounterexamples` instantiates this complete pruning chain for both
+empty-list transitions, with all callees realized under every lawful map
+schedule. The actual typed/set implementations are still separate from those
+normalized primitive instances.
 
 `FieldsV1` independently proves the recursive trie/object-grammar round trip at
 arbitrary finite depth, including leaf `{}` membership and the `"."` marker
@@ -222,6 +241,11 @@ rechecks proof terms with `leanchecker --fresh Main`, rejects five negative
 audit probes, checks/regenerates fixture JSON, runs Go tests and both upstream
 comparisons, and rejects a stale HTML explorer. No check is skipped. Prow setup
 in [ci](ci/README.md) requires a separate test-infra activation.
+
+In a Kubernetes checkout, `bash ci/verify-apiserver.sh` additionally runs the
+actual HTTP/etcd counterexample, Required/CEL rejection and ownership bootstrap.
+The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
+to Kubernetes integration testing and is unavailable in published apimachinery.
 
 Regenerate the fixtures and explorer after model changes:
 

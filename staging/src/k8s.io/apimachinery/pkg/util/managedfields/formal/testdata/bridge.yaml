@@ -210,3 +210,20 @@ cases:
   - manager: B
     apply: {}
     expect: {object: {}, owners: {}}
+- name: empty-list-repetition-changes-presence
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old}]}
+    expect:
+      object: {items: [{name: db, host: old}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {}, owners: {}}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {items: []}, owners: {}}
+  - manager: A
+    apply: {items: []}
+    expect: {object: {items: []}, owners: {}}

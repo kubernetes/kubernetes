@@ -170,9 +170,9 @@
     "sketch": "Exact actor claims imply no releases and no deletion roots. The first success establishes stable cell/claim list forms, so replacing the same writes and claims changes neither list."
   },
   "SSA.Contracts.accepted_apply_idempotent": {
-    "title": "Repeating successful Apply succeeds with the same state",
+    "title": "Proposed core: repeating successful Apply returns the same state",
     "meaning": "For every schema, state, and request: if the first Apply succeeds, the immediate repetition succeeds and returns exactly that result, even with force.",
-    "limits": "This proves the proposed item-core Apply, with no intervening operation. Scoped histories, Update and admission composition have separate theorems; arbitrary admission is not part of this idempotence result.",
+    "limits": "This proves the proposed item-core Apply, with no intervening operation. Scoped histories, Update and admission composition have separate theorems; arbitrary admission is not part of this idempotence result. The unrestricted current-SSA law is refuted by Counterexamples.raw_apply_is_not_unconditionally_idempotent and an actual CRD HTTP regression.",
     "sketch": "First prove that repeated writes are unchanged and cannot conflict. Exact actor claims eliminate releases and lifetime deletion. Stable list forms give the same candidate. That unchanged state is already valid, so every acceptance guard succeeds."
   },
   "SSA.Contracts.repeated_apply_observationally_equal": {
@@ -406,5 +406,22 @@
   },
   "SSA.GoSubset.exec_declare_error": {
     "scope": "definition"
+  },
+  "SSA.Counterexamples.raw_apply_is_not_unconditionally_idempotent": {
+    "title": "Current SSA: immediate data idempotence is false",
+    "meaning": "A owns a nonempty associative list. Applying an empty list first removes the field; the identical request then creates the empty list. These accepted transitions refute the universal immediate-idempotence proposition.",
+    "limits": "A concrete counterexample, also reproduced on both pinned SMD revisions and through CRD HTTP. This does not refute every conditional idempotence law.",
+    "sketch": "Instantiate the universal law with the populated state and empty-list request. The first transition succeeds. Kernel evaluation of its repetition yields different cells, contradicting equality."
+  },
+  "SSA.Counterexamples.required_list_retries_never_empty_the_list": {
+    "scope": "general",
+    "title": "Presence validation blocks every finite number of identical retries",
+    "meaning": "The empty-list request is valid as data, but its first pruned proposal lacks the required field. Validation rejects it atomically. Induction proves that every finite retry count leaves the original populated state unchanged.",
+    "limits": "The chosen policy checks list presence with no mutation or defaulting. Real OpenAPI required and CEL has(self.endpoints) are additionally exercised through HTTP; their interpreters are not generally formalized."
+  },
+  "SSA.RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list": {
+    "title": "Imported Go pruning reproduces the empty-list loss",
+    "meaning": "The source-bound four-function pruning chain returns the state without the explicitly applied empty list, with all callees realized under every lawful map-iteration schedule.",
+    "limits": "Concrete normalized object/field-set primitives. Their actual Go implementations remain a separate proof obligation; Go comparisons and the HTTP regression supply implementation evidence."
   }
 }

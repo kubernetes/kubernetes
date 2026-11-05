@@ -41,7 +41,7 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
   <h1>What does this model prove?</h1>
   <p class="lede">Explore the exact statements, their premises, and the lemmas they use. The model separates current SSA, the pinned PR, the stronger full-manager policy, and admission composition.</p>
   <div class="stats" id="stats"></div>
-  <div class="notice"><strong>Specification review remains open.</strong> The two former representation defects are fixed. A checked proof establishes its Lean statement; implementation correspondence is checked separately on bounded traces.</div>
+  <div class="notice"><strong>Baseline counterexample found.</strong> An empty-list Apply can change data on immediate repetition. Required or CEL presence validation can reject every retry. The proposed core's idempotence theorem does not describe this raw behavior.</div>
   <nav class="tabs" aria-label="Explorer views">
     <button class="tab" data-view="proofs">Proofs</button>
     <button class="tab" data-view="definitions">Definitions</button>
@@ -110,6 +110,12 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
     </div>
   </section>
   <section class="view" id="view-gaps" hidden>
+    <div class="card gap"><h2>Current SSA: empty-list repetition changes data</h2>
+      <p>A previously owns <code>endpoints: [{name: db, host: old}]</code>, then applies <code>endpoints: []</code>. The first request removes the field. The second identical request creates the empty list. Actual CRD HTTP execution confirms the data difference and a later ownership bootstrap by <code>before-first-apply</code>.</p>
+      <p>OpenAPI <code>required: [endpoints]</code> or CEL <code>has(self.endpoints)</code> rejects the first request and every identical retry. The populated state, ownership and resourceVersion remain unchanged, although empty-list creation succeeds.</p>
+      <p><a href="baseline-empty-list.md">Requests, source cause and exact proof boundaries</a></p>
+      <div class="chips"><button class="chip" data-proof="SSA.Counterexamples.raw_apply_is_not_unconditionally_idempotent">Kernel-checked refutation</button><button class="chip" data-proof="SSA.Counterexamples.required_list_retries_never_empty_the_list">Every finite retry count</button><button class="chip" data-proof="SSA.RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list">Imported pruning witness</button></div>
+    </div>
     <div class="card"><h2>Resolved: structural consistency and invented ownership</h2>
       <p>Every proper ancestor must be a real container. Scalars cannot have descendants. Structural context no longer invents presence ownership for nonempty maps; actual empty-map claims are compared.</p>
       <div class="chips"><button class="chip" data-proof="SSA.Contracts.scalar_has_no_descendants">Structural theorem</button><button class="chip" data-proof="SSA.Contracts.accepted_preserves_cells">Separate data and ownership</button></div>
@@ -156,7 +162,7 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
 "use strict";
 const DATA=/*@@PROOF_DATA@@*/{};
 const NODES=Object.fromEntries(DATA.nodes.map(node=>[node.name,node]));
-const DEFAULT="SSA.Contracts.accepted_apply_idempotent";
+const DEFAULT="SSA.Counterexamples.raw_apply_is_not_unconditionally_idempotent";
 const LABELS={general:"General theorem",guard:"Guard consequence",definition:"Definitional law",execution:"Concrete execution",helper:"Internal helper"};
 let selected=DEFAULT;
 function el(tag,attributes,...children){const node=document.createElement(tag);for(const [key,value] of Object.entries(attributes||{})){if(key==="class")node.className=value;else node.setAttribute(key,value);}for(const child of children.flat()){if(child!==null&&child!==undefined)node.append(child instanceof Node?child:document.createTextNode(String(child)));}return node;}
