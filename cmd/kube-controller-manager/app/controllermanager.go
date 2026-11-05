@@ -92,6 +92,7 @@ import (
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	configv1alpha1conversion "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
+	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
@@ -227,6 +228,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		return fmt.Errorf("unable to register configz: %w", err)
 	} else if err := cfgz.Set(externalConfig); err != nil {
 		return fmt.Errorf("unable to set configz: %w", err)
+	}
+
+	if genericcontrollermanager.IsControllerEnabled(names.NodeLifecycleController, sets.NewString(), c.ComponentConfig.Generic.Controllers) {
+		lifecyclecontroller.RecordLivenessSource(c.ComponentConfig.NodeLifecycleController.NodeLivenessSource)
 	}
 
 	// Setup any healthz checks we will want to use.

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 
 	updateNodeHealthKey     = "update_node_health_duration_seconds"
 	updateAllNodesHealthKey = "update_all_nodes_health_duration_seconds"
+	livenessSourceKey       = "liveness_source"
 )
 
 var (
@@ -90,6 +92,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	livenessSource = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      nodeControllerSubsystem,
+			Name:           livenessSourceKey,
+			Help:           "Gauge set to 1 for the configured node liveness source.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"source"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -103,5 +114,25 @@ func Register() {
 		legacyregistry.MustRegister(evictionsTotal)
 		legacyregistry.MustRegister(updateNodeHealthDuration)
 		legacyregistry.MustRegister(updateAllNodesHealthDuration)
+		legacyregistry.MustRegister(livenessSource)
 	})
+}
+
+// RecordLivenessSource sets the node_collector_liveness_source gauge to 1 for
+// the configured source and 0 for other known sources.
+func RecordLivenessSource(source nodelifecycleconfig.NodeLivenessSource) {
+	Register()
+	if source == "" {
+		source = nodelifecycleconfig.NodeLivenessSourceKubelet
+	}
+	for _, s := range []nodelifecycleconfig.NodeLivenessSource{
+		nodelifecycleconfig.NodeLivenessSourceKubelet,
+		nodelifecycleconfig.NodeLivenessSourceExternal,
+	} {
+		val := 0.0
+		if s == source {
+			val = 1.0
+		}
+		livenessSource.WithLabelValues(string(s)).Set(val)
+	}
 }

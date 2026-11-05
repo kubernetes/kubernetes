@@ -58,6 +58,7 @@ import (
 	nodetopology "k8s.io/component-helpers/node/topology"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
@@ -170,18 +171,32 @@ type nodeHealthData struct {
 	readyTransitionTimestamp metav1.Time
 	status                   *v1.NodeStatus
 	lease                    *coordv1.Lease
+	// hasReportedReady latches true once a non-nil NodeReady condition has ever been
+	// observed for this node, so omitting Ready later on an already-running node in
+	// external mode does not trigger the startup grace period fallback.
+	hasReportedReady bool
+	hasLastReady     bool
+	// lastReady holds the NodeReady condition observed at the end of the previous
+	// successful pass, since status is only refreshed when LastHeartbeatTime changes.
+	lastReady v1.NodeCondition
 }
 
 func (n *nodeHealthData) deepCopy() *nodeHealthData {
 	if n == nil {
 		return nil
 	}
-	return &nodeHealthData{
+	out := &nodeHealthData{
 		probeTimestamp:           n.probeTimestamp,
 		readyTransitionTimestamp: n.readyTransitionTimestamp,
 		status:                   n.status.DeepCopy(),
 		lease:                    n.lease.DeepCopy(),
+		hasReportedReady:         n.hasReportedReady,
+		hasLastReady:             n.hasLastReady,
 	}
+	if n.hasLastReady {
+		n.lastReady.DeepCopyInto(&out.lastReady)
+	}
+	return out
 }
 
 type nodeHealthMap struct {
@@ -201,6 +216,23 @@ func (n *nodeHealthMap) getDeepCopy(name string) *nodeHealthData {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 	return n.nodeHealths[name].deepCopy()
+}
+
+// getLastReady returns the node's previous NodeReady condition by value without
+// deep-copying NodeStatus or Lease.
+func (n *nodeHealthMap) getLastReady(name string) (lastReady v1.NodeCondition, hasLastReady, exists bool) {
+	n.lock.RLock()
+	defer n.lock.RUnlock()
+	data := n.nodeHealths[name]
+	if data == nil {
+		return v1.NodeCondition{}, false, false
+	}
+	if !data.hasLastReady {
+		return v1.NodeCondition{}, false, true
+	}
+	var out v1.NodeCondition
+	data.lastReady.DeepCopyInto(&out)
+	return out, true, true
 }
 
 func (n *nodeHealthMap) set(name string, data *nodeHealthData) {
@@ -303,6 +335,7 @@ type Controller struct {
 	secondaryEvictionLimiterQPS float32
 	largeClusterThreshold       int32
 	unhealthyZoneThreshold      float32
+	nodeLivenessSource          nodelifecycleconfig.NodeLivenessSource
 
 	nodeUpdateQueue workqueue.TypedInterface[string]
 	podUpdateQueue  workqueue.TypedRateLimitingInterface[podUpdateItem]
@@ -322,6 +355,11 @@ type ControllerOptions struct {
 	SecondaryEvictionLimiterQPS float32
 	LargeClusterThreshold       int32
 	UnhealthyZoneThreshold      float32
+	NodeLivenessSource          nodelifecycleconfig.NodeLivenessSource
+}
+
+func (nc *Controller) isExternalLiveness() bool {
+	return nc.nodeLivenessSource == nodelifecycleconfig.NodeLivenessSourceExternal
 }
 
 func (o *ControllerOptions) validate() error {
@@ -352,6 +390,22 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 		return nil, err
 	}
 
+	nodeLivenessSource := opts.NodeLivenessSource
+	if nodeLivenessSource == "" {
+		nodeLivenessSource = nodelifecycleconfig.NodeLivenessSourceKubelet
+	}
+	switch nodeLivenessSource {
+	case nodelifecycleconfig.NodeLivenessSourceKubelet:
+	case nodelifecycleconfig.NodeLivenessSourceExternal:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalNodeLivenessDetection) {
+			return nil, fmt.Errorf("node liveness source %q requires feature gate %s to be enabled",
+				nodelifecycleconfig.NodeLivenessSourceExternal, features.ExternalNodeLivenessDetection)
+		}
+	default:
+		return nil, fmt.Errorf("invalid node liveness source %q: must be %q or %q",
+			nodeLivenessSource, nodelifecycleconfig.NodeLivenessSourceKubelet, nodelifecycleconfig.NodeLivenessSourceExternal)
+	}
+
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 
@@ -373,6 +427,7 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 		secondaryEvictionLimiterQPS: opts.SecondaryEvictionLimiterQPS,
 		largeClusterThreshold:       opts.LargeClusterThreshold,
 		unhealthyZoneThreshold:      opts.UnhealthyZoneThreshold,
+		nodeLivenessSource:          nodeLivenessSource,
 		nodeUpdateQueue:             workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node_lifecycle_controller"}),
 		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
@@ -445,13 +500,15 @@ func NewNodeLifecycleController(ctx context.Context, opts ControllerOptions) (*C
 	nc.daemonSetStore = opts.DaemonSetInformer.Lister()
 	nc.daemonSetInformerSynced = opts.DaemonSetInformer.Informer().HasSynced
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+	if !nc.isExternalLiveness() && utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
 		nc.consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
 			leaseResource: opts.LeaseInformer.Informer().GetStore(),
 		})
 	} else {
 		nc.consistencyStore = consistencyutil.NewNoopConsistencyStore()
 	}
+
+	RecordLivenessSource(nodeLivenessSource)
 
 	return nc, nil
 }
@@ -677,6 +734,21 @@ func (n shortCircuitError) Unwrap() error {
 	return n.error
 }
 
+// isExternalReadyToUnknownTransition reports whether currentReady represents an
+// external transition into Ready=Unknown compared to prevLastReady.
+// When !hadPrevLastReady (first observation of Ready), this returns false so
+// controller restarts and failovers do not emit a NodeNotReady event per node.
+func isExternalReadyToUnknownTransition(hadPrevLastReady bool, prevLastReady v1.NodeCondition, currentReady *v1.NodeCondition) bool {
+	if !hadPrevLastReady || currentReady == nil || currentReady.Status != v1.ConditionUnknown {
+		return false
+	}
+	if prevLastReady.Status != v1.ConditionUnknown {
+		return true
+	}
+	// Catch a fast Unknown -> True -> Unknown flip within a single monitor pass.
+	return currentReady.LastTransitionTime.After(prevLastReady.LastTransitionTime.Time)
+}
+
 // monitorNodeHealth verifies node health are constantly updated by kubelet, and if not, post "NodeReady==ConditionUnknown".
 // This function will
 //   - add nodes which are not ready or not reachable for a long period of time to a rate-limited
@@ -725,6 +797,11 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
 		node := nodes[piece].DeepCopy()
+		var prevLastReady v1.NodeCondition
+		var hadPrevLastReady bool
+		if nc.isExternalLiveness() {
+			prevLastReady, hadPrevLastReady, _ = nc.nodeHealthMap.getLastReady(node.Name)
+		}
 
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) {
 			var err error
@@ -733,7 +810,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 				return true, nil
 			}
 			// If the error is due to a short circuit, don't retry.
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+			if !nc.isExternalLiveness() && utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
 				if err, ok := errors.AsType[shortCircuitError](err); ok {
 					return false, err.error
 				}
@@ -758,10 +835,22 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		}
 
 		if currentReadyCondition != nil {
+			var transitionToNotReady bool
+			if nc.isExternalLiveness() {
+				transitionToNotReady = isExternalReadyToUnknownTransition(hadPrevLastReady, prevLastReady, currentReadyCondition)
+				if !hadPrevLastReady && currentReadyCondition.Status == v1.ConditionUnknown {
+					// After a restart or leader change, ensure pods on already-Unknown
+					// nodes are marked NotReady without emitting a NodeNotReady event.
+					nc.nodesToRetry.Store(node.Name, struct{}{})
+				}
+			} else {
+				transitionToNotReady = currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue
+			}
+
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods", "node", klog.KObj(node))
-				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
+				if transitionToNotReady {
 					// If error happened during node status transition (Ready -> NotReady)
 					// we need to mark node for retry to force MarkPodsNotReady execution
 					// in the next iteration.
@@ -772,12 +861,16 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			nc.processTaintBaseEviction(ctx, node, currentReadyCondition)
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
+			shouldRetry := observedReadyCondition.Status != v1.ConditionTrue
+			if nc.isExternalLiveness() {
+				shouldRetry = currentReadyCondition.Status == v1.ConditionUnknown
+			}
 			switch {
-			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
+			case transitionToNotReady:
 				// Report node event only once when status changed.
 				controllerutil.RecordNodeStatusChange(logger, nc.recorder, node, "NodeNotReady")
 				fallthrough
-			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
+			case needsRetry && shouldRetry:
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to mark all pods NotReady on node; queuing for retry", "node", node.Name)
 					nc.nodesToRetry.Store(node.Name, struct{}{})
@@ -851,11 +944,23 @@ func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
 // which given node is entitled, state of current and last observed Ready Condition, and an error if it occurred.
 func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
 	nodeHealth := nc.nodeHealthMap.getDeepCopy(node.Name)
+	var prevLastReady v1.NodeCondition
+	var prevHasLastReady bool
+	var prevHasReportedReady bool
+	if nodeHealth != nil && nc.isExternalLiveness() {
+		prevLastReady = nodeHealth.lastReady
+		prevHasLastReady = nodeHealth.hasLastReady
+		prevHasReportedReady = nodeHealth.hasReportedReady
+	}
+	hasReportedReady := prevHasReportedReady
 	defer func() {
+		if nodeHealth != nil && nc.isExternalLiveness() {
+			nodeHealth.hasReportedReady = hasReportedReady
+		}
 		nc.nodeHealthMap.set(node.Name, nodeHealth)
 	}()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+	if !nc.isExternalLiveness() && utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
 		// This is a controller-wide consistency check, if the lease cache is stale, then we cannot
 		// trust any node leases until the cache has caught back up.
 		err := nc.consistencyStore.EnsureReady(types.NamespacedName{})
@@ -886,12 +991,15 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 				status:                   &node.Status,
 				probeTimestamp:           node.CreationTimestamp,
 				readyTransitionTimestamp: node.CreationTimestamp,
+				hasLastReady:             prevHasLastReady,
+				lastReady:                prevLastReady,
 			}
 		}
 	} else {
 		// If ready condition is not nil, make a copy of it, since we may modify it in place later.
 		observedReadyCondition = *currentReadyCondition
 		gracePeriod = nc.nodeMonitorGracePeriod
+		hasReportedReady = true
 	}
 	// There are following cases to check:
 	// - both saved and new status have no Ready Condition set - we leave everything as it is,
@@ -920,6 +1028,8 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 			status:                   &node.Status,
 			probeTimestamp:           nc.now(),
 			readyTransitionTimestamp: nc.now(),
+			hasLastReady:             prevHasLastReady,
+			lastReady:                prevLastReady,
 		}
 	} else if savedCondition == nil && currentReadyCondition != nil {
 		logger.V(1).Info("Creating timestamp entry for newly observed Node", "node", klog.KObj(node))
@@ -927,6 +1037,8 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 			status:                   &node.Status,
 			probeTimestamp:           nc.now(),
 			readyTransitionTimestamp: nc.now(),
+			hasLastReady:             prevHasLastReady,
+			lastReady:                prevLastReady,
 		}
 	} else if savedCondition != nil && currentReadyCondition == nil {
 		logger.Error(nil, "ReadyCondition was removed from Status of Node", "node", klog.KObj(node))
@@ -935,6 +1047,8 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 			status:                   &node.Status,
 			probeTimestamp:           nc.now(),
 			readyTransitionTimestamp: nc.now(),
+			hasLastReady:             prevHasLastReady,
+			lastReady:                prevLastReady,
 		}
 	} else if savedCondition != nil && currentReadyCondition != nil && savedCondition.LastHeartbeatTime != currentReadyCondition.LastHeartbeatTime {
 		var transitionTime metav1.Time
@@ -955,20 +1069,25 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 			status:                   &node.Status,
 			probeTimestamp:           nc.now(),
 			readyTransitionTimestamp: transitionTime,
+			hasLastReady:             prevHasLastReady,
+			lastReady:                prevLastReady,
 		}
 	}
-	// Always update the probe time if node lease is renewed.
-	// Note: If kubelet never posted the node status, but continues renewing the
-	// heartbeat leases, the node controller will assume the node is healthy and
-	// take no action.
-	observedLease, _ := nc.leaseLister.Leases(v1.NamespaceNodeLease).Get(node.Name)
-	if observedLease != nil && (savedLease == nil || savedLease.Spec.RenewTime.Before(observedLease.Spec.RenewTime)) {
-		nodeHealth.lease = observedLease
-		nodeHealth.probeTimestamp = nc.now()
+	var observedLease *coordv1.Lease
+	if !nc.isExternalLiveness() {
+		// Always update the probe time if node lease is renewed.
+		// Note: If kubelet never posted the node status, but continues renewing the
+		// heartbeat leases, the node controller will assume the node is healthy and
+		// take no action.
+		observedLease, _ = nc.leaseLister.Leases(v1.NamespaceNodeLease).Get(node.Name)
+		if observedLease != nil && (savedLease == nil || savedLease.Spec.RenewTime.Before(observedLease.Spec.RenewTime)) {
+			nodeHealth.lease = observedLease
+			nodeHealth.probeTimestamp = nc.now()
+		}
 	}
 
-	if nc.now().After(nodeHealth.probeTimestamp.Add(gracePeriod)) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
+	if (!nc.isExternalLiveness() || !hasReportedReady) && nc.now().After(nodeHealth.probeTimestamp.Add(gracePeriod)) {
+		if !nc.isExternalLiveness() && utilfeature.DefaultFeatureGate.Enabled(features.NodeControllerLeaseCircuitBreaker) {
 			var nodeHealthLeaseRV string
 			if nodeHealth.lease != nil {
 				nodeHealthLeaseRV = nodeHealth.lease.ResourceVersion
@@ -1047,10 +1166,19 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 				readyTransitionTimestamp: nc.now(),
 				lease:                    observedLease,
 			}
+			if nc.isExternalLiveness() && currentReadyCondition != nil {
+				hasReportedReady = true
+				currentReadyCondition.DeepCopyInto(&nodeHealth.lastReady)
+				nodeHealth.hasLastReady = true
+			}
 			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
 		}
 	}
 
+	if nc.isExternalLiveness() && currentReadyCondition != nil {
+		currentReadyCondition.DeepCopyInto(&nodeHealth.lastReady)
+		nodeHealth.hasLastReady = true
+	}
 	return gracePeriod, observedReadyCondition, currentReadyCondition, nil
 }
 
@@ -1189,10 +1317,26 @@ func (nc *Controller) processPod(ctx context.Context, podItem podUpdateItem) {
 
 	nodeName := pod.Spec.NodeName
 
-	nodeHealth := nc.nodeHealthMap.getDeepCopy(nodeName)
-	if nodeHealth == nil {
-		// Node data is not gathered yet or node has been removed in the meantime.
-		return
+	var readyStatus v1.ConditionStatus
+	var hasReadyCondition bool
+	if nc.isExternalLiveness() {
+		lastReady, hasLastReady, exists := nc.nodeHealthMap.getLastReady(nodeName)
+		if !exists {
+			// Node data is not gathered yet or node has been removed in the meantime.
+			return
+		}
+		readyStatus = lastReady.Status
+		hasReadyCondition = hasLastReady
+	} else {
+		nodeHealth := nc.nodeHealthMap.getDeepCopy(nodeName)
+		if nodeHealth == nil {
+			// Node data is not gathered yet or node has been removed in the meantime.
+			return
+		}
+		if _, currentReadyCondition := controllerutil.GetNodeCondition(nodeHealth.status, v1.NodeReady); currentReadyCondition != nil {
+			readyStatus = currentReadyCondition.Status
+			hasReadyCondition = true
+		}
 	}
 
 	_, err = nc.nodeLister.Get(nodeName)
@@ -1202,8 +1346,7 @@ func (nc *Controller) processPod(ctx context.Context, podItem podUpdateItem) {
 		return
 	}
 
-	_, currentReadyCondition := controllerutil.GetNodeCondition(nodeHealth.status, v1.NodeReady)
-	if currentReadyCondition == nil {
+	if !hasReadyCondition {
 		// Lack of NodeReady condition may only happen after node addition (or if it will be maliciously deleted).
 		// In both cases, the pod will be handled correctly (evicted if needed) during processing
 		// of the next node update event.
@@ -1211,7 +1354,7 @@ func (nc *Controller) processPod(ctx context.Context, podItem podUpdateItem) {
 	}
 
 	pods := []*v1.Pod{pod}
-	if currentReadyCondition.Status != v1.ConditionTrue {
+	if readyStatus != v1.ConditionTrue {
 		if err := controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, nodeName); err != nil {
 			logger.Info("Unable to mark pod NotReady on node", "pod", klog.KRef(podItem.namespace, podItem.name), "node", klog.KRef("", nodeName), "err", err)
 			nc.podUpdateQueue.AddRateLimited(podItem)
