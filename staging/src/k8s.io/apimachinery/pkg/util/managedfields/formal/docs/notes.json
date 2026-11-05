@@ -331,5 +331,35 @@
   "SSA.updater_keeps_membership": {
     "scope": "definition",
     "limits": "This is membership eligibility in the modeled PR classifier; the actual pruning passes and pinned Go comparisons are separate evidence."
+  },
+  "SSA.WireContracts.candidate_foreign_claim_exact": {
+    "title": "Exact final foreign-claim survival in raw SSA",
+    "meaning": "A foreign claim survives exactly when it existed before, its path exists after pruning, and the final comparison reports no modification at that path.",
+    "limits": "Current/PR normalized wire transition. This characterizes ownership updating; it does not prove the Go typed tree operations."
+  },
+  "SSA.WireContracts.accepted_nonforce_foreign_unchanged": {
+    "title": "Successful raw Apply does not modify a foreign final target",
+    "meaning": "For each original foreign owner and matching cell in the final pruned object, acceptance without force implies that comparison reports no modification.",
+    "limits": "This concerns surviving final targets. It does not assert that every foreign-owned target survives deletion or prove conversion/admission behavior."
+  },
+  "SSA.WireContracts.unchanged_snapshot_acquisition": {
+    "title": "Fresh snapshot acquisition in current and PR SSA",
+    "meaning": "A fresh actor can apply a normalized unchanged snapshot to any structurally valid state; the request succeeds, data stays unchanged, and all old claims remain alongside the new footprint.",
+    "limits": "No full-manager invariant is assumed. Snapshot equality includes the normalized cell-list order. It is not arbitrary edit progress or admission-constrained liveness."
+  },
+  "SSA.FieldsV1.root_roundtrip": {
+    "title": "Canonical FieldsV1 trie/object-grammar round trip",
+    "meaning": "At arbitrary finite depth, encoding and decoding preserve the canonical root trie, including leaf membership and membership shared with descendants.",
+    "limits": "The grammar begins after JSON and path-element parsing. Unique keys and nonempty child sets are premises; Go JSON bytes and parser correctness are not proved."
+  },
+  "SSA.SourceContracts.imported_dangling_matches_spec": {
+    "title": "Imported Go pruning source satisfies its outcome contract",
+    "meaning": "Executing the complete imported addBackDanglingItems AST returns the specified result for every object/error domain and every supplied primitive implementation, including all failure and missing-version branches.",
+    "limits": "One source function. The Go parser/importer and Go-subset semantics need review; conversion and typed operations are explicit pure-function parameters, not proved Go implementations. A semantic source mutation must invalidate this theorem."
+  },
+  "SSA.SourceContracts.source_dangling_refines_model": {
+    "title": "Imported source specializes to normalized final pruning",
+    "meaning": "With the normalized single-version primitives, the imported Go function computes exactly the model's dangling-field removal expression for arbitrary states and field sets.",
+    "limits": "The specialization does not prove that the Go implementations of those primitives refine the normalized definitions."
   }
 }

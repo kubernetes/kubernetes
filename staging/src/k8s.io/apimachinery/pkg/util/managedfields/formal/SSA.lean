@@ -26,3 +26,8 @@ import SSA.Pruning
 import SSA.Locality
 import SSA.Counterexamples
 import SSA.ObjectScope
+import SSA.WireContracts
+import SSA.FieldsV1
+import SSA.GoSubset
+import SSA.GoSource
+import SSA.SourceContracts

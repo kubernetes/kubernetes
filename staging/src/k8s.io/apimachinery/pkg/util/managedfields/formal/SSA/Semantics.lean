@@ -72,10 +72,10 @@ def wireConflicts (owners before after : State) (actor : String) : Bool :=
   owners.claims.any (fun claim => claim.manager != actor && after.cells.any
     (fun cell => cell.path == claim.target.path && modifiedCell before after cell))
 
+/-- Go prunes with the original foreign claims, including under force; transfer follows pruning. -/
 def wireMerged (before : State) (r : Request) : State :=
   let data := merged before r
-  { data with claims := before.claims.filter (fun claim => claim.manager != r.manager &&
-      !(r.force && data.cells.any (fun cell => cell.path == claim.target.path && modifiedCell before data cell))) ++
+  { data with claims := before.claims.filter (fun claim => claim.manager != r.manager) ++
       r.desired.map (fun target => ⟨r.manager,target,true⟩) }
 
 def wirePruned (mode : Semantics) (schema : Schema) (before : State) (r : Request) : State :=
@@ -100,8 +100,7 @@ def applyWith (mode : Semantics) (schema : Schema) (before : State)
   | .current | .predrag =>
       if !shapeValid schema before then .error .invalidInitialState
       else if !normalized r then .error .invalidRequest
-      else if (wireConflicts before before (wireMerged before r) r.manager ||
-          wireConflicts (wireMerged before r) before (wirePruned mode schema before r) r.manager) && !r.force
+      else if wireConflicts before before (wirePruned mode schema before r) r.manager && !r.force
         then .error .conflict
       else
         let after := candidateWith mode schema before r

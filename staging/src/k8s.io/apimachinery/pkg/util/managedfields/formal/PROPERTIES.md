@@ -48,7 +48,7 @@ guarantees.
 | BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | `Contracts.shared_omission_preserves_value` and `Contracts.handoff_preserves_full_successor` prove safety under explicit ownership and lifetime assumptions. `Progress.unchanged_snapshot_acquisition` proves fresh-manager acquisition; Update now has its own transition. Arbitrary validator-constrained release progress remains conditional. |
 | BASE-08 | Repeating the same intent by the same manager without intervening writes is observationally idempotent. | [Semantic no-op test][noop], [defaulted CRD no-op test][default-noop]. | `Contracts.accepted_apply_idempotent` proves immediate repetition succeeds with exactly the same model state, including force. `Contracts.repeated_apply_observationally_equal` exposes the weaker observation-level result. Defaulting, resourceVersion, and persistence are outside the model. |
 | BASE-09 | Atomic units cannot be partially overwritten; granular sibling fields can be independently managed. | [KEP topology][topology]. | Atoms are opaque scalar cells. The independent bridge corpus exercises both topologies against managedfields. General topology mapping and independent-request commutativity remain unproved. |
-| BASE-10 | Field sets and paths survive serialization round trips. | [Fields round trip][roundtrip], KEP testing plan. | The Go bridge checks the real FieldsV1 round trip after every request, including API version and operation. This is bounded evidence, not a general serialization theorem. |
+| BASE-10 | Field sets and paths survive serialization round trips. | [Fields round trip][roundtrip], KEP testing plan. | `FieldsV1.root_roundtrip` and `root_membership_roundtrip` prove arbitrary-depth canonical trie/object-grammar round trips, including `{}` and `"."` membership. JSON bytes and path-element parsing remain unproved. The Go bridge additionally checks the real FieldsV1 round trip after every request, including API version and operation. |
 | BASE-11 | API-version conversion preserves the intended correspondence of values and claims. | [ManagedFields version conversion test][conversion]. | Outside the model; no theorem assumes that all schema conversions are invertible. |
 | BASE-12 | Spec/status reset fields do not acquire claims in the other subresource. | [Reset-fields test][reset]. | Outside the model; subresources and reset filters are absent. |
 
@@ -144,6 +144,10 @@ In particular:
 | PR compatibility | `no_required_transition_equivalence` | All finite states/requests and metadata-free item schemas, actual three-pass pruning modes. |
 | PR classifier | `explicit_map_shortcuts_required_children`, `granular_list_without_member_is_partial`, `updater_keeps_membership` | Direct classifier facts, distinct from a complete Go refinement proof. |
 | Raw pruning | `remove_items_has_no_selected_descendant` | Selected subtrees are absent; unselected empty container slots may become null. |
+| Raw ownership | `WireContracts.merged_foreign_claim`, `candidate_foreign_claim_exact` | Foreign claims participate in pruning before transfer; final survival is characterized exactly. These are current/PR wire-model laws. |
+| Raw conflicts/force | `WireContracts.accepted_nonforce_foreign_unchanged`, `candidate_force_independent`, `accepted_also_succeeds_forced` | The final pruned result is compared with original ownership. Force changes the conflict gate, not the candidate. |
+| Raw acquisition | `WireContracts.unchanged_snapshot_acquisition` | Both current/PR modes, arbitrary structurally valid finite states, fresh actor, normalized unchanged snapshot; all original claims survive. No full-manager premise. |
+| Source execution | `SourceContracts.imported_dangling_matches_spec`, `source_dangling_refines_model` | Complete imported Go AST of `addBackDanglingItems`, all error/missing-version branches, explicit primitive parameters. Importer/subset semantics and primitive correctness remain review/proof obligations. A semantic source mutation must invalidate the proof. |
 
 `SSA/Counterexamples.lean` kernel-checks the raw PR fragmentation, partial-owner
 deletion, required-map shortcut, required-list failure, and opposite roles in
@@ -167,7 +171,12 @@ regression agrees with current managedfields for the latter. The broader
 comparison also led to explicit modeling of implicit key leaves, named fields,
 three-pass restoration, null promotion and final ownership updates.
 
-A universal Go refinement/normalization proof remains open. Version conversion,
+A source-bound refinement now covers `Updater.addBackDanglingItems` control flow
+and specializes it to the normalized model. This is one function, with explicit
+primitive contracts, not a universal Go refinement/normalization proof. The
+importer, subset semantics and its signature check need human review; unsupported
+syntax is rejected. The source digest and generated AST are checked by CI, and
+an operator mutation is required to break the unchanged theorem. Version conversion,
 defaulting, schema evolution, reset/subresource filters, duplicate-list behavior,
 key defaults and storage concurrency remain integration obligations. The
 adapter rejects unsupported/duplicate shapes rather than silently projecting

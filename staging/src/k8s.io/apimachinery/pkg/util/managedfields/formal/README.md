@@ -68,12 +68,14 @@ also proves that a fresh manager can acquire a normalized snapshot of unchanged
 data without force, preserving the data and all existing claims. This theorem
 allows sparse real ownership; it does not fabricate container claims.
 
-Required granular lists remain a substantive design problem: current FieldsV1
-does not record a direct claim for a known granular list, even when explicitly
-applied empty. The stronger core uses an explicit collection-presence assertion
-for this case. Its synthetic required-list examples are **not** evidence of a
-wire-compatible encoding. The actual-wire modes preserve the missing marker
-and demonstrate the PR's resulting misclassification.
+Required granular lists remain a substantive design problem: current SMD
+field-set extraction creates no direct claim for a known granular list, even
+when explicitly applied empty. The FieldsV1 trie grammar can represent such
+membership; generating and preserving it through SSA operations is the missing
+design. The stronger core uses an explicit collection-presence assertion for
+this case. Its synthetic required-list examples do not establish compatibility
+with the current implementation. The actual-wire modes preserve the missing
+marker and demonstrate the PR's resulting misclassification.
 
 ## What is checked
 
@@ -102,6 +104,40 @@ proof is not advertised as a theorem about arbitrary admission or the whole
 scoped operation. `Pruning` and `Semantics` represent the current/PR field-set
 algorithm separately, including named-field expansion, three-pass pruning,
 implicit key leaves, empty/null promotion and the final ownership update.
+
+`WireContracts` proves laws for that separate current/PR transition: pruning
+retains foreign claims until the final comparison, the candidate is independent
+of force, final foreign claims have an exact survival condition, successful
+non-forced requests do not modify foreign-owned final targets, and forcing an
+already successful request preserves its result. Fresh unchanged snapshot
+acquisition is also proved directly for both raw modes; it requires only
+structural validity, not the proposed full-manager invariant.
+
+## Binding proofs to source
+
+`cmd/ssa-source` uses Go's parser to import the complete body and checked
+signature of the vendored `Updater.addBackDanglingItems` into `SSA/GoSource.lean`.
+It rejects unsupported syntax and block scopes instead of dropping them.
+Verification checks the generated AST and the source digest before building.
+`SourceContracts.imported_dangling_matches_spec` executes this imported program
+in a small Go-subset interpreter and proves its outcome for arbitrary primitive
+operations, including every error and missing-version branch. The model
+specialization identifies its final pruning expression for arbitrary states.
+A negative check changes `Intersection(last)` to `Difference(last)` in a source
+copy and requires the unchanged theorem to fail.
+
+This is the first source-bound function, not an end-to-end Go verification.
+The Go parser/importer and the subset semantics need human review. Conversion,
+typed field-set extraction, named-field expansion and removal remain explicit
+primitive contracts; their Go implementations and the other updater functions
+are not discharged by this theorem. No generated AST digest substitutes for
+those proofs.
+
+`FieldsV1` independently proves the recursive trie/object-grammar round trip at
+arbitrary finite depth, including leaf `{}` membership and the `"."` marker
+used when membership and descendants coexist. Its canonicality premise excludes
+empty child sets and duplicate edge keys. JSON bytes and path-element string
+parsing remain separate obligations; this does not verify Go's JSON library.
 
 ## Implementation evidence
 

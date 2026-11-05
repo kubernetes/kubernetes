@@ -27,10 +27,15 @@ if [[ "${actual_version}" != "Lean (version ${expected_version},"* ]]; then
   exit 1
 fi
 
+go run ./cmd/ssa-source \
+  -source ../../../../../../../../vendor/sigs.k8s.io/structured-merge-diff/v6/merge/update.go \
+  -check SSA/GoSource.lean
+
 "${SSA_LAKE}" clean
 "${SSA_LAKE}" build
 "${SSA_LAKE}" env leanchecker --fresh Main
 bash ci/verify-audit.sh
+bash ci/verify-source.sh
 
 "${SSA_LAKE}" exe ssa-model --self-test
 "${SSA_LAKE}" exe ssa-model --check fixtures/scenarios.json
@@ -39,7 +44,7 @@ bash ci/verify-audit.sh
 "${SSA_LAKE}" exe ssa-model --fixtures >.lake/scenarios.regenerated.json
 diff -u fixtures/scenarios.json .lake/scenarios.regenerated.json
 
-go test ./bridge ./cmd/ssa-compare
+go test ./bridge ./cmd/ssa-compare ./cmd/ssa-source
 go run ./cmd/ssa-compare -model .lake/build/bin/ssa-model
 bash ci/verify-pr336.sh
 python3 docs/generate.py --check
