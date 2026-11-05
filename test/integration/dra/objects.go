@@ -72,7 +72,7 @@ import (
 //
 //	variant            devices    spec size    total size    % of budget
 //	basic                  128      729,946       744,798             47
-//	advanced                64    1,192,410     1,207,262             77
+//	advanced                64    1,356,250     1,371,101             87
 //	shared-counters          0       20,856        35,700              2
 //
 // Total size minus spec size is almost entirely ManagedFields. The total varies
@@ -85,8 +85,6 @@ import (
 //   - nodeSelector: devices set nodeName instead. A node selector term has no
 //     size limit of its own, so a slice using per-device node selectors can be
 //     larger than anything measured here.
-//   - bindingConditions and bindingFailureConditions: 4 + 4 qualified names per
-//     device are allowed, but not covered here yet.
 //
 // To re-measure after changing a limit or adding a field:
 //
@@ -101,10 +99,11 @@ func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 	slices := map[string]*resourceapi.ResourceSlice{
 		"basic": newBasicResourceSlice(resourceapi.ResourceSliceMaxDevices),
 		// advanced combines all device-level features (taints, consumes counters
-		// with compatibility groups, and list values) into the largest possible
-		// device-based slice.
+		// with compatibility groups, list values, and binding conditions) into the
+		// largest possible device-based slice.
 		// Compatibility groups grow this maximal slice by ~16,640 B (1,190,621 B -> ~1,207,261 B, +1.4%),
-		// which stays well within the object size limit.
+		// binding conditions by another ~163,840 B (~1,207,262 B -> ~1,371,101 B, +13.6%),
+		// which stays within the object size budget.
 		"advanced": newAdvancedResourceSlice(),
 		// shared-counters is a distinct slice kind: SharedCounters and Devices are
 		// mutually exclusive per slice, so it cannot be merged into "advanced".
@@ -200,6 +199,7 @@ func newAdvancedResourceSlice() *resourceapi.ResourceSlice {
 	slice := newResourceSliceWithTaintsAndConsumesCounters()
 	addListValues(slice)
 	addCompatibilityGroups(slice)
+	addBindingConditions(slice)
 	return slice
 }
 
@@ -214,6 +214,23 @@ func addCompatibilityGroups(slice *resourceapi.ResourceSlice) {
 			}
 			slice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = groups
 		}
+	}
+}
+
+// addBindingConditions declares the maximum number of binding conditions on
+// each device. Both lists have to be set together and must not overlap.
+func addBindingConditions(slice *resourceapi.ResourceSlice) {
+	conditions := make([]string, 0, resourceapi.BindingConditionsMaxSize)
+	for i := range resourceapi.BindingConditionsMaxSize {
+		conditions = append(conditions, maxQualifiedName(i))
+	}
+	failureConditions := make([]string, 0, resourceapi.BindingFailureConditionsMaxSize)
+	for i := range resourceapi.BindingFailureConditionsMaxSize {
+		failureConditions = append(failureConditions, maxQualifiedName(resourceapi.BindingConditionsMaxSize+i))
+	}
+	for i := range slice.Spec.Devices {
+		slice.Spec.Devices[i].BindingConditions = conditions
+		slice.Spec.Devices[i].BindingFailureConditions = failureConditions
 	}
 }
 
