@@ -186,6 +186,13 @@ The same failure occurs when A explicitly supplied `children: []`. The
 FieldsV1 grammar supports a list-presence claim, but ordinary Apply extraction
 does not generate it for this known granular list.
 
+Explicit `children: null` is a contrasting control: extraction creates a direct
+field member, so the PR retains A's membership when B leaves. The pinned corpus
+also checks a direct null member on a required map. FieldSet stores paths
+without the model's value/presence tags; the raw classifier therefore checks
+direct path membership for both. This comparison exposed and corrected a model
+mismatch. Null's API validity remains a separate schema/validation question.
+
 ## Verification and limits
 
 From the formal project directory:

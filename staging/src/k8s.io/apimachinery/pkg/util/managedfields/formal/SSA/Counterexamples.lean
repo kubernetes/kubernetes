@@ -91,6 +91,15 @@ def listCreate := request "A" [itemCell,⟨child,.item⟩] [listCell,⟨children
 def listShare := request "B" [itemCell,noteCell] [listCell]
 def beforeListRelease := run .predrag listSchema {} [listCreate,listShare]
 
+def nullListCreate := request "A" [itemCell,⟨children,.value "null"⟩] [listCell]
+def beforeNullListRelease := run .predrag listSchema {} [nullListCreate,listShare]
+
+/-- Null creates the direct member that an empty list lacks; the actual PR retains this owner. -/
+theorem pr_explicit_null_list_has_direct_membership :
+    prCovers beforeNullListRelease "A" (.collection children) = true ∧
+    (run .predrag listSchema beforeNullListRelease [leave "B"]).hasItem item = true ∧
+    (run .predrag listSchema beforeNullListRelease [leave "B"]).hasValue children = true := by decide
+
 /-- A supplies the required list and all its elements, but the PR still calls A partial. -/
 theorem pr_required_list_owner_is_misclassified :
     requiredPresent beforeListRelease (.collection children) = true ∧
@@ -249,6 +258,9 @@ theorem default_wrapper_fourth_apply_is_fixed :
   exact ⟨rfl,rfl⟩
 
 def fixtures : List Fixture := [
+  { name := "raw-pr-null-list-direct-member",schema := listSchema,semantics := .predrag
+    steps := [⟨nullListCreate,{present := [itemCell,⟨children,.value "null"⟩]}⟩,
+      ⟨listShare,{}⟩,⟨leave "B",{present := [itemCell,⟨children,.value "null"⟩]}⟩] },
   { name := "default-wrapper-reinitializes-empty-list-ownership",schema := keyOnlySchema
     semantics := .current,bootstrap := true
     steps := [⟨createList,{present := [itemCell,hostCell]}⟩,

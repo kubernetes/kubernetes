@@ -482,5 +482,19 @@
     "title": "The empty-map failure is independent of the removed scalar payload",
     "meaning": "For every encoded scalar value at settings.left, replacing the populated granular map with the same empty-map intent yields the identical null result and retained map claim.",
     "limits": "One map/child shape in the raw transition, arbitrary scalar text. The concrete witness uses the same JSON string encoding as the Go adapter. This is not a universal Go primitive refinement."
+  },
+  "SSA.owns_member_of_owns": {
+    "scope": "definition"
+  },
+  "SSA.direct_value_member_covers_containers": {
+    "scope": "definition",
+    "title": "The raw PR counts a direct null member for maps and lists",
+    "meaning": "An explicit null claim has a value tag in the normalized model but only a direct path member on the wire. The PR classifier counts that member for required maps and lists.",
+    "limits": "This concerns ownership classification. Null validity depends on the API schema; the stronger nullable-container policy has a separate schema-mapping obligation."
+  },
+  "SSA.Counterexamples.pr_explicit_null_list_has_direct_membership": {
+    "title": "Explicit null retains membership that an empty granular list lacks",
+    "meaning": "A supplies a required children field as null. Its direct member causes the actual PR to retain A’s item when partial B leaves. The same trace matches both pinned revisions.",
+    "limits": "A contrasting ownership control that corrected a model mismatch. API admission may reject null; no nullable-schema validity theorem is asserted here."
   }
 }

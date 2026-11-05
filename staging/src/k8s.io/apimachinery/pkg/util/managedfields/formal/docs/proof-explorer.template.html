@@ -130,7 +130,7 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
       <button class="chip" data-proof="SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch">Inspect the kernel-checked counterexample</button>
     </div>
     <div class="card gap"><h2>PR #336: required maps and granular lists</h2>
-      <p>A direct claim on <code>conn: {}</code> bypasses required-child recursion. Conversely, a known granular list has no direct member claim, including when explicitly applied empty. The PR classifies its supplier as partial. Both cases run against pinned head and base Go revisions.</p>
+      <p>A direct claim on <code>conn: {}</code> bypasses required-child recursion. Conversely, a known non-null granular list has no direct member claim, including when explicitly applied empty. The PR classifies its supplier as partial. Explicit null creates a direct member and is retained by the classifier; pinned map/list controls verify this distinction.</p>
       <div class="chips"><button class="chip" data-proof="SSA.explicit_map_shortcuts_required_children">General map shortcut</button><button class="chip" data-proof="SSA.Counterexamples.pr_required_list_owner_is_misclassified">Actual list failure</button></div>
     </div>
     <div class="card"><h2>Boundaries still requiring separate work</h2>

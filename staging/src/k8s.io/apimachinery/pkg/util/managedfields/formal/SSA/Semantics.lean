@@ -27,13 +27,24 @@ inductive Semantics where
 
 deriving instance ReflBEq, LawfulBEq for Semantics
 
-/-- The PR accepts an explicit map member before checking that map's required children. -/
+/-- FieldSet membership has no value/presence tag; explicit null is also a direct member. -/
+def State.ownsMember (s : State) (manager : String) (path : Path) : Bool :=
+  s.claims.any fun claim => claim.manager == manager && claim.target.path == path
+
+theorem owns_member_of_owns (s : State) (manager : String) (path : Path) (kind : ClaimKind)
+    (owned : s.owns manager path kind = true) : s.ownsMember manager path = true := by
+  obtain ⟨claim,present,property⟩ := List.any_eq_true.mp owned
+  have parts := Bool.and_eq_true_iff.mp property
+  have target : claim.target = ⟨path,kind⟩ := eq_of_beq parts.2
+  exact List.any_eq_true.mpr ⟨claim,present,by simpa [target] using parts.1⟩
+
+/-- The PR accepts any direct map member before checking that map's required children. -/
 def prCovers (s : State) (manager : String) : RequiredCore → Bool
   | .none => true
   | .value path => s.owns manager path .value
-  | .object path children => s.owns manager path .presence ||
+  | .object path children => s.ownsMember manager path ||
       (s.ownsMapPresence manager path && prCovers s manager children)
-  | .collection path => s.owns manager path .presence
+  | .collection path => s.ownsMember manager path
   | .both left right => prCovers s manager left && prCovers s manager right
 
 /-- Key filtering affects only other applying managers, and only while restoring pruned data. -/
@@ -138,13 +149,22 @@ theorem explicit_map_shortcuts_required_children (s : State) (manager : String)
     (missing : covers s manager children = false) :
     prCovers s manager (.object path children) = true ∧
       covers s manager (.object path children) = false := by
-  simp [prCovers, covers, member, missing]
+  have direct := owns_member_of_owns s manager path .presence member
+  simp [prCovers, covers, direct, missing]
 
 /-- Required collection coverage asks for a marker which ordinary granular-list normalization omits. -/
 theorem granular_list_without_member_is_partial (s : State) (manager : String) (path : Path)
-    (noMember : s.owns manager path .presence = false) :
+    (noMember : s.ownsMember manager path = false) :
     prCovers s manager (.collection path) = false := by
   simp [prCovers, noMember]
+
+/-- An explicit null claim is the same direct field member to the PR classifier. -/
+theorem direct_value_member_covers_containers (s : State) (manager : String) (path : Path)
+    (children : RequiredCore) (owned : s.owns manager path .value = true) :
+    prCovers s manager (.object path children) = true ∧
+    prCovers s manager (.collection path) = true := by
+  have direct := owns_member_of_owns s manager path .value owned
+  simp [prCovers,direct]
 
 /-- Update ownership is deliberately exempt from the PR's partial-manager filtering. -/
 theorem updater_keeps_membership (s : State) (actor : String) (item : ItemSpec) (claim : Claim)

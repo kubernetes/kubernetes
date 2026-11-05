@@ -81,7 +81,7 @@ cases:
     differenceKind: proposal
     difference: The last full owner deletes the item, including a partial owner's optional value.
 - name: required-map-member-shortcut
-  schema: |
+  schema: &required-map |
     types:
     - name: Document
       map:
@@ -295,3 +295,43 @@ cases:
   - manager: B
     apply: {settings: {}}
     expect: {object: {settings: {}}, owners: {A: [.settings], B: [.settings]}}
+- name: required-granular-list-null-has-a-direct-member
+  schema: *required-list
+  steps:
+  - manager: A
+    apply: {items: [{name: db, children: null}]}
+    expect:
+      object: {items: [{name: db, children: null}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].children']}
+  - manager: B
+    apply: {items: [{name: db, note: injected}]}
+    expect:
+      object: {items: [{name: db, children: null, note: injected}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].children']
+        B: ['.items[name="db"]', '.items[name="db"].note']
+  - manager: B
+    apply: {}
+    expect:
+      object: {items: [{name: db, children: null}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].children']}
+- name: required-map-null-has-a-direct-member
+  schema: *required-map
+  steps:
+  - manager: A
+    apply: {items: [{name: db, conn: null}]}
+    expect:
+      object: {items: [{name: db, conn: null}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].conn']}
+  - manager: B
+    apply: {items: [{name: db}]}
+    expect:
+      object: {items: [{name: db, conn: null}]}
+      owners:
+        A: ['.items[name="db"]', '.items[name="db"].conn']
+        B: ['.items[name="db"]']
+  - manager: B
+    apply: {}
+    expect:
+      object: {items: [{name: db, conn: null}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].conn']}

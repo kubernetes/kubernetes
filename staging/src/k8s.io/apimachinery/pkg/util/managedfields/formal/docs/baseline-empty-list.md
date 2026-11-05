@@ -35,7 +35,7 @@ and therefore reaches a fixed point earlier.
 ## Why the first Apply loses the empty list
 
 Apply's `ToFieldSet` extracts item membership and child claims for a known
-associative list, but no direct list-presence claim, including for `[]`.
+non-null associative list, but no direct list-presence claim, including for `[]`.
 Pruning expands the previous item claims to the named list field and removes
 it. The newly applied empty list has no ownership claim to restore it. Once
 the old item claims are gone, the next identical intent creates the empty list.

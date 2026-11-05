@@ -143,6 +143,7 @@ In particular:
 | Validation limits | `value_only_validation_cannot_enforce_ownership`, `validator_can_block_any_handoff` | Same data can carry different claims; arbitrary external validation can prevent otherwise safe progress. |
 | PR compatibility | `no_required_transition_equivalence` | All finite states/requests and metadata-free item schemas, actual three-pass pruning modes. |
 | PR classifier | `explicit_map_shortcuts_required_children`, `granular_list_without_member_is_partial`, `updater_keeps_membership` | Direct classifier facts, distinct from a complete Go refinement proof. |
+| PR direct-member projection | `State.ownsMember`, `direct_value_member_covers_containers` | FieldSet has no value/presence tag. Explicit null is a direct member and is counted by the raw classifier. Pinned map/list controls close the former model mismatch; API nullability and the stronger policy need their separate schema mapping. |
 | Raw pruning | `remove_items_has_no_selected_descendant` | Selected subtrees are absent; unselected empty container slots may become null. |
 | Raw ownership | `WireContracts.merged_foreign_claim`, `candidate_foreign_claim_exact` | Foreign claims participate in pruning before transfer; final survival is characterized exactly. These are current/PR wire-model laws. |
 | Raw conflicts/force | `WireContracts.accepted_nonforce_foreign_unchanged`, `candidate_force_independent`, `accepted_also_succeeds_forced` | The final pruned result is compared with original ownership. Force changes the conflict gate, not the candidate. |

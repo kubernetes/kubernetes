@@ -32,7 +32,7 @@ def claimFields (claims : List Claim) : FieldSet :=
   claims.flatMap (fun claim => claim.target.path ::
     (if claim.target.kind == .item then keyLeaves claim.target.path else []))
 
-/-- List keys carry key leaves implicitly; known granular lists have no direct field member. -/
+/-- Keys carry key leaves implicitly; known non-null granular lists have no direct field member. -/
 def dataFields (named : FieldSet) (s : State) : FieldSet :=
   (s.cells.filter fun cell => match cell.content with
     | .value _ | .item => true

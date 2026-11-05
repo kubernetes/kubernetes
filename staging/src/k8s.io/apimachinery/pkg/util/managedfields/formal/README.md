@@ -69,13 +69,19 @@ data without force, preserving the data and all existing claims. This theorem
 allows sparse real ownership; it does not fabricate container claims.
 
 Required granular lists remain a substantive design problem: current SMD
-field-set extraction creates no direct claim for a known granular list, even
+field-set extraction creates no direct claim for a known non-null granular list, even
 when explicitly applied empty. The FieldsV1 trie grammar can represent such
 membership; generating and preserving it through SSA operations is the missing
 design. The stronger core uses an explicit collection-presence assertion for
 this case. Its synthetic required-list examples do not establish compatibility
 with the current implementation. The actual-wire modes preserve the missing
 marker and demonstrate the PR's resulting misclassification.
+
+Explicit null creates a direct field member. The raw PR classifier checks that
+path independently of the model's value/presence tag, matching the real FieldSet
+representation. Pinned list/map null controls caught and closed an earlier
+model mismatch. API validity of null is checked separately; mapping nullable
+required containers into the stronger policy needs additional shape metadata.
 
 ## Baseline counterexample
 
