@@ -250,11 +250,11 @@ func IsDNS1035Label(value string) []string {
 const wildcardDNS1123SubdomainFmt = "\\*\\." + dns1123SubdomainFmt
 const wildcardDNS1123SubdomainErrMsg = "a wildcard DNS-1123 subdomain must start with '*.', followed by a valid DNS subdomain, which must consist of lower case alphanumeric characters, '-' or '.' and end with an alphanumeric character"
 
+var wildcardDNS1123SubdomainRegexp = regexp.MustCompile("^" + wildcardDNS1123SubdomainFmt + "$")
+
 // IsWildcardDNS1123Subdomain tests for a string that conforms to the definition of a
 // wildcard subdomain in DNS (RFC 1034 section 4.3.3).
 func IsWildcardDNS1123Subdomain(value string) []string {
-	wildcardDNS1123SubdomainRegexp := regexp.MustCompile("^" + wildcardDNS1123SubdomainFmt + "$")
-
 	var errs []string
 	if len(value) > DNS1123SubdomainMaxLength {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
