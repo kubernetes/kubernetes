@@ -289,6 +289,34 @@ Usage:
 ```
 
 
+### invalid-conntrack-state-server
+
+Reproduces [kubernetes/kubernetes#74839](https://github.com/kubernetes/kubernetes/issues/74839),
+used to check that a proxy implementation is not vulnerable to the invalid conntrack state bug.
+
+The subcommand listens on TCP port `9000`. For every connection established with the pod IPs, it
+injects a TCP packet whose sequence number is out of the connection window. The pod IPs are read
+from the `POD_IPS` environment variable (for example, set through the downward API).
+The container needs the `NET_RAW` capability.
+
+Usage: run it as the container command of a Pod, which provides the pod IPs through the downward
+API and the `NET_RAW` capability, then connect to port `9000` of the Pod:
+
+```yaml
+containers:
+- name: server
+  image: registry.k8s.io/e2e-test-images/agnhost:2.67.0
+  args: ["invalid-conntrack-state-server"]
+  securityContext:
+    capabilities:
+      add: ["NET_RAW"]
+  env:
+  - name: POD_IPS
+    valueFrom:
+      fieldRef:
+        fieldPath: status.podIPs
+```
+
 ### liveness
 
 Starts a simple server that is alive for 10 seconds, then reports unhealthy for the rest
