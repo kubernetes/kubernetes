@@ -549,7 +549,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
-					name: "Get etcd3",
+					name: "cacher.Get",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"audit-id": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() != ""
@@ -557,14 +557,15 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"key": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "/minions/fake"
 						},
-						"resource": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "nodes"
+						"resource-version": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == ""
 						},
 					},
 					events: []string{
-						"Get call succeeded",
-						"TransformFromStorage succeeded",
-						"Decode succeeded",
+						"watchCache locked acquired",
+						"watchCache fresh enough",
+						"LatestSnapshot success",
+						"GetByKey success",
 					},
 				},
 				{
@@ -971,7 +972,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
-					name: "GuaranteedUpdate etcd3",
+					name: "cacher.GuaranteedUpdate",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"audit-id": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() != ""
@@ -1114,7 +1115,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
-					name: "GuaranteedUpdate etcd3",
+					name: "cacher.GuaranteedUpdate",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"audit-id": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() != ""
