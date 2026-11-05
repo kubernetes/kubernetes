@@ -47,6 +47,8 @@ type PodValidationOptions struct {
 	AllowOnlyRecursiveSELinuxChangePolicy bool
 	// Indicates whether PodLevelResources feature is enabled or disabled.
 	PodLevelResourcesEnabled bool
+	// Indicates whether PodLevelResourcesEphemeralStorage feature is enabled or disabled.
+	PodLevelResourcesEphemeralStorageEnabled bool
 	// Indicates whether InPlacePodLevelResourcesVerticalScaling feature is enabled
 	// or disabled.
 	InPlacePodLevelResourcesVerticalScalingEnabled bool
@@ -194,6 +196,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEphemeralStorageEnabled:            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
@@ -266,6 +269,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 
 		// If old spec uses a seccomp profile of type OCI, allow it
 		opts.AllowSecurityProfileOCI = opts.AllowSecurityProfileOCI || seccompProfileOCIInUse(oldPodSpec)
+
+		opts.PodLevelResourcesEphemeralStorageEnabled = opts.PodLevelResourcesEphemeralStorageEnabled || podLevelEphemeralStorageInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -557,4 +562,17 @@ func seccompProfileOCIInUse(podSpec *core.PodSpec) bool {
 		return true
 	})
 	return inUse
+}
+
+func podLevelEphemeralStorageInUse(podSpec *core.PodSpec) bool {
+	if podSpec == nil || podSpec.Resources == nil {
+		return false
+	}
+	if _, ok := podSpec.Resources.Requests[core.ResourceEphemeralStorage]; ok {
+		return true
+	}
+	if _, ok := podSpec.Resources.Limits[core.ResourceEphemeralStorage]; ok {
+		return true
+	}
+	return false
 }

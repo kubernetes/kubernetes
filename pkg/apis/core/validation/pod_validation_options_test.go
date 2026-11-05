@@ -1411,3 +1411,56 @@ func TestSecurityProfileOCIValidationOption(t *testing.T) {
 		}
 	}
 }
+
+func TestGetValidationOptionsPodLevelEphemeralStorageRatcheting(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, false)
+
+	tests := []struct {
+		name       string
+		oldPodSpec *core.PodSpec
+		want       bool
+	}{
+		{
+			name:       "create with gate disabled",
+			oldPodSpec: nil,
+			want:       false,
+		},
+		{
+			name: "update when oldPod only has pod-level cpu",
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("100m")},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "update ratcheted when oldPod has pod-level ephemeral-storage request",
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Requests: core.ResourceList{core.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "update ratcheted when oldPod has pod-level ephemeral-storage limit",
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+			},
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if opts.PodLevelResourcesEphemeralStorageEnabled != tc.want {
+				t.Errorf("PodLevelResourcesEphemeralStorageEnabled = %v, want %v", opts.PodLevelResourcesEphemeralStorageEnabled, tc.want)
+			}
+		})
+	}
+}

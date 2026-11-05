@@ -57,13 +57,19 @@ type PodResourcesOptions struct {
 	// from the calculation. If pod-level resources are not set in PodSpec,
 	// pod-level resources will always be skipped.
 	SkipPodLevelResources bool
+	// PodLevelResourcesEphemeralStorageEnabled indicates whether pod-level
+	// ephemeral-storage requests and limits should be considered when evaluating
+	// the pod resources. This MUST be false if the PodLevelResourcesEphemeralStorage
+	// feature is not enabled.
+	PodLevelResourcesEphemeralStorageEnabled bool
 	// SkipContainerLevelResources
 	SkipContainerLevelResources bool
 	// Use node allocatable resource claim information from pod status to compute the effective pod resource request.
 	UseDRANodeAllocatableResourceClaimStatus bool
 }
 
-var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
+var supportedPodLevelComputeResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
+var supportedPodLevelResources = supportedPodLevelComputeResources.Clone().Insert(v1.ResourceEphemeralStorage)
 
 func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
 	return supportedPodLevelResources.Clone().Insert(v1.ResourceHugePagesPrefix)
@@ -76,10 +82,34 @@ func IsSupportedPodLevelResource(name v1.ResourceName) bool {
 	return supportedPodLevelResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
 }
 
+// IsSupportedPodLevelComputeResource checks if a given resource is a compute resource
+// (CPU, Memory, or HugePages) supported at the pod level.
+func IsSupportedPodLevelComputeResource(name v1.ResourceName) bool {
+	return supportedPodLevelComputeResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+func (opts PodResourcesOptions) isSupportedPodLevelResource(name v1.ResourceName) bool {
+	if name == v1.ResourceEphemeralStorage && !opts.PodLevelResourcesEphemeralStorageEnabled {
+		return false
+	}
+	return IsSupportedPodLevelResource(name)
+}
+
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
 // It returns true if either the Requests or Limits maps are non-empty.
 // Note: keep this in sync with k8s.io/kubernetes/pkg/apis/core/helper.IsPodLevelResourcesSet
 func IsPodLevelResourcesSet(pod *v1.Pod) bool {
+	return isPodLevelResourcesSet(pod, IsSupportedPodLevelResource)
+}
+
+// IsPodLevelComputeResourcesSet checks if pod-level compute resources (CPU, Memory, or HugePages)
+// are set, ignoring ephemeral-storage which does not participate in QoS or cgroup management.
+// Note: keep this in sync with k8s.io/kubernetes/pkg/apis/core/helper.IsPodLevelComputeResourcesSet
+func IsPodLevelComputeResourcesSet(pod *v1.Pod) bool {
+	return isPodLevelResourcesSet(pod, IsSupportedPodLevelComputeResource)
+}
+
+func isPodLevelResourcesSet(pod *v1.Pod, isSupportedFn func(v1.ResourceName) bool) bool {
 	if pod.Spec.Resources == nil {
 		return false
 	}
@@ -89,13 +119,13 @@ func IsPodLevelResourcesSet(pod *v1.Pod) bool {
 	}
 
 	for resourceName := range pod.Spec.Resources.Requests {
-		if IsSupportedPodLevelResource(resourceName) {
+		if isSupportedFn(resourceName) {
 			return true
 		}
 	}
 
 	for resourceName := range pod.Spec.Resources.Limits {
-		if IsSupportedPodLevelResource(resourceName) {
+		if isSupportedFn(resourceName) {
 			return true
 		}
 	}
@@ -106,6 +136,10 @@ func IsPodLevelResourcesSet(pod *v1.Pod) bool {
 // IsPodLevelRequestsSet checks if pod-level requests are set. It returns true if
 // Requests map is non-empty.
 func IsPodLevelRequestsSet(pod *v1.Pod) bool {
+	return isPodLevelRequestsSet(pod, IsSupportedPodLevelResource)
+}
+
+func isPodLevelRequestsSet(pod *v1.Pod, isSupportedFn func(v1.ResourceName) bool) bool {
 	if pod.Spec.Resources == nil {
 		return false
 	}
@@ -115,7 +149,7 @@ func IsPodLevelRequestsSet(pod *v1.Pod) bool {
 	}
 
 	for resourceName := range pod.Spec.Resources.Requests {
-		if IsSupportedPodLevelResource(resourceName) {
+		if isSupportedFn(resourceName) {
 			return true
 		}
 	}
@@ -154,13 +188,13 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		reqs = AggregateContainerRequests(pod, opts)
 	}
 
-	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
+	if !opts.SkipPodLevelResources && isPodLevelRequestsSet(pod, opts.isSupportedPodLevelResource) {
 		effectiveReqs := pod.Spec.Resources.Requests
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
 			effectiveReqs = effectivePodLevelResources(pod, pod.Spec.Resources.Requests, pod.Status.Resources.Requests, pod.Status.AllocatedResources)
 		}
 
-		applyPodLevelResources(reqs, effectiveReqs)
+		applyPodLevelResources(reqs, effectiveReqs, opts)
 	}
 
 	// Add overhead for running a pod to the sum of requests if requested:
@@ -171,9 +205,9 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	return reqs
 }
 
-func applyPodLevelResources(result, effectiveResources v1.ResourceList) {
+func applyPodLevelResources(result, effectiveResources v1.ResourceList, opts PodResourcesOptions) {
 	for resourceName, quantity := range effectiveResources {
-		if IsSupportedPodLevelResource(resourceName) {
+		if opts.isSupportedPodLevelResource(resourceName) {
 			result[resourceName] = quantity
 		}
 	}
@@ -184,6 +218,26 @@ func effectivePodLevelResources(pod *v1.Pod, spec v1.ResourceList, statuses ...v
 		spec = nil
 	}
 	return max(spec, statuses...)
+}
+
+// withoutPodLevelEphemeralStorage replaces any pod-level ephemeral-storage entry in
+// status with the aggregated container spec value when PodLevelResourcesEphemeralStorageEnabled
+// is false. Because pod-level status maps record the pod-level value and ephemeral-storage
+// cannot be resized in place, the container spec aggregate is authoritative when disabled.
+func withoutPodLevelEphemeralStorage(status, containerSpec v1.ResourceList, opts PodResourcesOptions) v1.ResourceList {
+	if opts.PodLevelResourcesEphemeralStorageEnabled {
+		return status
+	}
+	if _, ok := status[v1.ResourceEphemeralStorage]; !ok {
+		return status
+	}
+	filtered := status.DeepCopy()
+	if specVal, ok := containerSpec[v1.ResourceEphemeralStorage]; ok {
+		filtered[v1.ResourceEphemeralStorage] = specVal
+	} else {
+		delete(filtered, v1.ResourceEphemeralStorage)
+	}
+	return filtered
 }
 
 func containerSpecRequests(container *v1.Container, _ *v1.ContainerStatus, _ bool) v1.ResourceList {
@@ -315,8 +369,8 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		// Once InPlacePodLevelResourcesVerticalScaling is GA and its feature gate is removed,
 		// container-level fallback becomes redundant because max(spec, actuated, allocated) naturally evaluates to spec at creation time.
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.AllocatedResources != nil && pod.Status.Resources != nil && pod.Status.Resources.Requests != nil {
-			allocatedReqs = pod.Status.AllocatedResources
-			actuatedReqs = pod.Status.Resources.Requests
+			allocatedReqs = withoutPodLevelEphemeralStorage(pod.Status.AllocatedResources, specReqs, opts)
+			actuatedReqs = withoutPodLevelEphemeralStorage(pod.Status.Resources.Requests, specReqs, opts)
 			// DRA values are not added to allocatedReqs and actuatedReqs because
 			// 1. Kubelet adds DRA allocations when setting pod.Status.AllocatedResources.
 			// 2. Kubelet adds DRA allocations when configuring pod-level cgroups. Since pod.Status.Resources.Requests is read from cgroup settings, it already contains DRA values.
@@ -394,12 +448,17 @@ func containerActuatedLimits(c *v1.Container, cs *v1.ContainerStatus, isResizeIn
 func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	// attempt to reuse the maps if passed, or allocate otherwise
 	limits := AggregateContainerLimits(pod, opts)
-	if !opts.SkipPodLevelResources && IsPodLevelResourcesSet(pod) {
+	if !opts.SkipPodLevelResources && isPodLevelResourcesSet(pod, opts.isSupportedPodLevelResource) {
+		if opts.PodLevelResourcesEphemeralStorageEnabled {
+			if _, ok := pod.Spec.Resources.Limits[v1.ResourceEphemeralStorage]; !ok {
+				omitPartiallySetOvercommittableLimits(pod, limits, v1.ResourceEphemeralStorage)
+			}
+		}
 		effectiveLims := pod.Spec.Resources.Limits
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && opts.UseStatusResources && pod.Status.Resources != nil {
 			effectiveLims = effectivePodLevelResources(pod, pod.Spec.Resources.Limits, pod.Status.Resources.Limits)
 		}
-		applyPodLevelResources(limits, effectiveLims)
+		applyPodLevelResources(limits, effectiveLims, opts)
 	}
 
 	// Add overhead to non-zero limits if requested:
@@ -415,25 +474,31 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	return limits
 }
 
-// omitPartiallySetCPUMemLimits deletes the cpu and memory limits from limits unless every
-// init and regular container sets them to a non-zero value.
-func omitPartiallySetCPUMemLimits(pod *v1.Pod, limits v1.ResourceList) {
-	_, cpuPresent := limits[v1.ResourceCPU]
-	_, memoryPresent := limits[v1.ResourceMemory]
+// omitPartiallySetOvercommittableLimits deletes any of the given overcommittable
+// resources from limits unless every init and regular container sets it to a non-zero value.
+func omitPartiallySetOvercommittableLimits(pod *v1.Pod, limits v1.ResourceList, resources ...v1.ResourceName) {
+	present := make([]v1.ResourceName, 0, len(resources))
+	for _, res := range resources {
+		if _, ok := limits[res]; ok {
+			present = append(present, res)
+		}
+	}
 	for _, containers := range [][]v1.Container{pod.Spec.InitContainers, pod.Spec.Containers} {
 		for i := range containers {
-			if !cpuPresent && !memoryPresent {
+			if len(present) == 0 {
 				return
 			}
 			ctrLimits := containers[i].Resources.Limits
-			if limit, found := ctrLimits[v1.ResourceCPU]; cpuPresent && (!found || limit.IsZero()) {
-				cpuPresent = false
-				delete(limits, v1.ResourceCPU)
+			n := 0
+			for _, res := range present {
+				if limit, found := ctrLimits[res]; !found || limit.IsZero() {
+					delete(limits, res)
+				} else {
+					present[n] = res
+					n++
+				}
 			}
-			if limit, found := ctrLimits[v1.ResourceMemory]; memoryPresent && (!found || limit.IsZero()) {
-				memoryPresent = false
-				delete(limits, v1.ResourceMemory)
-			}
+			present = present[:n]
 		}
 	}
 }
@@ -463,7 +528,7 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 		// Once InPlacePodLevelResourcesVerticalScaling is GA and its feature gate is removed,
 		// container-level fallback becomes redundant because max(spec, actuated) naturally evaluates to spec at creation time.
 		if opts.InPlacePodLevelResourcesVerticalScalingEnabled && pod.Status.Resources != nil && pod.Status.Resources.Limits != nil {
-			actuatedLimits = pod.Status.Resources.Limits
+			actuatedLimits = withoutPodLevelEphemeralStorage(pod.Status.Resources.Limits, specLimits, opts)
 			// Kubelet includes DRA values when populating pod limits. Since pod.Status.Resources.Limits is updated based on cgroup settings, it already contains DRA values, so we should not add them again here.
 		} else {
 			// Kubelet considers DRA values while updating container limits. We should not be adding it here again.
@@ -477,7 +542,7 @@ func AggregateContainerLimits(pod *v1.Pod, opts PodResourcesOptions) v1.Resource
 		}
 	}
 
-	omitPartiallySetCPUMemLimits(pod, limits)
+	omitPartiallySetOvercommittableLimits(pod, limits, v1.ResourceCPU, v1.ResourceMemory)
 	return limits
 }
 

@@ -843,7 +843,7 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.plrEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, tc.plrFixUpdateEnabled)
 
-			podutil.DefaultPodLevelResources(tc.pod)
+			podutil.DefaultPodLevelResourcesForCreate(tc.pod)
 
 			if len(tc.wantRequests) == 0 {
 				if tc.pod.Spec.Resources != nil && len(tc.pod.Spec.Resources.Requests) > 0 {
@@ -877,15 +877,16 @@ func TestApplyPodLevelResourceDefaults(t *testing.T) {
 // TestPrepareForUpdatePodLevelResources tests update and resize strategy PrepareForUpdate behaviors.
 func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 	tests := []struct {
-		name          string
-		useResize     bool
-		oldResources  *api.ResourceRequirements
-		newResources  *api.ResourceRequirements
-		oldContainers []api.Container
-		newContainers []api.Container
-		wantNil       bool
-		wantRequests  api.ResourceList
-		wantLimits    api.ResourceList
+		name                       string
+		useResize                  bool
+		plrEphemeralStorageEnabled bool
+		oldResources               *api.ResourceRequirements
+		newResources               *api.ResourceRequirements
+		oldContainers              []api.Container
+		newContainers              []api.Container
+		wantNil                    bool
+		wantRequests               api.ResourceList
+		wantLimits                 api.ResourceList
 	}{
 		{
 			name:         "client omits spec.resources on update (nil) for non-resize strategy - preserves old PLR",
@@ -1026,12 +1027,82 @@ func TestPrepareForUpdatePodLevelResources(t *testing.T) {
 			wantRequests: getResourceList("500m", "512Mi"),
 			wantLimits:   getResourceList("500m", "512Mi"),
 		},
+		{
+			name:                       "resize: old pod has pod-level CPU and container ephemeral-storage without pod-level ephemeral-storage - does not inject ephemeral-storage",
+			useResize:                  true,
+			plrEphemeralStorageEnabled: true,
+			oldResources:               &api.ResourceRequirements{Requests: getResourceList("200m", "")},
+			newResources:               &api.ResourceRequirements{Requests: getResourceList("300m", "")},
+			oldContainers: []api.Container{
+				newContainer("c1", api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("100m"),
+					api.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				}, api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("200m"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				}),
+			},
+			wantRequests: getResourceList("300m", ""),
+			wantLimits:   getResourceList("300m", ""),
+		},
+		{
+			name:                       "resize: non-PLR pod with container ephemeral-storage adds pod-level CPU - does not inject ephemeral-storage",
+			useResize:                  true,
+			plrEphemeralStorageEnabled: true,
+			oldResources:               nil,
+			newResources:               &api.ResourceRequirements{Requests: getResourceList("200m", "")},
+			oldContainers: []api.Container{
+				newContainer("c1", api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("100m"),
+					api.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				}, api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("200m"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				}),
+			},
+			wantRequests: getResourceList("200m", ""),
+			wantLimits:   getResourceList("200m", ""),
+		},
+		{
+			name:                       "resize: old pod already has pod-level ephemeral-storage - re-defaults ephemeral-storage when client replaces spec.resources",
+			useResize:                  true,
+			plrEphemeralStorageEnabled: true,
+			oldResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("200m"),
+					api.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("200m"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+			},
+			newResources: &api.ResourceRequirements{Requests: getResourceList("300m", "")},
+			oldContainers: []api.Container{
+				newContainer("c1", api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("100m"),
+					api.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+				}, api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("200m"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				}),
+			},
+			wantRequests: api.ResourceList{
+				api.ResourceCPU:              resource.MustParse("300m"),
+				api.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+			},
+			wantLimits: api.ResourceList{
+				api.ResourceCPU:              resource.MustParse("300m"),
+				api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, tc.plrEphemeralStorageEnabled)
 
 			defaultContainers := []api.Container{
 				newContainer("c1", getResourceList("100m", "128Mi"), getResourceList("200m", "256Mi")),

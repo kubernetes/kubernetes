@@ -5780,3 +5780,284 @@ func TestDisableEvictionResponders(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultPodLevelResourcesEphemeralStorage(t *testing.T) {
+	restartAlways := api.ContainerRestartPolicyAlways
+	tests := []struct {
+		name                    string
+		ephemeralStorageEnabled bool
+		pod                     *api.Pod
+		wantResources           *api.ResourceRequirements
+	}{
+		{
+			name:                    "gate disabled: pod cpu PLR does not default container ephemeral-storage",
+			ephemeralStorageEnabled: false,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("500m")},
+					},
+					Containers: []api.Container{{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:              resource.MustParse("200m"),
+								api.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+							},
+						},
+					}},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("500m")},
+			},
+		},
+		{
+			name:                    "gate disabled: pod ephemeral-storage still triggers cpu/memory defaulting without defaulting pod ephemeral-storage limit",
+			ephemeralStorageEnabled: false,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					},
+					Containers: []api.Container{{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits: api.ResourceList{
+								api.ResourceCPU:              resource.MustParse("500m"),
+								api.ResourceEphemeralStorage: resource.MustParse("4Gi"),
+							},
+						},
+					}},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("200m"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("500m"),
+				},
+			},
+		},
+		{
+			name:                    "gate enabled: pod cpu PLR defaults ephemeral-storage request and limit when all containers set non-zero limit",
+			ephemeralStorageEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("500m")},
+					},
+					InitContainers: []api.Container{
+						{
+							Name: "init-1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("500Mi")},
+								Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name:          "sidecar",
+							RestartPolicy: &restartAlways,
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+								Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+							},
+						},
+					},
+					Containers: []api.Container{{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("3Gi")},
+						},
+					}},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("500m"),
+					api.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+				},
+			},
+		},
+		{
+			name:                    "gate enabled: pod ephemeral-storage triggers cpu, memory, and hugepages defaulting",
+			ephemeralStorageEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Limits: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("4Gi")},
+					},
+					Containers: []api.Container{{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:                   resource.MustParse("250m"),
+								api.ResourceMemory:                resource.MustParse("256Mi"),
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("4Mi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceCPU:                   resource.MustParse("500m"),
+								api.ResourceMemory:                resource.MustParse("512Mi"),
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("4Mi"),
+							},
+						},
+					}},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:                   resource.MustParse("250m"),
+					api.ResourceMemory:                resource.MustParse("256Mi"),
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("4Mi"),
+					api.ResourceEphemeralStorage:      resource.MustParse("4Gi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU:                   resource.MustParse("500m"),
+					api.ResourceMemory:                resource.MustParse("512Mi"),
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("4Mi"),
+					api.ResourceEphemeralStorage:      resource.MustParse("4Gi"),
+				},
+			},
+		},
+		{
+			name:                    "gate enabled: partial container ephemeral-storage limits do not default pod limit",
+			ephemeralStorageEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					},
+					Containers: []api.Container{
+						{
+							Name: "c1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("500Mi")},
+								Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("500Mi")},
+							},
+						},
+					},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+		},
+		{
+			name:                    "gate enabled: zero container ephemeral-storage limit does not default pod limit",
+			ephemeralStorageEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					},
+					Containers: []api.Container{
+						{
+							Name: "c1",
+							Resources: api.ResourceRequirements{
+								Limits: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: api.ResourceRequirements{
+								Limits: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("0")},
+							},
+						},
+					},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+		},
+		{
+			name:                    "gate enabled: pod ephemeral-storage limit raised to pod request when request exceeds aggregate container limits",
+			ephemeralStorageEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("5Gi")},
+					},
+					Containers: []api.Container{{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+						},
+					}},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("5Gi")},
+				Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("5Gi")},
+			},
+		},
+		{
+			name:                    "gate enabled: init, sidecar, and regular container ephemeral-storage limits aggregate to max(init, sum(regular+sidecar))",
+			ephemeralStorageEnabled: true,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					},
+					InitContainers: []api.Container{
+						{
+							Name: "init-1",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+								Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("5Gi")},
+							},
+						},
+						{
+							Name:          "sidecar-1",
+							RestartPolicy: ptr.To(api.ContainerRestartPolicyAlways),
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("500Mi")},
+								Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+							},
+						},
+					},
+					Containers: []api.Container{{
+						Name: "c1",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("500Mi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+						},
+					}},
+				},
+			},
+			wantResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("5Gi")},
+			},
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, true)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, tc.ephemeralStorageEnabled)
+			DefaultPodLevelResourcesForCreate(tc.pod)
+			if diff := cmp.Diff(tc.wantResources, tc.pod.Spec.Resources); diff != "" {
+				t.Errorf("DefaultPodLevelResourcesForCreate() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
