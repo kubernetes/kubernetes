@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -51,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -102,6 +105,9 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	podutil.DefaultPodLevelResources(pod)
 
 	pod.Status.QOSClass = qos.GetPodQOS(pod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		initPendingVolumeStatuses(pod)
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -254,6 +260,9 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	}
 
 	preserveOldObservedGeneration(newPod, oldPod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		preservePendingVolumeStatuses(newPod, oldPod)
+	}
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
@@ -487,6 +496,154 @@ func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]field
 	return map[fieldpath.APIVersion]fieldpath.Filter{
 		"v1": p.resetFieldsFilter,
 	}
+}
+
+// podDynamicStrategy is the strategy for the pods/dynamic subresource, which
+// allows an expanded set of mutations.
+type podDynamicStrategy struct {
+	podStrategy
+}
+
+// DynamicStrategy wraps and exports the used podStrategy for the storage package.
+var DynamicStrategy = podDynamicStrategy{Strategy}
+
+func (podDynamicStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
+
+	// Pod-level resources are defaulted the same way as for a resize.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+		if newPod.Spec.Resources != nil {
+			podutil.DefaultPodLevelResources(newPod)
+		}
+	}
+
+	podutil.DropDisabledPodFields(newPod, oldPod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		updateDynamicVolumeStatuses(newPod, oldPod)
+	}
+	updatePodGeneration(newPod, oldPod)
+}
+
+func initPendingVolumeStatuses(pod *api.Pod) {
+	seen := sets.New[string]()
+	var statuses []api.PodVolumeStatus
+	for i := range pod.Spec.Volumes {
+		vol := &pod.Spec.Volumes[i]
+		if seen.Has(vol.Name) || !helper.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+			continue
+		}
+		seen.Insert(vol.Name)
+		statuses = append(statuses, api.PodVolumeStatus{
+			Name:      vol.Name,
+			HostPhase: api.PodVolumeHostPending,
+		})
+	}
+	slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	pod.Status.VolumeStatuses = statuses
+}
+
+func updateDynamicVolumeStatuses(newPod, oldPod *api.Pod) {
+	newSpecVolumes := sets.New[string]()
+	for i := range newPod.Spec.Volumes {
+		newSpecVolumes.Insert(newPod.Spec.Volumes[i].Name)
+	}
+
+	seen := sets.New[string]()
+	for i := range oldPod.Spec.Volumes {
+		seen.Insert(oldPod.Spec.Volumes[i].Name)
+	}
+
+	pruned := false
+	statuses := make([]api.PodVolumeStatus, 0, len(oldPod.Status.VolumeStatuses))
+	for i := range oldPod.Status.VolumeStatuses {
+		vs := oldPod.Status.VolumeStatuses[i]
+		// If the pod is not yet bound to a node, no kubelet has observed it, so Pending
+		// entries for removed volumes can be pruned immediately instead of waiting on kubelet.
+		if oldPod.Spec.NodeName == "" && vs.HostPhase == api.PodVolumeHostPending && !newSpecVolumes.Has(vs.Name) {
+			pruned = true
+			continue
+		}
+		seen.Insert(vs.Name)
+		statuses = append(statuses, vs)
+	}
+
+	var added []api.PodVolumeStatus
+	for i := range newPod.Spec.Volumes {
+		vol := &newPod.Spec.Volumes[i]
+		if seen.Has(vol.Name) || !helper.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+			continue
+		}
+		seen.Insert(vol.Name)
+		added = append(added, api.PodVolumeStatus{
+			Name:      vol.Name,
+			HostPhase: api.PodVolumeHostPending,
+		})
+	}
+	if !pruned && len(added) == 0 {
+		return
+	}
+
+	statuses = append(statuses, added...)
+	if len(statuses) == 0 {
+		newPod.Status.VolumeStatuses = nil
+		return
+	}
+	slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	newPod.Status.VolumeStatuses = statuses
+}
+
+// preservePendingVolumeStatuses prevents status writers that have not yet observed oldPod.Generation
+// (such as a concurrent kubelet status patch computed against an earlier pod generation) from clearing
+// Pending VolumeStatuses seeded by the apiserver on pod creation or /dynamic updates.
+func preservePendingVolumeStatuses(newPod, oldPod *api.Pod) {
+	if newPod.Status.ObservedGeneration >= oldPod.Generation || len(oldPod.Status.VolumeStatuses) == 0 {
+		return
+	}
+	present := sets.New[string]()
+	for i := range newPod.Status.VolumeStatuses {
+		present.Insert(newPod.Status.VolumeStatuses[i].Name)
+	}
+	var missingPending []api.PodVolumeStatus
+	for i := range oldPod.Status.VolumeStatuses {
+		vs := oldPod.Status.VolumeStatuses[i]
+		if vs.HostPhase == api.PodVolumeHostPending && !present.Has(vs.Name) {
+			present.Insert(vs.Name)
+			missingPending = append(missingPending, vs)
+		}
+	}
+	if len(missingPending) == 0 {
+		return
+	}
+	statuses := make([]api.PodVolumeStatus, 0, len(newPod.Status.VolumeStatuses)+len(missingPending))
+	statuses = append(statuses, newPod.Status.VolumeStatuses...)
+	statuses = append(statuses, missingPending...)
+	slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	newPod.Status.VolumeStatuses = statuses
+}
+
+func (podDynamicStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
+	return corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDynamicStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

@@ -819,6 +819,7 @@ func NewMainKubelet(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}
+	klet.actuatedState = actuatedState
 
 	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
@@ -1085,9 +1086,20 @@ func NewMainKubelet(ctx context.Context,
 
 	// setup volumeManager
 	var vmPodManager volumemanager.PodManager = klet.podManager
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) ||
+		utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
 		// The volume manager should only ever be aware of the 'allocated' pod.
 		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
+	}
+
+	var triggerPodSync func(klog.Logger, types.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		triggerPodSync = func(logger klog.Logger, podUID types.UID) {
+			if klet.pleg != nil {
+				klet.RequestPodReinspect(podUID)
+				klet.RequestPodRelist(logger, podUID)
+			}
+		}
 	}
 
 	klet.volumeManager = volumemanager.NewVolumeManager(
@@ -1104,7 +1116,8 @@ func NewMainKubelet(ctx context.Context,
 		volumepathhandler.NewBlockVolumePathHandler(),
 		klet.statusManager,
 		kubeCfg.VolumeStatsAggPeriod.Duration,
-		actuatedState)
+		actuatedState,
+		triggerPodSync)
 
 	boMax, base := newCrashLoopBackOff(kubeCfg)
 
@@ -1340,6 +1353,9 @@ type Kubelet struct {
 
 	// allocationManager manages allocated resources for pods.
 	allocationManager allocation.Manager
+
+	// actuatedState tracks actuated resources, volumes, and volume mounts for pods.
+	actuatedState state.State
 
 	// podCertificateManager is fed updates as pods are added and removed from
 	// the node, and requests certificates for them based on their configured

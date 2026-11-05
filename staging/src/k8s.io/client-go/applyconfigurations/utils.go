@@ -662,6 +662,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ConfigMapVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Container"):
 		return &applyconfigurationscorev1.ContainerApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ContainerDynamicVolumePolicy"):
+		return &applyconfigurationscorev1.ContainerDynamicVolumePolicyApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerExtendedResourceRequest"):
 		return &applyconfigurationscorev1.ContainerExtendedResourceRequestApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerImage"):
@@ -914,6 +916,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodTemplateSpecApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodVolumeHealth"):
 		return &applyconfigurationscorev1.PodVolumeHealthApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodVolumeStatus"):
+		return &applyconfigurationscorev1.PodVolumeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortStatus"):
 		return &applyconfigurationscorev1.PortStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PortworxVolumeSource"):

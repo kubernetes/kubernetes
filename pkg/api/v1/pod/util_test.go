@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -1521,5 +1523,116 @@ func TestFindMatchingContainerRestartRule(t *testing.T) {
 				t.Errorf("FindMatchingContainerRestartRule() rule = %+v, want %+v", rule, tc.expectedRule)
 			}
 		})
+	}
+}
+
+func TestContainerPairs(t *testing.T) {
+	containers := func(names ...string) []v1.Container {
+		var containers []v1.Container
+		for _, name := range names {
+			containers = append(containers, v1.Container{Name: name})
+		}
+		return containers
+	}
+	// pairs returns each pair as "type:new/old", with "-" for a missing container.
+	pairs := func(pod, oldPod *v1.Pod, mask ContainerType) string {
+		name := func(c *v1.Container) string {
+			if c == nil {
+				return "-"
+			}
+			return c.Name
+		}
+		typeNames := map[ContainerType]string{InitContainers: "init", Containers: "main", EphemeralContainers: "ephemeral"}
+		var pairs []string
+		for pair, containerType := range ContainerPairs(pod, oldPod, mask) {
+			pairs = append(pairs, typeNames[containerType]+":"+name(pair.New)+"/"+name(pair.Old))
+		}
+		return strings.Join(pairs, " ")
+	}
+
+	tests := []struct {
+		name       string
+		names, old []string
+		expected   string
+	}{
+		{name: "no containers"},
+		{name: "unchanged", names: []string{"a", "b"}, old: []string{"a", "b"}, expected: "main:a/a main:b/b"},
+		{name: "added in the middle", names: []string{"a", "x", "b"}, old: []string{"a", "b"}, expected: "main:a/a main:x/- main:b/b"},
+		{name: "removed first", names: []string{"b", "c"}, old: []string{"a", "b", "c"}, expected: "main:-/a main:b/b main:c/c"},
+		{name: "replaced", names: []string{"a", "x", "c"}, old: []string{"a", "b", "c"}, expected: "main:a/a main:x/- main:-/b main:c/c"},
+		{
+			name:     "added and removed in several places",
+			names:    []string{"x", "b", "y", "d", "z"},
+			old:      []string{"a", "b", "c", "d", "e"},
+			expected: "main:x/- main:-/a main:b/b main:y/- main:-/c main:d/d main:z/- main:-/e",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{Containers: containers(tc.names...)}}
+			oldPod := &v1.Pod{Spec: v1.PodSpec{Containers: containers(tc.old...)}}
+			assert.Equal(t, tc.expected, pairs(pod, oldPod, Containers))
+		})
+	}
+
+	t.Run("mask", func(t *testing.T) {
+		pod := &v1.Pod{Spec: v1.PodSpec{
+			InitContainers:      containers("init"),
+			Containers:          containers("a", "x"),
+			EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}}},
+		}}
+		oldPod := &v1.Pod{Spec: v1.PodSpec{
+			InitContainers: containers("init"),
+			Containers:     containers("a", "b"),
+		}}
+		assert.Equal(t, "init:init/init", pairs(pod, oldPod, InitContainers))
+		assert.Equal(t, "init:init/init main:a/a main:x/- main:-/b ephemeral:debug/-", pairs(pod, oldPod, AllContainers))
+	})
+}
+
+func TestIsSupportedDynamicVolumeSource(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   *v1.VolumeSource
+		expected bool
+	}{
+		{name: "nil", source: nil, expected: false},
+		{name: "empty", source: &v1.VolumeSource{}, expected: false},
+		{name: "configMap", source: &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{}}, expected: true},
+		{name: "secret", source: &v1.VolumeSource{Secret: &v1.SecretVolumeSource{}}, expected: true},
+		{name: "projected", source: &v1.VolumeSource{Projected: &v1.ProjectedVolumeSource{}}, expected: true},
+		{name: "emptyDir", source: &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, expected: true},
+		{name: "image", source: &v1.VolumeSource{Image: &v1.ImageVolumeSource{}}, expected: true},
+		{name: "hostPath", source: &v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{}}, expected: false},
+		{name: "pvc", source: &v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{}}, expected: false},
+		{name: "downwardAPI", source: &v1.VolumeSource{DownwardAPI: &v1.DownwardAPIVolumeSource{}}, expected: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, IsSupportedDynamicVolumeSource(tc.source))
+		})
+	}
+}
+
+func TestIsSupportedDynamicVolumeSourceParity(t *testing.T) {
+	v1Type := reflect.TypeFor[v1.VolumeSource]()
+	coreType := reflect.TypeFor[core.VolumeSource]()
+	assert.Equal(t, v1Type.NumField(), coreType.NumField(), "v1.VolumeSource and core.VolumeSource field counts must match")
+
+	for i := 0; i < v1Type.NumField(); i++ {
+		v1Field := v1Type.Field(i)
+		coreField, ok := coreType.FieldByName(v1Field.Name)
+		if !assert.True(t, ok, "core.VolumeSource missing field %s", v1Field.Name) {
+			continue
+		}
+		var v1Src v1.VolumeSource
+		var coreSrc core.VolumeSource
+		reflect.ValueOf(&v1Src).Elem().Field(i).Set(reflect.New(v1Field.Type.Elem()))
+		reflect.ValueOf(&coreSrc).Elem().FieldByIndex(coreField.Index).Set(reflect.New(coreField.Type.Elem()))
+		assert.Equal(t,
+			helper.IsSupportedDynamicVolumeSource(&coreSrc),
+			IsSupportedDynamicVolumeSource(&v1Src),
+			"parity mismatch for VolumeSource field %s", v1Field.Name,
+		)
 	}
 }

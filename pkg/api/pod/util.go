@@ -31,25 +31,26 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
 // ContainerType signifies container type
-type ContainerType int
+type ContainerType = pods.ContainerType
 
 const (
 	// Containers is for normal containers
-	Containers ContainerType = 1 << iota
+	Containers = pods.Containers
 	// InitContainers is for init containers
-	InitContainers
+	InitContainers = pods.InitContainers
 	// EphemeralContainers is for ephemeral containers
-	EphemeralContainers
+	EphemeralContainers = pods.EphemeralContainers
 )
 
 // AllContainers specifies that all containers be visited
-const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+const AllContainers = pods.AllContainers
 
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
@@ -77,29 +78,7 @@ func VisitContainers(podSpec *api.PodSpec, mask ContainerType, visitor Container
 // ContainerIter returns an iterator over all containers in the given pod spec with a masked type.
 // The iteration order is InitContainers, then main Containers, then EphemeralContainers.
 func ContainerIter(podSpec *api.PodSpec, mask ContainerType) iter.Seq2[*api.Container, ContainerType] {
-	return func(yield func(*api.Container, ContainerType) bool) {
-		if mask&InitContainers != 0 {
-			for i := range podSpec.InitContainers {
-				if !yield(&podSpec.InitContainers[i], InitContainers) {
-					return
-				}
-			}
-		}
-		if mask&Containers != 0 {
-			for i := range podSpec.Containers {
-				if !yield(&podSpec.Containers[i], Containers) {
-					return
-				}
-			}
-		}
-		if mask&EphemeralContainers != 0 {
-			for i := range podSpec.EphemeralContainers {
-				if !yield((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
-					return
-				}
-			}
-		}
-	}
+	return pods.ContainerIter(podSpec, mask)
 }
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -425,6 +404,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
 		InPlacePodLevelResourcesVerticalScalingEnabled:      utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 		InPlacePodVerticalScalingMemoryBackedVolumesEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes),
+		DynamicNodeLocalEphemeralVolumesEnabled:             utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
@@ -784,6 +764,12 @@ func dropDisabledFields(
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && !dynamicVolumePolicyInUse(oldPodSpec) {
+		for i := range podSpec.Containers {
+			podSpec.Containers[i].DynamicVolumePolicy = nil
+		}
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) && !containerRestartRulesInUse(oldPodSpec) {
 		dropContainerRestartRules(podSpec)
 	}
@@ -1123,6 +1109,10 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
 		podStatus.VolumeHealth = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && !volumeStatusesInUse(oldPodStatus) {
+		podStatus.VolumeStatuses = nil
+	}
 }
 
 func draExendedResourceInUse(podStatus *api.PodStatus) bool {
@@ -1151,6 +1141,25 @@ func volumeHealthInUse(podStatus *api.PodStatus) bool {
 		return false
 	}
 	return len(podStatus.VolumeHealth) > 0
+}
+
+func dynamicVolumePolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].DynamicVolumePolicy != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func volumeStatusesInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	return len(podStatus.VolumeStatuses) > 0
 }
 
 func resourceHealthStatusInUse(podStatus *api.PodStatus) bool {

@@ -806,6 +806,11 @@ message Container {
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
 
+  // dynamicVolumePolicy defines dynamic volume mutation behavior for this container.
+  // +featureGate=DynamicNodeLocalEphemeralVolumes
+  // +optional
+  optional ContainerDynamicVolumePolicy dynamicVolumePolicy = 26;
+
   // restartPolicy defines the restart behavior of individual containers in a pod.
   // This overrides the pod-level restart policy. When this field is not specified,
   // the restart behavior is defined by the Pod's restart policy and the container type.
@@ -941,6 +946,15 @@ message Container {
   // Default is false.
   // +optional
   optional bool tty = 18;
+}
+
+// ContainerDynamicVolumePolicy defines dynamic volume mutation behavior for a container.
+message ContainerDynamicVolumePolicy {
+  // restartPolicy defines whether dynamic volume mount additions or removals
+  // require restarting the container. Supported values: RestartContainer, "".
+  // Defaults to "".
+  // +optional
+  optional string restartPolicy = 1;
 }
 
 // ContainerExtendedResourceRequest has the mapping of container name,
@@ -1634,6 +1648,12 @@ message EphemeralContainerCommon {
   // +optional
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
+
+  // dynamicVolumePolicy defines dynamic volume mutation behavior for this container.
+  // This field cannot be set on ephemeral containers.
+  // +featureGate=DynamicNodeLocalEphemeralVolumes
+  // +optional
+  optional ContainerDynamicVolumePolicy dynamicVolumePolicy = 26;
 
   // restartPolicy is the restart policy for the container to manage the restart behavior of each
   // container within a pod.
@@ -3955,6 +3975,7 @@ message PhotonPersistentDiskVolumeSource {
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/ephemeralcontainers"
 // +k8s:supportsSubresource="/resize"
+// +k8s:supportsSubresource="/dynamic"
 // +k8s:supportsSubresource="/eviction"
 message Pod {
   // metadata is the standard object's metadata.
@@ -5332,6 +5353,21 @@ message PodStatus {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   repeated PodVolumeHealth volumeHealth = 22;
+
+  // volumeStatuses contains the status of volumes in the pod, tracking whether
+  // volumes are allocated and prepared on the host node. Currently, only
+  // node-local ephemeral volume types supported for dynamic updates (configMap,
+  // secret, projected, emptyDir, and image) are reported.
+  // +featureGate=DynamicNodeLocalEphemeralVolumes
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated PodVolumeStatus volumeStatuses = 23;
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -5399,6 +5435,21 @@ message PodVolumeHealth {
   // lastTransitionTime is when the current set of conditions first appeared.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+}
+
+// PodVolumeStatus represents the status of an individual volume in a pod.
+message PodVolumeStatus {
+  // name is the name of the volume matching pod.Spec.Volumes.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
+  optional string name = 1;
+
+  // hostPhase represents the host-level preparation phase of the volume:
+  // Pending, HostMounted, Unmounting.
+  // +optional
+  // +k8s:optional
+  optional string hostPhase = 2;
 }
 
 // PortStatus represents the error condition of a service port

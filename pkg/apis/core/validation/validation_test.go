@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24840,6 +24841,7 @@ func TestValidateOSFields(t *testing.T) {
 		"AutomountServiceAccountToken",
 		"Containers[*].Args",
 		"Containers[*].Command",
+		"Containers[*].DynamicVolumePolicy.RestartPolicy",
 		"Containers[*].Env",
 		"Containers[*].EnvFrom",
 		"Containers[*].Image",
@@ -24871,6 +24873,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EnableServiceLinks",
 		"EphemeralContainers[*].EphemeralContainerCommon.Args",
 		"EphemeralContainers[*].EphemeralContainerCommon.Command",
+		"EphemeralContainers[*].EphemeralContainerCommon.DynamicVolumePolicy.RestartPolicy",
 		"EphemeralContainers[*].EphemeralContainerCommon.Env",
 		"EphemeralContainers[*].EphemeralContainerCommon.EnvFrom",
 		"EphemeralContainers[*].EphemeralContainerCommon.Image",
@@ -24906,6 +24909,7 @@ func TestValidateOSFields(t *testing.T) {
 		"ImagePullSecrets",
 		"InitContainers[*].Args",
 		"InitContainers[*].Command",
+		"InitContainers[*].DynamicVolumePolicy.RestartPolicy",
 		"InitContainers[*].Env",
 		"InitContainers[*].EnvFrom",
 		"InitContainers[*].Image",
@@ -33498,4 +33502,1254 @@ func TestValidatePodSecurityProfileOCI(t *testing.T) {
 			field.Forbidden(specPath.Child("ephemeralContainers").Index(0).Child("securityContext", "privileged"), ""),
 		}, errs)
 	})
+}
+
+func TestValidatePodDynamicUpdate(t *testing.T) {
+	runningStatus := func(name string) core.ContainerStatus {
+		return core.ContainerStatus{
+			Name:      name,
+			State:     core.ContainerState{Running: &core.ContainerStateRunning{}},
+			Resources: &core.ResourceRequirements{},
+		}
+	}
+	terminatedStatus := func(name string) core.ContainerStatus {
+		return core.ContainerStatus{
+			Name:  name,
+			State: core.ContainerState{Terminated: &core.ContainerStateTerminated{}},
+		}
+	}
+	cpuReq := func(cpu string) podtest.TweakContainer {
+		return podtest.SetContainerResources(podtest.MakeResourceRequirements(map[string]string{"cpu": cpu}, nil))
+	}
+	mkCtr := func(name string, tweaks ...podtest.TweakContainer) core.Container {
+		return podtest.MakeContainer(name, append([]podtest.TweakContainer{cpuReq("100m")}, tweaks...)...)
+	}
+	basePod := func() *core.Pod {
+		return podtest.MakePod("pod",
+			podtest.SetResourceVersion("1"),
+			podtest.SetInitContainers(podtest.MakeContainer("init")),
+			podtest.SetContainers(mkCtr("c1"), mkCtr("c2")),
+			podtest.SetVolumes(podtest.MakeEmptyVolume("vol")),
+			podtest.SetNodeName("node"),
+			podtest.SetStatus(core.PodStatus{
+				Phase:                 core.PodRunning,
+				Conditions:            []core.PodCondition{{Type: core.PodInitialized, Status: core.ConditionTrue}},
+				InitContainerStatuses: []core.ContainerStatus{terminatedStatus("init")},
+				ContainerStatuses:     []core.ContainerStatus{runningStatus("c1"), runningStatus("c2")},
+			}),
+		)
+	}
+	addCtr := func(ctrs ...core.Container) func(*core.Pod) {
+		return func(p *core.Pod) { p.Spec.Containers = append(p.Spec.Containers, ctrs...) }
+	}
+	removeCtr := func(name string) func(*core.Pod) {
+		return func(p *core.Pod) {
+			p.Spec.Containers = slices.DeleteFunc(p.Spec.Containers, func(c core.Container) bool { return c.Name == name })
+		}
+	}
+	combine := func(fns ...func(*core.Pod)) func(*core.Pod) {
+		return func(p *core.Pod) {
+			for _, fn := range fns {
+				fn(p)
+			}
+		}
+	}
+	editCtr := func(name string, fn func(*core.Container)) func(*core.Pod) {
+		return func(p *core.Pod) {
+			for i := range p.Spec.Containers {
+				if p.Spec.Containers[i].Name == name {
+					fn(&p.Spec.Containers[i])
+				}
+			}
+		}
+	}
+	bestEffort := func(p *core.Pod) {
+		for i := range p.Spec.Containers {
+			p.Spec.Containers[i].Resources = core.ResourceRequirements{}
+		}
+	}
+
+	tests := []struct {
+		name                     string
+		old                      func(*core.Pod)
+		new                      func(*core.Pod)
+		disablePodLevelResizeOpt bool
+		err                      string
+	}{{
+		name: "no-op",
+	}, {
+		name: "add container",
+		new:  addCtr(mkCtr("c3")),
+	}, {
+		name: "add multiple containers",
+		new:  addCtr(mkCtr("c3"), mkCtr("c4")),
+	}, {
+		name: "add container before existing containers",
+		new: func(p *core.Pod) {
+			p.Spec.Containers = append([]core.Container{mkCtr("c0")}, p.Spec.Containers...)
+		},
+	}, {
+		name: "remove container",
+		new:  removeCtr("c2"),
+	}, {
+		name: "add and remove containers",
+		new:  combine(removeCtr("c1"), addCtr(mkCtr("c3"))),
+	}, {
+		name: "insert container between existing containers",
+		new: func(p *core.Pod) {
+			p.Spec.Containers = slices.Insert(p.Spec.Containers, 1, mkCtr("c1a"))
+		},
+	}, {
+		name: "replace container in the middle",
+		old: func(p *core.Pod) {
+			p.Spec.Containers = append(p.Spec.Containers, mkCtr("c3"))
+			p.Status.ContainerStatuses = append(p.Status.ContainerStatuses, runningStatus("c3"))
+		},
+		new: func(p *core.Pod) {
+			p.Spec.Containers[1] = mkCtr("c2a")
+		},
+	}, {
+		name: "add container while reordering existing containers",
+		new: func(p *core.Pod) {
+			p.Spec.Containers = []core.Container{p.Spec.Containers[1], mkCtr("c3"), p.Spec.Containers[0]}
+		},
+		err: "existing containers may not be reordered",
+	}, {
+		name: "remove container while reordering remaining containers",
+		old: func(p *core.Pod) {
+			p.Spec.Containers = append(p.Spec.Containers, mkCtr("c3"))
+			p.Status.ContainerStatuses = append(p.Status.ContainerStatuses, runningStatus("c3"))
+		},
+		new: func(p *core.Pod) {
+			p.Spec.Containers = []core.Container{p.Spec.Containers[2], p.Spec.Containers[1]}
+		},
+		err: "existing containers may not be reordered",
+	}, {
+		name: "add container while updating image and resizing",
+		new: combine(
+			editCtr("c1", func(c *core.Container) { c.Image = "new-image" }),
+			editCtr("c2", func(c *core.Container) {
+				c.Resources = podtest.MakeResourceRequirements(map[string]string{"cpu": "200m"}, nil)
+			}),
+			addCtr(mkCtr("c3")),
+		),
+	}, {
+		name: "update image",
+		new:  editCtr("c1", func(c *core.Container) { c.Image = "new-image" }),
+	}, {
+		name: "resize",
+		new: editCtr("c1", func(c *core.Container) {
+			c.Resources = podtest.MakeResourceRequirements(map[string]string{"cpu": "200m", "memory": "100Mi"}, nil)
+		}),
+	}, {
+		name: "update tolerations",
+		new: func(p *core.Pod) {
+			p.Spec.Tolerations = append(p.Spec.Tolerations, core.Toleration{Key: "foo", Operator: core.TolerationOpExists, Effect: core.TaintEffectNoSchedule})
+		},
+	}, {
+		name: "add container with existing volume",
+		new: addCtr(mkCtr("c3", func(c *core.Container) {
+			c.VolumeMounts = []core.VolumeMount{{Name: "vol", MountPath: "/vol"}}
+		})),
+	}, {
+		name: "add container with memory and claims",
+		old: func(p *core.Pod) {
+			p.Spec.ResourceClaims = []core.PodResourceClaim{{Name: "claim", ResourceClaimName: new("claim")}}
+		},
+		new: addCtr(mkCtr("c3", func(c *core.Container) {
+			c.Resources = podtest.MakeResourceRequirements(map[string]string{"cpu": "100m", "memory": "10Mi"}, map[string]string{"memory": "20Mi"})
+			c.Resources.Claims = []core.ResourceClaim{{Name: "claim"}}
+		})),
+	}, {
+		name: "reuse name of garbage collected container",
+		old:  removeCtr("c2"),
+		new:  addCtr(mkCtr("c3")),
+	}, {
+		name: "image update on a windows pod",
+		old:  func(p *core.Pod) { p.Spec.OS = &core.PodOS{Name: core.Windows} },
+		new:  editCtr("c1", func(c *core.Container) { c.Image = "new-image" }),
+	}, {
+		name: "image update on terminating pod",
+		old:  func(p *core.Pod) { p.DeletionTimestamp = &metav1.Time{} },
+		new:  editCtr("c1", func(c *core.Container) { c.Image = "new-image" }),
+	}, {
+		name: "image update on pending pod",
+		old:  func(p *core.Pod) { p.Status.Phase = core.PodPending },
+		new:  editCtr("c1", func(c *core.Container) { c.Image = "new-image" }),
+	}, {
+		name: "add container without resources on node without resize support",
+		old:  func(p *core.Pod) { p.Status.ContainerStatuses[0].Resources = nil },
+		new:  addCtr(podtest.MakeContainer("c3")),
+	}, {
+		name: "add container with resources on node without resize support",
+		old:  func(p *core.Pod) { p.Status.ContainerStatuses[0].Resources = nil },
+		new:  addCtr(mkCtr("c3")),
+		err:  "Pod running on node without support for resize",
+	}, {
+		name: "remove container with resources on node without resize support",
+		old:  func(p *core.Pod) { p.Status.ContainerStatuses[0].Resources = nil },
+		new:  removeCtr("c2"),
+		err:  "Pod running on node without support for resize",
+	}, {
+		name: "remove container targeted by an ephemeral container",
+		old: func(p *core.Pod) {
+			p.Spec.EphemeralContainers = []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+				TargetContainerName: "c2",
+			}}
+		},
+		new: removeCtr("c2"),
+		err: `spec.containers: Forbidden: container "c2" may not be removed: it is the target of ephemeral container(s) debug`,
+	}, {
+		name: "remove container not targeted by an ephemeral container",
+		old: func(p *core.Pod) {
+			p.Spec.EphemeralContainers = []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+				TargetContainerName: "c1",
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name: "debug-untargeted", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+			}}
+		},
+		new: removeCtr("c2"),
+	}, {
+		name: "add container with port to host network pod",
+		old:  podtest.SetHostNetwork(true),
+		// Defaulting sets hostPort to containerPort for host network pods.
+		new: addCtr(mkCtr("c3", podtest.SetContainerPorts(core.ContainerPort{ContainerPort: 80, HostPort: 80, Protocol: core.ProtocolTCP}))),
+		err: "spec.containers[2].ports[0].hostPort: Forbidden",
+	}, {
+		name: "resize on node without resize support",
+		old:  func(p *core.Pod) { p.Status.ContainerStatuses[0].Resources = nil },
+		new: editCtr("c1", func(c *core.Container) {
+			c.Resources = podtest.MakeResourceRequirements(map[string]string{"cpu": "200m"}, nil)
+		}),
+		err: "Pod running on node without support for resize",
+	}, {
+		name: "add init container",
+		new: func(p *core.Pod) {
+			p.Spec.InitContainers = append(p.Spec.InitContainers, podtest.MakeContainer("init2"))
+		},
+		err: "spec.initContainers: Forbidden: init containers may not be added or removed",
+	}, {
+		name: "remove init container",
+		new:  func(p *core.Pod) { p.Spec.InitContainers = nil },
+		err:  "spec.initContainers: Forbidden: init containers may not be added or removed",
+	}, {
+		name: "replace init container",
+		new:  func(p *core.Pod) { p.Spec.InitContainers[0].Name = "init2" },
+		err:  "spec.initContainers[0].name: Forbidden",
+	}, {
+		name: "add ephemeral container",
+		new: func(p *core.Pod) {
+			p.Spec.EphemeralContainers = []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+			}}}
+		},
+		err: "pod updates may not change fields",
+	}, {
+		name: "reorder existing containers",
+		new: func(p *core.Pod) {
+			p.Spec.Containers[0], p.Spec.Containers[1] = p.Spec.Containers[1], p.Spec.Containers[0]
+		},
+		err: "existing containers may not be reordered",
+	}, {
+		name: "add container to pending pod",
+		old:  func(p *core.Pod) { p.Status.Phase = core.PodPending },
+		new:  addCtr(mkCtr("c3")),
+		err:  "containers may only be added or removed while the pod is Running",
+	}, {
+		name: "remove container from succeeded pod",
+		old:  func(p *core.Pod) { p.Status.Phase = core.PodSucceeded },
+		new:  removeCtr("c2"),
+		err:  "containers may only be added or removed while the pod is Running",
+	}, {
+		name: "add container before initialized",
+		old: func(p *core.Pod) {
+			p.Status.Conditions[0].Status = core.ConditionFalse
+		},
+		new: addCtr(mkCtr("c3")),
+		err: "containers may only be added or removed after all init containers have completed",
+	}, {
+		name: "add container without initialized condition",
+		old:  func(p *core.Pod) { p.Status.Conditions = nil },
+		new:  addCtr(mkCtr("c3")),
+		err:  "containers may only be added or removed after all init containers have completed",
+	}, {
+		name: "add container to terminating pod",
+		old:  func(p *core.Pod) { p.DeletionTimestamp = &metav1.Time{} },
+		new:  addCtr(mkCtr("c3")),
+		err:  "containers may not be added or removed once the pod is terminating",
+	}, {
+		name: "remove container from terminating pod",
+		old:  func(p *core.Pod) { p.DeletionTimestamp = &metav1.Time{} },
+		new:  removeCtr("c2"),
+		err:  "containers may not be added or removed once the pod is terminating",
+	}, {
+		name: "add container with name of removed container status",
+		old: func(p *core.Pod) {
+			p.Status.ContainerStatuses = append(p.Status.ContainerStatuses, terminatedStatus("removed"))
+		},
+		new: addCtr(mkCtr("removed")),
+		err: `spec.containers[2].name: Forbidden: a status for container "removed" is still present`,
+	}, {
+		name: "remove and re-add container",
+		old:  removeCtr("c2"),
+		new:  addCtr(mkCtr("c2")),
+		err:  `spec.containers[1].name: Forbidden: a status for container "c2" is still present`,
+	}, {
+		name: "add container with name of init container status",
+		old: func(p *core.Pod) {
+			p.Status.InitContainerStatuses = append(p.Status.InitContainerStatuses, terminatedStatus("old-init"))
+		},
+		new: addCtr(mkCtr("old-init")),
+		err: `a status for container "old-init" is still present`,
+	}, {
+		name: "add container with name of ephemeral container status",
+		old: func(p *core.Pod) {
+			p.Status.EphemeralContainerStatuses = []core.ContainerStatus{terminatedStatus("debug")}
+		},
+		new: addCtr(mkCtr("debug")),
+		err: `a status for container "debug" is still present`,
+	}, {
+		name: "add container with name of init container",
+		new:  addCtr(mkCtr("init")),
+		err:  `Duplicate value: "init"`,
+	}, {
+		name: "remove all containers",
+		new:  func(p *core.Pod) { p.Spec.Containers = nil },
+		err:  "spec.containers: Required value",
+	}, {
+		name: "add container changing QoS class",
+		old:  bestEffort,
+		new:  addCtr(mkCtr("c3")),
+		err:  "Pod QOS Class may not change",
+	}, {
+		name: "remove container changing QoS class",
+		old: combine(bestEffort, editCtr("c2", func(c *core.Container) {
+			c.Resources = podtest.MakeResourceRequirements(map[string]string{"cpu": "100m"}, nil)
+		})),
+		new: removeCtr("c2"),
+		err: "Pod QOS Class may not change",
+	}, {
+		name: "add container to best-effort pod",
+		old:  bestEffort,
+		new:  addCtr(podtest.MakeContainer("c3")),
+	}, {
+		name: "add container with unknown volume",
+		new: addCtr(mkCtr("c3", func(c *core.Container) {
+			c.VolumeMounts = []core.VolumeMount{{Name: "other", MountPath: "/vol"}}
+		})),
+		err: "spec.containers[2].volumeMounts[0].name: Not found",
+	}, {
+		name: "add volume with container",
+		new: combine(
+			func(p *core.Pod) { p.Spec.Volumes = append(p.Spec.Volumes, podtest.MakeEmptyVolume("other")) },
+			addCtr(mkCtr("c3", func(c *core.Container) {
+				c.VolumeMounts = []core.VolumeMount{{Name: "other", MountPath: "/vol"}}
+			})),
+		),
+		err: "pod updates may not change fields",
+	}, {
+		name: "add container with unknown claim",
+		new: addCtr(mkCtr("c3", func(c *core.Container) {
+			c.Resources.Claims = []core.ResourceClaim{{Name: "claim"}}
+		})),
+		err: "spec.containers[2].resources.claims[0]: Not found",
+	}, {
+		name: "add privileged container",
+		new:  addCtr(mkCtr("c3", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(true)}))),
+		err:  "spec.containers[2].securityContext.privileged: Forbidden",
+	}, {
+		name: "add explicitly unprivileged container",
+		new:  addCtr(mkCtr("c3", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(false)}))),
+	}, {
+		name: "remove privileged container",
+		old:  addCtr(mkCtr("c3", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(true)}))),
+		new:  removeCtr("c3"),
+	}, {
+		name: "add container with host port",
+		new:  addCtr(mkCtr("c3", podtest.SetContainerPorts(core.ContainerPort{ContainerPort: 80, HostPort: 8080, Protocol: core.ProtocolTCP}))),
+		err:  "spec.containers[2].ports[0].hostPort: Forbidden",
+	}, {
+		name: "add container with container port",
+		new:  addCtr(mkCtr("c3", podtest.SetContainerPorts(core.ContainerPort{ContainerPort: 80, Protocol: core.ProtocolTCP}))),
+	}, {
+		name: "remove container with host port",
+		old:  addCtr(mkCtr("c3", podtest.SetContainerPorts(core.ContainerPort{ContainerPort: 80, HostPort: 8080, Protocol: core.ProtocolTCP}))),
+		new:  removeCtr("c3"),
+	}, {
+		name: "add container with ephemeral-storage",
+		new: addCtr(mkCtr("c3", podtest.SetContainerResources(podtest.MakeResourceRequirements(
+			map[string]string{"cpu": "100m", "ephemeral-storage": "1Gi"}, nil)))),
+		err: `spec.containers[2].resources.requests[ephemeral-storage]: Unsupported value`,
+	}, {
+		name: "add container with extended resource",
+		new: addCtr(mkCtr("c3", podtest.SetContainerResources(podtest.MakeResourceRequirements(
+			map[string]string{"example.com/foo": "1"}, map[string]string{"example.com/foo": "1"})))),
+		err: `spec.containers[2].resources.limits[example.com/foo]: Unsupported value`,
+	}, {
+		name: "remove container with ephemeral-storage",
+		old: addCtr(mkCtr("c3", podtest.SetContainerResources(podtest.MakeResourceRequirements(
+			map[string]string{"cpu": "100m", "ephemeral-storage": "1Gi"}, nil)))),
+		new: removeCtr("c3"),
+		err: `container "c3" may not be removed`,
+	}, {
+		name: "add container to windows pod",
+		old:  func(p *core.Pod) { p.Spec.OS = &core.PodOS{Name: core.Windows} },
+		new:  addCtr(mkCtr("c3")),
+		err:  "windows pods cannot be resized or have containers added or removed",
+	}, {
+		name: "add container to static pod",
+		old: func(p *core.Pod) {
+			p.Annotations = map[string]string{core.MirrorPodAnnotationKey: "mirror"}
+		},
+		new: addCtr(mkCtr("c3")),
+		err: "static pods cannot be resized or have containers added or removed",
+	}, {
+		name: "add container without image",
+		new:  addCtr(mkCtr("c3", podtest.SetContainerImage(""))),
+		err:  "spec.containers[2].image: Required value",
+	}, {
+		name: "add container with image whitespace",
+		new:  addCtr(mkCtr("c3", podtest.SetContainerImage(" image"))),
+		err:  "spec.containers[2].image: Invalid value",
+	}, {
+		name: "change immutable field of existing container",
+		new:  combine(addCtr(mkCtr("c3")), editCtr("c1", func(c *core.Container) { c.Command = []string{"foo"} })),
+		err:  "pod updates may not change fields",
+	}, {
+		name: "resize non-cpu/memory resource of existing container",
+		new: editCtr("c1", func(c *core.Container) {
+			c.Resources = podtest.MakeResourceRequirements(map[string]string{"cpu": "100m", "ephemeral-storage": "1Gi"}, nil)
+		}),
+		err: "pod updates may not change fields",
+	}, {
+		name: "remove resource requests from existing container",
+		new:  editCtr("c1", func(c *core.Container) { c.Resources = core.ResourceRequirements{} }),
+		err:  "resource requests cannot be removed",
+	}, {
+		name: "add container to pod with pod-level resources",
+		old: podtest.SetPodResources(&core.ResourceRequirements{
+			Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("1")},
+		}),
+		new: addCtr(mkCtr("c3")),
+	}, {
+		name: "add container to pod with pod-level resources without pod-level resize",
+		old: podtest.SetPodResources(&core.ResourceRequirements{
+			Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("1")},
+		}),
+		new:                      addCtr(mkCtr("c3")),
+		disablePodLevelResizeOpt: true,
+		err:                      "resize of pods with pod-level resources is forbidden",
+	}, {
+		name: "add container without resources to pod with pod-level resources without pod-level resize",
+		old: podtest.SetPodResources(&core.ResourceRequirements{
+			Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("1")},
+		}),
+		new:                      addCtr(podtest.MakeContainer("c3")),
+		disablePodLevelResizeOpt: true,
+	}, {
+		name: "insert container while making an invalid change to a later container",
+		new: combine(
+			func(p *core.Pod) { p.Spec.Containers = append([]core.Container{mkCtr("c0")}, p.Spec.Containers...) },
+			editCtr("c2", func(c *core.Container) { c.Resources = core.ResourceRequirements{} }),
+		),
+		err: "spec.containers[2].resources",
+	}, {
+		name: "image update on pod with pod-level resources without pod-level resize",
+		old: podtest.SetPodResources(&core.ResourceRequirements{
+			Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("1")},
+		}),
+		new:                      editCtr("c1", func(c *core.Container) { c.Image = "new-image" }),
+		disablePodLevelResizeOpt: true,
+	}, {
+		name: "pod-level resize",
+		old: podtest.SetPodResources(&core.ResourceRequirements{
+			Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("1")},
+		}),
+		new: podtest.SetPodResources(&core.ResourceRequirements{
+			Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("2")},
+		}),
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			oldPod := basePod()
+			if tc.old != nil {
+				tc.old(oldPod)
+			}
+			newPod := oldPod.DeepCopy()
+			if tc.new != nil {
+				tc.new(newPod)
+			}
+
+			errs := ValidatePodDynamicUpdate(newPod, oldPod, PodValidationOptions{
+				ResourceIsPod:            true,
+				PodLevelResourcesEnabled: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: !tc.disablePodLevelResizeOpt,
+			})
+			if tc.err == "" {
+				if len(errs) != 0 {
+					t.Errorf("unexpected errors: %v", errs)
+				}
+				return
+			}
+			if len(errs) == 0 {
+				t.Fatalf("expected error containing %q, got none", tc.err)
+			}
+			if actual := errs.ToAggregate().Error(); !strings.Contains(actual, tc.err) {
+				t.Errorf("expected error containing %q, got: %s", tc.err, actual)
+			}
+		})
+	}
+}
+
+// Container add/remove must remain exclusive to the pods/dynamic subresource.
+func TestPodUpdateAndResizeForbidContainerAddRemove(t *testing.T) {
+	oldPod := podtest.MakePod("pod",
+		podtest.SetResourceVersion("1"),
+		podtest.SetContainers(podtest.MakeContainer("c1"), podtest.MakeContainer("c2")),
+		podtest.SetStatus(core.PodStatus{
+			Phase:      core.PodRunning,
+			Conditions: []core.PodCondition{{Type: core.PodInitialized, Status: core.ConditionTrue}},
+		}),
+	)
+	added := oldPod.DeepCopy()
+	added.Spec.Containers = append(added.Spec.Containers, podtest.MakeContainer("c3"))
+	removed := oldPod.DeepCopy()
+	removed.Spec.Containers = removed.Spec.Containers[:1]
+
+	opts := PodValidationOptions{ResourceIsPod: true}
+	for name, newPod := range map[string]*core.Pod{"add": added, "remove": removed} {
+		t.Run(name, func(t *testing.T) {
+			if errs := ValidatePodUpdate(newPod, oldPod, opts); len(errs) == 0 {
+				t.Error("expected pod update to reject the container change")
+			}
+			if errs := ValidatePodResize(newPod, oldPod, opts); len(errs) == 0 {
+				t.Error("expected pod resize to reject the container change")
+			}
+			if errs := ValidatePodDynamicUpdate(newPod, oldPod, opts); len(errs) != 0 {
+				t.Errorf("unexpected dynamic update errors: %v", errs)
+			}
+		})
+	}
+}
+
+// TestValidatePodDynamicUpdateDRACoverage checks that the pod-level resources must cover the
+// containers that a dynamic update adds, along with the node-allocatable DRA resources.
+func TestValidatePodDynamicUpdateDRACoverage(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+	ctr := func(name, cpu string) core.Container {
+		return podtest.MakeContainer(name, podtest.SetContainerResources(podtest.MakeResourceRequirements(map[string]string{"cpu": cpu}, nil)))
+	}
+	oldPod := podtest.MakePod("pod",
+		podtest.SetResourceVersion("1"),
+		podtest.SetContainers(ctr("c1", "100m")),
+		podtest.SetNodeName("node"),
+		podtest.SetPodResources(&core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("1")}}),
+		podtest.SetStatus(core.PodStatus{
+			Phase:             core.PodRunning,
+			Conditions:        []core.PodCondition{{Type: core.PodInitialized, Status: core.ConditionTrue}},
+			ContainerStatuses: []core.ContainerStatus{{Name: "c1", State: core.ContainerState{Running: &core.ContainerStateRunning{}}, Resources: &core.ResourceRequirements{}}},
+			NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "claim",
+				Containers:        []string{"c1"},
+				Mapping:           []core.NodeAllocatableMappedResources{{Name: core.ResourceCPU, Quantity: new(resource.MustParse("800m"))}},
+			}},
+		}),
+	)
+	oldPod.Spec.ResourceClaims = []core.PodResourceClaim{{Name: "claim", ResourceClaimName: new("claim")}}
+	opts := PodValidationOptions{ResourceIsPod: true, PodLevelResourcesEnabled: true, InPlacePodLevelResourcesVerticalScalingEnabled: true}
+
+	fits := oldPod.DeepCopy()
+	fits.Spec.Containers = append(fits.Spec.Containers, ctr("c2", "100m"))
+	if errs := ValidatePodDynamicUpdate(fits, oldPod, opts); len(errs) != 0 {
+		t.Errorf("unexpected errors: %v", errs)
+	}
+
+	exceeds := oldPod.DeepCopy()
+	exceeds.Spec.Containers = append(exceeds.Spec.Containers, ctr("c2", "200m"))
+	errs := ValidatePodDynamicUpdate(exceeds, oldPod, opts)
+	if want := "insufficient to cover the aggregated container and node-allocatable DRA requests"; !strings.Contains(errs.ToAggregate().Error(), want) {
+		t.Errorf("expected error containing %q, got: %v", want, errs)
+	}
+}
+
+func TestValidateDynamicNodeLocalEphemeralVolumes(t *testing.T) {
+	baseRunningPod := func() *core.Pod {
+		p := podtest.MakePod("test-pod",
+			podtest.SetVolumes(core.Volume{
+				Name: "vol-1",
+				VolumeSource: core.VolumeSource{
+					EmptyDir: &core.EmptyDirVolumeSource{},
+				},
+			}),
+			podtest.SetContainers(core.Container{
+				Name:                     "c1",
+				Image:                    "image",
+				TerminationMessagePolicy: core.TerminationMessageReadFile,
+				ImagePullPolicy:          core.PullAlways,
+				DynamicVolumePolicy: &core.ContainerDynamicVolumePolicy{
+					RestartPolicy: core.DynamicVolumeRestartContainer,
+				},
+				VolumeMounts: []core.VolumeMount{
+					{Name: "vol-1", MountPath: "/mnt/vol-1"},
+				},
+			}),
+		)
+		p.ObjectMeta.ResourceVersion = "1"
+		p.Status.Phase = core.PodRunning
+		p.Status.Conditions = []core.PodCondition{
+			{Type: core.PodInitialized, Status: core.ConditionTrue},
+		}
+		return p
+	}
+
+	defaultMode := int32(0644)
+	hostPathType := core.HostPathDirectory
+	size64Mi := resource.MustParse("64Mi")
+	size128Mi := resource.MustParse("128Mi")
+	tests := []struct {
+		name                   string
+		oldPod                 *core.Pod
+		newPod                 *core.Pod
+		dynamicSubres          bool
+		featureEnabled         bool
+		memBackedResizeEnabled bool
+		wantErr                string
+	}{
+		{
+			name:   "valid dynamic emptyDir addition and container volumeMount addition",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "vol-2",
+					MountPath: "/mnt/vol-2",
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name:   "valid dynamic configMap, secret, projected, and image volume additions",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes,
+					core.Volume{
+						Name: "cm-vol",
+						VolumeSource: core.VolumeSource{
+							ConfigMap: &core.ConfigMapVolumeSource{
+								LocalObjectReference: core.LocalObjectReference{Name: "my-cm"},
+								DefaultMode:          &defaultMode,
+							},
+						},
+					},
+					core.Volume{
+						Name: "secret-vol",
+						VolumeSource: core.VolumeSource{
+							Secret: &core.SecretVolumeSource{
+								SecretName:  "my-secret",
+								DefaultMode: &defaultMode,
+							},
+						},
+					},
+					core.Volume{
+						Name: "proj-vol",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{
+								DefaultMode: &defaultMode,
+								Sources: []core.VolumeProjection{
+									{
+										ConfigMap: &core.ConfigMapProjection{
+											LocalObjectReference: core.LocalObjectReference{Name: "my-cm"},
+										},
+									},
+								},
+							},
+						},
+					},
+				)
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name:   "valid dynamic volume and volumeMount removal",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = nil
+				p.Spec.Containers[0].VolumeMounts = nil
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name: "valid dynamic volumeMount addition when container also has unchanged static PVC volumeMount",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "pvc-vol",
+					VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "pvc-vol",
+					MountPath: "/mnt/pvc",
+				})
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes,
+					core.Volume{
+						Name:         "pvc-vol",
+						VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+					},
+					core.Volume{
+						Name:         "vol-2",
+						VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+					},
+				)
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts,
+					core.VolumeMount{Name: "pvc-vol", MountPath: "/mnt/pvc"},
+					core.VolumeMount{Name: "vol-2", MountPath: "/mnt/vol-2"},
+				)
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+		},
+		{
+			name: "valid joint dynamic volume addition and memory-backed emptyDir sizeLimit resize",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.NodeName = "node-1"
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size64Mi,
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.NodeName = "node-1"
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size128Mi,
+				}
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "vol-2",
+					MountPath: "/mnt/vol-2",
+				})
+				return p
+			}(),
+			dynamicSubres:          true,
+			featureEnabled:         true,
+			memBackedResizeEnabled: true,
+		},
+		{
+			name: "valid standalone memory-backed emptyDir sizeLimit resize on Pending pod",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size64Mi,
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				p.Spec.Volumes[0].EmptyDir = &core.EmptyDirVolumeSource{
+					Medium:    core.StorageMediumMemory,
+					SizeLimit: &size128Mi,
+				}
+				return p
+			}(),
+			dynamicSubres:          true,
+			featureEnabled:         true,
+			memBackedResizeEnabled: true,
+		},
+		{
+			name:   "rejected when not using /dynamic subresource",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  false,
+			featureEnabled: true,
+			wantErr:        "pod updates may not change fields other than",
+		},
+		{
+			name:   "rejected when feature gate is disabled",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: false,
+			wantErr:        "pod updates may not change fields other than",
+		},
+		{
+			name: "rejected when container lacks RestartContainer dynamicVolumePolicy",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].DynamicVolumePolicy = nil
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].DynamicVolumePolicy = nil
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "vol-2",
+					MountPath: "/mnt/vol-2",
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts may only be mutated on containers with dynamicVolumePolicy.restartPolicy set to 'RestartContainer'",
+		},
+		{
+			name:   "rejected when adding unsupported volume type (hostPath)",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name: "hp-vol",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/tmp",
+							Type: &hostPathType,
+						},
+					},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "only configMap, secret, projected, emptyDir, and image volumes may be dynamically added",
+		},
+		{
+			name: "rejected when adding volumeMount referencing existing static hostPath volume",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name: "hp-vol",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/tmp",
+							Type: &hostPathType,
+						},
+					},
+				})
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name: "hp-vol",
+					VolumeSource: core.VolumeSource{
+						HostPath: &core.HostPathVolumeSource{
+							Path: "/tmp",
+							Type: &hostPathType,
+						},
+					},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "hp-vol",
+					MountPath: "/mnt/hp",
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts referencing unsupported volume \"hp-vol\" may not be dynamically added, removed, or mutated",
+		},
+		{
+			name: "rejected when removing volumeMount referencing existing static PVC volume",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "pvc-vol",
+					VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+				})
+				p.Spec.Containers[0].VolumeMounts = append(p.Spec.Containers[0].VolumeMounts, core.VolumeMount{
+					Name:      "pvc-vol",
+					MountPath: "/mnt/pvc",
+				})
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "pvc-vol",
+					VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts referencing unsupported volume \"pvc-vol\" may not be dynamically added, removed, or mutated",
+		},
+		{
+			name: "rejected when re-adding volume name that is still Unmounting in VolumeStatuses",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.VolumeStatuses = []core.PodVolumeStatus{
+					{Name: "vol-unmounting", HostPhase: core.PodVolumeHostUnmounting},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-unmounting",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "cannot be re-added while previous volume with the same name is still pending, mounted, or unmounting in pod status",
+		},
+		{
+			name: "rejected when pod is not in Running phase",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Status.Phase = core.PodPending
+				p.Spec.Volumes = append(p.Spec.Volumes, core.Volume{
+					Name:         "vol-2",
+					VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}},
+				})
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "dynamic volume updates are only allowed when pod is in Running phase",
+		},
+		{
+			name:   "rejected when removing a volume still mounted by a container",
+			oldPod: baseRunningPod(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Volumes = nil
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "spec.containers[0].volumeMounts[0].name: Not found: \"vol-1\"",
+		},
+		{
+			name: "rejected when removing a volume still mounted by an initContainer",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol-1", MountPath: "/mnt/vol-1"},
+						},
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.Volumes = nil
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol-1", MountPath: "/mnt/vol-1"},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "spec.initContainers[0].volumeMounts[0].name: Not found: \"vol-1\"",
+		},
+		{
+			name: "rejected when removing a volume still mounted by an ephemeralContainer",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							VolumeMounts: []core.VolumeMount{
+								{Name: "vol-1", MountPath: "/mnt/vol-1"},
+							},
+						},
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.Containers[0].VolumeMounts = nil
+				p.Spec.Volumes = nil
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							VolumeMounts: []core.VolumeMount{
+								{Name: "vol-1", MountPath: "/mnt/vol-1"},
+							},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "spec.ephemeralContainers[0].volumeMounts[0].name: Not found: \"vol-1\"",
+		},
+		{
+			name: "rejected when mutating volumeMounts on initContainers",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol-1", MountPath: "/mnt/vol-1"},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts for initContainers may not be mutated",
+		},
+		{
+			name: "rejected when mutating volumeMounts on ephemeralContainers",
+			oldPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+						},
+					},
+				}
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := baseRunningPod()
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							VolumeMounts: []core.VolumeMount{
+								{Name: "vol-1", MountPath: "/mnt/vol-1"},
+							},
+						},
+					},
+				}
+				return p
+			}(),
+			dynamicSubres:  true,
+			featureEnabled: true,
+			wantErr:        "volumeMounts for ephemeralContainers may not be mutated",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := PodValidationOptions{
+				DynamicNodeLocalEphemeralVolumesEnabled:             tc.featureEnabled,
+				InPlacePodVerticalScalingMemoryBackedVolumesEnabled: tc.memBackedResizeEnabled,
+			}
+			var errs field.ErrorList
+			if tc.dynamicSubres {
+				errs = ValidatePodDynamicUpdate(tc.newPod, tc.oldPod, opts)
+			} else {
+				errs = ValidatePodUpdate(tc.newPod, tc.oldPod, opts)
+			}
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected validation errors: %v", errs)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Fatalf("expected error containing %q, got none", tc.wantErr)
+				}
+				if !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, errs)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateDynamicVolumePolicy(t *testing.T) {
+	basePod := func() *core.Pod {
+		return podtest.MakePod("test-pod",
+			podtest.SetContainers(core.Container{
+				Name:                     "c1",
+				Image:                    "image",
+				TerminationMessagePolicy: core.TerminationMessageReadFile,
+				ImagePullPolicy:          core.PullAlways,
+			}),
+		)
+	}
+
+	tests := []struct {
+		name    string
+		tweak   func(*core.Pod)
+		wantErr string
+	}{
+		{
+			name: "valid RestartContainer policy on regular container",
+			tweak: func(p *core.Pod) {
+				p.Spec.Containers[0].DynamicVolumePolicy = &core.ContainerDynamicVolumePolicy{
+					RestartPolicy: core.DynamicVolumeRestartContainer,
+				}
+			},
+		},
+		{
+			name: "unsupported restartPolicy on regular container",
+			tweak: func(p *core.Pod) {
+				p.Spec.Containers[0].DynamicVolumePolicy = &core.ContainerDynamicVolumePolicy{
+					RestartPolicy: "InvalidPolicy",
+				}
+			},
+			wantErr: "spec.containers[0].dynamicVolumePolicy.restartPolicy: Unsupported value: \"InvalidPolicy\"",
+		},
+		{
+			name: "dynamicVolumePolicy forbidden on initContainer",
+			tweak: func(p *core.Pod) {
+				p.Spec.InitContainers = []core.Container{
+					{
+						Name:                     "init-1",
+						Image:                    "image",
+						TerminationMessagePolicy: core.TerminationMessageReadFile,
+						ImagePullPolicy:          core.PullAlways,
+						DynamicVolumePolicy: &core.ContainerDynamicVolumePolicy{
+							RestartPolicy: core.DynamicVolumeRestartContainer,
+						},
+					},
+				}
+			},
+			wantErr: "spec.initContainers[0].dynamicVolumePolicy: Forbidden: may not be set for init containers",
+		},
+		{
+			name: "dynamicVolumePolicy forbidden on ephemeralContainer",
+			tweak: func(p *core.Pod) {
+				p.Spec.EphemeralContainers = []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Name:                     "eph-1",
+							Image:                    "image",
+							TerminationMessagePolicy: core.TerminationMessageReadFile,
+							ImagePullPolicy:          core.PullAlways,
+							DynamicVolumePolicy: &core.ContainerDynamicVolumePolicy{
+								RestartPolicy: core.DynamicVolumeRestartContainer,
+							},
+						},
+					},
+				}
+			},
+			wantErr: "spec.ephemeralContainers[0].dynamicVolumePolicy: Forbidden: cannot be set for an Ephemeral Container",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := basePod()
+			tc.tweak(p)
+			errs := ValidatePodCreate(p, PodValidationOptions{})
+			if tc.wantErr == "" {
+				if len(errs) != 0 {
+					t.Fatalf("unexpected validation errors: %v", errs)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Fatalf("expected error containing %q, got none", tc.wantErr)
+				}
+				if !strings.Contains(errs.ToAggregate().Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, errs)
+				}
+			}
+		})
+	}
 }

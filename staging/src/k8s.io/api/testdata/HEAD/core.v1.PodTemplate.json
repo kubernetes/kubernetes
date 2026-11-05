@@ -594,6 +594,9 @@
               "restartPolicy": "restartPolicyValue"
             }
           ],
+          "dynamicVolumePolicy": {
+            "restartPolicy": "restartPolicyValue"
+          },
           "restartPolicy": "restartPolicyValue",
           "restartPolicyRules": [
             {
@@ -926,6 +929,9 @@
               "restartPolicy": "restartPolicyValue"
             }
           ],
+          "dynamicVolumePolicy": {
+            "restartPolicy": "restartPolicyValue"
+          },
           "restartPolicy": "restartPolicyValue",
           "restartPolicyRules": [
             {
@@ -1258,6 +1264,9 @@
               "restartPolicy": "restartPolicyValue"
             }
           ],
+          "dynamicVolumePolicy": {
+            "restartPolicy": "restartPolicyValue"
+          },
           "restartPolicy": "restartPolicyValue",
           "restartPolicyRules": [
             {

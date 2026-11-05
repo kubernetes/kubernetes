@@ -248,6 +248,9 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 			storage[resource+"/resize"] = podStorage.Resize
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) || utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+			storage[resource+"/dynamic"] = podStorage.Dynamic
+		}
 	}
 	if resource := "bindings"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
 		storage[resource] = podStorage.LegacyBinding

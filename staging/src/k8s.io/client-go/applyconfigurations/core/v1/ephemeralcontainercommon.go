@@ -76,6 +76,9 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	Resources *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	// resizePolicy is the resources resize policy for the container.
 	ResizePolicy []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
+	// dynamicVolumePolicy defines dynamic volume mutation behavior for this container.
+	// This field cannot be set on ephemeral containers.
+	DynamicVolumePolicy *ContainerDynamicVolumePolicyApplyConfiguration `json:"dynamicVolumePolicy,omitempty"`
 	// restartPolicy is the restart policy for the container to manage the restart behavior of each
 	// container within a pod.
 	// You cannot set this field on ephemeral containers.
@@ -246,6 +249,14 @@ func (b *EphemeralContainerCommonApplyConfiguration) WithResizePolicy(values ...
 		}
 		b.ResizePolicy = append(b.ResizePolicy, *values[i])
 	}
+	return b
+}
+
+// WithDynamicVolumePolicy sets the DynamicVolumePolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DynamicVolumePolicy field is set to the value of the last call.
+func (b *EphemeralContainerCommonApplyConfiguration) WithDynamicVolumePolicy(value *ContainerDynamicVolumePolicyApplyConfiguration) *EphemeralContainerCommonApplyConfiguration {
+	b.DynamicVolumePolicy = value
 	return b
 }
 

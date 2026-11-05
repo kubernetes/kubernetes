@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1448,6 +1449,10 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 			normalizeTimeStamp(&status.VolumeHealth[i].LastTransitionTime)
 		}
 	}
+
+	slices.SortFunc(status.VolumeStatuses, func(a, b v1.PodVolumeStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return status
 }

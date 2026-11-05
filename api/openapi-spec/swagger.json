@@ -7070,6 +7070,10 @@
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
+        "dynamicVolumePolicy": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ContainerDynamicVolumePolicy",
+          "description": "dynamicVolumePolicy defines dynamic volume mutation behavior for this container."
+        },
         "env": {
           "description": "env is the list of environment variables to set in the container. Cannot be updated.",
           "items": {
@@ -7215,6 +7219,16 @@
       "required": [
         "name"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.ContainerDynamicVolumePolicy": {
+      "description": "ContainerDynamicVolumePolicy defines dynamic volume mutation behavior for a container.",
+      "properties": {
+        "restartPolicy": {
+          "description": "restartPolicy defines whether dynamic volume mount additions or removals require restarting the container. Supported values: RestartContainer, \"\". Defaults to \"\".",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.core.v1.ContainerExtendedResourceRequest": {
@@ -7869,6 +7883,10 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "dynamicVolumePolicy": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ContainerDynamicVolumePolicy",
+          "description": "dynamicVolumePolicy defines dynamic volume mutation behavior for this container. This field cannot be set on ephemeral containers."
         },
         "env": {
           "description": "env is the list of environment variables to set in the container. Cannot be updated.",
@@ -11288,6 +11306,19 @@
             "name"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "volumeStatuses": {
+          "description": "volumeStatuses contains the status of volumes in the pod, tracking whether volumes are allocated and prepared on the host node. Currently, only node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image) are reported.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.PodVolumeStatus"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "name",
+          "x-kubernetes-patch-strategy": "merge"
         }
       },
       "type": "object"
@@ -11393,6 +11424,23 @@
         },
         "name": {
           "description": "name matches an entry in pod.spec.volumes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.PodVolumeStatus": {
+      "description": "PodVolumeStatus represents the status of an individual volume in a pod.",
+      "properties": {
+        "hostPhase": {
+          "description": "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting.",
+          "type": "string"
+        },
+        "name": {
+          "description": "name is the name of the volume matching pod.Spec.Volumes.",
           "type": "string"
         }
       },
@@ -29426,6 +29474,200 @@
         "x-kubernetes-group-version-kind": {
           "group": "",
           "kind": "Binding",
+          "version": "v1"
+        }
+      }
+    },
+    "/api/v1/namespaces/{namespace}/pods/{name}/dynamic": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read dynamic of the specified Pod",
+        "operationId": "readCoreV1NamespacedPodDynamic",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
+          "version": "v1"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the Pod",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "patch": {
+        "consumes": [
+          "application/json-patch+json",
+          "application/merge-patch+json",
+          "application/strategic-merge-patch+json",
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
+        ],
+        "description": "partially update dynamic of the specified Pod",
+        "operationId": "patchCoreV1NamespacedPodDynamic",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-78PwaGsr"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-7c6nTn1T"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/force-tOGGb0Yi"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
+          "version": "v1"
+        }
+      },
+      "put": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "replace dynamic of the specified Pod",
+        "operationId": "replaceCoreV1NamespacedPodDynamic",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "core_v1"
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "",
+          "kind": "Pod",
           "version": "v1"
         }
       }

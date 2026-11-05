@@ -167,6 +167,11 @@ func (in Container) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ContainerDynamicVolumePolicy) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.ContainerDynamicVolumePolicy"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ContainerExtendedResourceRequest) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.ContainerExtendedResourceRequest"
 }
@@ -869,6 +874,11 @@ func (in PodTemplateSpec) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodVolumeHealth) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodVolumeHealth"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodVolumeStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodVolumeStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

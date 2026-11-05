@@ -7272,3 +7272,69 @@ func TestInitializeActuatedPod_PreservesActuatedVolumes(t *testing.T) {
 	require.NoError(t, m.GarbageCollect(tCtx, kubecontainer.GCPolicy{}, true, false))
 	require.False(t, m.actuatedState.HasPod(pod.UID))
 }
+
+func TestComputePodActions_DynamicVolumeMounts(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, status := makeBasePodAndStatus()
+	vol1 := v1.Volume{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	vol2 := v1.Volume{Name: "vol2", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm2"}}}}
+	pod.Spec.Volumes = []v1.Volume{vol1}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}
+	pod.Spec.Containers[0].DynamicVolumePolicy = &v1.ContainerDynamicVolumePolicy{
+		RestartPolicy: v1.DynamicVolumeRestartContainer,
+	}
+
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, vol1))
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	// Steady state: no container restarts
+	actions := m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill)
+	assert.Empty(t, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+
+	// Step 1: Add vol2 to pod.Spec.Volumes and container[0].VolumeMounts before vol2 is mounted on host
+	pod.Spec.Volumes = []v1.Volume{vol1, vol2}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+		{Name: "vol1", MountPath: "/mnt/vol1"},
+		{Name: "vol2", MountPath: "/mnt/vol2"},
+	}
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill, "container restart should be deferred while vol2 is not mounted in actuatedState")
+	assert.Empty(t, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+
+	// Step 2: VolumeManager mounts vol2 and records it in actuatedState
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, vol2))
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Contains(t, actions.ContainersToKill, status.ContainerStatuses[0].ID)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+
+	// Simulate container[0] restarted with new VolumeMounts
+	require.NoError(t, m.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[0]))
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill)
+	assert.Empty(t, actions.ContainersToStart)
+
+	// Step 3: Remove vol2 from container[0].VolumeMounts -> container[0] restarts immediately without waiting
+	pod.Spec.Volumes = []v1.Volume{vol1}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+		{Name: "vol1", MountPath: "/mnt/vol1"},
+	}
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Contains(t, actions.ContainersToKill, status.ContainerStatuses[0].ID)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+}

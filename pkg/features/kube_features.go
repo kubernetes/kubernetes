@@ -380,6 +380,12 @@ const (
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
+	// owner: @tallclair
+	// kep: http://kep.k8s.io/5972
+	//
+	// Enables adding and removing main containers on running pods via the pods/dynamic subresource.
+	DynamicContainers featuregate.Feature = "DynamicContainers"
+
 	// owner: @natasha41575
 	// kep: https://kep.k8s.io/6395
 	//
@@ -1466,6 +1472,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // lock to default in 1.36 and remove in v1.39
 	},
 
+	DynamicContainers: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DynamicNodeLocalEphemeralVolumes: {
 		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2436,6 +2446,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DisableCPUQuotaWithExclusiveCPUs: {},
 
 	DisableNodeKubeProxyVersion: {},
+
+	DynamicContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 
 	DynamicNodeLocalEphemeralVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 

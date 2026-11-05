@@ -346,6 +346,7 @@ func newTestKubeletWithImageList(
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
 		kubelet.recorder,
 	)
+	kubelet.actuatedState = state.NewStateMemory(logger, nil, kuberuntime.KeepOnlyResourceValues)
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
@@ -456,6 +457,7 @@ func newTestKubeletWithImageList(
 		volumetest.NewBlockVolumePathHandler(),
 		kubelet.statusManager,
 		0,
+		kubelet.actuatedState,
 		nil)
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
@@ -514,6 +516,9 @@ func createDNSConfigurer() *dns.Configurer {
 }
 
 func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg kubeletconfiginternal.KubeletConfiguration, runtimeSvc internalapi.RuntimeService, imageSvc internalapi.ImageManagerService, tracerProvider oteltrace.TracerProvider) (kuberuntime.KubeGenericRuntime, []images.PostImageGCHook, error) {
+	if kubelet.actuatedState == nil {
+		kubelet.actuatedState = state.NewStateMemory(klog.FromContext(ctx), nil, kuberuntime.KeepOnlyResourceValues)
+	}
 	return kuberuntime.NewKubeGenericRuntimeManager(
 		ctx,
 		kubelet.recorder,
@@ -556,7 +561,7 @@ func createGenericRuntimeManager(ctx context.Context, kubelet *Kubelet, kubeCfg 
 		token.NewManager(kubelet.kubeClient),
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
 		kubelet.podStartupLatencyTracker,
-		state.NewStateMemory(klog.FromContext(ctx), nil, kuberuntime.KeepOnlyResourceValues),
+		kubelet.actuatedState,
 	)
 }
 
