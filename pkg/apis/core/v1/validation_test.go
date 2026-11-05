@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -156,5 +157,53 @@ func TestValidateCustom_SecurityProfileOCIBase_LocalhostProfile(t *testing.T) {
 		if errs := ValidateCustom_SecurityProfileOCIBase_LocalhostProfile(context.Background(), operation.Operation{}, field.NewPath("localhostProfile"), value, nil); len(errs) != 0 {
 			t.Errorf("expected no errors for %v: %v", value, errs)
 		}
+	}
+}
+
+// TestSecurityProfileOCILengthGuards pins the length guards of the custom
+// validators to the +k8s:maxLength tags of the fields: a value at the guard
+// must not be too long for the generated validation, and a value one character
+// over it must be. Otherwise a tag raised without the guard would let values
+// above the guard skip the format check.
+func TestSecurityProfileOCILengthGuards(t *testing.T) {
+	ctx := context.Background()
+	op := operation.Operation{Type: operation.Create}
+	tests := []struct {
+		name     string
+		max      int
+		validate func(value string) field.ErrorList
+	}{{
+		name: "ref",
+		max:  securityProfileOCIRefMaxLength,
+		validate: func(value string) field.ErrorList {
+			return Validate_SecurityProfileOCI(ctx, op, field.NewPath("oci"), &corev1.SecurityProfileOCI{Ref: value}, nil)
+		},
+	}, {
+		name: "baseProfile.localhostProfile",
+		max:  securityProfileOCIBaseLocalhostProfileMaxLength,
+		validate: func(value string) field.ErrorList {
+			base := &corev1.SecurityProfileOCIBase{Type: corev1.SecurityProfileOCIBaseTypeLocalhost, LocalhostProfile: &value}
+			return Validate_SecurityProfileOCIBase(ctx, op, field.NewPath("baseProfile"), base, nil)
+		},
+	}}
+	tooLong := func(errs field.ErrorList) int {
+		count := 0
+		for _, err := range errs {
+			if err.Type == field.ErrorTypeTooLong {
+				count++
+			}
+		}
+		return count
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Multibyte characters show that the guard and the tag both count characters.
+			if errs := tc.validate(strings.Repeat("ä", tc.max)); tooLong(errs) != 0 {
+				t.Errorf("expected no too long error for %d characters, got %v", tc.max, errs)
+			}
+			if errs := tc.validate(strings.Repeat("a", tc.max+1)); tooLong(errs) != 1 {
+				t.Errorf("expected one too long error for %d characters, got %v", tc.max+1, errs)
+			}
+		})
 	}
 }
