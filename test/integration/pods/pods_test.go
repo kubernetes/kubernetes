@@ -2792,3 +2792,186 @@ func TestSecurityProfileOCI(t *testing.T) {
 		t.Errorf("Unexpected error switching deployment to RuntimeDefault: %v", err)
 	}
 }
+
+func TestPodLevelEphemeralStorageRejectedWhenGateDisabled(t *testing.T) {
+	// The gate is fixed before the server starts: flipping it on a running apiserver races
+	// with its goroutines and with state cached at startup.
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                 true,
+		features.PodLevelResourcesEphemeralStorage: false,
+	})
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-level-ephemeral-storage-disabled", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "plr-ephemeral-disabled-"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+			},
+			Containers: []v1.Container{{Name: "c1", Image: "fakeimage"}},
+		},
+	}
+	_, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if !apierrors.IsInvalid(err) {
+		t.Fatalf("expected Invalid error when PodLevelResourcesEphemeralStorage is disabled, got: %v", err)
+	}
+}
+
+func TestPodLevelEphemeralStorageValidationAndDefaulting(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                 true,
+		features.PodLevelResourcesEphemeralStorage: true,
+	})
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-level-ephemeral-storage", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	t.Run("defaults pod-level ephemeral-storage from containers when pod-level CPU is set", func(t *testing.T) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "plr-ephemeral-defaulted-"},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  "c1",
+						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+							Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+						},
+					},
+					{
+						Name:  "c2",
+						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("500Mi")},
+							Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+						},
+					},
+				},
+			},
+		}
+		created, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+		if err != nil {
+			t.Fatalf("unexpected create error: %v", err)
+		}
+		wantPodRes := &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("500m"),
+				v1.ResourceEphemeralStorage: resource.MustParse("1524Mi"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+			},
+		}
+		if !apiequality.Semantic.DeepEqual(created.Spec.Resources, wantPodRes) {
+			t.Errorf("pod.Spec.Resources = %v, want %v", created.Spec.Resources, wantPodRes)
+		}
+		if created.Status.QOSClass != v1.PodQOSBurstable {
+			t.Errorf("QOSClass = %v, want %v", created.Status.QOSClass, v1.PodQOSBurstable)
+		}
+	})
+
+	t.Run("guaranteed QoS unaffected by unequal pod-level ephemeral-storage request and limit", func(t *testing.T) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "plr-ephemeral-qos-"},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("1"),
+						v1.ResourceMemory:           resource.MustParse("1Gi"),
+						v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("1"),
+						v1.ResourceMemory:           resource.MustParse("1Gi"),
+						v1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+					},
+				},
+				Containers: []v1.Container{{Name: "c1", Image: "fakeimage"}},
+			},
+		}
+		created, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+		if err != nil {
+			t.Fatalf("unexpected create error: %v", err)
+		}
+		if created.Status.QOSClass != v1.PodQOSGuaranteed {
+			t.Errorf("QOSClass = %v, want %v", created.Status.QOSClass, v1.PodQOSGuaranteed)
+		}
+	})
+
+	t.Run("rejects initContainer ephemeral-storage limit exceeding pod-level limit", func(t *testing.T) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "plr-ephemeral-init-exceeds-"},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+				},
+				InitContainers: []v1.Container{
+					{
+						Name:  "init-1",
+						Image: "fakeimage",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")},
+							Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("3Gi")},
+						},
+					},
+				},
+				Containers: []v1.Container{{Name: "c1", Image: "fakeimage"}},
+			},
+		}
+		_, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+		if !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "spec.resources.initContainers[0][ephemeral-storage].limits") {
+			t.Fatalf("expected Invalid error on spec.resources.initContainers[0][ephemeral-storage].limits, got: %v", err)
+		}
+	})
+
+	t.Run("rejects pod-level ephemeral-storage resize while allowing CPU resize", func(t *testing.T) {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "plr-ephemeral-resize-"},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("500m"),
+						v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("1"),
+						v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+					},
+				},
+				Containers: []v1.Container{{Name: "c1", Image: "fakeimage"}},
+			},
+		}
+		created, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("unexpected create error: %v", err)
+		}
+		defer integration.DeletePodOrErrorf(t, client, ns.Name, created.Name)
+
+		resized := created.DeepCopy()
+		resized.Spec.Resources.Requests[v1.ResourceEphemeralStorage] = resource.MustParse("2Gi")
+		_, err = client.CoreV1().Pods(ns.Name).UpdateResize(t.Context(), resized.Name, resized, metav1.UpdateOptions{})
+		if !apierrors.IsInvalid(err) {
+			t.Fatalf("expected Invalid error when resizing pod-level ephemeral-storage, got: %v", err)
+		}
+
+		cpuResized := created.DeepCopy()
+		cpuResized.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("800m")
+		if _, err := client.CoreV1().Pods(ns.Name).UpdateResize(t.Context(), cpuResized.Name, cpuResized, metav1.UpdateOptions{}); err != nil {
+			t.Fatalf("unexpected error resizing pod-level CPU when pod-level ephemeral-storage is set: %v", err)
+		}
+	})
+}
