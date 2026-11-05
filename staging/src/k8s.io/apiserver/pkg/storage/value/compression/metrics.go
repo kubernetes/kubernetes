@@ -57,13 +57,15 @@ var (
 		[]string{"resource", "operation", "outcome"},
 	)
 
+	// The largest value takes about a millisecond to compress or inflate, so the
+	// top bucket, about 82ms, leaves room for a throttled CPU.
 	durationSeconds = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "compression_duration_seconds",
 			Help:           "Time spent compressing and decompressing storage values, not counting any encryption at rest or the wait for a decompression slot.",
-			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 20),
+			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation"},

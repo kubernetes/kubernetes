@@ -113,7 +113,13 @@ func (t *transformer) TransformFromStorage(ctx context.Context, data []byte, dat
 	switch kind {
 	case unframed:
 		if t.enabled {
-			recordOperation(t.resource, fromStorage, outcomeUnframedLegacyRead)
+			// If the Rule would frame this value, it was stored before the Rule applied.
+			// Otherwise the Rule skips it for its size, so count it as a write would.
+			outcome := outcomeUnframedLegacyRead
+			if !t.willFrame(out) {
+				outcome = skipOutcome(len(out))
+			}
+			recordOperation(t.resource, fromStorage, outcome)
 		}
 	case framedStored:
 		recordOperation(t.resource, fromStorage, outcomeStored)

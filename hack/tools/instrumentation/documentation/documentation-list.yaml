@@ -1827,11 +1827,6 @@
   - 0.02048
   - 0.04096
   - 0.08192
-  - 0.16384
-  - 0.32768
-  - 0.65536
-  - 1.31072
-  - 2.62144
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

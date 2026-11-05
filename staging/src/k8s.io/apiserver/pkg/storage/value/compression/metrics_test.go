@@ -120,6 +120,18 @@ func TestOperationMetrics(t *testing.T) {
 				rewritesHeader + `apiserver_storage_compression_rewrites_needed_total{direction="to_framed",resource="configmaps"} 1` + "\n",
 		},
 		{
+			desc:    "an unframed read below the threshold",
+			run:     read(compress, []byte("{}"), false),
+			metrics: []string{"apiserver_storage_compression_operations_total", "apiserver_storage_compression_rewrites_needed_total"},
+			want:    operationsHeader + `apiserver_storage_compression_operations_total{operation="from_storage",outcome="unframed_below_threshold",resource="configmaps"} 1` + "\n",
+		},
+		{
+			desc:    "an unframed read above the ceiling",
+			run:     read(compress, bytes.Repeat([]byte("a"), maxPlaintextBytes+1), false),
+			metrics: []string{"apiserver_storage_compression_operations_total", "apiserver_storage_compression_rewrites_needed_total"},
+			want:    operationsHeader + `apiserver_storage_compression_operations_total{operation="from_storage",outcome="unframed_above_max",resource="configmaps"} 1` + "\n",
+		},
+		{
 			desc:    "a checksum mismatch is counted as a format error",
 			run:     read(Rule{}, damaged, true),
 			metrics: []string{"apiserver_storage_compression_format_errors_total"},
