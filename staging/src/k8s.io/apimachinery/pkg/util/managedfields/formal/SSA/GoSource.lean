@@ -33,4 +33,85 @@ def danglingProgram : List GoSubset.Stmt := [
   (.ret [(.call (.var "merged") "RemoveItems" [(.call (.call (.var "mergedSet") "Difference" [(.var "prunedSet")]) "Intersection" [(.var "last")])]), (.var "nil")])
 ]
 
+def ownedVersionProgram : List GoSubset.Stmt := [
+  (.declareError "err"),
+  (.assign ["merged", "err"] [(.call (.select (.var "s") "Converter") "Convert" [(.var "merged"), (.var "version")])]),
+  (.branch (.neNil (.var "err")) [
+  (.branch (.call (.select (.var "s") "Converter") "IsMissingVersionError" [(.var "err")]) [
+  (.ret [(.var "merged"), (.var "pruned"), (.var "nil")])
+]),
+  (.ret [(.var "nil"), (.var "nil"), (.call (.var "fmt") "Errorf" [(.text "failed to convert merged object at version %v: %v"), (.var "version"), (.var "err")])])
+]),
+  (.assign ["pruned", "err"] [(.call (.select (.var "s") "Converter") "Convert" [(.var "pruned"), (.var "version")])]),
+  (.branch (.neNil (.var "err")) [
+  (.branch (.call (.select (.var "s") "Converter") "IsMissingVersionError" [(.var "err")]) [
+  (.ret [(.var "merged"), (.var "pruned"), (.var "nil")])
+]),
+  (.ret [(.var "nil"), (.var "nil"), (.call (.var "fmt") "Errorf" [(.text "failed to convert pruned object at version %v: %v"), (.var "version"), (.var "err")])])
+]),
+  (.assign ["mergedSet", "err"] [(.call (.var "merged") "ToFieldSet" [])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.var "nil"), (.call (.var "fmt") "Errorf" [(.text "failed to create field set from merged object at version %v: %v"), (.var "version"), (.var "err")])])
+]),
+  (.assign ["prunedSet", "err"] [(.call (.var "pruned") "ToFieldSet" [])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.var "nil"), (.call (.var "fmt") "Errorf" [(.text "failed to create field set from pruned object at version %v: %v"), (.var "version"), (.var "err")])])
+]),
+  (.assign ["sc", "tr"] [(.call (.var "merged") "Schema" []), (.call (.var "merged") "TypeRef" [])]),
+  (.assign ["pruned"] [(.call (.var "merged") "RemoveItems" [(.call (.call (.var "mergedSet") "EnsureNamedFieldsAreMembers" [(.var "sc"), (.var "tr")]) "Difference" [(.call (.call (.var "prunedSet") "EnsureNamedFieldsAreMembers" [(.var "sc"), (.var "tr")]) "Union" [(.call (.var "managed") "EnsureNamedFieldsAreMembers" [(.var "sc"), (.var "tr")])])])])]),
+  (.ret [(.var "merged"), (.var "pruned"), (.var "nil")])
+]
+
+def pruneProgram : List GoSubset.Stmt := [
+  (.branch (.orElse (.eqNil (.var "lastSet")) (.call (.call (.var "lastSet") "Set" []) "Empty" [])) [
+  (.ret [(.var "merged"), (.var "nil")])
+]),
+  (.assign ["version"] [(.call (.var "lastSet") "APIVersion" [])]),
+  (.assign ["convertedMerged", "err"] [(.call (.select (.var "s") "Converter") "Convert" [(.var "merged"), (.var "version")])]),
+  (.branch (.neNil (.var "err")) [
+  (.branch (.call (.select (.var "s") "Converter") "IsMissingVersionError" [(.var "err")]) [
+  (.ret [(.var "merged"), (.var "nil")])
+]),
+  (.ret [(.var "nil"), (.call (.var "fmt") "Errorf" [(.text "failed to convert merged object to last applied version: %v"), (.var "err")])])
+]),
+  (.assign ["sc", "tr"] [(.call (.var "convertedMerged") "Schema" []), (.call (.var "convertedMerged") "TypeRef" [])]),
+  (.assign ["pruned"] [(.call (.var "convertedMerged") "RemoveItems" [(.call (.call (.var "lastSet") "Set" []) "EnsureNamedFieldsAreMembers" [(.var "sc"), (.var "tr")])])]),
+  (.assign ["pruned", "err"] [(.call (.var "s") "addBackOwnedItems" [(.var "convertedMerged"), (.var "pruned"), (.var "version"), (.var "managers"), (.var "applyingManager")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.call (.var "fmt") "Errorf" [(.text "failed add back owned items: %v"), (.var "err")])])
+]),
+  (.assign ["pruned", "err"] [(.call (.var "s") "addBackDanglingItems" [(.var "convertedMerged"), (.var "pruned"), (.var "lastSet")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.call (.var "fmt") "Errorf" [(.text "failed add back dangling items: %v"), (.var "err")])])
+]),
+  (.ret [(.call (.select (.var "s") "Converter") "Convert" [(.var "pruned"), (.call (.index (.var "managers") (.var "applyingManager")) "APIVersion" [])])])
+]
+
+def ownedItemsProgram : List GoSubset.Stmt := [
+  (.declareError "err"),
+  (.assign ["managedAtVersion"] [(.emptyVersionMap)]),
+  (.rangeMap "_" "managerSet$1" (.var "managedFields") [
+  (.assign ["_", "ok$2"] [(.indexTwo (.var "managedAtVersion") (.call (.var "managerSet$1") "APIVersion" []))]),
+  (.branch (.notFlag (.var "ok$2")) [
+  (.mapSet "managedAtVersion" (.call (.var "managerSet$1") "APIVersion" []) (.call (.var "fieldpath") "NewSet" []))
+]),
+  (.mapSet "managedAtVersion" (.call (.var "managerSet$1") "APIVersion" []) (.call (.index (.var "managedAtVersion") (.call (.var "managerSet$1") "APIVersion" [])) "Union" [(.call (.var "managerSet$1") "Set" [])]))
+]),
+  (.assign ["managed$3", "ok$4"] [(.indexTwo (.var "managedAtVersion") (.var "prunedVersion"))]),
+  (.branch (.var "ok$4") [
+  (.assign ["merged", "pruned", "err"] [(.call (.var "s") "addBackOwnedItemsForVersion" [(.var "merged"), (.var "pruned"), (.var "prunedVersion"), (.var "managed$3")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.var "err")])
+]),
+  (.mapDelete "managedAtVersion" (.var "prunedVersion"))
+]),
+  (.rangeMap "version$5" "managed$6" (.var "managedAtVersion") [
+  (.assign ["merged", "pruned", "err"] [(.call (.var "s") "addBackOwnedItemsForVersion" [(.var "merged"), (.var "pruned"), (.var "version$5"), (.var "managed$6")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.var "err")])
+])
+]),
+  (.ret [(.var "pruned"), (.var "nil")])
+]
+
 end SSA.GoSource

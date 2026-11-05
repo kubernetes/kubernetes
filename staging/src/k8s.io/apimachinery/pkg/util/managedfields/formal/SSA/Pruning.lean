@@ -53,18 +53,52 @@ def removeItems (s : State) (fields : FieldSet) : State :=
 def fieldDifference (left right : FieldSet) : FieldSet := left.filter (fun p => !right.contains p)
 def fieldIntersection (left right : FieldSet) : FieldSet := left.filter right.contains
 
+/-- Recompute from the merged object, restoring both retained data and ownership. -/
+def addBackOwnedFields (named : FieldSet) (merged pruned : State) (managed : FieldSet) : State :=
+  removeItems merged (fieldDifference (ensureNamed named (dataFields named merged))
+    (ensureNamed named (dataFields named pruned) ++ ensureNamed named managed))
+
+/-- Only last-applied fields may remain removed after ownership restoration. -/
+def addBackDanglingFields (named : FieldSet) (merged pruned : State) (last : FieldSet) : State :=
+  removeItems merged (fieldIntersection
+    (fieldDifference (ensureNamed named (dataFields named merged))
+      (ensureNamed named (dataFields named pruned))) (ensureNamed named last))
+
+theorem ensure_named_empty_iff (named fields : FieldSet) :
+    (ensureNamed named fields).isEmpty = fields.isEmpty := by
+  cases fields with
+  | nil =>
+      have absent : named.filter (fun _ => false) = [] :=
+        List.filter_eq_nil_iff.mpr (by intros; simp)
+      simp [ensureNamed, absent]
+  | cons field fields => rfl
+
 /-- This is the three-pass SMD pruning algorithm, including dangling-field restoration. -/
-def pruneFieldSets (named : FieldSet) (before provisional : State) (r : Request)
-    (restoring : FieldSet) : State :=
-  let last := ensureNamed named (claimFields (before.claims.filter (fun c => c.manager == r.manager)))
+def pruneWithFields (named : FieldSet) (provisional : State) (rawLast restoring : FieldSet) : State :=
+  let last := ensureNamed named rawLast
   if last.isEmpty then provisional
   else
-    let fields := ensureNamed named (dataFields named provisional)
     let first := removeItems provisional last
-    let owned := ensureNamed named restoring
-    let addedBack := removeItems provisional (fieldDifference fields (ensureNamed named (dataFields named first) ++ owned))
-    let dangling := fieldIntersection (fieldDifference fields (ensureNamed named (dataFields named addedBack))) last
-    removeItems provisional dangling
+    addBackDanglingFields named provisional (addBackOwnedFields named provisional first restoring) rawLast
+
+def pruneFieldSets (named : FieldSet) (before provisional : State) (r : Request)
+    (restoring : FieldSet) : State :=
+  pruneWithFields named provisional (claimFields (before.claims.filter (fun c => c.manager == r.manager))) restoring
+
+/-- Factoring the phases preserves the original normalized three-pass formula exactly. -/
+theorem pruning_pipeline_formula (named : FieldSet) (provisional : State) (rawLast restoring : FieldSet) :
+    pruneWithFields named provisional rawLast restoring =
+      (let last := ensureNamed named rawLast
+       if last.isEmpty then provisional
+       else
+         let fields := ensureNamed named (dataFields named provisional)
+         let first := removeItems provisional last
+         let owned := ensureNamed named restoring
+         let addedBack := removeItems provisional
+           (fieldDifference fields (ensureNamed named (dataFields named first) ++ owned))
+         let dangling := fieldIntersection
+           (fieldDifference fields (ensureNamed named (dataFields named addedBack))) last
+         removeItems provisional dangling) := rfl
 
 /-- Removing data never fabricates a path or retains a selected subtree. -/
 theorem remove_items_has_no_selected_descendant (s : State) (fields : FieldSet)

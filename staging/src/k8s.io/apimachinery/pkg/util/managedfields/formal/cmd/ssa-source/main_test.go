@@ -47,19 +47,21 @@ return converted, nil`))
 func TestUnsupportedSyntaxCannotDisappear(t *testing.T) {
 	for name, body := range map[string]string{
 		"loop":         "for { return merged, nil }",
-		"block shadow": "if merged != nil { merged := pruned; return merged, nil }; return merged, nil",
 		"else":         "if merged != nil { return merged, nil } else { return pruned, nil }",
 		"if init":      "if err := fail(); err != nil { return merged, err }; return pruned, nil",
 		"call":         "return merge(merged, pruned), nil",
 		"literal":      "return 42, nil",
 		"named return": "return",
 		"index":        "return objects[0], nil",
-		"comparison":   "if merged == nil { return merged, nil }; return pruned, nil",
+		"comparison":   "if merged == pruned { return merged, nil }; return pruned, nil",
 		"mutation":     "merged.field = pruned; return merged, nil",
 		"global name":  "if globalError != nil { return pruned, nil }; return merged, nil",
 		"unbound":      "return unknown, nil",
 		"self binding": "unknown := unknown; return unknown, nil",
 		"global write": "global = merged; return merged, nil",
+		"zero type":    "var count int; return merged, nil",
+		"zero init":    "var err error = fail(); return merged, err",
+		"zero shadow":  "var merged error; return pruned, merged",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := importProgram(sourceWith(body)); err == nil {
@@ -69,9 +71,68 @@ func TestUnsupportedSyntaxCannotDisappear(t *testing.T) {
 	}
 }
 
+func TestLexicalShadowDoesNotChangeOuterBinding(t *testing.T) {
+	program, err := importProgram(sourceWith("if merged != nil { merged := pruned; return merged, nil }; return merged, nil"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(program, `"merged$1"`) || !strings.HasSuffix(program, "(.ret [(.var \"merged\"), (.var \"nil\")])\n]") {
+		t.Fatalf("lexical shadow leaked into the outer return: %s", program)
+	}
+}
+
+func TestOwnedVersionImportsTypedZeroAndVersionedErrors(t *testing.T) {
+	source := []byte("package merge\n" + functions[1].signature + ` {
+var err error
+merged, err = s.Converter.Convert(merged, version)
+if err != nil { return nil, nil, fmt.Errorf("conversion at %v: %v", version, err) }
+return merged, pruned, nil
+}`)
+	program, err := importFunction(source, functions[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{`(.declareError "err")`, "conversion at %v: %v", `(.var "version")`} {
+		if !strings.Contains(program, required) {
+			t.Fatalf("import dropped %q: %s", required, program)
+		}
+	}
+}
+
 func TestSignatureChangesAreRejected(t *testing.T) {
 	source := strings.Replace(string(sourceWith("return merged, nil")), "lastSet fieldpath.VersionedSet", "lastSet OtherType", 1)
 	if _, err := importProgram([]byte(source)); err == nil {
 		t.Fatal("changed parameter type was not rejected")
+	}
+}
+
+func TestMapsCannotAcquireUnmodeledAliasesOrIterationMutations(t *testing.T) {
+	for name, body := range map[string]string{
+		"input alias":  "alias := managedFields; return pruned, nil",
+		"local alias":  "fields := map[fieldpath.APIVersion]*fieldpath.Set{}; alias := fields; return pruned, nil",
+		"input write":  `managedFields["v1"] = fieldpath.NewSet(); return pruned, nil`,
+		"range delete": "fields := map[fieldpath.APIVersion]*fieldpath.Set{}; for version, managed := range fields { delete(fields, version) }; return pruned, nil",
+		"range write":  "fields := map[fieldpath.APIVersion]*fieldpath.Set{}; for version, managed := range fields { fields[version] = managed }; return pruned, nil",
+		"nil shadow":   "nil := merged; if pruned == nil { return merged, nil }; return pruned, nil",
+	} {
+		t.Run(name, func(t *testing.T) {
+			source := []byte("package merge\n" + functions[3].signature + " {\n" + body + "\n}")
+			if _, err := importFunction(source, functions[3]); err == nil {
+				t.Fatalf("unsupported alias or map behavior was accepted: %s", body)
+			}
+		})
+	}
+}
+
+func TestImportBindingsCannotBeReplacedUnderTheSameName(t *testing.T) {
+	source := `package merge
+import (
+ "fmt"
+ "sigs.k8s.io/structured-merge-diff/v6/typed"
+ fieldpath "example.com/unrelated"
+)
+`
+	if err := validateImports([]byte(source)); err == nil {
+		t.Fatal("unrelated package was accepted as the fieldpath primitive implementation")
 	}
 }

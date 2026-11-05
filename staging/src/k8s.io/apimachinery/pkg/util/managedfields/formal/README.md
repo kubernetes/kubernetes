@@ -115,29 +115,48 @@ structural validity, not the proposed full-manager invariant.
 
 ## Binding proofs to source
 
-`cmd/ssa-source` uses Go's parser to import the complete body and checked
-signature of the vendored `Updater.addBackDanglingItems` into `SSA/GoSource.lean`.
-It rejects unsupported syntax and block scopes instead of dropping them.
-Verification checks the generated AST and the source digest before building.
-`SourceContracts.imported_dangling_matches_spec` executes this imported program
-in a small Go-subset interpreter and proves its outcome for arbitrary primitive
-operations, including every error and missing-version branch. The model
-specialization identifies its final pruning expression for arbitrary states.
-A negative check changes `Intersection(last)` to `Difference(last)` in a source
-copy and requires the unchanged theorem to fail.
+`cmd/ssa-source` uses Go's parser to import complete bodies and checked signatures
+from the vendored updater into `SSA/GoSource.lean`:
 
-This is the first source-bound function, not an end-to-end Go verification.
-The Go parser/importer and the subset semantics need human review. Conversion,
-typed field-set extraction, named-field expansion and removal remain explicit
-primitive contracts; their Go implementations and the other updater functions
-are not discharged by this theorem. No generated AST digest substitutes for
-those proofs.
+| Source function | Kernel-checked contract |
+| --- | --- |
+| `addBackDanglingItems` | `SourceContracts.imported_dangling_matches_spec` |
+| `addBackOwnedItemsForVersion` | `SourceContracts.imported_owned_version_matches_spec` |
+| `addBackOwnedItems` | `OwnedSource.imported_owned_items_matches_spec` |
+| `prune` | `PruneSource.imported_prune_matches_spec` |
+
+The interpreter handles lexical variable identity, tuple assignment, error
+zero values, short-circuit nil checks, map presence, local version maps and
+finite map traversal. It quantifies over every lawful version-map iteration
+permutation. Statement fuel bounds syntax depth; the loop proofs cover arbitrary
+finite manager/version counts. Unsupported syntax, map aliases, mutations of
+iterated maps, unbound globals and changed import bindings are rejected.
+Successful conversion has a non-nil result in the primitive contract; a failed
+conversion retains its optional returned object rather than assuming it is nil.
+
+`PruningRefinement.single_version_pruning_refinement` connects all four imported
+functions to the normalized three-pass model for arbitrary states and field
+sets, with all managers in one API version. Its callee-realization witnesses
+discharge the restoration callbacks using the other imported source functions.
+The model's phase factoring has a separate exact equality with its original
+formula. Each imported function has a semantic Go-source mutation that must
+invalidate the unchanged theorem at the expected module.
+
+The Go parser/importer and subset semantics need human review. Conversion,
+typed field-set extraction, named-field expansion, set primitives and removal
+remain explicit primitive contracts. Their Go implementations and the remaining
+updater/request pipeline are further proof obligations. The multi-version
+source orchestration contract does not establish semantic correctness of API
+conversions. No generated AST digest substitutes for those proofs.
 
 `FieldsV1` independently proves the recursive trie/object-grammar round trip at
 arbitrary finite depth, including leaf `{}` membership and the `"."` marker
 used when membership and descendants coexist. Its canonicality premise excludes
 empty child sets and duplicate edge keys. JSON bytes and path-element string
 parsing remain separate obligations; this does not verify Go's JSON library.
+`FieldPathSet` additionally proves exact trie-to-path-set membership at arbitrary
+depth and the correspondence of normalized difference/intersection with trie
+selection. Empty structural nodes in selection still require wire normalization.
 
 ## Implementation evidence
 

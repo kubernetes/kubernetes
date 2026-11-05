@@ -63,7 +63,7 @@ theorem candidate_foreign_claim_exact (mode : Semantics) (schema : Schema)
         (fun cell => cell.path == claim.target.path &&
           modifiedCell before (wirePruned mode schema before r) cell) = false := by
   have pruningClaims : (wirePruned mode schema before r).claims = (wireMerged before r).claims := by
-    simp only [wirePruned, pruneFieldSets, removeItems]
+    simp only [wirePruned, pruneFieldSets, pruneWithFields, addBackOwnedFields, addBackDanglingFields, removeItems]
     split <;> rfl
   rcases modeRaw with rfl | rfl <;>
     simp only [candidateWith, List.mem_filter, pruningClaims,
@@ -172,7 +172,7 @@ theorem unchanged_snapshot_acquisition (mode : Semantics) (schema : Schema)
     simp only [noPrevious, claimFields, List.flatMap_nil, ensureNamed, List.any_nil, List.nil_append]
     exact List.filter_eq_nil_iff.mpr (by intros; simp)
   have samePruned : wirePruned mode schema before r = after := by
-    simp only [wirePruned, pruneFieldSets, noLast, List.isEmpty_nil, ↓reduceIte]
+    simp only [wirePruned, pruneFieldSets, pruneWithFields, noLast, List.isEmpty_nil, ↓reduceIte]
     exact sameMerge
   have newTargets : ∀ fp ∈ r.desired, targetExists before fp = true := by
     have normalizedIntent := norm

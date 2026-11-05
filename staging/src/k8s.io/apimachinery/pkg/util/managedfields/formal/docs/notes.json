@@ -361,5 +361,50 @@
     "title": "Imported source specializes to normalized final pruning",
     "meaning": "With the normalized single-version primitives, the imported Go function computes exactly the model's dangling-field removal expression for arbitrary states and field sets.",
     "limits": "The specialization does not prove that the Go implementations of those primitives refine the normalized definitions."
+  },
+  "SSA.SourceContracts.imported_owned_version_matches_spec": {
+    "title": "Imported per-version restoration covers all source exits",
+    "meaning": "The complete Go helper matches its contract, including both conversions, field-set errors, restoration and missing-version returns carrying the actual optional conversion result.",
+    "limits": "Successful conversion is non-nil in the primitive interface. Conversion and typed/set implementations remain explicit proof obligations."
+  },
+  "SSA.OwnedSource.imported_owned_items_matches_spec": {
+    "title": "Imported ownership restoration for any finite manager map",
+    "meaning": "The entire Go helper computes version grouping, restores the last-applied version first, then traverses every remaining version under any lawful permutation, propagating the exact success/error result.",
+    "limits": "Manager/version counts are arbitrary finite sizes. The per-version callee is an explicit contract; source semantics and primitive implementations still require their separate justification."
+  },
+  "SSA.PruneSource.imported_prune_matches_spec": {
+    "title": "Complete imported three-phase pruning orchestration",
+    "meaning": "The actual Go AST short-circuits nil/empty last sets, performs initial conversion and removal, invokes ownership and dangling restoration in order, propagates all errors, and performs the final actor-version conversion.",
+    "limits": "Requires the actor entry installed by Apply. Callees and typed/conversion primitives are explicit contracts; this theorem alone does not discharge them."
+  },
+  "SSA.PruningRefinement.single_version_pruning_refinement": {
+    "title": "All four source functions compose in the single-version model",
+    "meaning": "For arbitrary states, field sets and finite manager counts, the imported pruning function equals the normalized three-pass model, with callee-realization witnesses proved from all three other imported functions.",
+    "limits": "All managers share the last-applied API version, and the actor entry exists. Typed/set primitives are normalized definitions; their actual Go implementations are not proved by this composition result."
+  },
+  "SSA.PruningRefinement.linked_restore_preserves_objects": {
+    "title": "Model restoration never falls into nullable-input recovery",
+    "meaning": "Every finite restoration schedule under the identity-conversion primitives succeeds with two present object values.",
+    "limits": "This is a non-vacuity and call-domain result for the normalized primitive instance, not a claim about arbitrary external Go converters."
+  },
+  "SSA.FieldPathSet.paths_membership": {
+    "title": "Trie normalization preserves every membership claim",
+    "meaning": "For arbitrary finite tries and paths, flat path membership is equivalent to recursive trie membership, preserving the distinction between direct membership and descendants.",
+    "limits": "This proves the normalization relation, not Go JSON-byte parsing or sorting implementation correctness."
+  },
+  "SSA.pruning_pipeline_formula": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_assign": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_branch": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_range": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_declare_error": {
+    "scope": "definition"
   }
 }

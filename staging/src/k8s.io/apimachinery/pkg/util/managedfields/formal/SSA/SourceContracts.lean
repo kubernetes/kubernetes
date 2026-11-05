@@ -42,8 +42,8 @@ def danglingSpec {Obj Err : Type} (ops : Ops Obj Err) (merged pruned : Obj)
         | .ok fields => .ok fields
         | .error error => .error (ops.wrap "failed to create field set from merged object in last applied version: %v" error)
       let named := ops.ensureNamed merged merged
-      .ok (ops.remove merged (fieldIntersection
-        (fieldDifference (named mergedFields) (named prunedFields)) (named last)))
+      .ok (ops.remove merged (ops.intersection
+        (ops.difference (named mergedFields) (named prunedFields)) (named last)))
 
 /-- The theorem executes the imported source AST, with conversion and typed primitives explicit. -/
 theorem imported_dangling_matches_spec {Obj Err : Type} (ops : Ops Obj Err)
@@ -54,20 +54,83 @@ theorem imported_dangling_matches_spec {Obj Err : Type} (ops : Ops Obj Err)
   | error error =>
       cases missing : ops.missing error <;>
         simp [GoSource.danglingProgram, exec, eval, evalAll, call, bindNames, lookup, initialEnv, Bind.bind, Except.bind,
-          outcome, danglingSpec, conversion, missing]
+          outcome, conversionOutcome, isNil, danglingSpec, conversion, missing]
   | ok converted =>
       cases prunedFields : ops.toFields converted with
       | error error =>
           simp [GoSource.danglingProgram, exec, eval, evalAll, call, bindNames, lookup, initialEnv, Bind.bind, Except.bind,
-            outcome, fieldOutcome, danglingSpec, conversion, prunedFields]
+            outcome, conversionOutcome, fieldOutcome, isNil, danglingSpec, conversion, prunedFields]
       | ok prunedFields =>
           cases mergedFields : ops.toFields merged with
           | error error =>
               simp [GoSource.danglingProgram, exec, eval, evalAll, call, bindNames, lookup, initialEnv, Bind.bind, Except.bind,
-                outcome, fieldOutcome, danglingSpec, conversion, prunedFields, mergedFields]
+                outcome, conversionOutcome, fieldOutcome, isNil, danglingSpec, conversion, prunedFields, mergedFields]
           | ok mergedFields =>
               simp [GoSource.danglingProgram, exec, eval, evalAll, call, bindNames, lookup, initialEnv, Bind.bind, Except.bind,
-                outcome, fieldOutcome, danglingSpec, conversion, prunedFields, mergedFields]
+                outcome, conversionOutcome, fieldOutcome, isNil, danglingSpec, conversion, prunedFields, mergedFields]
+
+def ownedVersionEnv {Obj Err : Type} (merged pruned : Obj) (managed : FieldSet)
+    (version : String) : Env Obj Err := [
+  ("s", .updater), ("fmt", .formatter), ("merged", .object merged),
+  ("pruned", .object pruned), ("version", .text version), ("managed", .fields managed)]
+
+/-- Missing-version exits preserve the actual object/error pair returned by conversion. -/
+def ownedVersionSpec {Obj Err : Type} (ops : Ops Obj Err) (merged pruned : Obj)
+    (managed : FieldSet) (version : String) : Except Err (Option Obj × Option Obj) :=
+  match ops.convert merged version with
+  | .error error =>
+      if ops.missing error then .ok (ops.failedConversion merged version error, some pruned)
+      else .error (ops.wrapAt "failed to convert merged object at version %v: %v" version error)
+  | .ok convertedMerged =>
+      match ops.convert pruned version with
+      | .error error =>
+          if ops.missing error then .ok (some convertedMerged, ops.failedConversion pruned version error)
+          else .error (ops.wrapAt "failed to convert pruned object at version %v: %v" version error)
+      | .ok convertedPruned => do
+          let mergedFields ← match ops.toFields convertedMerged with
+            | .ok fields => .ok fields
+            | .error error => .error (ops.wrapAt "failed to create field set from merged object at version %v: %v" version error)
+          let prunedFields ← match ops.toFields convertedPruned with
+            | .ok fields => .ok fields
+            | .error error => .error (ops.wrapAt "failed to create field set from pruned object at version %v: %v" version error)
+          let named := ops.ensureNamed convertedMerged convertedMerged
+          .ok (some convertedMerged, some (ops.remove convertedMerged (ops.difference
+            (named mergedFields) (ops.union (named prunedFields) (named managed)))))
+
+/-- Every source branch of addBackOwnedItemsForVersion satisfies the independent contract. -/
+theorem imported_owned_version_matches_spec {Obj Err : Type} (ops : Ops Obj Err)
+    (merged pruned : Obj) (managed : FieldSet) (version : String) :
+    exec ops 64 GoSource.ownedVersionProgram (ownedVersionEnv merged pruned managed version) =
+      .ok (.returned (pairOutcome (ownedVersionSpec ops merged pruned managed version))) := by
+  cases first : ops.convert merged version with
+  | error error =>
+      cases missing : ops.missing error <;>
+        simp [GoSource.ownedVersionProgram, exec, eval, evalAll, call, bindNames, lookup,
+          ownedVersionEnv, Bind.bind, Except.bind, conversionOutcome, pairOutcome,
+          ownedVersionSpec, isNil, first, missing, optionalObject]
+  | ok convertedMerged =>
+      cases second : ops.convert pruned version with
+      | error error =>
+          cases missing : ops.missing error <;>
+            simp [GoSource.ownedVersionProgram, exec, eval, evalAll, call, bindNames, lookup,
+              ownedVersionEnv, Bind.bind, Except.bind, conversionOutcome, pairOutcome,
+              ownedVersionSpec, isNil, first, second, missing, optionalObject]
+      | ok convertedPruned =>
+          cases mergedFields : ops.toFields convertedMerged with
+          | error error =>
+              simp [GoSource.ownedVersionProgram, exec, eval, evalAll, call, bindNames, lookup,
+                ownedVersionEnv, Bind.bind, Except.bind, conversionOutcome, pairOutcome, fieldOutcome,
+                ownedVersionSpec, isNil, first, second, mergedFields]
+          | ok mergedFields =>
+              cases prunedFields : ops.toFields convertedPruned with
+              | error error =>
+                  simp [GoSource.ownedVersionProgram, exec, eval, evalAll, call, bindNames, lookup,
+                    ownedVersionEnv, Bind.bind, Except.bind, conversionOutcome, pairOutcome, fieldOutcome,
+                    ownedVersionSpec, isNil, first, second, mergedFields, prunedFields]
+              | ok prunedFields =>
+                  simp [GoSource.ownedVersionProgram, exec, eval, evalAll, call, bindNames, lookup,
+                    ownedVersionEnv, Bind.bind, Except.bind, conversionOutcome, pairOutcome, fieldOutcome,
+                    ownedVersionSpec, isNil, first, second, mergedFields, prunedFields, optionalObject]
 
 /-- Single-version model primitives instantiate the imported source without conversion errors. -/
 def normalizedOps (named : FieldSet) : Ops State Unit where
@@ -86,6 +149,16 @@ theorem source_dangling_refines_model (named : FieldSet) (merged pruned : State)
         (fieldDifference (ensureNamed named (dataFields named merged))
           (ensureNamed named (dataFields named pruned))) (ensureNamed named last))), .nil]) := by
   rw [imported_dangling_matches_spec]
+  rfl
+
+/-- The imported owned-items pass computes the normalized restoration expression at any depth. -/
+theorem source_owned_version_refines_model (named : FieldSet) (merged pruned : State)
+    (managed : FieldSet) (version : String) :
+    exec (normalizedOps named) 64 GoSource.ownedVersionProgram (ownedVersionEnv merged pruned managed version) =
+      .ok (.returned [.object merged, .object (removeItems merged
+        (fieldDifference (ensureNamed named (dataFields named merged))
+          (ensureNamed named (dataFields named pruned) ++ ensureNamed named managed))), .nil]) := by
+  rw [imported_owned_version_matches_spec]
   rfl
 
 end SSA.SourceContracts

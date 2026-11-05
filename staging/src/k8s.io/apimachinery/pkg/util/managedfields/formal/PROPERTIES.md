@@ -147,7 +147,11 @@ In particular:
 | Raw ownership | `WireContracts.merged_foreign_claim`, `candidate_foreign_claim_exact` | Foreign claims participate in pruning before transfer; final survival is characterized exactly. These are current/PR wire-model laws. |
 | Raw conflicts/force | `WireContracts.accepted_nonforce_foreign_unchanged`, `candidate_force_independent`, `accepted_also_succeeds_forced` | The final pruned result is compared with original ownership. Force changes the conflict gate, not the candidate. |
 | Raw acquisition | `WireContracts.unchanged_snapshot_acquisition` | Both current/PR modes, arbitrary structurally valid finite states, fresh actor, normalized unchanged snapshot; all original claims survive. No full-manager premise. |
-| Source execution | `SourceContracts.imported_dangling_matches_spec`, `source_dangling_refines_model` | Complete imported Go AST of `addBackDanglingItems`, all error/missing-version branches, explicit primitive parameters. Importer/subset semantics and primitive correctness remain review/proof obligations. A semantic source mutation must invalidate the proof. |
+| Source helpers | `SourceContracts.imported_dangling_matches_spec`, `imported_owned_version_matches_spec` | Complete Go ASTs, all error/missing-version branches, returned failure payloads and explicit primitive parameters. |
+| Source version loops | `OwnedSource.imported_owned_items_matches_spec` | Complete Go AST, arbitrary finite manager/version counts, lexical scope, last-applied version first, every lawful remaining-map permutation and all propagated errors. |
+| Source orchestration | `PruneSource.imported_prune_matches_spec` | Complete Go AST of `prune`; nil/empty early exits, initial conversion, both restoration phases, errors and final conversion. Callees are explicit contracts. |
+| Pruning composition | `PruningRefinement.single_version_pruning_refinement` | Realizes all three callee contracts from imported helpers and equates source pruning to the three-pass model, for arbitrary states/field sets and any finite nonempty same-version manager map. Typed/set primitive implementations remain obligations. |
+| Field-set normalization | `FieldPathSet.paths_membership`, `flat_difference_refines_trie`, `flat_intersection_refines_trie` | Arbitrary finite trie depth. Ordinary membership difference is distinct from subtree removal. Raw selection may retain empty structural nodes, so this is not a JSON codec theorem. |
 
 `SSA/Counterexamples.lean` kernel-checks the raw PR fragmentation, partial-owner
 deletion, required-map shortcut, required-list failure, and opposite roles in
@@ -171,12 +175,15 @@ regression agrees with current managedfields for the latter. The broader
 comparison also led to explicit modeling of implicit key leaves, named fields,
 three-pass restoration, null promotion and final ownership updates.
 
-A source-bound refinement now covers `Updater.addBackDanglingItems` control flow
-and specializes it to the normalized model. This is one function, with explicit
-primitive contracts, not a universal Go refinement/normalization proof. The
-importer, subset semantics and its signature check need human review; unsupported
-syntax is rejected. The source digest and generated AST are checked by CI, and
-an operator mutation is required to break the unchanged theorem. Version conversion,
+A source-bound refinement covers the four pruning functions, including both
+unbounded finite map loops. Same-version composition realizes the callee
+contracts and specializes the entire pruning path to the normalized model.
+The importer, subset semantics, import/signature checks and primitive contracts
+need human review. Unsupported syntax and unmodeled aliasing are rejected.
+Source digests and generated ASTs are checked by CI; four semantic Go mutations
+must fail in their expected proof modules. The remaining updater functions and
+typed/set primitive implementations are not discharged by this pruning result.
+Version conversion,
 defaulting, schema evolution, reset/subresource filters, duplicate-list behavior,
 key defaults and storage concurrency remain integration obligations. The
 adapter rejects unsupported/duplicate shapes rather than silently projecting
