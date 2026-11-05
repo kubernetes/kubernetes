@@ -9,6 +9,7 @@ formal_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$formal_root"
 SSA_LAKE="${SSA_LAKE:-lake}"
 lean_binary="$("${SSA_LAKE}" env which lean)"
+updater_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/merge)/update.go"
 
 for mutation in dangling owned-version prune owned-items; do
   probe="$formal_root/.lake/source-mutation/$mutation"
@@ -16,7 +17,7 @@ for mutation in dangling owned-version prune owned-items; do
   cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
 
   # Each edit preserves supported syntax and changes one source operation.
-  python3 - ../../../../../../../../vendor/sigs.k8s.io/structured-merge-diff/v6/merge/update.go "$probe/update.go" "$mutation" <<'PY'
+  python3 - "$updater_source" "$probe/update.go" "$mutation" <<'PY'
 import sys
 from pathlib import Path
 

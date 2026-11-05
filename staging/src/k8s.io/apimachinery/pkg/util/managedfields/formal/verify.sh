@@ -27,8 +27,9 @@ if [[ "${actual_version}" != "Lean (version ${expected_version},"* ]]; then
   exit 1
 fi
 
+updater_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/merge)/update.go"
 go run ./cmd/ssa-source \
-  -source ../../../../../../../../vendor/sigs.k8s.io/structured-merge-diff/v6/merge/update.go \
+  -source "$updater_source" \
   -check SSA/GoSource.lean
 
 "${SSA_LAKE}" clean
