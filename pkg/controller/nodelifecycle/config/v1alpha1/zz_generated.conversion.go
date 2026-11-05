@@ -90,6 +90,7 @@ func autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLif
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.NodeLivenessSource = in.NodeLivenessSource
 	return nil
 }
 
@@ -101,5 +102,6 @@ func autoConvert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLif
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 	out.NodeMonitorPeriod = in.NodeMonitorPeriod
+	out.NodeLivenessSource = in.NodeLivenessSource
 	return nil
 }

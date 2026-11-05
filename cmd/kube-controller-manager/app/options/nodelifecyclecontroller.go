@@ -64,6 +64,7 @@ func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *nodelifecycleconfig.NodeLi
 	cfg.LargeClusterSizeThreshold = o.LargeClusterSizeThreshold
 	cfg.UnhealthyZoneThreshold = o.UnhealthyZoneThreshold
 	cfg.NodeMonitorPeriod = o.NodeMonitorPeriod
+	cfg.NodeLivenessSource = o.NodeLivenessSource
 
 	return nil
 }
