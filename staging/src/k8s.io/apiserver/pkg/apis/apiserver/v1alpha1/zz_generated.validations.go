@@ -74,10 +74,6 @@ func Validate_CompressionResourceConfiguration(
 			if earlyReturn {
 				return // do not proceed
 			}
-			// custom validation
-			if e := ValidateCustom_CompressionResourceConfiguration_Resources(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -160,11 +156,6 @@ func Validate_CompressionResourceConfiguration(
 func Validate_StorageCompressionConfiguration(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *StorageCompressionConfiguration) (errs field.ErrorList) {
-
-	// custom validation
-	if e := ValidateCustom_StorageCompressionConfiguration(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-		errs = append(errs, e...)
-	}
 
 	// field StorageCompressionConfiguration.TypeMeta has no validation
 

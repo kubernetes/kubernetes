@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/internal/storagecompression"
@@ -98,7 +99,7 @@ func newCompressionConfiguration(versioned *apiserverv1alpha1.StorageCompression
 		return nil, errors.New("StorageCompressionConfiguration can't be nil")
 	}
 	configScheme.Default(versioned)
-	if err := apiserverv1alpha1.Validate_StorageCompressionConfiguration(context.Background(), operation.Operation{Type: operation.Create}, nil, versioned, nil).ToAggregate(); err != nil {
+	if err := validateConfig(versioned).ToAggregate(); err != nil {
 		return nil, err
 	}
 	config := &apiserver.StorageCompressionConfiguration{}
@@ -116,6 +117,19 @@ func newCompressionConfiguration(versioned *apiserverv1alpha1.StorageCompression
 		}
 	}
 	return c, nil
+}
+
+// validateConfig runs the validation generated from the v1alpha1 tags, then the
+// selector checks that no tag can express.
+func validateConfig(versioned *apiserverv1alpha1.StorageCompressionConfiguration) field.ErrorList {
+	allErrs := apiserverv1alpha1.Validate_StorageCompressionConfiguration(context.Background(), operation.Operation{Type: operation.Create}, nil, versioned, nil)
+	compressionResourcesPath := field.NewPath("compressionResources")
+	selectorsByEntry := make([][]string, 0, len(versioned.CompressionResources))
+	for i, entry := range versioned.CompressionResources {
+		allErrs = append(allErrs, storagecompression.ValidateSelectors(entry.Resources, compressionResourcesPath.Index(i).Child("resources"))...)
+		selectorsByEntry = append(selectorsByEntry, entry.Resources)
+	}
+	return append(allErrs, storagecompression.ValidateMasking(selectorsByEntry, compressionResourcesPath)...)
 }
 
 // entryRule maps one validated entry to its Rule. Defaulting has already set

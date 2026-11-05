@@ -242,10 +242,25 @@ func fieldErrors(t *testing.T, err error) field.ErrorList {
 	return errs
 }
 
+// TestValidateConfig checks that validateConfig reports a selector both
+// ValidateSelectors and ValidateMasking catch only once. It reads the errors
+// before ToAggregate, which would drop the repeat.
+func TestValidateConfig(t *testing.T) {
+	selector := func(i, j int) *field.Path {
+		return field.NewPath("compressionResources").Index(i).Child("resources").Index(j)
+	}
+	got := validateConfig(&apiserverv1alpha1.StorageCompressionConfiguration{CompressionResources: []entryConfig{
+		entry(deflate, "configmaps"),
+		entry(deflate, "configmaps", "configmaps"),
+	}})
+	want := field.ErrorList{field.Duplicate(selector(1, 0), nil), field.Duplicate(selector(1, 1), nil)}
+	field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring().RequireOriginWhenInvalid().Test(t, want, got)
+}
+
 // TestLoadCompressionConfigReportsEachErrorOnce checks that each problem in a
-// file gets exactly one error, whether the tags or the custom hooks catch it.
-// It can't see an error reported twice word for word, since ToAggregate drops
-// exact repeats; the v1alpha1 test catches those.
+// file gets exactly one error, whether the tags or the selector checks catch
+// it. It can't see an error reported twice word for word, since ToAggregate
+// drops exact repeats; TestValidateConfig catches those.
 func TestLoadCompressionConfigReportsEachErrorOnce(t *testing.T) {
 	content := `
 apiVersion: apiserver.config.k8s.io/v1alpha1
@@ -587,13 +602,13 @@ func TestRuleForFollowsFirstMatch(t *testing.T) {
 
 // TestNewCompressionConfigurationValidates checks that the only constructor,
 // newCompressionConfiguration, rejects a nil config and runs both the tags and
-// the custom hooks, so no CompressionConfiguration holds rules from an invalid
-// config.
+// the selector checks, so no CompressionConfiguration holds rules from an
+// invalid config.
 func TestNewCompressionConfigurationValidates(t *testing.T) {
 	for name, config := range map[string]*apiserverv1alpha1.StorageCompressionConfiguration{
 		"nil":                                nil,
 		"missing algorithm, caught by a tag": {CompressionResources: []entryConfig{entry("", "configmaps")}},
-		"masked selector, caught by a hook":  {CompressionResources: []entryConfig{entry(deflate, "*.*"), entry(none, "configmaps")}},
+		"masked selector, caught by the selector checks": {CompressionResources: []entryConfig{entry(deflate, "*.*"), entry(none, "configmaps")}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c, err := newCompressionConfiguration(config, "")

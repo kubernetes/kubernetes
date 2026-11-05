@@ -27,7 +27,6 @@ import (
 // they're written to etcd, ahead of any encryption at rest. Entries are checked
 // in order and the first match wins, so a selector already covered by an earlier
 // one is rejected. Wildcards never match secrets; name secrets to compress them.
-// +k8s:customValidation
 type StorageCompressionConfiguration struct {
 	metav1.TypeMeta `json:""`
 
@@ -48,7 +47,6 @@ type CompressionResourceConfiguration struct {
 	// +k8s:required
 	// +k8s:listType=set
 	// +k8s:customUnique
-	// +k8s:customValidation
 	Resources []string `json:"resources"`
 
 	// algorithm is Deflate or None. None keeps resources out of a later wildcard.

@@ -41,14 +41,13 @@ func minSizeEntry(resource, minSize string) CompressionResourceConfiguration {
 	return e
 }
 
-// TestValidateStorageCompressionConfiguration covers the +k8s: tags and checks
-// that the custom validation hooks are wired in. What the hooks check is tested
-// in storagecompression. The floor cases pin +k8s:minimum=64: DEFLATE almost
-// never shrinks a smaller value, which then costs a 9-byte frame and the CPU.
+// TestValidateStorageCompressionConfiguration covers the +k8s: tags. The
+// selector checks run in the loader's validateConfig, and storagecompression
+// tests them. The floor cases pin +k8s:minimum=64: DEFLATE almost never shrinks
+// a smaller value, which then costs a 9-byte frame and the CPU.
 func TestValidateStorageCompressionConfiguration(t *testing.T) {
 	root := field.NewPath("compressionResources")
 	resources := root.Index(0).Child("resources")
-	selector := func(i, j int) *field.Path { return root.Index(i).Child("resources").Index(j) }
 	minSize := func(i int) *field.Path { return root.Index(i).Child("minSize") }
 	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring().RequireOriginWhenInvalid()
 
@@ -72,21 +71,6 @@ func TestValidateStorageCompressionConfiguration(t *testing.T) {
 			deflateEntry("*."),
 			deflateEntry("*.*"),
 		),
-	}, {
-		desc: "the selector hook checks every entry",
-		in:   compressionConfig(deflateEntry("ConfigMaps"), deflateEntry("configmaps", "*.")),
-		want: field.ErrorList{
-			field.Invalid(selector(0, 0), nil, "").WithOrigin("lowercase"),
-			field.Invalid(selector(1, 1), nil, "").WithOrigin("overlap"),
-		},
-	}, {
-		desc: "the masking hook compares entries",
-		in:   compressionConfig(deflateEntry("*.*"), deflateEntry("configmaps")),
-		want: field.ErrorList{field.Invalid(selector(1, 0), nil, "compressionResources[0].resources[0]").WithOrigin("masked")},
-	}, {
-		desc: "a selector both hooks catch is reported once",
-		in:   compressionConfig(deflateEntry("configmaps"), deflateEntry("configmaps", "configmaps")),
-		want: field.ErrorList{field.Duplicate(selector(1, 0), nil), field.Duplicate(selector(1, 1), nil)},
 	}, {
 		desc: "a missing algorithm",
 		in:   compressionConfig(CompressionResourceConfiguration{Resources: []string{"configmaps"}}),
