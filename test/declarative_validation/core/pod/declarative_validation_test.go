@@ -185,7 +185,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 	}
 }
 
-func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
+func TestDeclarativeValidateExtraNodeAllocatableResources(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.DRANodeAllocatableResources: true,
 	})
@@ -197,241 +197,128 @@ func TestDeclarativeValidateNodeAllocatableStatus(t *testing.T) {
 			expectedErrs field.ErrorList
 		}{
 			"valid no changes": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
-						},
-					},
+				old: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 				}),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
-						},
-					},
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 				}),
 				subresource: "/status",
 			},
-
-			"invalid: status overhead both perPod and perContainer nil": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Overhead: []api.NodeAllocatableOverheadResources{
-							{Name: "cpu"},
-						},
-					},
+			"valid status: pod level and container entries": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "8", "memory", "2Gi"), Limits: resources("cpu", "8", "memory", "2Gi")},
+					{ContainerName: "ctr", Requests: resources("memory", "512Mi"), Limits: resources("cpu", "8", "memory", "1536Mi")},
+				}),
+				subresource: "/status",
+			},
+			"valid status: ephemeral-storage and hugepages": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("ephemeral-storage", "1Gi", "hugepages-2Mi", "2Mi"), Limits: resources("ephemeral-storage", "1Gi", "hugepages-2Mi", "2Mi")},
+				}),
+				subresource: "/status",
+			},
+			"invalid status: duplicate containerName": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "2"), Limits: resources("cpu", "2")},
+					{ContainerName: "ctr", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
+					{ContainerName: "ctr", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0), "", "at least one of perPod or perContainer must be set").MarkFromImperative(),
+					field.Duplicate(field.NewPath("status", "extraNodeAllocatableResources").Index(2), nil),
 				},
 			},
-			"invalid: status overhead perPod negative": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Overhead: []api.NodeAllocatableOverheadResources{
-							{Name: "cpu", PerPod: new(apiresource.MustParse("-100m"))},
-						},
-					},
+			"invalid status: two pod level entries": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
+					{Requests: resources("cpu", "2"), Limits: resources("cpu", "2")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("perPod"), "-100m", "must be non-negative").MarkFromImperative(),
+					field.Duplicate(field.NewPath("status", "extraNodeAllocatableResources").Index(1), nil),
 				},
 			},
-			"invalid: status mapping duplicate resource name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
-							{Name: "cpu", Quantity: new(apiresource.MustParse("2"))},
-						},
-					},
+			"invalid status: container entry without a pod level entry": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{ContainerName: "ctr", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(1), "cpu"),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources"), "must have an entry with an empty containerName").MarkFromImperative(),
 				},
 			},
-			"invalid status: duplicate claim status name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
-						},
-					},
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "memory", Quantity: new(apiresource.MustParse("1G"))},
-						},
-					},
+			"invalid status: unknown container": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
+					{ContainerName: "unknown", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(1), "claim-1"),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(1).Child("containerName"), "unknown", "must be empty or match the name of an entry in `spec.initContainers` or `spec.containers`").MarkFromImperative(),
 				},
 			},
-			"invalid status: duplicate container name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Containers:        []string{"c1", "c1"},
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
-						},
-					},
+			"invalid status: resource that is not node allocatable": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("kubernetes.io/foo", "1"), Limits: resources("kubernetes.io/foo", "1")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("containers").Index(1), "c1"),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("requests").Key("kubernetes.io/foo"), api.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("limits").Key("kubernetes.io/foo"), api.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name").MarkFromImperative(),
 				},
 			},
-			"invalid status: mapping name required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Quantity: new(apiresource.MustParse("1"))},
-						},
-					},
+			"invalid status: entries without limits": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1")},
+					{ContainerName: "ctr"},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), ""),
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("limits"), ""),
+					field.Required(field.NewPath("status", "extraNodeAllocatableResources").Index(1).Child("limits"), ""),
 				},
 			},
-			"invalid status: mapping quantity required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "cpu"},
-						},
-					},
+			"invalid status: negative quantity": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1"), Limits: resources("cpu", "-1")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("quantity"), ""),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("limits").Key("cpu"), "-1", "must be greater than or equal to 0").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("requests").Key("cpu"), "1", "must be less than or equal to cpu limit of -1").MarkFromImperative(),
 				},
 			},
-			"invalid status: duplicate overhead resource name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Overhead: []api.NodeAllocatableOverheadResources{
-							{Name: "cpu", PerPod: new(apiresource.MustParse("100m"))},
-							{Name: "cpu", PerPod: new(apiresource.MustParse("200m"))},
-						},
-					},
+			"invalid status: aggregate container requests exceed the pod level requests": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1"), Limits: resources("cpu", "2")},
+					{ContainerName: "ctr", Requests: resources("cpu", "2"), Limits: resources("cpu", "2")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Duplicate(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(1), "cpu"),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(0).Child("requests").Key("cpu"), "1", "must be greater than or equal to the aggregate requests of the container entries (2)").MarkFromImperative(),
 				},
 			},
-			"invalid status: overhead name required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Overhead: []api.NodeAllocatableOverheadResources{
-							{PerPod: new(apiresource.MustParse("100m"))},
-						},
-					},
+			"invalid status: container limit exceeds the pod level limit": {
+				old: makePodWithExtraNodeAllocatableResources(nil),
+				update: makePodWithExtraNodeAllocatableResources([]api.ExtraNodeAllocatableResource{
+					{Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
+					{ContainerName: "ctr", Limits: resources("cpu", "2")},
 				}),
 				subresource: "/status",
 				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), ""),
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName(""), "must be a node allocatable resource name").MarkFromImperative(),
+					field.Invalid(field.NewPath("status", "extraNodeAllocatableResources").Index(1).Child("limits").Key("cpu"), "2", "must be less than or equal to the limit of the entry with an empty containerName (1)").MarkFromImperative(),
 				},
-			},
-			"invalid status: resourceClaimName required": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("", []api.NodeAllocatableResourceClaimStatus{
-					{
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "cpu", Quantity: new(apiresource.MustParse("1"))},
-						},
-					},
-				}),
-				subresource: "/status",
-				expectedErrs: field.ErrorList{
-					field.Required(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("resourceClaimName"), ""),
-				},
-			},
-			"invalid status: mapping name not a standard container resource": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "abc", Quantity: new(apiresource.MustParse("1"))},
-						},
-					},
-				}),
-				subresource: "/status",
-				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("abc"), "must be a node allocatable resource name").MarkFromImperative(),
-				},
-			},
-			"invalid status: mapping name ephemeral-storage": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "ephemeral-storage", Quantity: new(apiresource.MustParse("1Gi"))},
-						},
-					},
-				}),
-				subresource: "/status",
-				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("mapping").Index(0).Child("name"), api.ResourceName("ephemeral-storage"), "must be a node allocatable resource name").MarkFromImperative(),
-				},
-			},
-			"invalid status: overhead name in kubernetes.io namespace": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Overhead: []api.NodeAllocatableOverheadResources{
-							{Name: "kubernetes.io/foo", PerPod: new(apiresource.MustParse("100m"))},
-						},
-					},
-				}),
-				subresource: "/status",
-				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("status", "nodeAllocatableResourceClaimStatuses").Index(0).Child("overhead").Index(0).Child("name"), api.ResourceName("kubernetes.io/foo"), "must be a node allocatable resource name").MarkFromImperative(),
-				},
-			},
-			"valid status: hugepages mapping name": {
-				old: makePodWithNodeAllocatableResourceClaimStatuses("", nil),
-				update: makePodWithNodeAllocatableResourceClaimStatuses("claim-1", []api.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "claim-1",
-						Mapping: []api.NodeAllocatableMappedResources{
-							{Name: "hugepages-2Mi", Quantity: new(apiresource.MustParse("2Mi"))},
-						},
-					},
-				}),
-				subresource: "/status",
 			},
 		}
 
@@ -593,16 +480,17 @@ func makePodVolumeHealthConditions(count int) []api.VolumeHealthCondition {
 	return conditions
 }
 
-func makePodWithNodeAllocatableResourceClaimStatuses(claimName string, statuses []api.NodeAllocatableResourceClaimStatus) *api.Pod {
+func makePodWithExtraNodeAllocatableResources(entries []api.ExtraNodeAllocatableResource) *api.Pod {
 	pod := podtest.MakePod("foo")
-	if claimName != "" {
-		pod.Spec.ResourceClaims = []api.PodResourceClaim{
-			{
-				Name:              "claim-ref",
-				ResourceClaimName: new(claimName),
-			},
-		}
-	}
-	pod.Status.NodeAllocatableResourceClaimStatuses = statuses
+	pod.Status.ExtraNodeAllocatableResources = entries
 	return pod
+}
+
+// resources returns a ResourceList from pairs of resource names and quantities.
+func resources(namesAndQuantities ...string) api.ResourceList {
+	list := api.ResourceList{}
+	for i := 0; i < len(namesAndQuantities); i += 2 {
+		list[api.ResourceName(namesAndQuantities[i])] = apiresource.MustParse(namesAndQuantities[i+1])
+	}
+	return list
 }

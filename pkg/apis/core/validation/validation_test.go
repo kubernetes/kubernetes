@@ -17145,497 +17145,181 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 	}
 }
 
-func TestValidateNodeAllocatableResourceClaimStatus(t *testing.T) {
-	validPodSpec1 := core.PodSpec{
-		Containers: []core.Container{
-			{
-				Name:  "c1",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Claims: []core.ResourceClaim{
-						{Name: "claim1"},
-					},
-				},
-			},
+func TestValidateExtraNodeAllocatableResources(t *testing.T) {
+	restartAlways := core.ContainerRestartPolicyAlways
+	spec := core.PodSpec{
+		InitContainers: []core.Container{
+			{Name: "sidecar", Image: "image", RestartPolicy: &restartAlways},
+			{Name: "init", Image: "image"},
 		},
-		ResourceClaims: []core.PodResourceClaim{
-			{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
+		Containers: []core.Container{
+			{Name: "c1", Image: "image"},
+			{Name: "c2", Image: "image"},
+		},
+		EphemeralContainers: []core.EphemeralContainer{
+			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image"}},
 		},
 	}
-	validPodSpec2 := core.PodSpec{
-		Containers: []core.Container{
-			{
-				Name:  "c1",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Claims: []core.ResourceClaim{
-						{Name: "claim1"},
-						{Name: "claim2"},
-					},
-				},
-			},
-		},
-		ResourceClaims: []core.PodResourceClaim{
-			{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
-			{Name: "claim2", ResourceClaimName: ptr.To("my-claim2")},
-		},
+	resources := func(namesAndQuantities ...string) core.ResourceList {
+		list := core.ResourceList{}
+		for i := 0; i < len(namesAndQuantities); i += 2 {
+			list[core.ResourceName(namesAndQuantities[i])] = resource.MustParse(namesAndQuantities[i+1])
+		}
+		return list
 	}
+	fldPath := field.NewPath("status", "extraNodeAllocatableResources")
 
-	testCases := []struct {
-		name        string
-		podStatus   core.PodStatus
-		spec        core.PodSpec
-		expectError bool
-		errorType   field.ErrorType
-		errorField  string
-		errorMsg    string
+	testCases := map[string]struct {
+		entries  []core.ExtraNodeAllocatableResource
+		wantErrs field.ErrorList
 	}{
-		{
-			name: "Valid NodeAllocatableResourceClaimStatus",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("1Gi"))},
-						},
-					},
-				},
+		"no entries": {},
+		"pod level entry only": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("cpu", "8", "memory", "2Gi"), Limits: resources("cpu", "8", "memory", "2Gi")},
 			},
-			expectError: false,
 		},
-		{
-			name: "Valid Multiple NodeAllocatableResourceClaimStatus",
-			spec: validPodSpec2,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						},
-					},
-					{
-						ResourceClaimName: "my-claim2",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceMemory, Quantity: new(resource.MustParse("2Gi"))},
-						},
-					},
+		"all node allocatable resource names": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{
+					Requests: resources("cpu", "1", "memory", "1Gi", "ephemeral-storage", "1Gi", "hugepages-2Mi", "4Mi"),
+					Limits:   resources("cpu", "1", "memory", "1Gi", "ephemeral-storage", "1Gi", "hugepages-2Mi", "4Mi"),
 				},
 			},
-			expectError: false,
 		},
-		{
-			name: "Invalid Resource Name",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: "example.com/foo", Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
+		"container entries of a device shared by two containers": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("cpu", "8", "memory", "2Gi"), Limits: resources("cpu", "8", "memory", "2Gi")},
+				{ContainerName: "c1", Requests: resources("memory", "512Mi"), Limits: resources("cpu", "8", "memory", "1536Mi")},
+				{ContainerName: "c2", Requests: resources("memory", "512Mi"), Limits: resources("cpu", "8", "memory", "1536Mi")},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].name",
-			errorMsg:    "must be a node allocatable resource name",
 		},
-		{
-			name: "Non-standard resource name",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: "abc", Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
+		"init container requests count at their peak": {
+			// The init container finishes before c1 starts: max(2Gi, 1Gi), not 3Gi.
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
+				{ContainerName: "init", Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
+				{ContainerName: "c1", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].name",
-			errorMsg:    "must be a node allocatable resource name",
 		},
-		{
-			name: "kubernetes.io prefixed resource name",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Overhead: []core.NodeAllocatableOverheadResources{
-							{Name: "kubernetes.io/foo", PerPod: new(resource.MustParse("1Gi"))},
-						},
-					},
-				},
+		"sidecar requests count with the init container started after it": {
+			// max(sidecar + init, sidecar + c1) = max(3Gi, 2Gi).
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("memory", "3Gi"), Limits: resources("memory", "3Gi")},
+				{ContainerName: "sidecar", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
+				{ContainerName: "init", Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
+				{ContainerName: "c1", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].name",
-			errorMsg:    "must be a node allocatable resource name",
 		},
-		{
-			name: "Ephemeral Storage resource name is rejected",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: "ephemeral-storage", Quantity: new(resource.MustParse("10Gi"))},
-						},
-					},
-				},
+		"aggregate container requests with a sidecar exceed the pod level requests": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("memory", "2Gi"), Limits: resources("memory", "3Gi")},
+				{ContainerName: "sidecar", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
+				{ContainerName: "init", Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].name",
-			errorMsg:    "must be a node allocatable resource name",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("requests").Key("memory"), "2Gi", "must be greater than or equal to the aggregate requests of the container entries (3Gi)"),
+			},
 		},
-		{
-			name: "Valid hugepages resource name",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-						},
-					},
-				},
+		"aggregate requests of regular containers exceed the pod level requests": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
+				{ContainerName: "c1", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
+				{ContainerName: "c2", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 			},
-			expectError: false,
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("requests").Key("memory"), "1Gi", "must be greater than or equal to the aggregate requests of the container entries (2Gi)"),
+			},
 		},
-		{
-			name: "Negative Quantity",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("-1"))},
-						},
-					},
-				},
+		"container requests for a resource that the pod level entry does not request": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi", "cpu", "1")},
+				{ContainerName: "c1", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].mapping[0].quantity",
-			errorMsg:    "must be non-negative",
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("requests").Key("cpu"), "0", "must be greater than or equal to the aggregate requests of the container entries (1)"),
+			},
 		},
-		{
-			name: "Valid NodeAllocatableResourceClaimStatus with empty containers",
-			spec: validPodSpec1,
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
+		"container limit exceeds the pod level limit": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("cpu", "8"), Limits: resources("cpu", "8")},
+				{ContainerName: "c1", Limits: resources("cpu", "9")},
 			},
-			expectError: false,
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(1).Child("limits").Key("cpu"), "9", "must be less than or equal to the limit of the entry with an empty containerName (8)"),
+			},
 		},
-
-		{
-			name: "Valid ResourceClaimName from PodSpec",
-			spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name:  "c1",
-						Image: "image",
-					},
-				},
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
-				},
+		"container limit for a resource that the pod level entry does not limit": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("cpu", "8"), Limits: resources("cpu", "8")},
+				{ContainerName: "c1", Limits: resources("memory", "1Gi")},
 			},
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
-			},
-			expectError: false,
 		},
-		{
-			name: "Valid ResourceClaimName from PodStatus",
-			spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name:  "c1",
-						Image: "image",
-					},
-				},
+		"container request exceeds its limit": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
+				{ContainerName: "c1", Requests: resources("memory", "2Gi"), Limits: resources("memory", "1Gi")},
 			},
-			podStatus: core.PodStatus{
-				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "claim1", ResourceClaimName: ptr.To("generated-claim1")},
-				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "generated-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(1).Child("requests").Key("memory"), "2Gi", "must be less than or equal to memory limit of 1Gi"),
 			},
-			expectError: false,
 		},
-		{
-			name: "Invalid ResourceClaimName not found",
-			spec: core.PodSpec{
-				Containers: []core.Container{
-					{
-						Name:  "c1",
-						Image: "image",
-					},
-				},
-				ResourceClaims: []core.PodResourceClaim{
-					{Name: "claim1", ResourceClaimName: ptr.To("my-claim1")},
-				},
+		"request for a resource that has no limit": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("cpu", "1", "memory", "1Gi"), Limits: resources("cpu", "1")},
 			},
-			podStatus: core.PodStatus{
-				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "claim2", ResourceClaimName: ptr.To("generated-claim2")},
-				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "non-existent-claim",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
-			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
-			errorMsg:    "not found in PodSpec.ResourceClaims or PodStatus.ResourceClaimStatuses",
 		},
-
-		{
-			name: "Invalid NodeAllocatableResourceClaimStatus overhead neither perPod nor perContainer set",
-			spec: core.PodSpec{
-				Containers:     []core.Container{{Name: "c1", Image: "image"}},
-				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+		"container entries without a pod level entry": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{ContainerName: "c1", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 			},
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Overhead: []core.NodeAllocatableOverheadResources{
-							{Name: core.ResourceMemory},
-						},
-					},
-				},
+			wantErrs: field.ErrorList{
+				field.Required(fldPath, "must have an entry with an empty containerName"),
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0]",
-			errorMsg:    "at least one of perPod or perContainer must be set",
 		},
-		{
-			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perPod",
-			spec: core.PodSpec{
-				Containers:     []core.Container{{Name: "c1", Image: "image"}},
-				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+		"unknown container": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
+				{ContainerName: "unknown", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 			},
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Overhead: []core.NodeAllocatableOverheadResources{
-							{Name: core.ResourceMemory, PerPod: new(resource.MustParse("-1Gi"))},
-						},
-					},
-				},
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(1).Child("containerName"), "unknown", "must be empty or match the name of an entry in `spec.initContainers` or `spec.containers`"),
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perPod",
-			errorMsg:    "must be non-negative",
 		},
-		{
-			name: "Invalid NodeAllocatableResourceClaimStatus overhead negative perContainer",
-			spec: core.PodSpec{
-				Containers:     []core.Container{{Name: "c1", Image: "image"}},
-				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+		"ephemeral container": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
+				{ContainerName: "debug", Requests: resources("cpu", "1"), Limits: resources("cpu", "1")},
 			},
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Overhead: []core.NodeAllocatableOverheadResources{
-							{Name: core.ResourceMemory, PerContainer: new(resource.MustParse("-500Mi"))},
-						},
-					},
-				},
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(1).Child("containerName"), "debug", "must be empty or match the name of an entry in `spec.initContainers` or `spec.containers`"),
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].perContainer",
-			errorMsg:    "must be non-negative",
 		},
-		{
-			name: "Valid NodeAllocatableResourceClaimStatus overhead both set",
-			spec: core.PodSpec{
-				Containers:     []core.Container{{Name: "c1", Image: "image"}},
-				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+		"resource that is not node allocatable": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("example.com/gpu", "1")},
 			},
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Overhead: []core.NodeAllocatableOverheadResources{
-							{
-								Name:         core.ResourceMemory,
-								PerPod:       new(resource.MustParse("1Gi")),
-								PerContainer: new(resource.MustParse("500Mi")),
-							},
-						},
-					},
-				},
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("requests").Key("example.com/gpu"), "example.com/gpu", "must be a node allocatable resource name"),
 			},
-			expectError: false,
 		},
-		{
-			name: "Invalid Resource Name in Overhead",
-			spec: core.PodSpec{
-				Containers:     []core.Container{{Name: "c1", Image: "image"}},
-				ResourceClaims: []core.PodResourceClaim{{Name: "claim1", ResourceClaimName: new("my-claim1")}},
+		"negative quantity": {
+			entries: []core.ExtraNodeAllocatableResource{
+				{Requests: resources("memory", "1Gi"), Limits: resources("memory", "-1Gi")},
 			},
-			podStatus: core.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "my-claim1",
-						Containers:        []string{"c1"},
-						Overhead: []core.NodeAllocatableOverheadResources{
-							{Name: "example.com/foo", PerPod: new(resource.MustParse("1Gi"))},
-						},
-					},
-				},
+			wantErrs: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("limits").Key("memory"), "-1Gi", isNegativeErrorMsg),
+				field.Invalid(fldPath.Index(0).Child("requests").Key("memory"), "1Gi", "must be less than or equal to memory limit of -1Gi"),
 			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].overhead[0].name",
-			errorMsg:    "must be a node allocatable resource name",
-		},
-		{
-			name: "Valid ResourceClaimName from ExtendedResourceClaimStatus",
-			spec: core.PodSpec{
-				Containers: []core.Container{
-					{Name: "c1", Image: "image"},
-				},
-			},
-			podStatus: core.PodStatus{
-				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
-					ResourceClaimName: "extended-claim1",
-				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "extended-claim1",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
-			},
-			expectError: false,
-		},
-		{
-			name: "Invalid ResourceClaimName not matching ExtendedResourceClaimStatus",
-			spec: core.PodSpec{
-				Containers: []core.Container{
-					{Name: "c1", Image: "image"},
-				},
-			},
-			podStatus: core.PodStatus{
-				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
-					ResourceClaimName: "extended-claim1",
-				},
-				NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "some-other-claim",
-						Containers:        []string{"c1"},
-						Mapping: []core.NodeAllocatableMappedResources{
-							{Name: core.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						},
-					},
-				},
-			},
-			expectError: true,
-			errorType:   field.ErrorTypeInvalid,
-			errorField:  "status.nodeAllocatableResourceClaimStatuses[0].resourceClaimName",
-			errorMsg:    "no mapping found in pod reference",
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			errs := validateNodeAllocatableResourceClaimStatus(tc.podStatus, &tc.spec, field.NewPath("status", "nodeAllocatableResourceClaimStatuses"))
-
-			if !tc.expectError {
-				if len(errs) != 0 {
-					t.Errorf("Unexpected errors: %v", errs)
-				}
-				return
-			}
-
-			if len(errs) == 0 {
-				t.Errorf("Expected errors, but got none")
-				return
-			}
-
-			found := false
-			for _, err := range errs {
-				if err.Type == tc.errorType && err.Field == tc.errorField {
-					found = true
-					break
-				}
-			}
-			if !found {
-				if tc.errorMsg != "" {
-					t.Errorf("Expected error [Type: %v, Field: %s, Message containing: %q], but got %v",
-						tc.errorType, tc.errorField, tc.errorMsg, errs)
-				} else {
-					t.Errorf("Expected error [Type: %v, Field: %s], but got %v",
-						tc.errorType, tc.errorField, errs)
-				}
-			}
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			status := core.PodStatus{ExtraNodeAllocatableResources: tc.entries}
+			errs := validateExtraNodeAllocatableResources(status, &spec, fldPath)
+			matcher.Test(t, tc.wantErrs, errs)
 		})
 	}
 }
@@ -30746,7 +30430,7 @@ func TestValidatePodResize(t *testing.T) {
 			err: "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 		{
-			test: "Resize allowed for pod with NodeAllocatableResourceClaimStatuses",
+			test: "Resize allowed for pod with ExtraNodeAllocatableResources",
 			old: func() *core.Pod {
 				p := podtest.MakePod("pod",
 					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
@@ -30757,15 +30441,9 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Mapping: []core.NodeAllocatableMappedResources{{
-							Name:     core.ResourceCPU,
-							Quantity: new(resource.MustParse("100m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -30779,15 +30457,9 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Mapping: []core.NodeAllocatableMappedResources{{
-							Name:     core.ResourceCPU,
-							Quantity: new(resource.MustParse("100m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -31369,15 +31041,9 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("200m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Mapping: []core.NodeAllocatableMappedResources{{
-							Name:     core.ResourceCPU,
-							Quantity: new(resource.MustParse("100m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -31391,15 +31057,9 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Requests: getResources("150m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Mapping: []core.NodeAllocatableMappedResources{{
-							Name:     core.ResourceCPU,
-							Quantity: new(resource.MustParse("100m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -31418,16 +31078,9 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("300m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Overhead: []core.NodeAllocatableOverheadResources{{
-							Name:         core.ResourceCPU,
-							PerPod:       new(resource.MustParse("50m")),
-							PerContainer: new(resource.MustParse("50m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -31441,16 +31094,9 @@ func TestValidatePodResize(t *testing.T) {
 						}))),
 					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("250m", "200Mi", "", "")}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Overhead: []core.NodeAllocatableOverheadResources{{
-							Name:         core.ResourceCPU,
-							PerPod:       new(resource.MustParse("50m")),
-							PerContainer: new(resource.MustParse("50m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -31473,16 +31119,9 @@ func TestValidatePodResize(t *testing.T) {
 						Limits:   getResources("300m", "400Mi", "", ""),
 					}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Overhead: []core.NodeAllocatableOverheadResources{{
-							Name:         core.ResourceCPU,
-							PerPod:       new(resource.MustParse("50m")),
-							PerContainer: new(resource.MustParse("50m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -31500,16 +31139,9 @@ func TestValidatePodResize(t *testing.T) {
 						Limits:   getResources("400m", "400Mi", "", ""),
 					}),
 				)
-				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
-					{
-						ResourceClaimName: "node-allocatable-claim-1",
-						Containers:        []string{"container"},
-						Overhead: []core.NodeAllocatableOverheadResources{{
-							Name:         core.ResourceCPU,
-							PerPod:       new(resource.MustParse("50m")),
-							PerContainer: new(resource.MustParse("50m")),
-						}},
-					},
+				p.Status.ExtraNodeAllocatableResources = []core.ExtraNodeAllocatableResource{
+					{Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
+					{ContainerName: "container", Requests: getResources("100m", "", "", ""), Limits: getResources("100m", "", "", "")},
 				}
 				return p
 			}(),
@@ -34256,11 +33888,10 @@ func TestValidatePodDynamicUpdateDRACoverage(t *testing.T) {
 			Phase:             core.PodRunning,
 			Conditions:        []core.PodCondition{{Type: core.PodInitialized, Status: core.ConditionTrue}},
 			ContainerStatuses: []core.ContainerStatus{{Name: "c1", State: core.ContainerState{Running: &core.ContainerStateRunning{}}, Resources: &core.ResourceRequirements{}}},
-			NodeAllocatableResourceClaimStatuses: []core.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim",
-				Containers:        []string{"c1"},
-				Mapping:           []core.NodeAllocatableMappedResources{{Name: core.ResourceCPU, Quantity: new(resource.MustParse("800m"))}},
-			}},
+			ExtraNodeAllocatableResources: []core.ExtraNodeAllocatableResource{
+				{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("800m")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("800m")}},
+				{ContainerName: "c1", Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("800m")}},
+			},
 		}),
 	)
 	oldPod.Spec.ResourceClaims = []core.PodResourceClaim{{Name: "claim", ResourceClaimName: new("claim")}}
