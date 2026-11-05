@@ -427,7 +427,7 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 
 		// For resources specified at pod level, check if container and DRA aggregates do not exceed pod level budget.
 		for resName, podLevelReq := range pod.Spec.Resources.Requests {
-			if !resourcehelper.IsSupportedPodLevelResource(resName) {
+			if !pl.isSupportedPodLevelResource(resName) {
 				continue
 			}
 			val, ok := requestWithoutPodLevel[resName]
@@ -475,6 +475,9 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 				if v1helper.IsHugePageResourceName(resourceName) {
 					continue
 				}
+				if !pl.isSupportedPodLevelResource(resourceName) {
+					continue
+				}
 
 				// Skip if the pod-level limit of the resource is not set.
 				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
@@ -491,9 +494,35 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 				}
 			}
 		}
+
+		// Init container ephemeral-storage limits are also validated against the pod-level
+		// ephemeral-storage limit to stay consistent with API validation.
+		if pl.fts.EnablePodLevelResourcesEphemeralStorage {
+			if podLevelResLimit, exists := pod.Spec.Resources.Limits[v1.ResourceEphemeralStorage]; exists {
+				for _, ctr := range pod.Spec.InitContainers {
+					ctrLimit, hasCtrLimit := ctr.Resources.Limits[v1.ResourceEphemeralStorage]
+					if !hasCtrLimit {
+						continue
+					}
+					draResAllocation := resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)[v1.ResourceEphemeralStorage]
+					effectiveLimit := ctrLimit
+					effectiveLimit.Add(draResAllocation)
+					if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+						return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for init container %s", v1.ResourceEphemeralStorage, ctr.Name))
+					}
+				}
+			}
+		}
 	}
 
 	return nil
+}
+
+func (pl *DynamicResources) isSupportedPodLevelResource(name v1.ResourceName) bool {
+	if name == v1.ResourceEphemeralStorage && !pl.fts.EnablePodLevelResourcesEphemeralStorage {
+		return false
+	}
+	return resourcehelper.IsSupportedPodLevelResource(name)
 }
 
 // getPodNodeAllocatableResourceFootprint determines the total nodeAllocatable resource demand of a pod.
@@ -529,6 +558,7 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 	// Calculate the final totalPodDemand to be used for node fitting
 	optsTotal := resourcehelper.PodResourcesOptions{
 		SkipPodLevelResources:                    !pl.fts.EnablePodLevelResources,
+		PodLevelResourcesEphemeralStorageEnabled: pl.fts.EnablePodLevelResourcesEphemeralStorage,
 		UseDRANodeAllocatableResourceClaimStatus: true,
 	}
 	// Perform shallow copy - we only use the resource information from container and pod spec to calculatate the resource foot print.

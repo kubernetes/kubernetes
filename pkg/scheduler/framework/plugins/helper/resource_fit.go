@@ -31,6 +31,7 @@ import (
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
 type ResourceRequestsOptions struct {
 	EnablePodLevelResources                            bool
+	EnablePodLevelResourcesEphemeralStorage            bool
 	EnableDRAExtendedResource                          bool
 	EnableDRANodeAllocatableResources                  bool
 	EnableInPlacePodVerticalScalingSchedulerPreemption bool
@@ -92,6 +93,7 @@ func ComputePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) framew
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
+		PodLevelResourcesEphemeralStorageEnabled: opts.EnablePodLevelResourcesEphemeralStorage,
 		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
 	})
 	var result framework.Resource
