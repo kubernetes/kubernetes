@@ -46,7 +46,7 @@ func (s *intSet) reset() {
 // increment adds one to the refcount of the specified id.
 // it is not thread-safe.
 func (s *intSet) increment(i int) {
-	s.members[i]++
+	s.add(i, 1)
 }
 
 // decrement removes one from the refcount of the specified id,
@@ -54,9 +54,16 @@ func (s *intSet) increment(i int) {
 // it will not track refcounts lower than zero.
 // it is not thread-safe.
 func (s *intSet) decrement(i int) {
-	if s.members[i] <= 1 {
+	s.add(i, -1)
+}
+
+// add adjusts the refcount of the specified id by delta,
+// and removes the id if the resulting refcount is <= 0.
+// it is not thread-safe.
+func (s *intSet) add(i, delta int) {
+	if s.members[i]+delta <= 0 {
 		delete(s.members, i)
 	} else {
-		s.members[i]--
+		s.members[i] += delta
 	}
 }
