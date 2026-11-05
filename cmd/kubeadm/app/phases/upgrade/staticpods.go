@@ -282,6 +282,44 @@ func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter a
 	return nil
 }
 
+// CheckEtcdDowngrade returns an error if the upgrade would skip etcd because the installed etcd is newer
+// than the desired version, or if the two versions cannot be determined. The bool marks the latter as
+// fatal: a skip lets the upgrade go on without etcd.
+func CheckEtcdDowngrade(cfg *kubeadmapi.InitConfiguration, manifestDir string) (bool, error) {
+	var desiredEtcdVersion *version.Version
+	var err error
+	if cfg.Etcd.Local.ImageTag != "" {
+		desiredEtcdVersion, err = version.ParseSemantic(
+			convertImageTagMetadataToSemver(cfg.Etcd.Local.ImageTag))
+		if err != nil {
+			return true, errors.Wrapf(err, "failed to parse tag %q as a semantic version", cfg.Etcd.Local.ImageTag)
+		}
+	} else {
+		var warning error
+		desiredEtcdVersion, warning, err = constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
+		if err != nil {
+			return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
+		}
+		if warning != nil {
+			klog.V(1).Infof("[upgrade/etcd] WARNING: %v", warning)
+		}
+	}
+
+	currentEtcdVersionStr, err := GetEtcdImageTagFromStaticPod(manifestDir)
+	if err != nil {
+		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
+	}
+
+	cmpResult, err := desiredEtcdVersion.Compare(currentEtcdVersionStr)
+	if err != nil {
+		return true, errors.Wrapf(err, "failed comparing the current etcd version %q to the desired one %q", currentEtcdVersionStr, desiredEtcdVersion)
+	}
+	if cmpResult < 0 {
+		return false, errors.Errorf("the desired etcd version %q is older than the currently installed %q. Skipping etcd upgrade", desiredEtcdVersion, currentEtcdVersionStr)
+	}
+	return false, nil
+}
+
 // performEtcdStaticPodUpgrade performs upgrade of etcd, it returns bool which indicates fatal error or not and the actual error.
 func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientset.Interface, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
 	// Add etcd static pod spec only if external etcd is not configured
@@ -324,39 +362,8 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		return true, errors.Wrapf(err, "failed to back up etcd data after %d attempts", attempt)
 	}
 
-	// Get the desired etcd version. That's either the one specified by the user in cfg.Etcd.Local.ImageTag
-	// or the kubeadm preferred one for the desired Kubernetes version
-	var desiredEtcdVersion *version.Version
-	if cfg.Etcd.Local.ImageTag != "" {
-		desiredEtcdVersion, err = version.ParseSemantic(
-			convertImageTagMetadataToSemver(cfg.Etcd.Local.ImageTag))
-		if err != nil {
-			return true, errors.Wrapf(err, "failed to parse tag %q as a semantic version", cfg.Etcd.Local.ImageTag)
-		}
-	} else {
-		// Need to check currently used version and version from constants, if differs then upgrade
-		var warning error
-		desiredEtcdVersion, warning, err = constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
-		if err != nil {
-			return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
-		}
-		if warning != nil {
-			klog.V(1).Infof("[upgrade/etcd] WARNING: %v", warning)
-		}
-	}
-
-	// Get the etcd version of the local/stacked etcd member running on the current machine
-	currentEtcdVersionStr, err := GetEtcdImageTagFromStaticPod(pathMgr.RealManifestDir())
-	if err != nil {
-		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
-	}
-
-	cmpResult, err := desiredEtcdVersion.Compare(currentEtcdVersionStr)
-	if err != nil {
-		return true, errors.Wrapf(err, "failed comparing the current etcd version %q to the desired one %q", currentEtcdVersionStr, desiredEtcdVersion)
-	}
-	if cmpResult < 0 {
-		return false, errors.Errorf("the desired etcd version %q is older than the currently installed %q. Skipping etcd upgrade", desiredEtcdVersion, currentEtcdVersionStr)
+	if fatal, err := CheckEtcdDowngrade(cfg, pathMgr.RealManifestDir()); err != nil {
+		return fatal, err
 	}
 
 	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeRegistration.Name, constants.Etcd)
@@ -678,13 +685,29 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
-func DryRunStaticPodUpgrade(patchesDir string, internalcfg *kubeadmapi.InitConfiguration) error {
+func DryRunStaticPodUpgrade(patchesDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) error {
 	dryRunManifestDir, err := constants.GetDryRunDir(constants.EnvVarUpgradeDryRunDir, "kubeadm-upgrade-dryrun", klog.Warningf)
 	if err != nil {
 		return err
 	}
 
 	defer os.RemoveAll(dryRunManifestDir)
+	// etcd upgrade is done prior to other control plane components; the etcd phase prints the manifest in dry-run mode
+	if internalcfg.Etcd.Local != nil && etcdUpgrade {
+		fatal, err := CheckEtcdDowngrade(internalcfg, constants.GetStaticPodDirectory())
+		if errors.Is(err, os.ErrNotExist) {
+			// A dry run without a cluster has no etcd manifest to compare against.
+			fatal, err = false, nil
+		}
+		if fatal {
+			return err
+		}
+		if err != nil {
+			fmt.Printf("[dryrun] %v\n", err)
+		} else if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(dryRunManifestDir, patchesDir, internalcfg.NodeRegistration.Name, &internalcfg.ClusterConfiguration, &internalcfg.LocalAPIEndpoint, true /* isDryRun */); err != nil {
+			return err
+		}
+	}
 	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, patchesDir, internalcfg, true /* isDryRun */); err != nil {
 		return err
 	}

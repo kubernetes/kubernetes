@@ -17,15 +17,17 @@ limitations under the License.
 package upgrade
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"os"
+	"strings"
 	"testing"
 
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
@@ -50,6 +52,38 @@ func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, log
 			KubernetesVersion: "v1.0.1",
 		},
 	}, nil
+}
+
+func fakeFetchInitConfigWithLocalEtcd(client clientset.Interface, printer output.Printer, logPrefix string, getNodeRegistration, getAPIEndpoint, getComponentConfigs, shortConfigMapGet bool) (*kubeadmapi.InitConfiguration, error) {
+	return &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			KubernetesVersion: "v1.0.1",
+			Etcd: kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{
+					ImageMeta: kubeadmapi.ImageMeta{ImageTag: "3.5.0-0"},
+					DataDir:   "/var/lib/etcd",
+				},
+			},
+		},
+	}, nil
+}
+
+func createTestRunDiffEtcdManifest(t *testing.T, imageTag string) string {
+	manifest := fmt.Sprintf(`apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - name: etcd
+    image: registry.k8s.io/etcd:%s
+`, imageTag)
+	path := constants.GetStaticPodFilepath(constants.Etcd, t.TempDir())
+	if err := os.WriteFile(path, []byte(manifest), 0644); err != nil {
+		t.Fatalf("failed to write test etcd manifest: %v", err)
+	}
+	return path
 }
 
 func TestRunDiff(t *testing.T) {
@@ -80,18 +114,25 @@ diff:
 	//nolint:errcheck
 	defer os.Remove(kubeConfigPath)
 
+	noVersionEtcdManifest := createTestRunDiffEtcdManifest(t, "latest")
+	// etcd manifests on either side of the desired tag of fakeFetchInitConfigWithLocalEtcd
+	olderEtcdManifest := createTestRunDiffEtcdManifest(t, "3.4.0-0")
+	newerEtcdManifest := createTestRunDiffEtcdManifest(t, "3.6.0-0")
+
 	flags := &diffFlags{
 		cfgPath: "",
-		out:     io.Discard,
 	}
 
 	testCases := []struct {
-		name            string
-		args            []string
-		setManifestPath bool
-		manifestPath    string
-		cfgPath         string
-		expectedError   bool
+		name             string
+		args             []string
+		setManifestPath  bool
+		manifestPath     string
+		etcdManifestPath string
+		fetchInitConfig  FetchInitConfigurationFunc
+		cfgPath          string
+		expectedError    bool
+		expectedEtcdDiff bool
 	}{
 		{
 			name:            "valid: run diff with empty config path on valid manifest path",
@@ -99,6 +140,44 @@ diff:
 			setManifestPath: true,
 			manifestPath:    testUpgradeDiffManifest,
 			expectedError:   false,
+		},
+		{
+			name:             "valid: run diff with local etcd on valid manifest paths",
+			cfgPath:          testUpgradeDiffConfig,
+			setManifestPath:  true,
+			manifestPath:     testUpgradeDiffManifest,
+			etcdManifestPath: olderEtcdManifest,
+			fetchInitConfig:  fakeFetchInitConfigWithLocalEtcd,
+			expectedError:    false,
+			expectedEtcdDiff: true,
+		},
+		{
+			name:             "valid: local etcd newer than the desired version is left out of the diff",
+			cfgPath:          testUpgradeDiffConfig,
+			setManifestPath:  true,
+			manifestPath:     testUpgradeDiffManifest,
+			etcdManifestPath: newerEtcdManifest,
+			fetchInitConfig:  fakeFetchInitConfigWithLocalEtcd,
+			expectedError:    false,
+			expectedEtcdDiff: false,
+		},
+		{
+			name:             "invalid: local etcd manifest without a version in its image tag",
+			cfgPath:          testUpgradeDiffConfig,
+			setManifestPath:  true,
+			manifestPath:     testUpgradeDiffManifest,
+			etcdManifestPath: noVersionEtcdManifest,
+			fetchInitConfig:  fakeFetchInitConfigWithLocalEtcd,
+			expectedError:    true,
+		},
+		{
+			name:             "invalid: local etcd but bad etcd manifest path",
+			cfgPath:          testUpgradeDiffConfig,
+			setManifestPath:  true,
+			manifestPath:     testUpgradeDiffManifest,
+			etcdManifestPath: "bad-path",
+			fetchInitConfig:  fakeFetchInitConfigWithLocalEtcd,
+			expectedError:    true,
 		},
 		{
 			name:            "valid: run diff on valid manifest path",
@@ -137,8 +216,18 @@ diff:
 				flags.controllerManagerManifestPath = tc.manifestPath
 				flags.schedulerManifestPath = tc.manifestPath
 			}
-			if err := runDiff(cmd.Flags(), flags, tc.args, fakeFetchInitConfig); (err != nil) != tc.expectedError {
+			flags.etcdManifestPath = tc.etcdManifestPath
+			out := &bytes.Buffer{}
+			flags.out = out
+			fetchInitConfig := tc.fetchInitConfig
+			if fetchInitConfig == nil {
+				fetchInitConfig = fakeFetchInitConfig
+			}
+			if err := runDiff(cmd.Flags(), flags, tc.args, fetchInitConfig); (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, saw: %v, error: %v", tc.expectedError, (err != nil), err)
+			}
+			if etcdDiff := strings.Contains(out.String(), "--- "+tc.etcdManifestPath+"\n"); etcdDiff != tc.expectedEtcdDiff {
+				t.Fatalf("expected etcd manifest in the diff: %v, saw: %v, output:\n%s", tc.expectedEtcdDiff, etcdDiff, out.String())
 			}
 		})
 	}
