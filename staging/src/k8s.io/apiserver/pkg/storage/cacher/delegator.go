@@ -70,7 +70,7 @@ func (c *CacheDelegator) Create(ctx context.Context, key string, obj, out runtim
 }
 
 func (c *CacheDelegator) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
-	return c.storage.GetCurrentResourceVersion(ctx)
+	return c.cacher.GetCurrentResourceVersion(ctx)
 }
 
 func (c *CacheDelegator) EnableResourceSizeEstimation(keys storage.KeysFunc) error {
