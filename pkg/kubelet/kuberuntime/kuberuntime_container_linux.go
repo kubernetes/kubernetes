@@ -52,6 +52,11 @@ import (
 
 var defaultPageSize = int64(os.Getpagesize())
 
+// resizePodInPlacePlatform delegates resize actuation to the Linux cgroup path.
+func (m *kubeGenericRuntimeManager) resizePodInPlacePlatform(_ context.Context, _ *v1.Pod, _ *kubecontainer.PodStatus, _ podActions) (bool, error) {
+	return false, nil
+}
+
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx context.Context, config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
 	enforceMemoryQoS := false

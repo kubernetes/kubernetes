@@ -19,6 +19,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,8 +28,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
@@ -231,5 +237,78 @@ func TestCalculateWindowsResources(t *testing.T) {
 	for _, test := range tests {
 		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(tCtx, &test.cpuLim, &test.memLim)
 		assert.Equal(t, test.expected, windowsContainerResources)
+	}
+}
+
+func TestResizePodInPlacePlatformWindows(t *testing.T) {
+	newPod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "resize-pod", Name: "resize-pod", Namespace: "default"},
+			Spec: v1.PodSpec{Containers: []v1.Container{{
+				Name: "app",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("192Mi")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("256Mi")},
+				},
+			}}},
+		}
+	}
+	usage := uint64(220 * 1024 * 1024)
+	tests := []struct {
+		name       string
+		currentMi  int64
+		desiredMi  int64
+		wantErr    string
+		wantUpdate bool
+	}{
+		{name: "memory increase is applied", currentMi: 128, desiredMi: 256, wantUpdate: true},
+		{name: "memory decrease below usage is rejected", currentMi: 256, desiredMi: 200, wantErr: "current usage is 230686720", wantUpdate: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			helper := &containertest.FakeRuntimeHelper{PodStats: map[types.UID]*statsapi.PodStats{
+				"resize-pod": {Containers: []statsapi.ContainerStats{{Name: "app", Memory: &statsapi.MemoryStats{UsageBytes: &usage}}}},
+			}}
+			m.runtimeHelper = helper
+			pod := newPod()
+			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(tt.desiredMi*1024*1024, resource.BinarySI)
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(tt.desiredMi*1024*1024, resource.BinarySI)
+			_, containers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+			require.Len(t, containers, 1)
+			var containerID kubecontainer.ContainerID
+			for id := range fakeRuntime.Containers {
+				containerID = kubecontainer.ContainerID{Type: "testRuntime", ID: id}
+				break
+			}
+			require.NotEmpty(t, containerID.ID)
+			fakeRuntime.Called = []string{}
+
+			handled, err := m.resizePodInPlacePlatform(tCtx, pod, &kubecontainer.PodStatus{}, podActions{ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+				v1.ResourceMemory: {{
+					container:                 &pod.Spec.Containers[0],
+					kubeContainerID:           containerID,
+					containerType:             podutil.Containers,
+					currentContainerResources: &resourceRequirements{memoryLimit: tt.currentMi * 1024 * 1024, memoryRequest: tt.currentMi * 1024 * 1024},
+					desiredContainerResources: resourceRequirements{memoryLimit: tt.desiredMi * 1024 * 1024, memoryRequest: tt.desiredMi * 1024 * 1024},
+				}},
+			}})
+			require.True(t, handled)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantUpdate, slices.Contains(fakeRuntime.Called, "UpdateContainerResources"))
+			if tt.wantUpdate {
+				c, ok := fakeRuntime.Containers[containerID.ID]
+				require.True(t, ok)
+				require.NotNil(t, c.Resources)
+				require.NotNil(t, c.Resources.Windows)
+				assert.Equal(t, tt.desiredMi*1024*1024, c.Resources.Windows.MemoryLimitInBytes)
+			}
+		})
 	}
 }

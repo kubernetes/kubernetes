@@ -20,6 +20,7 @@ package kuberuntime
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -53,6 +55,47 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(ctx context.Conte
 // generateUpdatePodSandboxResourcesRequest generates platform specific podsandox resources config for runtime
 func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
 	return nil
+}
+
+// resizePodInPlacePlatform applies a resize without Linux cgroup accounting on Windows.
+func (m *kubeGenericRuntimeManager) resizePodInPlacePlatform(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podContainerChanges podActions) (bool, error) {
+	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) == 0 &&
+		len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) == 0 {
+		return true, nil
+	}
+
+	usage, err := m.runtimeHelper.PodCPUAndMemoryStats(ctx, pod, podStatus)
+	if err != nil {
+		return true, fmt.Errorf("unable to read memory usage for pod %q: %w", format.Pod(pod), err)
+	}
+	for _, cUpdate := range podContainerChanges.ContainersToUpdate[v1.ResourceMemory] {
+		if cUpdate.currentContainerResources == nil || cUpdate.desiredContainerResources.memoryLimit >= cUpdate.currentContainerResources.memoryLimit {
+			continue
+		}
+		var currentUsage uint64
+		found := false
+		for _, cStats := range usage.Containers {
+			if cStats.Name == cUpdate.container.Name && cStats.Memory != nil && cStats.Memory.UsageBytes != nil {
+				currentUsage = *cStats.Memory.UsageBytes
+				found = true
+				break
+			}
+		}
+		if !found {
+			return true, fmt.Errorf("missing container %q memory usage", cUpdate.container.Name)
+		}
+		if currentUsage >= uint64(cUpdate.desiredContainerResources.memoryLimit) {
+			return true, fmt.Errorf("cannot decrease memory limit of container %q to %d: current usage is %d", cUpdate.container.Name, cUpdate.desiredContainerResources.memoryLimit, currentUsage)
+		}
+	}
+
+	if err := m.updatePodContainerResources(ctx, pod, v1.ResourceMemory, podContainerChanges.ContainersToUpdate[v1.ResourceMemory]); err != nil {
+		return true, err
+	}
+	if err := m.updatePodContainerResources(ctx, pod, v1.ResourceCPU, podContainerChanges.ContainersToUpdate[v1.ResourceCPU]); err != nil {
+		return true, err
+	}
+	return true, nil
 }
 
 // generateWindowsContainerResources generates windows container resources config for runtime

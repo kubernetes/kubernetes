@@ -18,10 +18,20 @@ limitations under the License.
 
 package allocation
 
-import v1 "k8s.io/api/core/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+)
 
 func IsInPlacePodVerticalScalingAllowed(_ *v1.Pod) (allowed bool, msg, reason string) {
-	return false, "In-place pod resize is not supported on Windows", "windows"
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return false, "InPlacePodVerticalScaling is disabled", "feature_gate_off"
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsInPlacePodResize) {
+		return false, "WindowsInPlacePodResize is disabled", "windows_gate_off"
+	}
+	return true, "", ""
 }
 
 func IsInPlacePodLevelResourcesVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
