@@ -763,16 +763,9 @@ func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	return limits
 }
 
-// isSupportedPodLevelResource checks if a given resource is supported by pod-level
-// resource management through the PodLevelResources feature. Returns true if
-// the resource is supported.
-//
-// This delegates to the canonical implementation in component-helpers instead of
-// keeping a local copy. The predicate only needs a resource name, so the conversion
-// of v1.Pod to api.Pod that motivated the other duplicated helpers in this file does
-// not apply here. A local copy previously omitted hugepages, which made podRequests
-// and podLimits fall back to the aggregated container values and silently skip
-// pod-level LimitRange enforcement for hugepages.
+// isSupportedPodLevelResource reports whether name is managed by pod-level
+// resources. It delegates to component-helpers; the predicate only needs a
+// resource name, so no v1/core conversion is required.
 func isSupportedPodLevelResource(name api.ResourceName) bool {
 	return resourcehelper.IsSupportedPodLevelResource(corev1.ResourceName(name))
 }
