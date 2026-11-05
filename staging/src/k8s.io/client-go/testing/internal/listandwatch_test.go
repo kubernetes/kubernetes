@@ -116,20 +116,33 @@ func testListAndWatch(t *testing.T) {
 		t.Fatalf("Unexpected error creating ConfigMap: %v", err)
 	}
 	logger.Info("Created second ConfigMap")
+
+	cm.Data = map[string]string{"k": "v"}
+	_, err = client.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error updating ConfigMap: %v", err)
+	}
+	logger.Info("Updated second ConfigMap")
+
+	err = client.CoreV1().ConfigMaps("default").Delete(ctx, "cm1", metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error deleting ConfigMap: %v", err)
+	}
+	logger.Info("Deleted first ConfigMap")
 	close(createDone)
 
 	// Wait for watch setup and event processing.
 	synctest.Wait()
 
 	objs = configMapStore.List()
-	if len(objs) != 2 {
-		t.Errorf("Unexpected item(s) in informer cache, want 2, got %d = %v", len(objs), objs)
+	if len(objs) != 1 || objs[0].(*v1.ConfigMap).Name != "cm2" {
+		t.Errorf("Unexpected item(s) in informer cache, want [cm2], got %d = %v", len(objs), objs)
 	}
 
 	if !handle.HasSynced() {
 		t.Error("Expected event handler to have synced, it didn't")
 	}
-	if adds != 2 || updates != 0 || deletes != 0 {
-		t.Errorf("Expected two new objects, got adds/updates/deletes %d/%d/%d", adds, updates, deletes)
+	if adds != 2 || updates != 1 || deletes != 1 {
+		t.Errorf("Expected adds/updates/deletes 2/1/1, got %d/%d/%d", adds, updates, deletes)
 	}
 }

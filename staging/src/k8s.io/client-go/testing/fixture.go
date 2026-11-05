@@ -320,6 +320,7 @@ type tracker struct {
 	// also tracked by GroupVersionResource instead of GroupVersion, so the
 	// same is done here to match how List is implemented.
 	resourceVersions map[schema.GroupVersionResource]int64
+	events           map[schema.GroupVersionResource][]versionedEvent
 }
 
 // versionedObject stores an object together with the resource version that was
@@ -331,6 +332,12 @@ type versionedObject struct {
 	// is the initial value for an empty set of objects.
 	resourceVersion int64
 	runtime.Object
+}
+
+type versionedEvent struct {
+	resourceVersion int64
+	namespace       string
+	event           watch.Event
 }
 
 var _ ObjectTracker = &tracker{}
@@ -353,7 +360,16 @@ func NewObjectTrackerWithLogger(logger klog.Logger, scheme ObjectScheme, decoder
 		objects:          make(map[schema.GroupVersionResource]map[types.NamespacedName]versionedObject),
 		watchers:         make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 		resourceVersions: make(map[schema.GroupVersionResource]int64),
+		events:           make(map[schema.GroupVersionResource][]versionedEvent),
 	}
+}
+
+func (t *tracker) recordEventLocked(gvr schema.GroupVersionResource, ns string, resourceVersion int64, action watch.EventType, obj runtime.Object) {
+	t.events[gvr] = append(t.events[gvr], versionedEvent{
+		resourceVersion: resourceVersion,
+		namespace:       ns,
+		event:           watch.Event{Type: action, Object: obj.DeepCopyObject()},
+	})
 }
 
 func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, opts ...metav1.ListOptions) (runtime.Object, error) {
@@ -451,6 +467,14 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	// Deliver all objects that match the list options, for example
 	// between the initial List and the following Watch.
 	if addExisting {
+		if addFromRV > 0 {
+			for _, ev := range t.events[gvr] {
+				if addFromRV < ev.resourceVersion && (ns == "" || ev.namespace == ns) {
+					fakewatcher.Action(ev.event.Type, ev.event.Object.DeepCopyObject())
+				}
+			}
+			return fakewatcher, nil
+		}
 		objs := t.objects[gvr]
 		matchingObjs, err := filterByNamespace(objs, ns)
 		if err != nil {
@@ -675,6 +699,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		if replaceExisting {
 			t.resourceVersions[gvr] = resourceVersion
 			t.objects[gvr][namespacedName] = versionedObject{resourceVersion, obj}
+			t.recordEventLocked(gvr, ns, resourceVersion, watch.Modified, obj)
 
 			for _, w := range t.getWatches(gvr, ns) {
 				// To avoid the object from being accidentally modified by watcher
@@ -692,6 +717,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 
 	t.resourceVersions[gvr] = resourceVersion
 	t.objects[gvr][namespacedName] = versionedObject{resourceVersion, obj}
+	t.recordEventLocked(gvr, ns, resourceVersion, watch.Added, obj)
 
 	for _, w := range t.getWatches(gvr, ns) {
 		// To avoid the object from being accidentally modified by watcher
@@ -737,6 +763,9 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string, opts 
 		return apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
+	resourceVersion := max(t.resourceVersions[gvr], 1) + 1
+	t.resourceVersions[gvr] = resourceVersion
+	t.recordEventLocked(gvr, ns, resourceVersion, watch.Deleted, obj.Object)
 	delete(objs, namespacedName)
 	for _, w := range t.getWatches(gvr, ns) {
 		w.Delete(obj.DeepCopyObject())
