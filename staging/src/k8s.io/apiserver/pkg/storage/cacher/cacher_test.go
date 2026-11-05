@@ -115,10 +115,15 @@ func TestCreateWithKeyExist(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	t.Parallel()
-	ctx, cacher, server, terminate := SetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGet(ctx, t, cacher, IncreaseRVFunc(server.V3Client.Client))
+	for _, consistentGetFromCache := range []bool{true, false} {
+		t.Run(fmt.Sprintf("ConsistentGetFromCache=%v", consistentGetFromCache), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, consistentGetFromCache)
+			ForceRequestWatchProgressSupport(t)
+			ctx, cacher, server, terminate := SetupWithEtcdServer(t)
+			t.Cleanup(terminate)
+			storagetesting.RunTestGet(ctx, t, cacher, IncreaseRVFunc(server.V3Client.Client))
+		})
+	}
 }
 
 func TestDeleteOnce(t *testing.T) {
@@ -496,6 +501,10 @@ func (t *swappablePrefixTransformer) TransformToStorage(ctx context.Context, dat
 type cacherWithPrefixTransformer struct {
 	*CacheDelegator
 	transformer *swappablePrefixTransformer
+}
+
+func (c *cacherWithPrefixTransformer) UnderlyingStorage() storage.Interface {
+	return c.storage
 }
 
 func (c *cacherWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetesting.PrefixTransformerModifier) func() {
