@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -156,5 +157,48 @@ func TestValidateCustom_SecurityProfileOCIBase_LocalhostProfile(t *testing.T) {
 		if errs := ValidateCustom_SecurityProfileOCIBase_LocalhostProfile(context.Background(), operation.Operation{}, field.NewPath("localhostProfile"), value, nil); len(errs) != 0 {
 			t.Errorf("expected no errors for %v: %v", value, errs)
 		}
+	}
+}
+
+// TestSecurityProfileOCILengthGuards pins the length guards of the custom
+// validators to the +k8s:maxLength tags of the fields: a value of max
+// characters that fails the format check must get exactly that error, and one
+// character more must get only the too long error, so the guard let the first
+// value through and skipped the second. Multibyte characters show that both the
+// guard and the tag count characters, not bytes.
+func TestSecurityProfileOCILengthGuards(t *testing.T) {
+	ctx := context.Background()
+	op := operation.Operation{Type: operation.Create}
+	tests := []struct {
+		name string
+		max  int
+		// prefix makes the value fail the format check.
+		prefix   string
+		validate func(value string) field.ErrorList
+	}{{
+		name: "ref",
+		max:  securityProfileOCIRefMaxLength,
+		validate: func(value string) field.ErrorList {
+			return Validate_SecurityProfileOCI(ctx, op, field.NewPath("oci"), &corev1.SecurityProfileOCI{Ref: value}, nil)
+		},
+	}, {
+		name:   "baseProfile.localhostProfile",
+		max:    securityProfileOCIBaseLocalhostProfileMaxLength,
+		prefix: "/",
+		validate: func(value string) field.ErrorList {
+			base := &corev1.SecurityProfileOCIBase{Type: corev1.SecurityProfileOCIBaseTypeLocalhost, LocalhostProfile: &value}
+			return Validate_SecurityProfileOCIBase(ctx, op, field.NewPath("baseProfile"), base, nil)
+		},
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			atMax := tc.prefix + strings.Repeat("ä", tc.max-len(tc.prefix))
+			if errs := tc.validate(atMax); len(errs) != 1 || errs[0].Type != field.ErrorTypeInvalid {
+				t.Errorf("expected one invalid error for %d characters, got %v", tc.max, errs)
+			}
+			if errs := tc.validate(atMax + "ä"); len(errs) != 1 || errs[0].Type != field.ErrorTypeTooLong {
+				t.Errorf("expected one too long error for %d characters, got %v", tc.max+1, errs)
+			}
+		})
 	}
 }
