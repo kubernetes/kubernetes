@@ -107,6 +107,11 @@ type stateData struct {
 	// and PreBind must patch the field: with the entries of this attempt, or by clearing it.
 	staleExtraNodeAllocatableResources bool
 
+	// preemption holds the PreFilter snapshot used to simulate pod removal
+	// during preemption (KEP-5690). Nil unless DRAPreemption is enabled and
+	// the pod has claims.
+	preemption *preemptionData
+
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
 
@@ -138,6 +143,9 @@ type stateData struct {
 	nodeAllocatableSlices map[string][]*draapi.ResourceSlice
 }
 
+// Clone returns d without copying, so all CycleState clones share one
+// stateData. Mutable per-clone state lives in a separate CycleState entry,
+// preemptionSimulationState in preemption.go.
 func (d *stateData) Clone() fwk.StateData {
 	return d
 }
@@ -807,6 +815,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 	}
 
+	var allocatedState *structured.AllocatedState
 	if numClaimsToAllocate > 0 {
 		if loggerV := logger.V(5); loggerV.Enabled() {
 			claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, claims.len())
@@ -831,7 +840,6 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		//
 		// This might have to be retried in the unlikely case that some concurrent modification made
 		// the result invalid.
-		var allocatedState *structured.AllocatedState
 		err = wait.PollUntilContextTimeout(ctx, time.Microsecond, 5*time.Second, true /* immediate */, func(context.Context) (bool, error) {
 			if pl.fts.EnableDRAConsumableCapacity {
 				allocatedState, err = pl.draManager.ResourceClaims().GatherAllocatedState()
@@ -882,6 +890,10 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		s.allocator = allocator
 	}
 	s.claims = claims
+	if pl.fts.EnableDRAPreemption {
+		s.preemption = pl.newPreemptionData(pod, &s.claims, allocatedState, resourceSlices)
+		state.Write(preemptionSimulationStateKey, &preemptionSimulationState{})
+	}
 	return nil, nil
 }
 
@@ -916,11 +928,6 @@ func (pl *DynamicResources) validateDeviceClass(logger klog.Logger, deviceClassN
 			return statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("request %s: device class %s does not exist", requestName, deviceClassName))
 		}
 	}
-	return nil
-}
-
-// PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *DynamicResources) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -1121,7 +1128,14 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			claimsToAllocate = append(claimsToAllocate, claim)
 			freshPositions = append(freshPositions, position)
 		}
-		allocationResult, err := state.allocator.Allocate(allocCtx, node, claimsToAllocate)
+		// In a preemption simulation, RemovePod may have released victim
+		// claims on this node in cs, so build or reuse an allocator reflecting
+		// that state.
+		allocator, err := pl.allocatorForNode(ctx, state, getPreemptionSimulationState(cs), node.Name)
+		if err != nil {
+			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
+		}
+		allocationResult, err := allocator.Allocate(allocCtx, node, claimsToAllocate)
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
