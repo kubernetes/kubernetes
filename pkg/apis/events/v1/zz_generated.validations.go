@@ -89,7 +89,37 @@ func Validate_Event(
 	}
 
 	// field eventsv1.Event.EventTime has no validation
-	// field eventsv1.Event.Series has no validation
+
+	{ // field eventsv1.Event.Series
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *eventsv1.EventSeries,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EventSeries(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *eventsv1.Event) *eventsv1.EventSeries {
+				return oldObj.Series
+			})
+		errs = append(errs, fn(fldPath.Child("series"), obj.Series, oldVal, oldObj != nil)...)
+	}
+
 	// field eventsv1.Event.ReportingController has no validation
 	// field eventsv1.Event.ReportingInstance has no validation
 	// field eventsv1.Event.Action has no validation
@@ -102,5 +132,47 @@ func Validate_Event(
 	// field eventsv1.Event.DeprecatedFirstTimestamp has no validation
 	// field eventsv1.Event.DeprecatedLastTimestamp has no validation
 	// field eventsv1.Event.DeprecatedCount has no validation
+	return errs
+}
+
+// Validate_EventSeries validates an instance of EventSeries according
+// to declarative validation rules in the API schema.
+func Validate_EventSeries(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *eventsv1.EventSeries) (errs field.ErrorList) {
+
+	{ // field eventsv1.EventSeries.Count
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *eventsv1.EventSeries) *int32 {
+				return &oldObj.Count
+			})
+		errs = append(errs, fn(fldPath.Child("count"), &obj.Count, oldVal, oldObj != nil)...)
+	}
+
+	// field eventsv1.EventSeries.LastObservedTime has no validation
 	return errs
 }
