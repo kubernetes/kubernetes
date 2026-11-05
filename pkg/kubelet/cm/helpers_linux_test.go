@@ -1452,6 +1452,55 @@ func TestApplyPodLevelMemoryHigh(t *testing.T) {
 			t.Errorf("expected no Unified map for mixed limits, got %v", rc.Unified)
 		}
 	})
+
+	t.Run("container-only limits on every container sets memory.high", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"))},
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("", "200Mi"))},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		// request=200Mi, limit=400Mi: 200Mi + 0.9*200Mi = 380Mi (page aligned).
+		if got, want := rc.Unified[Cgroup2MemoryHigh], strconv.Itoa(380*1024*1024); got != want {
+			t.Errorf("memory.high = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("container-only with a missing container limit does not set memory.high", func(t *testing.T) {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"))},
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("", ""))},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified != nil {
+			t.Errorf("expected no Unified map, got %v", rc.Unified)
+		}
+	})
+
+	t.Run("feature gate disabled does not set memory.high", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, false)
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi"))},
+				},
+			},
+		}
+		rc := &ResourceConfig{}
+		ApplyPodLevelMemoryHigh(pod, rc, 0.9)
+		if rc.Unified != nil {
+			t.Errorf("expected no Unified map, got %v", rc.Unified)
+		}
+	})
 }
 
 func TestCPUSharesEqualAfterV2RoundTrip(t *testing.T) {
