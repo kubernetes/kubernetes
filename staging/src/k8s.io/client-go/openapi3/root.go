@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -54,11 +55,14 @@ type Root interface {
 	GVSpecAsMap(gv schema.GroupVersion) (map[string]interface{}, error)
 }
 
-// root implements the Root interface, and encapsulates the
+// root implements the Root and Resources interfaces, and encapsulates the
 // fields to retrieve, store the parsed OpenAPI V3 root document.
 type root struct {
 	// OpenAPI client to retrieve the OpenAPI V3 documents.
 	client openapi.Client
+
+	mu    sync.Mutex
+	cache map[schema.GroupVersion]*gvCacheEntry
 }
 
 // Validate root implements the Root interface.
