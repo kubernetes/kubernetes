@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	resourcehelper "k8s.io/component-helpers/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -76,15 +75,10 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// adjustment. Otherwise, only container-level memory requests are used. See
 	// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
 	// for more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		resourcehelper.IsPodLevelRequestsSet(pod) {
-		// TODO(ndixita): Refactor to use this formula in all cases, as
-		// remainingReqPerContainer will be 0 when pod-level resources are not set.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && pod.Spec.Resources != nil {
 		remainingReqPerContainer = remainingPodMemReqPerContainer(pod)
-		oomScoreAdjust = 1000 - (1000 * (containerMemReq + remainingReqPerContainer) / memoryCapacity)
-	} else {
-		oomScoreAdjust = 1000 - (1000*containerMemReq)/memoryCapacity
 	}
+	oomScoreAdjust = 1000 - (1000 * (containerMemReq + remainingReqPerContainer) / memoryCapacity)
 
 	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
 	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
@@ -97,10 +91,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
 		// calculation remains consistent
 		//  with how we handle pod-level memory requests for regular containers.
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-			resourcehelper.IsPodLevelRequestsSet(pod) {
-			minMemoryRequest += remainingReqPerContainer
-		}
+		minMemoryRequest += remainingReqPerContainer
 		minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
 		// the OOM adjustment for sidecar container will match
 		// or fall below the OOM score adjustment of regular containers in the Pod.
