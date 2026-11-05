@@ -202,8 +202,10 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	// have injected all containers, giving a complete view of the pod.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
-		defaultHugePagePodLimits(obj)
-		defaultPodRequests(obj)
+		// PodLevelResourcesEphemeralStorage depends on PodLevelResourcesFixDefaulting,
+		// so legacy decode-time defaulting never enables pod-level ephemeral-storage.
+		defaultHugePagePodLimits(obj, false)
+		defaultPodRequests(obj, false)
 	}
 
 	if obj.Spec.EnableServiceLinks == nil {
@@ -513,6 +515,40 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 	}
 }
 
+func isSupportedPodLevelResource(name v1.ResourceName, ephemeralStorageEnabled bool) bool {
+	if name == v1.ResourceEphemeralStorage && !ephemeralStorageEnabled {
+		return false
+	}
+	return resourcehelper.IsSupportedPodLevelResource(name)
+}
+
+func hasSupportedPodLevelLimits(res *v1.ResourceRequirements, ephemeralStorageEnabled bool) bool {
+	if res == nil {
+		return false
+	}
+	for name := range res.Limits {
+		if isSupportedPodLevelResource(name, ephemeralStorageEnabled) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSupportedPodLevelResources(res *v1.ResourceRequirements, ephemeralStorageEnabled bool) bool {
+	if res == nil {
+		return false
+	}
+	if hasSupportedPodLevelLimits(res, ephemeralStorageEnabled) {
+		return true
+	}
+	for name := range res.Requests {
+		if isSupportedPodLevelResource(name, ephemeralStorageEnabled) {
+			return true
+		}
+	}
+	return false
+}
+
 // defaultPodRequests applies default values for pod-level requests, only when
 // pod-level limits are set, in following scenarios:
 // 1. When at least one container (regular, init or sidecar) has requests set:
@@ -524,13 +560,9 @@ func SetDefaults_PodLogOptions(obj *v1.PodLogOptions) {
 // while maintaining compatibility with the container-level specifications, as detailed
 // in KEP-2837: https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#proposed-validation--defaulting-rules
 // TODO(ndixita): Remove defaultPodRequests once PodLevelResourcesFixDefaulting feature gate is GA.
-func defaultPodRequests(obj *v1.Pod) {
+func defaultPodRequests(obj *v1.Pod, ephemeralStorageEnabled bool) {
 	// We only populate defaults when the pod-level resources are partly specified already.
-	if obj.Spec.Resources == nil {
-		return
-	}
-
-	if len(obj.Spec.Resources.Limits) == 0 {
+	if !hasSupportedPodLevelLimits(obj.Spec.Resources, ephemeralStorageEnabled) {
 		return
 	}
 
@@ -547,7 +579,7 @@ func defaultPodRequests(obj *v1.Pod) {
 	// default to the effective requests of all the containers for that resource.
 	for key, aggrCtrLim := range aggrCtrReqs {
 		// Default pod level requests for overcommittable resources from aggregated container requests.
-		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && corev1helper.IsOvercommitAllowed(key) {
+		if _, exists := podReqs[key]; !exists && isSupportedPodLevelResource(key, ephemeralStorageEnabled) && corev1helper.IsOvercommitAllowed(key) {
 			podReqs[key] = aggrCtrLim.DeepCopy()
 		}
 	}
@@ -558,7 +590,7 @@ func defaultPodRequests(obj *v1.Pod) {
 	// Defaulting for pod level hugepages requests is dependent on defaultHugePagePodLimits,
 	// if defaultHugePagePodLimits defined the limit, the request will be set here.
 	for key, podLim := range obj.Spec.Resources.Limits {
-		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+		if _, exists := podReqs[key]; !exists && isSupportedPodLevelResource(key, ephemeralStorageEnabled) {
 			podReqs[key] = podLim.DeepCopy()
 		}
 	}
@@ -578,13 +610,9 @@ func defaultPodRequests(obj *v1.Pod) {
 // The pod-level limit becomes equal to the aggregated hugepages limit of all
 // the containers in the pod.
 // TODO(ndixita): Remove defaultHugePagePodLimits once PodLevelResourcesFixDefaulting feature gate is GA.
-func defaultHugePagePodLimits(pod *v1.Pod) {
+func defaultHugePagePodLimits(pod *v1.Pod, ephemeralStorageEnabled bool) {
 	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
-	if pod.Spec.Resources == nil {
-		return
-	}
-
-	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
+	if !hasSupportedPodLevelResources(pod.Spec.Resources, ephemeralStorageEnabled) {
 		return
 	}
 
@@ -600,7 +628,7 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 	// set for that resource, the pod-level limit will default to the aggregated
 	// hugepages limit of all the containers.
 	for key, aggrCtrLim := range aggrCtrLims {
-		if !resourcehelper.IsSupportedPodLevelResource(key) || !corev1helper.IsHugePageResourceName(key) {
+		if !isSupportedPodLevelResource(key, ephemeralStorageEnabled) || !corev1helper.IsHugePageResourceName(key) {
 			continue
 		}
 
