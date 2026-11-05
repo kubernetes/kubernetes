@@ -286,9 +286,10 @@ func TestMergePodResourceRequirements(t *testing.T) {
 
 func TestPodLimitFunc(t *testing.T) {
 	type testCase struct {
-		pod                      api.Pod
-		limitRange               corev1.LimitRange
-		podLevelResourcesEnabled bool
+		pod                                      api.Pod
+		limitRange                               corev1.LimitRange
+		podLevelResourcesEnabled                 bool
+		podLevelResourcesEphemeralStorageEnabled bool
 	}
 
 	successCases := []testCase{
@@ -481,11 +482,30 @@ func TestPodLimitFunc(t *testing.T) {
 			limitRange:               createLimitRange(api.LimitTypePod, getComputeResourceList("", ""), getComputeResourceList("160m", "200Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 			podLevelResourcesEnabled: true,
 		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-ephemeral-storage-with-min-max-ratio", 3,
+				getResourceRequirements(getLocalStorageResourceList("100Mi"), getLocalStorageResourceList("200Mi")),
+				getResourceRequirements(getLocalStorageResourceList("500Mi"), getLocalStorageResourceList("750Mi")),
+			),
+			limitRange:                               createLimitRange(api.LimitTypePod, getLocalStorageResourceList("400Mi"), getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-ephemeral-storage-ignored-when-gate-disabled", 2,
+				getResourceRequirements(getLocalStorageResourceList("100Mi"), getLocalStorageResourceList("200Mi")),
+				getResourceRequirements(getLocalStorageResourceList("600Mi"), getLocalStorageResourceList("1Gi")),
+			),
+			limitRange:                               createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("500Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: false,
+		},
 	}
 	for i := range successCases {
 		test := successCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, test.podLevelResourcesEphemeralStorageEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
 				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
@@ -694,11 +714,39 @@ func TestPodLimitFunc(t *testing.T) {
 			limitRange:               createLimitRange(api.LimitTypePod, getComputeResourceList("", ""), getComputeResourceList("160m", "200Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
 			podLevelResourcesEnabled: true,
 		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-ephemeral-storage-requests-less-than-min", 3,
+				getResourceRequirements(getLocalStorageResourceList("100Mi"), getLocalStorageResourceList("")),
+				getResourceRequirements(getLocalStorageResourceList("150Mi"), getLocalStorageResourceList("")),
+			),
+			limitRange:                               createLimitRange(api.LimitTypePod, getLocalStorageResourceList("200Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-ephemeral-storage-limits-exceeding-max", 2,
+				getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("50Mi")),
+				getResourceRequirements(getLocalStorageResourceList(""), getLocalStorageResourceList("600Mi")),
+			),
+			limitRange:                               createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("500Mi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+		},
+		{
+			pod: validPodWithPodLevelResources("pod-level-ephemeral-storage-ratio-exceeded", 2,
+				getResourceRequirements(getLocalStorageResourceList("100Mi"), getLocalStorageResourceList("100Mi")),
+				getResourceRequirements(getLocalStorageResourceList("200Mi"), getLocalStorageResourceList("400Mi")),
+			),
+			limitRange:                               createLimitRange(api.LimitTypePod, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, getLocalStorageResourceList("1.5")),
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+		},
 	}
 	for i := range errorCases {
 		test := errorCases[i]
 		t.Run(test.pod.Name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, test.podLevelResourcesEphemeralStorageEnabled)
 			err := PodMutateLimitFunc(&test.limitRange, &test.pod)
 			if err != nil {
 				t.Errorf("Unexpected error for pod: %s, %v", test.pod.Name, err)
@@ -835,6 +883,7 @@ func TestLimitRangerAllowPodResize(t *testing.T) {
 func TestLimitRangerValidatePodResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, true)
 
 	cpu := func(request, limit string) api.ResourceRequirements {
 		return getResourceRequirements(getComputeResourceList(request, ""), getComputeResourceList(limit, ""))
@@ -864,6 +913,7 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 	containerCPURatio := createLimitRange(api.LimitTypeContainer, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, getComputeResourceList("2", ""))
 	podMaxCPU := createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
 	podMaxMemory := createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
+	podMaxEphemeralStorage := createLimitRange(api.LimitTypePod, api.ResourceList{}, getLocalStorageResourceList("1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
 	podMinCPU := createLimitRange(api.LimitTypePod, getComputeResourceList("2", ""), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
 	podCPURatio := createLimitRange(api.LimitTypePod, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, api.ResourceList{}, getComputeResourceList("2", ""))
 	containerMaxCPUAndMemory := createLimitRange(api.LimitTypeContainer, api.ResourceList{}, getComputeResourceList("4", "1Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{})
@@ -983,6 +1033,30 @@ func TestLimitRangerValidatePodResize(t *testing.T) {
 			limitRange: podMaxCPU,
 			old:        new(validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), cpu("3", "3"))),
 			pod:        validPodWithPodLevelResources("pod", 1, cpu("1", "1"), cpu("3", "3")),
+		},
+		{
+			name:       "unchanged pod-level ephemeral-storage above the max is not checked when pod cpu is resized",
+			limitRange: podMaxEphemeralStorage,
+			old: new(validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("1"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("1"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+			})),
+			pod: validPodWithPodLevelResources("pod", 1, cpu("500m", "500m"), api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("2"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU:              resource.MustParse("2"),
+					api.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+				},
+			}),
 		},
 		{
 			name:       "resized pod-level cpu above the max is rejected",

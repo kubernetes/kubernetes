@@ -535,7 +535,8 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod, oldPod *api.Pod) e
 		// enforce pod limits
 		if limitType == corev1.LimitTypePod {
 			opts := podResourcesOptions{
-				PodLevelResourcesEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+				PodLevelResourcesEnabled:                 feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+				PodLevelResourcesEphemeralStorageEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 			}
 			var oldPodRequests, oldPodLimits api.ResourceList
 			if oldPod != nil {
@@ -650,6 +651,9 @@ type podResourcesOptions struct {
 	// PodLevelResourcesEnabled indicates that the PodLevelResources feature gate is
 	// enabled.
 	PodLevelResourcesEnabled bool
+	// PodLevelResourcesEphemeralStorageEnabled indicates that the
+	// PodLevelResourcesEphemeralStorage feature gate is enabled.
+	PodLevelResourcesEphemeralStorageEnabled bool
 }
 
 // podRequests is a simplified version of pkg/api/v1/resource/PodRequests that operates against the core version of
@@ -699,7 +703,7 @@ func podRequests(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	// resources with quantities specified at pod-level.
 	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
-			if isSupportedPodLevelResource(resourceName) {
+			if isSupportedPodLevelResource(resourceName, opts) {
 				// override with pod-level resource requests
 				reqs[resourceName] = quantity
 			}
@@ -753,7 +757,7 @@ func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	// resources with quantities specified at pod-level.
 	if opts.PodLevelResourcesEnabled && pod.Spec.Resources != nil {
 		for resourceName, quantity := range pod.Spec.Resources.Limits {
-			if isSupportedPodLevelResource(resourceName) {
+			if isSupportedPodLevelResource(resourceName, opts) {
 				// override with pod-level resource limits
 				limits[resourceName] = quantity
 			}
@@ -763,9 +767,9 @@ func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	return limits
 }
 
-var supportedPodLevelResources = sets.New(api.ResourceCPU, api.ResourceMemory)
+var supportedPodLevelResources = sets.New(api.ResourceCPU, api.ResourceMemory, api.ResourceEphemeralStorage)
 
-// isSupportedPodLevelResources checks if a given resource is supported by pod-level
+// isSupportedPodLevelResource checks if a given resource is supported by pod-level
 // resource management through the PodLevelResources feature. Returns true if
 // the resource is supported.
 // isSupportedPodLevelResource method exists in
@@ -773,7 +777,10 @@ var supportedPodLevelResources = sets.New(api.ResourceCPU, api.ResourceMemory)
 // isSupportedPodLevelResource is added here to avoid conversion of v1.
 // Pod to api.Pod.
 // TODO(ndixita): Find alternatives to avoid duplicating the code.
-func isSupportedPodLevelResource(name api.ResourceName) bool {
+func isSupportedPodLevelResource(name api.ResourceName, opts podResourcesOptions) bool {
+	if name == api.ResourceEphemeralStorage && !opts.PodLevelResourcesEphemeralStorageEnabled {
+		return false
+	}
 	return supportedPodLevelResources.Has(name)
 }
 
