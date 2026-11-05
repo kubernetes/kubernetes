@@ -18,11 +18,14 @@ package options
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
@@ -652,4 +656,94 @@ func (f *fakeMonitor) Monitor(ctx context.Context) (metrics.StorageMetrics, erro
 func (f *fakeMonitor) Close() error {
 	f.closeCalls.Add(1)
 	return nil
+}
+
+func TestWatchCacheMaxAverageObjectSizeFlag(t *testing.T) {
+	testCases := []struct {
+		value     string
+		want      int64
+		expectErr bool
+	}{
+		{value: "0", want: 0},
+		{value: "100000", want: 100000},
+		{value: "100k", want: 100000},
+		{value: "100Ki", want: 102400},
+		{value: "1M", want: 1000000},
+		{value: "100K", expectErr: true},
+		{value: "0.5", expectErr: true},
+		{value: "lots", expectErr: true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.value, func(t *testing.T) {
+			options := NewEtcdOptions(storagebackend.NewDefaultConfig("", nil))
+			fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+			options.AddFlags(fs)
+			err := fs.Parse([]string{"--watch-cache-max-average-object-size=" + tc.value})
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected an error, got %d", options.StorageConfig.WatchCacheMaxAverageObjectSize)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := options.StorageConfig.WatchCacheMaxAverageObjectSize; got != tc.want {
+				t.Errorf("got %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestWatchCacheMaxAverageObjectSizeValidate(t *testing.T) {
+	options := NewEtcdOptions(storagebackend.NewDefaultConfig("", nil))
+	options.StorageConfig.Transport.ServerList = []string{"http://127.0.0.1:2379"}
+	options.StorageConfig.WatchCacheMaxAverageObjectSize = -1
+	err := utilerrors.NewAggregate(options.Validate())
+	if err == nil || !strings.Contains(err.Error(), "--watch-cache-max-average-object-size must not be negative") {
+		t.Errorf("expected a validation error for a negative value, got %v", err)
+	}
+}
+
+func TestRESTOptionsWatchCacheMaxAverageObjectSize(t *testing.T) {
+	const budget = 100000
+	options := NewEtcdOptions(storagebackend.NewDefaultConfig("/registry", nil))
+	options.StorageConfig.WatchCacheMaxAverageObjectSize = budget
+	options.WatchCacheSizes = []string{"pods#1", "secrets#0"}
+	factory := &StorageFactoryRestOptionsFactory{
+		Options:        *options,
+		StorageFactory: &SimpleStorageFactory{StorageConfig: options.StorageConfig},
+	}
+	undecorated := reflect.ValueOf(generic.UndecoratedStorage).Pointer()
+
+	testCases := []struct {
+		resource   schema.GroupResource
+		wantBudget int64
+		wantCache  bool
+	}{
+		{resource: schema.GroupResource{Resource: "configmaps"}, wantBudget: budget, wantCache: true},
+		// A non-zero watch cache size exempts the resource from the budget.
+		{resource: schema.GroupResource{Resource: "pods"}, wantBudget: 0, wantCache: true},
+		// The exemption must not leak into other resources.
+		{resource: schema.GroupResource{Group: "apps", Resource: "deployments"}, wantBudget: budget, wantCache: true},
+		// A zero watch cache size still disables the watch cache.
+		{resource: schema.GroupResource{Resource: "secrets"}, wantBudget: budget, wantCache: false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.resource.String(), func(t *testing.T) {
+			restOptions, err := factory.GetRESTOptions(tc.resource, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := restOptions.StorageConfig.WatchCacheMaxAverageObjectSize; got != tc.wantBudget {
+				t.Errorf("WatchCacheMaxAverageObjectSize = %d, want %d", got, tc.wantBudget)
+			}
+			if cached := reflect.ValueOf(restOptions.Decorator).Pointer() != undecorated; cached != tc.wantCache {
+				t.Errorf("watch cache enabled = %v, want %v", cached, tc.wantCache)
+			}
+		})
+	}
+	if got := options.StorageConfig.WatchCacheMaxAverageObjectSize; got != budget {
+		t.Errorf("options were modified: WatchCacheMaxAverageObjectSize = %d, want %d", got, budget)
+	}
 }
