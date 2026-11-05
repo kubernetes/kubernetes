@@ -904,13 +904,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("--qos-reserved value failed to parse: %w", err)
 		}
 
-		var topologyManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
-			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
-		} else if s.TopologyManagerPolicyOptions != nil {
-			return fmt.Errorf("topology manager policy options %v require feature gates %q enabled",
-				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
-		}
+		topologyManagerPolicyOptions := s.TopologyManagerPolicyOptions
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
 			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
 				// This feature is not supported for cgroupv1 so we are failing early.

@@ -519,7 +519,6 @@ type KubeletConfiguration struct {
 	TopologyManagerScope string `json:"topologyManagerScope,omitempty"`
 	// TopologyManagerPolicyOptions is a set of key=value which allows to set extra options
 	// to fine tune the behaviour of the topology manager policies.
-	// Requires  both the "TopologyManager" and "TopologyManagerPolicyOptions" feature gates to be enabled.
 	// Default: nil
 	// +optional
 	TopologyManagerPolicyOptions map[string]string `json:"topologyManagerPolicyOptions,omitempty"`
