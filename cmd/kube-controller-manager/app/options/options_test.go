@@ -166,6 +166,7 @@ var args = []string{
 	"--node-cidr-mask-size-ipv4=48",
 	"--node-cidr-mask-size-ipv6=108",
 	"--node-eviction-rate=0.2",
+	"--node-liveness-source=external",
 	"--node-monitor-grace-period=30s",
 	"--node-monitor-period=10s",
 	"--node-startup-grace-period=30s",
@@ -395,7 +396,7 @@ func TestAddFlags(t *testing.T) {
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
 				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
-				NodeLivenessSource:        nodelifecycleconfig.NodeLivenessSourceKubelet,
+				NodeLivenessSource:        nodelifecycleconfig.NodeLivenessSourceExternal,
 			},
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
@@ -751,7 +752,7 @@ func TestApplyTo(t *testing.T) {
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
 				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
-				NodeLivenessSource:        nodelifecycleconfig.NodeLivenessSourceKubelet,
+				NodeLivenessSource:        nodelifecycleconfig.NodeLivenessSourceExternal,
 			},
 			PersistentVolumeBinderController: persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
 				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
