@@ -33677,7 +33677,7 @@ func schema_k8sio_api_core_v1_VolumeHealthStatus(ref common.ReferenceCallback) c
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "lastTransitionTime is when the current set of (status, reason) pairs first appeared. Changes to condition messages do not affect this field.",
+							Description: "lastTransitionTime is when the current set of (status, reason) pairs first appeared. lastTransitionTime remains unchanged when only message associated with healthConditions change.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
@@ -60702,7 +60702,7 @@ func schema_k8sio_api_storage_v1_StorageHealthCondition(ref common.ReferenceCall
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "lastTransitionTime is when this condition first appeared at its current state.",
+							Description: "lastTransitionTime is when this condition first appeared at its current state. lastTransitionTime remains unchanged when only the message changes.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
@@ -62416,7 +62416,7 @@ func schema_k8sio_api_storage_v1beta1_StorageHealthCondition(ref common.Referenc
 					},
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "lastTransitionTime is when this condition first appeared at its current state.",
+							Description: "lastTransitionTime is when this condition first appeared at its current state. lastTransitionTime remains unchanged when only the message changes.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},

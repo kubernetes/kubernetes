@@ -35,7 +35,7 @@ type VolumeHealthStatusApplyConfiguration struct {
 	// volume is healthy, a Healthy condition is reported.
 	HealthConditions []VolumeHealthConditionApplyConfiguration `json:"healthConditions,omitempty"`
 	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
-	// Changes to condition messages do not affect this field.
+	// lastTransitionTime remains unchanged when only message associated with healthConditions change.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 

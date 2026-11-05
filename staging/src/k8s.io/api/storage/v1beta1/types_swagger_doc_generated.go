@@ -183,7 +183,7 @@ var map_StorageHealthCondition = map[string]string{
 	"message":            "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",
 	"accessMode":         "accessMode is the access mode affected. Nil means all access modes are affected.",
 	"volumeMode":         "volumeMode is the volume mode affected. Nil means both are affected.",
-	"lastTransitionTime": "lastTransitionTime is when this condition first appeared at its current state.",
+	"lastTransitionTime": "lastTransitionTime is when this condition first appeared at its current state. lastTransitionTime remains unchanged when only the message changes.",
 }
 
 func (StorageHealthCondition) SwaggerDoc() map[string]string {

@@ -53,6 +53,7 @@ type StorageHealthConditionApplyConfiguration struct {
 	// volumeMode is the volume mode affected. Nil means both are affected.
 	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
 	// lastTransitionTime is when this condition first appeared at its current state.
+	// lastTransitionTime remains unchanged when only the message changes.
 	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 

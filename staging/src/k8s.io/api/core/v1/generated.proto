@@ -7427,7 +7427,7 @@ message VolumeHealthStatus {
   repeated VolumeHealthCondition healthConditions = 1;
 
   // lastTransitionTime is when the current set of (status, reason) pairs first appeared.
-  // Changes to condition messages do not affect this field.
+  // lastTransitionTime remains unchanged when only message associated with healthConditions change.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 2;
 }

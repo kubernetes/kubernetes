@@ -13386,7 +13386,7 @@
         },
         "lastTransitionTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
-          "description": "lastTransitionTime is when the current set of (status, reason) pairs first appeared. Changes to condition messages do not affect this field."
+          "description": "lastTransitionTime is when the current set of (status, reason) pairs first appeared. lastTransitionTime remains unchanged when only message associated with healthConditions change."
         }
       },
       "type": "object"
@@ -21989,7 +21989,7 @@
         },
         "lastTransitionTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
-          "description": "lastTransitionTime is when this condition first appeared at its current state."
+          "description": "lastTransitionTime is when this condition first appeared at its current state. lastTransitionTime remains unchanged when only the message changes."
         },
         "message": {
           "description": "message is a human-readable description. Maximum permitted length of a message is 1024 bytes.",

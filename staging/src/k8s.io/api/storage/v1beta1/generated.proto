@@ -606,6 +606,7 @@ message StorageHealthCondition {
   optional string volumeMode = 5;
 
   // lastTransitionTime is when this condition first appeared at its current state.
+  // lastTransitionTime remains unchanged when only the message changes.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 6;
 }
