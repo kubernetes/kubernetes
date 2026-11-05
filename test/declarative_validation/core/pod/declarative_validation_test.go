@@ -496,6 +496,18 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 					HealthStatus: &api.VolumeHealthStatus{HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthDegraded, Reason: "DiskSlow"}}},
 				}},
 			},
+			"healthy status accepted": {
+				volumeHealth: []api.PodVolumeStatus{{
+					Name:         "vol",
+					HealthStatus: &api.VolumeHealthStatus{HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthHealthy, Reason: "VolumeHealthy"}}},
+				}},
+			},
+			"unknown status accepted": {
+				volumeHealth: []api.PodVolumeStatus{{
+					Name:         "vol",
+					HealthStatus: &api.VolumeHealthStatus{HealthConditions: []api.VolumeHealthCondition{{Status: api.VolumeHealthUnknown, Reason: "FutureHealth"}}},
+				}},
+			},
 			"name required": {
 				volumeHealth: []api.PodVolumeStatus{{}},
 				expectedErrs: field.ErrorList{

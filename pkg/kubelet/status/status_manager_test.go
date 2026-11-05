@@ -1949,7 +1949,7 @@ func TestVolumeHealthIsNotRestoredForRemovedVolumes(t *testing.T) {
 				pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}, {Name: "vol2"}}
 				health := &v1.VolumeHealthStatus{
 					HealthConditions:   []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
-					LastTransitionTime: metav1.NewTime(time.Unix(123, 0)),
+					LastTransitionTime: metav1.NewTime(time.Unix(123, 0).UTC()),
 				}
 				pod.Status.VolumeStatuses = []v1.PodVolumeStatus{
 					{Name: "vol1", HealthStatus: health},
