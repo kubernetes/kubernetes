@@ -41,7 +41,7 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
   <h1>What does this model prove?</h1>
   <p class="lede">Explore the exact statements, their premises, and the lemmas they use. The model separates current SSA, the pinned PR, the stronger full-manager policy, and admission composition.</p>
   <div class="stats" id="stats"></div>
-  <div class="notice"><strong>Baseline counterexample found.</strong> An empty-list Apply can change data on immediate repetition. Required or CEL presence validation can reject every retry. The proposed core's idempotence theorem does not describe this raw behavior.</div>
+  <div class="notice"><strong>Two baseline bugs reproduced.</strong> Empty-list intent can disappear, and empty-map intent can become null despite a presence claim. Validation can reject every retry. <a href="ssa-bugs.md">Bug register and evidence</a>.</div>
   <nav class="tabs" aria-label="Explorer views">
     <button class="tab" data-view="proofs">Proofs</button>
     <button class="tab" data-view="definitions">Definitions</button>
@@ -110,6 +110,11 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
     </div>
   </section>
   <section class="view" id="view-gaps" hidden>
+    <div class="card gap"><h2>SSA-02: an empty map becomes null despite its claim</h2>
+      <p>A replaces <code>settings: {left: old}</code> with <code>settings: {}</code>. Pruning returns <code>settings: null</code> while A still owns map presence. An optional non-nullable schema rejects every retry. A nullable schema stores null; B's identical empty-map intent then conflicts until A repeats and repairs the data.</p>
+      <p>Actual HTTP tests confirm nullable/CEL behavior, unchanged state on rejection, successful empty-map creation, and atomic/defaulted control cases. <a href="ssa-bugs.md#ssa-02-an-explicitly-empty-map-becomes-null">Detailed trace and schema</a>.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.ContainerCounterexamples.empty_map_first_apply_creates_null">Claim retained, intent lost</button><button class="chip" data-proof="SSA.ContainerCounterexamples.nonnullable_map_retries_never_empty">Every finite retry count</button><button class="chip" data-proof="SSA.ContainerCounterexamples.empty_map_can_conflict_with_identical_previous_intent">Conflict and repair</button></div>
+    </div>
     <div class="card gap"><h2>Current SSA: empty-list repetition changes data</h2>
       <p>A previously owns <code>endpoints: [{name: db, host: old}]</code>, then applies <code>endpoints: []</code>. The first request removes the field. The second identical request creates the empty list. Actual CRD HTTP execution confirms the data difference and a later ownership bootstrap by <code>before-first-apply</code>.</p>
       <p>OpenAPI <code>required: [endpoints]</code> or CEL <code>has(self.endpoints)</code> rejects the first request and every identical retry. The populated state, ownership and resourceVersion remain unchanged, although empty-list creation succeeds.</p>

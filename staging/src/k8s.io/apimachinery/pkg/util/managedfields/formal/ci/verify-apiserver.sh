@@ -29,4 +29,4 @@ fi
 trap kube::etcd::cleanup EXIT
 kube::etcd::start
 go test ./staging/src/k8s.io/apiextensions-apiserver/test/integration \
-  -run '^TestSSAEmptyAssociativeListPresence$' -v -count=1 -timeout=240s
+  -run '^TestSSAEmpty(AssociativeList|GranularMap)Presence$' -v -count=1 -timeout=240s

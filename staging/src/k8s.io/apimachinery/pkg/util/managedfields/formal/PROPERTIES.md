@@ -156,6 +156,9 @@ In particular:
 | Source counterexample | `RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list` | Imported pruning AST with all callees realized, normalized primitives and every lawful iteration schedule; checked against actual Go and API execution. |
 | Required-list retry failure | `Counterexamples.required_list_retries_never_empty_the_list` | Every finite retry count under the explicit presence validator; the real OpenAPI and CEL implementations reproduce the rejection through HTTP. |
 | Default-wrapper initialization | `bootstrap_preserves_data`, `bootstrap_keeps_nonempty_manager_map`, `bootstrap_creates_update_claims` | General laws of the explicit Update-from-empty model. Concrete ownership-bootstrap/fixed-point proofs, the actual wrapper comparison and HTTP regression agree. Full wrapper source refinement and probabilistic Update tracking remain open. |
+| Empty-map intent loss | `ContainerCounterexamples.empty_map_first_apply_creates_null`, `applied_empty_map_intent_is_not_preserved` | An explicit map claim survives while the asserted empty object becomes null. Confirmed on both pinned SMD revisions and through CRD HTTP. |
+| Optional-map retry failure | `ContainerCounterexamples.nonnullable_map_retries_never_empty` | Every finite retry count under object-or-absent validation. The actual optional non-nullable map schema rejects the produced null; no required-field rule is needed. |
+| Empty-map conflict/default controls | `empty_map_can_conflict_with_identical_previous_intent`, `empty_object_default_repairs_this_proposal` | Concrete stored-null conflict, co-ownership after repair and a specific default mutator. HTTP tests exercise nullable/CEL/defaulted/atomic variants; these are not universal defaulting theorems. |
 
 `SSA/Counterexamples.lean` kernel-checks the raw PR fragmentation, partial-owner
 deletion, required-map shortcut, required-list failure, and opposite roles in

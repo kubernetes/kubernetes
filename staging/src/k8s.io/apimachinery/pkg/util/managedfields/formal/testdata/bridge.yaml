@@ -252,3 +252,21 @@ cases:
     expect:
       object: {items: []}
       owners: {'before-first-apply@update': [.items]}
+- name: explicit-empty-map-becomes-null-before-repetition
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: {left: old}}
+    expect: {object: {settings: {left: old}}, owners: {A: [.settings.left]}}
+  - manager: A
+    apply: {settings: {}}
+    expect: {object: {settings: null}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {}}
+    expect: {error: conflict, object: {settings: null}, owners: {A: [.settings]}}
+  - manager: A
+    apply: {settings: {}}
+    expect: {object: {settings: {}}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {}}
+    expect: {object: {settings: {}}, owners: {A: [.settings], B: [.settings]}}

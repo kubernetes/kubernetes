@@ -75,6 +75,10 @@ claim, Required/CEL rejection of otherwise valid empty-list intent, and atomic
 rollback verified by GET, including ownership and `resourceVersion`. Complete
 API-server and etcd logs are retained under `ARTIFACTS`.
 
+The same entrypoint also runs `TestSSAEmptyGranularMapPresence`: optional
+non-nullable rejection, nullable null/empty divergence, identical-intent
+conflict, CEL rejection, an empty-object default and an atomic-map control.
+
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;
 the ordinary apiextensions integration suite also discovers the HTTP test.

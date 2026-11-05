@@ -24,12 +24,14 @@ import (
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 )
 
@@ -64,32 +66,9 @@ func TestSSAEmptyAssociativeListPresence(t *testing.T) {
 			if policy == "cel" {
 				crSchema.XValidations = apiextensionsv1.ValidationRules{{Rule: "has(self.endpoints)"}}
 			}
-			crd := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
-			crd.Spec.Group = policy + ".formal.ssa"
-			crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
-			crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: crSchema}
-
-			// This test uses GET rather than watches; the watch-primer creates a schema-incompatible object.
-			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiClient)
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() {
-				if err := apiClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, metav1.DeleteOptions{}); err != nil {
-					t.Error(err)
-				}
-			})
-			version := crd.Spec.Versions[0].Name
-			resource := dynamicClient.Resource(schema.GroupVersionResource{Group: crd.Spec.Group, Version: version, Resource: crd.Spec.Names.Plural})
+			resource := newSSAFormalResource(t, apiClient, dynamicClient, policy+".formal.ssa", crSchema)
 			apply := func(name string, items []any) (*unstructured.Unstructured, error) {
-				body, err := json.Marshal(map[string]any{
-					"apiVersion": crd.Spec.Group + "/" + version, "kind": crd.Spec.Names.Kind,
-					"metadata": map[string]any{"name": name}, "endpoints": items,
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return resource.Patch(context.Background(), name, types.ApplyPatchType, body, metav1.PatchOptions{FieldManager: "A"})
+				return resource.apply(t, name, "A", map[string]any{"endpoints": items})
 			}
 
 			// Presence policies permit an empty list when there are no old item claims.
@@ -146,6 +125,161 @@ func TestSSAEmptyAssociativeListPresence(t *testing.T) {
 				}
 				if !reflect.DeepEqual(stored.Object, original.Object) {
 					t.Fatalf("rejected attempt %d changed the stored object or ownership", attempt)
+				}
+			}
+		})
+	}
+}
+
+// Discovery readiness suffices because these tests observe state through GET.
+func newSSAFormalResource(t *testing.T, apiClient clientset.Interface, dynamicClient dynamic.Interface, group string, crSchema *apiextensionsv1.JSONSchemaProps) ssaFormalResource {
+	t.Helper()
+	crd := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	crd.Spec.Group = group
+	crd.Name = crd.Spec.Names.Plural + "." + group
+	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: crSchema}
+	crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := apiClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, metav1.DeleteOptions{}); err != nil {
+			t.Error(err)
+		}
+	})
+	version := crd.Spec.Versions[0].Name
+	resource := dynamicClient.Resource(schema.GroupVersionResource{Group: group, Version: version, Resource: crd.Spec.Names.Plural})
+	return ssaFormalResource{resource, group + "/" + version, crd.Spec.Names.Kind}
+}
+
+type ssaFormalResource struct {
+	dynamic.ResourceInterface
+	apiVersion, kind string
+}
+
+func (r ssaFormalResource) apply(t *testing.T, name, manager string, fields map[string]any) (*unstructured.Unstructured, error) {
+	t.Helper()
+	object := map[string]any{"apiVersion": r.apiVersion, "kind": r.kind, "metadata": map[string]any{"name": name}}
+	for key, value := range fields {
+		object[key] = value
+	}
+	body, err := json.Marshal(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r.Patch(context.Background(), name, types.ApplyPatchType, body, metav1.PatchOptions{FieldManager: manager})
+}
+
+// Empty-map intent has a presence claim, but granular pruning can still create null.
+func TestSSAEmptyGranularMapPresence(t *testing.T) {
+	tearDown, apiClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+	for _, policy := range []string{"nonnullable", "nullable", "cel", "defaulted", "atomic"} {
+		t.Run(policy, func(t *testing.T) {
+			mapSchema := apiextensionsv1.JSONSchemaProps{
+				Type: "object", Nullable: policy == "nullable" || policy == "cel",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{"left": {Type: "string"}},
+			}
+			if policy == "defaulted" {
+				mapSchema.Default = &apiextensionsv1.JSON{Raw: []byte(`{}`)}
+			}
+			if policy == "atomic" {
+				mapSchema.XMapType = ptr.To("atomic")
+			}
+			crSchema := &apiextensionsv1.JSONSchemaProps{Type: "object", Properties: map[string]apiextensionsv1.JSONSchemaProps{"settings": mapSchema}}
+			if policy == "cel" {
+				crSchema.XValidations = apiextensionsv1.ValidationRules{{Rule: "has(self.settings)"}}
+			}
+			resource := newSSAFormalResource(t, apiClient, dynamicClient, "map-"+policy+".formal.ssa", crSchema)
+			empty := map[string]any{"settings": map[string]any{}}
+			control, err := resource.apply(t, "created-empty", "A", empty)
+			if err != nil {
+				t.Fatalf("empty-map creation must succeed: %v", err)
+			}
+			if value, exists := control.Object["settings"]; !exists || !reflect.DeepEqual(value, map[string]any{}) {
+				t.Fatalf("empty-map creation changed intent: %#v", control.Object)
+			}
+			original, err := resource.apply(t, "example", "A", map[string]any{"settings": map[string]any{"left": "old"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			previous := original
+			for attempt := 1; attempt <= 3; attempt++ {
+				proposed, err := resource.apply(t, "example", "A", empty)
+				if policy == "nonnullable" || policy == "cel" {
+					if !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "settings") {
+						t.Fatalf("attempt %d must fail map validation: %v", attempt, err)
+					}
+					if policy == "cel" && !strings.Contains(err.Error(), "has(self.settings)") {
+						t.Fatalf("unexpected CEL failure: %v", err)
+					}
+					stored, err := resource.Get(context.Background(), "example", metav1.GetOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(stored.Object, original.Object) {
+						t.Fatalf("rejected attempt %d changed data or ownership", attempt)
+					}
+					continue
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				var want any = map[string]any{}
+				changes := 1
+				if policy == "nullable" {
+					changes = 2
+					if attempt == 1 {
+						want = nil
+					}
+				}
+				if value, exists := proposed.Object["settings"]; !exists || !reflect.DeepEqual(value, want) {
+					t.Fatalf("attempt %d: settings=%#v, want %#v", attempt, proposed.Object, want)
+				}
+				owners := proposed.GetManagedFields()
+				if len(owners) != 1 || owners[0].Manager != "A" || owners[0].Operation != metav1.ManagedFieldsOperationApply ||
+					owners[0].FieldsV1 == nil || string(owners[0].FieldsV1.Raw) != `{"f:settings":{}}` {
+					t.Fatalf("attempt %d lost the explicit map claim: %#v", attempt, owners)
+				}
+				if (proposed.GetResourceVersion() != previous.GetResourceVersion()) != (attempt <= changes) {
+					t.Fatalf("attempt %d: unexpected resourceVersion transition", attempt)
+				}
+				previous = proposed
+				if policy == "nullable" && attempt == 1 {
+					// B's identical intent conflicts with the null A stored; rejection is atomic.
+					_, err := resource.apply(t, "example", "B", empty)
+					if !apierrors.IsConflict(err) {
+						t.Fatalf("B must conflict against the unexpected null: %v", err)
+					}
+					stored, err := resource.Get(context.Background(), "example", metav1.GetOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(stored.Object, proposed.Object) {
+						t.Fatal("B's rejected Apply changed data or ownership")
+					}
+				}
+			}
+			if policy == "nullable" {
+				// After A repairs its result, B can acquire the same empty-map value.
+				shared, err := resource.apply(t, "example", "B", empty)
+				if err != nil {
+					t.Fatalf("B must acquire the repaired empty map without force: %v", err)
+				}
+				owners := shared.GetManagedFields()
+				seen := map[string]bool{}
+				for _, owner := range owners {
+					seen[owner.Manager] = true
+					if owner.Operation != metav1.ManagedFieldsOperationApply || owner.APIVersion != resource.apiVersion ||
+						owner.FieldsV1 == nil || string(owner.FieldsV1.Raw) != `{"f:settings":{}}` {
+						t.Fatalf("unexpected co-ownership after repair: %#v", owner)
+					}
+				}
+				if len(owners) != 2 || !seen["A"] || !seen["B"] {
+					t.Fatalf("expected co-ownership after repair: %#v", owners)
 				}
 			}
 		})

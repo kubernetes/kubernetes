@@ -87,7 +87,9 @@ def build():
         )
         if item["kind"] == "theorem" and not set(item["axioms"]) <= ALLOWED_AXIOMS:
             raise ValueError(f"Forbidden axiom in {name}: {item['axioms']}")
-        executions = {"SSA.Examples", "SSA.Counterexamples", "SSA.RawSourceCounterexamples"}
+        executions = {
+            "SSA.Examples", "SSA.Counterexamples", "SSA.RawSourceCounterexamples", "SSA.ContainerCounterexamples"
+        }
         default_scope = "execution" if item["module"] in executions else "general"
         if item["private"]:
             default_scope = "helper"

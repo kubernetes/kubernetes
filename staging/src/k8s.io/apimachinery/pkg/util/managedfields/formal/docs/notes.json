@@ -450,5 +450,37 @@
     "title": "The fourth Apply preserves the bootstrapped data and claims",
     "meaning": "The nonempty Update-manager map suppresses reinitialization; the repeated request returns the same modeled data and claims.",
     "limits": "Concrete ownership/data fixed point. ResourceVersion stability is observed separately in the real HTTP test."
+  },
+  "SSA.ContainerCounterexamples.empty_map_first_apply_creates_null": {
+    "title": "SSA-02: explicit empty-map intent becomes null while its claim survives",
+    "meaning": "A releases the last granular-map child by applying an empty map. The accepted raw result is null, with A still holding the requested map-presence claim.",
+    "limits": "Concrete normalized trace, reproduced by managedfields, both pinned SMD revisions and CRD HTTP. Map presence is already claimed, so a missing collection marker does not explain this case."
+  },
+  "SSA.ContainerCounterexamples.nonnullable_map_retries_never_empty": {
+    "scope": "general",
+    "title": "Optional non-nullable maps fail after every finite retry count",
+    "meaning": "The validator permits an absent settings field or an object. The first Apply instead produces null and is rejected atomically. Induction proves that every finite number of identical requests preserves the populated map.",
+    "limits": "No required-field premise. The object-or-absent policy is explicit; the actual optional non-nullable CRD schema independently reproduces the failure through HTTP."
+  },
+  "SSA.ContainerCounterexamples.empty_map_can_conflict_with_identical_previous_intent": {
+    "title": "An identical empty-map intent conflicts until the first actor repairs null",
+    "meaning": "After A applies an empty map and stores null, B conflicts when applying the same empty-map intent. A repeats its request, creating the actual empty object; B can then co-own it without force.",
+    "limits": "The stored value before B’s failure is null, not the intended empty object. This is a downstream effect of lost intent, rather than a counterexample to conflict-free acquisition of equal stored values."
+  },
+  "SSA.ContainerCounterexamples.imported_pruning_creates_null": {
+    "title": "The imported four-function pruning chain creates the null map",
+    "meaning": "The source-bound pruning composition produces the null result, with all callees realized and every lawful version-map schedule.",
+    "limits": "Concrete object/field-set instance with normalized typed/set primitives. Actual Go and HTTP results independently confirm the trace; a universal primitive refinement is still separate."
+  },
+  "SSA.ContainerCounterexamples.empty_object_default_repairs_this_proposal": {
+    "title": "A specific empty-object default repairs the unexpected null",
+    "meaning": "The explicit post-pruning mutation replaces null with the empty map before type validation. The resulting state equals A’s repaired second raw result.",
+    "limits": "Concrete mutator and trace. The real HTTP test checks the matching CRD default; this theorem does not formalize arbitrary defaulting programs."
+  },
+  "SSA.ContainerCounterexamples.empty_map_null_for_every_scalar_payload": {
+    "scope": "general",
+    "title": "The empty-map failure is independent of the removed scalar payload",
+    "meaning": "For every encoded scalar value at settings.left, replacing the populated granular map with the same empty-map intent yields the identical null result and retained map claim.",
+    "limits": "One map/child shape in the raw transition, arbitrary scalar text. The concrete witness uses the same JSON string encoding as the Go adapter. This is not a universal Go primitive refinement."
   }
 }

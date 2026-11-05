@@ -89,6 +89,14 @@ reproduced through actual CRD HTTP requests and etcd. The default pipeline also
 bootstraps an Update owner on a later retry. See the
 [requests, cause, exact proof boundaries and checks](docs/baseline-empty-list.md).
 
+A second baseline bug affects empty granular maps even with a presence claim:
+Apply of `settings: {}` produces `settings: null`. An optional non-nullable map
+then cannot be emptied; with nullable maps, another manager's identical empty
+intent conflicts until the original actor repairs the value by repeating its
+request. Real HTTP tests also cover CEL, atomic-map and defaulting controls.
+The [bug register](docs/ssa-bugs.md) separates both baseline bugs from the three
+PR #336 classifier/deletion failures and links each to its proof and reproducer.
+
 ## What is checked
 
 - General core laws: scalar conflicts, equal-value co-ownership, force transfer,
