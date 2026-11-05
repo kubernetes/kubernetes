@@ -53,6 +53,9 @@ func newGoEngine(cases ...Case) (*goEngine, error) {
 	if len(cases) > 0 {
 		c = cases[0]
 	}
+	if c.Bootstrap {
+		return nil, fmt.Errorf("the Kubernetes default-manager bootstrap wrapper is unavailable in standalone SMD")
+	}
 	sc, err := schemaFor(c)
 	if err != nil {
 		return nil, err

@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -/
 import SSA.ObjectScope
+import SSA.Bootstrap
 
 namespace SSA
 
@@ -39,6 +40,7 @@ structure Fixture where
   steps : List FixtureStep
   semantics : Semantics := .full
   objects : List ObjectSpec := []
+  bootstrap : Bool := false
   deriving Repr, FromJson, ToJson
 
 structure Observation where
@@ -50,8 +52,10 @@ structure Observation where
 def isFullAt (schema : Schema) (s : State) (manager : String) (path : Path) : Bool :=
   schema.any fun item => item.path == path && full s manager item
 
-def observe (objects : List ObjectSpec) (mode : Semantics) (schema : Schema) (before : State) (step : FixtureStep) : Observation :=
-  let result := writeScoped objects mode schema before step.request
+def observe (objects : List ObjectSpec) (mode : Semantics) (schema : Schema) (before : State)
+    (step : FixtureStep) (bootstrap : Bool := false) : Observation :=
+  let prepared := if bootstrap && step.request.operation == .apply then bootstrapExisting before else before
+  let result := writeScoped objects mode schema prepared step.request
   let after := commit before result
   let error := match result with
     | .ok _ => none
@@ -65,14 +69,15 @@ def observe (objects : List ObjectSpec) (mode : Semantics) (schema : Schema) (be
       expected.partialManagers.all (fun (m, p) =>
         after.owns m p .item && !isFullAt schema after m p) }
 
-def runSteps (objects : List ObjectSpec) (mode : Semantics) (schema : Schema) : State → List FixtureStep → List Observation
+def runSteps (objects : List ObjectSpec) (mode : Semantics) (schema : Schema)
+    (bootstrap : Bool := false) : State → List FixtureStep → List Observation
   | _, [] => []
   | before, step :: steps =>
-      let observation := observe objects mode schema before step
-      observation :: runSteps objects mode schema observation.state steps
+      let observation := observe objects mode schema before step bootstrap
+      observation :: runSteps objects mode schema bootstrap observation.state steps
 
 def runFixture (fixture : Fixture) : List Observation :=
-  runSteps fixture.objects fixture.semantics fixture.schema fixture.initial fixture.steps
+  runSteps fixture.objects fixture.semantics fixture.schema fixture.bootstrap fixture.initial fixture.steps
 
 def passes (fixture : Fixture) : Bool :=
   (runFixture fixture).all (·.matched)

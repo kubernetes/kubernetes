@@ -38,6 +38,7 @@ type Case struct {
 	Schema    string              `json:"schema,omitempty"`
 	RootType  string              `json:"rootType,omitempty"`
 	Semantics string              `json:"semantics,omitempty"`
+	Bootstrap bool                `json:"bootstrap,omitempty"`
 	Required  map[string][]string `json:"required,omitempty"`
 	Steps     []Step              `json:"steps"`
 }
@@ -197,6 +198,7 @@ type itemSpec struct {
 
 type fixture struct {
 	Objects   []itemSpec `json:"objects"`
+	Bootstrap bool       `json:"bootstrap"`
 	Name      string     `json:"name"`
 	Semantics string     `json:"semantics"`
 	Schema    []itemSpec `json:"schema"`
@@ -358,11 +360,21 @@ func normalize(c Case) (fixture, error) {
 	if mode != "full" && mode != "current" && mode != "predrag" {
 		return fixture{}, fmt.Errorf("unknown semantics %s", mode)
 	}
+	if c.Bootstrap {
+		if mode != "current" {
+			return fixture{}, fmt.Errorf("bootstrap comparison requires current Kubernetes semantics")
+		}
+		for _, step := range c.Steps {
+			if step.Operation != "" && step.Operation != "apply" {
+				return fixture{}, fmt.Errorf("bootstrap comparison supports Apply histories; probabilistic Update tracking is outside this model")
+			}
+		}
+	}
 	schema, err := schemaFor(c)
 	if err != nil {
 		return fixture{}, err
 	}
-	out := fixture{Name: c.Name, Semantics: mode, Schema: []itemSpec{}, Objects: []itemSpec{}, Initial: state{[]cell{}, []claim{}}}
+	out := fixture{Name: c.Name, Semantics: mode, Bootstrap: c.Bootstrap, Schema: []itemSpec{}, Objects: []itemSpec{}, Initial: state{[]cell{}, []claim{}}}
 	known := map[string]bool{}
 	objectSeen := map[string]bool{}
 	named := []path{}

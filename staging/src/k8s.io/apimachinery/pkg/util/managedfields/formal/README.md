@@ -109,6 +109,9 @@ bootstraps an Update owner on a later retry. See the
   partial deletion, required-map member shortcut, and required granular lists.
 - Baseline counterexample: empty-list Apply changes data on repetition; a
   presence validator makes every finite number of identical retries fail.
+- Default Apply wrapper: Update-from-empty initialization preserves data,
+  leaves existing manager maps alone and creates non-Apply claims. A concrete
+  proof and real wrapper comparison track reinitialization after ownership loss.
 - General PR compatibility: with no additional required metadata, `predrag` and
   `current` transitions are equal for every finite state and normalized request.
 
@@ -193,6 +196,12 @@ wrappers with real FieldsV1 round trips. New mismatches fail with a replayable
 request prefix. There is no tolerated `model-gap` category. Intended differences
 between the stronger policy and existing Go require exact independent outcomes
 for both engines.
+
+Explicit `bootstrap: true` cases additionally run the actual
+`NewSkipNonAppliedManager` wrapper and the separate `Bootstrap` model.
+This comparison accepts single-version Apply-only histories and also runs
+generated structural requests. Probabilistic non-Apply tracking is outside
+that comparison domain; unsupported combinations fail explicitly.
 
 [PR cases](testdata/pr336.yaml) also run against **both pinned upstream revisions**:
 head `6fab440a518a1b329e5cabd5a3c924d6c267828b` and base

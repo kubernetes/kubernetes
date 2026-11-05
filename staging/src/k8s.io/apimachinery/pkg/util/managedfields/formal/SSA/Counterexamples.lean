@@ -98,7 +98,7 @@ theorem pr_required_list_owner_is_misclassified :
     prCovers beforeListRelease "A" (.collection children) = false ∧
     (run .predrag listSchema beforeListRelease [leave "B"]).hasItem item = false := by decide
 
-/-- FieldsV1 cannot remember whether A explicitly supplied an empty granular list. -/
+/-- Apply's sparse footprint omits explicit granular-list presence; the trie grammar can encode it. -/
 theorem empty_granular_list_has_no_ownership_marker :
     (request "A" [itemCell] [listCell,⟨children,.collection⟩]).desired =
     (request "A" [itemCell] [listCell]).desired := rfl
@@ -184,6 +184,18 @@ theorem raw_apply_is_not_unconditionally_idempotent :
   have different : secondEmptyList.cells ≠ firstEmptyList.cells := by decide
   exact different cells
 
+/-- The failure survives projection to application data; it is not list order or metadata. -/
+theorem raw_apply_is_not_presence_idempotent :
+    ¬ (∀ before once twice : State, ∀ r : Request,
+      applyWith .current keyOnlySchema before r = .ok once →
+      applyWith .current keyOnlySchema once r = .ok twice →
+      ∀ path, once.hasContainer path = twice.hasContainer path) := by
+  intro idempotent
+  have contradiction := idempotent populatedList firstEmptyList secondEmptyList emptyList
+    raw_empty_list_first_apply_loses_presence.1 raw_empty_list_second_apply_adds_presence.1 items
+  change false = true at contradiction
+  cases contradiction
+
 /-- No additional required metadata means the PR has exactly the same counterexample. -/
 theorem pr_has_same_empty_list_counterexample :
     applyWith .predrag keyOnlySchema populatedList emptyList = .ok firstEmptyList ∧
@@ -220,7 +232,30 @@ theorem required_list_retries_never_empty_the_list (attempts : Nat) :
       rw [ih]
       rfl
 
+def bootstrappedEmptyList := bootstrapExisting secondEmptyList
+
+/-- Default-manager initialization adds an Update presence claim on the third identical Apply. -/
+theorem default_wrapper_bootstraps_empty_list_owner :
+    bootstrappedEmptyList.cells = secondEmptyList.cells ∧
+    bootstrappedEmptyList.claims = [⟨beforeFirstApply,⟨items,.presence⟩,false⟩] ∧
+    applyWith .current keyOnlySchema bootstrappedEmptyList emptyList = .ok bootstrappedEmptyList := by
+  exact ⟨rfl,rfl,rfl⟩
+
+/-- Once that owner is stored, a fourth request neither bootstraps nor changes the result. -/
+theorem default_wrapper_fourth_apply_is_fixed :
+    bootstrapExisting bootstrappedEmptyList = bootstrappedEmptyList ∧
+    applyWith .current keyOnlySchema (bootstrapExisting bootstrappedEmptyList) emptyList =
+      .ok bootstrappedEmptyList := by
+  exact ⟨rfl,rfl⟩
+
 def fixtures : List Fixture := [
+  { name := "default-wrapper-reinitializes-empty-list-ownership",schema := keyOnlySchema
+    semantics := .current,bootstrap := true
+    steps := [⟨createList,{present := [itemCell,hostCell]}⟩,
+      ⟨emptyList,{absent := [items,item,host]}⟩,
+      ⟨emptyList,{present := [listCell]}⟩,
+      ⟨emptyList,{present := [listCell]}⟩,
+      ⟨emptyList,{present := [listCell]}⟩] },
   { name := "raw-empty-list-repetition-changes-presence",schema := keyOnlySchema,semantics := .current
     steps := [⟨createList,{present := [itemCell,hostCell]}⟩,
       ⟨emptyList,{absent := [items,item,host]}⟩,

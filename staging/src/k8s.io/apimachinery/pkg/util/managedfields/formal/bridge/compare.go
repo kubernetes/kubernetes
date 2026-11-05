@@ -109,7 +109,7 @@ func Compare(ctx context.Context, model string, cases []Case) (Summary, error) {
 			if err := compareStepFor(c, step, lean, actual); err != nil {
 				// The first failing prefix is enough to replay the discrepancy.
 				prefix, _ := json.Marshal(Corpus{Version: 1, Cases: []Case{{
-					Name: c.Name, Schema: c.Schema, RootType: c.RootType, Semantics: c.Semantics, Required: c.Required, Steps: c.Steps[:i+1],
+					Name: c.Name, Schema: c.Schema, RootType: c.RootType, Semantics: c.Semantics, Bootstrap: c.Bootstrap, Required: c.Required, Steps: c.Steps[:i+1],
 				}}})
 				return summary, fmt.Errorf("%s step %d: %w\nreproducer: %s", c.Name, i+1, err, prefix)
 			}
@@ -271,6 +271,20 @@ func GeneratedStructuralCases(seed int64, count, steps int) []Case {
 			c.Steps = append(c.Steps, Step{Operation: operation, Manager: []string{"A", "B", "C"}[random.Intn(3)], Force: random.Intn(3) == 0, Apply: object})
 		}
 		cases = append(cases, c)
+	}
+	return cases
+}
+
+// GeneratedBootstrapCases exercises the default Apply wrapper on the same
+// structural domain. Non-Apply histories need a model of probabilistic tracking.
+func GeneratedBootstrapCases(seed int64, count, steps int) []Case {
+	cases := GeneratedStructuralCases(seed, count, steps)
+	for i := range cases {
+		cases[i].Name = "bootstrap-" + cases[i].Name
+		cases[i].Bootstrap = true
+		for j := range cases[i].Steps {
+			cases[i].Steps[j].Operation = "apply"
+		}
 	}
 	return cases
 }

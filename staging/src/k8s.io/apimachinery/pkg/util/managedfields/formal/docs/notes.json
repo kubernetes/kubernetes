@@ -423,5 +423,32 @@
     "title": "Imported Go pruning reproduces the empty-list loss",
     "meaning": "The source-bound four-function pruning chain returns the state without the explicitly applied empty list, with all callees realized under every lawful map-iteration schedule.",
     "limits": "Concrete normalized object/field-set primitives. Their actual Go implementations remain a separate proof obligation; Go comparisons and the HTTP regression supply implementation evidence."
+  },
+  "SSA.bootstrap_preserves_data": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_keeps_nonempty_manager_map": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_from_empty_claims": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_creates_update_claims": {
+    "scope": "definition"
+  },
+  "SSA.Counterexamples.raw_apply_is_not_presence_idempotent": {
+    "title": "Even application-data presence changes on immediate repetition",
+    "meaning": "The current-SSA counterexample refutes the universal law that every field has the same container presence after the first and second identical accepted Apply.",
+    "limits": "This is independent of metadata, timestamps and internal list ordering. The concrete trace is also checked through the CRD HTTP API."
+  },
+  "SSA.Counterexamples.default_wrapper_bootstraps_empty_list_owner": {
+    "title": "The default wrapper creates an Update owner on the third Apply",
+    "meaning": "With no remaining claims, Update-from-empty initialization gives before-first-apply a presence claim on the existing empty list. The identical Apply retains that foreign Update claim.",
+    "limits": "A concrete proof in the separate bootstrap model, matched by NewSkipNonAppliedManager and HTTP/etcd execution. This is not a general source-refinement theorem for the default manager stack."
+  },
+  "SSA.Counterexamples.default_wrapper_fourth_apply_is_fixed": {
+    "title": "The fourth Apply preserves the bootstrapped data and claims",
+    "meaning": "The nonempty Update-manager map suppresses reinitialization; the repeated request returns the same modeled data and claims.",
+    "limits": "Concrete ownership/data fixed point. ResourceVersion stability is observed separately in the real HTTP test."
   }
 }

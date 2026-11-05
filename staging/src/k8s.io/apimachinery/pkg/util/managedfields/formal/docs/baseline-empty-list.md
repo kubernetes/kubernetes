@@ -81,6 +81,8 @@ verified here. A mutating webhook or a schema default could alter this trace.
   `raw_empty_list_second_apply_adds_presence` prove the two raw transitions.
 - `Counterexamples.raw_apply_is_not_unconditionally_idempotent` refutes the
   universally quantified immediate-idempotence proposition.
+  `raw_apply_is_not_presence_idempotent` refutes the corresponding
+  data-observation law, independently of metadata or internal list ordering.
 - `Counterexamples.pr_has_same_empty_list_counterexample` proves the same
   witness for PR semantics without additional required metadata.
 - `Counterexamples.required_list_retries_never_empty_the_list` proves that
@@ -92,8 +94,15 @@ verified here. A mutating webhook or a schema default could alter this trace.
   quantify over every lawful version-map iteration schedule. Typed/set
   primitives remain the normalized instance, with their existing proof boundary.
 - `testdata/bridge.yaml` checks exact data and sparse ownership against the
-  actual managedfields implementation. `testdata/pr336.yaml` checks both pinned
-  SMD revisions. Those inner traces use `items` as the field name.
+  actual managedfields implementation. Its explicit `bootstrap: true` case
+  wraps the actual `NewSkipNonAppliedManager`, matching the separate
+  `Bootstrap.bootstrapExisting` Update-from-empty model.
+  `Counterexamples.default_wrapper_bootstraps_empty_list_owner` proves the
+  concrete ownership transition; `default_wrapper_fourth_apply_is_fixed`
+  proves its next fixed point. Generated structural Apply histories also
+  exercise this wrapper. `testdata/pr336.yaml` checks both pinned SMD
+  revisions without this Kubernetes-only wrapper. The traces use `items` as
+  the field name.
 - `TestSSAEmptyAssociativeListPresence` in the Kubernetes
   `apiextensions-apiserver/test/integration` package checks actual HTTP Apply,
   persisted data and FieldsV1, OpenAPI required validation, CEL evaluation,
@@ -104,8 +113,11 @@ verified here. A mutating webhook or a schema default could alter this trace.
 The general `Contracts.accepted_apply_idempotent` theorem continues to describe
 the stronger proposed item-core transition. This counterexample proves why
 that theorem cannot be promoted to unconditional correctness of current SSA.
-The synthetic-wrapper ownership transition is checked through the actual API;
-it is not claimed as a general source-refinement theorem.
+The synthetic-wrapper ownership transition now has a separate model, concrete
+proof, inner-wrapper comparison and actual API regression. A general source
+refinement of that wrapper, including runtime metadata and error handling,
+remains a separate obligation. The bootstrap comparison accepts Apply-only
+histories; probabilistic tracking of non-Apply operations is outside its domain.
 
 ## Running the checks
 

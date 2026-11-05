@@ -74,6 +74,14 @@ type noDefaults struct{}
 
 func (noDefaults) Default(runtime.Object) {}
 
+type objectCreator struct{}
+
+func (objectCreator) New(gvk schema.GroupVersionKind) (runtime.Object, error) {
+	object := &unstructured.Unstructured{Object: map[string]any{}}
+	object.SetGroupVersionKind(gvk)
+	return object, nil
+}
+
 type goEngine struct {
 	manager internal.Manager
 	live    *unstructured.Unstructured
@@ -101,6 +109,9 @@ func newGoEngine(cases ...Case) (*goEngine, error) {
 		return nil, err
 	}
 	manager = internal.NewBuildManagerInfoManager(internal.NewStripMetaManager(manager), groupVersion, "")
+	if c.Bootstrap {
+		manager = internal.NewSkipNonAppliedManager(manager, objectCreator{})
+	}
 	return &goEngine{manager, envelope(map[string]any{}), internal.NewEmptyManaged(), sc}, nil
 }
 

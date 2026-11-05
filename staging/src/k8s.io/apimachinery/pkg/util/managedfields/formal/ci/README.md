@@ -92,7 +92,10 @@ go run ./cmd/ssa-compare -model .lake/build/bin/ssa-model -reproducer failure.js
 
 Each hand-authored step has a complete expected object and owner map. Expected
 proposal differences require both the Lean and Go outcome; changes to either
-outcome fail. No model-defect exception category is accepted.
+outcome fail. No model-defect exception category is accepted. Generated families
+cover scalars, structural Apply/Update, and the default Apply bootstrap wrapper.
+The bootstrap family is Apply-only; probabilistic non-Apply tracking is rejected
+as outside the model rather than silently approximated.
 The normal corpus reader refuses missing golden outcomes; only the explicit
 reproducer mode permits generated prefixes with no golden outcomes.
 

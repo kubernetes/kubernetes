@@ -155,6 +155,7 @@ In particular:
 | Baseline idempotence counterexample | `Counterexamples.raw_apply_is_not_unconditionally_idempotent`, `pr_has_same_empty_list_counterexample` | Explicit accepted raw transitions change field presence on immediate repetition. The universal baseline proposition is therefore false, independently of the PR. |
 | Source counterexample | `RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list` | Imported pruning AST with all callees realized, normalized primitives and every lawful iteration schedule; checked against actual Go and API execution. |
 | Required-list retry failure | `Counterexamples.required_list_retries_never_empty_the_list` | Every finite retry count under the explicit presence validator; the real OpenAPI and CEL implementations reproduce the rejection through HTTP. |
+| Default-wrapper initialization | `bootstrap_preserves_data`, `bootstrap_keeps_nonempty_manager_map`, `bootstrap_creates_update_claims` | General laws of the explicit Update-from-empty model. Concrete ownership-bootstrap/fixed-point proofs, the actual wrapper comparison and HTTP regression agree. Full wrapper source refinement and probabilistic Update tracking remain open. |
 
 `SSA/Counterexamples.lean` kernel-checks the raw PR fragmentation, partial-owner
 deletion, required-map shortcut, required-list failure, and opposite roles in
@@ -198,7 +199,8 @@ not arbitrary admission policies, Update, or the entire added object-scope
 operation. The unrestricted current-SSA version is false: an explicitly applied
 empty list can disappear on the first request and reappear on the second.
 The Kubernetes HTTP regression additionally observes a later synthetic Update
-owner from `skipNonAppliedManager`, outside the inner SMD bridge. These are
+owner from `skipNonAppliedManager`. A separate bootstrap-enabled bridge and
+model now cover that ownership transition for Apply-only histories. These are
 documented counterexamples, not suppressed comparison discrepancies.
 The original history theorem is a core safety induction; `scoped_history_preserves_invariants` also covers mixed scoped Apply/Update histories. The boundary
 composition theorems and bounded implementation comparisons are additional,
