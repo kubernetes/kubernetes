@@ -26,6 +26,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1289,4 +1291,50 @@ func (cache *cacheImpl) FindRootGroup(key fwk.EntityKey) (*fwk.GenericPodGroup, 
 			return nil, fmt.Errorf("pod key type not supported in FindRootGroup for %s", currentKey.String())
 		}
 	}
+}
+
+// AssumeGroupInitiallyScheduled records that the InitiallyScheduled condition of the group with the given key and UID is set to True.
+func (cache *cacheImpl) AssumeGroupInitiallyScheduled(logger klog.Logger, key fwk.EntityKey, uid types.UID) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		if pgs, exists := cache.podGroupStates[key]; exists {
+			pgs.setInitiallyScheduledUID(uid)
+		}
+	case fwk.CompositePodGroupKeyType:
+		if cpgs, exists := cache.compositePodGroupStates[key]; exists {
+			cpgs.setInitiallyScheduledUID(uid)
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unsupported entity key type", "key", key)
+	}
+}
+
+// IsGroupInitiallyScheduled returns the cached group with the given key, or nil if it isn't in the cache,
+// and whether its InitiallyScheduled condition is True in the cached object or was set to True by the scheduler.
+func (cache *cacheImpl) IsGroupInitiallyScheduled(logger klog.Logger, key fwk.EntityKey) (*fwk.GenericPodGroup, bool) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	switch key.Type {
+	case fwk.PodGroupKeyType:
+		if pgs, exists := cache.podGroupStates[key]; exists {
+			if pg := pgs.PodGroup(); pg != nil {
+				return fwk.NewGenericPodGroup(pg), apimeta.IsStatusConditionTrue(pg.Status.Conditions, schedulingv1beta1.PodGroupInitiallyScheduled) ||
+					(pg.UID != "" && pgs.getInitiallyScheduledUID() == pg.UID)
+			}
+		}
+	case fwk.CompositePodGroupKeyType:
+		if cpgs, exists := cache.compositePodGroupStates[key]; exists {
+			if cpg := cpgs.CompositePodGroup(); cpg != nil {
+				return fwk.NewGenericCompositePodGroup(cpg), apimeta.IsStatusConditionTrue(cpg.Status.Conditions, schedulingv1beta1.CompositePodGroupInitiallyScheduled) ||
+					(cpg.UID != "" && cpgs.getInitiallyScheduledUID() == cpg.UID)
+			}
+		}
+	default:
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unsupported entity key type", "key", key)
+	}
+	return nil, false
 }

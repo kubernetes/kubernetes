@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -160,24 +161,14 @@ func (sched *Scheduler) updatePodGroupConditionWithError(ctx context.Context, pg
 		if _, ok := errors.AsType[*validationError](err); ok {
 			pgReason = schedulingapi.PodGroupReasonPodGroupError
 		}
-		sched.updatePodGroupCondition(ctx, pgi, &metav1.Condition{
-			Type:    schedulingapi.PodGroupInitiallyScheduled,
-			Status:  metav1.ConditionFalse,
-			Reason:  pgReason,
-			Message: err.Error(),
-		})
+		sched.updateInitiallyScheduledCondition(ctx, pgi, metav1.ConditionFalse, pgReason, err.Error())
 		return
 	}
 	cpgReason := schedulingapi.CompositePodGroupReasonSchedulerError
 	if _, ok := errors.AsType[*validationError](err); ok {
 		cpgReason = schedulingapi.CompositePodGroupReasonCompositePodGroupError
 	}
-	sched.updateCompositePodGroupCondition(ctx, pgi, &metav1.Condition{
-		Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
-		Status:  metav1.ConditionFalse,
-		Reason:  cpgReason,
-		Message: err.Error(),
-	})
+	sched.updateInitiallyScheduledCondition(ctx, pgi, metav1.ConditionFalse, cpgReason, err.Error())
 	for _, child := range pgi.Children() {
 		sched.updatePodGroupConditionWithError(ctx, child, err)
 	}
@@ -563,24 +554,15 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 func (sched *Scheduler) submitCompositePodGroupResult(ctx context.Context, podGroupResult *PodGroupScheduledResult) {
 	logger := klog.FromContext(ctx)
 	pgi := podGroupResult.podGroupInfo
-	var condition *metav1.Condition
+	var status metav1.ConditionStatus
+	var reason string
 	switch {
 	case podGroupResult.status.IsSuccess():
-		condition = &metav1.Condition{
-			Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
-			Status:  metav1.ConditionTrue,
-			Reason:  schedulingapi.CompositePodGroupReasonScheduled,
-			Message: podGroupResult.status.Message(),
-		}
+		status, reason = metav1.ConditionTrue, schedulingapi.CompositePodGroupReasonScheduled
 		logger.V(2).Info("Successfully scheduled a composite pod group", "compositePodGroup", klog.KObj(pgi))
 
 	case podGroupResult.status.IsRejected():
-		condition = &metav1.Condition{
-			Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
-			Status:  metav1.ConditionFalse,
-			Reason:  schedulingapi.CompositePodGroupReasonUnschedulable,
-			Message: podGroupResult.status.Message(),
-		}
+		status, reason = metav1.ConditionFalse, schedulingapi.CompositePodGroupReasonUnschedulable
 		if podGroupResult.waitingOnPreemption {
 			logger.V(2).Info("Composite pod group is waiting for preemption", "compositePodGroup", klog.KObj(pgi), "err", podGroupResult.status.Message())
 		} else {
@@ -588,15 +570,10 @@ func (sched *Scheduler) submitCompositePodGroupResult(ctx context.Context, podGr
 		}
 
 	default:
-		condition = &metav1.Condition{
-			Type:    schedulingapi.CompositePodGroupInitiallyScheduled,
-			Status:  metav1.ConditionFalse,
-			Reason:  schedulingapi.CompositePodGroupReasonSchedulerError,
-			Message: podGroupResult.status.Message(),
-		}
+		status, reason = metav1.ConditionFalse, schedulingapi.CompositePodGroupReasonSchedulerError
 		utilruntime.HandleErrorWithContext(ctx, podGroupResult.status.AsError(), "Error scheduling composite pod group", "compositePodGroup", klog.KObj(pgi))
 	}
-	sched.updateCompositePodGroupCondition(ctx, pgi, condition)
+	sched.updateInitiallyScheduledCondition(ctx, pgi, status, reason, podGroupResult.status.Message())
 }
 
 // submitPodGroupResult processes scheduling results for a leaf PodGroup and its member pods.
@@ -672,24 +649,15 @@ func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk frame
 		}
 	}
 
-	var condition *metav1.Condition
+	var status metav1.ConditionStatus
+	var reason string
 	switch {
 	case podGroupResult.status.IsSuccess():
-		condition = &metav1.Condition{
-			Type:    schedulingapi.PodGroupInitiallyScheduled,
-			Status:  metav1.ConditionTrue,
-			Reason:  schedulingapi.PodGroupReasonScheduled,
-			Message: podGroupResult.status.Message(),
-		}
+		status, reason = metav1.ConditionTrue, schedulingapi.PodGroupReasonScheduled
 		logger.V(2).Info("Successfully scheduled a pod group", "podGroup", klog.KObj(pgi), "scheduledPods", scheduledPods, "unschedulablePods", unschedulablePods)
 
 	case podGroupResult.status.IsRejected():
-		condition = &metav1.Condition{
-			Type:    schedulingapi.PodGroupInitiallyScheduled,
-			Status:  metav1.ConditionFalse,
-			Reason:  schedulingapi.PodGroupReasonUnschedulable,
-			Message: podGroupResult.status.Message(),
-		}
+		status, reason = metav1.ConditionFalse, schedulingapi.PodGroupReasonUnschedulable
 		if podGroupResult.waitingOnPreemption {
 			logger.V(2).Info("Pod group is waiting for preemption", "podGroup", klog.KObj(pgi), "unschedulablePods", unschedulablePods, "err", podGroupResult.status.Message())
 		} else {
@@ -697,69 +665,66 @@ func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk frame
 		}
 
 	default:
-		condition = &metav1.Condition{
-			Type:    schedulingapi.PodGroupInitiallyScheduled,
-			Status:  metav1.ConditionFalse,
-			Reason:  schedulingapi.PodGroupReasonSchedulerError,
-			Message: podGroupResult.status.Message(),
-		}
+		status, reason = metav1.ConditionFalse, schedulingapi.PodGroupReasonSchedulerError
 		utilruntime.HandleErrorWithContext(ctx, podGroupResult.status.AsError(), "Error scheduling pod group", "podGroup", klog.KObj(pgi), "errorPods", len(queuedPodInfos))
 	}
-	sched.updatePodGroupCondition(ctx, pgi, condition)
+	sched.updateInitiallyScheduledCondition(ctx, pgi, status, reason, podGroupResult.status.Message())
 }
 
-// updatePodGroupCondition patches the given condition on a PodGroup.
-func (sched *Scheduler) updatePodGroupCondition(ctx context.Context,
-	podGroupInfo *framework.PodGroupInfo, condition *metav1.Condition) {
+// updateInitiallyScheduledCondition patches the InitiallyScheduled condition of a PodGroup or a CompositePodGroup.
+func (sched *Scheduler) updateInitiallyScheduledCondition(ctx context.Context,
+	podGroupInfo *framework.PodGroupInfo, status metav1.ConditionStatus, reason, message string) {
 	logger := klog.FromContext(ctx)
 
 	// Get the newest object from cache to ensure the update below serves on the newest object possible.
-	pg, err := sched.Cache.PodGroups().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
-	if err != nil {
+	gpg, initiallyScheduled := sched.Cache.IsGroupInitiallyScheduled(logger, podGroupInfo.GetKey())
+	// Skip the update if the group was deleted or recreated during the scheduling cycle.
+	if gpg == nil || gpg.GetUID() != podGroupInfo.GetUID() {
 		return
 	}
-	// If the PodGroup was already successfully scheduled, don't regress the
-	// condition back to False on a subsequent cycle for extra pods.
-	existing := apimeta.FindStatusCondition(pg.Status.Conditions, condition.Type)
-	if existing != nil && existing.Status == metav1.ConditionTrue && condition.Status != metav1.ConditionTrue {
-		return
-	}
-
-	condition.ObservedGeneration = pg.Generation
-	newStatus := pg.Status.DeepCopy()
-	if !apimeta.SetStatusCondition(&newStatus.Conditions, *condition) {
+	// If the group was already successfully scheduled, don't update
+	// the condition on a subsequent cycle for extra pods.
+	if initiallyScheduled {
 		return
 	}
 
-	if err := util.PatchPodGroupStatus(ctx, sched.client, podGroupInfo.GetName(), podGroupInfo.GetNamespace(), &pg.Status, newStatus); err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update PodGroup status", "podGroup", klog.KObj(podGroupInfo))
+	condition := metav1.Condition{Status: status, Reason: reason, Message: message}
+	var patch func() error
+	switch gpg.GetType() {
+	case fwk.PodGroupKeyType:
+		pg := gpg.GetPodGroup()
+		condition.Type = schedulingapi.PodGroupInitiallyScheduled
+		condition.ObservedGeneration = pg.Generation
+		newStatus := pg.Status.DeepCopy()
+		if !apimeta.SetStatusCondition(&newStatus.Conditions, condition) {
+			return
+		}
+		patch = func() error {
+			return util.PatchPodGroupStatus(ctx, sched.client, gpg.GetName(), gpg.GetNamespace(), &pg.Status, newStatus)
+		}
+	case fwk.CompositePodGroupKeyType:
+		cpg := gpg.GetCompositePodGroup()
+		condition.Type = schedulingapi.CompositePodGroupInitiallyScheduled
+		condition.ObservedGeneration = cpg.Generation
+		newStatus := cpg.Status.DeepCopy()
+		if !apimeta.SetStatusCondition(&newStatus.Conditions, condition) {
+			return
+		}
+		patch = func() error {
+			return util.PatchCompositePodGroupStatus(ctx, sched.client, gpg.GetName(), gpg.GetNamespace(), &cpg.Status, newStatus)
+		}
 	}
-}
 
-// updateCompositePodGroupCondition patches the given condition on a CompositePodGroup.
-func (sched *Scheduler) updateCompositePodGroupCondition(ctx context.Context,
-	podGroupInfo *framework.PodGroupInfo, condition *metav1.Condition) {
-	logger := klog.FromContext(ctx)
-
-	// Get the newest object from cache to ensure the update below serves on the newest object possible.
-	cpg, err := sched.Cache.CompositePodGroups().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
-	if err != nil {
+	if err := patch(); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.V(4).Info("Group is already deleted, skipping status update", "groupType", gpg.GetType(), "group", klog.KObj(gpg))
+			return
+		}
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update group status", "groupType", gpg.GetType(), "group", klog.KObj(gpg))
 		return
 	}
-	// If the CompositePodGroup was already successfully scheduled, don't regress the
-	// condition back to False on a subsequent cycle for extra pods.
-	existing := apimeta.FindStatusCondition(cpg.Status.Conditions, condition.Type)
-	if existing != nil && existing.Status == metav1.ConditionTrue && condition.Status != metav1.ConditionTrue {
-		return
-	}
-
-	condition.ObservedGeneration = cpg.Generation
-	newStatus := cpg.Status.DeepCopy()
-	if !apimeta.SetStatusCondition(&newStatus.Conditions, *condition) {
-		return
-	}
-
-	if err := util.PatchCompositePodGroupStatus(ctx, sched.client, podGroupInfo.GetName(), podGroupInfo.GetNamespace(), &cpg.Status, newStatus); err != nil {
-		utilruntime.HandleErrorWithLogger(logger, err, "Failed to update CompositePodGroup status", "compositePodGroup", klog.KObj(podGroupInfo))
+	// Record the True condition until the cache observes it, so that a later cycle doesn't regress it.
+	if status == metav1.ConditionTrue {
+		sched.Cache.AssumeGroupInitiallyScheduled(logger, gpg.GetKey(), gpg.GetUID())
 	}
 }
