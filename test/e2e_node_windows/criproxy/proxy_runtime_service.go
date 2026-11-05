@@ -62,6 +62,7 @@ const (
 	CheckpointContainer       = "CheckpointContainer"
 	CheckpointPod             = "CheckpointPod"
 	RestorePod                = "RestorePod"
+	CancelPodOperation        = "CancelPodOperation"
 	GetContainerEvents        = "GetContainerEvents"
 	ListMetricDescriptors     = "ListMetricDescriptors"
 	ListPodSandboxMetrics     = "ListPodSandboxMetrics"
@@ -494,6 +495,17 @@ func (p *RemoteRuntime) CheckpointPod(ctx context.Context, req *runtimeapi.Check
 		return nil, err
 	}
 	return &runtimeapi.CheckpointPodResponse{}, nil
+}
+
+// CancelPodOperation forwards cancellation to the runtime service.
+func (p *RemoteRuntime) CancelPodOperation(ctx context.Context, req *runtimeapi.CancelPodOperationRequest) (*runtimeapi.CancelPodOperationResponse, error) {
+	if err := p.runInjectors(CancelPodOperation); err != nil {
+		return nil, err
+	}
+	if err := p.runtimeService.CancelPodOperation(ctx, req); err != nil {
+		return nil, err
+	}
+	return &runtimeapi.CancelPodOperationResponse{}, nil
 }
 
 // RestorePod restores a pod sandbox from a checkpoint.

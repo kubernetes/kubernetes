@@ -33,6 +33,7 @@ type linter struct {
 	rules  []lintRule
 	// noLintTag is the qualified name of the tag that disables linting.
 	noLintTag string
+	opaqueTag string
 	// lintErrors is all the errors, grouped by type, that occurred during the
 	// linting process.
 	lintErrors map[*types.Type][]error
@@ -64,6 +65,7 @@ func newLinter(tagPrefix string, rules ...lintRule) *linter {
 		linted:     make(map[*types.Type]bool),
 		rules:      rules,
 		noLintTag:  tagPrefix + noLintTagName,
+		opaqueTag:  tagPrefix + "opaqueType",
 		lintErrors: map[*types.Type][]error{},
 	}
 }
@@ -104,6 +106,10 @@ func (l *linter) lintType(t *types.Type) error {
 			}
 			for _, lintErr := range lintErrs {
 				l.AddError(t, member.Name, lintErr)
+			}
+			// Opaque fields keep field-level rules but do not validate the nested type.
+			if _, opaque := codetags.Extract("+", member.CommentLines)[l.opaqueTag]; opaque {
+				continue
 			}
 			if err := l.lintType(member.Type); err != nil {
 				return err

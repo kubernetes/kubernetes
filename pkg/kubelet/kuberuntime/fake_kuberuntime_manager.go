@@ -64,8 +64,9 @@ func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
 }
 
 type fakePodStateProvider struct {
-	terminated map[types.UID]struct{}
-	removed    map[types.UID]struct{}
+	operationPending map[types.UID]struct{}
+	terminated       map[types.UID]struct{}
+	removed          map[types.UID]struct{}
 }
 
 func newFakePodStateProvider() *fakePodStateProvider {
@@ -73,6 +74,11 @@ func newFakePodStateProvider() *fakePodStateProvider {
 		terminated: make(map[types.UID]struct{}),
 		removed:    make(map[types.UID]struct{}),
 	}
+}
+
+func (f *fakePodStateProvider) PodOperationMayUsePodResources(uid types.UID) bool {
+	_, found := f.operationPending[uid]
+	return found
 }
 
 func (f *fakePodStateProvider) IsPodTerminationRequested(uid types.UID) bool {

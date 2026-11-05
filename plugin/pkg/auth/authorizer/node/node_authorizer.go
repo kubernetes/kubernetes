@@ -32,6 +32,7 @@ import (
 	certsapi "k8s.io/kubernetes/pkg/apis/certificates"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -59,7 +60,9 @@ import (
 //     existing object has the node in its NodeName field. For create, the access gets
 //     granted because the noderestriction admission plugin checks that the NodeName
 //     is set to the node.
-//  5. For other resources, authorize all nodes uniformly using statically defined rules
+//  5. For podcheckpoints, require the assigned node for individual reads and
+//     status writes, and a matching status.nodeName selector for list/watch.
+//  6. For other resources, authorize all nodes uniformly using statically defined rules
 type NodeAuthorizer struct {
 	graph      *Graph
 	identifier nodeidentifier.NodeIdentifier
@@ -96,6 +99,7 @@ var (
 	leaseResource         = coordapi.Resource("leases")
 	csiNodeResource       = storageapi.Resource("csinodes")
 	pcrResource           = certsapi.Resource("podcertificaterequests")
+	podCheckpointResource = nodeapi.Resource("podcheckpoints")
 )
 
 func (r *NodeAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -159,6 +163,11 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			return r.authorizeNode(nodeName, attrs)
 		case podResource:
 			return r.authorizePod(nodeName, attrs)
+		case podCheckpointResource:
+			if r.features.Enabled(features.PodLevelCheckpointRestore) {
+				return r.authorizePodCheckpoint(nodeName, attrs)
+			}
+			return authorizer.DecisionNoOpinion, "", nil
 		case pcrResource:
 			if r.features.Enabled(features.PodCertificateRequest) {
 				return r.authorizePodCertificateRequest(nodeName, attrs)
@@ -562,4 +571,32 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 		return false, fmt.Errorf("node '%s' cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 	return true, nil
+}
+
+// authorizePodCheckpoint limits reads to the assigned node. Status writes also
+// require a graph relationship; NodeRestriction protects the assignment and UID.
+func (r *NodeAuthorizer) authorizePodCheckpoint(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	switch attrs.GetSubresource() {
+	case "":
+		switch attrs.GetVerb() {
+		case "get":
+			return r.authorizeGet(nodeName, podCheckpointVertexType, attrs)
+		case "list", "watch":
+			requirements, err := attrs.GetFieldSelector()
+			if err != nil {
+				return authorizer.DecisionNoOpinion, "invalid field selector for podcheckpoints", nil
+			}
+			for _, requirement := range requirements {
+				if requirement.Field == "status.nodeName" && requirement.Operator == selection.Equals && requirement.Value == nodeName {
+					return authorizer.DecisionAllow, "", nil
+				}
+			}
+			return authorizer.DecisionNoOpinion, "can only list/watch podcheckpoints with status.nodeName field selector", nil
+		}
+	case "status":
+		if attrs.GetVerb() == "update" || attrs.GetVerb() == "patch" {
+			return r.authorize(nodeName, podCheckpointVertexType, attrs)
+		}
+	}
+	return authorizer.DecisionNoOpinion, "", nil
 }

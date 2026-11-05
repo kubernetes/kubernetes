@@ -536,6 +536,17 @@ type KubeletConfiguration struct {
 	// Default: "2m"
 	// +optional
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout,omitempty"`
+	// podCheckpointTimeout limits probe draining and the CheckpointPod request
+	// before cancellation. The kubelet clamps a PodCheckpoint's
+	// spec.timeoutSeconds to this ceiling. Runtime cleanup can outlive the
+	// deadline; probes resume after completion is confirmed, so this does not
+	// promise a hard freeze bound. Checkpoint time grows with the Pod's
+	// memory and depends on disk throughput, so raise this value on nodes that
+	// checkpoint Pods with large memory footprints.
+	// Requires the PodLevelCheckpointRestore feature gate to be enabled.
+	// Default: "5m"
+	// +optional
+	PodCheckpointTimeout metav1.Duration `json:"podCheckpointTimeout,omitempty"`
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to

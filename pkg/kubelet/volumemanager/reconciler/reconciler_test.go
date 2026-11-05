@@ -100,6 +100,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 
 	// Act
@@ -146,6 +147,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -244,6 +246,7 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -348,6 +351,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -430,6 +434,7 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -511,6 +516,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -616,6 +622,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -742,6 +749,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 
 	volumeSpec := &volume.Spec{
@@ -860,6 +868,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 
 	podName := util.GetUniquePodName(pod)
@@ -960,6 +969,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 
 	podName := util.GetUniquePodName(pod)
@@ -1087,6 +1097,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 
 	podName := util.GetUniquePodName(pod)
@@ -1370,6 +1381,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				hostutil.NewFakeHostUtil(nil),
 				volumePluginMgr,
 				kubeletPodsDir,
+				nil,
 				nil)
 
 			volumeSpec := &volume.Spec{PersistentVolume: pv}
@@ -1633,6 +1645,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					hostutil.NewFakeHostUtil(nil),
 					volumePluginMgr,
 					uniquePodDir,
+					nil,
 					nil)
 				volumeSpec := &volume.Spec{PersistentVolume: pv}
 				podName := util.GetUniquePodName(pod)
@@ -1855,6 +1868,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					hostutil.NewFakeHostUtil(nil),
 					volumePluginMgr,
 					uniquePodDir,
+					nil,
 					nil)
 				volumeSpec := &volume.Spec{PersistentVolume: pv}
 				podName := util.GetUniquePodName(pod)
@@ -2194,6 +2208,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2354,6 +2369,7 @@ func getReconciler(kubeletDir string, t *testing.T, volumePaths []string, kubeCl
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		tmpKubeletPodDir,
+		nil,
 		nil)
 	return rc, fakePlugin
 }
@@ -2403,6 +2419,7 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	reconciler := rc.(*reconciler)
 
@@ -2508,6 +2525,7 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir,
+		nil,
 		nil)
 	reconciler := rc.(*reconciler)
 

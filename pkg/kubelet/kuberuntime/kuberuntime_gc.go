@@ -52,6 +52,15 @@ func newContainerGC(client internalapi.RuntimeService, podStateProvider podState
 	}
 }
 
+// Removal predicates allow quota collection for ordinary active Pods. A pending
+// operation must also exclude its resources from that collection.
+func (cgc *containerGC) podOperationMayUsePodResources(uid types.UID) bool {
+	provider, ok := cgc.podStateProvider.(interface {
+		PodOperationMayUsePodResources(types.UID) bool
+	})
+	return ok && provider.PodOperationMayUsePodResources(uid)
+}
+
 // containerGCInfo is the internal information kept for containers being considered for GC.
 type containerGCInfo struct {
 	// The ID of the container.
@@ -209,6 +218,9 @@ func (cgc *containerGC) evictableContainers(ctx context.Context, minAge time.Dur
 		}
 
 		labeledInfo := getContainerInfoFromLabels(ctx, container.Labels)
+		if cgc.podOperationMayUsePodResources(labeledInfo.PodUID) {
+			continue
+		}
 		containerInfo := containerGCInfo{
 			id:         container.Id,
 			name:       container.Metadata.Name,
@@ -312,6 +324,9 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 	}
 
 	for podUID, sandboxes := range sandboxesByPod {
+		if cgc.podOperationMayUsePodResources(podUID) {
+			continue
+		}
 		if cgc.podStateProvider.ShouldPodContentBeRemoved(podUID) || (evictNonDeletedPods && cgc.podStateProvider.ShouldPodRuntimeBeRemoved(podUID)) {
 			// Remove all evictable sandboxes if the pod has been removed.
 			// Note that the latest dead sandbox is also removed if there is

@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -71,10 +72,11 @@ type manager struct {
 	kubeClient clientset.Interface
 	podManager PodManager
 	// Map from pod UID to sync status of the corresponding pod.
-	podStatuses         map[types.UID]versionedPodStatus
-	podResizeConditions map[types.UID]podResizeConditions
-	podStatusesLock     sync.RWMutex
-	podStatusChannel    chan struct{}
+	podStatuses                map[types.UID]versionedPodStatus
+	podResizeConditions        map[types.UID]podResizeConditions
+	podCheckpointingConditions map[types.UID]v1.PodCondition
+	podStatusesLock            sync.RWMutex
+	podStatusChannel           chan struct{}
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
@@ -158,6 +160,10 @@ type Manager interface {
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
 	SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodStatus) (v1.PodStatus, bool)
 
+	// SetPodCheckpointingCondition publishes the node-local checkpoint window.
+	// A nil condition clears it; later status updates cannot restore stale state.
+	SetPodCheckpointingCondition(podUID types.UID, condition *v1.PodCondition)
+
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
 	SetContainerReadiness(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
@@ -217,14 +223,15 @@ const syncPeriod = 10 * time.Second
 // NewManager returns a functional Manager.
 func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
 	return &manager{
-		kubeClient:              kubeClient,
-		podManager:              podManager,
-		podStatuses:             make(map[types.UID]versionedPodStatus),
-		podResizeConditions:     make(map[types.UID]podResizeConditions),
-		podStatusChannel:        make(chan struct{}, 1),
-		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
-		podDeletionSafety:       podDeletionSafety,
-		podStartupLatencyHelper: podStartupLatencyHelper,
+		kubeClient:                 kubeClient,
+		podManager:                 podManager,
+		podStatuses:                make(map[types.UID]versionedPodStatus),
+		podResizeConditions:        make(map[types.UID]podResizeConditions),
+		podCheckpointingConditions: make(map[types.UID]v1.PodCondition),
+		podStatusChannel:           make(chan struct{}, 1),
+		apiStatusVersions:          make(map[kubetypes.MirrorPodUID]uint64),
+		podDeletionSafety:          podDeletionSafety,
+		podStartupLatencyHelper:    podStartupLatencyHelper,
 	}
 }
 
@@ -506,6 +513,52 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 	notification = notif
 
 	return m.podStatuses[pod.UID].status, changed
+}
+
+func (m *manager) SetPodCheckpointingCondition(podUID types.UID, condition *v1.PodCondition) {
+	logger := klog.Background()
+	var notification *podStatusNotification
+	defer func() {
+		if notification != nil {
+			m.sendNotification(logger, notification)
+		}
+	}()
+
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	pod, found := m.podManager.GetPodByUID(podUID)
+	if !found {
+		delete(m.podCheckpointingConditions, podUID)
+		return
+	}
+	cached, isCached := m.podStatuses[podUID]
+	if condition == nil && !isCached {
+		delete(m.podCheckpointingConditions, podUID)
+		return
+	}
+
+	if condition != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if m.podCheckpointingConditions == nil {
+			m.podCheckpointingConditions = make(map[types.UID]v1.PodCondition)
+		}
+		current := *condition
+		current.Type = v1.PodCheckpointing
+		if previous, active := m.podCheckpointingConditions[podUID]; active && previous.Status == current.Status {
+			current.LastTransitionTime = previous.LastTransitionTime
+		} else if current.LastTransitionTime.IsZero() {
+			current.LastTransitionTime = metav1.Now()
+		}
+		m.podCheckpointingConditions[podUID] = current
+	} else {
+		delete(m.podCheckpointingConditions, podUID)
+	}
+
+	status := &pod.Status
+	if isCached {
+		status = &cached.status
+	}
+	_, notification = m.updateStatusInternal(logger, pod, *status.DeepCopy(), false, false)
 }
 
 func (m *manager) SetContainerReadiness(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
@@ -948,6 +1001,20 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		oldStatus = pod.Status
 	}
 
+	// Checkpoint windows change outside SyncPod. Merge their current state
+	// under the status lock so an older generated status cannot undo a start
+	// or restore the condition after the window ends or the kubelet restarts.
+	status.Conditions = slices.DeleteFunc(status.Conditions, func(condition v1.PodCondition) bool {
+		return condition.Type == v1.PodCheckpointing
+	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelCheckpointRestore) {
+		if condition, active := m.podCheckpointingConditions[pod.UID]; active {
+			status.Conditions = append(status.Conditions, condition)
+		}
+	} else {
+		delete(m.podCheckpointingConditions, pod.UID)
+	}
+
 	// Check for illegal state transition in containers
 	if err := checkContainerStateTransition(&oldStatus, &status, &pod.Spec); err != nil {
 		logger.Error(err, "Status update on pod aborted", "pod", klog.KObj(pod))
@@ -1132,6 +1199,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	delete(m.podStatuses, uid)
+	delete(m.podCheckpointingConditions, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		if conds, exists := m.podResizeConditions[uid]; exists {
@@ -1151,6 +1219,7 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 		if _, ok := podUIDs[key]; !ok {
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)
+			delete(m.podCheckpointingConditions, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				if conds, exists := m.podResizeConditions[key]; exists {
 					m.observeDeferredResizeDuration(key, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)

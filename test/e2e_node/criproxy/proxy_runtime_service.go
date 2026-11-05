@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -62,6 +64,7 @@ const (
 	CheckpointContainer       = "CheckpointContainer"
 	CheckpointPod             = "CheckpointPod"
 	RestorePod                = "RestorePod"
+	CancelPodOperation        = "CancelPodOperation"
 	GetContainerEvents        = "GetContainerEvents"
 	ListMetricDescriptors     = "ListMetricDescriptors"
 	ListPodSandboxMetrics     = "ListPodSandboxMetrics"
@@ -80,16 +83,25 @@ const (
 
 // AddInjector inject the error or delay to the next call to the RuntimeService.
 func (p *RemoteRuntime) AddInjector(injector func(string) error) {
+	p.injectorsLock.Lock()
+	defer p.injectorsLock.Unlock()
 	p.injectors = append(p.injectors, injector)
 }
 
 // ResetInjectors resets all registered injectors.
 func (p *RemoteRuntime) ResetInjectors() {
-	p.injectors = []func(string) error{}
+	p.injectorsLock.Lock()
+	defer p.injectorsLock.Unlock()
+	p.injectors = nil
 }
 
 func (p *RemoteRuntime) runInjectors(apiName string) error {
-	for _, injector := range p.injectors {
+	p.injectorsLock.RLock()
+	injectors := slices.Clone(p.injectors)
+	p.injectorsLock.RUnlock()
+
+	// An injector can block an RPC while the test resets the next RPC's hooks.
+	for _, injector := range injectors {
 		if err := injector(apiName); err != nil {
 			return err
 		}
@@ -100,6 +112,7 @@ func (p *RemoteRuntime) runInjectors(apiName string) error {
 // RemoteRuntime represents a proxy for remote container runtime.
 type RemoteRuntime struct {
 	server         *grpc.Server
+	injectorsLock  sync.RWMutex
 	injectors      []func(string) error
 	runtimeService internalapi.RuntimeService
 	imageService   internalapi.ImageManagerService
@@ -494,6 +507,17 @@ func (p *RemoteRuntime) CheckpointPod(ctx context.Context, req *runtimeapi.Check
 		return nil, err
 	}
 	return &runtimeapi.CheckpointPodResponse{}, nil
+}
+
+// CancelPodOperation forwards cancellation to the runtime service.
+func (p *RemoteRuntime) CancelPodOperation(ctx context.Context, req *runtimeapi.CancelPodOperationRequest) (*runtimeapi.CancelPodOperationResponse, error) {
+	if err := p.runInjectors(CancelPodOperation); err != nil {
+		return nil, err
+	}
+	if err := p.runtimeService.CancelPodOperation(ctx, req); err != nil {
+		return nil, err
+	}
+	return &runtimeapi.CancelPodOperationResponse{}, nil
 }
 
 // RestorePod restores a pod sandbox from a checkpoint.

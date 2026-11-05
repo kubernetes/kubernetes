@@ -294,6 +294,39 @@ func TestRuleAlphaBetaPrefix(t *testing.T) {
 	}
 }
 
+func TestLintOpaqueField(t *testing.T) {
+	for _, prefix := range []string{"k8s:", "custom:"} {
+		t.Run(prefix, func(t *testing.T) {
+			nested := testStruct("Nested", []types.Member{
+				testField("Value", testType("string")),
+			})
+			root := testStruct("Root", []types.Member{
+				testField("Opaque", nested, "+"+prefix+"opaqueType"),
+				testField("Checked", nested),
+			})
+			l := newLinter(prefix, ruleAlwaysFail)
+			if err := l.lintType(root); err != nil {
+				t.Fatal(err)
+			}
+			if len(l.lintErrors[root]) != 2 {
+				t.Fatalf("expected both fields to be linted, got %v", l.lintErrors[root])
+			}
+			if len(l.lintErrors[nested]) == 0 {
+				t.Fatal("opaque use must not suppress linting through a non-opaque field")
+			}
+
+			l = newLinter(prefix, ruleAlwaysFail)
+			root.Members = root.Members[:1]
+			if err := l.lintType(root); err != nil {
+				t.Fatal(err)
+			}
+			if len(l.lintErrors[root]) != 1 || len(l.lintErrors[nested]) != 0 {
+				t.Fatalf("expected only opaque field rules to run, got %v", l.lintErrors)
+			}
+		})
+	}
+}
+
 func TestLintType(t *testing.T) {
 	tests := []struct {
 		name        string
