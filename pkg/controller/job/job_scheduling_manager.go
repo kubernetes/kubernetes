@@ -400,7 +400,7 @@ func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 // controller compiles for a Job. A Job-owned Workload has exactly one template.
 func podGroupTemplateName(job *batch.Job) string {
 	const suffix = "-pgt-0"
-	templateName := job.Name + suffix
+	templateName := strings.ReplaceAll(job.Name, ".", "-") + suffix
 	// Preserve the suffix while keeping the name within the DNS label limit.
 	if len(templateName) > validation.DNS1123LabelMaxLength {
 		templateName = templateName[:validation.DNS1123LabelMaxLength-len(suffix)] + suffix

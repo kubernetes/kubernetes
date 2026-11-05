@@ -5143,6 +5143,7 @@ func TestJobGangScheduling(t *testing.T) {
 	})
 
 	cases := map[string]struct {
+		jobName        string
 		jobSpec        batchv1.JobSpec
 		expectWorkload bool
 		expectPodGroup bool
@@ -5151,6 +5152,7 @@ func TestJobGangScheduling(t *testing.T) {
 		// restarts the controller after the Workload is created
 		// and verifies the Workload UID is preserved.
 		simulateRestart   bool
+		wantTemplateName  string
 		wantGangMinCount  *int32
 		wantDisruptionAll bool
 		wantTopologyKey   string
@@ -5172,6 +5174,16 @@ func TestJobGangScheduling(t *testing.T) {
 			expectWorkload: true,
 			expectPodGroup: true,
 			wantActivePods: 3,
+		},
+		"non-indexed job with dots in name creates workload and podgroup": {
+			jobName: "backup.daily",
+			jobSpec: batchv1.JobSpec{
+				Parallelism: ptr.To[int32](1),
+			},
+			expectWorkload:   true,
+			expectPodGroup:   true,
+			wantActivePods:   1,
+			wantTemplateName: "backup-daily-pgt-0",
 		},
 		"single-pod basic job materializes objects": {
 			jobSpec: batchv1.JobSpec{
@@ -5317,7 +5329,8 @@ func TestJobGangScheduling(t *testing.T) {
 			t.Cleanup(closeFn)
 
 			jobObj, err := createJobWithDefaults(t.Context(), clientSet, ns.Name, &batchv1.Job{
-				Spec: tc.jobSpec,
+				ObjectMeta: metav1.ObjectMeta{Name: tc.jobName},
+				Spec:       tc.jobSpec,
 			})
 			if err != nil {
 				t.Fatalf("Failed to create Job: %v", err)
@@ -5460,6 +5473,10 @@ func TestJobGangScheduling(t *testing.T) {
 					t.Fatalf("expected exactly one PodGroupTemplate, got %d", len(workload.Spec.PodGroupTemplates))
 				}
 				pgt := workload.Spec.PodGroupTemplates[0]
+
+				if tc.wantTemplateName != "" && pgt.Name != tc.wantTemplateName {
+					t.Errorf("Workload template name = %q, want %q", pgt.Name, tc.wantTemplateName)
+				}
 
 				if tc.wantGangMinCount != nil {
 					if pgt.SchedulingPolicy.Gang == nil || pgt.SchedulingPolicy.Gang.MinCount != *tc.wantGangMinCount {
