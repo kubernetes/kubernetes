@@ -739,6 +739,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.38"
+- name: ExternalNodeLivenessDetection
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ExternalServiceAccountTokenSigner
   versionedSpecs:
   - default: false

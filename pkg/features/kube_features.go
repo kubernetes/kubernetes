@@ -422,6 +422,13 @@ const (
 	// if the kubelet has advertised that it supports them.
 	ExtendWebSocketsToKubelet featuregate.Feature = "ExtendWebSocketsToKubelet"
 
+	// owner: @jpbetz, @howieraem
+	// kep: https://kep.k8s.io/6371
+	//
+	// Enables delegating node liveness detection to an external component via
+	// --node-liveness-source=external on kube-controller-manager and enableNodeLease: false on kubelet.
+	ExternalNodeLivenessDetection featuregate.Feature = "ExternalNodeLivenessDetection"
+
 	// owner: @HarshalNeelkamal
 	//
 	// Enables external service account JWT signing and key management.
@@ -1486,6 +1493,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	ExternalNodeLivenessDetection: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ExternalServiceAccountTokenSigner: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
@@ -2435,6 +2446,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	EvictionRequestAPI: {},
 
 	ExtendWebSocketsToKubelet: {NodeDeclaredFeatures},
+
+	ExternalNodeLivenessDetection: {},
 
 	ExternalServiceAccountTokenSigner: {},
 
