@@ -1459,14 +1459,12 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 func TestEventsToRegister(t *testing.T) {
 	tests := []struct {
-		name                            string
-		enableInPlacePodVerticalScaling bool
-		enableDRAExtendedResource       bool
-		expectedClusterEvents           []fwk.ClusterEventWithHint
+		name                      string
+		enableDRAExtendedResource bool
+		expectedClusterEvents     []fwk.ClusterEventWithHint
 	}{
 		{
-			name:                            "Register events with InPlacePodVerticalScaling feature enabled",
-			enableInPlacePodVerticalScaling: true,
+			name: "Register events with default features",
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
 				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
@@ -1475,18 +1473,13 @@ func TestEventsToRegister(t *testing.T) {
 			},
 		},
 		{
-			name: "Register events with default features",
-			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
-				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
-			},
-		},
-		{
 			name:                      "Register events with DRAExtendedResource feature enabled",
 			enableDRAExtendedResource: true,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
 				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
+				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}},
+				{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}},
 				{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 			},
 		},
@@ -1494,7 +1487,7 @@ func TestEventsToRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableDRAExtendedResource: test.enableDRAExtendedResource}
+			fp := &Fit{enableDRAExtendedResource: test.enableDRAExtendedResource}
 			_, ctx := ktesting.NewTestContext(t)
 			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {
@@ -1594,9 +1587,7 @@ func Test_isSchedulableAfterTargetPodScaleDown(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScaling: true,
-			})
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1678,7 +1669,6 @@ func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScaling:                    true,
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			})
 			if err != nil {
@@ -3042,7 +3032,7 @@ func TestScorePlacement_Resources(t *testing.T) {
 			expectedScore: 30,
 		},
 		{
-			name: "Ignores container status resources when InPlacePodVerticalScaling is disabled",
+			name: "Honors container status resources",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
 				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
@@ -3056,25 +3046,6 @@ func TestScorePlacement_Resources(t *testing.T) {
 				{Name: "cpu", Weight: 1},
 				{Name: "memory", Weight: 1},
 			},
-			features:      plfeature.Features{EnableInPlacePodVerticalScaling: false},
-			expectedScore: 10,
-		},
-		{
-			name: "Honors container status resources when InPlacePodVerticalScaling is enabled",
-			nodes: []*v1.Node{
-				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
-				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
-			},
-			placementNodeNames: []string{"node1", "node2"},
-			podGroupPods: []*v1.Pod{
-				withContainerStatusResources(st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "1000")).Obj(), cpuAndMemory("4000m", "4000")),
-			},
-			podGroupAssignments: map[types.UID]string{"foo": "node1"},
-			resourceSpec: []config.ResourceSpec{
-				{Name: "cpu", Weight: 1},
-				{Name: "memory", Weight: 1},
-			},
-			features:      plfeature.Features{EnableInPlacePodVerticalScaling: true},
 			expectedScore: 40,
 		},
 		{
@@ -3097,7 +3068,6 @@ func TestScorePlacement_Resources(t *testing.T) {
 			},
 			features: plfeature.Features{
 				EnablePodLevelResources:                       true,
-				EnableInPlacePodVerticalScaling:               true,
 				EnableInPlacePodLevelResourcesVerticalScaling: false,
 			},
 			expectedScore: 10,
@@ -3122,7 +3092,6 @@ func TestScorePlacement_Resources(t *testing.T) {
 			},
 			features: plfeature.Features{
 				EnablePodLevelResources:                       true,
-				EnableInPlacePodVerticalScaling:               true,
 				EnableInPlacePodLevelResourcesVerticalScaling: true,
 			},
 			expectedScore: 40,
@@ -3880,25 +3849,11 @@ func TestFitScoreFeatureGates(t *testing.T) {
 			},
 		},
 		{
-			name: "InPlacePodVerticalScaling disabled ignores container status resources",
+			name: "Uses container status resources",
 			pod: withContainerStatusResources(
 				st.MakePod().Req(cpuAndMemory("1000m", "400Mi")).Obj(),
 				cpuAndMemory("2000m", "800Mi"),
 			),
-			features: plfeature.Features{EnableInPlacePodVerticalScaling: false},
-			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
-				config.LeastAllocated:           {{Name: "node1", Score: 80}, {Name: "node2", Score: 85}},
-				config.MostAllocated:            {{Name: "node1", Score: 20}, {Name: "node2", Score: 15}},
-				config.RequestedToCapacityRatio: {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
-			},
-		},
-		{
-			name: "InPlacePodVerticalScaling enabled uses container status resources",
-			pod: withContainerStatusResources(
-				st.MakePod().Req(cpuAndMemory("1000m", "400Mi")).Obj(),
-				cpuAndMemory("2000m", "800Mi"),
-			),
-			features: plfeature.Features{EnableInPlacePodVerticalScaling: true},
 			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
 				config.LeastAllocated:           {{Name: "node1", Score: 60}, {Name: "node2", Score: 70}},
 				config.MostAllocated:            {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
@@ -3916,7 +3871,6 @@ func TestFitScoreFeatureGates(t *testing.T) {
 			),
 			features: plfeature.Features{
 				EnablePodLevelResources:                       true,
-				EnableInPlacePodVerticalScaling:               true,
 				EnableInPlacePodLevelResourcesVerticalScaling: false,
 			},
 			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
@@ -3936,7 +3890,6 @@ func TestFitScoreFeatureGates(t *testing.T) {
 			),
 			features: plfeature.Features{
 				EnablePodLevelResources:                       true,
-				EnableInPlacePodVerticalScaling:               true,
 				EnableInPlacePodLevelResourcesVerticalScaling: true,
 			},
 			// Effective request: cpu=3000m, memory=1200Mi -> node1: 60% cpu, 60% mem; node2: 30% cpu, 60% mem

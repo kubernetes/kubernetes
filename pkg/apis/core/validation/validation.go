@@ -3972,10 +3972,6 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 			}
 		}
 
-		if !opts.AllowSidecarResizePolicy && len(ctr.ResizePolicy) > 0 {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("resizePolicy"), ctr.ResizePolicy, "must not be set for init containers"))
-		}
-
 		if !restartAlways && !opts.AllowExistingRestartContainerForNonSidecarInitContainer {
 			for j, p := range ctr.ResizePolicy {
 				if p.RestartPolicy == core.RestartContainer {
@@ -4595,8 +4591,6 @@ type PodValidationOptions struct {
 	// Indicates whether InPlacePodVerticalScalingMemoryBackedVolumes feature is enabled
 	// or disabled.
 	InPlacePodVerticalScalingMemoryBackedVolumesEnabled bool
-	// Allow sidecar containers resize policy for backward compatibility
-	AllowSidecarResizePolicy bool
 	// Allow invalid label-value in RequiredNodeSelector
 	AllowInvalidLabelValueInRequiredNodeAffinity bool
 	// Allow feature of MatchLabelKeys in TopologySpreadConstraints
@@ -6570,10 +6564,6 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
 	}
 
-	if !isPodResizeRequestSupported(*oldPod) {
-		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without support for resize"))
-	}
-
 	// Part 2: Validate that changes between pod-level resources in oldPod.Spec.Resources and
 	// newPod.Spec.Resources are allowed.
 
@@ -6958,23 +6948,6 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 	}
 
 	return true, ""
-}
-
-// isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
-func isPodResizeRequestSupported(pod core.Pod) bool {
-	// TODO: Remove this after GA+3 releases of InPlacePodVerticalScaling
-	// This code handles the version skew as described in the KEP.
-	// For handling version skew we're only allowing to update the Pod's Resources
-	// if the Pod already has Pod.Status.ContainerStatuses[i].Resources. This means
-	// that the apiserver would only allow updates to Pods running on Nodes with
-	// the InPlacePodVerticalScaling feature gate enabled.
-	for _, c := range pod.Status.ContainerStatuses {
-		if c.State.Running != nil {
-			return c.Resources != nil
-		}
-	}
-	// No running containers. We cannot tell whether the node supports resize at this point, so we assume it does.
-	return true
 }
 
 // validateContainerResize validates the changes to the container's resource requirements for a pod resize request.

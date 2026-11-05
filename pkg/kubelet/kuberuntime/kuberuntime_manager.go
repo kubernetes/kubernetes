@@ -831,9 +831,6 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 // TODO: Move InitializeActuatedPod, UpdateActuatedPodLevelResources, and IsPodResizeInProgress
 // out of the runtime now that actuatedState is owned by the Kubelet.
 func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, allocatedPod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return
-	}
 	stored, hasPod := m.actuatedState.GetPod(allocatedPod.UID)
 	// TODO: In v1.39, when the V1 checkpoint format is no longer supported, we will still need to
 	// check stored.Name == "" (and preserve stored.Spec.Resources and stored.Spec.Volumes below)
@@ -2371,11 +2368,6 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 }
 
 func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(logger klog.Logger, actuatedPod *v1.Pod) error {
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return nil
-	}
-
 	if actuatedPod.Spec.Resources == nil {
 		return nil
 	}

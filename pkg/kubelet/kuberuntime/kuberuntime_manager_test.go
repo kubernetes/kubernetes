@@ -3118,7 +3118,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is currently not supported on Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	logger, tCtx := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
@@ -4041,7 +4040,6 @@ func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
 		t.Skip("in-place resize is only supported on Linux")
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	require.NoError(t, err)
@@ -4088,7 +4086,6 @@ func TestComputePodResizeActionForOOMKilledInitContainer(t *testing.T) {
 		t.Skip("in-place resize is only supported on Linux")
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	require.NoError(t, err)
@@ -4149,7 +4146,6 @@ func TestComputePodResizeActionForOOMKilledSidecarContainer(t *testing.T) {
 		t.Skip("in-place resize is only supported on Linux")
 	}
 	logger, tCtx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	require.NoError(t, err)
@@ -4223,7 +4219,6 @@ func TestUpdatePodContainerResources(t *testing.T) {
 	}
 
 	tCtx := ktesting.Init(t)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	m.cpuCFSQuota = true
@@ -4519,7 +4514,6 @@ func TestDoPodResizeAction(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	logger := tCtx.Logger()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	metrics.Register()
 	metrics.PodResizeDurationMilliseconds.Reset()
 
@@ -7173,7 +7167,6 @@ func TestSyncResultErrorsMetric(t *testing.T) {
 func TestInitializeActuatedPod_PreservesActuatedVolumes(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.InPlacePodVerticalScaling:                    true,
 		features.InPlacePodLevelResourcesVerticalScaling:      true,
 		features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
 	})

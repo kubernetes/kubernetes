@@ -157,10 +157,6 @@ func NewManager(checkpointDirectory string,
 }
 
 func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string) state.State {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return state.NewNoopStateCheckpoint()
-	}
-
 	stateImpl, err := state.NewStateCheckpoint(logger, checkpointDirectory, checkpointName, nil)
 	if err != nil {
 		// This is a critical, non-recoverable failure.
@@ -515,17 +511,15 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// To handle kubelet restarts, test pod admissibility using AllocatedResources values
-		// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
-		pod, _ = m.UpdatePodFromAllocation(pod)
-	}
+	// To handle kubelet restarts, test pod admissibility using AllocatedResources values
+	// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
+	pod, _ = m.UpdatePodFromAllocation(pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
 	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
 
-	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if ok {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
@@ -652,10 +646,6 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 }
 
 func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return activePods
-	}
-
 	allocatedPods := make([]*v1.Pod, 0, len(activePods))
 	for _, pod := range activePods {
 		// Filter out pods that don't yet have an allocation, which will filter pods that

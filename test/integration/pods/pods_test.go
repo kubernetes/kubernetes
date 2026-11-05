@@ -857,7 +857,6 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 }
 
 func TestPodResizeRBAC(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
 		append(framework.DefaultTestServerFlags(), "--authorization-mode=RBAC"), framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -961,7 +960,6 @@ func TestPodResizeRBAC(t *testing.T) {
 }
 
 func TestPodResize(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()

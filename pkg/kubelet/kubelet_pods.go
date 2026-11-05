@@ -245,10 +245,6 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 // allocated state.
 func (kl *Kubelet) getAllocatedPods() []*v1.Pod {
 	activePods := kl.GetActivePods()
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return activePods
-	}
-
 	allocatedPods := make([]*v1.Pod, len(activePods))
 	for i, pod := range activePods {
 		allocatedPods[i], _ = kl.allocationManager.UpdatePodFromAllocation(pod)
@@ -2024,18 +2020,16 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 			s.Conditions = append(s.Conditions, c)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		resizeStatus := kl.determinePodResizeStatus(pod, podState)
-		for _, c := range resizeStatus {
-			// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
-			// observed generation is not already set. We avoid overwriting the condition's observedGeneration
-			// in other cases, because the condition may be reflecting an older podspec.
-			gen := podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
-			if gen == 0 {
-				c.ObservedGeneration = 0
-			}
-			s.Conditions = append(s.Conditions, *c)
+	resizeStatus := kl.determinePodResizeStatus(pod, podState)
+	for _, c := range resizeStatus {
+		// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
+		// observed generation is not already set. We avoid overwriting the condition's observedGeneration
+		// in other cases, because the condition may be reflecting an older podspec.
+		gen := podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
+		if gen == 0 {
+			c.ObservedGeneration = 0
 		}
+		s.Conditions = append(s.Conditions, *c)
 	}
 
 	// copy over the pod disruption conditions from state which is already
@@ -2752,19 +2746,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
-			if allocatedContainer != nil {
-				// status.Resources reflects cgroup-actuated resources. If the container is running,
-				// it is populated from CRI status.
-				status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
-				// status.AllocatedResources represents the desired cgroup resource state for resize,
-				// and is strictly based on the uninflated standard cgroup resources requested in the spec.
-				// DRA based allocations are not included in AllocatedResources at the container level.
-				// This is because the claims can be shared across containers in the pod and can be
-				// shared unevenly (enforced by the DRA driver).
-				status.AllocatedResources = allocatedContainer.Resources.Requests
-			}
+		allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
+		if allocatedContainer != nil {
+			// status.Resources reflects cgroup-actuated resources. If the container is running,
+			// it is populated from CRI status.
+			status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
+			// status.AllocatedResources represents the desired cgroup resource state for resize,
+			// and is strictly based on the uninflated standard cgroup resources requested in the spec.
+			// DRA based allocations are not included in AllocatedResources at the container level.
+			// This is because the claims can be shared across containers in the pod and can be
+			// shared unevenly (enforced by the DRA driver).
+			status.AllocatedResources = allocatedContainer.Resources.Requests
 		}
 
 		status.User = convertContainerStatusUser(cStatus)

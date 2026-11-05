@@ -53,7 +53,6 @@ type DRACaches struct {
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                                          string
-	enableInPlacePodVerticalScaling               bool
 	enablePodLevelResources                       bool
 	enableDRAExtendedResource                     bool
 	enableInPlacePodLevelResourcesVerticalScaling bool
@@ -238,7 +237,7 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: r.enableInPlacePodVerticalScaling,
+		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources: !r.enablePodLevelResources,

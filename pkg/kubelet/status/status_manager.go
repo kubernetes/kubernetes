@@ -1133,13 +1133,11 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	defer m.podStatusesLock.Unlock()
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if conds, exists := m.podResizeConditions[uid]; exists {
-			m.observeDeferredResizeDuration(uid, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
-			delete(m.podResizeConditions, uid)
-			m.recordInProgressResizeCount()
-			m.observePendingResizeCount()
-		}
+	if conds, exists := m.podResizeConditions[uid]; exists {
+		m.observeDeferredResizeDuration(uid, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
+		delete(m.podResizeConditions, uid)
+		m.recordInProgressResizeCount()
+		m.observePendingResizeCount()
 	}
 }
 
@@ -1151,13 +1149,11 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 		if _, ok := podUIDs[key]; !ok {
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				if conds, exists := m.podResizeConditions[key]; exists {
-					m.observeDeferredResizeDuration(key, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
-					delete(m.podResizeConditions, key)
-					m.recordInProgressResizeCount()
-					m.observePendingResizeCount()
-				}
+			if conds, exists := m.podResizeConditions[key]; exists {
+				m.observeDeferredResizeDuration(key, conds.PodResizePending, metrics.DeferredResizeResolutionTerminated)
+				delete(m.podResizeConditions, key)
+				m.recordInProgressResizeCount()
+				m.observePendingResizeCount()
 			}
 		}
 	}

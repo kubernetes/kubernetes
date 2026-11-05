@@ -1598,15 +1598,13 @@ func Register() {
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			legacyregistry.MustRegister(ContainerRequestedResizes)
-			legacyregistry.MustRegister(PodResizeDurationMilliseconds)
-			legacyregistry.MustRegister(PodPendingResizes)
-			legacyregistry.MustRegister(PodInfeasibleResizes)
-			legacyregistry.MustRegister(PodInProgressResizes)
-			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
-			legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
-		}
+		legacyregistry.MustRegister(ContainerRequestedResizes)
+		legacyregistry.MustRegister(PodResizeDurationMilliseconds)
+		legacyregistry.MustRegister(PodPendingResizes)
+		legacyregistry.MustRegister(PodInfeasibleResizes)
+		legacyregistry.MustRegister(PodInProgressResizes)
+		legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+		legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 			legacyregistry.MustRegister(ResourceManagerAllocationsTotal)

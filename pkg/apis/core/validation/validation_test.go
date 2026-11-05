@@ -8738,7 +8738,6 @@ func TestValidatePullPolicy(t *testing.T) {
 }
 
 func TestValidateResizePolicy(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 	type T struct {
@@ -10353,7 +10352,7 @@ func TestValidateInitContainers(t *testing.T) {
 	}}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowExistingRestartContainerForNonSidecarInitContainer: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -10729,19 +10728,6 @@ func TestValidateInitContainers(t *testing.T) {
 		}},
 		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
 	}, {
-		"Not supported ResizePolicy: invalid",
-		line(),
-		[]core.Container{{
-			Name:                     "init",
-			Image:                    "image",
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-			ResizePolicy: []core.ContainerResizePolicy{
-				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-			},
-		}},
-		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].resizePolicy", BadValue: []core.ContainerResizePolicy{{ResourceName: "cpu", RestartPolicy: "NotRequired"}}}},
-	}, {
 		"RestartContainer policy forbidden for non-sidecar init container",
 		line(),
 		[]core.Container{{
@@ -10754,10 +10740,6 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{
-			Type:     field.ErrorTypeInvalid,
-			Field:    "initContainers[0].resizePolicy",
-			BadValue: []core.ContainerResizePolicy{{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer}},
-		}, {
 			Type:     field.ErrorTypeInvalid,
 			Field:    "initContainers[0].resizePolicy[0].restartPolicy",
 			BadValue: core.RestartContainer,
@@ -14651,7 +14633,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "spec.initContainers[0].resizePolicy[0].restartPolicy: Invalid value: \"RestartContainer\": must not be set to 'RestartContainer' for non-sidecar initContainers",
 			test: "adding RestartContainer resize policy to non-sidecar init container should fail",
-			opts: PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: false},
+			opts: PodValidationOptions{AllowExistingRestartContainerForNonSidecarInitContainer: false},
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetInitContainers(core.Container{
@@ -14667,7 +14649,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "",
 			test: "existing RestartContainer resize policy on non-sidecar init container should be allowed on update",
-			opts: PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true},
+			opts: PodValidationOptions{AllowExistingRestartContainerForNonSidecarInitContainer: true},
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetOS(core.Windows),
@@ -30507,75 +30489,6 @@ func TestValidatePodResize(t *testing.T) {
 				))),
 			disableInitCtrResize: true,
 			err:                  "Forbidden: resources for non-sidecar init containers are immutable",
-		},
-
-		{
-			test: "Pod with nil Resource field in Status",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{{
-					ContainerID: "docker://numbers",
-					Image:       "nginx:alpine",
-					Name:        "main",
-					Ready:       true,
-					Started:     proto.Bool(true),
-					Resources:   nil,
-					State: core.ContainerState{
-						Running: &core.ContainerStateRunning{
-							StartedAt: metav1.NewTime(time.Now()),
-						},
-					},
-				}},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "Forbidden: Pod running on node without support for resize",
-		},
-		{
-			test: "Pod with non-nil Resources field in Status",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{{
-					ContainerID: "docker://numbers",
-					Image:       "nginx:alpine",
-					Name:        "main",
-					Ready:       true,
-					Started:     proto.Bool(true),
-					Resources:   &core.ResourceRequirements{},
-					State: core.ContainerState{
-						Running: &core.ContainerStateRunning{
-							StartedAt: metav1.NewTime(time.Now()),
-						},
-					},
-				}},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "",
-		},
-		{
-			test: "Pod without running containers",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "",
-		},
-		{
-			test: "Pod with containers which are not running yet",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{{
-					ContainerID: "docker://numbers",
-					Image:       "nginx:alpine",
-					Name:        "main",
-					Ready:       true,
-					Started:     proto.Bool(true),
-					Resources:   &core.ResourceRequirements{},
-					State: core.ContainerState{
-						Waiting: &core.ContainerStateWaiting{
-							Reason: "PodInitializing",
-						},
-					},
-				}},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "",
 		}, {
 			test: "cpu limit change for sidecar containers",
 			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), core.ContainerRestartPolicyAlways),
@@ -31362,7 +31275,6 @@ func TestValidatePodResize(t *testing.T) {
 			}
 
 			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{
-				AllowSidecarResizePolicy:                            true,
 				InPlacePodLevelResourcesVerticalScalingEnabled:      true,
 				PodLevelResourcesEnabled:                            true,
 				InPlacePodVerticalScalingMemoryBackedVolumesEnabled: test.enableMemoryBackedVolumesResize,

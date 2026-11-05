@@ -33,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
@@ -301,7 +300,6 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 // of a container is allocated. A field that is added to the API fails it until it is classified
 // here and, if it is passthrough, copied in copyPassthroughFields.
 func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
 
@@ -480,7 +478,6 @@ func TestUpdatePodFromAllocationFieldClassification(t *testing.T) {
 //
 // TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported.
 func TestUpdatePodFromAllocationMigratedFromV1(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
 	logger, ctx := ktesting.NewTestContext(t)
@@ -588,8 +585,6 @@ func TestUpdatePodFromAllocationMigratedFromV1(t *testing.T) {
 //
 // TODO: Remove the checks of the overlay in v1.39 when the V1 checkpoint format is no longer supported.
 func TestUpdatePodFromAllocationPending(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-
 	cpu := func(quantity string) v1.ResourceRequirements {
 		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
 	}
@@ -695,7 +690,6 @@ func TestRetryPendingResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
@@ -1247,7 +1241,6 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	nodeConfig := cm.NodeConfig{}
@@ -1487,7 +1480,6 @@ func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tCtx := ktesting.Init(t)
 
 	logger := klog.FromContext(tCtx)
@@ -1692,9 +1684,6 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 	metrics.Register()
 	metrics.PodInfeasibleResizes.Reset()
 
-	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.InPlacePodVerticalScaling: true,
-	})
 	logger, tCtx := ktesting.NewTestContext(t)
 	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"
 
@@ -1856,7 +1845,6 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	cpu500m := resource.MustParse("500m")
@@ -2052,7 +2040,6 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	cpu := func(quantity string) v1.ResourceRequirements {
 		return v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse(quantity)}}
@@ -2527,7 +2514,6 @@ func TestAllocationManagerAddPod(t *testing.T) {
 
 	testCases := []struct {
 		name                            string
-		ipprFeatureGate                 bool
 		initialAllocatedResourcesState  map[types.UID]v1.ResourceList
 		currentActivePods               []*v1.Pod
 		podToAdd                        *v1.Pod
@@ -2538,8 +2524,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 		expectedAllocatedResourcesState map[types.UID]v1.ResourceList
 	}{
 		{
-			name:                           "IPPR Enabled - New pod admitted and allocated resources updated",
-			ipprFeatureGate:                true,
+			name:                           "New pod admitted and allocated resources updated",
 			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{},
 			currentActivePods:              []*v1.Pod{},
 			podToAdd:                       pod1Small,
@@ -2549,18 +2534,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
 		},
 		{
-			name:                            "IPPR Disabled - New pod admitted but allocated resources not updated",
-			ipprFeatureGate:                 false,
-			initialAllocatedResourcesState:  map[types.UID]v1.ResourceList{},
-			currentActivePods:               []*v1.Pod{},
-			podToAdd:                        pod1Small,
-			admitFunc:                       nil,
-			expectAdmit:                     true,
-			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{},
-		},
-		{
-			name:                           "IPPR Enabled - New pod not admititted due to insufficient resources",
-			ipprFeatureGate:                true,
+			name:                           "New pod not admititted due to insufficient resources",
 			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
 			currentActivePods:              []*v1.Pod{pod1Small},
 			podToAdd:                       pod2Large,
@@ -2582,31 +2556,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
 		},
 		{
-			name:                           "IPPR Disabled - New pod not admitted due to insufficient resources",
-			ipprFeatureGate:                false,
-			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
-			currentActivePods:              []*v1.Pod{pod1Small},
-			podToAdd:                       pod2Large,
-			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-				cpuRequest := attrs.Pod.Spec.Containers[0].Resources.Requests.Cpu().Value()
-				if cpuRequest > 1 {
-					return lifecycle.PodAdmitResult{
-						Admit:   false,
-						Reason:  "OutOfcpu",
-						Message: fmt.Sprintf("not enough CPUs available for pod %s/%s, requested: %d, available:1", attrs.Pod.Namespace, attrs.Pod.Name, cpuRequest),
-					}
-				}
-				return lifecycle.PodAdmitResult{Admit: true}
-			},
-			expectAdmit:             false,
-			admissionFailureReason:  "OutOfcpu",
-			admissionFailureMessage: "not enough CPUs available for pod ns2/pod2, requested: 2, available:1",
-			// allocated resources not modified
-			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
-		},
-		{
-			name:                            "IPPR Enabled - no pod resize request. Resource request same as existing allocation",
-			ipprFeatureGate:                 true,
+			name:                            "no pod resize request. Resource request same as existing allocation",
 			initialAllocatedResourcesState:  map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
 			currentActivePods:               []*v1.Pod{pod1Small},
 			podToAdd:                        pod1Small,
@@ -2615,8 +2565,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
 		},
 		{
-			name:                           "IPPR Enabled - current allocation not found for added pod. Allocated resources updated.",
-			ipprFeatureGate:                true,
+			name:                           "current allocation not found for added pod. Allocated resources updated.",
 			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{},
 			currentActivePods:              []*v1.Pod{pod1Small},
 			podToAdd:                       pod1Large,
@@ -2626,8 +2575,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu2Mem2G},
 		},
 		{
-			name:                           "IPPR Enabled - request different from current allocation. Pod still admitted based on existing allocation, but allocated resources remains unchanges.",
-			ipprFeatureGate:                true,
+			name:                           "request different from current allocation. Pod still admitted based on existing allocation, but allocated resources remains unchanges.",
 			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
 			currentActivePods:              []*v1.Pod{pod1Small, pod2Small},
 			podToAdd:                       pod1Large,
@@ -2647,37 +2595,11 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			//  allocated Resources state must not be updated.
 			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
 		},
-		{
-			name:                           "IPPR Disabled - request different from current allocation. Admission fails. Allocated resources not updated.",
-			ipprFeatureGate:                false,
-			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
-			currentActivePods:              []*v1.Pod{pod1Small},
-			podToAdd:                       pod1Large,
-			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-				cpuRequest := attrs.Pod.Spec.Containers[0].Resources.Requests.Cpu().Value()
-				if cpuRequest > 1 {
-					return lifecycle.PodAdmitResult{
-						Admit:   false,
-						Reason:  "OutOfcpu",
-						Message: fmt.Sprintf("not enough CPUs available for pod %s/%s, requested: %d, available:1", attrs.Pod.Namespace, attrs.Pod.Name, cpuRequest),
-					}
-				}
-				return lifecycle.PodAdmitResult{Admit: true}
-			},
-			// pod is still admitted as allocated resources are considered during admission.
-			expectAdmit:             false,
-			admissionFailureReason:  "OutOfcpu",
-			admissionFailureMessage: "not enough CPUs available for pod ns1/pod1, requested: 2, available:1",
-			// allocated Resources state must not be updated.
-			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
-		},
 	}
 
 	for _, tc := range testCases {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 		t.Run(tc.name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tc.ipprFeatureGate)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{}, nil)
 
 			podForAllocation := func(uid types.UID, resources v1.ResourceList) *v1.Pod {
@@ -3118,7 +3040,6 @@ func TestAllocationManager_EmptyDirVolumeLimits_AddPod(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tCtx := ktesting.Init(t)
 
 	tests := []struct {
@@ -3313,7 +3234,6 @@ func TestAllocationManager_EmptyDirVolumeLimits_UpdatePodFromAllocation(t *testi
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	tests := []struct {
 		name               string
@@ -3518,7 +3438,6 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	tests := []struct {
@@ -4166,7 +4085,6 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -4250,7 +4168,6 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	cpu100m := resource.MustParse("100m")
 	cpu200m := resource.MustParse("200m")

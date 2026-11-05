@@ -189,7 +189,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		mutatingadmissionpolicy.PluginName,      // Mutatingadmissionpolicy, only active when feature gate MutatingAdmissionpolicy is enabled
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 		nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator, only active when feature gate NodeDeclaredFeatures is enabled
-		podresize.PluginName,                    // PodResizeValidator, only active when feature gate InPlacePodVerticalScaling is enabled
+		podresize.PluginName,                    // PodResizeValidator
 		conditionsenforcer.PluginName,           // AuthorizationConditionsEnforcer, only active when feature gate ConditionalAuthorization is enabled
 	)
 

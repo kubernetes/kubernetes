@@ -2114,19 +2114,17 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
-		if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
-			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
-		} else if generation, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID); cleared {
-			// (Allocated == Actual) => clear the resize in-progress status.
-			msg := events.PodResizeCompletedMsg(logger, pod, generation)
-			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "%s", msg)
-		}
-		// TODO(natasha41575): There is a race condition here, where the goroutine in the
-		// allocation manager may allocate a new resize and unconditionally set the
-		// PodResizeInProgressCondition before we set the status below.
+	// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
+	if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
+		kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
+	} else if generation, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID); cleared {
+		// (Allocated == Actual) => clear the resize in-progress status.
+		msg := events.PodResizeCompletedMsg(logger, pod, generation)
+		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "%s", msg)
 	}
+	// TODO(natasha41575): There is a race condition here, where the goroutine in the
+	// allocation manager may allocate a new resize and unconditionally set the
+	// PodResizeInProgressCondition before we set the status below.
 
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, SyncPod)
@@ -2315,14 +2313,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		for _, r := range result.SyncResults {
-			if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {
-				// If the condition already exists, the observedGeneration does not get updated.
-				if generation, updated := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, pod.Generation); updated {
-					msg := events.PodResizeErrorMsg(logger, pod, generation, r.Message)
-					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.ResizeError, "%s", msg)
-				}
+	for _, r := range result.SyncResults {
+		if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {
+			// If the condition already exists, the observedGeneration does not get updated.
+			if generation, updated := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, pod.Generation); updated {
+				msg := events.PodResizeErrorMsg(logger, pod, generation, r.Message)
+				kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.ResizeError, "%s", msg)
 			}
 		}
 	}
@@ -2965,14 +2961,12 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 
 			kl.podCertificateManager.TrackPod(ctx, pod)
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				// Backfill the queue of pending resizes, but only after all the pods have
-				// been added. This ensures that no resizes get resolved until all the
-				// existing pods are added.
-				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
-				if updatedFromAllocation {
-					pendingResizes = append(pendingResizes, pod.UID)
-				}
+			// Backfill the queue of pending resizes, but only after all the pods have
+			// been added. This ensures that no resizes get resolved until all the
+			// existing pods are added.
+			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+			if updatedFromAllocation {
+				pendingResizes = append(pendingResizes, pod.UID)
 			}
 		}
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
@@ -2982,16 +2976,14 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			StartTime:  start,
 		})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		kl.statusManager.BackfillPodResizeConditions(pods)
-		// Admitted pods with DeletionTimestamp set are still pushed here so RetryPendingResizes
-		// clears any backfilled PodResizePending condition with DeferredResizeResolutionTerminated.
-		for _, uid := range pendingResizes {
-			kl.allocationManager.PushPendingResize(logger, uid)
-		}
-		if len(pendingResizes) > 0 {
-			kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsAdded)
-		}
+	kl.statusManager.BackfillPodResizeConditions(pods)
+	// Admitted pods with DeletionTimestamp set are still pushed here so RetryPendingResizes
+	// clears any backfilled PodResizePending condition with DeferredResizeResolutionTerminated.
+	for _, uid := range pendingResizes {
+		kl.allocationManager.PushPendingResize(logger, uid)
+	}
+	if len(pendingResizes) > 0 {
+		kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsAdded)
 	}
 }
 
@@ -3004,13 +2996,11 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			// Skip pods that haven't been allocated yet to avoid counting them against
-			// node capacity before they've been admitted.
-			if !kl.allocationManager.HasPodAllocatedResources(pod.UID) {
-				logger.V(4).Info("Skipping pod update for non-allocated pod", "pod", klog.KObj(pod), "podUID", pod.UID)
-				continue
-			}
+		// Skip pods that haven't been allocated yet to avoid counting them against
+		// node capacity before they've been admitted.
+		if !kl.allocationManager.HasPodAllocatedResources(pod.UID) {
+			logger.V(4).Info("Skipping pod update for non-allocated pod", "pod", klog.KObj(pod), "podUID", pod.UID)
+			continue
 		}
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
@@ -3021,21 +3011,19 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			recordResizeOperations(oldPod, pod)
-			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
-			if updatedFromAllocation {
-				if !kl.IsPodTerminatingOrTerminal(pod) {
-					kl.allocationManager.PushPendingResize(logger, pod.UID)
-				}
-				// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
-				// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
-				kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodUpdated)
-			} else {
-				// We can hit this case if a pending resize has been reverted,
-				// so we need to clear the pending resize condition.
-				kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
+		recordResizeOperations(oldPod, pod)
+		_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+		if updatedFromAllocation {
+			if !kl.IsPodTerminatingOrTerminal(pod) {
+				kl.allocationManager.PushPendingResize(logger, pod.UID)
 			}
+			// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
+			// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
+			kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodUpdated)
+		} else {
+			// We can hit this case if a pending resize has been reverted,
+			// so we need to clear the pending resize condition.
+			kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && oldPod != nil {
@@ -3082,10 +3070,6 @@ func recordResizeOperations(oldPod, newPod *v1.Pod) {
 
 // recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized.
 func recordPodLevelResourceResizeOperations(oldPod, newPod *v1.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return
-	}
-
 	// TODO(ndixita): add metrics for pod-level resources resize.
 }
 
@@ -3182,9 +3166,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsRemoved)
-	}
+	kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsRemoved)
 }
 
 // HandlePodReconcile is the callback in the SyncHandler interface for pods
@@ -3211,46 +3193,44 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 			// Static pods should be reconciled the same way as regular pods
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			if hasPendingResizes && !retryPendingResizes && oldPod != nil {
-				// If the pod has reached a terminal phase, we retry all pending resizes.
-				// A terminated pod releases capacity even if its allocation has already
-				// been purged, so check this before the non-allocated skip below.
-				if podutil.IsPodTerminal(pod) && !podutil.IsPodTerminal(oldPod) {
-					retryPendingResizes = true
-					triggerReason = allocation.TriggerReasonPodTerminated
-				}
-
-				// If there are pending resizes, check whether the requests shrank as a result of the status
-				// resources changing.
-				opts := resourcehelper.PodResourcesOptions{
-					UseStatusResources:                             true,
-					SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-					InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-					UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-				}
-
-				// Ignore desired resources when aggregating the resources.
-				allocatedOldPod, _ := kl.allocationManager.UpdatePodFromAllocation(oldPod)
-				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
-
-				oldRequest := resourcehelper.PodRequests(allocatedOldPod, opts)
-				newRequest := resourcehelper.PodRequests(allocatedPod, opts)
-
-				// If cpu or memory requests shrank, then retry the pending resizes.
-				if newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
-					newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 0 {
-					retryPendingResizes = true
-					triggerReason = allocation.TriggerReasonPodResized
-				}
+		if hasPendingResizes && !retryPendingResizes && oldPod != nil {
+			// If the pod has reached a terminal phase, we retry all pending resizes.
+			// A terminated pod releases capacity even if its allocation has already
+			// been purged, so check this before the non-allocated skip below.
+			if podutil.IsPodTerminal(pod) && !podutil.IsPodTerminal(oldPod) {
+				retryPendingResizes = true
+				triggerReason = allocation.TriggerReasonPodTerminated
 			}
 
-			// Skip further reconciliation for pods that haven't been allocated yet.
-			// We still updated podManager above to keep status in sync with the API server.
-			if !kl.allocationManager.HasPodAllocatedResources(pod.UID) {
-				logger.V(4).Info("Skipping pod reconcile operations for non-allocated pod", "pod", klog.KObj(pod), "podUID", pod.UID)
-				continue
+			// If there are pending resizes, check whether the requests shrank as a result of the status
+			// resources changing.
+			opts := resourcehelper.PodResourcesOptions{
+				UseStatusResources:                             true,
+				SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+				InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+				UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 			}
+
+			// Ignore desired resources when aggregating the resources.
+			allocatedOldPod, _ := kl.allocationManager.UpdatePodFromAllocation(oldPod)
+			allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+
+			oldRequest := resourcehelper.PodRequests(allocatedOldPod, opts)
+			newRequest := resourcehelper.PodRequests(allocatedPod, opts)
+
+			// If cpu or memory requests shrank, then retry the pending resizes.
+			if newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
+				newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 0 {
+				retryPendingResizes = true
+				triggerReason = allocation.TriggerReasonPodResized
+			}
+		}
+
+		// Skip further reconciliation for pods that haven't been allocated yet.
+		// We still updated podManager above to keep status in sync with the API server.
+		if !kl.allocationManager.HasPodAllocatedResources(pod.UID) {
+			logger.V(4).Info("Skipping pod reconcile operations for non-allocated pod", "pod", klog.KObj(pod), "podUID", pod.UID)
+			continue
 		}
 
 		// TODO: reconcile being calculated in the config manager is questionable, and avoiding
@@ -3282,10 +3262,8 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if retryPendingResizes {
-			kl.allocationManager.RetryPendingResizes(ctx, triggerReason)
-		}
+	if retryPendingResizes {
+		kl.allocationManager.RetryPendingResizes(ctx, triggerReason)
 	}
 }
 
@@ -3701,12 +3679,10 @@ func (a *allocatedPodManager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, bool) {
 	if pod == nil {
 		return nil, false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
-			return allocatedPod, true
-		}
+	if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
+		return allocatedPod, true
 	}
-	// When the feature gate is disabled or there is no allocation stored for this pod, return the pod as-is.
+	// When there is no allocation stored for this pod, return the pod as-is.
 	return pod, true
 }
 

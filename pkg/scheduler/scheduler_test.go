@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -36,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
@@ -925,11 +923,10 @@ func Test_buildQueueingHintMap(t *testing.T) {
 // It verifies that a given set of plugins is correctly registered for a specific set of cluster events.
 func Test_UnionedGVKs(t *testing.T) {
 	tests := []struct {
-		name                            string
-		plugins                         schedulerapi.PluginSet
-		want                            map[fwk.EventResource]fwk.ActionType
-		enableInPlacePodVerticalScaling bool
-		enableGenericWorkload           bool
+		name                  string
+		plugins               schedulerapi.PluginSet
+		want                  map[fwk.EventResource]fwk.ActionType
+		enableGenericWorkload bool
 	}{
 		{
 			name: "filter without EnqueueExtensions plugin",
@@ -981,8 +978,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.DeviceClass:           fwk.All,
 				fwk.PodGroup:              fwk.All,
 			},
-			enableGenericWorkload:           true,
-			enableInPlacePodVerticalScaling: true,
+			enableGenericWorkload: true,
 		},
 		{
 			name: "node plugin",
@@ -1045,25 +1041,6 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[fwk.EventResource]fwk.ActionType{},
 		},
 		{
-			name:    "plugins with default profile (InPlacePodVerticalScaling disabled)",
-			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.AssignedPod:           fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
-				fwk.TargetPod:             fwk.UpdatePodLabel | fwk.UpdatePodGeneratedResourceClaim | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated,
-				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
-				fwk.CSINode:               fwk.All - fwk.Delete,
-				fwk.CSIDriver:             fwk.Update,
-				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
-				fwk.PersistentVolume:      fwk.All - fwk.Delete,
-				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
-				fwk.StorageClass:          fwk.All - fwk.Delete,
-				fwk.VolumeAttachment:      fwk.Delete,
-				fwk.DeviceClass:           fwk.All - fwk.Delete,
-				fwk.ResourceClaim:         fwk.All,
-				fwk.ResourceSlice:         fwk.All - fwk.Delete,
-			},
-		},
-		{
 			name:    "plugins with default profile",
 			plugins: defaults.PluginsV1.MultiPoint,
 			want: map[fwk.EventResource]fwk.ActionType{
@@ -1083,7 +1060,6 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.ResourceClaim:         fwk.All,
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 			},
-			enableInPlacePodVerticalScaling: true,
 		},
 		{
 			name: "plugin registering to a specific pod resource 'AssignedPod'",
@@ -1119,38 +1095,15 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.ResourceSlice:         fwk.All - fwk.Delete,
 				fwk.PodGroup:              fwk.Add | fwk.Update,
 			},
-			enableGenericWorkload:           true,
-			enableInPlacePodVerticalScaling: true,
+			enableGenericWorkload: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pluginConfig := defaults.PluginConfigsV1
 
-			if !tt.enableInPlacePodVerticalScaling {
-				// In place pod resize GA'd in 1.35. Set emulation version to 1.34 for tests that do not have the flag set
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.34"))
-				// DRADeviceBindingConditions is alpha in 1.34 (disabled by default).
-				// Strip BindingTimeout from DynamicResources args to avoid validation failure.
-				// StorageCapacityScoring is alpha in 1.34 (disabled by default).
-				// Strip Shape from VolumeBinding args to avoid validation failure.
-				// BindTimeoutSeconds: 600 is the default value of VolumeBindingArgs when StorageCapacityScoring is disabled.
-				pluginConfig = slices.Clone(pluginConfig)
-				for i := range pluginConfig {
-					switch pluginConfig[i].Name {
-					case "DynamicResources":
-						pluginConfig[i].Args = &schedulerapi.DynamicResourcesArgs{}
-					case "VolumeBinding":
-						pluginConfig[i].Args = &schedulerapi.VolumeBindingArgs{BindTimeoutSeconds: 600}
-					}
-				}
-			} else {
-				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload: tt.enableGenericWorkload,
-				})
-			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.InPlacePodVerticalScaling: tt.enableInPlacePodVerticalScaling,
+				features.GenericWorkload: tt.enableGenericWorkload,
 			})
 
 			_, ctx := ktesting.NewTestContext(t)

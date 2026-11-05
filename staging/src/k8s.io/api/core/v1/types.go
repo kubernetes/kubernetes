@@ -3327,7 +3327,6 @@ type Container struct {
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// resizePolicy is the resize policy for the container.
 	// This field cannot be set on ephemeral containers.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
@@ -3721,7 +3720,6 @@ type ContainerStatus struct {
 	AllocatedResources ResourceList `json:"allocatedResources,omitempty" protobuf:"bytes,10,rep,name=allocatedResources,casttype=ResourceList,castkey=ResourceName"`
 	// resources represents the compute resource requests and limits that have been successfully
 	// enacted on the running container after it has been started or has been successfully resized.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,11,opt,name=resources"`
 	// volumeMounts represents the status of volume mounts.
@@ -5656,7 +5654,6 @@ type EphemeralContainerCommon struct {
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
 	// resizePolicy is the resources resize policy for the container.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
@@ -5958,7 +5955,6 @@ type PodStatus struct {
 	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
 	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
 	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
-	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus `json:"resize,omitempty" protobuf:"bytes,14,opt,name=resize,casttype=PodResizeStatus"`
 

@@ -6202,7 +6202,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
 
@@ -7024,7 +7023,6 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	nowTime := time.Now()
 	testContainerName := "ctr0"
@@ -10175,8 +10173,6 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 }
 
 func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-
 	tests := []struct {
 		name             string
 		podState         PodWorkerState

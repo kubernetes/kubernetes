@@ -1283,8 +1283,7 @@ type PodInfo struct {
 	PreferredAffinityTerms     []fwk.WeightedAffinityTerm
 	PreferredAntiAffinityTerms []fwk.WeightedAffinityTerm
 	// cachedResource contains precomputed resources for Pod (podResource).
-	// The value can change only if InPlacePodVerticalScaling is enabled.
-	// In that case, the whole PodInfo object is recreated (for assigned pods in cache).
+	// When a pod is resized in-place, the whole PodInfo object is recreated (for assigned pods in cache).
 	// cachedResource contains a podResource, computed when adding a scheduled pod to NodeInfo.
 	// When removing a pod from a NodeInfo, i.e. finding victims for preemption or removing a pod from a cluster,
 	// cachedResource is used instead, what provides a noticeable performance boost.
@@ -1355,13 +1354,12 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	if pi.cachedResource != nil {
 		return *pi.cachedResource
 	}
-	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
 
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-		UseStatusResources: inPlacePodVerticalScalingEnabled,
+		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:                    !podLevelResourcesEnabled,
@@ -1372,7 +1370,7 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	non0Requests := requests
 	if len(nonMissingContainerRequests) > 0 {
 		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-			UseStatusResources: inPlacePodVerticalScalingEnabled,
+			UseStatusResources: true,
 			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 			SkipPodLevelResources:                    !podLevelResourcesEnabled,
