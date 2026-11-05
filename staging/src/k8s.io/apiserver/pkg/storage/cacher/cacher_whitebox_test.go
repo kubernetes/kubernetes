@@ -442,106 +442,126 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 `,
 		},
 	}
+
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			forceRequestWatchProgressSupport(t)
-			if tc.skipStorageFallback {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
-			}
-
-			registry := k8smetrics.NewKubeRegistry()
-			metrics.ConsistentReadTotal.Reset()
-			if err := registry.Register(metrics.ConsistentReadTotal); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			backingStorage := &cachertesting.MockStorage{}
-			backingStorage.GetListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-				podList := listObj.(*example.PodList)
-				podList.ResourceVersion = tc.watchCacheRV
-				return nil
-			}
-			c := testingclock.NewFakeClock(time.Now())
-			cacher, _, err := newTestCacherWithoutSyncing(backingStorage, c)
-			if err != nil {
-				t.Fatalf("Couldn't create cacher: %v", err)
-			}
-			defer cacher.Stop()
-			delegator := NewCacheDelegator(cacher, backingStorage)
-			defer delegator.Stop()
-			if err := cacher.ready.wait(context.Background()); err != nil {
-				t.Fatalf("unexpected error waiting for the cache to be ready")
-			}
-
-			if fmt.Sprintf("%d", cacher.watchCache.resourceVersion) != tc.watchCacheRV {
-				t.Fatalf("Expected watch cache RV to equal watchCacheRV, got: %d, want: %s", cacher.watchCache.resourceVersion, tc.watchCacheRV)
-			}
-			requestToStorageCount := 0
-			backingStorage.GetListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-				requestToStorageCount += 1
-				podList := listObj.(*example.PodList)
-				if key == cacher.resourcePrefix {
-					podList.ResourceVersion = tc.storageRV
-					return nil
-				}
-				if tc.fallbackError {
-					return errDummy
-				}
-				podList.ResourceVersion = tc.storageRV
-				return nil
-			}
-			backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
-				requestToStorageCount += 1
-				rv, err := strconv.Atoi(tc.storageRV)
-				if err != nil {
-					t.Fatalf("failed to parse RV: %s", err)
-				}
-				return uint64(rv), nil
-			}
-			result := &example.PodList{}
-
-			ctx, clockStepCancelFn := context.WithTimeout(context.TODO(), time.Minute)
-			defer clockStepCancelFn()
-			if tc.expectBlock {
-				go func(ctx context.Context) {
-					for {
-						select {
-						case <-ctx.Done():
-							return
-						default:
-							if c.HasWaiters() {
-								c.Step(blockTimeout)
-							}
-							time.Sleep(time.Millisecond)
-						}
-					}
-				}(ctx)
-			}
-
-			start := cacher.clock.Now()
-			err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
-			clockStepCancelFn()
-			duration := cacher.clock.Since(start)
-			if (err != nil) != tc.expectError {
-				t.Fatalf("Unexpected error err: %v", err)
-			}
-			if tc.expectTooManyRequests && !apierrors.IsTooManyRequests(err) {
-				t.Fatalf("Unexpected error, got: %v, want TooManyRequests", err)
-			}
-			if result.ResourceVersion != tc.expectRV {
-				t.Fatalf("Unexpected List response RV, got: %q, want: %q", result.ResourceVersion, tc.expectRV)
-			}
-			if requestToStorageCount != tc.expectRequestsToStorage {
-				t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", requestToStorageCount, tc.expectRequestsToStorage)
-			}
-			blocked := duration >= blockTimeout
-			if blocked != tc.expectBlock {
-				t.Fatalf("Unexpected block, got: %v, want: %v", blocked, tc.expectBlock)
-			}
-
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetric), "apiserver_watch_cache_consistent_read_total"); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			t.Run("GetList", func(t *testing.T) {
+				delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
+				testConsistentListFallback(t, delegator, fakeClock, requestToStorageCount, registry, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+			})
 		})
+	}
+}
+
+func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, fallbackError, skipStorageFallback bool) (*CacheDelegator, *testingclock.FakeClock, *int, k8smetrics.KubeRegistry) {
+	t.Helper()
+	forceRequestWatchProgressSupport(t)
+	if skipStorageFallback {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
+	}
+
+	registry := k8smetrics.NewKubeRegistry()
+	metrics.ConsistentReadTotal.Reset()
+	if err := registry.Register(metrics.ConsistentReadTotal); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	backingStorage := &cachertesting.MockStorage{}
+	backingStorage.GetListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+		podList := listObj.(*example.PodList)
+		podList.ResourceVersion = watchCacheRV
+		podList.Items = []example.Pod{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod1",
+				Namespace:       "ns",
+				ResourceVersion: watchCacheRV,
+			},
+		}}
+		return nil
+	}
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, fakeClock)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	t.Cleanup(cacher.Stop)
+	delegator := NewCacheDelegator(cacher, backingStorage)
+	t.Cleanup(delegator.Stop)
+	if err := cacher.ready.wait(context.Background()); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
+
+	if fmt.Sprintf("%d", cacher.watchCache.resourceVersion) != watchCacheRV {
+		t.Fatalf("Expected watch cache RV to equal watchCacheRV, got: %d, want: %s", cacher.watchCache.resourceVersion, watchCacheRV)
+	}
+	requestToStorageCount := 0
+	backingStorage.GetListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+		requestToStorageCount += 1
+		podList := listObj.(*example.PodList)
+		if key == cacher.resourcePrefix {
+			podList.ResourceVersion = storageRV
+			return nil
+		}
+		if fallbackError {
+			return errDummy
+		}
+		podList.ResourceVersion = storageRV
+		return nil
+	}
+	backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
+		requestToStorageCount += 1
+		rv, err := strconv.Atoi(storageRV)
+		if err != nil {
+			t.Fatalf("failed to parse RV: %s", err)
+		}
+		return uint64(rv), nil
+	}
+	return delegator, fakeClock, &requestToStorageCount, registry
+}
+
+func testConsistentListFallback(t *testing.T, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, expectRV string, expectBlock, expectError, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
+	t.Helper()
+	ctx, clockStepCancelFn := context.WithTimeout(context.TODO(), time.Minute)
+	defer clockStepCancelFn()
+	if expectBlock {
+		go func(ctx context.Context) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					if fakeClock.HasWaiters() {
+						fakeClock.Step(blockTimeout)
+					}
+					time.Sleep(time.Millisecond)
+				}
+			}
+		}(ctx)
+	}
+
+	start := fakeClock.Now()
+	result := &example.PodList{}
+	err := delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
+	clockStepCancelFn()
+	duration := fakeClock.Since(start)
+	if (err != nil) != expectError {
+		t.Fatalf("Unexpected error err: %v", err)
+	}
+	if expectTooManyRequests && !apierrors.IsTooManyRequests(err) {
+		t.Fatalf("Unexpected error, got: %v, want TooManyRequests", err)
+	}
+	if result.ResourceVersion != expectRV {
+		t.Fatalf("Unexpected List response RV, got: %q, want: %q", result.ResourceVersion, expectRV)
+	}
+	if *requestToStorageCount != expectRequestsToStorage {
+		t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", *requestToStorageCount, expectRequestsToStorage)
+	}
+	blocked := duration >= blockTimeout
+	if blocked != expectBlock {
+		t.Fatalf("Unexpected block, got: %v, want: %v", blocked, expectBlock)
+	}
+
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectMetric), "apiserver_watch_cache_consistent_read_total"); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
@@ -729,29 +749,69 @@ func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 }
 
 func TestGetCacheBypass(t *testing.T) {
-	backingStorage := &cachertesting.MockStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-	delegator := NewCacheDelegator(cacher, backingStorage)
-	defer delegator.Stop()
-
-	result := &example.Pod{}
-
-	backingStorage.InjectGetListError(errDummy)
-	tcs := []struct {
-		resourceVersion string
-		expectBypass    bool
+	scenarios := []struct {
+		name                   string
+		consistentGetFromCache bool
+		watchProgressSupported bool
+		expectConsistentBypass bool
 	}{
-		{resourceVersion: "", expectBypass: true},
-		{resourceVersion: "0", expectBypass: false},
-		{resourceVersion: "100", expectBypass: false},
+		{
+			name:                   "ConsistentGetFromCache=true,RequestWatchProgress=true",
+			consistentGetFromCache: true,
+			watchProgressSupported: true,
+			expectConsistentBypass: true,
+		},
+		{
+			name:                   "ConsistentGetFromCache=true,RequestWatchProgress=false",
+			consistentGetFromCache: true,
+			watchProgressSupported: false,
+			expectConsistentBypass: true,
+		},
+		{
+			name:                   "ConsistentGetFromCache=false,RequestWatchProgress=true",
+			consistentGetFromCache: false,
+			watchProgressSupported: true,
+			expectConsistentBypass: true,
+		},
 	}
-	for _, tc := range tcs {
-		t.Run(fmt.Sprintf("RV=%s", tc.resourceVersion), func(t *testing.T) {
-			newTestGetCacheBypass(t, delegator, result, tc.resourceVersion, tc.expectBypass)
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, scenario.consistentGetFromCache)
+			if scenario.watchProgressSupported {
+				forceRequestWatchProgressSupport(t)
+			} else {
+				origChecker := etcdfeature.DefaultFeatureSupportChecker
+				etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
+				t.Cleanup(func() {
+					etcdfeature.DefaultFeatureSupportChecker = origChecker
+				})
+			}
+
+			backingStorage := &cachertesting.MockStorage{}
+			cacher, _, err := newTestCacher(backingStorage)
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			defer cacher.Stop()
+			delegator := NewCacheDelegator(cacher, backingStorage)
+			defer delegator.Stop()
+
+			result := &example.Pod{}
+
+			backingStorage.InjectGetListError(errDummy)
+			tcs := []struct {
+				resourceVersion string
+				expectBypass    bool
+			}{
+				{resourceVersion: "", expectBypass: scenario.expectConsistentBypass},
+				{resourceVersion: "0", expectBypass: false},
+				{resourceVersion: "100", expectBypass: false},
+			}
+			for _, tc := range tcs {
+				t.Run(fmt.Sprintf("RV=%s", tc.resourceVersion), func(t *testing.T) {
+					newTestGetCacheBypass(t, delegator, result, tc.resourceVersion, tc.expectBypass)
+				})
+			}
 		})
 	}
 }
@@ -761,7 +821,7 @@ func newTestGetCacheBypass(t *testing.T, delegator *CacheDelegator, result *exam
 		ResourceVersion: resourceVersion,
 	}, result)
 	if errors.Is(err, errDummy) != expectBypass {
-		t.Errorf("Get without RV=0 should bypass cacher: %v", err)
+		t.Errorf("Unexpected bypass result for Get with RV=%q, expectBypass=%v, err=%v", resourceVersion, expectBypass, err)
 	}
 }
 
@@ -1066,6 +1126,8 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 }
 
 func TestCacherDontAcceptRequestsStopped(t *testing.T) {
+	forceRequestWatchProgressSupport(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1099,13 +1161,15 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 		t.Fatalf("Success to create Watch: %v", err)
 	}
 
-	result := &example.Pod{}
-	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
-		IgnoreNotFound:  true,
-		ResourceVersion: "1",
-	}, result)
-	if err != nil {
-		t.Fatalf("Failed to get object: %v:", err)
+	for _, rv := range []string{"", "1"} {
+		result := &example.Pod{}
+		err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
+			IgnoreNotFound:  true,
+			ResourceVersion: rv,
+		}, result)
+		if err != nil {
+			t.Fatalf("Failed to get object with RV=%q: %v", rv, err)
+		}
 	}
 
 	listResult := &example.PodList{}
