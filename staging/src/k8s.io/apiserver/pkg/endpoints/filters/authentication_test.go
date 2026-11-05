@@ -18,10 +18,16 @@ package filters
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -37,9 +43,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	"k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -491,10 +499,7 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 				}),
 				nil,
 				&authenticatorfactory.RequestHeaderConfig{
-					UsernameHeaders:     headerrequest.StaticStringSlice(testcase.nameHeaders),
-					UIDHeaders:          headerrequest.StaticStringSlice(testcase.uidHeaders),
-					GroupHeaders:        headerrequest.StaticStringSlice(testcase.groupHeaders),
-					ExtraHeaderPrefixes: headerrequest.StaticStringSlice(testcase.extraPrefixHeaders),
+					Config: headerrequest.NewStaticRequestHeaderConfig(testcase.nameHeaders, testcase.uidHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders, nil),
 				},
 			)
 
@@ -515,6 +520,234 @@ func TestAuthenticateRequestClearHeaders(t *testing.T) {
 	}
 }
 
+func TestAuthenticateRequestClearsCustomRequestHeaders(t *testing.T) {
+	snapshot := &headerrequest.RequestHeaderConfig{UsernameHeaders: []string{"X-Custom-User"}}
+	snapshotCalls := 0
+	auth := WithAuthentication(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			if req.Header.Get("X-Custom-User") != "" {
+				t.Errorf("expected the custom request header to be cleared")
+			}
+		}),
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "panda"}}, true, nil
+		}),
+		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			t.Errorf("unexpected authentication failure")
+		}),
+		nil,
+		&authenticatorfactory.RequestHeaderConfig{
+			Config: headerrequest.RequestHeaderConfigProviderFunc(func() *headerrequest.RequestHeaderConfig {
+				snapshotCalls++
+				return snapshot
+			}),
+		},
+	)
+
+	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: http.Header{"X-Custom-User": {"alice"}}})
+	if snapshotCalls != 1 {
+		t.Fatalf("expected one request header snapshot for header clearing, got %d", snapshotCalls)
+	}
+}
+
+// TestWithAuthenticationRequestHeaderProvidersAreIsolated runs the filter around a union of two
+// request header authenticators with different CA roots and different configurations: A accepts
+// any common name signed by its CA, B only accepts "proxy-b" signed by its own CA. Each
+// authenticator must decide using its own configuration, so neither A's allowlist, A's header
+// names nor A's unavailability may leak into B's decision.
+func TestWithAuthenticationRequestHeaderProvidersAreIsolated(t *testing.T) {
+	caA, certsA := newRequestHeaderTestCA(t, "ca-a", "ordinary-client")
+	caB, certsB := newRequestHeaderTestCA(t, "ca-b", "ordinary-client", "proxy-b")
+
+	tests := []struct {
+		name            string
+		certificate     *x509.Certificate
+		unavailableA    bool
+		unavailableB    bool
+		restrictedA     bool
+		distinctHeaders bool
+		wantStatus      int
+		wantUser        *user.DefaultInfo
+	}{
+		{
+			name:        "disallowed CN signed by CA B is rejected by B's allowlist",
+			certificate: certsB[0],
+			wantStatus:  http.StatusUnauthorized,
+		},
+		{
+			name:        "allowed CN signed by CA B is accepted",
+			certificate: certsB[1],
+			wantStatus:  http.StatusOK,
+			wantUser:    &user.DefaultInfo{Name: "admin", Groups: []string{}, Extra: map[string][]string{}},
+		},
+		{
+			name:         "unavailable A does not disable B",
+			certificate:  certsB[1],
+			unavailableA: true,
+			wantStatus:   http.StatusOK,
+			wantUser:     &user.DefaultInfo{Name: "admin", Groups: []string{}, Extra: map[string][]string{}},
+		},
+		{
+			name:            "B extracts and clears its own header names",
+			certificate:     certsB[1],
+			distinctHeaders: true,
+			wantStatus:      http.StatusOK,
+			wantUser:        &user.DefaultInfo{Name: "b-user", UID: "b-uid", Groups: []string{"b-group"}, Extra: map[string][]string{"scope": {"b-scope"}}},
+		},
+		{
+			name:        "B is not restricted by A's allowlist",
+			certificate: certsB[1],
+			restrictedA: true,
+			wantStatus:  http.StatusOK,
+			wantUser:    &user.DefaultInfo{Name: "admin", Groups: []string{}, Extra: map[string][]string{}},
+		},
+		{
+			name:         "unavailable B cannot borrow A's configuration",
+			certificate:  certsB[1],
+			unavailableB: true,
+			wantStatus:   http.StatusUnauthorized,
+		},
+		{
+			name:        "unrestricted A still accepts any CN signed by CA A",
+			certificate: certsA[0],
+			wantStatus:  http.StatusOK,
+			wantUser:    &user.DefaultInfo{Name: "admin", Groups: []string{}, Extra: map[string][]string{}},
+		},
+		{
+			name:       "no client certificate never authenticates request headers",
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name:         "both unavailable fails closed",
+			certificate:  certsB[1],
+			unavailableA: true,
+			unavailableB: true,
+			wantStatus:   http.StatusUnauthorized,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configA := headerrequest.NewStaticRequestHeaderConfig([]string{"X-Remote-User"}, nil, nil, nil, nil)
+			configB := headerrequest.NewStaticRequestHeaderConfig([]string{"X-Remote-User"}, nil, nil, nil, []string{"proxy-b"})
+			if tt.distinctHeaders {
+				configA = headerrequest.NewStaticRequestHeaderConfig([]string{"X-A-User"}, nil, nil, nil, nil)
+				configB = headerrequest.NewStaticRequestHeaderConfig([]string{"X-B-User"}, []string{"X-B-Uid"}, []string{"X-B-Group"}, []string{"X-B-Extra-"}, []string{"proxy-b"})
+			}
+			if tt.restrictedA {
+				configA = headerrequest.NewStaticRequestHeaderConfig([]string{"X-Remote-User"}, nil, nil, nil, []string{"proxy-a"})
+			}
+			if tt.unavailableA {
+				configA = nil
+			}
+			if tt.unavailableB {
+				configB = nil
+			}
+			// function providers are not comparable, so a fix relying on provider identity
+			// must not compare interface values
+			providerA := headerrequest.RequestHeaderConfigProviderFunc(func() *headerrequest.RequestHeaderConfig { return configA })
+			providerB := headerrequest.RequestHeaderConfigProviderFunc(func() *headerrequest.RequestHeaderConfig { return configB })
+
+			var gotUser user.Info
+			var remaining http.Header
+			handler := WithAuthentication(
+				http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+					gotUser, _ = genericapirequest.UserFrom(req.Context())
+					remaining = req.Header.Clone()
+					w.WriteHeader(http.StatusOK)
+				}),
+				union.New(headerrequest.NewSecure(providerA, caA), headerrequest.NewSecure(providerB, caB)),
+				http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) }),
+				nil,
+				&authenticatorfactory.RequestHeaderConfig{Config: providerA, CAContentProvider: caA},
+			)
+
+			req := httptest.NewRequest(http.MethodGet, "https://extension.example.test/", nil)
+			if tt.certificate != nil {
+				req.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{tt.certificate}}
+			}
+			req.Header.Set("X-Remote-User", "admin")
+			if tt.distinctHeaders {
+				req.Header.Set("X-A-User", "a-admin")
+				req.Header.Set("X-B-User", "b-user")
+				req.Header.Set("X-B-Uid", "b-uid")
+				req.Header.Set("X-B-Group", "b-group")
+				req.Header.Set("X-B-Extra-Scope", "b-scope")
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, req)
+
+			if response.Code != tt.wantStatus {
+				t.Errorf("HTTP status = %d, want %d", response.Code, tt.wantStatus)
+			}
+			if tt.wantUser == nil {
+				if gotUser != nil {
+					t.Errorf("expected no authenticated user, got %#v", gotUser)
+				}
+				return
+			}
+			if diff := cmp.Diff(tt.wantUser, gotUser); len(diff) > 0 {
+				t.Errorf("unexpected user (-want +got):\n%s", diff)
+			}
+			for _, name := range []string{"X-Remote-User", "X-A-User", "X-B-User", "X-B-Uid", "X-B-Group", "X-B-Extra-Scope"} {
+				if remaining.Get(name) != "" {
+					t.Errorf("authentication header %s leaked to the handler", name)
+				}
+			}
+		})
+	}
+}
+
+// newRequestHeaderTestCA returns a CA content provider and one client certificate per common
+// name, all signed by that CA.
+func newRequestHeaderTestCA(t *testing.T, name string, commonNames ...string) (dynamiccertificates.CAContentProvider, []*x509.Certificate) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: name},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, ca, ca, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsedCA, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := dynamiccertificates.NewStaticCAContent(name, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	certs := make([]*x509.Certificate, 0, len(commonNames))
+	for i, cn := range commonNames {
+		leaf := &x509.Certificate{
+			SerialNumber: big.NewInt(int64(i + 2)),
+			Subject:      pkix.Name{CommonName: cn},
+			NotBefore:    ca.NotBefore,
+			NotAfter:     ca.NotAfter,
+			KeyUsage:     x509.KeyUsageDigitalSignature,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		der, err := x509.CreateCertificate(rand.Reader, leaf, parsedCA, &key.PublicKey, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			t.Fatal(err)
+		}
+		certs = append(certs, cert)
+	}
+	return provider, certs
+}
 func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 	s := httptest.NewUnstartedServer(WithAuthentication(
 		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) }),
