@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
 	v1 "k8s.io/api/core/v1"
@@ -294,4 +295,135 @@ func TestGetPodContainerName(t *testing.T) {
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 		})
 	}
+}
+
+// cpuWeightCgroupManager models the cpu.weight file of cgroup v2 pod cgroups:
+// shares are converted to a weight on write and back to shares on read, using
+// whatever scale is in effect at the time, like the real cgroup v2 manager.
+type cpuWeightCgroupManager struct {
+	fakeCgroupManager
+	weights map[string]uint64
+	writes  int
+}
+
+func (f *cpuWeightCgroupManager) Exists(name CgroupName) bool {
+	_, ok := f.weights[name.ToCgroupfs()]
+	return ok
+}
+
+func (f *cpuWeightCgroupManager) GetCgroupConfig(name CgroupName, _ v1.ResourceName) (*ResourceConfig, error) {
+	shares := cpuWeightToCPUShares(f.weights[name.ToCgroupfs()])
+	return &ResourceConfig{CPUShares: &shares}, nil
+}
+
+func (f *cpuWeightCgroupManager) SetCgroupConfig(_ klog.Logger, name CgroupName, rc *ResourceConfig) error {
+	f.writes++
+	f.weights[name.ToCgroupfs()] = getCPUWeight(rc.CPUShares)
+	return nil
+}
+
+func (f *cpuWeightCgroupManager) Version() int { return 2 }
+
+func TestRescaleCPUWeightAfterKubeletRestart(t *testing.T) {
+	burstablePod := func(cpu string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: types.UID("pod-" + cpu)},
+			Spec: v1.PodSpec{Containers: []v1.Container{{
+				Name: "c",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(cpu),
+					v1.ResourceMemory: resource.MustParse("64Mi"),
+				}},
+			}}},
+		}
+	}
+
+	tests := []struct {
+		name string
+		// capacityMilliCPU is the node CPU capacity seen by the restarted kubelet.
+		capacityMilliCPU int64
+		cpu              string
+		// weight overrides the cpu.weight found in the pod cgroup after the
+		// restart. Zero means the weight the previous kubelet wrote at the
+		// fixed MaxShares scale.
+		weight      uint64
+		wantRewrite bool
+	}{
+		{name: "1 CPU pod on a 384 CPU node", capacityMilliCPU: 384000, cpu: "1", wantRewrite: true},
+		{name: "300 CPU pod on a 384 CPU node", capacityMilliCPU: 384000, cpu: "300", wantRewrite: true},
+		{name: "pod at node capacity keeps the maximum weight", capacityMilliCPU: 384000, cpu: "384"},
+		{name: "pod at the minimum weight", capacityMilliCPU: 384000, cpu: "1m"},
+		{name: "small node keeps the legacy scale", capacityMilliCPU: 64000, cpu: "1"},
+		{name: "256 CPU node keeps the legacy scale", capacityMilliCPU: 256000, cpu: "300"},
+		// 26 is the new-scale weight of 1 CPU on a 384 CPU node, i.e. a pod
+		// created by the restarted kubelet itself.
+		{name: "weight already at the new scale", capacityMilliCPU: 384000, cpu: "1", weight: 26},
+		// A weight matching neither scale, e.g. an in-place resize that has
+		// not been actuated yet, is left for the resize path.
+		{name: "unrelated weight is left alone", capacityMilliCPU: 384000, cpu: "1", weight: 157},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			old := cgroupV2MaxShares.Load()
+			t.Cleanup(func() { cgroupV2MaxShares.Store(old) })
+
+			pod := burstablePod(tc.cpu)
+			cgroups := &cpuWeightCgroupManager{weights: map[string]uint64{}}
+			m := &podContainerManagerImpl{
+				qosContainersInfo: QOSContainersInfo{Burstable: RootCgroupName},
+				cgroupManager:     cgroups,
+				cpuCFSQuotaPeriod: 100000,
+			}
+			podCgroup, _ := m.GetPodContainerName(pod)
+
+			// The previous kubelet created the pod cgroup at the fixed scale.
+			cgroupV2MaxShares.Store(MaxShares)
+			allocated := ResourceConfigForPod(pod, false, 100000, false, "")
+			legacyWeight := getCPUWeight(allocated.CPUShares)
+			cgroups.weights[podCgroup.ToCgroupfs()] = legacyWeight
+			if tc.weight != 0 {
+				cgroups.weights[podCgroup.ToCgroupfs()] = tc.weight
+			}
+			before := cgroups.weights[podCgroup.ToCgroupfs()]
+
+			// The kubelet restarts and scales to the node's capacity.
+			SetCgroupV2CPUCapacity(tc.capacityMilliCPU)
+			request := resource.MustParse(tc.cpu)
+			shares := MilliCPUToCgroupShares(request.MilliValue())
+			wantWeight := getCPUWeight(&shares)
+
+			require.NoError(t, m.RescaleCPUWeight(logger, pod))
+			got := cgroups.weights[podCgroup.ToCgroupfs()]
+			if !tc.wantRewrite {
+				require.Equal(t, before, got, "cpu.weight must not change")
+				require.Zero(t, cgroups.writes)
+				return
+			}
+			require.NotEqual(t, wantWeight, legacyWeight, "test case must change the weight")
+			require.Equal(t, wantWeight, got)
+
+			// The readback now matches the pod's request, so status.resources
+			// reports the request instead of an inflated value.
+			readback, err := m.GetPodCgroupConfig(pod, v1.ResourceCPU)
+			require.NoError(t, err)
+			require.True(t, CPUSharesEqualAfterV2RoundTrip(shares, *readback.CPUShares))
+
+			// Later syncs find the new weight and do not write again.
+			require.NoError(t, m.RescaleCPUWeight(logger, pod))
+			require.Equal(t, 1, cgroups.writes)
+		})
+	}
+}
+
+func TestRescaleCPUWeightMissingCgroup(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	old := cgroupV2MaxShares.Load()
+	t.Cleanup(func() { cgroupV2MaxShares.Store(old) })
+	SetCgroupV2CPUCapacity(384000)
+
+	cgroups := &cpuWeightCgroupManager{weights: map[string]uint64{}}
+	m := &podContainerManagerImpl{qosContainersInfo: QOSContainersInfo{Burstable: RootCgroupName}, cgroupManager: cgroups}
+	require.NoError(t, m.RescaleCPUWeight(logger, &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "missing"}}))
+	require.Zero(t, cgroups.writes)
 }

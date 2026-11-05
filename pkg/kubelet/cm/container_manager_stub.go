@@ -118,6 +118,10 @@ func (m *podContainerManagerStub) SetPodCgroupConfig(_ klog.Logger, _ *v1.Pod, _
 	return fmt.Errorf("not implemented")
 }
 
+func (m *podContainerManagerStub) RescaleCPUWeight(_ klog.Logger, _ *v1.Pod) error {
+	return nil
+}
+
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
 }

@@ -48,6 +48,11 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 	return 0
 }
 
+// MilliCPUToCgroupShares converts milliCPU to shares for kubelet-managed cgroups.
+func MilliCPUToCgroupShares(milliCPU int64) uint64 {
+	return 0
+}
+
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
 func ResourceConfigForPod(pod *v1.Pod, enforceCPULimit bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
 	return nil
