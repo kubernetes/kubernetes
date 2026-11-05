@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -594,6 +595,11 @@ func (m *manager) SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volum
 		logger.V(4).Info("Pod has been deleted, no need to update volume health", "podUID", podUID)
 		return false
 	}
+	// A probe started before volume removal may complete after the spec changed.
+	if !slices.ContainsFunc(pod.Spec.Volumes, func(volume v1.Volume) bool { return volume.Name == volumeName }) {
+		logger.V(4).Info("Volume is no longer in pod spec, skipping volume health update", "podUID", podUID, "volumeName", volumeName)
+		return false
+	}
 
 	oldStatus, found := m.podStatuses[pod.UID]
 	if !found {
@@ -987,9 +993,13 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		status.StartTime = &now
 	}
 
-	// Preserve independently reported health when other status producers omit it.
+	// Preserve independently reported health when other status producers omit it,
+	// but do not resurrect health for volumes removed from the pod spec.
 	for _, oldVolumeStatus := range oldStatus.VolumeStatuses {
 		if oldVolumeStatus.HealthStatus == nil {
+			continue
+		}
+		if !slices.ContainsFunc(pod.Spec.Volumes, func(volume v1.Volume) bool { return volume.Name == oldVolumeStatus.Name }) {
 			continue
 		}
 		entryIndex := -1

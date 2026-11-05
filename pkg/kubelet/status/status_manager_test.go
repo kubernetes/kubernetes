@@ -1590,6 +1590,7 @@ func TestSetPodVolumeHealth(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}, {Name: "vol2"}}
 	m := newTestManager(&fake.Clientset{})
 	m.podManager.(mutablePodManager).AddPod(pod)
 
@@ -1718,6 +1719,7 @@ func TestSetPodVolumeHealthEmptyConditions(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
 			m := newTestManager(&fake.Clientset{})
 			m.podManager.(mutablePodManager).AddPod(pod)
 			m.SetPodStatus(logger, pod, v1.PodStatus{VolumeStatuses: tc.volumeStatuses})
@@ -1749,6 +1751,7 @@ func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
 	m := newTestManager(&fake.Clientset{})
 	m.podManager.(mutablePodManager).AddPod(pod)
 
@@ -1819,6 +1822,7 @@ func TestVolumeHealthPreservedWithFeatureGateDisabled(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
 			pod.Status.VolumeStatuses = []v1.PodVolumeStatus{{
 				Name: "vol1",
 				HealthStatus: &v1.VolumeHealthStatus{
@@ -1870,6 +1874,7 @@ func TestPodVolumeHealthTransitionTime(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
 			m := newTestManager(&fake.Clientset{})
 			m.podManager.(mutablePodManager).AddPod(pod)
 			initialStatus := v1.PodStatus{VolumeStatuses: []v1.PodVolumeStatus{
@@ -1901,6 +1906,7 @@ func TestPodVolumeHealthTransitionTime(t *testing.T) {
 func TestVolumeHealthMergesByName(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}, {Name: "vol2"}}
 	m := newTestManager(&fake.Clientset{})
 	m.podManager.(mutablePodManager).AddPod(pod)
 	health := &v1.VolumeHealthStatus{
@@ -1924,6 +1930,87 @@ func TestVolumeHealthMergesByName(t *testing.T) {
 	status.VolumeStatuses[1].HealthStatus.HealthConditions[0].Reason = "Changed"
 	assert.Equal(t, "SlowIO", health.HealthConditions[0].Reason)
 	assert.Equal(t, "SlowIO", status.VolumeStatuses[2].HealthStatus.HealthConditions[0].Reason)
+}
+
+func TestVolumeHealthIsNotRestoredForRemovedVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	for _, cached := range []bool{false, true} {
+		for _, tc := range []struct {
+			name           string
+			volumeStatuses []v1.PodVolumeStatus
+		}{
+			{name: "nil volume statuses"},
+			{name: "empty volume statuses", volumeStatuses: []v1.PodVolumeStatus{}},
+			{name: "retained lifecycle entry", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+		} {
+			t.Run(fmt.Sprintf("cached=%t/%s", cached, tc.name), func(t *testing.T) {
+				logger, _ := ktesting.NewTestContext(t)
+				pod := getTestPod()
+				pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}, {Name: "vol2"}}
+				health := &v1.VolumeHealthStatus{
+					HealthConditions:   []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+					LastTransitionTime: metav1.NewTime(time.Unix(123, 0)),
+				}
+				pod.Status.VolumeStatuses = []v1.PodVolumeStatus{
+					{Name: "vol1", HealthStatus: health},
+					{Name: "vol2", HealthStatus: health.DeepCopy()},
+				}
+				m := newTestManager(&fake.Clientset{})
+				m.podManager.(mutablePodManager).AddPod(pod)
+				if cached {
+					m.SetPodStatus(logger, pod, pod.Status)
+					verifyUpdates(t, m, 1)
+				}
+
+				pod = pod.DeepCopy()
+				pod.Spec.Volumes = pod.Spec.Volumes[1:]
+				m.podManager.(mutablePodManager).UpdatePod(pod)
+				incoming := v1.PodStatus{VolumeStatuses: tc.volumeStatuses}
+				before := incoming.DeepCopy()
+				m.SetPodStatus(logger, pod, incoming)
+				verifyUpdates(t, m, 1)
+
+				want := append([]v1.PodVolumeStatus(nil), tc.volumeStatuses...)
+				want = append(want, v1.PodVolumeStatus{Name: "vol2", HealthStatus: health})
+				assert.Equal(t, want, expectPodStatus(t, m, pod).VolumeStatuses)
+				assert.Equal(t, *before, incoming, "input status must not be mutated")
+				assert.Equal(t, health, pod.Status.VolumeStatuses[0].HealthStatus, "persisted health must not be mutated")
+			})
+		}
+	}
+}
+
+func TestSetPodVolumeHealthIgnoresRemovedVolume(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		volumeStatuses []v1.PodVolumeStatus
+	}{
+		{name: "entry already pruned"},
+		{name: "retained lifecycle entry", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1"}}},
+		{name: "cached health", volumeStatuses: []v1.PodVolumeStatus{{Name: "vol1", HealthStatus: &v1.VolumeHealthStatus{
+			HealthConditions: []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}},
+		}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			pod := getTestPod()
+			pod.Spec.Volumes = []v1.Volume{{Name: "vol1"}}
+			m := newTestManager(&fake.Clientset{})
+			m.podManager.(mutablePodManager).AddPod(pod)
+			m.SetPodStatus(logger, pod, v1.PodStatus{VolumeStatuses: tc.volumeStatuses})
+			verifyUpdates(t, m, 1)
+			before := expectPodStatus(t, m, pod)
+			beforeCopy := before.DeepCopy()
+
+			pod = pod.DeepCopy()
+			pod.Spec.Volumes = nil
+			m.podManager.(mutablePodManager).UpdatePod(pod)
+			conditions := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthInaccessible, Reason: "PathMissing"}}
+			assert.False(t, m.SetPodVolumeHealth(logger, pod.UID, "vol1", conditions))
+			verifyUpdates(t, m, 0)
+			assert.Equal(t, *beforeCopy, expectPodStatus(t, m, pod))
+		})
+	}
 }
 
 func TestNormalizeStatusVolumeHealth(t *testing.T) {
