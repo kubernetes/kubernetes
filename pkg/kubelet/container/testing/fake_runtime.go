@@ -586,8 +586,13 @@ func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ types.UID, _ kubec
 }
 
 func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubetypes.SwapBehavior {
-	if f.SwapBehavior != nil && f.SwapBehavior[container.Name] != "" {
-		return f.SwapBehavior[container.Name]
+	if f.SwapBehavior != nil {
+		if container != nil && f.SwapBehavior[container.Name] != "" {
+			return f.SwapBehavior[container.Name]
+		}
+		if f.SwapBehavior[""] != "" {
+			return f.SwapBehavior[""]
+		}
 	}
 	return kubetypes.NoSwap
 }

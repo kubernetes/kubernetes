@@ -419,6 +419,44 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 	return config, cleanupAction, nil
 }
 
+// swapLimitSource records where a container's effective swap limit came from
+// (see effectiveSwapLimit). The resize path uses it to tell a user-requested
+// change from a kubelet recalculation (LimitedSwap), which have different
+// admission rules.
+type swapLimitSource int
+
+const (
+	// swapSourceNone: the node cannot swap (NoSwap/"" behavior, cgroup v1, or no
+	// swap controller). Any declared limit is inert.
+	swapSourceNone swapLimitSource = iota
+	// swapSourceContainer: containers[i].resources.limits.swap
+	swapSourceContainer
+	// swapSourcePod: pod.spec.resources.limits.swap inherited by a container
+	// without its own limit (mirrors how pod-level memory limits propagate).
+	swapSourcePod
+	// swapSourceLimitedSwap: proportional value computed from requests.memory.
+	swapSourceLimitedSwap
+	// swapSourceModeDefault: 0 because the mode gives this container no swap
+	// (WorkloadControlledSwap without a limit, or LimitedSwap ineligible).
+	swapSourceModeDefault
+)
+
+func (s swapLimitSource) String() string {
+	switch s {
+	case swapSourceNone:
+		return "None"
+	case swapSourceContainer:
+		return "Container"
+	case swapSourcePod:
+		return "Pod"
+	case swapSourceLimitedSwap:
+		return "LimitedSwap"
+	case swapSourceModeDefault:
+		return "ModeDefault"
+	}
+	return "Unknown"
+}
+
 func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, containerType podutil.ContainerType) error {
 	logger := klog.FromContext(ctx)
 	containerResources := m.generateContainerResources(ctx, pod, container)
