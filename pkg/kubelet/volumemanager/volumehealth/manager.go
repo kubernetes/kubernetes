@@ -58,27 +58,32 @@ type Manager interface {
 	Run(ctx context.Context)
 }
 
-// volumeToProbe carries everything a worker needs to probe one volume. It is
-// also the work queue key: the queue coalesces duplicates and never hands the
-// same item to two workers at once, so status writes for a volume stay ordered.
-type volumeToProbe struct {
+// volumeKey keeps probes for a pod volume serialized even when its paths change.
+type volumeKey struct {
 	podUID          types.UID
 	outerVolumeName string
-	driverName      string
-	volumeHandle    string
-	stagingPath     string
-	publishPath     string
+}
+
+type volumeToProbe struct {
+	volumeKey
+	driverName   string
+	volumeHandle string
+	stagingPath  string
+	publishPath  string
 }
 
 type manager struct {
 	statusUpdater  StatusUpdater
 	probeInterval  time.Duration
 	workers        int
-	queue          workqueue.TypedInterface[volumeToProbe]
+	queue          workqueue.TypedInterface[volumeKey]
 	clientFactory  HealthClientFactory
 	listVolumes    func() []cache.VolumeToHealthCheck
 	listDrivers    func() []string
 	csiNodeUpdater func() CSINodeUpdater
+
+	volumesMu sync.RWMutex
+	volumes   map[volumeKey]volumeToProbe
 }
 
 // NewManager creates a volume health manager. probeInterval should typically be
@@ -109,7 +114,7 @@ func newManager(statusUpdater StatusUpdater, probeInterval time.Duration, worker
 		statusUpdater: statusUpdater,
 		probeInterval: probeInterval,
 		workers:       workers,
-		queue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[volumeToProbe]{
+		queue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[volumeKey]{
 			Name: "csi_volume_health",
 		}),
 		clientFactory: csi.NewHealthClient,
@@ -140,19 +145,43 @@ func (m *manager) Run(ctx context.Context) {
 }
 
 func (m *manager) enqueueVolumes(ctx context.Context) {
+	volumes := make(map[volumeKey]volumeToProbe)
 	for _, vol := range m.listVolumes() {
 		if vol.Pod == nil || vol.OuterVolumeName == "" || vol.CSIVolumeHandle == "" {
 			continue
 		}
-		m.queue.Add(volumeToProbe{
+		key := volumeKey{
 			podUID:          vol.Pod.UID,
 			outerVolumeName: vol.OuterVolumeName,
-			driverName:      vol.DriverName,
-			volumeHandle:    vol.CSIVolumeHandle,
-			stagingPath:     vol.StagingPath,
-			publishPath:     vol.PublishPath,
-		})
+		}
+		volumes[key] = volumeToProbe{
+			volumeKey:    key,
+			driverName:   vol.DriverName,
+			volumeHandle: vol.CSIVolumeHandle,
+			stagingPath:  vol.StagingPath,
+			publishPath:  vol.PublishPath,
+		}
 	}
+	// Replace the snapshot so removed volumes are forgotten and pending keys
+	// always use the latest probe parameters.
+	m.saveVolumeSnapshot(volumes)
+	for key := range volumes {
+		m.queue.Add(key)
+	}
+}
+
+func (m *manager) saveVolumeSnapshot(volumes map[volumeKey]volumeToProbe) {
+	m.volumesMu.Lock()
+	defer m.volumesMu.Unlock()
+	m.volumes = volumes
+}
+
+func (m *manager) getVolumeToProbe(key volumeKey) (volumeToProbe, bool) {
+	m.volumesMu.RLock()
+	defer m.volumesMu.RUnlock()
+
+	vol, exists := m.volumes[key]
+	return vol, exists
 }
 
 func (m *manager) runWorker(ctx context.Context) {
@@ -161,12 +190,15 @@ func (m *manager) runWorker(ctx context.Context) {
 }
 
 func (m *manager) processNextVolume(ctx context.Context) bool {
-	vol, shutdown := m.queue.Get()
+	key, shutdown := m.queue.Get()
 	if shutdown {
 		return false
 	}
-	defer m.queue.Done(vol)
-	m.probeVolumeHealth(ctx, vol)
+	defer m.queue.Done(key)
+	vol, exists := m.getVolumeToProbe(key)
+	if exists {
+		m.probeVolumeHealth(ctx, vol)
+	}
 	return true
 }
 

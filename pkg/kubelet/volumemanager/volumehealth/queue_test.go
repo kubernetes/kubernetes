@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -47,6 +48,13 @@ type blockingHealthClient struct {
 	inFlight    int
 	maxInFlight int
 	calls       int
+	requests    []volumeProbeCall
+}
+
+type volumeProbeCall struct {
+	volumeHandle string
+	stagingPath  string
+	publishPath  string
 }
 
 func newBlockingHealthClient(block bool) *blockingHealthClient {
@@ -61,6 +69,7 @@ func (c *blockingHealthClient) NodeGetVolumeHealth(ctx context.Context, volID, s
 	c.mu.Lock()
 	c.inFlight++
 	c.calls++
+	c.requests = append(c.requests, volumeProbeCall{volID, stagingTargetPath, volumePublishPath})
 	c.maxInFlight = max(c.maxInFlight, c.inFlight)
 	c.mu.Unlock()
 	defer func() {
@@ -133,17 +142,6 @@ func testVolumes(driverName string, n int) []cache.VolumeToHealthCheck {
 		volumes = append(volumes, testVolume(driverName, i))
 	}
 	return volumes
-}
-
-func probeItem(vol cache.VolumeToHealthCheck) volumeToProbe {
-	return volumeToProbe{
-		podUID:          vol.Pod.UID,
-		outerVolumeName: vol.OuterVolumeName,
-		driverName:      vol.DriverName,
-		volumeHandle:    vol.CSIVolumeHandle,
-		stagingPath:     vol.StagingPath,
-		publishPath:     vol.PublishPath,
-	}
 }
 
 // newQueueTestManager returns a manager whose probes go to clients[driverName]
@@ -219,6 +217,7 @@ func TestWorkersProbeInParallel(t *testing.T) {
 }
 
 func TestSameVolumeIsNotProbedConcurrently(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	vol := testVolume("driver", 0)
 	client := newBlockingHealthClient(true)
 	status := &testStatusUpdater{}
@@ -226,13 +225,83 @@ func TestSameVolumeIsNotProbedConcurrently(t *testing.T) {
 	runManager(t, m)
 
 	client.waitStarted(t, 1)
-	m.queue.Add(probeItem(vol))
+	vol.StagingPath = "/staging"
+	vol.PublishPath = "/publish"
+	m.listVolumes = func() []cache.VolumeToHealthCheck { return []cache.VolumeToHealthCheck{vol} }
+	m.enqueueVolumes(tCtx)
+	if got := m.queue.Len(); got != 0 {
+		t.Fatalf("expected updated volume to wait for its in-flight probe, got %d queued items", got)
+	}
 	close(client.release)
 	client.waitStarted(t, 1)
 	waitForStatusUpdates(t, status, "uid-driver", 2)
 
 	if calls, maxInFlight := client.stats(); calls != 2 || maxInFlight != 1 {
 		t.Errorf("expected 2 sequential probes, got %d calls with %d in flight at most", calls, maxInFlight)
+	}
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	want := []volumeProbeCall{
+		{volumeHandle: vol.CSIVolumeHandle},
+		{volumeHandle: vol.CSIVolumeHandle, stagingPath: vol.StagingPath, publishPath: vol.PublishPath},
+	}
+	if !reflect.DeepEqual(client.requests, want) {
+		t.Errorf("expected probes with old then updated paths: got %+v, want %+v", client.requests, want)
+	}
+}
+
+func TestQueuedVolumeUsesLatestParameters(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	volumes := []cache.VolumeToHealthCheck{testVolume("driver", 0)}
+	oldClient := newBlockingHealthClient(false)
+	client := newBlockingHealthClient(false)
+	status := &testStatusUpdater{}
+	m := newQueueTestManager(status, 1, volumes, map[string]csi.HealthClient{"driver": oldClient, "new-driver": client})
+	t.Cleanup(m.queue.ShutDown)
+	m.enqueueVolumes(tCtx)
+
+	volumes[0].DriverName = "new-driver"
+	volumes[0].CSIVolumeHandle = "new-handle"
+	volumes[0].StagingPath = "/staging"
+	volumes[0].PublishPath = "/publish"
+	m.enqueueVolumes(tCtx)
+	if got := m.queue.Len(); got != 1 {
+		t.Fatalf("expected path changes to coalesce into one queued item, got %d", got)
+	}
+	m.processNextVolume(tCtx)
+	if calls, _ := oldClient.stats(); calls != 0 {
+		t.Errorf("expected no probes using the old driver, got %d", calls)
+	}
+	want := []volumeProbeCall{{volumeHandle: "new-handle", stagingPath: "/staging", publishPath: "/publish"}}
+	if !reflect.DeepEqual(client.requests, want) {
+		t.Errorf("expected latest probe parameters: got %+v, want %+v", client.requests, want)
+	}
+	if got := status.callCount(); got != 1 {
+		t.Errorf("expected one status update, got %d", got)
+	}
+}
+
+func TestRemovedVolumeIsNotProbed(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	vol := testVolume("driver", 0)
+	client := newBlockingHealthClient(false)
+	status := &testStatusUpdater{}
+	m := newQueueTestManager(status, 1, []cache.VolumeToHealthCheck{vol}, map[string]csi.HealthClient{"driver": client})
+	t.Cleanup(m.queue.ShutDown)
+	m.enqueueVolumes(tCtx)
+	m.listVolumes = func() []cache.VolumeToHealthCheck { return nil }
+	m.enqueueVolumes(tCtx)
+	m.processNextVolume(tCtx)
+	if calls, _ := client.stats(); calls != 0 {
+		t.Errorf("expected no probes for removed volume, got %d", calls)
+	}
+	if got := status.callCount(); got != 0 {
+		t.Errorf("expected no status updates for removed volume, got %d", got)
+	}
+	m.volumesMu.Lock()
+	defer m.volumesMu.Unlock()
+	if got := len(m.volumes); got != 0 {
+		t.Errorf("expected removed volume to be forgotten, got %d retained volumes", got)
 	}
 }
 
