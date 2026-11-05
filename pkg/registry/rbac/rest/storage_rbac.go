@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -180,26 +182,64 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 	}
 }
 
+// listedObjects is a client optimized for dry-run reconciles. It serves Gets from
+// previously listed ClusterRoles or ClusterRoleBindings.
+type listedObjects[T any] map[string]T
+
+func (l listedObjects[T]) Get(_, name string) (T, error) {
+	obj, ok := l[name]
+	if !ok {
+		return obj, apierrors.NewNotFound(schema.GroupResource{}, name) // The reconciler only checks IsNotFound, so no GroupResource is needed.
+	}
+	return obj, nil
+}
+
+func (listedObjects[T]) Create(obj T) (T, error) {
+	return obj, errors.New("dry-run reconcile attempted a write")
+}
+
+func (listedObjects[T]) Update(obj T) (T, error) {
+	return obj, errors.New("dry-run reconcile attempted a write")
+}
+
+func (listedObjects[T]) Delete(string, string, types.UID) error {
+	return errors.New("dry-run reconcile attempted a write")
+}
+
 func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err error) {
 	failedReconciliation := false
 	// Make sure etcd is responding before we start reconciling
-	if _, err := client.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{}); err != nil {
+	clusterRoleList, err := client.RbacV1().ClusterRoles().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
 		return false, nil
 	}
-	if _, err := client.RbacV1().ClusterRoleBindings().List(context.TODO(), metav1.ListOptions{}); err != nil {
+	clusterRoleBindingList, err := client.RbacV1().ClusterRoleBindings().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to initialize clusterrolebindings: %v", err))
 		return false, nil
 	}
 
+	// Keep list responses and use them to skip objects that need no write.
+	// To ensure data consistency, this list data must never be used to
+	// prepare a write.
+	listedRoles := listedObjects[reconciliation.RuleOwner]{}
+	for _, role := range clusterRoleList.Items {
+		listedRoles[role.Name] = reconciliation.ClusterRoleRuleOwner{ClusterRole: &role}
+	}
+	listedBindings := listedObjects[reconciliation.RoleBinding]{}
+	for _, binding := range clusterRoleBindingList.Items {
+		listedBindings[binding.Name] = reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &binding}
+	}
+
 	// if the new cluster roles to aggregate do not yet exist, then we need to copy the old roles if they don't exist
 	// in new locations
-	if err := primeAggregatedClusterRoles(p.ClusterRolesToAggregate, client.RbacV1()); err != nil {
+	if err := primeAggregatedClusterRoles(p.ClusterRolesToAggregate, listedRoles, client.RbacV1()); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to prime aggregated clusterroles: %v", err))
 		return false, nil
 	}
 
-	if err := primeSplitClusterRoleBindings(p.ClusterRoleBindingsToSplit, client.RbacV1()); err != nil {
+	if err := primeSplitClusterRoleBindings(p.ClusterRoleBindingsToSplit, listedBindings, client.RbacV1()); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to prime split ClusterRoleBindings: %v", err))
 		return false, nil
 	}
@@ -211,6 +251,14 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			Client:  reconciliation.ClusterRoleModifier{Client: client.RbacV1().ClusterRoles()},
 			Confirm: true,
 		}
+		// Skip the role if a dry run against the List finds nothing to change.
+		dryRun := opts
+		dryRun.Client = listedRoles
+		dryRun.Confirm = false
+		if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
+			continue
+		}
+
 		// ServiceUnavailble error is returned when the API server is blocked by storage version updates
 		err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 			result, err := opts.Run()
@@ -241,6 +289,14 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: client.RbacV1().ClusterRoleBindings()},
 			Confirm:     true,
 		}
+		// Skip the binding if a dry run against the List finds nothing to change.
+		dryRun := opts
+		dryRun.Client = listedBindings
+		dryRun.Confirm = false
+		if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
+			continue
+		}
+
 		// ServiceUnavailble error is returned when the API server is blocked by storage version updates
 		err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 			result, err := opts.Run()
@@ -345,8 +401,13 @@ func (p RESTStorageProvider) GroupName() string {
 
 // primeAggregatedClusterRoles copies roles that have transitioned to aggregated roles and may need to pick up changes
 // that were done to the legacy roles.
-func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clusterRoleClient rbacv1client.ClusterRolesGetter) error {
+func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, listedRoles map[string]reconciliation.RuleOwner, clusterRoleClient rbacv1client.ClusterRolesGetter) error {
 	for oldName, newName := range clusterRolesToAggregate {
+		// Skip the live Gets if the List shows nothing to migrate.
+		if listedRoles[newName] != nil || listedRoles[oldName] == nil {
+			continue
+		}
+
 		_, err := clusterRoleClient.ClusterRoles().Get(context.TODO(), newName, metav1.GetOptions{})
 		if err == nil {
 			continue
@@ -380,8 +441,13 @@ func primeAggregatedClusterRoles(clusterRolesToAggregate map[string]string, clus
 // primeSplitClusterRoleBindings ensures the existence of target ClusterRoleBindings
 // by copying Subjects, Annotations, and Labels from the specified source
 // ClusterRoleBinding, if present.
-func primeSplitClusterRoleBindings(clusterRoleBindingToSplit map[string]rbacapiv1.ClusterRoleBinding, clusterRoleBindingClient rbacv1client.ClusterRoleBindingsGetter) error {
+func primeSplitClusterRoleBindings(clusterRoleBindingToSplit map[string]rbacapiv1.ClusterRoleBinding, listedBindings map[string]reconciliation.RoleBinding, clusterRoleBindingClient rbacv1client.ClusterRoleBindingsGetter) error {
 	for existingBindingName, clusterRoleBindingToCreate := range clusterRoleBindingToSplit {
+		// Skip the live Gets if the List shows nothing to copy.
+		if listedBindings[existingBindingName] == nil || listedBindings[clusterRoleBindingToCreate.Name] != nil {
+			continue
+		}
+
 		// If source ClusterRoleBinding does not exist, do nothing.
 		existingRoleBinding, err := clusterRoleBindingClient.ClusterRoleBindings().Get(context.TODO(), existingBindingName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
