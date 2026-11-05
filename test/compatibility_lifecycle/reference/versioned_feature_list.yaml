@@ -1464,6 +1464,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.37"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.38"
 - name: PodDeletionCost
   versionedSpecs:
   - default: false

@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -78,6 +79,7 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	serviceAccountTokenForCredentialProvidersDisabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, f, version.MajorMinor(1, 37))
 		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
 			features.KubeletServiceAccountTokenForCredentialProviders: false,
 			features.PodCertificateRequest:                            false,
@@ -93,14 +95,12 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	podCertificateProjectionEnabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
-		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
-			features.PodCertificateRequest: true,
-		})
 		return f
 	}
 
 	podCertificateProjectionDisabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, f, version.MajorMinor(1, 37))
 		featuregatetesting.SetFeatureGateDuringTest(t, f, features.PodCertificateRequest, false)
 		return f
 	}
