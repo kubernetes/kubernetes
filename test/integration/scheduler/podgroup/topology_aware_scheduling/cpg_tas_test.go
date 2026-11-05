@@ -1029,6 +1029,10 @@ func TestCPGTopologyAwareScheduling(t *testing.T) {
 					},
 				},
 				{
+					Name:                                "Wait for the scheduler to see all 4 pods before the root CompositePodGroup exists",
+					WaitForPodsInIncompletePodGroupPods: []string{"p1", "p2", "p3", "p4"},
+				},
+				{
 					Name:                    "Create root CompositePodGroup (Gang minGroupCount=1, TopologyKey=rack)",
 					CreateCompositePodGroup: makeGangCompositePodGroup("cpg-root", "", "rack", 1),
 				},
