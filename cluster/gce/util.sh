@@ -143,7 +143,8 @@ KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 # How long (in seconds) to wait for cluster initialization.
 KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
 # Regions to choose from when neither KUBE_GCE_ZONE nor KUBE_GCE_REGION is set.
-KUBE_GCE_DEFAULT_REGIONS=(us-central1 us-east1 us-east4 europe-west1)
+# Keep to regions near the Prow build cluster: e2e.test talks to the apiserver
+KUBE_GCE_DEFAULT_REGIONS=(us-central1 us-east1 us-east4)
 
 function join_csv() {
   local IFS=','; echo "$*";
