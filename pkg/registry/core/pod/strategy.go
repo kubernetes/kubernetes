@@ -460,7 +460,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		}
 
 		if newPod.Spec.Resources != nil {
-			podutil.DefaultPodLevelResources(newPod)
+			podutil.DefaultPodLevelResourcesForResize(newPod, oldPod)
 		}
 	}
 

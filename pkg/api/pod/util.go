@@ -419,6 +419,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEphemeralStorageEnabled:            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
@@ -498,6 +499,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// If old spec uses a seccomp profile of type OCI, allow it
 		opts.AllowSecurityProfileOCI = opts.AllowSecurityProfileOCI || seccompProfileOCIInUse(oldPodSpec)
+
+		opts.PodLevelResourcesEphemeralStorageEnabled = opts.PodLevelResourcesEphemeralStorageEnabled || podLevelEphemeralStorageInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -1357,6 +1360,13 @@ func podLevelResourcesInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
+func podLevelEphemeralStorageInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	return hasPodLevelEphemeralStorage(podSpec.Resources)
+}
+
 // podLevelStatusResourcesInUse checks if AllocationResources or Resources are set
 // in PodStatus.
 func podLevelStatusResourcesInUse(podStatus *api.PodStatus) bool {
@@ -2145,6 +2155,43 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 	return false
 }
 
+func isSupportedPodLevelResource(name apiv1.ResourceName, ephemeralStorageEnabled bool) bool {
+	if name == apiv1.ResourceEphemeralStorage && !ephemeralStorageEnabled {
+		return false
+	}
+	return resourcehelper.IsSupportedPodLevelResource(name)
+}
+
+func hasSupportedPodLevelResources(res *api.ResourceRequirements, ephemeralStorageEnabled bool) bool {
+	if res == nil {
+		return false
+	}
+	for name := range res.Requests {
+		if isSupportedPodLevelResource(apiv1.ResourceName(name), ephemeralStorageEnabled) {
+			return true
+		}
+	}
+	for name := range res.Limits {
+		if isSupportedPodLevelResource(apiv1.ResourceName(name), ephemeralStorageEnabled) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPodLevelEphemeralStorage(res *api.ResourceRequirements) bool {
+	if res == nil {
+		return false
+	}
+	if _, ok := res.Requests[api.ResourceEphemeralStorage]; ok {
+		return true
+	}
+	if _, ok := res.Limits[api.ResourceEphemeralStorage]; ok {
+		return true
+	}
+	return false
+}
+
 // DefaultPodLevelResources runs all pod-level resource defaulting in dependency order,
 // converting container specs to v1.PodSpec once to avoid redundant conversions.
 //
@@ -2157,14 +2204,25 @@ func hasRestartContainerForNonSidecarInitContainer(spec *api.PodSpec) bool {
 //     for resources where all containers have limits. Step 2 must run first so that
 //     pod-level requests are complete before the max() comparison.
 func DefaultPodLevelResources(pod *api.Pod) {
+	defaultPodLevelResources(pod, utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage))
+}
+
+// DefaultPodLevelResourcesForResize applies pod-level resource defaulting during in-place
+// pod resize. Because ephemeral-storage is immutable on resize, pod-level ephemeral-storage
+// is only defaulted when the feature gate is enabled and oldPod already specified pod-level
+// ephemeral-storage.
+func DefaultPodLevelResourcesForResize(newPod, oldPod *api.Pod) {
+	ephemeralStorageEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage) &&
+		oldPod != nil && hasPodLevelEphemeralStorage(oldPod.Spec.Resources)
+	defaultPodLevelResources(newPod, ephemeralStorageEnabled)
+}
+
+func defaultPodLevelResources(pod *api.Pod, ephemeralStorageEnabled bool) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
 		return
 	}
-	if pod.Spec.Resources == nil {
-		return
-	}
-	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+	if !hasSupportedPodLevelResources(pod.Spec.Resources, ephemeralStorageEnabled) {
 		return
 	}
 
@@ -2179,18 +2237,15 @@ func DefaultPodLevelResources(pod *api.Pod) {
 	}
 	v1Pod := &apiv1.Pod{Spec: *v1PodSpec}
 
-	defaultHugePagePodLevelLimits(pod, v1Pod)
-	defaultPodLevelRequests(pod, v1Pod)
-	defaultPodLevelLimits(pod, v1Pod)
+	defaultHugePagePodLevelLimits(pod, v1Pod, ephemeralStorageEnabled)
+	defaultPodLevelRequests(pod, v1Pod, ephemeralStorageEnabled)
+	defaultPodLevelLimits(pod, v1Pod, ephemeralStorageEnabled)
 }
 
 // defaultHugePagePodLevelLimits applies default values for pod-level hugepage limits,
 // setting pod-level hugepage limit equal to aggregated container limits if not specified.
-func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
-	if pod.Spec.Resources == nil {
-		return
-	}
-	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
+func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod, ephemeralStorageEnabled bool) {
+	if !hasSupportedPodLevelResources(pod.Spec.Resources, ephemeralStorageEnabled) {
 		return
 	}
 
@@ -2202,8 +2257,8 @@ func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 	aggrCtrLims := resourcehelper.AggregateContainerLimits(v1Pod, resourcehelper.PodResourcesOptions{})
 	for key, aggrCtrLim := range aggrCtrLims {
 		coreKey := api.ResourceName(key)
-		// Only default hugepages here; non-hugepage resources (CPU/Memory) are overcommittable and defaulted in subsequent steps.
-		if !resourcehelper.IsSupportedPodLevelResource(key) || !helper.IsHugePageResourceName(coreKey) {
+		// Only default hugepages here; non-hugepage resources (CPU/Memory/EphemeralStorage) are overcommittable and defaulted in subsequent steps.
+		if !isSupportedPodLevelResource(key, ephemeralStorageEnabled) || !helper.IsHugePageResourceName(coreKey) {
 			continue
 		}
 
@@ -2223,11 +2278,8 @@ func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 
 // defaultPodLevelRequests applies default values for pod-level requests from aggregated container
 // requests (for overcommittable resources) and pod-level limits.
-func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
-	if pod.Spec.Resources == nil {
-		return
-	}
-	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod, ephemeralStorageEnabled bool) {
+	if !hasSupportedPodLevelResources(pod.Spec.Resources, ephemeralStorageEnabled) {
 		return
 	}
 
@@ -2239,14 +2291,14 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 	aggrCtrReqs := resourcehelper.AggregateContainerRequests(v1Pod, resourcehelper.PodResourcesOptions{})
 	for key, aggrCtrReq := range aggrCtrReqs {
 		coreKey := api.ResourceName(key)
-		if _, exists := podReqs[coreKey]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && helper.IsOvercommitAllowed(coreKey) {
+		if _, exists := podReqs[coreKey]; !exists && isSupportedPodLevelResource(key, ephemeralStorageEnabled) && helper.IsOvercommitAllowed(coreKey) {
 			podReqs[coreKey] = aggrCtrReq
 		}
 	}
 
 	if pod.Spec.Resources.Limits != nil {
 		for key, podLim := range pod.Spec.Resources.Limits {
-			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) {
+			if _, exists := podReqs[key]; !exists && isSupportedPodLevelResource(apiv1.ResourceName(key), ephemeralStorageEnabled) {
 				podReqs[key] = podLim.DeepCopy()
 			}
 		}
@@ -2259,11 +2311,8 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 
 // defaultPodLevelLimits sets pod-level limits equal to max(PLR request, aggregated container limits)
 // if all containers have limits set for candidate resources.
-func defaultPodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
-	if pod.Spec.Resources == nil {
-		return
-	}
-	if len(pod.Spec.Resources.Requests) == 0 && len(pod.Spec.Resources.Limits) == 0 {
+func defaultPodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod, ephemeralStorageEnabled bool) {
+	if !hasSupportedPodLevelResources(pod.Spec.Resources, ephemeralStorageEnabled) {
 		return
 	}
 
@@ -2277,7 +2326,7 @@ func defaultPodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 	// requests map. This makes iterating over Requests both efficient and
 	// sufficient for identifying defaulting candidates.
 	for resName := range pod.Spec.Resources.Requests {
-		if !resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(resName)) {
+		if !isSupportedPodLevelResource(apiv1.ResourceName(resName), ephemeralStorageEnabled) {
 			continue
 		}
 		// If pod-level limits for that resource is already set, defaulting logic
@@ -2325,9 +2374,12 @@ func defaultPodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 func aggregateContainerLimits(spec *api.PodSpec, candidates sets.Set[api.ResourceName], v1Pod *apiv1.Pod) apiv1.ResourceList {
 	// For a resource limit to be defaulted at the pod level, all containers (including init containers
 	// and sidecars) must specify a limit for that resource.
+	// Unlike cpu/memory (where AggregateContainerLimits omits zero container limits),
+	// AggregateContainerLimits sums specified ephemeral-storage limits including zero;
+	// check !lim.IsZero() for ephemeral-storage so a zero container limit prevents pod-level limit defaulting.
 	VisitContainers(spec, AllContainers, func(ctr *api.Container, _ ContainerType) bool {
 		for resName := range candidates {
-			if _, ok := ctr.Resources.Limits[resName]; !ok {
+			if lim, ok := ctr.Resources.Limits[resName]; !ok || (resName == api.ResourceEphemeralStorage && lim.IsZero()) {
 				candidates.Delete(resName)
 			}
 		}

@@ -26,11 +26,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 
 	resourcehelper "k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 type resourceLifecycleDescriptors struct {
@@ -196,7 +198,17 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 		return
 	}
 
-	reqs = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{Reuse: reuseReqs})
-	limits = resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{Reuse: reuseLimits})
+	skipPodLevelResources := !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	skipPodLevelEphemeralStorage := !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage)
+	reqs = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+		Reuse:                        reuseReqs,
+		SkipPodLevelResources:        skipPodLevelResources,
+		SkipPodLevelEphemeralStorage: skipPodLevelEphemeralStorage,
+	})
+	limits = resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
+		Reuse:                        reuseLimits,
+		SkipPodLevelResources:        skipPodLevelResources,
+		SkipPodLevelEphemeralStorage: skipPodLevelEphemeralStorage,
+	})
 	return
 }

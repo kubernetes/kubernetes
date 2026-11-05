@@ -477,6 +477,54 @@ func TestGetPodQOS(t *testing.T) {
 			},
 			want: corev1.PodQOSBurstable,
 		},
+		{
+			name: "guaranteed containers with only pod level ephemeral-storage",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+						Limits:   corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+					},
+					Containers: []corev1.Container{
+						{
+							Name: "container1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("1"),
+									corev1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("1"),
+									corev1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: corev1.PodQOSGuaranteed,
+		},
+		{
+			name: "burstable containers with only pod level ephemeral-storage",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{corev1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+					},
+					Containers: []corev1.Container{
+						{
+							Name: "container1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU: resource.MustParse("100m"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: corev1.PodQOSBurstable,
+		},
 	}
 
 	for _, tt := range tests {

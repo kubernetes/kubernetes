@@ -38,6 +38,17 @@ import (
 // It returns true if either the Requests or Limits maps are non-empty.
 // Note: keep this in sync with k8s.io/component-helpers/resource.IsPodLevelResourcesSet
 func IsPodLevelResourcesSet(pod *core.Pod) bool {
+	return isPodLevelResourcesSet(pod, false)
+}
+
+// IsPodLevelComputeResourcesSet checks if pod-level compute resources (CPU, Memory, or HugePages)
+// are set, ignoring ephemeral-storage which does not participate in QoS or cgroup management.
+// Note: keep this in sync with k8s.io/component-helpers/resource.IsPodLevelComputeResourcesSet
+func IsPodLevelComputeResourcesSet(pod *core.Pod) bool {
+	return isPodLevelResourcesSet(pod, true)
+}
+
+func isPodLevelResourcesSet(pod *core.Pod, skipPodLevelEphemeralStorage bool) bool {
 	if pod.Spec.Resources == nil {
 		return false
 	}
@@ -47,12 +58,18 @@ func IsPodLevelResourcesSet(pod *core.Pod) bool {
 	}
 
 	for name := range pod.Spec.Resources.Requests {
+		if name == core.ResourceEphemeralStorage && skipPodLevelEphemeralStorage {
+			continue
+		}
 		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
 			return true
 		}
 	}
 
 	for name := range pod.Spec.Resources.Limits {
+		if name == core.ResourceEphemeralStorage && skipPodLevelEphemeralStorage {
+			continue
+		}
 		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
 			return true
 		}

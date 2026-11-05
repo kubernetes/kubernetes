@@ -107,3 +107,65 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertToAPIPodLevelResourcesStatusEphemeralStorage(t *testing.T) {
+	testCases := []struct {
+		name                            string
+		podLevelEphemeralStorageEnabled bool
+		wantEphemeralStorage            bool
+	}{
+		{
+			name:                            "pod-level ephemeral-storage reported when feature gate enabled",
+			podLevelEphemeralStorageEnabled: true,
+			wantEphemeralStorage:            true,
+		},
+		{
+			name:                            "pod-level ephemeral-storage dropped when feature gate disabled",
+			podLevelEphemeralStorageEnabled: false,
+			wantEphemeralStorage:            false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResources:                       true,
+				features.InPlacePodLevelResourcesVerticalScaling: true,
+				features.PodLevelResourcesEphemeralStorage:       tc.podLevelEphemeralStorageEnabled,
+			})
+			logger, _ := ktesting.NewTestContext(t)
+
+			pod := &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("100m"),
+							v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("200m"),
+							v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+						},
+					},
+					Containers: []v1.Container{{Name: "pause"}},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			}
+
+			mockPCM := cmtesting.NewMockPodContainerManager(t)
+			mockPCM.EXPECT().GetPodCgroupConfig(pod, v1.ResourceMemory).Return(nil, nil)
+			mockPCM.EXPECT().GetPodCgroupConfig(pod, v1.ResourceCPU).Return(nil, nil)
+
+			mockCM := cmtesting.NewMockContainerManager(t)
+			mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+
+			kl := &Kubelet{containerManager: mockCM}
+			got := kl.convertToAPIPodLevelResourcesStatus(logger, pod, v1.PodStatus{})
+			require.NotNil(t, got)
+			_, hasReq := got.Requests[v1.ResourceEphemeralStorage]
+			_, hasLim := got.Limits[v1.ResourceEphemeralStorage]
+			require.Equal(t, tc.wantEphemeralStorage, hasReq, "requests: %v", got.Requests)
+			require.Equal(t, tc.wantEphemeralStorage, hasLim, "limits: %v", got.Limits)
+		})
+	}
+}

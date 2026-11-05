@@ -54,7 +54,7 @@ func (s *podScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.O
 	// If the PodLevelResourceManagers feature is enabled, delegate the resource
 	// allocation to the hint providers (CPU and Memory managers) via the AllocatePod call.
 	// This is a one-time allocation for the entire pod.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		return s.admitUsingPodResources(ctx, pod, operation)
 	}
 	return s.admitUsingContainerResources(ctx, pod, operation)

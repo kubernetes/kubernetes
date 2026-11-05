@@ -99,7 +99,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Con
 // getCPULimit returns the CPU limit for the container to be used to calculate
 // Linux Container Resources.
 func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		// When container-level CPU limit is not set, the pod-level
 		// limit is used in the calculation for components relying on linux resource limits
 		// to be set.
@@ -125,7 +125,7 @@ func getCPULimit(pod *v1.Pod, container *v1.Container, draAllocations v1.Resourc
 // getMemoryLimit returns the memory limit for the container to be used to calculate
 // Linux Container Resources.
 func getMemoryLimit(pod *v1.Pod, container *v1.Container, draAllocations v1.ResourceList) *resource.Quantity {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		// When container-level memory limit is not set, the pod-level
 		// limit is used in the calculation for components relying on linux resource limits
 		// to be set.
@@ -221,7 +221,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		// throttling hierarchically (kernel walks ancestors in try_charge_memcg).
 		skipContainerMemoryHigh := memoryLimitSpec == 0 &&
 			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
-			resourcehelper.IsPodLevelResourcesSet(pod) &&
+			resourcehelper.IsPodLevelComputeResourcesSet(pod) &&
 			!pod.Spec.Resources.Limits.Memory().IsZero()
 		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitSpec || memoryRequest == 0) {
 			memoryLimitVal := memoryLimitSpec
@@ -419,7 +419,7 @@ func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerR
 
 	// When hugepage limits are specified at pod level and no hugepage limits are
 	// specified at container level, the container's cgroup will reflect the pod level limit.
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		for limitName, limitAmount := range pod.Spec.Resources.Limits {
 			readAndDefineRequiredHugepageLimit(ctx, requiredHugepageLimits, limitName, limitAmount)
 		}

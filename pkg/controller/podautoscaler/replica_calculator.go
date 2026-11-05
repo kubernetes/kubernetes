@@ -471,6 +471,7 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 // It returns a map of pod names to their calculated request values.
 func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
 	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEphemeralStorageEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage)
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		var request int64
@@ -478,13 +479,13 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 		// Determine if we should use pod-level requests: see KEP-2837
 		// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md
 		usePodLevelRequests := podLevelResourcesEnabled &&
-			resourcehelpers.IsPodLevelRequestsSet(pod) &&
+			isPodLevelRequestsSet(pod, resource, podLevelResourcesEphemeralStorageEnabled) &&
 			// If a container name is specified in the HPA, it takes precedence over
 			// the pod-level requests.
 			container == ""
 
 		if usePodLevelRequests {
-			request, err = calculatePodLevelRequests(pod, resource)
+			request, err = calculatePodLevelRequests(pod, resource, podLevelResourcesEphemeralStorageEnabled)
 		} else {
 			request, err = calculatePodRequestsFromContainers(pod, container, resource)
 		}
@@ -498,15 +499,26 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
-func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
+func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName, podLevelResourcesEphemeralStorageEnabled bool) (int64, error) {
 	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
-		ExcludeOverhead: true,
+		ExcludeOverhead:              true,
+		SkipPodLevelEphemeralStorage: !podLevelResourcesEphemeralStorageEnabled,
 	})
 	podRequest, ok := podLevelRequests[resource]
 	if !ok {
 		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
 	}
 	return podRequest.MilliValue(), nil
+}
+
+func isPodLevelRequestsSet(pod *v1.Pod, resource v1.ResourceName, podLevelResourcesEphemeralStorageEnabled bool) bool {
+	if resource != v1.ResourceEphemeralStorage {
+		return resourcehelpers.IsPodLevelComputeRequestsSet(pod)
+	}
+	if !podLevelResourcesEphemeralStorageEnabled || pod.Spec.Resources == nil {
+		return false
+	}
+	return resourcehelpers.IsPodLevelRequestsSet(pod)
 }
 
 // calculatePodRequestsFromContainers computes the requests for the specified

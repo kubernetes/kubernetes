@@ -43,10 +43,11 @@ import (
 
 func TestPodConstraintsFunc(t *testing.T) {
 	testCases := map[string]struct {
-		pod                      *api.Pod
-		required                 []corev1.ResourceName
-		err                      string
-		podLevelResourcesEnabled bool
+		pod                                      *api.Pod
+		required                                 []corev1.ResourceName
+		err                                      string
+		podLevelResourcesEnabled                 bool
+		podLevelResourcesEphemeralStorageEnabled bool
 	}{
 		"init container resource missing": {
 			pod: &api.Pod{
@@ -154,18 +155,84 @@ func TestPodConstraintsFunc(t *testing.T) {
 			podLevelResourcesEnabled: true,
 			err:                      ``,
 		},
+		"pod-level ephemeral-storage only with gate enabled, container-level required resources enforced": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}, {
+						Name:      "bar",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                                 []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+			err:                                      `must specify cpu for: bar,foo; memory for: bar,foo`,
+		},
+		"pod-level ephemeral-storage and cpu set with gate enabled, container-level required resources missing": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:              resource.MustParse("1m"),
+							api.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+						},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}, {
+						Name:      "bar",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                                 []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+			err:                                      ``,
+		},
+		"pod-level ephemeral-storage set with gate disabled, container-level required resources enforced": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}, {
+						Name:      "bar",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                                 []corev1.ResourceName{corev1.ResourceMemory, corev1.ResourceCPU},
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: false,
+			err:                                      `must specify cpu for: bar,foo; memory for: bar,foo`,
+		},
 	}
 	evaluator := NewPodEvaluator(nil, clock.RealClock{})
 	for testName, test := range testCases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, test.podLevelResourcesEphemeralStorageEnabled)
 
-		err := evaluator.Constraints(test.required, test.pod)
-		switch {
-		case err != nil && len(test.err) == 0,
-			err == nil && len(test.err) != 0,
-			err != nil && test.err != err.Error():
-			t.Errorf("%s want: %v,got: %v", testName, test.err, err)
-		}
+			err := evaluator.Constraints(test.required, test.pod)
+			switch {
+			case err != nil && len(test.err) == 0,
+				err == nil && len(test.err) != 0,
+				err != nil && test.err != err.Error():
+				t.Errorf("%s want: %v,got: %v", testName, test.err, err)
+			}
+		})
 	}
 }
 
@@ -181,9 +248,10 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	deletionTimestampNotPastGracePeriod := metav1.NewTime(fakeClock.Now())
 
 	testCases := map[string]struct {
-		pod                      *api.Pod
-		usage                    corev1.ResourceList
-		podLevelResourcesEnabled bool
+		pod                                      *api.Pod
+		usage                                    corev1.ResourceList
+		podLevelResourcesEnabled                 bool
+		podLevelResourcesEphemeralStorageEnabled bool
 	}{
 		"init container CPU": {
 			pod: &api.Pod{
@@ -650,11 +718,86 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"pod-level ephemeral storage overrides container ephemeral storage when gate enabled": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("128Mi")},
+						Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("256Mi")},
+					},
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("32Mi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("64Mi")},
+						},
+					}},
+				},
+			},
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+			usage: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage:         resource.MustParse("128Mi"),
+				corev1.ResourceRequestsEphemeralStorage: resource.MustParse("128Mi"),
+				corev1.ResourceLimitsEphemeralStorage:   resource.MustParse("256Mi"),
+				corev1.ResourcePods:                     resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
+		"pod-level ephemeral storage ignored when gate disabled": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("128Mi")},
+						Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("256Mi")},
+					},
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("32Mi")},
+							Limits:   api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("64Mi")},
+						},
+					}},
+				},
+			},
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: false,
+			usage: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
+				corev1.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
+				corev1.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
+				corev1.ResourcePods:                     resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
+		"pod-level resources omit partial container ephemeral storage limits when pod limit unset": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Requests: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("128Mi")},
+					},
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{api.ResourceEphemeralStorage: resource.MustParse("64Mi")},
+						},
+					}, {
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			podLevelResourcesEnabled:                 true,
+			podLevelResourcesEphemeralStorageEnabled: true,
+			usage: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage:         resource.MustParse("128Mi"),
+				corev1.ResourceRequestsEphemeralStorage: resource.MustParse("128Mi"),
+				corev1.ResourcePods:                     resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
 	}
 	t.Parallel()
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, testCase.podLevelResourcesEphemeralStorageEnabled)
 			actual, err := evaluator.Usage(testCase.pod)
 			if err != nil {
 				t.Error(err)

@@ -848,6 +848,12 @@ const (
 	PodLevelResources featuregate.Feature = "PodLevelResources"
 
 	// owner: @ndixita
+	// kep: https://kep.k8s.io/6386
+	//
+	// Enables ephemeral-storage requests and limits in pod-level resources (pod.spec.resources).
+	PodLevelResourcesEphemeralStorage featuregate.Feature = "PodLevelResourcesEphemeralStorage"
+
+	// owner: @ndixita
 	//
 	// Enables PodLevelResourcesFixDefaulting.
 	PodLevelResourcesFixDefaulting featuregate.Feature = "PodLevelResourcesFixDefaulting"
@@ -1831,6 +1837,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodLevelResourcesEphemeralStorage: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodLevelResourcesFixDefaulting: {
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2592,6 +2602,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodLevelResourceManagers: {PodLevelResources},
 
 	PodLevelResources: {},
+
+	PodLevelResourcesEphemeralStorage: {PodLevelResources, PodLevelResourcesFixDefaulting, PodLevelResourcesFixKubeletQOSClass, NodeDeclaredFeatures},
 
 	PodLevelResourcesFixDefaulting: {PodLevelResources},
 

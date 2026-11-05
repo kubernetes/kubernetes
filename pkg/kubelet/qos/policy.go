@@ -77,7 +77,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md#oom-score-adjustment
 	// for more details.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		resourcehelper.IsPodLevelRequestsSet(pod) {
+		resourcehelper.IsPodLevelComputeRequestsSet(pod) {
 		// TODO(ndixita): Refactor to use this formula in all cases, as
 		// remainingReqPerContainer will be 0 when pod-level resources are not set.
 		remainingReqPerContainer = remainingPodMemReqPerContainer(pod)
@@ -98,7 +98,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		// calculation remains consistent
 		//  with how we handle pod-level memory requests for regular containers.
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-			resourcehelper.IsPodLevelRequestsSet(pod) {
+			resourcehelper.IsPodLevelComputeRequestsSet(pod) {
 			minMemoryRequest += remainingReqPerContainer
 		}
 		minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
