@@ -41,9 +41,10 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 // A pod is Guaranteed only when cpu & memory requests and limits are specified for all the containers and they are equal.
 // A pod is Burstable if cpu & memory limits and requests do not match across all containers.
 func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
-	// When pod-level resources are specified, we use them to determine QoS class.
+	// When pod-level compute resources are specified, we use them to determine QoS class.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) || resourcehelper.IsPodLevelResourcesSet(pod))) {
+		(pod.Spec.Resources != nil && (!utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixKubeletQOSClass) ||
+			resourcehelper.IsPodLevelComputeResourcesSet(pod))) {
 		return requirementsQOS(pod.Spec.Resources)
 	}
 

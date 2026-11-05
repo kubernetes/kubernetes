@@ -469,7 +469,8 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 // (including restartable init containers).
 // It returns a map of pod names to their calculated request values.
 func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
-	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		(resource != v1.ResourceEphemeralStorage || feature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage))
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		// See KEP-2837:
