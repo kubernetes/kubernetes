@@ -508,6 +508,99 @@ func TestNewSnapshot(t *testing.T) {
 	}
 }
 
+// TestNewSnapshotNodeOrder checks the order of NewSnapshot's node lists.
+func TestNewSnapshotNodeOrder(t *testing.T) {
+	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"app": "a"}}
+	noAffinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).Obj()
+	}
+	affinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).PodAffinity("zone", selector, st.PodAffinityWithRequiredReq).Obj()
+	}
+	antiAffinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).PodAntiAffinity("zone", selector, st.PodAntiAffinityWithRequiredReq).Obj()
+	}
+	hostScopedAntiAffinityPod := func(name, nodeName string) *v1.Pod {
+		return st.MakePod().Name(name).Namespace("ns").Node(nodeName).PodAntiAffinity(v1.LabelHostname, selector, st.PodAntiAffinityWithRequiredReq).Obj()
+	}
+	pods := []*v1.Pod{
+		antiAffinityPod("p1", "missing-b"),
+		noAffinityPod("p2", ""),
+		antiAffinityPod("p3", "node-a"),
+		noAffinityPod("p4", "missing-a"),
+		affinityPod("p5", "node-c"),
+		antiAffinityPod("p6", "node-d"),
+		noAffinityPod("p7", "missing-b"),
+		hostScopedAntiAffinityPod("p8", "node-e"),
+		hostScopedAntiAffinityPod("p9", "missing-a"),
+	}
+	var nodes []*v1.Node
+	for _, name := range []string{"node-c", "node-a", "node-e", "node-a", "node-d"} {
+		nodes = append(nodes, st.MakeNode().Name(name).Obj())
+	}
+
+	for _, fastPathEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("fastPath=%v", fastPathEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.InterPodAffinityHostnameFastPath: fastPathEnabled,
+			})
+			names := func(list []fwk.NodeInfo, err error) []string {
+				t.Helper()
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got []string
+				for _, nodeInfo := range list {
+					if nodeInfo.Node() != nil {
+						got = append(got, nodeInfo.Node().Name)
+					} else {
+						got = append(got, "nodeless:"+nodeInfo.GetPods()[0].GetPod().Spec.NodeName)
+					}
+				}
+				return got
+			}
+			// p8 and p9 only have host-scoped anti-affinity, so node-e and missing-a are
+			// on the anti-affinity list but not on the non-host-scoped one.
+			wantNonHostScopedAntiAffinity := []string{"node-a", "node-d", "nodeless:missing-b"}
+			if !fastPathEnabled {
+				// The non-host-scoped list is empty when the feature gate is disabled.
+				wantNonHostScopedAntiAffinity = nil
+			}
+
+			lister := NewSnapshot(pods, nodes).NodeInfos()
+			for _, list := range []struct {
+				name      string
+				got, want []string
+			}{
+				{
+					name: "List",
+					got:  names(lister.List()),
+					want: []string{"node-c", "node-a", "node-e", "node-d", "nodeless:missing-b", "nodeless:", "nodeless:missing-a"},
+				},
+				{
+					name: "HavePodsWithAffinityList",
+					got:  names(lister.HavePodsWithAffinityList()),
+					want: []string{"node-c", "node-a", "node-e", "node-d", "nodeless:missing-b", "nodeless:missing-a"},
+				},
+				{
+					name: "HavePodsWithRequiredAntiAffinityList",
+					got:  names(lister.HavePodsWithRequiredAntiAffinityList()),
+					want: []string{"node-a", "node-e", "node-d", "nodeless:missing-b", "nodeless:missing-a"},
+				},
+				{
+					name: "HavePodsWithRequiredNonHostScopedAntiAffinityList",
+					got:  names(lister.HavePodsWithRequiredNonHostScopedAntiAffinityList()),
+					want: wantNonHostScopedAntiAffinity,
+				},
+			} {
+				if diff := cmp.Diff(list.want, list.got); diff != "" {
+					t.Errorf("%s: unexpected node order (-want +got):\n%s", list.name, diff)
+				}
+			}
+		})
+	}
+}
+
 func TestSnapshot_AssumeForget(t *testing.T) {
 	node1 := st.MakeNode().Name("node-1").Obj()
 	node2 := st.MakeNode().Name("node-2").Obj()
