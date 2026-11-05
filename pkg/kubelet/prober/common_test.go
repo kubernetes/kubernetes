@@ -201,3 +201,14 @@ func (p *syncExecProber) Probe(cmd exec.Cmd) (probe.Result, string, error) {
 	defer p.RUnlock()
 	return p.fakeExecProber.Probe(cmd)
 }
+
+type blockingCheckpointProbe struct {
+	started chan struct{}
+	finish  chan struct{}
+}
+
+func (p blockingCheckpointProbe) Probe(exec.Cmd) (probe.Result, string, error) {
+	close(p.started)
+	<-p.finish
+	return probe.Success, "", nil
+}

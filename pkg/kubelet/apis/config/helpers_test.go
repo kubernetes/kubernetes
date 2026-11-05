@@ -283,6 +283,8 @@ var (
 		"ReservedMemory",
 		"ReservedSystemCPUs",
 		"RegisterWithTaints",
+		"PodCheckpointTimeout.Duration",
+		"PodRestoreTimeout.Duration",
 		"RuntimeRequestTimeout.Duration",
 		"RunOnce",
 		"SeccompDefault",

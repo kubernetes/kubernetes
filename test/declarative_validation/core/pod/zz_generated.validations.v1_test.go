@@ -142,6 +142,20 @@ func init() {
 			"spec.initContainers[*].securityContext.seccompProfile.type": {
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.restoreFrom": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
+			"spec.restoreFrom.name": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.restoreFrom.options": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"spec.restoreFrom.options[*]": {
+				{ErrorType: "FieldValueTooLong", Origin: "maxBytes"},
+			},
 			"spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},

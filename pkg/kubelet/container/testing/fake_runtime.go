@@ -47,27 +47,29 @@ type FakePod struct {
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
-	CalledFunctions     []string
-	PodList             []*FakePod
-	AllPodList          []*FakePod
-	ImageList           []kubecontainer.Image
-	ImageFsStats        []*runtimeapi.FilesystemUsage
-	ContainerFsStats    []*runtimeapi.FilesystemUsage
-	APIPodStatus        v1.PodStatus
-	PodStatus           kubecontainer.PodStatus
-	StartedPods         []string
-	KilledPods          []string
-	StartedContainers   []string
-	KilledContainers    []string
-	RuntimeStatus       *kubecontainer.RuntimeStatus
-	VersionInfo         string
-	APIVersionInfo      string
-	RuntimeType         string
-	PodResizeInProgress bool
-	SyncResults         *kubecontainer.PodSyncResult
-	Err                 error
-	InspectErr          error
-	StatusErr           error
+	CalledFunctions        []string
+	PodList                []*FakePod
+	AllPodList             []*FakePod
+	ImageList              []kubecontainer.Image
+	ImageFsStats           []*runtimeapi.FilesystemUsage
+	ContainerFsStats       []*runtimeapi.FilesystemUsage
+	APIPodStatus           v1.PodStatus
+	PodStatus              kubecontainer.PodStatus
+	StartedPods            []string
+	KilledPods             []string
+	StartedContainers      []string
+	KilledContainers       []string
+	RuntimeStatus          *kubecontainer.RuntimeStatus
+	VersionInfo            string
+	APIVersionInfo         string
+	RuntimeType            string
+	PodResizeInProgress    bool
+	SyncResults            *kubecontainer.PodSyncResult
+	Err                    error
+	InspectErr             error
+	StatusErr              error
+	CanceledPodOperations  []*runtimeapi.CancelPodOperationRequest
+	CancelPodOperationFunc func(context.Context, *runtimeapi.CancelPodOperationRequest) error
 	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
 	// UnblockImagePulls() is called. This is used to simulate image pull latency
 	// from container runtime.
@@ -482,6 +484,27 @@ func (f *FakeRuntime) CheckpointContainer(_ context.Context, options *runtimeapi
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "CheckpointContainer")
+	return f.Err
+}
+
+func (f *FakeRuntime) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	f.Lock()
+	f.CalledFunctions = append(f.CalledFunctions, "CancelPodOperation")
+	f.CanceledPodOperations = append(f.CanceledPodOperations, request)
+	callback := f.CancelPodOperationFunc
+	err := f.Err
+	f.Unlock()
+	if callback != nil {
+		return callback(ctx, request)
+	}
+	return err
+}
+
+func (f *FakeRuntime) CheckpointPod(_ context.Context, options *runtimeapi.CheckpointPodRequest) error {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "CheckpointPod")
 	return f.Err
 }
 

@@ -654,7 +654,7 @@ func TestRuntimeStatusString(t *testing.T) {
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false PodCheckpointRestoreCancellation: false"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -735,12 +735,13 @@ func TestRuntimeFeaturesString(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "features with both flags true",
+			name: "features enabled",
 			features: &RuntimeFeatures{
-				SupplementalGroupsPolicy:  true,
-				UserNamespacesHostNetwork: true,
+				SupplementalGroupsPolicy:         true,
+				UserNamespacesHostNetwork:        true,
+				PodCheckpointRestoreCancellation: true,
 			},
-			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false",
+			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true MountOptions: false PodCheckpointRestoreCancellation: true",
 		},
 		{
 			name: "features with both flags false",
@@ -748,7 +749,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 				SupplementalGroupsPolicy:  false,
 				UserNamespacesHostNetwork: false,
 			},
-			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false MountOptions: false",
+			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false MountOptions: false PodCheckpointRestoreCancellation: false",
 		},
 		{
 			name:     "nil features",

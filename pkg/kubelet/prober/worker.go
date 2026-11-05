@@ -37,6 +37,9 @@ import (
 // stop channel is closed. The worker uses the probe Manager's statusManager to get up-to-date
 // container IDs.
 type worker struct {
+	// probeLock lets checkpoint suspension wait for an in-flight probe to finish.
+	probeLock chan struct{}
+
 	// Channel for stopping the probe.
 	stopCh chan struct{}
 
@@ -101,6 +104,7 @@ func newWorker(
 	container v1.Container) *worker {
 
 	w := &worker{
+		probeLock:       make(chan struct{}, 1),
 		stopCh:          make(chan struct{}, 1), // Buffer so stop() can be non-blocking.
 		manualTriggerCh: make(chan struct{}, 1), // Buffer so prober_manager can do non-blocking calls to doProbe.
 		pod:             pod,
@@ -213,11 +217,26 @@ func (w *worker) stop() {
 // doProbe probes the container once and records the result.
 // Returns whether the worker should continue.
 func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
+	select {
+	case w.probeLock <- struct{}{}:
+		defer func() { <-w.probeLock }()
+	case <-ctx.Done():
+		return false
+	}
+
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrashWithContext(ctx, func(ctx context.Context, _ interface{}) { keepGoing = true })
 
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
+
+	// Skip probing while the pod's probes are suspended (e.g. during a
+	// checkpoint, when containers are frozen). Keep the worker alive and leave
+	// the last result untouched so the liveness manager takes no action.
+	if w.probeManager.isSuspended(w.pod.UID) {
+		return true
+	}
+
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.

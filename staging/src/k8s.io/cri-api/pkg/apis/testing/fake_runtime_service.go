@@ -74,6 +74,7 @@ type FakeRuntimeService struct {
 	FakeMetricDescriptors  map[string]*runtimeapi.MetricDescriptor
 	FakeContainerMetrics   map[string]*runtimeapi.ContainerMetrics
 	FakeLinuxConfiguration *runtimeapi.LinuxRuntimeConfiguration
+	FakeRuntimeFeatures    *runtimeapi.RuntimeFeatures
 
 	ErrorOnSandboxCreate bool
 
@@ -89,7 +90,10 @@ type FakeRuntimeService struct {
 	RestoredPods []*runtimeapi.RestorePodRequest
 	// RestorePodDeadline records the most recent RestorePod context deadline
 	// observed by the fake runtime.
-	RestorePodDeadline time.Time
+	RestorePodDeadline         time.Time
+	CanceledPodOperations      []*runtimeapi.CancelPodOperationRequest
+	CancelPodOperationDeadline time.Time
+	CancelPodOperationFunc     func(context.Context, *runtimeapi.CancelPodOperationRequest) error
 }
 
 // GetContainerID returns the unique container ID from the FakeRuntimeService.
@@ -211,7 +215,7 @@ func (r *FakeRuntimeService) Status(_ context.Context, verbose bool) (*runtimeap
 		return nil, err
 	}
 
-	return &runtimeapi.StatusResponse{Status: r.FakeStatus}, nil
+	return &runtimeapi.StatusResponse{Status: r.FakeStatus, Features: r.FakeRuntimeFeatures}, nil
 }
 
 // RunPodSandbox emulates the run of the pod sandbox in the FakeRuntimeService.
@@ -298,6 +302,11 @@ func (r *FakeRuntimeService) RemovePodSandbox(_ context.Context, podSandboxID st
 
 	// Remove the pod sandbox
 	delete(r.Sandboxes, podSandboxID)
+	for containerID, container := range r.Containers {
+		if container.SandboxID == podSandboxID {
+			delete(r.Containers, containerID)
+		}
+	}
 
 	return nil
 }
@@ -763,6 +772,24 @@ func (r *FakeRuntimeService) CheckpointPod(ctx context.Context, options *runtime
 	return nil
 }
 
+// CancelPodOperation records a cancellation barrier request in the fake runtime.
+func (r *FakeRuntimeService) CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error {
+	r.Lock()
+	r.Called = append(r.Called, "CancelPodOperation")
+	r.CanceledPodOperations = append(r.CanceledPodOperations, proto.Clone(request).(*runtimeapi.CancelPodOperationRequest))
+	r.CancelPodOperationDeadline, _ = ctx.Deadline()
+	err := r.popError("CancelPodOperation")
+	callback := r.CancelPodOperationFunc
+	r.Unlock()
+	if err != nil {
+		return err
+	}
+	if callback != nil {
+		return callback(ctx, request)
+	}
+	return nil
+}
+
 // RestorePod emulates call to restore a pod sandbox in the FakeRuntimeService.
 func (r *FakeRuntimeService) RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error) {
 	r.Lock()
@@ -776,14 +803,62 @@ func (r *FakeRuntimeService) RestorePod(ctx context.Context, options *runtimeapi
 		return nil, err
 	}
 
-	response := &runtimeapi.RestorePodResponse{PodSandboxId: "fake-restored-pod-id"}
+	podSandboxID := BuildSandboxName(options.GetConfig().GetMetadata())
+	response := &runtimeapi.RestorePodResponse{PodSandboxId: podSandboxID}
 	for _, config := range options.GetContainerConfigs() {
 		name := config.GetMetadata().GetName()
-		containerID := "fake-restored-container-" + name
+		containerID := BuildContainerName(config.GetMetadata(), podSandboxID)
 		response.RestoredContainers = append(response.RestoredContainers, &runtimeapi.RestoredContainer{
 			Name:        name,
 			ContainerId: containerID,
 		})
+	}
+
+	network := &runtimeapi.PodSandboxNetworkStatus{Ip: FakePodSandboxIPs[0]}
+	for _, ip := range FakePodSandboxIPs[1:] {
+		network.AdditionalIps = append(network.AdditionalIps, &runtimeapi.PodIP{Ip: ip})
+	}
+	r.Sandboxes[podSandboxID] = &FakePodSandbox{
+		PodSandboxStatus: runtimeapi.PodSandboxStatus{
+			Id:        podSandboxID,
+			Metadata:  options.GetConfig().GetMetadata(),
+			State:     runtimeapi.PodSandboxState_SANDBOX_READY,
+			CreatedAt: time.Now().UnixNano(),
+			Network:   network,
+			Linux: &runtimeapi.LinuxPodSandboxStatus{
+				Namespaces: &runtimeapi.Namespace{
+					Options: options.GetConfig().GetLinux().GetSecurityContext().GetNamespaceOptions(),
+				},
+			},
+			Labels:         options.GetConfig().GetLabels(),
+			Annotations:    options.GetConfig().GetAnnotations(),
+			RuntimeHandler: options.GetRuntimeHandler(),
+		},
+		RuntimeHandler: options.GetRuntimeHandler(),
+	}
+	configsByName := make(map[string]*runtimeapi.ContainerConfig, len(options.GetContainerConfigs()))
+	for _, config := range options.GetContainerConfigs() {
+		configsByName[config.GetMetadata().GetName()] = config
+	}
+	for _, restored := range response.GetRestoredContainers() {
+		config := configsByName[restored.GetName()]
+		if config == nil || restored.GetContainerId() == "" {
+			continue
+		}
+		r.Containers[restored.GetContainerId()] = &FakeContainer{
+			ContainerStatus: runtimeapi.ContainerStatus{
+				Id:          restored.GetContainerId(),
+				Metadata:    config.Metadata,
+				Image:       config.Image,
+				ImageRef:    config.GetImage().GetImage(),
+				CreatedAt:   time.Now().UnixNano(),
+				State:       runtimeapi.ContainerState_CONTAINER_CREATED,
+				Labels:      config.Labels,
+				Annotations: config.Annotations,
+			},
+			SandboxID:      podSandboxID,
+			LinuxResources: config.GetLinux().GetResources(),
+		}
 	}
 	return response, nil
 }

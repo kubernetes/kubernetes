@@ -182,7 +182,12 @@ func (rc *reconciler) cleanOrphanVolumes(logger klog.Logger) {
 		return
 	}
 
+	retained := rc.volumesFailedReconstruction[:0]
 	for _, volume := range rc.volumesFailedReconstruction {
+		if rc.podOperationMayUsePodResources != nil && rc.podOperationMayUsePodResources(types.UID(volume.podName)) {
+			retained = append(retained, volume)
+			continue
+		}
 		if rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
 			// Some pod needs the volume, don't clean it up and hope that
 			// reconcile() calls SetUp and reconstructs the volume in ASW.
@@ -194,8 +199,8 @@ func (rc *reconciler) cleanOrphanVolumes(logger klog.Logger) {
 	}
 
 	logger.V(2).Info("Orphan volume cleanup finished")
-	// Clean the cache, cleanup is one shot operation.
-	rc.volumesFailedReconstruction = make([]podVolume, 0)
+	// Keep protected mounts queued so cleanup resumes after runtime acknowledgment.
+	rc.volumesFailedReconstruction = retained
 }
 
 // updateReconstructedFromNodeStatus tries to file devicePaths of reconstructed volumes from

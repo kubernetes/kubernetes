@@ -490,7 +490,7 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod
 // CleanupOrphanedPodUsernsAllocations reconciliates the state of user namespace
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
-func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context, pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context, pods []*v1.Pod, runningPods []*kubecontainer.Pod, podOperationMayUsePodResources func(types.UID) bool) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return nil
 	}
@@ -519,7 +519,7 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context,
 
 	// Lets remove all the pods "found" that are not known.
 	for _, podUID := range found {
-		if allPods.Has(string(podUID)) {
+		if allPods.Has(string(podUID)) || podOperationMayUsePodResources != nil && podOperationMayUsePodResources(podUID) {
 			continue
 		}
 
@@ -529,7 +529,7 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context,
 
 	// Lets remove any existing allocation for a pod that is not "found".
 	for podUID := range m.usedBy {
-		if allFound.Has(string(podUID)) {
+		if allFound.Has(string(podUID)) || podOperationMayUsePodResources != nil && podOperationMayUsePodResources(podUID) {
 			continue
 		}
 

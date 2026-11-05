@@ -118,6 +118,63 @@ func (_c *MockRuntime_APIVersion_Call) RunAndReturn(run func() (container.Versio
 	return _c
 }
 
+// CancelPodOperation provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) CancelPodOperation(ctx context.Context, request *v1.CancelPodOperationRequest) error {
+	ret := _mock.Called(ctx, request)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CancelPodOperation")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.CancelPodOperationRequest) error); ok {
+		r0 = returnFunc(ctx, request)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRuntime_CancelPodOperation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelPodOperation'
+type MockRuntime_CancelPodOperation_Call struct {
+	*mock.Call
+}
+
+// CancelPodOperation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - request *v1.CancelPodOperationRequest
+func (_e *MockRuntime_Expecter) CancelPodOperation(ctx any, request any) *MockRuntime_CancelPodOperation_Call {
+	return &MockRuntime_CancelPodOperation_Call{Call: _e.mock.On("CancelPodOperation", ctx, request)}
+}
+
+func (_c *MockRuntime_CancelPodOperation_Call) Run(run func(ctx context.Context, request *v1.CancelPodOperationRequest)) *MockRuntime_CancelPodOperation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1.CancelPodOperationRequest
+		if args[1] != nil {
+			arg1 = args[1].(*v1.CancelPodOperationRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_CancelPodOperation_Call) Return(err error) *MockRuntime_CancelPodOperation_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRuntime_CancelPodOperation_Call) RunAndReturn(run func(ctx context.Context, request *v1.CancelPodOperationRequest) error) *MockRuntime_CancelPodOperation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckpointContainer provides a mock function for the type MockRuntime
 func (_mock *MockRuntime) CheckpointContainer(ctx context.Context, options *v1.CheckpointContainerRequest) error {
 	ret := _mock.Called(ctx, options)
@@ -171,6 +228,63 @@ func (_c *MockRuntime_CheckpointContainer_Call) Return(err error) *MockRuntime_C
 }
 
 func (_c *MockRuntime_CheckpointContainer_Call) RunAndReturn(run func(ctx context.Context, options *v1.CheckpointContainerRequest) error) *MockRuntime_CheckpointContainer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CheckpointPod provides a mock function for the type MockRuntime
+func (_mock *MockRuntime) CheckpointPod(ctx context.Context, options *v1.CheckpointPodRequest) error {
+	ret := _mock.Called(ctx, options)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckpointPod")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1.CheckpointPodRequest) error); ok {
+		r0 = returnFunc(ctx, options)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRuntime_CheckpointPod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckpointPod'
+type MockRuntime_CheckpointPod_Call struct {
+	*mock.Call
+}
+
+// CheckpointPod is a helper method to define mock.On call
+//   - ctx context.Context
+//   - options *v1.CheckpointPodRequest
+func (_e *MockRuntime_Expecter) CheckpointPod(ctx any, options any) *MockRuntime_CheckpointPod_Call {
+	return &MockRuntime_CheckpointPod_Call{Call: _e.mock.On("CheckpointPod", ctx, options)}
+}
+
+func (_c *MockRuntime_CheckpointPod_Call) Run(run func(ctx context.Context, options *v1.CheckpointPodRequest)) *MockRuntime_CheckpointPod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1.CheckpointPodRequest
+		if args[1] != nil {
+			arg1 = args[1].(*v1.CheckpointPodRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRuntime_CheckpointPod_Call) Return(err error) *MockRuntime_CheckpointPod_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRuntime_CheckpointPod_Call) RunAndReturn(run func(ctx context.Context, options *v1.CheckpointPodRequest) error) *MockRuntime_CheckpointPod_Call {
 	_c.Call.Return(run)
 	return _c
 }

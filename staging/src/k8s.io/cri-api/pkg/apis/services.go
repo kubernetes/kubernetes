@@ -90,6 +90,8 @@ type PodSandboxManager interface {
 	UpdatePodSandboxResources(ctx context.Context, request *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error)
 	// CheckpointPod checkpoints a pod sandbox
 	CheckpointPod(ctx context.Context, options *runtimeapi.CheckpointPodRequest) error
+	// CancelPodOperation cancels an operation and confirms runtime cleanup.
+	CancelPodOperation(ctx context.Context, request *runtimeapi.CancelPodOperationRequest) error
 	// RestorePod restores a pod sandbox from a checkpoint
 	RestorePod(ctx context.Context, options *runtimeapi.RestorePodRequest) (*runtimeapi.RestorePodResponse, error)
 }

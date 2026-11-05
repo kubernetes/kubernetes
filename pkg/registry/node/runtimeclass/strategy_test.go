@@ -19,11 +19,15 @@ package runtimeclass
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateUpdate(t *testing.T) {
@@ -123,6 +127,55 @@ func TestValidateUpdate(t *testing.T) {
 				t.Errorf("expected error")
 			} else if !test.expectError && len(errs) != 0 {
 				t.Errorf("unexpected error: %v", errs)
+			}
+		})
+	}
+}
+
+func TestCheckpointPolicyFeatureGate(t *testing.T) {
+	policy := func() *node.RuntimeClassPodCheckpointOptions {
+		return &node.RuntimeClassPodCheckpointOptions{
+			AllowedCheckpointOptions: []string{"compression"},
+			AllowedRestoreOptions:    []string{"tcp-close"},
+		}
+	}
+	for _, enabled := range []bool{false, true} {
+		name := "disabled"
+		if enabled {
+			name = "enabled"
+		}
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelCheckpointRestore, enabled)
+			ctx := genericapirequest.NewDefaultContext()
+			t.Run("create", func(t *testing.T) {
+				obj := &node.RuntimeClass{PodCheckpointOptions: policy()}
+				Strategy.PrepareForCreate(ctx, obj)
+				if enabled {
+					require.Equal(t, policy(), obj.PodCheckpointOptions)
+				} else {
+					require.Nil(t, obj.PodCheckpointOptions)
+				}
+			})
+			for _, tc := range []struct {
+				name     string
+				old, new *node.RuntimeClassPodCheckpointOptions
+			}{
+				{name: "new use", new: policy()},
+				{name: "existing use", old: policy(), new: policy()},
+				{name: "empty existing policy", old: &node.RuntimeClassPodCheckpointOptions{}, new: policy()},
+				{name: "clear policy", old: policy()},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					obj := &node.RuntimeClass{PodCheckpointOptions: tc.new}
+					old := &node.RuntimeClass{PodCheckpointOptions: tc.old}
+					Strategy.PrepareForUpdate(ctx, obj, old)
+					if enabled || tc.old != nil {
+						require.Equal(t, tc.new, obj.PodCheckpointOptions)
+					} else {
+						require.Nil(t, obj.PodCheckpointOptions)
+					}
+					require.Equal(t, tc.old, old.PodCheckpointOptions, "preparation must not alter the old object")
+				})
 			}
 		})
 	}

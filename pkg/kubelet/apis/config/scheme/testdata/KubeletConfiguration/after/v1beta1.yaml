@@ -79,8 +79,10 @@ nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
+podCheckpointTimeout: 5m0s
 podLogsDir: /var/log/pods
 podPidsLimit: -1
+podRestoreTimeout: 5m0s
 port: 10250
 registerNode: true
 registryBurst: 10
