@@ -675,6 +675,7 @@ type StorageHealthCondition struct {
 	// +optional
 	VolumeMode *api.PersistentVolumeMode
 	// lastTransitionTime is when this condition first appeared at its current state.
+	// lastTransitionTime remains unchanged when only the message changes.
 	// +optional
 	LastTransitionTime metav1.Time
 }

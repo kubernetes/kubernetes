@@ -733,6 +733,7 @@ type StorageHealthCondition struct {
 	// +optional
 	VolumeMode *v1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,5,opt,name=volumeMode,casttype=k8s.io/api/core/v1.PersistentVolumeMode"`
 	// lastTransitionTime is when this condition first appeared at its current state.
+	// lastTransitionTime remains unchanged when only the message changes.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,6,opt,name=lastTransitionTime"`
 }

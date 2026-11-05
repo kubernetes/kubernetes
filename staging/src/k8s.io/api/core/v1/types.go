@@ -888,7 +888,7 @@ type VolumeHealthStatus struct {
 	// +k8s:maxItems=16
 	HealthConditions []VolumeHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,1,rep,name=healthConditions"`
 	// lastTransitionTime is when the current set of (status, reason) pairs first appeared.
-	// Changes to condition messages do not affect this field.
+	// lastTransitionTime remains unchanged when only message associated with healthConditions change.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,2,opt,name=lastTransitionTime"`
 }
