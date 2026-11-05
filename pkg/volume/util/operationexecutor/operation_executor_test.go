@@ -659,16 +659,6 @@ func (fopg *fakeOperationGenerator) GenerateVerifyControllerAttachedVolumeFunc(l
 	}, nil
 }
 
-func (fopg *fakeOperationGenerator) GenerateExpandVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
-	opFunc := func() volumetypes.OperationContext {
-		startOperationAndBlock(fopg.ch, fopg.quit)
-		return volumetypes.NewOperationContext(nil, nil, false)
-	}
-	return volumetypes.GeneratedOperations{
-		OperationFunc: opFunc,
-	}, nil
-}
-
 func (fopg *fakeOperationGenerator) GenerateExpandAndRecoverVolumeFunc(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, resizerName string) (volumetypes.GeneratedOperations, error) {
 	opFunc := func() volumetypes.OperationContext {
 		startOperationAndBlock(fopg.ch, fopg.quit)
