@@ -305,7 +305,7 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.
 func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
 	c := types.SwapBehavior(m.memorySwapBehavior)
 	if c == types.LimitedSwap {
-		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) || !m.getSwapControllerAvailable() {
+		if !m.getSwapControllerAvailable() {
 			return types.NoSwap
 		}
 
