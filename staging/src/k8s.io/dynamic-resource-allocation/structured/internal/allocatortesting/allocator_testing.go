@@ -7830,9 +7830,6 @@ func TestAllocator(t *testing.T,
 
 		// Test cases for DRAListTypeAttributes features (matchAttributes/distinctAttributes)
 		"list-attributes-match-constaint-scalar-string-values": {
-			features: Features{
-				ListTypeAttributes: true,
-			},
 			claimsToAllocate: objects(claimWithRequests(
 				claim0,
 				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
@@ -8230,7 +8227,6 @@ func TestAllocator(t *testing.T,
 		},
 		"list-attributes-distinct-constraint-scalar-string-values-all-distinct": {
 			features: Features{
-				ListTypeAttributes: true,
 				ConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(claimWithRequests(
@@ -8253,7 +8249,6 @@ func TestAllocator(t *testing.T,
 		},
 		"list-attributes-distinct-constraint-scalar-string-values-not-distinct": {
 			features: Features{
-				ListTypeAttributes: true,
 				ConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(claimWithRequests(
@@ -8272,7 +8267,6 @@ func TestAllocator(t *testing.T,
 		},
 		"list-attributes-distinct-constraint-single-request-count-3-not-distinct": {
 			features: Features{
-				ListTypeAttributes: true,
 				ConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(claimWithRequests(
@@ -8298,7 +8292,6 @@ func TestAllocator(t *testing.T,
 		},
 		"list-attributes-distinct-constraint-single-request-count-3-all-distinct": {
 			features: Features{
-				ListTypeAttributes: true,
 				ConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(claimWithRequests(
