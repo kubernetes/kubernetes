@@ -150,8 +150,8 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 	// RestartContainer resize policies.
 	_, desiredPodSwapMemReq := cm.IsPodEligibleForSwap(desiredPod)
 	_, allocatedPodSwapMemReq := cm.IsPodEligibleForSwap(allocatedPod)
-	desiredPLR := resourcehelper.IsPodLevelResourcesSet(desiredPod)
-	allocatedPLR := resourcehelper.IsPodLevelResourcesSet(allocatedPod)
+	desiredPLR := resourcehelper.IsPodLevelComputeResourcesSet(desiredPod)
+	allocatedPLR := resourcehelper.IsPodLevelComputeResourcesSet(allocatedPod)
 	podSwapChanged := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) &&
 		(desiredPLR || allocatedPLR) &&
 		(desiredPLR != allocatedPLR || desiredPodSwapMemReq != allocatedPodSwapMemReq)
@@ -197,7 +197,7 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 // admitted, so a container added later would run outside of it.
 // TODO(KEP-5972): Allow this once the static policies can repartition a pod-level allocation.
 func (h *podResizesAdmitHandler) disallowContainerChangesForPodLevelExclusiveResources(pod, allocatedPod *v1.Pod) (bool, string) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !resourcehelper.IsPodLevelResourcesSet(pod) || v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) || !resourcehelper.IsPodLevelComputeResourcesSet(pod) || v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return false, ""
 	}
 	changed := false

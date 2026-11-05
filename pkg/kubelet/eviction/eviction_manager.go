@@ -572,11 +572,15 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 }
 
 func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podStats statsapi.PodStats, pod *v1.Pod) bool {
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelEphemeralStorageEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage)
 	podLimits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{
-		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		PodLevelResourcesEphemeralStorageEnabled: podLevelEphemeralStorageEnabled,
+		UseExtraNodeAllocatableResources:         utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	})
-	_, found := podLimits[v1.ResourceEphemeralStorage]
-	if !found {
+	podEphemeralStorageLimit, found := podLimits[v1.ResourceEphemeralStorage]
+	if !found || podEphemeralStorageLimit.IsZero() {
 		return false
 	}
 
@@ -585,10 +589,13 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(logger klog.Logger, podSt
 	if podStats.EphemeralStorage != nil && podStats.EphemeralStorage.UsedBytes != nil {
 		podEphemeralStorageTotalUsage = resource.NewQuantity(int64(*podStats.EphemeralStorage.UsedBytes), resource.BinarySI)
 	}
-	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
-		// the total usage of pod exceeds the total size limit of containers, evict the pod
 		message := fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String())
+		if podLevelResourcesEnabled && podLevelEphemeralStorageEnabled && pod.Spec.Resources != nil {
+			if plLimit, hasPodLevelLimit := pod.Spec.Resources.Limits[v1.ResourceEphemeralStorage]; hasPodLevelLimit && !plLimit.IsZero() {
+				message = fmt.Sprintf(podLevelEphemeralStorageMessageFmt, podEphemeralStorageTotalUsage.String(), podEphemeralStorageLimit.String())
+			}
+		}
 		if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, message, nil, nil) {
 			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
 			return true

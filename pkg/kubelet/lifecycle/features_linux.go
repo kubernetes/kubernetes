@@ -35,5 +35,14 @@ func isPodLevelResourcesSupported(pod *v1.Pod) PodAdmitResult {
 			RejectionType: RejectionInfeasible,
 		}
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage) &&
+		pod != nil && resource.IsPodLevelEphemeralStorageSet(pod.Spec.Resources) {
+		return PodAdmitResult{
+			Admit:         false,
+			Reason:        PodLevelResourcesNotAdmittedReason,
+			Message:       "PodLevelResourcesEphemeralStorage feature gate is disabled",
+			RejectionType: RejectionInfeasible,
+		}
+	}
 	return PodAdmitResult{Admit: true}
 }

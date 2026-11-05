@@ -129,7 +129,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			}
 
 			// Allocate resources (Pod Scope)
-			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
+			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 				err = mgr.AllocatePod(logger, pod, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
@@ -187,7 +187,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				container := &pod.Spec.Containers[i]
 				containerCPUSet, ok := mgr2.State().GetCPUSet(string(pod.UID), container.Name)
 				// If allocation was skipped (PLR enabled but Manager disabled), no cpuset.
-				allocationSkipped := tc.podLevelResourcesEnabled && !tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod)
+				allocationSkipped := tc.podLevelResourcesEnabled && !tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelComputeResourcesSet(pod)
 
 				if allocationSkipped {
 					if ok {

@@ -2033,8 +2033,9 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		s.Resources = kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus, s.Phase)
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-			UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			PodLevelResourcesEphemeralStorageEnabled: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
+			UseExtraNodeAllocatableResources:         utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 		}
 		s.AllocatedResources = resourcehelper.PodRequests(pod, opts)
 	}
@@ -2256,8 +2257,9 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 		allocatedResources = &v1.ResourceRequirements{}
 	}
 	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEphemeralStorageEnabled: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
+		UseExtraNodeAllocatableResources:         utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
 	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
@@ -3126,7 +3128,12 @@ func recordPodLevelResourcesAdmission(pod *v1.Pod) {
 		return false
 	}
 
-	hasPodLevel := resourcehelper.IsPodLevelResourcesSet(pod)
+	var hasPodLevel bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage) {
+		hasPodLevel = resourcehelper.IsPodLevelResourcesSet(pod)
+	} else {
+		hasPodLevel = resourcehelper.IsPodLevelComputeResourcesSet(pod)
+	}
 	hasContainerLevel := hasResources(pod.Spec.Containers) || hasResources(pod.Spec.InitContainers)
 
 	var configMode string
