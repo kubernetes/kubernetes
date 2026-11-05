@@ -1802,7 +1802,7 @@ func (p *staticPolicy) getPodTopologyHintsForResize(logger klog.Logger, s state.
 
 	// Generate hints. Outside of regeneration the usable CPUs are exactly the
 	// free ones, so the same set drives both feasibility and the Score.
-	cpuHints := p.generateCPUTopologyHintsForResize(available, reusable, available, requested)
+	cpuHints := p.generateCPUTopologyHintsForResize(available, reusable, retainedCPUs, available, requested)
 	logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
@@ -2076,7 +2076,8 @@ func (p *staticPolicy) isFeasibleResize(logger klog.Logger, s state.State, pod *
 // It follows the convention of marking all hints that have the same number of
 // bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
-func (p *staticPolicy) generateCPUTopologyHintsForResize(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, freeCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
+// On top of that, the hint whose NUMANodeAffinity matches exactly the retained CPUs is marked preferred as well.
+func (p *staticPolicy) generateCPUTopologyHintsForResize(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, retainedCPUs cpuset.CPUSet, freeCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes.
 	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
 
@@ -2129,12 +2130,19 @@ func (p *staticPolicy) generateCPUTopologyHintsForResize(availableCPUs cpuset.CP
 		})
 	})
 
-	// Loop back through all hints and update the 'Preferred' field based on
-	// counting the number of bits sets in the affinity mask and comparing it
-	// to the minAffinitySize. Only those with an equal number of bits set (and
-	// with a minimal set of numa nodes) will be considered preferred.
+	retainedNUMANodes := p.topology.CPUDetails.KeepOnly(retainedCPUs).NUMANodes()
+	// Loop back through all hints and update the 'Preferred' field. A hint is
+	// considered preferred when any of the following conditions is met:
+	// 1. with the AlignBySocket option configured, the hint is socket-aligned;
+	// 2. the hint's NUMANodeAffinity matches exactly the retained CPUs;
+	// 3. the number of bits set in the hint's NUMANodeAffinity equals minAffinitySize.
 	for i := range hints {
 		if p.options.AlignBySocket && p.isHintSocketAligned(hints[i], minAffinitySize) {
+			hints[i].Preferred = true
+			continue
+		}
+		hintNUMANodes := cpuset.New(hints[i].NUMANodeAffinity.GetBits()...)
+		if retainedNUMANodes.Equals(hintNUMANodes) {
 			hints[i].Preferred = true
 			continue
 		}
@@ -2193,7 +2201,7 @@ func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, s state.Sta
 		return nil
 	}
 
-	reusable := cpuset.New()
+	retained := cpuset.New()
 
 	// Get a list of available CPUs.
 	available := p.GetAvailableCPUs(s)
@@ -2210,11 +2218,11 @@ func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, s state.Sta
 
 		if allocated.Size() != requested {
 			if allocated.Size() < requested {
-				reusable = reusable.Union(allocated)
+				retained = retained.Union(allocated)
 			} else {
 				baselineCPUs, _ := s.GetBaselineCPUSet(string(pod.UID), container.Name)
 				freeCPUs := available.Union(allocated.Difference(baselineCPUs))
-				cpuHints := p.generateCPUTopologyHintsForResize(allocated.Difference(baselineCPUs), baselineCPUs, freeCPUs, requested)
+				cpuHints := p.generateCPUTopologyHintsForResize(allocated.Difference(baselineCPUs), baselineCPUs, baselineCPUs, freeCPUs, requested)
 				logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 				return map[string][]topologymanager.TopologyHint{
@@ -2224,18 +2232,18 @@ func (p *staticPolicy) getTopologyHintsForResize(logger klog.Logger, s state.Sta
 		} else {
 			logger.Info("Regenerating TopologyHints for CPUs already allocated")
 			return map[string][]topologymanager.TopologyHint{
-				string(v1.ResourceCPU): p.generateCPUTopologyHintsForResize(allocated, cpuset.New(), p.GetAvailableCPUs(s), requested),
+				string(v1.ResourceCPU): p.generateCPUTopologyHintsForResize(allocated, cpuset.New(), allocated, p.GetAvailableCPUs(s), requested),
 			}
 		}
 	}
 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers).
 	// It should be an empty CPUSet for a newly created pod.
-	reusable = reusable.Union(p.cpusToReuse[string(pod.UID)])
+	reusable := retained.Union(p.cpusToReuse[string(pod.UID)])
 
 	// Generate hints. Outside of regeneration the usable CPUs are exactly the
 	// free ones, so the same set drives both feasibility and the Score.
-	cpuHints := p.generateCPUTopologyHintsForResize(available, reusable, available, requested)
+	cpuHints := p.generateCPUTopologyHintsForResize(available, reusable, retained, available, requested)
 	logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{

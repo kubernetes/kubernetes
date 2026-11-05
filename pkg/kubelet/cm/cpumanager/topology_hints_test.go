@@ -974,7 +974,7 @@ func TestGetTopologyHintsForResize(t *testing.T) {
 			}},
 			defaultCPUSet: mustParseCPUSet(t, "12-79"),
 			expectedHints: []topologymanager.TopologyHint{
-				{NUMANodeAffinity: m0011, Preferred: false, Score: 30},
+				{NUMANodeAffinity: m0011, Preferred: true, Score: 30},
 				{NUMANodeAffinity: m0111, Preferred: false, Score: 20},
 				{NUMANodeAffinity: m1011, Preferred: false, Score: 20},
 				{NUMANodeAffinity: m1111, Preferred: false, Score: 15},
@@ -1017,7 +1017,7 @@ func TestGetTopologyHintsForResize(t *testing.T) {
 			}},
 			defaultCPUSet: mustParseCPUSet(t, "12-79"),
 			expectedHints: []topologymanager.TopologyHint{
-				{NUMANodeAffinity: m0011, Preferred: false, Score: 30},
+				{NUMANodeAffinity: m0011, Preferred: true, Score: 30},
 				{NUMANodeAffinity: m0111, Preferred: false, Score: 20},
 				{NUMANodeAffinity: m1011, Preferred: false, Score: 20},
 				{NUMANodeAffinity: m1111, Preferred: false, Score: 15},
@@ -1241,7 +1241,7 @@ func TestGetPodTopologyHintsForResize(t *testing.T) {
 			}},
 			defaultCPUSet: mustParseCPUSet(t, "4-9,14-79"),
 			expectedHints: []topologymanager.TopologyHint{
-				{NUMANodeAffinity: m0011, Preferred: false, Score: 20},
+				{NUMANodeAffinity: m0011, Preferred: true, Score: 20},
 				{NUMANodeAffinity: m0111, Preferred: false, Score: 13},
 				{NUMANodeAffinity: m1011, Preferred: false, Score: 13},
 				{NUMANodeAffinity: m1111, Preferred: false, Score: 10},
@@ -1264,7 +1264,7 @@ func TestGetPodTopologyHintsForResize(t *testing.T) {
 			}},
 			defaultCPUSet: mustParseCPUSet(t, "50-59,70-79"),
 			expectedHints: []topologymanager.TopologyHint{
-				{NUMANodeAffinity: m0111, Preferred: false, Score: 56},
+				{NUMANodeAffinity: m0111, Preferred: true, Score: 56},
 				{NUMANodeAffinity: m1111, Preferred: false, Score: 42},
 			},
 			topology: topoDualSocketMultiNumaPerSocketHT,
@@ -1285,7 +1285,7 @@ func TestGetPodTopologyHintsForResize(t *testing.T) {
 			}},
 			defaultCPUSet: mustParseCPUSet(t, "30-39,50-59,70-79"),
 			expectedHints: []topologymanager.TopologyHint{
-				{NUMANodeAffinity: m0111, Preferred: false, Score: 56},
+				{NUMANodeAffinity: m0111, Preferred: true, Score: 56},
 				{NUMANodeAffinity: m1111, Preferred: false, Score: 42},
 			},
 			topology: topoDualSocketMultiNumaPerSocketHT,

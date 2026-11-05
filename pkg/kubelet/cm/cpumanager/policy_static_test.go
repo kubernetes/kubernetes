@@ -6234,6 +6234,7 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 		reservedCPUs  cpuset.CPUSet
 		availableCPUs cpuset.CPUSet
 		reusableCPUs  cpuset.CPUSet
+		retainedCPUs  cpuset.CPUSet
 		freeCPUs      cpuset.CPUSet
 		request       int
 		expectedHints []topologymanager.TopologyHint
@@ -6245,6 +6246,7 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 			availableCPUs: cpuset.New(2, 3, 4, 5, 6, 7),
 			// Use case: ReusableCPUs are the baselines
 			reusableCPUs: cpuset.New(0, 1),
+			retainedCPUs: cpuset.New(0, 1),
 			freeCPUs:     cpuset.New(2, 3, 4, 5, 6, 7),
 			request:      1,
 			// Below Scores are based on node status when the decision was taken.
@@ -6265,6 +6267,7 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 			availableCPUs: cpuset.New(3, 4, 5, 6, 7),
 			// Use case: ReusableCPUs are the baselines
 			reusableCPUs: cpuset.New(1, 2),
+			retainedCPUs: cpuset.New(1, 2),
 			freeCPUs:     cpuset.New(3, 4, 5, 6, 7),
 			request:      1,
 			// Below Scores are based on node status when the decision was taken.
@@ -6285,6 +6288,7 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 			availableCPUs: cpuset.New(0, 1),
 			// Use case: ReusableCPUs are the baselines
 			reusableCPUs: cpuset.New(0, 1),
+			retainedCPUs: cpuset.New(0, 1),
 			freeCPUs:     cpuset.New(2, 3, 4, 5, 6, 7),
 			request:      3,
 			// Below Scores are based on node status when the decision was taken.
@@ -6305,6 +6309,7 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 			availableCPUs: cpuset.New(1, 2),
 			// Use case: ReusableCPUs are the baselines
 			reusableCPUs: cpuset.New(1, 2),
+			retainedCPUs: cpuset.New(1, 2),
 			freeCPUs:     cpuset.New(3, 4, 5, 6, 7),
 			request:      3,
 			// Below Scores are based on node status when the decision was taken.
@@ -6417,6 +6422,7 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 			reservedCPUs:  cpuset.New(),
 			availableCPUs: cpuset.New(),
 			reusableCPUs:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			retainedCPUs:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			freeCPUs:      cpuset.New(),
 			request:       1,
 			// NUMA 0: 8 allocatable, 0 free, 8 assigned → 8*100/8 = 100
@@ -6457,6 +6463,44 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 				{NUMANodeAffinity: newNUMAAffinity(1, 0), Preferred: false, Score: 50},
 			},
 		},
+		{
+			// topoDualSocketHT: 12 CPUs, 2 NUMA nodes, 6 CPUs each
+			// NUMA 0: CPUs {0,2,4,6,8,10}, NUMA 1: CPUs {1,3,5,7,9,11}
+			description:   "retained CPUs span both NUMA nodes, request fits in one: the hint covering the retained CPUs is preferred",
+			topo:          topoDualSocketHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(2, 3, 4, 5, 8, 9, 10, 11),
+			// Use case: ReusableCPUs are the retained CPUs of a scale up from 4 to 5
+			reusableCPUs: cpuset.New(0, 1, 6, 7),
+			retainedCPUs: cpuset.New(0, 1, 6, 7),
+			freeCPUs:     cpuset.New(2, 3, 4, 5, 8, 9, 10, 11),
+			request:      5,
+			// NUMA 0: no hint generated, it does not contain all retained CPUs
+			// NUMA 1: no hint generated, it does not contain all retained CPUs
+			// NUMA {0,1}: 12 allocatable, 8 free, 4 assigned → 4*100/12 = 33
+			// The narrowest affinity by request size is a single NUMA node, but the
+			// retained CPUs span both nodes, so the hint covering them is preferred.
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: newNUMAAffinity(1, 0), Preferred: true, Score: 33},
+			},
+		},
+		{
+			description:   "request outgrows the retained CPUs NUMA node: the narrowest hint still containing them is preferred",
+			topo:          topoDualSocketHT,
+			reservedCPUs:  cpuset.New(),
+			availableCPUs: cpuset.New(1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			// Use case: ReusableCPUs are the retained CPUs of a scale up from 2 to 7
+			reusableCPUs: cpuset.New(0, 2),
+			retainedCPUs: cpuset.New(0, 2),
+			freeCPUs:     cpuset.New(1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			request:      7,
+			// NUMA 0: no hint generated, 2 retained + 4 available CPUs cannot satisfy 7
+			// NUMA 1: no hint generated, it does not contain all retained CPUs
+			// NUMA {0,1}: 12 allocatable, 10 free, 2 assigned → 2*100/12 = 16
+			expectedHints: []topologymanager.TopologyHint{
+				{NUMANodeAffinity: newNUMAAffinity(1, 0), Preferred: true, Score: 16},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -6471,7 +6515,7 @@ func TestGenerateCPUTopologyHintsForResize(t *testing.T) {
 				numaNodes:    testCase.topo.CPUDetails.NUMANodes().List(),
 			}
 
-			hints := p.generateCPUTopologyHintsForResize(testCase.availableCPUs, testCase.reusableCPUs, testCase.freeCPUs, testCase.request)
+			hints := p.generateCPUTopologyHintsForResize(testCase.availableCPUs, testCase.reusableCPUs, testCase.retainedCPUs, testCase.freeCPUs, testCase.request)
 
 			if !reflect.DeepEqual(testCase.expectedHints, hints) {
 				t.Errorf("Expected in result to be %v, got %v", testCase.expectedHints, hints)
