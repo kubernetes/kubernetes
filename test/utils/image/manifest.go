@@ -214,7 +214,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.33.8"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.6.0"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-2"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.7.1-0"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.7.3-0"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.4"}
 	configs[GlibcDnsTesting] = Config{list.PromoterE2eRegistry, "glibc-dns-testing", "2.1.1"}
