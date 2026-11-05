@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/framer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 )
 
@@ -179,6 +180,27 @@ type objectDecoderFunc func([]byte) (runtime.Object, error)
 func (f objectDecoderFunc) Decode(data []byte, _ *schema.GroupVersionKind, _ runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	object, err := f(data)
 	return object, nil, err
+}
+
+func TestConcurrentWatchEventDecoderPanic(t *testing.T) {
+	reallyCrash := utilruntime.ReallyCrash
+	utilruntime.ReallyCrash = false
+	defer func() { utilruntime.ReallyCrash = reallyCrash }()
+
+	synctest.Test(t, func(t *testing.T) {
+		panickingDecoder := objectDecoderFunc(func([]byte) (runtime.Object, error) {
+			panic("object decoder panic")
+		})
+		input := watchEventJSON(watch.Added, podJSON("1"))
+		stream := streaming.NewDecoder(framer.NewJSONFramedReader(io.NopCloser(strings.NewReader(input))), getDecoder())
+		decoder := NewConcurrentWatchEventDecoder(stream, panickingDecoder)
+
+		eventType, object, err := decoder.Decode()
+		require.EqualError(t, err, "panic decoding watch event object: object decoder panic")
+		require.Empty(t, eventType)
+		require.Nil(t, object)
+		decoder.Close()
+	})
 }
 
 func TestConcurrentWatchEventDecoderPreservesOrder(t *testing.T) {
