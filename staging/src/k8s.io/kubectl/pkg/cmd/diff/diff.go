@@ -110,7 +110,7 @@ type DiffOptions struct {
 
 	Concurrency      int
 	Selector         string
-	OpenAPIV3Root    openapi3.Root
+	OpenAPIV3Root    openapi3.RootAndResources
 	DynamicClient    dynamic.Interface
 	CmdNamespace     string
 	EnforceNamespace bool
@@ -325,7 +325,7 @@ type InfoObject struct {
 	LocalObj        runtime.Object
 	Info            *resource.Info
 	Encoder         runtime.Encoder
-	OpenAPIV3Root   openapi3.Root
+	OpenAPIV3Root   openapi3.RootAndResources
 	Force           bool
 	ServerSideApply bool
 	FieldManager    string
@@ -641,7 +641,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	if !o.ServerSideApply {
 		openAPIV3Client, err := f.OpenAPIV3Client()
 		if err == nil {
-			o.OpenAPIV3Root = openapi3.NewRoot(openAPIV3Client)
+			o.OpenAPIV3Root = openapi3.NewRootAndResources(openAPIV3Client)
 		} else {
 			klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded")
 		}

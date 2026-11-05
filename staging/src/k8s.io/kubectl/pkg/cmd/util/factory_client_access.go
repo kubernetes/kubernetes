@@ -46,6 +46,12 @@ type factoryImpl struct {
 	oapi          *openapi.CachedOpenAPIGetter
 	parser        sync.Once
 	getter        sync.Once
+
+	// Caches OpenAPI V3 client and fieldValidation verifier
+	oapiV3Client     openapiclient.Client
+	oapiV3ClientOnce sync.Once
+	verifierV3       resource.Verifier
+	verifierV3Once   sync.Once
 }
 
 func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
@@ -164,17 +170,16 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 	if err != nil {
 		return nil, err
 	}
-	// Create the FieldValidationVerifier for use in the ParamVerifyingSchema.
-	discoveryClient, err := f.ToDiscoveryClient()
+	// Reuse the Factory's cached OpenAPI V3 client and fieldValidation verifier
+	// across Validator invocations.
+	oapiV3Client, err := f.OpenAPIV3Client()
 	if err != nil {
 		return nil, err
 	}
-	// Memory-cache the OpenAPI V3 responses. The disk cache behavior is determined by
-	// the discovery client.
-	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
-	queryParam := resource.QueryParamFieldValidation
-	verifier := newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam))
-	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
+	f.verifierV3Once.Do(func() {
+		f.verifierV3 = newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, resource.QueryParamFieldValidation))
+	})
+	return validation.NewParamVerifyingSchema(schema, f.verifierV3, string(validationDirective)), nil
 }
 
 // OpenAPISchema returns metadata and structural information about
@@ -207,11 +212,15 @@ func (f *factoryImpl) openAPIGetter() discovery.OpenAPISchemaInterface {
 	return f.oapi
 }
 
+// OpenAPIV3Client returns a memory-cached OpenAPI V3 client backed by the
+// Factory's discovery client, initialized once per Factory instance.
 func (f *factoryImpl) OpenAPIV3Client() (openapiclient.Client, error) {
 	discovery, err := f.clientGetter.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
-
-	return cached.NewClient(discovery.OpenAPIV3()), nil
+	f.oapiV3ClientOnce.Do(func() {
+		f.oapiV3Client = cached.NewClient(discovery.OpenAPIV3())
+	})
+	return f.oapiV3Client, nil
 }
