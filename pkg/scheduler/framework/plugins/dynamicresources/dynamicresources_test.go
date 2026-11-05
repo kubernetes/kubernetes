@@ -5263,6 +5263,85 @@ func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 	}
 }
 
+func TestIsSchedulableAfterNodeDeclaredFeaturesChange(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	nodeWithFeatures := func(features ...string) *v1.Node {
+		node := workerNode.DeepCopy()
+		node.Status.DeclaredFeatures = features
+		return node
+	}
+	optionalNodeOps := draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate
+
+	testcases := map[string]struct {
+		oldObj, newObj interface{}
+		wantHint       fwk.QueueingHint
+		wantErr        bool
+	}{
+		"wrong-object": {
+			oldObj:  nodeWithFeatures(),
+			newObj:  "not-a-node",
+			wantErr: true,
+		},
+		"starts-declaring": {
+			oldObj:   nodeWithFeatures("OtherFeature"),
+			newObj:   nodeWithFeatures(optionalNodeOps, "OtherFeature"),
+			wantHint: fwk.Queue,
+		},
+		"already-declared": {
+			oldObj:   nodeWithFeatures(optionalNodeOps),
+			newObj:   nodeWithFeatures(optionalNodeOps, "OtherFeature"),
+			wantHint: fwk.QueueSkip,
+		},
+		"stops-declaring": {
+			oldObj:   nodeWithFeatures(optionalNodeOps),
+			newObj:   nodeWithFeatures(),
+			wantHint: fwk.QueueSkip,
+		},
+		"other-feature": {
+			oldObj:   nodeWithFeatures(),
+			newObj:   nodeWithFeatures("OtherFeature"),
+			wantHint: fwk.QueueSkip,
+		},
+	}
+
+	for name, tc := range testcases {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			pl := &DynamicResources{fts: feature.Features{EnableDRAOptionalNodeOperations: true}}
+			gotHint, err := pl.isSchedulableAfterNodeDeclaredFeaturesChange(tCtx.Logger(), podWithClaimName, tc.oldObj, tc.newObj)
+			if tc.wantErr {
+				if err == nil {
+					tCtx.Fatal("want an error, got none")
+				}
+				return
+			}
+			tCtx.ExpectNoError(err)
+			if gotHint != tc.wantHint {
+				tCtx.Fatalf("want %s, got %s", tc.wantHint, gotHint)
+			}
+		})
+	}
+}
+
+func TestEventsToRegisterOptionalNodeOperations(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("DRAOptionalNodeOperations=%v", enabled), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			pl := &DynamicResources{fts: feature.Features{EnableDRAOptionalNodeOperations: enabled}}
+			events, err := pl.EventsToRegister(tCtx)
+			tCtx.ExpectNoError(err, "EventsToRegister")
+			registered := false
+			for _, event := range events {
+				if event.Event.Resource == fwk.Node && event.Event.ActionType&fwk.UpdateNodeDeclaredFeature != 0 {
+					registered = true
+				}
+			}
+			if registered != enabled {
+				tCtx.Errorf("UpdateNodeDeclaredFeature registered = %v, want %v", registered, enabled)
+			}
+		})
+	}
+}
+
 // mockDeviceClassResolver is a simple mock implementation of fwk.DeviceClassResolver for testing
 type mockDeviceClassResolver struct {
 	mapping map[v1.ResourceName]*resourceapi.DeviceClass
@@ -5324,6 +5403,13 @@ func TestAllocatorSelection(t *testing.T) {
 		// The default implementation, potentially with some beta features enabled.
 		"default": {
 			features:             "",
+			usingFeatureGroup:    true,
+			expectImplementation: "incubating",
+		},
+
+		// Disabling DRAOptionalNodeOperations is the rollback path for that feature.
+		"default-without-optional-node-operations": {
+			features:             "DRAOptionalNodeOperations=false",
 			usingFeatureGroup:    true,
 			expectImplementation: "stable",
 		},

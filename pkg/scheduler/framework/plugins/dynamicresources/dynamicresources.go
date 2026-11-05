@@ -290,8 +290,39 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
 	}
+	if pl.fts.EnableDRAOptionalNodeOperations {
+		// Devices which skip node operations are only usable on nodes which declare
+		// DRAOptionalNodeOperations. A node starts declaring it after a kubelet
+		// upgrade or after enabling the feature gate in the kubelet.
+		events = append(events, fwk.ClusterEventWithHint{
+			Event:          fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeDeclaredFeature},
+			QueueingHintFn: pl.isSchedulableAfterNodeDeclaredFeaturesChange,
+		})
+	}
 
 	return events, nil
+}
+
+// isSchedulableAfterNodeDeclaredFeaturesChange is invoked for node updates which change
+// the declared features. Only a node which starts declaring DRAOptionalNodeOperations
+// can make a pod schedulable which was rejected because of that feature.
+func (pl *DynamicResources) isSchedulableAfterNodeDeclaredFeaturesChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	originalNode, modifiedNode, err := schedutil.As[*v1.Node](oldObj, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterNodeDeclaredFeaturesChange: %w", err)
+	}
+
+	declares := func(node *v1.Node) bool {
+		return node != nil && slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate)
+	}
+	if declares(originalNode) || !declares(modifiedNode) {
+		logger.V(6).Info("node did not start declaring DRAOptionalNodeOperations", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+		return fwk.QueueSkip, nil
+	}
+
+	logger.V(5).Info("node started declaring DRAOptionalNodeOperations, pod might be schedulable now", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+	return fwk.Queue, nil
 }
 
 // PreEnqueue checks if there are known reasons why a pod currently cannot be

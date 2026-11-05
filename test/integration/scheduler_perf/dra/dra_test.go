@@ -71,6 +71,10 @@ func TestSchedulerPerf(t *testing.T) {
 					if gate.EmulationVersion().AtLeast(version.MustParse("1.34")) {
 						overrides[features.DRAConsumableCapacity] = false
 					}
+					// On by default since 1.38, which makes NewAllocator reject "stable".
+					if gate.EmulationVersion().AtLeast(version.MustParse("1.38")) {
+						overrides[features.DRAOptionalNodeOperations] = false
+					}
 					featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, overrides)
 					return nil, nil
 				}))

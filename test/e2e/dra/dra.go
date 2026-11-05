@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,10 +46,12 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
 	metadatav1alpha1 "k8s.io/dynamic-resource-allocation/api/metadata/v1alpha1"
 	metadatav1beta1 "k8s.io/dynamic-resource-allocation/api/metadata/v1beta1"
@@ -2685,6 +2688,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 				for _, event := range evList.Items {
 					gomega.Expect(event.Reason).NotTo(gomega.Equal(events.FailedPrepareDynamicResources), "unexpected FailedPrepareDynamicResources event")
 				}
+
+				// No driver could serve NodeUnprepareResources, so deletion must not wait for it.
+				b.DeletePodAndWaitForNotFound(tCtx, pod)
 			})
 
 			ginkgo.It("fails node preparation when SkipNodeOperations is not set", func(ctx context.Context) {
@@ -2846,6 +2852,45 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
+	// The expected outcome depends on what the kubelet declares. This also runs in the kubelet
+	// version skew jobs, where older kubelets don't declare DRAOptionalNodeOperations by default.
+	optionalNodeOperationsSkewTests := func() {
+		ginkgo.It("only schedules pods which skip node operations onto nodes which declare support", func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			nodes := drautils.NewNodesNow(tCtx, 1, 1)
+			driver := drautils.NewDriverInstance(tCtx)
+			driver.WithKubelet = false
+			b := drautils.NewBuilderNow(tCtx, driver)
+			driver.Run(tCtx, framework.TestContext.KubeletRootDir, nodes, drautils.DriverResourcesWithSkipNodeOperationsNow(nodes, 1, resourceapi.SkipNodeOperationAll))
+
+			claim := b.ExternalClaim()
+			pod := b.PodExternal(claim.Name)
+			b.Create(tCtx, claim, pod)
+
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodes.NodeNames[0], metav1.GetOptions{})
+			framework.ExpectNoError(err, "get node")
+			kubeletVersion, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
+			framework.ExpectNoError(err, "parse kubelet version %q of node %s", node.Status.NodeInfo.KubeletVersion, node.Name)
+			declared := slices.Contains(node.Status.DeclaredFeatures, draoptionalnodeoperations.DRAOptionalNodeOperationsFeatureGate)
+			// DRAOptionalNodeOperations is enabled by default since 1.38. Older kubelets
+			// only declare it when the feature gate was enabled explicitly. The generic
+			// (major.minor) comparison intentionally treats 1.38 pre-releases as 1.38.
+			if kubeletVersion.AtLeast(utilversion.MustParse("1.38")) {
+				gomega.Expect(declared).To(gomega.BeTrueBecause("kubelet %s should declare DRAOptionalNodeOperations", node.Status.NodeInfo.KubeletVersion))
+			}
+			if declared {
+				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
+				return
+			}
+
+			// Kubelet would call the node-local driver, which doesn't exist.
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "pod should be unschedulable")
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{})).
+				WithTimeout(30*time.Second).
+				Should(gomega.HaveField("Spec.NodeName", gomega.BeEmpty()), "pod must not get scheduled onto a node without DRAOptionalNodeOperations")
+		})
+	}
+
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
@@ -2867,7 +2912,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.GenericWorkload), f.WithFeatureGate(features.DRAWorkloadResourceClaims), f.WithKubeletMinVersion("1.36"), podGroupResourceClaimTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), optionalNodeOperationsTests)
+	// Older kubelets don't declare DRAOptionalNodeOperations by default, so most of these
+	// tests cannot pass in the kubelet version skew jobs.
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), f.WithKubeletMinVersion("1.38"), optionalNodeOperationsTests)
+	// Kubelets before 1.36 don't update status.declaredFeatures by default (NodeDeclaredFeatures
+	// was alpha). The kind skew jobs register nodes with the current kubelet before downgrading
+	// it, so those nodes keep declaring DRAOptionalNodeOperations without supporting it.
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAOptionalNodeOperations), f.WithKubeletMinVersion("1.36"), "with kubelet version skew", optionalNodeOperationsSkewTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
