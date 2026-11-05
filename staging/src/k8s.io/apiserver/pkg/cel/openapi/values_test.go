@@ -676,3 +676,24 @@ func BenchmarkUnstructuredToValWithEscape(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkUnstructuredMapFind(b *testing.B) {
+	obj := map[string]interface{}{
+		"field1": "a",
+		"field2": "b",
+	}
+	mapper := UnstructuredToVal(obj, objectSchema).(traits.Mapper)
+	k1 := types.String("field1")
+	k2 := types.String("field2")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		if _, ok := mapper.Find(k1); !ok {
+			b.Fatal("expected field1")
+		}
+		if _, ok := mapper.Find(k2); !ok {
+			b.Fatal("expected field2")
+		}
+	}
+}
