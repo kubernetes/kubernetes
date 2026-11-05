@@ -39,6 +39,8 @@ var validateWorkloadName = apimachineryvalidation.NameIsDNSSubdomain
 // name for a CompositePodGroup is valid.
 var validateCompositePodGroupName = apimachineryvalidation.NameIsDNSSubdomain
 
+const nonGangDisruptionModeAllErrorMsg = `cannot have "all" disruption mode when scheduling policy is other than "gang"`
+
 // ValidatePriorityClass tests whether required fields in the PriorityClass are
 // set correctly.
 func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
@@ -78,6 +80,9 @@ func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
 	if podGroup.Spec.ParentCompositePodGroupName != nil && podGroup.Spec.WorkloadRef == nil {
 		allErrs = append(allErrs, field.Required(field.NewPath("spec", "workloadRef"), "must be set when parentCompositePodGroupName is set").WithOrigin("dependentRequired").MarkCoveredByDeclarative())
 	}
+	if podGroup.Spec.SchedulingPolicy.Gang == nil && podGroup.Spec.DisruptionMode != nil && podGroup.Spec.DisruptionMode.All != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "disruptionMode"), field.OmitValueType{}, nonGangDisruptionModeAllErrorMsg))
+	}
 	return allErrs
 }
 
@@ -90,6 +95,8 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 type WorkloadValidationOptions struct {
 	// Allow templates whose preemptionPolicy values differ.
 	AllowMismatchedPreemptionPolicy bool
+	// Allow templates with non-"gang" scheduling policy and "all" disruption mode.
+	AllowAllDisruptionModeWithNonGangPolicy bool
 }
 
 // ValidateWorkload tests if all fields in a Workload are set correctly.
@@ -106,6 +113,8 @@ func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.Er
 		// Template preemptionPolicy is immutable and new templates cannot be added on update.
 		// Workloads stored before the consistency check may mix values. Tolerate them on update.
 		AllowMismatchedPreemptionPolicy: true,
+		// schedulingPolicy and disruptionMode are immutable, tolerate existing persisted values on update.
+		AllowAllDisruptionModeWithNonGangPolicy: true,
 	}
 	allErrs = append(allErrs, ValidateWorkloadSpec(&workload.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
@@ -119,13 +128,17 @@ func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.Er
 // - All composite pod group templates in the hierarchy have at least one child.
 // - CompositePodGroupTemplates with "gang" scheduling policy must have all their child templates with "gang" scheduling policy as well.
 // - CompositePodGroupTemplates with "all" disruption mode must have all their child templates with "all" disruption mode as well.
+// - Templates with non-"gang" scheduling policy must not have "all" disruption mode unless opts.AllowAllDisruptionModeWithNonGangPolicy is set.
 func ValidateWorkloadSpec(spec *scheduling.WorkloadSpec, fldPath *field.Path, opts WorkloadValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateWorkloadTemplateNamesUniqueness(spec, fldPath)...)
 	allErrs = append(allErrs, validateWorkloadTemplatesDepth(spec, fldPath.Child("compositePodGroupTemplates"))...)
 	allErrs = append(allErrs, validateWorkloadPriority(spec, fldPath, opts)...)
+	for i, pgt := range spec.PodGroupTemplates {
+		allErrs = append(allErrs, validatePodGroupTemplate(&pgt, fldPath.Child("podGroupTemplates").Index(i), opts)...)
+	}
 	for i, cpgt := range spec.CompositePodGroupTemplates {
-		allErrs = append(allErrs, validateCompositePodGroupTemplate(&cpgt, fldPath.Child("compositePodGroupTemplates").Index(i))...)
+		allErrs = append(allErrs, validateCompositePodGroupTemplate(&cpgt, fldPath.Child("compositePodGroupTemplates").Index(i), opts)...)
 	}
 	return allErrs
 }
@@ -271,11 +284,21 @@ func validateWorkloadPriority(spec *scheduling.WorkloadSpec, fldPath *field.Path
 	return nil
 }
 
+// validatePodGroupTemplate verifies that the template with non-"gang" scheduling policy does not specify the "all" disruption mode.
+func validatePodGroupTemplate(pgt *scheduling.PodGroupTemplate, fldPath *field.Path, opts WorkloadValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+	if !opts.AllowAllDisruptionModeWithNonGangPolicy && pgt.SchedulingPolicy.Gang == nil && pgt.DisruptionMode != nil && pgt.DisruptionMode.All != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("disruptionMode"), field.OmitValueType{}, nonGangDisruptionModeAllErrorMsg))
+	}
+	return allErrs
+}
+
 // validateCompositePodGroupTemplate recursively verifies that:
 // - each CompositePodGroupTemplate specifies at least one child PodGroupTemplate or CompositePodGroupTemplate.
 // - each CompositePodGroupTemplate with "gang" scheduling policy specifies child templates with the "gang" scheduling policy only.
 // - each CompositePodGroupTemplate with "all" disruption mode specifies child templates with the "all" disruption mode only.
-func validateCompositePodGroupTemplate(cpgt *scheduling.CompositePodGroupTemplate, fldPath *field.Path) field.ErrorList {
+// - each CompositePodGroupTemplate with non-"gang" scheduling policy does not specify the "all" disruption mode.
+func validateCompositePodGroupTemplate(cpgt *scheduling.CompositePodGroupTemplate, fldPath *field.Path, opts WorkloadValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(cpgt.PodGroupTemplates) == 0 && len(cpgt.CompositePodGroupTemplates) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, cpgt.Name, "must have at least one child PodGroupTemplate or CompositePodGroupTemplate"))
@@ -283,6 +306,10 @@ func validateCompositePodGroupTemplate(cpgt *scheduling.CompositePodGroupTemplat
 
 	parentIsGang := cpgt.SchedulingPolicy.Gang != nil
 	parentIsAll := cpgt.DisruptionMode != nil && cpgt.DisruptionMode.All != nil
+
+	if !opts.AllowAllDisruptionModeWithNonGangPolicy && !parentIsGang && parentIsAll {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("disruptionMode"), field.OmitValueType{}, nonGangDisruptionModeAllErrorMsg))
+	}
 
 	validateChild := func(childIsGang, childIsAll bool, childPath *field.Path) field.ErrorList {
 		var errs field.ErrorList
@@ -301,7 +328,7 @@ func validateCompositePodGroupTemplate(cpgt *scheduling.CompositePodGroupTemplat
 		childIsGang := child.SchedulingPolicy.Gang != nil
 		childIsAll := child.DisruptionMode != nil && child.DisruptionMode.All != nil
 		allErrs = append(allErrs, validateChild(childIsGang, childIsAll, childPath)...)
-		allErrs = append(allErrs, validateCompositePodGroupTemplate(child, childPath)...)
+		allErrs = append(allErrs, validateCompositePodGroupTemplate(child, childPath, opts)...)
 	}
 
 	for i := range cpgt.PodGroupTemplates {
@@ -310,6 +337,7 @@ func validateCompositePodGroupTemplate(cpgt *scheduling.CompositePodGroupTemplat
 		childIsGang := child.SchedulingPolicy.Gang != nil
 		childIsAll := child.DisruptionMode != nil && child.DisruptionMode.All != nil
 		allErrs = append(allErrs, validateChild(childIsGang, childIsAll, childPath)...)
+		allErrs = append(allErrs, validatePodGroupTemplate(child, childPath, opts)...)
 	}
 
 	return allErrs
@@ -347,7 +375,11 @@ func havePodGroupClaim(podGroupClaims []scheduling.PodGroupResourceClaim, name s
 
 // ValidateCompositePodGroup tests if all fields in a CompositePodGroup are set correctly.
 func ValidateCompositePodGroup(compositePodGroup *scheduling.CompositePodGroup) field.ErrorList {
-	return apivalidation.ValidateObjectMeta(&compositePodGroup.ObjectMeta, true, validateCompositePodGroupName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&compositePodGroup.ObjectMeta, true, validateCompositePodGroupName, field.NewPath("metadata"))
+	if compositePodGroup.Spec.SchedulingPolicy.Gang == nil && compositePodGroup.Spec.DisruptionMode != nil && compositePodGroup.Spec.DisruptionMode.All != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "disruptionMode"), field.OmitValueType{}, nonGangDisruptionModeAllErrorMsg))
+	}
+	return allErrs
 }
 
 // ValidateCompositePodGroupUpdate tests if an update to CompositePodGroup is valid.

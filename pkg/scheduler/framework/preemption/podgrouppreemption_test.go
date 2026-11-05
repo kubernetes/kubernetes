@@ -248,7 +248,38 @@ func TestPodGroupEvaluator_Preempt_Victims(t *testing.T) {
 				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
 			},
 			initPodGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeAll().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg1").UID("pg1").MinCount(2).DisruptionModeAll().Priority(lowPriority).Obj(),
+			},
+			preemptor: makePodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				[]*v1.Pod{st.MakePod().Name("p").UID("p").Priority(highPriority).Obj()},
+			),
+			nodeCapacities: []nodeCapacity{
+				{
+					nodeName: "node1",
+					capacity: 1,
+				},
+				{
+					nodeName: "node2",
+					capacity: 1,
+				},
+			},
+			expectedVictims:     []string{"p1", "p2"},
+			expectedStatus:      fwk.NewStatus(fwk.Success),
+			expectedDisruptions: map[fwk.EntityKeyType]int{fwk.PodGroupKeyType: 1},
+		},
+		{
+			name: "Basic pod group with disruption mode group not reprieved",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
+			},
+			initPodGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").BasicPolicy().DisruptionModeAll().Priority(lowPriority).Obj(),
 			},
 			preemptor: makePodGroupPreemptor(
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
