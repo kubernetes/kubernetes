@@ -204,10 +204,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		unified := map[string]string{}
 		memoryRequest := container.Resources.Requests.Memory().Value()
 		memoryLimitSpec := container.Resources.Limits.Memory().Value()
-		if memoryRequest != 0 && m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy {
-			// Guaranteed pods get memory.min (hard protection).
-			// Burstable pods get memory.low (soft protection).
-			if kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+		if memoryRequest != 0 && m.memoryReservationPolicy != kubeletconfiginternal.NoneMemoryReservationPolicy {
+			// TieredReservation uses memory.min for Guaranteed pods and memory.low for Burstable pods.
+			if m.memoryReservationPolicy == kubeletconfiginternal.HardMemoryReservationPolicy ||
+				(m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy && kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed) {
 				unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
 			} else {
 				unified[cm.Cgroup2MemoryLow] = strconv.FormatInt(memoryRequest, 10)

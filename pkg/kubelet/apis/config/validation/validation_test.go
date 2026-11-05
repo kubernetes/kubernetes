@@ -581,12 +581,49 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: memoryReservationPolicy \"TieredReservation\" requires MemoryQoS feature gate to be enabled",
 		}, {
+			name: "NodeMemoryReservationPolicy requires MemoryQoS",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"MemoryQoS": false, "NodeMemoryReservationPolicy": true}
+				conf.MemoryThrottlingFactor = nil
+				return conf
+			},
+			errMsg: "invalid configuration: NodeMemoryReservationPolicy feature gate requires MemoryQoS feature gate to be enabled",
+		}, {
+			name: "Soft requires NodeMemoryReservationPolicy",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.MemoryReservationPolicy = "Soft"
+				return conf
+			},
+			errMsg: "invalid configuration: memoryReservationPolicy \"Soft\" requires NodeMemoryReservationPolicy feature gate to be enabled",
+		}, {
+			name: "valid Soft reservation",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeMemoryReservationPolicy": true}
+				conf.MemoryReservationPolicy = "Soft"
+				return conf
+			},
+		}, {
+			name: "valid Hard reservation",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeMemoryReservationPolicy": true}
+				conf.MemoryReservationPolicy = "Hard"
+				return conf
+			},
+		}, {
 			name: "invalid MemoryReservationPolicy",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.MemoryReservationPolicy = "invalid"
 				return conf
 			},
 			errMsg: "invalid configuration: option \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\" or \"TieredReservation\"",
+		}, {
+			name: "invalid MemoryReservationPolicy with NodeMemoryReservationPolicy enabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.FeatureGates = map[string]bool{"NodeMemoryReservationPolicy": true}
+				conf.MemoryReservationPolicy = "invalid"
+				return conf
+			},
+			errMsg: "invalid configuration: option \"invalid\" specified for memoryReservationPolicy. Valid options are \"None\", \"TieredReservation\", \"Soft\" or \"Hard\"",
 		}, {
 			name: "invalid Taint.TimeAdded",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

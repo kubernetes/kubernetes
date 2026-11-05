@@ -730,6 +730,51 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			// since cgroup v2 memory protection is hierarchical (parent=0 wins).
 		})
 
+		ginkgo.It("should clear stale Burstable memory.min when switching from Hard to TieredReservation", func(ctx context.Context) {
+			hardCfg := oldCfg.DeepCopy()
+			if hardCfg.FeatureGates == nil {
+				hardCfg.FeatureGates = make(map[string]bool)
+			}
+			hardCfg.FeatureGates["MemoryQoS"] = true
+			hardCfg.FeatureGates["NodeMemoryReservationPolicy"] = true
+			hardCfg.MemoryReservationPolicy = kubeletconfig.HardMemoryReservationPolicy
+			hardCfg.CgroupsPerQOS = true
+			hardCfg.EnforceNodeAllocatable = []string{"pods"}
+			updateKubeletConfig(ctx, f, hardCfg, true)
+
+			pod := memqosMakePod("memqos-hard-to-tiered", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			)
+			e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			var burstableCgroupPath string
+			if cgroupDriver == "systemd" {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
+			} else {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods", "burstable")
+			}
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.BeNumerically(">", 0),
+				"Hard should set Burstable QoS memory.min")
+
+			ginkgo.By("Disabling NodeMemoryReservationPolicy and switching to TieredReservation")
+			tieredCfg := hardCfg.DeepCopy()
+			tieredCfg.FeatureGates["NodeMemoryReservationPolicy"] = false
+			tieredCfg.MemoryReservationPolicy = kubeletconfig.TieredReservationMemoryReservationPolicy
+			updateKubeletConfig(ctx, f, tieredCfg, true)
+
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryMin)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
+				"TieredReservation should clear stale Burstable QoS memory.min")
+			gomega.Eventually(ctx, func() (int64, error) {
+				return memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.BeNumerically(">", 0),
+				"TieredReservation should set Burstable QoS memory.low")
+		})
+
 		ginkgo.It("should clear stale memory.high when MemoryQoS is disabled and container is resized", func(ctx context.Context) {
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
 
