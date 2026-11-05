@@ -2104,7 +2104,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 	}
 
 	calcSwapForBurstablePods := func(containerMemoryRequest int64) int64 {
-		swapSize, err := calcSwapForBurstablePods(containerMemoryRequest, int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
+		swapSize, err := cm.CalcSwapForBurstablePods(containerMemoryRequest, int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
 		assert.NoError(t, err)
 
 		return swapSize
@@ -2335,6 +2335,687 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 
 			expectSwap(tc.cgroupVersion, c1ExpectedSwap, resourcesC1)
 			expectSwap(tc.cgroupVersion, c2ExpectedSwap, resourcesC2)
+		})
+	}
+}
+
+func TestGenerateLinuxContainerResourcesWithPodLevelSwap(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.machineInfo.MemoryCapacity = 42949672960 // 40Gi
+	m.machineInfo.SwapCapacity = 5368709120    // 5Gi
+
+	swapForReq := func(req string) string {
+		q := resource.MustParse(req)
+		swapBytes, err := cm.CalcSwapForBurstablePods(q.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
+		require.NoError(t, err)
+		return strconv.FormatInt(swapBytes, 10)
+	}
+
+	tests := []struct {
+		name               string
+		plrEnabled         bool
+		swapBehavior       types.SwapBehavior
+		cgroupVersion      CgroupVersion
+		swapDisabledOnNode bool
+		pod                *v1.Pod
+		expectedBehavior   map[string]types.SwapBehavior
+		expectedSwapMax    map[string]string
+	}{
+		{
+			name:          "Case 1a: pod-level resources only (req < lim) sets container memory.swap.max to max",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-case1a", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+				"c2": types.LimitedSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": cm.Cgroup2MaxSwapLimit,
+				"c2": cm.Cgroup2MaxSwapLimit,
+			},
+		},
+		{
+			name:          "Case 1b: pod-level memory request only (no memory limit) sets container memory.swap.max to max",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-case1b", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": cm.Cgroup2MaxSwapLimit,
+			},
+		},
+		{
+			name:          "Case 2: mixed pod with sum of container requests < pod request",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-case2", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("8Gi")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("3Gi")},
+							},
+						},
+						{Name: "c2"},
+						{
+							Name: "c3",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+				"c2": types.LimitedSwap,
+				"c3": types.LimitedSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": swapForReq("2Gi"),
+				"c2": cm.Cgroup2MaxSwapLimit,
+				"c3": swapForReq("1Gi"),
+			},
+		},
+		{
+			name:          "Case 3: mixed pod with sum of container requests == pod request",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-case3", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("8Gi")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("6Gi")},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+				"c2": types.LimitedSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": swapForReq("4Gi"),
+				"c2": cm.Cgroup2MaxSwapLimit,
+			},
+		},
+		{
+			name:          "Case 4: container opt-out (request == limit or un-defaulted limit only) inside eligible pod",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-case4", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("6Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("10Gi")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{
+							Name: "c2-limit-only",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+						{Name: "c3"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1":            types.NoSwap,
+				"c2-limit-only": types.NoSwap,
+				"c3":            types.LimitedSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1":            "0",
+				"c2-limit-only": "0",
+				"c3":            cm.Cgroup2MaxSwapLimit,
+			},
+		},
+		{
+			name:          "Case 5: regular, sidecar, init, and ephemeral containers",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-case5", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("8Gi")},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "init-no-res",
+						},
+						{
+							Name: "init-burstable",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name: "init-guaranteed",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name:          "sidecar-burstable",
+							RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{
+							Name:          "sidecar-no-res",
+							RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+						},
+						{
+							Name:          "sidecar-guaranteed",
+							RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{Name: "app"},
+					},
+					EphemeralContainers: []v1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: v1.EphemeralContainerCommon{
+								Name: "debugger",
+							},
+						},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"init-no-res":        types.LimitedSwap,
+				"init-burstable":     types.LimitedSwap,
+				"init-guaranteed":    types.NoSwap,
+				"sidecar-burstable":  types.LimitedSwap,
+				"sidecar-no-res":     types.LimitedSwap,
+				"sidecar-guaranteed": types.NoSwap,
+				"app":                types.LimitedSwap,
+				"debugger":           types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"init-no-res":        cm.Cgroup2MaxSwapLimit,
+				"init-burstable":     swapForReq("512Mi"),
+				"init-guaranteed":    "0",
+				"sidecar-burstable":  swapForReq("1Gi"),
+				"sidecar-no-res":     cm.Cgroup2MaxSwapLimit,
+				"sidecar-guaranteed": "0",
+				"app":                cm.Cgroup2MaxSwapLimit,
+				"debugger":           "0",
+			},
+		},
+		{
+			name:          "Case 6: Burstable pod with CPU req < lim and PodMemoryRequest == PodMemoryLimit disables swap",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-case6", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1"),
+							v1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("2"),
+							v1.ResourceMemory: resource.MustParse("4Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+				"c2": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "0",
+				"c2": "0",
+			},
+		},
+		{
+			name:          "pod-level CPU only with no memory anywhere disables swap on all containers",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-cpu-no-mem", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					Containers: []v1.Container{{Name: "c1"}, {Name: "c2"}},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+				"c2": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "0",
+				"c2": "0",
+			},
+		},
+		{
+			name:          "pod-level CPU with container c1 req < lim and c2 unbounded (un-defaulted pod-level requests) sets c2 to 0",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-cpu-ctr-mem-undefaulted", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+				"c2": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": swapForReq("1Gi"),
+				"c2": "0",
+			},
+		},
+		{
+			name:          "pod-level CPU with container c1 req < lim and c2 unbounded (API-defaulted pod) sets c2 to max",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-cpu-ctr-mem-defaulted", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+						},
+						Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+				"c2": types.LimitedSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": swapForReq("1Gi"),
+				"c2": cm.Cgroup2MaxSwapLimit,
+			},
+		},
+		{
+			name:          "pod-level CPU with c1 req == lim and c2 unbounded (un-defaulted pod-level requests) sets c1 to 0 and c2 to 0",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-cpu-c1-guar-c2-unbounded", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+				"c2": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "0",
+				"c2": "0",
+			},
+		},
+		{
+			name:          "pod-level CPU with single container req == lim sets container to 0",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-cpu-c1-guar-only", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "0",
+			},
+		},
+		{
+			name:          "container-only pod (pod.spec.resources unset) preserves KEP-2400 behavior with c2 at 0",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "ctr-only-burstable", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+				"c2": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": swapForReq("1Gi"),
+				"c2": "0",
+			},
+		},
+		{
+			name:          "container-only pod with larger Guaranteed init container preserves Burstable app swap",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "ctr-only-guar-init", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "init1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"init1": types.NoSwap,
+				"c1":    types.LimitedSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"init1": "0",
+				"c1":    swapForReq("1Gi"),
+			},
+		},
+		{
+			name:          "critical Burstable pod with pod-level resources disables swap",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-critical", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Priority: new(int32(2000001000)),
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "0",
+			},
+		},
+		{
+			name:          "NoSwap sets all containers to 0 even when pod-level memory request < limit",
+			plrEnabled:    true,
+			swapBehavior:  types.NoSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-noswap", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "0",
+			},
+		},
+		{
+			name:               "swap controller unavailable on node falls back to NoSwap without Unified swap entry",
+			plrEnabled:         true,
+			swapBehavior:       types.LimitedSwap,
+			cgroupVersion:      cgroupV2,
+			swapDisabledOnNode: true,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-no-swap-ctrl", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "",
+			},
+		},
+		{
+			name:          "cgroup v1 falls back to NoSwap without Unified swap entry",
+			plrEnabled:    true,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV1,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-cgroupv1", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+					Containers: []v1.Container{{Name: "c1"}},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": "",
+			},
+		},
+		{
+			name:          "PodLevelResources gate disabled falls back to container-level KEP-2400 behavior",
+			plrEnabled:    false,
+			swapBehavior:  types.LimitedSwap,
+			cgroupVersion: cgroupV2,
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "plr-disabled", Name: "pod", Namespace: "ns"},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+						{Name: "c2"},
+					},
+				},
+			},
+			expectedBehavior: map[string]types.SwapBehavior{
+				"c1": types.LimitedSwap,
+				"c2": types.NoSwap,
+			},
+			expectedSwapMax: map[string]string{
+				"c1": swapForReq("1Gi"),
+				"c2": "0",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.plrEnabled)
+			setCgroupVersionDuringTest(tc.cgroupVersion)
+			m.getSwapControllerAvailable = func() bool { return !tc.swapDisabledOnNode }
+			m.memorySwapBehavior = string(tc.swapBehavior)
+
+			checkContainer := func(ctr *v1.Container) {
+				require.Equal(t, tc.expectedBehavior[ctr.Name], m.GetContainerSwapBehavior(tc.pod, ctr), "GetContainerSwapBehavior(%s)", ctr.Name)
+				lcr := m.generateLinuxContainerResources(tCtx, tc.pod, ctr, false)
+				require.Equal(t, tc.expectedSwapMax[ctr.Name], lcr.Unified[cm.Cgroup2MaxSwapFilename], "memory.swap.max(%s)", ctr.Name)
+			}
+
+			for i := range tc.pod.Spec.InitContainers {
+				checkContainer(&tc.pod.Spec.InitContainers[i])
+			}
+			for i := range tc.pod.Spec.Containers {
+				checkContainer(&tc.pod.Spec.Containers[i])
+			}
+			for i := range tc.pod.Spec.EphemeralContainers {
+				ec := (*v1.Container)(&tc.pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
+				checkContainer(ec)
+			}
 		})
 	}
 }

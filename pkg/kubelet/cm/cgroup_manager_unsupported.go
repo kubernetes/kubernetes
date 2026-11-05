@@ -93,6 +93,11 @@ func (m *unsupportedCgroupManager) SetCgroupConfig(logger klog.Logger, name Cgro
 	return errNotSupported
 }
 
+const (
+	Cgroup2MaxSwapFilename string = "memory.swap.max"
+	Cgroup2MaxSwapLimit    string = "max"
+)
+
 var RootCgroupName = CgroupName([]string{})
 
 func NewCgroupName(base CgroupName, components ...string) CgroupName {

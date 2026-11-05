@@ -18,6 +18,8 @@ package cm
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -36,7 +38,77 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
+
+// CheckSwapControllerAvailability reports whether the swap cgroup controller is available on the host.
+func CheckSwapControllerAvailability(ctx context.Context, isCgroup2 bool) bool {
+	// See https://github.com/containerd/containerd/pull/7838/
+	logger := klog.FromContext(ctx)
+	const warn = "Failed to detect the availability of the swap controller, assuming not available"
+	p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+	if isCgroup2 {
+		// memory.swap.max does not exist in the cgroup root, so check /sys/fs/cgroup/<SELF>/memory.swap.max.
+		cgroupsMap, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
+		if err != nil {
+			logger.V(5).Info(warn, "err", fmt.Errorf("failed to parse /proc/self/cgroup: %w", err))
+			return false
+		}
+		p = filepath.Join("/sys/fs/cgroup", cgroupsMap[""], Cgroup2MaxSwapFilename)
+	}
+	if _, err := os.Stat(p); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.V(5).Info(warn, "err", err)
+		}
+		return false
+	}
+	return true
+}
+
+// CalcSwapForBurstablePods calculates the proportional swap limit per KEP-2400:
+// (memoryRequest / nodeTotalMemory) * totalPodsSwapAvailable.
+func CalcSwapForBurstablePods(memoryRequest, nodeTotalMemory, totalPodsSwapAvailable int64) (int64, error) {
+	if nodeTotalMemory <= 0 {
+		return 0, fmt.Errorf("total node memory is 0")
+	}
+	if memoryRequest > nodeTotalMemory {
+		return 0, fmt.Errorf("memory request %d is larger than total node memory %d", memoryRequest, nodeTotalMemory)
+	}
+
+	memoryProportion := float64(memoryRequest) / float64(nodeTotalMemory)
+	swapAllocation := memoryProportion * float64(totalPodsSwapAvailable)
+	return int64(swapAllocation), nil
+}
+
+// ApplyPodLevelSwapConfig sets memory.swap.max on the pod cgroup when PodLevelResources
+// is enabled and pod-level resources are set on cgroup v2 with the swap controller available.
+// Container-only pods leave pod cgroup memory.swap.max untouched ("max") per KEP-2400.
+// Skipping when the swap controller is absent avoids libcontainer Unified write failures on swapless kernels.
+func ApplyPodLevelSwapConfig(logger klog.Logger, pod *v1.Pod, rc *ResourceConfig, memorySwapBehavior string, nodeTotalMemory, totalPodsSwapAvailable int64, isCgroup2, swapControllerAvailable bool) {
+	if rc == nil || pod == nil || !isCgroup2 || !swapControllerAvailable ||
+		!utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) ||
+		!resourcehelper.IsPodLevelResourcesSet(pod) {
+		return
+	}
+
+	swapValue := "0"
+	if kubetypes.SwapBehavior(memorySwapBehavior) == kubetypes.LimitedSwap &&
+		utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+		if eligible, podMemoryRequest := IsPodEligibleForSwap(pod); eligible {
+			swapLimit, err := CalcSwapForBurstablePods(podMemoryRequest, nodeTotalMemory, totalPodsSwapAvailable)
+			if err != nil {
+				logger.Error(err, "Cannot calculate pod swap allocation amount; disallowing swap", "pod", klog.KObj(pod))
+			} else {
+				swapValue = strconv.FormatInt(swapLimit, 10)
+			}
+		}
+	}
+
+	if rc.Unified == nil {
+		rc.Unified = map[string]string{}
+	}
+	rc.Unified[Cgroup2MaxSwapFilename] = swapValue
+}
 
 // ApplyPodLevelMemoryHigh sets memory.high on the pod cgroup using the KEP-2570 formula.
 // Applies when PodLevelResources is enabled and the pod has memory limits declared

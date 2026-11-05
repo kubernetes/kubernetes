@@ -19,13 +19,18 @@ limitations under the License.
 package cm
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -292,6 +297,186 @@ func TestGetPodContainerName(t *testing.T) {
 			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
 			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
 			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
+	}
+}
+
+func TestEnsureExistsWithPodLevelSwap(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, true)
+
+	origIsCgroup2 := isCgroup2UnifiedMode
+	t.Cleanup(func() { isCgroup2UnifiedMode = origIsCgroup2 })
+
+	const (
+		gi             = 1024 * 1024 * 1024
+		nodeMem  int64 = 40 * gi
+		nodeSwap int64 = 5 * gi
+	)
+
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+
+	containerStub := NewStubContainerManager()
+
+	burstablePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-1"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+			},
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+	ineligibleBurstablePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-2"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("2Gi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+				},
+			},
+		},
+	}
+
+	containerOnlyBurstablePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-ctr-only"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					},
+				},
+			},
+		},
+	}
+	plrCPUOnlyPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-swap-plr-cpu"},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			},
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+
+	expectedSwapBytes, err := CalcSwapForBurstablePods(2*gi, nodeMem, nodeSwap)
+	require.NoError(t, err)
+	expectedSwap2Gi := strconv.FormatInt(expectedSwapBytes, 10)
+
+	tests := []struct {
+		name                    string
+		pod                     *v1.Pod
+		swapBehavior            string
+		isCgroup2               bool
+		swapControllerAvailable bool
+		expectedSwapMax         *string
+	}{
+		{
+			name:                    "LimitedSwap eligible pod sets proportional memory.swap.max",
+			pod:                     burstablePod,
+			swapBehavior:            string(kubetypes.LimitedSwap),
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         &expectedSwap2Gi,
+		},
+		{
+			name:                    "LimitedSwap ineligible pod (PodMemoryRequest == PodMemoryLimit) sets memory.swap.max to 0",
+			pod:                     ineligibleBurstablePod,
+			swapBehavior:            string(kubetypes.LimitedSwap),
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         new("0"),
+		},
+		{
+			name:                    "LimitedSwap pod with pod-level CPU only and no memory sets memory.swap.max to 0",
+			pod:                     plrCPUOnlyPod,
+			swapBehavior:            string(kubetypes.LimitedSwap),
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         new("0"),
+		},
+		{
+			name:                    "NoSwap sets memory.swap.max to 0 on pod with pod-level resources",
+			pod:                     burstablePod,
+			swapBehavior:            string(kubetypes.NoSwap),
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         new("0"),
+		},
+		{
+			name:                    "container-only pod under LimitedSwap omits pod cgroup memory.swap.max",
+			pod:                     containerOnlyBurstablePod,
+			swapBehavior:            string(kubetypes.LimitedSwap),
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         nil,
+		},
+		{
+			name:                    "container-only pod under NoSwap omits pod cgroup memory.swap.max",
+			pod:                     containerOnlyBurstablePod,
+			swapBehavior:            string(kubetypes.NoSwap),
+			isCgroup2:               true,
+			swapControllerAvailable: true,
+			expectedSwapMax:         nil,
+		},
+		{
+			name:                    "swap controller unavailable omits memory.swap.max",
+			pod:                     burstablePod,
+			swapBehavior:            string(kubetypes.LimitedSwap),
+			isCgroup2:               true,
+			swapControllerAvailable: false,
+			expectedSwapMax:         nil,
+		},
+		{
+			name:                    "cgroup v1 omits memory.swap.max",
+			pod:                     burstablePod,
+			swapBehavior:            string(kubetypes.LimitedSwap),
+			isCgroup2:               false,
+			swapControllerAvailable: true,
+			expectedSwapMax:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isCgroup2UnifiedMode = func() bool { return tt.isCgroup2 }
+			fakeCM := &fakeCgroupManager{}
+			pcm := &podContainerManagerImpl{
+				qosContainersInfo:          qosContainersInfo,
+				cgroupManager:              fakeCM,
+				enforceCPULimits:           true,
+				cpuCFSQuotaPeriod:          QuotaPeriod,
+				podContainerManager:        containerStub,
+				memorySwapBehavior:         tt.swapBehavior,
+				memoryCapacity:             nodeMem,
+				swapCapacity:               nodeSwap,
+				getSwapControllerAvailable: func() bool { return tt.swapControllerAvailable },
+			}
+			require.NoError(t, pcm.EnsureExists(logger, tt.pod))
+			require.Len(t, fakeCM.created, 1)
+			gotUnified := fakeCM.created[0].ResourceParameters.Unified
+			if tt.expectedSwapMax == nil {
+				require.NotContains(t, gotUnified, Cgroup2MaxSwapFilename)
+			} else {
+				require.Equal(t, *tt.expectedSwapMax, gotUnified[Cgroup2MaxSwapFilename])
+			}
 		})
 	}
 }
