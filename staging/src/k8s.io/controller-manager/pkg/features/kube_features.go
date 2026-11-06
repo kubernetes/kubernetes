@@ -61,6 +61,7 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	CloudControllerManagerWatchBasedRoutesReconciliation: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
 	},
 	CloudControllerManagerWebhook: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
