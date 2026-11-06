@@ -151,8 +151,8 @@ type Device struct {
 
 type DeviceCounterConsumption struct {
 	CounterSet          UniqueString
-	Counters            map[string]resourceapi.Counter `json:",omitempty"`
-	CompatibilityGroups []string                       `json:",omitempty"`
+	Counters            map[string]resourceapi.CounterRequirement `json:",omitempty"`
+	CompatibilityGroups []string                                  `json:",omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

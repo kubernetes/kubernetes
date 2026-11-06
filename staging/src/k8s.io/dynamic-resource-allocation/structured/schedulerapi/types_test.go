@@ -83,3 +83,25 @@ func TestNewDeviceConsumedCapacity(t *testing.T) {
 		})
 	}
 }
+
+// TestCounterConsumptionCollectionAdd keeps exact totals and independent snapshot quantities.
+func TestCounterConsumptionCollectionAdd(t *testing.T) {
+	id := DeviceID{Driver: draapi.MakeUniqueString("driver"), Pool: draapi.MakeUniqueString("pool"), Device: draapi.MakeUniqueString("device")}
+	source := []resourceapi.CounterSetConsumption{{CounterSet: "set", Counters: map[string]resource.Quantity{
+		"large": resource.MustParse("10000000000000000000"), "zero": resource.MustParse("0"),
+	}}}
+	collection := CounterConsumptionCollection{id: {Incomplete: true}}
+	collection.Add(id, source)
+	collection.Add(id, source)
+	usage := collection[id]
+	require.True(t, usage.Incomplete)
+	require.Len(t, usage.Counters, 1)
+	large := usage.Counters[0].Counters["large"]
+	require.Zero(t, large.Cmp(resource.MustParse("20000000000000000000")))
+	_, present := usage.Counters[0].Counters["zero"]
+	require.True(t, present)
+	original := source[0].Counters["large"]
+	require.Zero(t, original.Cmp(resource.MustParse("10000000000000000000")))
+	large.Add(resource.MustParse("1"))
+	require.Zero(t, original.Cmp(resource.MustParse("10000000000000000000")))
+}
