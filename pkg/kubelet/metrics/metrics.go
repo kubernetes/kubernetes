@@ -80,6 +80,8 @@ const (
 	CgroupVersionKey           = "cgroup_version"
 	CRILosingSupportKey        = "cri_losing_support"
 
+	SecurityProfilePullDurationKey = "security_profile_pull_duration_seconds"
+
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
@@ -1170,6 +1172,21 @@ var (
 		[]string{"image_size_in_bytes"},
 	)
 
+	// SecurityProfilePullDuration is a Histogram that tracks the duration (in seconds) of
+	// PullSecurityProfile calls, including the time spent in the waiting queue of the puller.
+	// The cached label is true if the runtime served the profile from its storage, and the
+	// result label is "success" or the reason of the failure.
+	SecurityProfilePullDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           SecurityProfilePullDurationKey,
+			Help:           "Duration in seconds to pull a security profile. The 'cached' label is true if the runtime served the profile from its storage; the 'result' label is 'success' or the failure reason: 'registry_unavailable', 'signature_validation_failed', 'security_profile_invalid', 'unauthenticated' or 'other'.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 4, 10),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"cached", "result"},
+	)
+
 	LifecycleHandlerSleepTerminated = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1591,6 +1608,10 @@ func Register() {
 		)
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI) {
+			legacyregistry.MustRegister(SecurityProfilePullDuration)
+		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
