@@ -19,14 +19,18 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -34,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/mount-utils"
 )
 
@@ -56,6 +61,16 @@ type Reconciler interface {
 	// StatesHasBeenSynced returns true only after syncStates process starts to sync
 	// states at least once after kubelet starts
 	StatesHasBeenSynced() bool
+}
+
+// PodGetter looks up active pods known to the kubelet by UID.
+type PodGetter interface {
+	GetPodByUID(types.UID) (*v1.Pod, bool)
+}
+
+// PodStateProvider reports whether a pod's runtime has been torn down.
+type PodStateProvider interface {
+	ShouldPodRuntimeBeRemoved(types.UID) bool
 }
 
 // NewReconciler returns a new instance of Reconciler.
@@ -104,6 +119,46 @@ func NewReconciler(
 	volumePluginMgr *volumepkg.VolumePluginMgr,
 	kubeletPodsDir string,
 	actuatedState state.State) Reconciler {
+	return NewReconcilerWithPodState(
+		kubeClient,
+		controllerAttachDetachEnabled,
+		loopSleepDuration,
+		waitForAttachTimeout,
+		nodeName,
+		desiredStateOfWorld,
+		actualStateOfWorld,
+		populatorHasAddedPods,
+		operationExecutor,
+		mounter,
+		hostutil,
+		volumePluginMgr,
+		kubeletPodsDir,
+		actuatedState,
+		nil,
+		nil)
+}
+
+// NewReconcilerWithPodState returns a Reconciler wired with pod lookup and termination state
+// providers so dynamic non-unmount volumes (such as OCI Image volumes) are neither pruned from
+// actuatedState before DesiredStateOfWorldPopulator observes a newly added volume nor retained
+// after a pod's runtime has terminated.
+func NewReconcilerWithPodState(
+	kubeClient clientset.Interface,
+	controllerAttachDetachEnabled bool,
+	loopSleepDuration time.Duration,
+	waitForAttachTimeout time.Duration,
+	nodeName types.NodeName,
+	desiredStateOfWorld cache.DesiredStateOfWorld,
+	actualStateOfWorld cache.ActualStateOfWorld,
+	populatorHasAddedPods func() bool,
+	operationExecutor operationexecutor.OperationExecutor,
+	mounter mount.Interface,
+	hostutil hostutil.HostUtils,
+	volumePluginMgr *volumepkg.VolumePluginMgr,
+	kubeletPodsDir string,
+	actuatedState state.State,
+	podGetter PodGetter,
+	podStateProvider PodStateProvider) Reconciler {
 	if actuatedState == nil {
 		actuatedState = state.NewNoopStateCheckpoint()
 	}
@@ -123,6 +178,8 @@ func NewReconciler(
 		volumePluginMgr:                 volumePluginMgr,
 		kubeletPodsDir:                  kubeletPodsDir,
 		actuatedState:                   actuatedState,
+		podGetter:                       podGetter,
+		podStateProvider:                podStateProvider,
 		timeOfLastSync:                  time.Time{},
 		volumesFailedReconstruction:     make([]podVolume, 0),
 		volumesNeedUpdateFromNodeStatus: make([]v1.UniqueVolumeName, 0),
@@ -145,6 +202,8 @@ type reconciler struct {
 	skippedDuringReconstruction   map[v1.UniqueVolumeName]*globalVolumeInfo
 	kubeletPodsDir                string
 	actuatedState                 state.State
+	podGetter                     PodGetter
+	podStateProvider              PodStateProvider
 	// lock protects timeOfLastSync for updating and checking
 	timeOfLastSyncLock              sync.Mutex
 	timeOfLastSync                  time.Time
@@ -171,6 +230,51 @@ func (rc *reconciler) unmountVolumes(logger klog.Logger) {
 			}
 		}
 	}
+	// Volumes whose TearDown is a no-op and have no per-pod directory on disk (such as Image
+	// volumes after a kubelet restart) are not reconstructed into actualStateOfWorld, so remove
+	// them from actuatedState once absent from desired and actual state and no longer mounted by
+	// any actuated container.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && rc.actuatedState != nil {
+		for _, uid := range rc.actuatedState.GetPodUIDs() {
+			actuatedPod, ok := rc.actuatedState.GetPodReadOnly(uid)
+			if !ok || actuatedPod == nil {
+				continue
+			}
+			podName := volumetypes.UniquePodName(uid)
+			podRuntimeRemoved := rc.podStateProvider != nil && rc.podStateProvider.ShouldPodRuntimeBeRemoved(uid)
+			var allocatedPod *v1.Pod
+			if !podRuntimeRemoved && rc.podGetter != nil {
+				allocatedPod, _ = rc.podGetter.GetPodByUID(uid)
+			}
+			for _, vol := range actuatedPod.Spec.Volumes {
+				if VolumeRequiresUnmount(vol) {
+					continue
+				}
+				if allocatedPod != nil && slices.ContainsFunc(allocatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vol.Name }) {
+					continue
+				}
+				mountedInActuatedPod := !podRuntimeRemoved && isVolumeMountedInActuatedPod(actuatedPod, vol.Name)
+				if !rc.desiredStateOfWorld.VolumeExistsWithSpecName(podName, vol.Name) &&
+					!rc.actualStateOfWorld.VolumeExistsWithSpecName(podName, vol.Name) &&
+					!mountedInActuatedPod {
+					if err := rc.actuatedState.RemovePodVolume(logger, uid, vol.Name); err != nil {
+						logger.Error(err, "Failed to remove unmounted volume from actuated state", "podUID", uid, "volumeName", vol.Name)
+					} else {
+						logger.Info("Removed unmounted volume from actuated state", "podUID", uid, "volumeName", vol.Name)
+					}
+				}
+			}
+		}
+	}
+}
+
+func isVolumeMountedInActuatedPod(actuatedPod *v1.Pod, volumeName string) bool {
+	for c := range pod.ContainerIter(&actuatedPod.Spec, pod.AllContainers) {
+		if slices.ContainsFunc(c.VolumeMounts, func(vm v1.VolumeMount) bool { return vm.Name == volumeName }) {
+			return true
+		}
+	}
+	return false
 }
 
 func (rc *reconciler) mountOrAttachVolumes(logger klog.Logger) {

@@ -235,8 +235,9 @@ func NewVolumeManager(
 		vm.actualStateOfWorld,
 		csiMigratedPluginManager,
 		intreeToCSITranslator,
-		volumePluginMgr)
-	vm.reconciler = reconciler.NewReconciler(
+		volumePluginMgr,
+		actuatedState)
+	vm.reconciler = reconciler.NewReconcilerWithPodState(
 		kubeClient,
 		controllerAttachDetachEnabled,
 		reconcilerLoopSleepPeriod,
@@ -250,7 +251,9 @@ func NewVolumeManager(
 		hostutil,
 		volumePluginMgr,
 		kubeletPodsDir,
-		actuatedState)
+		actuatedState,
+		podManager,
+		podStateProvider)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		vm.volumeHealthManager = volumehealth.NewManager(
