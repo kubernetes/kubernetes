@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
@@ -80,6 +81,36 @@ func (w *freshnessWaiter) broadcast(resourceVersion uint64) {
 	}
 }
 
+func requestVerb(ctx context.Context) string {
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok && requestInfo != nil {
+		switch requestInfo.Verb {
+		case "get", request.MethodGet:
+			return request.MethodGet
+		case "list", request.MethodList:
+			return request.MethodList
+		case "watch", request.MethodWatch, "watchlist", request.MethodWatchList:
+			return request.MethodWatch
+		case "create", request.MethodCreate:
+			return request.MethodCreate
+		case "update", request.MethodUpdate:
+			return request.MethodUpdate
+		case "patch", request.MethodPatch:
+			return request.MethodPatch
+		case "apply", request.MethodApply:
+			return request.MethodApply
+		case "delete", request.MethodDelete:
+			return request.MethodDelete
+		case "deletecollection", request.MethodDeleteCollection:
+			return request.MethodDeleteCollection
+		case "proxy", request.MethodProxy:
+			return request.MethodProxy
+		case "connect", request.MethodConnect:
+			return request.MethodConnect
+		}
+	}
+	return ""
+}
+
 func (w *freshnessWaiter) waitUntilFreshLockedWithLocker(ctx context.Context, resourceVersion uint64, locker sync.Locker) error {
 	if resourceVersion == 0 || resourceVersion <= w.latestRV {
 		return nil
@@ -89,7 +120,7 @@ func (w *freshnessWaiter) waitUntilFreshLockedWithLocker(ctx context.Context, re
 	startTime := w.clock.Now()
 	defer func() {
 		if resourceVersion > 0 {
-			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.Group, w.groupResource.Resource).Observe(w.clock.Since(startTime).Seconds())
+			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.Group, w.groupResource.Resource, requestVerb(ctx)).Observe(w.clock.Since(startTime).Seconds())
 		}
 	}()
 
