@@ -80,10 +80,6 @@ var (
 	// Enables configuring per-container restart policy and restart policy rules.
 	ContainerRestartRules = framework.WithFeature(framework.ValidFeatures.Add("ContainerRestartRules"))
 
-	// Owner: sig-node
-	// Enables configuring custom stop signals for containers from container lifecycle
-	ContainerStopSignals = framework.WithFeature(framework.ValidFeatures.Add("ContainerStopSignals"))
-
 	// Owner: sig-api-machinery
 	// Marks tests that require coordinated leader election
 	CoordinatedLeaderElection = framework.WithFeature(framework.ValidFeatures.Add("CoordinatedLeaderElection"))
