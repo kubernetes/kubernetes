@@ -27,6 +27,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	admissionauthorizer "k8s.io/apiserver/pkg/admission/plugin/authorizer"
 	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/load"
@@ -99,9 +100,11 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
 		var err error
+		// TODO(luxas): Check if there's some way we can de-duplicate this cached authorizer with what VAP uses.
 		r.builtinConditionsEvaluatorBuilder, err = plugincel.NewAuthorizationConditionsEvaluatorBuilder(
 			config.VersionedInformerFactory,
 			config.KubeClient,
+			admissionauthorizer.NewCachingAuthorizer(r),
 			apiscel.RuntimeCELCostBudget,
 		)
 		if err != nil {

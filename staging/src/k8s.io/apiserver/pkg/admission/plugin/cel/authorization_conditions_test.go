@@ -17,7 +17,6 @@ limitations under the License.
 package cel
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -44,10 +44,10 @@ var defaultNamespace = &corev1.Namespace{
 
 // newTestAuthorizationConditionsEvaluatorBuilder serves namespaces from the fake client, as
 // the informers are never started and the namespace matcher falls back to a live GET.
-func newTestAuthorizationConditionsEvaluatorBuilder(t *testing.T, budget int64, namespaces ...runtime.Object) authorizer.BuiltinConditionsEvaluatorBuilder {
+func newTestAuthorizationConditionsEvaluatorBuilder(t *testing.T, budget int64, authz authorizer.Authorizer, namespaces ...runtime.Object) authorizer.BuiltinConditionsEvaluatorBuilder {
 	t.Helper()
 	client := fake.NewClientset(namespaces...)
-	b, err := NewAuthorizationConditionsEvaluatorBuilder(informers.NewSharedInformerFactory(client, 0), client, budget)
+	b, err := NewAuthorizationConditionsEvaluatorBuilder(informers.NewSharedInformerFactory(client, 0), client, authz, budget)
 	if err != nil {
 		t.Fatalf("NewAuthorizationConditionsEvaluatorBuilder failed: %v", err)
 	}
@@ -267,12 +267,6 @@ func TestAuthorizationConditionsEvaluator_EvaluateCondition(t *testing.T) {
 			costBudget: 1,
 			wantResult: "Error",
 		},
-		{
-			name:       "authorizer variable is undeclared without an authorizer",
-			condition:  celCond("c", "authorizer.group('').resource('pods').namespace('default').check('get').allowed()"),
-			attrs:      podCreateAttributes(),
-			wantResult: "Error",
-		},
 	}
 
 	for _, tc := range tests {
@@ -281,9 +275,12 @@ func TestAuthorizationConditionsEvaluator_EvaluateCondition(t *testing.T) {
 			if budget == 0 {
 				budget = celconfig.RuntimeCELCostBudget
 			}
+			if tc.authz == nil {
+				tc.authz = authorizerfactory.NewAlwaysDenyAuthorizer()
+			}
 
-			builder := newTestAuthorizationConditionsEvaluatorBuilder(t, budget, defaultNamespace)
-			evaluator, err := builder.EvaluatorForData(t.Context(), versioned(t, tc.attrs), tc.authz)
+			builder := newTestAuthorizationConditionsEvaluatorBuilder(t, budget, tc.authz, defaultNamespace)
+			evaluator, err := builder.EvaluatorForData(t.Context(), versioned(t, tc.attrs))
 			if err != nil {
 				t.Fatalf("EvaluatorForData failed: %v", err)
 			}
@@ -298,15 +295,10 @@ func TestAuthorizationConditionsEvaluator_EvaluateCondition(t *testing.T) {
 
 func TestNewAuthorizationConditionsEvaluatorBuilder(t *testing.T) {
 	client := fake.NewClientset()
-	// On error, the builder must be a nil interface, not a non-nil interface holding a nil pointer,
-	// as callers check it against nil to decide whether to try in-process evaluation.
-	// Assigning to an interface-typed variable also catches the constructor returning a concrete type.
-	var b authorizer.BuiltinConditionsEvaluatorBuilder
-	var err error
-	if b, err = NewAuthorizationConditionsEvaluatorBuilder(nil, client, celconfig.RuntimeCELCostBudget); err == nil || b != nil {
+	if b, err := NewAuthorizationConditionsEvaluatorBuilder(nil, client, nil, celconfig.RuntimeCELCostBudget); err == nil || b != nil {
 		t.Errorf("expected an error and a nil builder for a nil informer factory, got err=%v, builder=%#v", err, b)
 	}
-	if b, err = NewAuthorizationConditionsEvaluatorBuilder(informers.NewSharedInformerFactory(client, 0), nil, celconfig.RuntimeCELCostBudget); err == nil || b != nil {
+	if b, err := NewAuthorizationConditionsEvaluatorBuilder(informers.NewSharedInformerFactory(client, 0), nil, nil, celconfig.RuntimeCELCostBudget); err == nil || b != nil {
 		t.Errorf("expected an error and a nil builder for a nil client, got err=%v, builder=%#v", err, b)
 	}
 }
@@ -350,8 +342,8 @@ func TestAuthorizationConditionsEvaluatorBuilder_EvaluatorForData(t *testing.T) 
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			builder := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget, tc.namespaces...)
-			_, err := builder.EvaluatorForData(t.Context(), tc.data, nil)
+			builder := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget, authorizerfactory.NewAlwaysDenyAuthorizer(), tc.namespaces...)
+			_, err := builder.EvaluatorForData(t.Context(), tc.data)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("got err=%v, wantErr=%v", err, tc.wantErr)
 			}
@@ -359,34 +351,12 @@ func TestAuthorizationConditionsEvaluatorBuilder_EvaluatorForData(t *testing.T) 
 	}
 }
 
-func TestAuthorizationConditionsEvaluator_CachesAuthorizerChecks(t *testing.T) {
-	calls := 0
-	authz := authorizer.AuthorizerFunc(func(context.Context, authorizer.Attributes) (authorizer.Decision, string, error) {
-		calls++
-		return authorizer.DecisionAllow, "", nil
-	})
-	builder := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget, defaultNamespace)
-	evaluator, err := builder.EvaluatorForData(t.Context(), versioned(t, podCreateAttributes()), authz)
-	if err != nil {
-		t.Fatalf("EvaluatorForData failed: %v", err)
-	}
-	check := "authorizer.group('').resource('pods').namespace('default').check('get').allowed()"
-	for _, id := range []string{"a", "b"} {
-		if got := evalResultString(evaluator.EvaluateCondition(t.Context(), celCond(id, check))); got != "True" {
-			t.Errorf("condition %s: got %s, want True", id, got)
-		}
-	}
-	if calls != 1 {
-		t.Errorf("expected the API server authorizer to be called once for identical checks, got %d calls", calls)
-	}
-}
-
 func TestAuthorizationConditionsEvaluator_AggregateCostBudget(t *testing.T) {
 	cond := celCond("c", "object.spec.nodeName == 'node1'")
 
 	// Measure the cost of a single evaluation, so the budget below fits exactly one.
-	measuring := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget, defaultNamespace)
-	evaluator, err := measuring.EvaluatorForData(t.Context(), versioned(t, podCreateAttributes()), nil)
+	measuring := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget, authorizerfactory.NewAlwaysDenyAuthorizer(), defaultNamespace)
+	evaluator, err := measuring.EvaluatorForData(t.Context(), versioned(t, podCreateAttributes()))
 	if err != nil {
 		t.Fatalf("EvaluatorForData failed: %v", err)
 	}
@@ -398,9 +368,9 @@ func TestAuthorizationConditionsEvaluator_AggregateCostBudget(t *testing.T) {
 		t.Fatalf("expected a positive evaluation cost, got %d", cost)
 	}
 
-	builder := newTestAuthorizationConditionsEvaluatorBuilder(t, cost+cost/2, defaultNamespace)
+	builder := newTestAuthorizationConditionsEvaluatorBuilder(t, cost+cost/2, authorizerfactory.NewAlwaysDenyAuthorizer(), defaultNamespace)
 	newEvaluator := func() authorizer.BuiltinConditionsEvaluator {
-		e, err := builder.EvaluatorForData(t.Context(), versioned(t, podCreateAttributes()), nil)
+		e, err := builder.EvaluatorForData(t.Context(), versioned(t, podCreateAttributes()))
 		if err != nil {
 			t.Fatalf("EvaluatorForData failed: %v", err)
 		}
@@ -426,7 +396,7 @@ func TestAuthorizationConditionsEvaluator_AggregateCostBudget(t *testing.T) {
 }
 
 func TestAuthorizationConditionsEvaluatorBuilder_Recognizes(t *testing.T) {
-	builder := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget)
+	builder := newTestAuthorizationConditionsEvaluatorBuilder(t, celconfig.RuntimeCELCostBudget, authorizerfactory.NewAlwaysDenyAuthorizer())
 	tests := []struct {
 		name      string
 		condition authorizer.Condition

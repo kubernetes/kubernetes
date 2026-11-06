@@ -47,7 +47,6 @@ import (
 	authorizationvalidation "k8s.io/apiserver/pkg/apis/authorization/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -438,22 +437,15 @@ func (w *WebhookAuthorizer) EvaluateConditions(ctx context.Context, decisionToEv
 		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("data must be non-nil in EvaluateConditions")
 	}
 
-	possiblyEvaluatedDecision := w.tryEvaluateUsingBuiltins(ctx, decisionToEvaluate, data)
-	// If we were successful in evaluating the conditions in-process to Allow/Deny/NoOpinion, return that
-	if possiblyEvaluatedDecision.IsUnconditional() {
-		return possiblyEvaluatedDecision.UnconditionalPartsOrError()
-	}
-	// Otherwise, webhook using the (possibly refined) ConditionsMap/Union decision
-	// Break this out into another function so there cannot be any confusion on whether
-	// to use the "original" or "possibly refined" decision, as we should always use the latter.
-	return w.webhookEvaluateConditions(ctx, possiblyEvaluatedDecision, data)
-}
-
-// webhookEvaluateConditions sends the conditional decisionToEvaluate to the webhook for evaluation.
-func (w *WebhookAuthorizer) webhookEvaluateConditions(ctx context.Context, decisionToEvaluate authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
 	// Fail closed when evaluation is not supported
 	if w.authorizationConditionsReviewer == nil {
 		return decisionToEvaluate.FailureDecision(), "failed closed", fmt.Errorf("no authorization conditions review client configured for the webhook authorizer, cannot evaluate conditions")
+	}
+
+	decisionToEvaluate, unconditional := w.tryEvaluateUsingBuiltins(ctx, decisionToEvaluate, data)
+	// If we were successful in evaluating the conditions in-process to an unconditional Allow/Deny/NoOpinion, return that
+	if unconditional {
+		return decisionToEvaluate.UnconditionalPartsOrError()
 	}
 
 	r := &authorizationv1alpha1.AuthorizationConditionsReview{
@@ -947,24 +939,24 @@ func v1ExtraToV1beta1Extra(in map[string]authorizationv1.ExtraValue) map[string]
 }
 
 // tryEvaluateUsingBuiltins evaluates as much as possible of the conditional decision in-process using builtinConditionsEvaluatorBuilder.
-// If the decision cannot be fully evaluated, a possibly refined decision is returned, to be evaluated by the webhook.
-func (w *WebhookAuthorizer) tryEvaluateUsingBuiltins(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) authorizer.ConditionsAwareDecision {
+// If the decision cannot be fully evaluated to unconditional (bool=true), a possibly refined decision and false is returned, to be evaluated by the webhook.
+func (w *WebhookAuthorizer) tryEvaluateUsingBuiltins(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.ConditionsAwareDecision, bool) {
 	if w.builtinConditionsEvaluatorBuilder == nil {
-		return unevaluatedDecision // no simplification possible, perform webhook
+		return unevaluatedDecision, false // no simplification possible, perform webhook
 	}
 	// Skip building the evaluator (e.g. namespace lookup and CEL activation setup) when it cannot make progress.
 	if !authorizer.CouldBenefitFromBuiltinEvaluation(unevaluatedDecision, w.builtinConditionsEvaluatorBuilder.Recognizes) {
-		return unevaluatedDecision
-	}
-	// The API server's authorizer, as set by WithConditionsAwareAuthorization, not w itself.
-	authz, _, _ := request.ConditionallyAuthorizedDecisionFrom(ctx)
-	builtinConditionsEvaluator, err := w.builtinConditionsEvaluatorBuilder.EvaluatorForData(ctx, data, authz)
-	if err != nil {
-		klog.Warningf("unexpected error from builtinConditionsEvaluatorBuilder.EvaluatorForData: %v", err)
-		return unevaluatedDecision // no simplification possible, perform webhook
+		return unevaluatedDecision, false
 	}
 
-	return authorizer.PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedDecision, data, func(ctx context.Context, cond authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
+	builtinConditionsEvaluator, err := w.builtinConditionsEvaluatorBuilder.EvaluatorForData(ctx, data)
+	if err != nil {
+		// TODO(luxas): Add metrics for how many times this error occurred, should be zero.
+		klog.Warningf("unexpected error from builtinConditionsEvaluatorBuilder.EvaluatorForData: %v", err)
+		return unevaluatedDecision, false // no simplification possible, perform webhook
+	}
+
+	evaluatedDecision := authorizer.PartiallyEvaluateConditionsAwareDecision(ctx, unevaluatedDecision, data, func(ctx context.Context, cond authorizer.Condition, data authorizer.ConditionsData) authorizer.ConditionEvaluationResult {
 		res := builtinConditionsEvaluator.EvaluateCondition(ctx, cond)
 		// Builtin evaluation could fail e.g. due to version skew, when the authorizer e.g. uses a newer CEL environment with a function/variable
 		// that the builtin CEL evaluator wouldn't recognize. In that case, builtin evaluation would fail, even though evaluation would succeed
@@ -974,4 +966,5 @@ func (w *WebhookAuthorizer) tryEvaluateUsingBuiltins(ctx context.Context, uneval
 		}
 		return res // True/False/Unevaluatable
 	})
+	return evaluatedDecision, evaluatedDecision.IsUnconditional()
 }

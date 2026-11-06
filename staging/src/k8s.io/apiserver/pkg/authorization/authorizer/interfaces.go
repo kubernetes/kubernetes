@@ -346,7 +346,14 @@ type ConditionsData interface {
 
 // ConditionTypeAuthorizationCEL is a well-known conditions type for the CEL environment of the kube-apiserver,
 // for authorization conditions evaluation.
-// This CEL environment strives to be equal to the ValidationAdmissionPolicy CEL environment.
+// This CEL environment contains the same variables as ValidatingAdmissionPolicy, minus the params variable.
+// This means in practice:
+// - 'object' - The object from the incoming request. The value is null for DELETE requests.
+// - 'oldObject' - The existing object. The value is null for CREATE requests.
+// - 'request' - Attributes of the admission request.
+// - 'namespaceObject' - The namespace, as a Kubernetes resource, that the incoming object belongs to. The value is null if the incoming object is cluster-scoped.
+// - 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (authenticated user) of the request. See AuthzSelectors and Authz in the Kubernetes CEL library documentation for more details.
+// - 'authorizer.requestResource' - A shortcut for an authorization check configured with the request resource (group, resource, (subresource), namespace, name).
 const ConditionTypeAuthorizationCEL = "authorizer.kubernetes.io/cel"
 
 // BuiltinConditionsEvaluatorBuilder builds an in-process conditions evaluator for the given data.
@@ -360,16 +367,14 @@ type BuiltinConditionsEvaluatorBuilder interface {
 
 	// EvaluatorForData returns a BuiltinConditionsEvaluator from the given ConditionsData,
 	// in order to initialize an evaluation environment only once.
-	// apiServerAuthorizer is the API server's authorizer (not the authorizer that authored the condition), which
-	// conditions may use for compound authorization, like in ValidatingAdmissionPolicy. It may be nil.
-	EvaluatorForData(ctx context.Context, data ConditionsData, apiServerAuthorizer Authorizer) (BuiltinConditionsEvaluator, error)
+	EvaluatorForData(ctx context.Context, data ConditionsData) (BuiltinConditionsEvaluator, error)
 }
 
 // BuiltinConditionsEvaluator might allow in-process evaluation of a condition of a
 // certain type, in the context of a given ConditionsData.
-// If the condition type is not handled, return ConditionsEvaluationResultUnevaluatable().
+// Because of the ConditionsData scope, an evaluator is scoped to a request.
 // Implementations may keep state across EvaluateCondition calls, e.g. an aggregate cost budget,
-// so an evaluator is scoped to one evaluation and need not be safe for concurrent use.
+// and should thus be safe for concurrent use.
 type BuiltinConditionsEvaluator interface {
 	// EvaluateCondition evaluates a single condition in the current ConditionsData context
 	// into a ConditionEvaluationResult if possible, or returns ConditionsEvaluationResultUnevaluatable().

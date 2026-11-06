@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	admissionauthorizer "k8s.io/apiserver/pkg/admission/plugin/authorizer"
 	namespacematcher "k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -37,10 +36,16 @@ import (
 
 // NewAuthorizationConditionsEvaluatorBuilder creates a new authorizer.BuiltinConditionsEvaluatorBuilder that can evaluate
 // authorizer.ConditionTypeAuthorizationCEL-typed conditions.
+//
+// apiServerAuthorizer is required, but can be set to nil initially, and then be lazily initialized through the SetAuthorizer function.
+// Only unconditional authorization is supported for compound authorization checks.
+//
 // runtimeCELCostBudget is shared by all conditions evaluated by one evaluator from EvaluatorForData, like the
 // per-binding budget of ValidatingAdmissionPolicy.
 // runtimeCELCostBudget was added for testing purpose only. Callers should always use const RuntimeCELCostBudget from k8s.io/apiserver/pkg/apis/cel/config.go as input.
-func NewAuthorizationConditionsEvaluatorBuilder(informerFactory informers.SharedInformerFactory, client kubernetes.Interface, runtimeCELCostBudget int64) (authorizer.BuiltinConditionsEvaluatorBuilder, error) {
+//
+// Note: the cel compiler construction depends on feature gates and the compatibility version to be initialized.
+func NewAuthorizationConditionsEvaluatorBuilder(informerFactory informers.SharedInformerFactory, client kubernetes.Interface, apiServerAuthorizer authorizer.UnconditionalAuthorizer, runtimeCELCostBudget int64) (*AuthorizationConditionsEvaluatorBuilder, error) {
 	if informerFactory == nil {
 		return nil, fmt.Errorf("NewAuthorizationConditionsEvaluator: informerFactory is required")
 	}
@@ -48,36 +53,50 @@ func NewAuthorizationConditionsEvaluatorBuilder(informerFactory informers.Shared
 		return nil, fmt.Errorf("NewAuthorizationConditionsEvaluator: client is required")
 	}
 
-	return &celAuthorizationConditionsEvaluatorBuilder{
+	return &AuthorizationConditionsEvaluatorBuilder{
 		compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
 		nsmatcher: &namespacematcher.Matcher{
 			NamespaceLister: informerFactory.Core().V1().Namespaces().Lister(),
 			Client:          client,
 		},
+		apiServerAuthorizer:  apiServerAuthorizer,
 		runtimeCELCostBudget: runtimeCELCostBudget,
 	}, nil
 }
 
-var _ authorizer.BuiltinConditionsEvaluatorBuilder = &celAuthorizationConditionsEvaluatorBuilder{}
+var _ authorizer.BuiltinConditionsEvaluatorBuilder = &AuthorizationConditionsEvaluatorBuilder{}
 
-type celAuthorizationConditionsEvaluatorBuilder struct {
+type AuthorizationConditionsEvaluatorBuilder struct {
 	compiler             Compiler
 	nsmatcher            *namespacematcher.Matcher
+	apiServerAuthorizer  authorizer.UnconditionalAuthorizer
 	runtimeCELCostBudget int64
+}
+
+// SetAuthorizer updates the authorizer that is used in EvaluatorForData. It must be non-nil.
+func (b *AuthorizationConditionsEvaluatorBuilder) SetAuthorizer(apiServerAuthorizer authorizer.UnconditionalAuthorizer) {
+	b.apiServerAuthorizer = apiServerAuthorizer
 }
 
 // Recognizes returns true for non-empty conditions of type authorizer.ConditionTypeAuthorizationCEL.
 // It's generally valid for condition strings to be empty, if the semantics of the condition is
 // clear from its (required) ID. However, the CEL evaluator cannot evaluate empty condition strings.
-func (b *celAuthorizationConditionsEvaluatorBuilder) Recognizes(condition authorizer.Condition) bool {
+func (b *AuthorizationConditionsEvaluatorBuilder) Recognizes(condition authorizer.Condition) bool {
 	return condition.GetType() == authorizer.ConditionTypeAuthorizationCEL && len(strings.TrimSpace(condition.GetCondition())) != 0
 }
 
-func (b *celAuthorizationConditionsEvaluatorBuilder) EvaluatorForData(ctx context.Context, data authorizer.ConditionsData, apiServerAuthorizer authorizer.Authorizer) (authorizer.BuiltinConditionsEvaluator, error) {
+func (b *AuthorizationConditionsEvaluatorBuilder) EvaluatorForData(ctx context.Context, data authorizer.ConditionsData) (authorizer.BuiltinConditionsEvaluator, error) {
 	if data == nil {
 		return nil, fmt.Errorf("programmer error: data is required")
 	}
 
+	if b.apiServerAuthorizer == nil {
+		return nil, fmt.Errorf("AuthorizationConditionsEvaluatorBuilder hasn't yet been initialized with SetAuthorizer")
+	}
+
+	// TODO(luxas): We know the AuthorizationConditionsEnforcer plugin provides this struct for now, and thus it works.
+	// However, follow up on lazily calling NewVersionedAttributes, when NewVersionedAttributes and ConvertToGVK accept
+	// a smaller interface than ObjectInterfaces, such that we could construct a no-op converter at this layer and pass it.
 	versionedAttrs, ok := data.(*admission.VersionedAttributes)
 	if !ok {
 		return nil, fmt.Errorf("in-process conditions evaluation only supported when data is of type *admission.VersionedAttributes")
@@ -95,26 +114,27 @@ func (b *celAuthorizationConditionsEvaluatorBuilder) EvaluatorForData(ctx contex
 
 	// Like ValidatingAdmissionPolicy, cache authorizer checks for the duration of the request, so that multiple
 	// conditions doing the same check get a consistent answer and don't each run the whole authorizer chain.
-	var authz authorizer.UnconditionalAuthorizer
-	if apiServerAuthorizer != nil {
-		authz = admissionauthorizer.NewCachingAuthorizer(apiServerAuthorizer)
-	}
+	varBindings := OptionalVariableBindings{VersionedParams: nil, Authorizer: b.apiServerAuthorizer}
 
-	activation, err := newActivation(compositionCtx, versionedAttrs, admissionRequest, OptionalVariableBindings{VersionedParams: nil, Authorizer: authz}, ns, useSchemalessTypeRef())
+	activation, err := newActivation(compositionCtx, versionedAttrs, admissionRequest, varBindings, ns, useSchemalessTypeRef())
 	if err != nil {
 		return nil, err
 	}
 
 	return &celAuthorizationConditionsEvaluator{
-		builder:           b,
-		activation:        activation,
-		optionalVarsDecls: OptionalVariableDeclarations{HasParams: false, HasAuthorizer: apiServerAuthorizer != nil},
-		remainingBudget:   b.runtimeCELCostBudget,
+		builder:    b,
+		activation: activation,
+		optionalVarsDecls: OptionalVariableDeclarations{
+			HasParams:     false,
+			HasAuthorizer: b.apiServerAuthorizer != nil, // Written in a generic form, but in practice always true as we require it to be non-nil above.
+		},
+		remainingBudget: b.runtimeCELCostBudget,
 	}, nil
 }
 
 // getNamespace exactly mirrors the similar logic in VAP
-func (b *celAuthorizationConditionsEvaluatorBuilder) getNamespace(ctx context.Context, attrs admission.Attributes) (*v1.Namespace, error) {
+// TODO(luxas): Try to de-duplicate this with VAP.
+func (b *AuthorizationConditionsEvaluatorBuilder) getNamespace(ctx context.Context, attrs admission.Attributes) (*v1.Namespace, error) {
 	var namespace *v1.Namespace
 	var err error
 	namespaceName := attrs.GetNamespace()
@@ -139,7 +159,7 @@ func (b *celAuthorizationConditionsEvaluatorBuilder) getNamespace(ctx context.Co
 
 // celAuthorizationConditionsEvaluator is not safe for concurrent use, as it tracks the remaining cost budget.
 type celAuthorizationConditionsEvaluator struct {
-	builder           *celAuthorizationConditionsEvaluatorBuilder
+	builder           *AuthorizationConditionsEvaluatorBuilder
 	optionalVarsDecls OptionalVariableDeclarations
 	activation        *evaluationActivation
 	// remainingBudget is negative once the budget has been exhausted.
@@ -160,6 +180,7 @@ func (e *celAuthorizationConditionsEvaluator) EvaluateCondition(ctx context.Cont
 		})
 	}
 
+	// TODO(luxas): Add metrics for request-aggregated authorization condition compile and evaluation (both separately).
 	compiledExpr := e.builder.compiler.CompileCELExpression(validationCondition(condition.GetCondition()), e.optionalVarsDecls, environment.StoredExpressions)
 
 	// if this activation supports composition, we will need the compositionCtx. It may be nil.
