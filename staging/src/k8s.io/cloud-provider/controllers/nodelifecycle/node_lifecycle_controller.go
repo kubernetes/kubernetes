@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	"k8s.io/cloud-provider/events"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
@@ -44,9 +45,6 @@ import (
 )
 
 const (
-	deleteNodeEvent       = "DeletingNode"
-	deleteNodeFailedEvent = "DeletingNodeFailed"
-
 	instanceExistsOp   = "instance_exists"
 	instanceShutdownOp = "instance_shutdown"
 	instanceMetadataOp = "instance_metadata"
@@ -189,12 +187,12 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 				Namespace:  "",
 			}
 
-			c.recorder.Eventf(ref, v1.EventTypeNormal, deleteNodeEvent,
+			c.recorder.Eventf(ref, v1.EventTypeNormal, events.DeletingNode,
 				"Deleting node %s because it does not exist in the cloud provider", node.Name)
 
 			if err := c.kubeClient.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{}); err != nil {
 				klog.Errorf("unable to delete node %q: %v", node.Name, err)
-				c.recorder.Eventf(ref, v1.EventTypeWarning, deleteNodeFailedEvent,
+				c.recorder.Eventf(ref, v1.EventTypeWarning, events.DeletingNodeFailed,
 					"Failed deleting node %s: %v", node.Name, err)
 			}
 		} else {
