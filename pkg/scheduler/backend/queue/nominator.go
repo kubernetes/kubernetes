@@ -36,6 +36,11 @@ type nominationChange struct {
 	pod         *v1.Pod
 	oldNodeName string
 	newNodeName string
+	// ownCycle is true if the scheduling cycle of the pod made the change,
+	// by nominating it, clearing its nomination or assuming it, and false
+	// for changes of the pod object, for example by preemption for another
+	// pod.
+	ownCycle bool
 }
 
 // nominator is a structure that stores pods nominated to run on nodes.
@@ -90,12 +95,12 @@ func newPodNominator(podLister listersv1.PodLister, draPreemption bool) *nominat
 // recordChangeUnlocked records a change if the pod is not nominated to
 // oldNodeName anymore. Removing and re-adding the same nomination, which the
 // nominator does for every update of a pod, is not a change.
-func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string) {
+func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string, ownCycle bool) {
 	if !npm.draPreemption {
 		return
 	}
 	if newNodeName := npm.nominatedPodToNode[pod.UID]; newNodeName != oldNodeName {
-		npm.changes = append(npm.changes, nominationChange{pod: pod, oldNodeName: oldNodeName, newNodeName: newNodeName})
+		npm.changes = append(npm.changes, nominationChange{pod: pod, oldNodeName: oldNodeName, newNodeName: newNodeName, ownCycle: ownCycle})
 	}
 }
 
@@ -121,9 +126,9 @@ func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomina
 		// An explicit nomination to the same node may come with resources
 		// selected anew (AllocationExtensions.PrepareAllocation), so it
 		// replaces the previous nomination.
-		npm.changes = append(npm.changes, nominationChange{pod: pi.GetPod(), oldNodeName: oldNodeName, newNodeName: oldNodeName})
+		npm.changes = append(npm.changes, nominationChange{pod: pi.GetPod(), oldNodeName: oldNodeName, newNodeName: oldNodeName, ownCycle: true})
 	} else {
-		npm.recordChangeUnlocked(pi.GetPod(), oldNodeName)
+		npm.recordChangeUnlocked(pi.GetPod(), oldNodeName, true)
 	}
 	if npm.draPreemption {
 		npm.expectUnlocked(pi.GetPod(), nominatingInfo)
@@ -257,7 +262,7 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	oldNodeName := npm.nominatedPodToNode[oldPod.UID]
 	npm.deleteUnlocked(oldPod)
 	npm.addNominatedPodUnlocked(logger, newPodInfo, nominatingInfo)
-	npm.recordChangeUnlocked(newPodInfo.GetPod(), oldNodeName)
+	npm.recordChangeUnlocked(newPodInfo.GetPod(), oldNodeName, false)
 }
 
 // DeleteNominatedPodIfExists deletes <pod> from nominatedPods.
@@ -266,7 +271,7 @@ func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
 	oldNodeName := npm.nominatedPodToNode[pod.UID]
 	npm.deleteUnlocked(pod)
 	delete(npm.expected, pod.UID)
-	npm.recordChangeUnlocked(pod, oldNodeName)
+	npm.recordChangeUnlocked(pod, oldNodeName, true)
 	npm.nLock.Unlock()
 }
 
