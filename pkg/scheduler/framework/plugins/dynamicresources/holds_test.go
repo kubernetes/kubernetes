@@ -323,7 +323,7 @@ func testHoldsConsumableCapacity(tCtx ktesting.TContext) {
 			reserve(st.FromResourceClaim(request("v-claim", "40Gi")).Allocation(share("v", "40Gi")).Obj(), v),
 		}, slice("80Gi"), vx, v, px, p, low)
 		nominate(tCtx, testCtx, px, nodeName, vx)
-		testCtx.p.RemoveNominatedPod(tCtx, px, "", false)
+		testCtx.p.RemoveNominatedPod(tCtx, px, "")
 		nominate(tCtx, testCtx, p, nodeName, v)
 		updateClaim(tCtx, testCtx, "v-claim", func(claim *resourceapi.ResourceClaim) {
 			claim.Status.ReservedFor = nil
@@ -331,7 +331,7 @@ func testHoldsConsumableCapacity(tCtx ktesting.TContext) {
 		})
 
 		require.False(tCtx, fits(tCtx, testCtx, low), "low priority pod")
-		testCtx.p.RemoveNominatedPod(tCtx, p, "", false)
+		testCtx.p.RemoveNominatedPod(tCtx, p, "")
 		require.True(tCtx, fits(tCtx, testCtx, low), "without the hold")
 	})
 
@@ -417,7 +417,7 @@ func testJoinVictimClaim(tCtx ktesting.TContext) {
 
 	tCtx.Run("nomination-ended", func(tCtx ktesting.TContext) {
 		testCtx := setup(tCtx)
-		testCtx.p.RemoveNominatedPod(tCtx, preemptor, "", false)
+		testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
 		_, status := filter(tCtx, testCtx, replacement)
 		require.True(tCtx, status.IsSuccess(), "Filter: %v", status)
 	})
@@ -449,13 +449,13 @@ func testHoldReleaseEvents(tCtx ktesting.TContext) {
 	}{
 		"deleted": {
 			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				testCtx.p.RemoveNominatedPod(tCtx, preemptor, "", false)
+				testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
 			},
 			wantEvents: []event{{device: "gpu-0", holder: preemptor.UID, priority: 100}},
 		},
 		"stale-node": {
 			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				testCtx.p.RemoveNominatedPod(tCtx, preemptor, node2Name, false)
+				testCtx.p.RemoveNominatedPod(tCtx, preemptor, node2Name)
 			},
 		},
 		"assumed-with-held-devices": {
@@ -465,7 +465,7 @@ func testHoldReleaseEvents(tCtx ktesting.TContext) {
 				claim = claim.DeepCopy()
 				claim.Status.Allocation = preemptionAllocation("gpu-0")
 				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
-				testCtx.p.RemoveNominatedPod(tCtx, fromPod(preemptor).Node(nodeName).Obj(), "", false)
+				testCtx.p.RemoveNominatedPod(tCtx, fromPod(preemptor).Node(nodeName).Obj(), "")
 			},
 		},
 		"assumed-with-other-devices": {
@@ -475,7 +475,7 @@ func testHoldReleaseEvents(tCtx ktesting.TContext) {
 				claim = claim.DeepCopy()
 				claim.Status.Allocation = preemptionAllocation("gpu-1")
 				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
-				testCtx.p.RemoveNominatedPod(tCtx, fromPod(preemptor).Node(nodeName).Obj(), "", false)
+				testCtx.p.RemoveNominatedPod(tCtx, fromPod(preemptor).Node(nodeName).Obj(), "")
 			},
 			wantEvents: []event{{device: "gpu-0", holder: preemptor.UID, priority: 100}},
 		},
@@ -541,7 +541,7 @@ func testNominationWithoutHold(tCtx ktesting.TContext) {
 	status = filterBothPasses(tCtx, testCtx, state, replacement)
 	require.Equal(tCtx, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "resourceclaim of preempted pods is being deallocated"), status, "Filter of a pod which uses the claim of the victim")
 
-	testCtx.p.RemoveNominatedPod(tCtx, preemptor, "", false)
+	testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
 	require.Zero(tCtx, events, "release events")
 }
 
@@ -663,8 +663,8 @@ func testHoldsConcurrency(tCtx ktesting.TContext) {
 	})
 	wg.Go(func() {
 		for range 10 {
-			testCtx.p.RemoveNominatedPod(tCtx, preemptors[1], "", false)
-			testCtx.p.AddNominatedPod(tCtx, nominationStates[1], preemptors[1], nodes[1].Name, []*v1.Pod{victims[1]})
+			testCtx.p.RemoveNominatedPod(tCtx, preemptors[1], "")
+			testCtx.p.AddNominatedPod(tCtx, nominationStates[1], preemptors[1], nodes[1].Name)
 		}
 	})
 	wg.Wait()

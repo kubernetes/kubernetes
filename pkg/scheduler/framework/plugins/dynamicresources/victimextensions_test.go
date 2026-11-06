@@ -200,7 +200,7 @@ func testPodEligibleToPreempt(tCtx ktesting.TContext) {
 		"nomination-ended": {
 			// The claim still blocks the node.
 			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				testCtx.p.RemoveNominatedPod(tCtx, preemptor, "", false)
+				testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
 			},
 			nodeName:   nodeName,
 			wantReason: notEligible,
@@ -273,7 +273,7 @@ func testPodEligibleToPreempt(tCtx ktesting.TContext) {
 				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(pendingClaim.UID, pendingClaim))
 			}
 			if tc.preemptionFailed {
-				nominateWithoutVictims(tCtx, testCtx, preemptor, nodeName, victim)
+				nominateWithoutAssume(tCtx, testCtx, preemptor, nodeName, victim)
 			} else {
 				nominate(tCtx, testCtx, preemptor, nodeName, victim)
 			}

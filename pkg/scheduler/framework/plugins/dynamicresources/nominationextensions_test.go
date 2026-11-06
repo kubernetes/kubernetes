@@ -17,6 +17,7 @@ limitations under the License.
 package dynamicresources
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -64,23 +65,41 @@ func setupNominations(tCtx ktesting.TContext, claims []*resourceapi.ResourceClai
 	return testCtx
 }
 
-// nominate runs PreFilter for the preemptor, AddNominatedPod and then
-// AssumeVictim for each victim, like a successful preemption.
+// nominate runs PreFilter for the preemptor, simulates the removal of the
+// victims, calls AddNominatedPod and then AssumeVictim for each victim, like
+// a successful preemption.
 func nominate(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
-	state := nominateWithoutVictims(tCtx, testCtx, preemptor, nodeName, victims...)
+	state := nominateWithoutAssume(tCtx, testCtx, preemptor, nodeName, victims...)
 	for _, victim := range victims {
 		testCtx.p.AssumeVictim(tCtx, victim)
 	}
 	return state
 }
 
-// nominateWithoutVictims is nominate for a preemption which failed to
+// nominateWithoutAssume is nominate for a preemption which failed to
 // preempt the victims.
-func nominateWithoutVictims(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
+func nominateWithoutAssume(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
+	tCtx.Helper()
 	state := framework.NewCycleState()
 	_, status := testCtx.p.PreFilter(tCtx, state, preemptor, testCtx.nodeInfos)
 	require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
-	testCtx.p.AddNominatedPod(tCtx, state, preemptor, nodeName, victims)
+	var nodeInfo fwk.NodeInfo
+	for _, info := range testCtx.nodeInfos {
+		if info.Node().Name == nodeName {
+			nodeInfo = info
+		}
+	}
+	require.NotNil(tCtx, nodeInfo, "node %s", nodeName)
+	// Like the dry run of preemption, which ends with Filter on a copy of
+	// the state without the victims. Whether the pod fits does not matter.
+	sim := state.Clone()
+	for _, victim := range victims {
+		podInfo, err := framework.NewPodInfo(victim)
+		tCtx.ExpectNoError(err)
+		require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo, nodeInfo).IsSuccess(), "RemovePod")
+	}
+	_ = testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo)
+	testCtx.p.AddNominatedPod(tCtx, state, preemptor, nodeName)
 	return state
 }
 
@@ -146,6 +165,73 @@ func TestAddNominatedPod(t *testing.T) {
 	testAddNominatedPod(ktesting.Init(t))
 }
 
+func TestAddNominatedPodAfterReprieve(t *testing.T) {
+	testAddNominatedPodAfterReprieve(ktesting.Init(t))
+}
+
+// testAddNominatedPodAfterReprieve checks that AddNominatedPod gets the
+// victims which SelectVictimsOnNode ends up with, also if the last Filter ran
+// on a copy made by RunFilterPluginsWithNominatedPods for a victim which did
+// not get reprieved.
+func testAddNominatedPodAfterReprieve(tCtx ktesting.TContext) {
+	slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Obj()
+	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
+	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
+	victim2 := preemptionPod("victim2", "victim-claim-2").Node(nodeName).Obj()
+	claims := []*resourceapi.ResourceClaim{
+		preemptionClaim("preemptor-claim").Obj(),
+		reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("instance-1")).Obj(), victim),
+		reserve(preemptionClaim("victim-claim-2").Allocation(preemptionAllocation("instance-2")).Obj(), victim2),
+	}
+	podInfo := func(pod *v1.Pod) fwk.PodInfo {
+		podInfo, err := framework.NewPodInfo(pod)
+		tCtx.ExpectNoError(err)
+		return podInfo
+	}
+	victimsOf := func(testCtx *testContext) []string {
+		var names []string
+		for _, name := range testCtx.p.nominations.nomination(preemptor.UID).victims {
+			names = append(names, name.Name)
+		}
+		slices.Sort(names)
+		return names
+	}
+
+	for name, tc := range map[string]struct {
+		reprieved   bool
+		wantVictims []string
+	}{
+		"not-reprieved": {wantVictims: []string{victim.Name, victim2.Name}},
+		"reprieved":     {reprieved: true, wantVictims: []string{victim.Name}},
+	} {
+		tCtx.Run(name, func(tCtx ktesting.TContext) {
+			testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, preemptor, victim, victim2})
+			nodeInfo := testCtx.nodeInfos[0]
+			state := framework.NewCycleState()
+			_, status := testCtx.p.PreFilter(tCtx, state, preemptor, testCtx.nodeInfos)
+			require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+
+			sim := state.Clone()
+			for _, pod := range []*v1.Pod{victim, victim2} {
+				require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo(pod), nodeInfo).IsSuccess(), "RemovePod")
+			}
+			require.True(tCtx, testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo).IsSuccess(), "Filter without victims")
+			// Reprieve victim2: the first pass of
+			// RunFilterPluginsWithNominatedPods runs on a copy.
+			require.True(tCtx, testCtx.p.AddPod(tCtx, sim, preemptor, podInfo(victim2), nodeInfo).IsSuccess(), "AddPod")
+			_ = testCtx.p.Filter(tCtx, sim.Clone(), preemptor, nodeInfo)
+			if tc.reprieved {
+				_ = testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo)
+			} else {
+				require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo(victim2), nodeInfo).IsSuccess(), "RemovePod")
+			}
+
+			testCtx.p.AddNominatedPod(tCtx, state, preemptor, nodeName)
+			require.Equal(tCtx, tc.wantVictims, victimsOf(testCtx), "victims of the nomination")
+		})
+	}
+}
+
 func testAddNominatedPod(tCtx ktesting.TContext) {
 	slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Obj()
 	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
@@ -182,7 +268,7 @@ func testAddNominatedPod(tCtx ktesting.TContext) {
 				objs = append(objs, tc.preemptor)
 			}
 			testCtx := setupNominations(tCtx, claims, objs)
-			nominateWithoutVictims(tCtx, testCtx, tc.preemptor, nodeName, victim, victim2)
+			nominateWithoutAssume(tCtx, testCtx, tc.preemptor, nodeName, victim, victim2)
 
 			nomination := testCtx.p.nominations.nomination(tc.preemptor.UID)
 			require.Equal(tCtx, tc.wantNomination, nomination != nil, "nomination")

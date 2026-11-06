@@ -189,24 +189,24 @@ type NominationExtensions interface {
 	fwk.Plugin
 	// AddNominatedPod is called by preemption with the scheduling cycle's
 	// state after it picked nodeName for pod and before it starts to
-	// preempt the victims.
-	AddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod)
+	// preempt the victims. Plugins find what the preemption simulation
+	// selected for nodeName in the state.
+	AddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 	// RemoveNominatedPod is called when the nomination of pod ends: the pod
 	// got scheduled, deleted or bound elsewhere, its nominated node changed
 	// or got cleared, or the preemption failed. A non-empty nodeName limits
 	// the removal to a nomination for that node, because the notification
 	// about an older nomination may arrive after the pod got nominated again.
-	// preemptionFailed is true if not all victims could be preempted.
-	RemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool)
+	RemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string)
 }
 
 // NominationExtensionsRunner runs the NominationExtensions of the plugins of
 // a profile. All methods are no-ops when no plugin implements them.
 type NominationExtensionsRunner interface {
 	// RunNominationExtensionsAddNominatedPod calls AddNominatedPod of all plugins.
-	RunNominationExtensionsAddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod)
+	RunNominationExtensionsAddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 	// RunNominationExtensionsRemoveNominatedPod calls RemoveNominatedPod of all plugins.
-	RunNominationExtensionsRemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool)
+	RunNominationExtensionsRemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string)
 }
 
 // VictimExtensions is an optional interface for plugins which manage

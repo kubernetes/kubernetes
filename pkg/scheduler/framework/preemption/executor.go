@@ -390,7 +390,7 @@ func (e *Executor) removeNomination(ctx context.Context, preemptor ExecutorPreem
 		return
 	}
 	if runner, ok := e.fh.(framework.NominationExtensionsRunner); ok {
-		runner.RunNominationExtensionsRemoveNominatedPod(ctx, podPreemptor.Pod, nodeName, true)
+		runner.RunNominationExtensionsRemoveNominatedPod(ctx, podPreemptor.Pod, nodeName)
 	}
 }
 

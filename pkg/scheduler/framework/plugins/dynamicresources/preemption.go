@@ -50,6 +50,9 @@ type preemptionState struct {
 	root *preemptionRoot
 	// sim belongs to one copy of the CycleState. Clone copies it.
 	sim simulation
+	// parent is the state which this one is a copy of, nil for the state
+	// created by PreFilter.
+	parent *preemptionState
 }
 
 // preemptionRoot holds what the simulation needs from PreFilter. Apart from
@@ -84,18 +87,20 @@ type preemptionRoot struct {
 	// devices of a node does not have to go through all of them.
 	perDeviceNodeDevices map[string][]structured.DeviceID
 
-	// mutex protects the lazily computed fields below.
+	// mutex protects the lazily computed fields and filtered below.
 	mutex       sync.Mutex
 	nodeDevices map[string]sets.Set[structured.DeviceID]
 	shareCounts map[structured.DeviceID]int
 	sharesKnown bool
+	// filtered is the state with which Filter ran last for each node.
+	filtered map[string]*preemptionState
 }
 
 // simulation records what RemovePod and AddPod changed in one copy of the
 // CycleState.
 type simulation struct {
 	// removedPods are the pods with claims which were removed and not added back.
-	removedPods sets.Set[types.UID]
+	removedPods map[types.UID]types.NamespacedName
 	// released maps the UIDs of claims which removing pods released to
 	// what got released. Entries are never modified, only replaced, because
 	// copies of the simulation share them.
@@ -122,7 +127,36 @@ func (p *preemptionState) clone() *preemptionState {
 			removedPods: maps.Clone(p.sim.removedPods),
 			released:    maps.Clone(p.sim.released),
 		},
+		parent: p,
 	}
+}
+
+// filteredNode is called by Filter for each node it checks.
+func (p *preemptionState) filteredNode(nodeName string) {
+	p.root.mutex.Lock()
+	defer p.root.mutex.Unlock()
+	if p.root.filtered == nil {
+		p.root.filtered = make(map[string]*preemptionState)
+	}
+	p.root.filtered[nodeName] = p
+}
+
+// simulationFor returns the copy of p with which preemption simulated the
+// removal of victims on the node, nil if there is none.
+//
+// SelectVictimsOnNode checks a node with a copy of the state, which ends up
+// with the victims removed. Filter runs with that copy or with copies of it
+// made by RunFilterPluginsWithNominatedPods. The latter don't see the last
+// changes if the pod did not fit, so the result is the ancestor of the state
+// which Filter got last which is a direct copy of p.
+func (p *preemptionState) simulationFor(nodeName string) *preemptionState {
+	p.root.mutex.Lock()
+	sim := p.root.filtered[nodeName]
+	p.root.mutex.Unlock()
+	for sim != nil && sim.parent != p {
+		sim = sim.parent
+	}
+	return sim
 }
 
 // newPreemptionState is called by PreFilter. allocatedState and
@@ -177,16 +211,16 @@ func (pl *DynamicResources) RemovePod(ctx context.Context, cs fwk.CycleState, po
 
 // removePod updates the simulation like RemovePod.
 func (pl *DynamicResources) removePod(logger klog.Logger, p *preemptionState, pod *v1.Pod, nodeName string) {
-	if len(pod.Spec.ResourceClaims) == 0 || p.sim.removedPods.Has(pod.UID) {
+	if _, removed := p.sim.removedPods[pod.UID]; len(pod.Spec.ResourceClaims) == 0 || removed {
 		return
 	}
 	if p.sim.removedPods == nil {
-		p.sim.removedPods = sets.New[types.UID]()
+		p.sim.removedPods = make(map[types.UID]types.NamespacedName)
 	}
 	if p.sim.released == nil {
 		p.sim.released = make(map[types.UID]*releasedClaim)
 	}
-	p.sim.removedPods.Insert(pod.UID)
+	p.sim.removedPods[pod.UID] = types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 	for _, claim := range pl.claimsOfPod(pod) {
 		if released := p.sim.released[claim.UID]; released != nil {
 			// Released because of other removed pods, now this one
@@ -228,10 +262,10 @@ func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podTo
 		return nil
 	}
 	pod := podInfoToAdd.GetPod()
-	if !p.sim.removedPods.Has(pod.UID) {
+	if _, removed := p.sim.removedPods[pod.UID]; !removed {
 		return nil
 	}
-	p.sim.removedPods.Delete(pod.UID)
+	delete(p.sim.removedPods, pod.UID)
 	for uid, released := range p.sim.released {
 		if released.consumers.Has(pod.UID) {
 			delete(p.sim.released, uid)
@@ -303,7 +337,7 @@ func (pl *DynamicResources) releasable(p *preemptionState, claim *resourceapi.Re
 		if consumer.APIGroup != "" || consumer.Resource != "pods" {
 			return nil, nil, "reserved for a PodGroup or some other non-pod consumer"
 		}
-		if p.sim.removedPods.Has(consumer.UID) {
+		if _, removed := p.sim.removedPods[consumer.UID]; removed {
 			consumers.Insert(consumer.UID)
 			continue
 		}

@@ -19,6 +19,7 @@ package dynamicresources
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -36,10 +37,11 @@ import (
 
 var _ framework.NominationExtensions = &DynamicResources{}
 
-// AddNominatedPod remembers the victims of the pod and which devices the pod
-// is going to get on the node, so that pods with lower or equal priority
-// don't get them first. Claims of the victims get tracked by AssumeVictim.
-func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod) {
+// AddNominatedPod remembers the victims with claims which the preemption
+// simulation removed for the node and which devices the pod is going to get
+// there, so that pods with lower or equal priority don't get them first.
+// Claims of the victims get tracked by AssumeVictim.
+func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
 	if pl.nominations == nil {
 		return
 	}
@@ -49,15 +51,15 @@ func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleSta
 	}
 	logger := klog.FromContext(ctx)
 
-	p := state.preemption.clone()
+	sim := state.preemption.simulationFor(nodeName)
+	if sim == nil {
+		sim = state.preemption
+	}
+	p := sim.clone()
 	nomination := &podNomination{
 		nodeName: nodeName,
 		priority: corev1helpers.PodPriority(pod),
-		victims:  make(map[types.UID]types.NamespacedName, len(victims)),
-	}
-	for _, victim := range victims {
-		nomination.victims[victim.UID] = types.NamespacedName{Namespace: victim.Namespace, Name: victim.Name}
-		pl.removePod(logger, p, victim, victim.Spec.NodeName)
+		victims:  maps.Clone(p.sim.removedPods),
 	}
 	nomination.holds = pl.computeHold(ctx, state, p, nodeName)
 	replaced := pl.nominations.add(pod.UID, nomination)
@@ -69,18 +71,16 @@ func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleSta
 	// If the pod got deleted before its nomination was recorded, then
 	// RemoveNominatedPod was called too early.
 	if current, err := pl.podLister.Pods(pod.Namespace).Get(pod.Name); err != nil || current.UID != pod.UID {
-		pl.RemoveNominatedPod(ctx, pod, nodeName, false)
+		pl.RemoveNominatedPod(ctx, pod, nodeName)
 	}
 }
 
 // RemoveNominatedPod forgets the nomination of the pod. Claims of its
 // victims are tracked independently of it until they are deallocated.
-// preemptionFailed does not matter for that, because victims whose
-// preemption failed never got reported to AssumeVictim.
 //
 // The devices held for the pod may be free, so pods waiting for devices get
 // another chance, unless the pod got assumed with exactly those devices.
-func (pl *DynamicResources) RemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, _ bool) {
+func (pl *DynamicResources) RemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string) {
 	if pl.nominations == nil {
 		return
 	}

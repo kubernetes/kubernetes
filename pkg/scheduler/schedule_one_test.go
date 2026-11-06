@@ -1417,19 +1417,19 @@ func TestPrepareForBindingCycleRemovesNomination(t *testing.T) {
 		wantCalls     []string
 	}{
 		"assumed": {
-			wantCalls: []string{"RemoveNominatedPod ns/p  assigned=node1 failed=false"},
+			wantCalls: []string{"RemoveNominatedPod ns/p  assigned=node1"},
 		},
 		"waiting-on-permit": {
 			permitStatus: fwk.NewStatus(fwk.Wait),
-			wantCalls:    []string{"RemoveNominatedPod ns/p  assigned=node1 failed=false"},
+			wantCalls:    []string{"RemoveNominatedPod ns/p  assigned=node1"},
 		},
 		"reserve-failed": {
 			reserveStatus: fwk.NewStatus(fwk.Unschedulable, "injected"),
-			wantCalls:     []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+			wantCalls:     []string{"RemoveNominatedPod ns/p  assigned="},
 		},
 		"permit-rejected": {
 			permitStatus: fwk.NewStatus(fwk.Unschedulable, "injected"),
-			wantCalls:    []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+			wantCalls:    []string{"RemoveNominatedPod ns/p  assigned="},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -1498,7 +1498,7 @@ func TestHandleSchedulingFailureRemovesNomination(t *testing.T) {
 	}{
 		"cleared": {
 			nominatingInfo: &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride},
-			wantCalls:      []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+			wantCalls:      []string{"RemoveNominatedPod ns/p  assigned="},
 		},
 		"cleared-gate-off": {
 			disableGate:    true,

@@ -1006,6 +1006,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	// numDeallocating counts the unavailable claims which are claims of
 	// preempted pods, for a more helpful reason.
 	numDeallocating := 0
+	if state.preemption != nil {
+		state.preemption.filteredNode(node.Name)
+	}
 	// Looked up once, so that the checks of the claims and the allocator
 	// agree although nominations may change concurrently.
 	holds := pl.holdsOnNode(logger, state.preemption, node.Name)

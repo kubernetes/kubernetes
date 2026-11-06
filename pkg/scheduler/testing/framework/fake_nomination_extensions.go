@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -77,20 +76,15 @@ func (pl *FakeNominationExtensionsPlugin) PreFilterExtensions() fwk.PreFilterExt
 	return nil
 }
 
-// AddNominatedPod records the call as "AddNominatedPod <pod> <node> <victims>".
-func (pl *FakeNominationExtensionsPlugin) AddNominatedPod(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod) {
-	names := make([]string, 0, len(victims))
-	for _, victim := range victims {
-		names = append(names, klog.KObj(victim).String())
-	}
-	slices.Sort(names)
-	pl.record(fmt.Sprintf("AddNominatedPod %s %s [%s]", klog.KObj(pod), nodeName, strings.Join(names, " ")))
+// AddNominatedPod records the call as "AddNominatedPod <pod> <node>".
+func (pl *FakeNominationExtensionsPlugin) AddNominatedPod(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
+	pl.record(fmt.Sprintf("AddNominatedPod %s %s", klog.KObj(pod), nodeName))
 }
 
 // RemoveNominatedPod records the call as
-// "RemoveNominatedPod <pod> <node> assigned=<pod.spec.nodeName> failed=<preemptionFailed>".
-func (pl *FakeNominationExtensionsPlugin) RemoveNominatedPod(_ context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
-	pl.record(fmt.Sprintf("RemoveNominatedPod %s %s assigned=%s failed=%t", klog.KObj(pod), nodeName, pod.Spec.NodeName, preemptionFailed))
+// "RemoveNominatedPod <pod> <node> assigned=<pod.spec.nodeName>".
+func (pl *FakeNominationExtensionsPlugin) RemoveNominatedPod(_ context.Context, pod *v1.Pod, nodeName string) {
+	pl.record(fmt.Sprintf("RemoveNominatedPod %s %s assigned=%s", klog.KObj(pod), nodeName, pod.Spec.NodeName))
 }
 
 // AssumeVictim records the call as "AssumeVictim <victim>".

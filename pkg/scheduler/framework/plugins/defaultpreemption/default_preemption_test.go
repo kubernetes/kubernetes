@@ -3118,8 +3118,8 @@ func TestPreemptNominationExtensions(t *testing.T) {
 	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
 	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).Obj()
 	eligibleCall := "PodEligibleToPreempt default/p "
-	addCall := "AddNominatedPod default/p node1 [default/v]"
-	removeCall := "RemoveNominatedPod default/p node1 assigned= failed=true"
+	addCall := "AddNominatedPod default/p node1"
+	removeCall := "RemoveNominatedPod default/p node1 assigned="
 	assumeCall := "AssumeVictim default/v"
 
 	for name, tc := range map[string]struct {

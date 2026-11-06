@@ -188,13 +188,13 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 	runner, _ := ev.Handler.(framework.NominationExtensionsRunner)
 	notifyNomination := runner != nil && pod.Spec.NodeName == ""
 	if notifyNomination {
-		runner.RunNominationExtensionsAddNominatedPod(ctx, state, pod, bestCandidate.Name(), bestCandidate.Victims().Pods)
+		runner.RunNominationExtensionsAddNominatedPod(ctx, state, pod, bestCandidate.Name())
 	}
 
 	// 5) Actuate the preemption.
 	if status := ev.executor.ActuatePodPreemption(ctx, bestCandidate, pod, ev.PluginName); !status.IsSuccess() {
 		if notifyNomination {
-			runner.RunNominationExtensionsRemoveNominatedPod(ctx, pod, bestCandidate.Name(), true)
+			runner.RunNominationExtensionsRemoveNominatedPod(ctx, pod, bestCandidate.Name())
 		}
 		return nil, status
 	}

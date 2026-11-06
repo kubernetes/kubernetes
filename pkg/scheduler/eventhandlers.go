@@ -420,7 +420,7 @@ func (sched *Scheduler) removeNomination(ctx context.Context, pod *v1.Pod, nodeN
 	if err != nil {
 		return
 	}
-	schedFramework.RunNominationExtensionsRemoveNominatedPod(ctx, pod, nodeName, false)
+	schedFramework.RunNominationExtensionsRemoveNominatedPod(ctx, pod, nodeName)
 }
 
 func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {

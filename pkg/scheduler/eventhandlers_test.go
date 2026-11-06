@@ -247,11 +247,11 @@ func TestEventHandlers_RemoveNomination(t *testing.T) {
 	}{
 		"nominated-node-changed": {
 			event:     func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("node2")) },
-			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned= failed=false"},
+			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned="},
 		},
 		"nominated-node-cleared": {
 			event:     func(s *Scheduler) { s.updatePodInSchedulingQueue(nominatedPod, withNomination("")) },
-			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned= failed=false"},
+			wantCalls: []string{"RemoveNominatedPod ns/p node1 assigned="},
 		},
 		"nominated-node-added": {
 			event: func(s *Scheduler) { s.updatePodInSchedulingQueue(withNomination(""), nominatedPod) },
@@ -261,11 +261,11 @@ func TestEventHandlers_RemoveNomination(t *testing.T) {
 		},
 		"deleted": {
 			event:     func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, false) },
-			wantCalls: []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+			wantCalls: []string{"RemoveNominatedPod ns/p  assigned="},
 		},
 		"bound-by-other": {
 			event:     func(s *Scheduler) { s.deletePodFromSchedulingQueue(nominatedPod, true) },
-			wantCalls: []string{"RemoveNominatedPod ns/p  assigned= failed=false"},
+			wantCalls: []string{"RemoveNominatedPod ns/p  assigned="},
 		},
 		"disabled": {
 			disabled: true,

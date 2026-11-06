@@ -53,12 +53,12 @@ func (pl *recordingNominationExtensions) PreFilter(context.Context, fwk.CycleSta
 
 func (pl *recordingNominationExtensions) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
 
-func (pl *recordingNominationExtensions) AddNominatedPod(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod) {
-	*pl.log = append(*pl.log, fmt.Sprintf("%s: add %s %s %d", pl.name, pod.Name, nodeName, len(victims)))
+func (pl *recordingNominationExtensions) AddNominatedPod(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
+	*pl.log = append(*pl.log, fmt.Sprintf("%s: add %s %s", pl.name, pod.Name, nodeName))
 }
 
-func (pl *recordingNominationExtensions) RemoveNominatedPod(_ context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
-	*pl.log = append(*pl.log, fmt.Sprintf("%s: remove %s %s %v", pl.name, pod.Name, nodeName, preemptionFailed))
+func (pl *recordingNominationExtensions) RemoveNominatedPod(_ context.Context, pod *v1.Pod, nodeName string) {
+	*pl.log = append(*pl.log, fmt.Sprintf("%s: remove %s %s", pl.name, pod.Name, nodeName))
 }
 
 func (pl *recordingNominationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
@@ -94,8 +94,8 @@ func TestNominationExtensions(t *testing.T) {
 			gateEnabled:  true,
 			wantEligible: true,
 			wantCalls: []string{
-				"a: add preemptor node1 1", "b: add preemptor node1 1",
-				"a: remove preemptor node1 true", "b: remove preemptor node1 true",
+				"a: add preemptor node1", "b: add preemptor node1",
+				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
 			},
@@ -106,8 +106,8 @@ func TestNominationExtensions(t *testing.T) {
 			wantEligible: false,
 			wantReason:   "still reclaiming",
 			wantCalls: []string{
-				"a: add preemptor node1 1", "b: add preemptor node1 1",
-				"a: remove preemptor node1 true", "b: remove preemptor node1 true",
+				"a: add preemptor node1", "b: add preemptor node1",
+				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
 			},
@@ -118,8 +118,8 @@ func TestNominationExtensions(t *testing.T) {
 			wantEligible: false,
 			wantReason:   "reason a",
 			wantCalls: []string{
-				"a: add preemptor node1 1", "b: add preemptor node1 1",
-				"a: remove preemptor node1 true", "b: remove preemptor node1 true",
+				"a: add preemptor node1", "b: add preemptor node1",
+				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1",
 			},
@@ -149,8 +149,8 @@ func TestNominationExtensions(t *testing.T) {
 				t.Fatalf("create framework: %v", err)
 			}
 
-			f.RunNominationExtensionsAddNominatedPod(ctx, nil, pod, "node1", victims)
-			f.RunNominationExtensionsRemoveNominatedPod(ctx, pod, "node1", true)
+			f.RunNominationExtensionsAddNominatedPod(ctx, nil, pod, "node1")
+			f.RunNominationExtensionsRemoveNominatedPod(ctx, pod, "node1")
 			f.RunVictimExtensionsAssumeVictim(ctx, victims[0])
 			eligible, reason := f.RunVictimExtensionsPodEligibleToPreempt(ctx, pod, "node1")
 			if eligible != tc.wantEligible || reason != tc.wantReason {

@@ -53,16 +53,16 @@ func (f *frameworkImpl) fillNominationExtensions() {
 }
 
 // RunNominationExtensionsAddNominatedPod calls AddNominatedPod of all plugins.
-func (f *frameworkImpl) RunNominationExtensionsAddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string, victims []*v1.Pod) {
+func (f *frameworkImpl) RunNominationExtensionsAddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
 	for _, ext := range f.nominationExtensions {
-		ext.AddNominatedPod(f.nominationExtensionsContext(ctx, ext), state, pod, nodeName, victims)
+		ext.AddNominatedPod(f.nominationExtensionsContext(ctx, ext), state, pod, nodeName)
 	}
 }
 
 // RunNominationExtensionsRemoveNominatedPod calls RemoveNominatedPod of all plugins.
-func (f *frameworkImpl) RunNominationExtensionsRemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
+func (f *frameworkImpl) RunNominationExtensionsRemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string) {
 	for _, ext := range f.nominationExtensions {
-		ext.RemoveNominatedPod(f.nominationExtensionsContext(ctx, ext), pod, nodeName, preemptionFailed)
+		ext.RemoveNominatedPod(f.nominationExtensionsContext(ctx, ext), pod, nodeName)
 	}
 }
 
