@@ -1845,6 +1845,7 @@ func TestDropHostUsers(t *testing.T) {
 }
 
 func TestDropGRPCContainerProbeTLS(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.38"))
 	grpcProbeModeTLS := func() *api.GRPCProbeMode {
 		mode := api.GRPCProbeModeTLS
 		return &mode
@@ -1999,6 +2000,33 @@ func TestDropGRPCContainerProbeTLS(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestDropGRPCContainerProbeTLSUnsupportedMode(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.38"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GRPCContainerProbeTLS, false)
+
+	// Unsupported values must not be dropped, so that validation can reject
+	// them regardless of the feature gate state.
+	mode := api.GRPCProbeMode("Verify")
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{{
+				Name: "container1",
+				LivenessProbe: &api.Probe{
+					ProbeHandler: api.ProbeHandler{
+						GRPC: &api.GRPCAction{Port: 8443, Mode: &mode},
+					},
+				},
+			}},
+		},
+	}
+
+	DropDisabledPodFields(pod, nil)
+
+	if got := pod.Spec.Containers[0].LivenessProbe.GRPC.Mode; got == nil || *got != mode {
+		t.Fatalf("expected unsupported mode to be preserved for validation, got %v", got)
 	}
 }
 
