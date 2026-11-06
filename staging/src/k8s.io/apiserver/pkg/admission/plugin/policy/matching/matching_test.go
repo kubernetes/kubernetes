@@ -662,12 +662,31 @@ func BenchmarkMatcher(b *testing.B) {
 	}
 
 	criteria := &fakeCriteria{matchResources: mr}
-	attrs := admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
 	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
-	for i := 0; i < b.N; i++ {
-		matcher.Matches(attrs, interfaces, criteria)
+	for _, tc := range []struct {
+		name  string
+		attrs admission.Attributes
+	}{
+		{
+			name:  "rules match",
+			attrs: admission.NewAttributesRecord(nil, nil, gvk("autoscaling", "v1", "Scale"), "ns", "name", gvr("apps", "v1", "deployments"), "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+		},
+		{
+			// Most requests on a busy cluster match none of a policy's rules.
+			name:  "rules do not match",
+			attrs: admission.NewAttributesRecord(nil, nil, gvk("coordination.k8s.io", "v1", "Lease"), "ns", "name", gvr("coordination.k8s.io", "v1", "leases"), "", admission.Update, &metav1.UpdateOptions{}, false, nil),
+		},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				if _, _, _, err := matcher.Matches(tc.attrs, interfaces, criteria); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
