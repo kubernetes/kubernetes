@@ -107,6 +107,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 	job.DropDisabledFields(&newCronJob.Spec.JobTemplate.Spec, &oldCronJob.Spec.JobTemplate.Spec)
 
 	pod.DropDisabledTemplateFields(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	pod.SyncPodNetworkOnTemplateUpdate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
 
 	// Any changes to the spec increment the generation number.
 	// See metav1.ObjectMeta description for more information on Generation.

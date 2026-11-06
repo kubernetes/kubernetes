@@ -152,6 +152,18 @@ func SetHostNetwork(b bool) Tweak {
 	}
 }
 
+func SetPodNetwork(network api.PodNetwork) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.PodNetwork = &network
+	}
+}
+
+func SetEnableServiceLinks(enable *bool) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.EnableServiceLinks = enable
+	}
+}
+
 func SetHostPID(b bool) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.HostPID = b
@@ -325,6 +337,24 @@ func SetContainerImage(image string) TweakContainer {
 func SetContainerLifecycle(lifecycle api.Lifecycle) TweakContainer {
 	return func(cnr *api.Container) {
 		cnr.Lifecycle = &lifecycle
+	}
+}
+
+func SetContainerLivenessProbe(probe api.Probe) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.LivenessProbe = &probe
+	}
+}
+
+func SetContainerReadinessProbe(probe api.Probe) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.ReadinessProbe = &probe
+	}
+}
+
+func SetContainerStartupProbe(probe api.Probe) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.StartupProbe = &probe
 	}
 }
 

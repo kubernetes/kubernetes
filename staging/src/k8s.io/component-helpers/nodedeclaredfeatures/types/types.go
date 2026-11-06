@@ -82,6 +82,9 @@ type RuntimeFeatures struct {
 	MountOptions bool
 	// SeccompProfileOCI indicates if the runtime supports seccomp profiles pulled from OCI registries.
 	SeccompProfileOCI bool
+	// PodNetworkIsolated indicates if the runtime supports sandboxes that are not
+	// attached to the pod network (PodSandboxConfig.pod_network = POD_NETWORK_ISOLATED).
+	PodNetworkIsolated bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.
