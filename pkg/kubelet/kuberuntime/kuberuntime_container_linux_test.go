@@ -121,7 +121,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 
 	enforceMemoryQoS := utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) && isCgroup2UnifiedMode()
 	expectedConfig := makeExpectedConfig(t, tCtx, m, pod, 0, enforceMemoryQoS)
-	containerConfig, _, err := m.generateContainerConfig(tCtx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, []string{}, nil, nil)
+	containerConfig, _, err := m.generateContainerConfig(tCtx, &pod.Spec.Containers[0], pod, 0, "", pod.Spec.Containers[0].Image, "", []string{}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, containerConfig, "generate container config for kubelet runtime v1.")
 	assert.Equal(t, runAsUser, containerConfig.GetLinux().GetSecurityContext().GetRunAsUser().GetValue(), "RunAsUser should be set")
@@ -152,7 +152,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 		},
 	}
 
-	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
+	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, "", []string{}, nil, nil)
 	assert.Error(t, err)
 
 	imageID, _ := imageService.PullImage(tCtx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
@@ -164,7 +164,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsUser = nil
 	podWithContainerSecurityContext.Spec.Containers[0].SecurityContext.RunAsNonRoot = &runAsNonRootTrue
 
-	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, []string{}, nil, nil)
+	_, _, err = m.generateContainerConfig(tCtx, &podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image, "", []string{}, nil, nil)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
 }
 

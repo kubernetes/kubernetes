@@ -181,7 +181,7 @@ func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubeconta
 // RemoveImage removes the specified image.
 func (m *kubeGenericRuntimeManager) RemoveImage(ctx context.Context, image kubecontainer.ImageSpec) error {
 	logger := klog.FromContext(ctx)
-	err := m.imageService.RemoveImage(ctx, &runtimeapi.ImageSpec{Image: image.Image})
+	err := m.imageService.RemoveImage(ctx, ToRuntimeAPIImageSpec(image))
 	if err != nil {
 		logger.Error(err, "Failed to remove image", "image", image.Image)
 		return err

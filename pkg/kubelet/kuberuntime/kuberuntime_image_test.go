@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -27,10 +28,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
@@ -209,18 +214,42 @@ func TestGetImageRefWithError(t *testing.T) {
 	assert.Equal(t, "", imageRef)
 }
 
+type recordingRemoveImageService struct {
+	internalapi.ImageManagerService
+	image *runtimeapi.ImageSpec
+}
+
+func (s *recordingRemoveImageService) RemoveImage(ctx context.Context, image *runtimeapi.ImageSpec) error {
+	s.image = image
+	return s.ImageManagerService.RemoveImage(ctx, image)
+}
+
 func TestRemoveImage(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
-	assert.NoError(t, err)
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("gate=%t", enabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, enabled)
+			tCtx := ktesting.Init(t)
+			_, fakeImageService, fakeManager, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+			service := &recordingRemoveImageService{ImageManagerService: fakeImageService}
+			fakeManager.imageService = service
+			image := kubecontainer.ImageSpec{Image: "busybox", RuntimeHandler: "runc"}
 
-	_, _, err = fakeManager.PullImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
-	assert.NoError(t, err)
-	assert.Len(t, fakeImageService.Images, 1)
+			_, _, err = fakeManager.PullImage(tCtx, image, nil, nil)
+			require.NoError(t, err)
+			assert.Len(t, fakeImageService.Images, 1)
 
-	err = fakeManager.RemoveImage(tCtx, kubecontainer.ImageSpec{Image: "busybox"})
-	assert.NoError(t, err)
-	assert.Empty(t, fakeImageService.Images)
+			require.NoError(t, fakeManager.RemoveImage(tCtx, image))
+			require.NotNil(t, service.image)
+			assert.Equal(t, image.Image, service.image.Image)
+			expectedHandler := ""
+			if enabled {
+				expectedHandler = "runc"
+			}
+			assert.Equal(t, expectedHandler, service.image.RuntimeHandler)
+			assert.Empty(t, fakeImageService.Images)
+		})
+	}
 }
 
 func TestRemoveImageNoOpIfImageNotLocal(t *testing.T) {

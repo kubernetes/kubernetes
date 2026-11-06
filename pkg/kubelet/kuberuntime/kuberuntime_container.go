@@ -269,7 +269,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	containerConfig, cleanupAction, err := m.generateContainerConfig(ctx, container, pod, restartCount, podIP, imageRef, podIPs, target, imageVolumes)
+	containerConfig, cleanupAction, err := m.generateContainerConfig(ctx, container, pod, restartCount, podIP, imageRef, podRuntimeHandler, podIPs, target, imageVolumes)
 	if cleanupAction != nil {
 		defer cleanupAction()
 	}
@@ -358,13 +358,14 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 }
 
 // generateContainerConfig generates container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), error) {
+func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, restartCount int, podIP, imageRef, podRuntimeHandler string, podIPs []string, nsTarget *kubecontainer.ContainerID, imageVolumes kubecontainer.ImageVolumes) (*runtimeapi.ContainerConfig, func(), error) {
 	opts, cleanupAction, err := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, podIPs, imageVolumes)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	uid, username, err := m.getImageUser(ctx, container.Image)
+	imageSpec := &runtimeapi.ImageSpec{Image: imageRef, UserSpecifiedImage: container.Image, RuntimeHandler: podRuntimeHandler}
+	uid, username, err := m.getImageUser(ctx, imageSpec)
 	if err != nil {
 		return nil, cleanupAction, err
 	}
@@ -388,7 +389,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 			Name:    container.Name,
 			Attempt: restartCountUint32,
 		},
-		Image:       &runtimeapi.ImageSpec{Image: imageRef, UserSpecifiedImage: container.Image},
+		Image:       imageSpec,
 		Command:     command,
 		Args:        args,
 		WorkingDir:  container.WorkingDir,
