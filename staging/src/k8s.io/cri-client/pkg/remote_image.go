@@ -38,6 +38,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
+	crimetrics "k8s.io/cri-client/pkg/metrics"
 	"k8s.io/cri-client/pkg/util"
 )
 
@@ -256,6 +257,7 @@ func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtime
 	})
 	if err != nil {
 		logger.Error(err, "StreamImages from image service failed", "filter", filter)
+		crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "error")
 		return nil, err
 	}
 
@@ -263,6 +265,7 @@ func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtime
 	for {
 		resp, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "success")
 			break
 		}
 		if err != nil {
@@ -272,9 +275,11 @@ func (r *remoteImageService) streamImagesV1(ctx context.Context, filter *runtime
 			if status.Code(err) == codes.Unimplemented {
 				logger.Info("StreamImages not implemented, falling back to ListImages", "filter", filter)
 				r.useStreaming.Store(false)
+				crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "fallback")
 				return r.listImagesV1(ctx, filter)
 			}
 			logger.Error(err, "StreamImages recv failed", "filter", filter, "itemsReceived", len(images))
+			crimetrics.ListStreamingTotal.Increment(ctx, "list_images", "error")
 			return nil, err
 		}
 		images = append(images, resp.Images...)

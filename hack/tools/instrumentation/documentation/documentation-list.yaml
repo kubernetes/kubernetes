@@ -3602,6 +3602,18 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: cri_list_streaming_total
+  subsystem: kubelet
+  help: Cumulative number of CRI list streaming RPC attempts by operation type and
+    result (success, error, fallback).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation_type
+  - result
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: cri_losing_support
   subsystem: kubelet
   help: the Kubernetes version that the currently running CRI implementation will
