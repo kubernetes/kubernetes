@@ -1464,6 +1464,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.22"
+- name: PodImplicitRootWarnings
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: PodLevelResourceManagers
   versionedSpecs:
   - default: false

@@ -823,6 +823,14 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
+	// owner: @thockin @priyankasaggu11929
+	// kep: https://kep.k8s.io/2172
+	//
+	// Enables kubelet to report InsecureImplicitUserID/InsecureImplicitGroupID pod conditions
+	// when a container is observed running as UID/GID 0 without the pod or container spec
+	// explicitly requesting it (via runAsUser, or via runAsGroup/fsGroup/supplementalGroups).
+	PodImplicitRootWarnings featuregate.Feature = "PodImplicitRootWarnings"
+
 	// owner: @KevinTMtz
 	// kep: https://kep.k8s.io/5526
 	//
@@ -1800,6 +1808,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PodImplicitRootWarnings: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PodLevelResourceManagers: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
@@ -2562,6 +2574,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	PodCertificateRequest: {},
 
 	PodDeletionCost: {},
+
+	PodImplicitRootWarnings: {},
 
 	PodLevelResourceManagers: {PodLevelResources},
 
