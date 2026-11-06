@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -1503,13 +1504,21 @@ func TestActualStateOfWorld_ActuatedVolumes_MemoryBackedOnlyWhenDynamicVolumesDi
 			},
 		},
 	}
+	uncappedMemVol := v1.Volume{
+		Name: "uncapped-mem-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium: v1.StorageMediumMemory,
+			},
+		},
+	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
 			UID:  "pod1uid",
 		},
 		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{cmVol, memVol},
+			Volumes: []v1.Volume{cmVol, memVol, uncappedMemVol},
 		},
 	}
 	podName := util.GetUniquePodName(pod)
@@ -1531,8 +1540,108 @@ func TestActualStateOfWorld_ActuatedVolumes_MemoryBackedOnlyWhenDynamicVolumesDi
 		}))
 	}
 
-	// Only the memory-backed emptyDir volume should be recorded when DynamicNodeLocalEphemeralVolumes is disabled.
+	// Only the memory-backed emptyDir volumes should be recorded when DynamicNodeLocalEphemeralVolumes is disabled.
 	actuatedVols, ok := actuatedState.GetPodVolumes(pod.UID)
 	require.True(t, ok)
-	require.Equal(t, []v1.Volume{memVol}, actuatedVols)
+	require.Equal(t, []v1.Volume{memVol, uncappedMemVol}, actuatedVols)
+}
+
+func TestActualStateOfWorld_ActuatedVolumes_RecordsEffectiveMemoryBackedLimit(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir := t.TempDir()
+
+	plugMgr := &volume.VolumePluginMgr{}
+	fakeVolumeHost := volumetesting.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil)
+	require.NoError(t, plugMgr.InitPlugins(emptydir.ProbeVolumePlugins(), nil, fakeVolumeHost))
+	plugin, err := plugMgr.FindPluginByName("kubernetes.io/empty-dir")
+	require.NoError(t, err)
+
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	asw := NewActualStateOfWorld("mynode", plugMgr, actuatedState)
+
+	containerMemLimit := resource.MustParse("128Mi")
+	smallerLimit := resource.MustParse("64Mi")
+	largerLimit := resource.MustParse("256Mi")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: containerMemLimit,
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "uncapped",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium: v1.StorageMediumMemory,
+						},
+					},
+				},
+				{
+					Name: "exceeding-pod-limit",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &largerLimit,
+						},
+					},
+				},
+				{
+					Name: "within-pod-limit",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &smallerLimit,
+						},
+					},
+				},
+			},
+		},
+	}
+	podName := util.GetUniquePodName(pod)
+
+	for i := range pod.Spec.Volumes {
+		volSpec := &volume.Spec{Volume: &pod.Spec.Volumes[i]}
+		genName, err := util.GetUniqueVolumeNameFromSpec(plugin, volSpec)
+		require.NoError(t, err)
+		require.NoError(t, asw.MarkVolumeAsAttached(logger, emptyVolumeName, volSpec, "", "fake/device/path"))
+		mounter, err := plugin.NewMounter(volSpec, pod)
+		require.NoError(t, err)
+		require.NoError(t, asw.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+			PodName:          podName,
+			PodUID:           pod.UID,
+			Pod:              pod,
+			VolumeName:       genName,
+			Mounter:          mounter,
+			VolumeSpec:       volSpec,
+			VolumeMountState: operationexecutor.VolumeMounted,
+		}))
+	}
+
+	uncappedRecorded, ok := actuatedState.GetEmptyDirVolumeLimit(pod.UID, "uncapped")
+	require.True(t, ok)
+	require.NotNil(t, uncappedRecorded)
+	require.True(t, containerMemLimit.Equal(*uncappedRecorded), "expected uncapped volume effective limit %s, got %s", containerMemLimit.String(), uncappedRecorded.String())
+
+	exceedingRecorded, ok := actuatedState.GetEmptyDirVolumeLimit(pod.UID, "exceeding-pod-limit")
+	require.True(t, ok)
+	require.NotNil(t, exceedingRecorded)
+	require.True(t, containerMemLimit.Equal(*exceedingRecorded), "expected exceeding volume effective limit %s, got %s", containerMemLimit.String(), exceedingRecorded.String())
+
+	withinRecorded, ok := actuatedState.GetEmptyDirVolumeLimit(pod.UID, "within-pod-limit")
+	require.True(t, ok)
+	require.NotNil(t, withinRecorded)
+	require.True(t, smallerLimit.Equal(*withinRecorded), "expected within-limit volume effective limit %s, got %s", smallerLimit.String(), withinRecorded.String())
 }

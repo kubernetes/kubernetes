@@ -5450,6 +5450,278 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 	}
 }
 
+func TestHandlePodUpdates_RecordVolumeRequestedResizes(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	logger, tCtx := ktesting.NewTestContext(t)
+	metrics.Register()
+	metrics.VolumeRequestedResizes.Reset()
+
+	type expectedMetricsStruct struct {
+		memoryVolumeCounter map[string]int
+	}
+	expectedMetrics := expectedMetricsStruct{
+		memoryVolumeCounter: make(map[string]int),
+	}
+
+	for _, tc := range []struct {
+		name               string
+		initialAllocation  *v1.Pod
+		updatedPod         *v1.Pod
+		updateExpectedFunc func(*expectedMetricsStruct)
+	}{
+		{
+			name: "add volume sizeLimit",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: v1.StorageMediumMemory,
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: new(resource.MustParse("100Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryVolumeCounter["add"]++
+			},
+		},
+		{
+			name: "remove volume sizeLimit",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: new(resource.MustParse("100Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium: v1.StorageMediumMemory,
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryVolumeCounter["remove"]++
+			},
+		},
+		{
+			name: "increase volume sizeLimit",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: new(resource.MustParse("100Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: new(resource.MustParse("200Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryVolumeCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease volume sizeLimit",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: new(resource.MustParse("200Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: new(resource.MustParse("100Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryVolumeCounter["decrease"]++
+			},
+		},
+		{
+			name: "non-memory volume sizeLimit ignored",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "disk-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumDefault,
+								SizeLimit: new(resource.MustParse("100Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "disk-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumDefault,
+								SizeLimit: new(resource.MustParse("200Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {},
+		},
+		{
+			name: "resize volume when another volume is added before it",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: "mem-vol",
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{
+								Medium:    v1.StorageMediumMemory,
+								SizeLimit: new(resource.MustParse("100Mi")),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "added-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: new(resource.MustParse("50Mi")),
+								},
+							},
+						},
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: new(resource.MustParse("200Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryVolumeCounter["increase"]++
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+			}
+			initialPod := testPod.DeepCopy()
+			updatedPod := testPod.DeepCopy()
+
+			initialPod.Spec = tc.initialAllocation.Spec
+			updatedPod.Spec = tc.updatedPod.Spec
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			t.Cleanup(func() { testKubelet.Cleanup() })
+			kubelet := testKubelet.kubelet
+
+			kubelet.podManager.AddPod(initialPod)
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, initialPod))
+			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{updatedPod})
+
+			tc.updateExpectedFunc(&expectedMetrics)
+
+			expectedFormat := `
+				# HELP kubelet_volume_requested_resizes_total [ALPHA] Number of requested resizes, counted at the volume level. The 'medium' label refers to the volume storage medium (e.g. 'memory'); the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.
+				# TYPE kubelet_volume_requested_resizes_total counter
+				kubelet_volume_requested_resizes_total{medium="memory",operation="add"} %d
+				kubelet_volume_requested_resizes_total{medium="memory",operation="decrease"} %d
+				kubelet_volume_requested_resizes_total{medium="memory",operation="increase"} %d
+				kubelet_volume_requested_resizes_total{medium="memory",operation="remove"} %d
+			`
+
+			expected := fmt.Sprintf(expectedFormat,
+				expectedMetrics.memoryVolumeCounter["add"],
+				expectedMetrics.memoryVolumeCounter["decrease"],
+				expectedMetrics.memoryVolumeCounter["increase"],
+				expectedMetrics.memoryVolumeCounter["remove"],
+			)
+
+			re := regexp.MustCompile("(?m)[\r\n]+^.*} 0.*$")
+			expected = re.ReplaceAllString(expected, "")
+
+			require.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expected), "kubelet_volume_requested_resizes_total",
+			))
+		})
+	}
+}
+
 func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
@@ -6151,4 +6423,101 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestAllocatedPodManager(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+	logger, _ := ktesting.NewTestContext(t)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	apm := &allocatedPodManager{
+		baseManager:       kl.podManager,
+		allocationManager: kl.allocationManager,
+	}
+
+	// Pod without a memory-backed emptyDir should bypass UpdatePodFromAllocation and return the desired pod directly.
+	podWithoutMemVol := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-no-mem-vol",
+			Name:      "pod-no-mem-vol",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "disk-vol",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium: v1.StorageMediumDefault,
+						},
+					},
+				},
+			},
+		},
+	}
+	require.NoError(t, kl.allocationManager.SetAllocatedResources(logger, podWithoutMemVol))
+
+	desiredPodWithoutMemVol := podWithoutMemVol.DeepCopy()
+	desiredPodWithoutMemVol.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("200Mi")
+	kl.podManager.SetPods([]*v1.Pod{desiredPodWithoutMemVol})
+
+	gotPod, found := apm.GetPodByUID(podWithoutMemVol.UID)
+	require.True(t, found)
+	assert.Same(t, desiredPodWithoutMemVol, gotPod)
+
+	// Pod with a memory-backed emptyDir should consult UpdatePodFromAllocation and return the allocated pod.
+	size100Mi := resource.MustParse("100Mi")
+	size200Mi := resource.MustParse("200Mi")
+	podWithMemVol := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-with-mem-vol",
+			Name:      "pod-with-mem-vol",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceMemory: size200Mi},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "mem-vol",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &size100Mi,
+						},
+					},
+				},
+			},
+		},
+	}
+	require.NoError(t, kl.allocationManager.SetAllocatedResources(logger, podWithMemVol))
+
+	desiredPodWithMemVol := podWithMemVol.DeepCopy()
+	desiredPodWithMemVol.Spec.Volumes[0].EmptyDir.SizeLimit = &size200Mi
+	kl.podManager.SetPods([]*v1.Pod{desiredPodWithMemVol})
+
+	gotPod, found = apm.GetPodByUID(podWithMemVol.UID)
+	require.True(t, found)
+	require.NotNil(t, gotPod.Spec.Volumes[0].EmptyDir.SizeLimit)
+	assert.True(t, size100Mi.Equal(*gotPod.Spec.Volumes[0].EmptyDir.SizeLimit))
+
+	gotPods := apm.GetPods()
+	require.Len(t, gotPods, 1)
+	assert.True(t, size100Mi.Equal(*gotPods[0].Spec.Volumes[0].EmptyDir.SizeLimit))
 }

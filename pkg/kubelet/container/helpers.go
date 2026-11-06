@@ -82,7 +82,10 @@ type RuntimeHelper interface {
 	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error
 
 	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
-	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+	ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error
+
+	// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+	EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.

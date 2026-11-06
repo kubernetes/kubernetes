@@ -165,7 +165,10 @@ type VolumeManager interface {
 	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
 	// This is intended for volumes that support online resizing and require
 	// strict coordination with container runtime operations.
-	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+	ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error
+
+	// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+	EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 // podStateProvider can determine if a pod is going to be terminated
@@ -676,12 +679,22 @@ func getExtraSupplementalGID(volumeGIDValue string, pod *v1.Pod) (int64, bool) {
 
 // ResizeEphemeralVolume synchronously triggers a resize of the specified volume.
 // This returns an error if the volume is not supported for direct resizing.
-func (vm *volumeManager) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+func (vm *volumeManager) ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error {
 	resizablePlugin, volumeSpec, err := vm.volumePluginSupportsDirectResize(pod, volumeName)
 	if err != nil {
 		return err
 	}
-	return resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod, newSize)
+	return resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod)
+}
+
+// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+// This returns an error if the volume is not supported for direct resizing.
+func (vm *volumeManager) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	resizablePlugin, volumeSpec, err := vm.volumePluginSupportsDirectResize(pod, volumeName)
+	if err != nil {
+		return nil, err
+	}
+	return resizablePlugin.EffectiveEphemeralVolumeLimit(volumeSpec, pod)
 }
 
 func (vm *volumeManager) volumePluginSupportsDirectResize(pod *v1.Pod, volumeName string) (volume.ResizableEphemeralVolumePlugin, *volume.Spec, error) {

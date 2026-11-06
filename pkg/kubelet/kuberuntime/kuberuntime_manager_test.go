@@ -65,6 +65,8 @@ import (
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -116,8 +118,34 @@ func createTestRuntimeManager(ctx context.Context, opts ...testRuntimeManagerOpt
 		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
 	}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(ctx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""), options.recorder)
+	fakeRuntimeHelper := &containertest.FakeRuntimeHelper{
+		EffectiveEphemeralVolumeLimitFunc: fakeEffectiveEphemeralVolumeLimit,
+	}
+	manager, err := newFakeKubeRuntimeManager(ctx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, fakeRuntimeHelper, noopoteltrace.NewTracerProvider().Tracer(""), options.recorder)
 	return fakeRuntimeService, fakeImageService, manager, err
+}
+
+type fakeEmptyDirVolumeHost struct {
+	volume.VolumeHost
+}
+
+func (f *fakeEmptyDirVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
+	return v1.ResourceList{
+		v1.ResourceMemory: resource.MustParse(fakeNodeAllocatableMemory),
+		v1.ResourceCPU:    resource.MustParse(fakeNodeAllocatableCPU),
+	}, nil
+}
+
+func fakeEffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	for i := range pod.Spec.Volumes {
+		vol := &pod.Spec.Volumes[i]
+		if vol.Name == volumeName {
+			plug := emptydir.ProbeVolumePlugins()[0]
+			_ = plug.Init(&fakeEmptyDirVolumeHost{})
+			return plug.(volume.ResizableEphemeralVolumePlugin).EffectiveEphemeralVolumeLimit(volume.NewSpecFromVolume(vol), pod)
+		}
+	}
+	return nil, fmt.Errorf("volume %s not found in pod %s", volumeName, pod.Name)
 }
 
 // sandboxTemplate is a sandbox template to create fake sandbox.
@@ -5195,30 +5223,40 @@ type mockVolumeResizeRuntimeHelper struct {
 
 type mockResizeCall struct {
 	volumeName string
-	newSize    *resource.Quantity
 }
 
-func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string, newSize *resource.Quantity) error {
-	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName, newSize: newSize})
+func (f *mockVolumeResizeRuntimeHelper) ResizeEphemeralVolume(_ *v1.Pod, volumeName string) error {
+	f.resizeCalls = append(f.resizeCalls, mockResizeCall{volumeName: volumeName})
 	return f.resizeErr
 }
 
+func (f *mockVolumeResizeRuntimeHelper) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	return fakeEffectiveEphemeralVolumeLimit(pod, volumeName)
+}
+
 func TestComputeVolumeResizeAction(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
 	logger, tCtx := ktesting.NewTestContext(t)
+	nodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
 
 	for _, tc := range []struct {
-		testName       string
-		enableGate     bool
-		actuatedLimit  *resource.Quantity
-		newLimit       *resource.Quantity
-		volMedium      v1.StorageMedium
-		expectUpsize   bool
-		expectDownsize bool
+		testName         string
+		enableGate       bool
+		noCheckpoint     bool
+		actuatedLimit    *resource.Quantity
+		newLimit         *resource.Quantity
+		podMemLimit      *resource.Quantity
+		podLevelMemLimit *resource.Quantity
+		volMedium        v1.StorageMedium
+		expectUpsize     bool
+		expectDownsize   bool
 	}{
 		{
 			testName:       "Feature gate disabled",
 			enableGate:     false,
-			actuatedLimit:  nil,
+			actuatedLimit:  &nodeAllocatable,
 			newLimit:       resource.NewQuantity(100, resource.BinarySI),
 			volMedium:      v1.StorageMediumMemory,
 			expectUpsize:   false,
@@ -5227,8 +5265,8 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 		{
 			testName:       "Non-memory emptyDir volume ignored",
 			enableGate:     true,
-			actuatedLimit:  nil,
-			newLimit:       resource.NewQuantity(100, resource.BinarySI),
+			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
+			newLimit:       resource.NewQuantity(200, resource.BinarySI),
 			volMedium:      v1.StorageMediumDefault,
 			expectUpsize:   false,
 			expectDownsize: false,
@@ -5252,17 +5290,46 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 			expectDownsize: true,
 		},
 		{
-			testName:       "No action: limit removed (new limit nil)",
+			testName:       "Upsize: limit removed (new limit nil)",
 			enableGate:     true,
 			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
 			newLimit:       nil,
 			volMedium:      v1.StorageMediumMemory,
-			expectUpsize:   false,
+			expectUpsize:   true,
 			expectDownsize: false,
 		},
 		{
-			testName:       "Unmounted volume: new limit specified, no actuated limit",
+			testName:       "Upsize: limit removed (new limit zero)",
 			enableGate:     true,
+			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
+			newLimit:       resource.NewQuantity(0, resource.BinarySI),
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   true,
+			expectDownsize: false,
+		},
+		{
+			testName:       "Downsize: limit added to uncapped volume (actuated at node allocatable)",
+			enableGate:     true,
+			actuatedLimit:  &nodeAllocatable,
+			newLimit:       resource.NewQuantity(100, resource.BinarySI),
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   false,
+			expectDownsize: true,
+		},
+		{
+			testName:       "Downsize: limit removed while pod memory limit shrinks below old volume limit",
+			enableGate:     true,
+			actuatedLimit:  resource.NewQuantity(200, resource.BinarySI),
+			newLimit:       nil,
+			podMemLimit:    resource.NewQuantity(100, resource.BinarySI),
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   false,
+			expectDownsize: true,
+		},
+		{
+			testName:       "Unmounted volume: new limit specified, no actuation checkpoint",
+			enableGate:     true,
+			noCheckpoint:   true,
 			actuatedLimit:  nil,
 			newLimit:       resource.NewQuantity(100, resource.BinarySI),
 			volMedium:      v1.StorageMediumMemory,
@@ -5279,10 +5346,59 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 			expectDownsize: false,
 		},
 		{
-			testName:       "No change: both limits nil",
+			testName:       "No change: uncapped volume already at node allocatable (new limit nil)",
 			enableGate:     true,
-			actuatedLimit:  nil,
+			actuatedLimit:  &nodeAllocatable,
 			newLimit:       nil,
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   false,
+			expectDownsize: false,
+		},
+		{
+			testName:       "No change: uncapped volume already at node allocatable (new limit zero)",
+			enableGate:     true,
+			actuatedLimit:  &nodeAllocatable,
+			newLimit:       resource.NewQuantity(0, resource.BinarySI),
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   false,
+			expectDownsize: false,
+		},
+		{
+			testName:       "Upsize: uncapped volume with pod memory limit increased above actuated limit",
+			enableGate:     true,
+			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
+			newLimit:       nil,
+			podMemLimit:    resource.NewQuantity(200, resource.BinarySI),
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   true,
+			expectDownsize: false,
+		},
+		{
+			testName:         "Upsize: uncapped volume with pod-level memory limit increased above actuated limit",
+			enableGate:       true,
+			actuatedLimit:    resource.NewQuantity(100, resource.BinarySI),
+			newLimit:         nil,
+			podLevelMemLimit: resource.NewQuantity(200, resource.BinarySI),
+			volMedium:        v1.StorageMediumMemory,
+			expectUpsize:     true,
+			expectDownsize:   false,
+		},
+		{
+			testName:       "Upsize: volume sizeLimit previously capped by pod memory limit expands when pod memory increases",
+			enableGate:     true,
+			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
+			newLimit:       resource.NewQuantity(300, resource.BinarySI),
+			podMemLimit:    resource.NewQuantity(200, resource.BinarySI),
+			volMedium:      v1.StorageMediumMemory,
+			expectUpsize:   true,
+			expectDownsize: false,
+		},
+		{
+			testName:       "No change: new limit exceeds pod memory limit and actuated limit already at pod cap",
+			enableGate:     true,
+			actuatedLimit:  resource.NewQuantity(100, resource.BinarySI),
+			newLimit:       resource.NewQuantity(300, resource.BinarySI),
+			podMemLimit:    resource.NewQuantity(100, resource.BinarySI),
 			volMedium:      v1.StorageMediumMemory,
 			expectUpsize:   false,
 			expectDownsize: false,
@@ -5312,8 +5428,25 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 					},
 				},
 			}
+			if tc.podMemLimit != nil {
+				pod.Spec.Containers = []v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceMemory: *tc.podMemLimit},
+					},
+				}}
+			}
+			if tc.podLevelMemLimit != nil {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				pod.Spec.Resources = &v1.ResourceRequirements{
+					Limits: v1.ResourceList{v1.ResourceMemory: *tc.podLevelMemLimit},
+				}
+				if len(pod.Spec.Containers) == 0 {
+					pod.Spec.Containers = []v1.Container{{Name: "c1"}}
+				}
+			}
 
-			if tc.actuatedLimit != nil {
+			if !tc.noCheckpoint {
 				err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{Medium: tc.volMedium, SizeLimit: tc.actuatedLimit})
 				require.NoError(t, err)
 			}
@@ -5350,6 +5483,61 @@ func TestComputeVolumeResizeAction(t *testing.T) {
 	}
 }
 
+func TestComputePodActions_VolumeResizeWithRestartContainerPolicy(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+	require.NoError(t, err)
+
+	cpu100m := resource.MustParse("100m")
+	mem200M := resource.MustParse("200Mi")
+	vol100M := resource.MustParse("100Mi")
+	vol200M := resource.MustParse("200Mi")
+
+	pod, status := makeBasePodAndStatus()
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+	status.ContainerStatuses = status.ContainerStatuses[:1]
+
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+	}
+	pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+		{ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer},
+		{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
+	}
+	pod.Spec.Volumes = []v1.Volume{
+		{
+			Name: "mem-vol",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: &vol100M,
+				},
+			},
+		},
+	}
+	status.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
+	require.NoError(t, m.actuatedState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
+	m.InitializeActuatedPod(logger, pod)
+
+	// Resize only the memory-backed emptyDir volume sizeLimit.
+	pod.Spec.Volumes[0].EmptyDir.SizeLimit = &vol200M
+
+	actions := m.computePodActions(tCtx, pod, status, false)
+
+	assert.Empty(t, actions.ContainersToKill, "volume-only resize must not restart container even with RestartContainer policy")
+	assert.Empty(t, actions.ContainersToStart, "volume-only resize must not start container")
+	assert.Empty(t, actions.ContainersToUpdate, "volume-only resize must not update container cgroups")
+	require.Len(t, actions.VolumesToUpsize, 1)
+	assert.Equal(t, "mem-vol", actions.VolumesToUpsize[0].Name)
+}
+
 func TestDoPodResizeAction_Volumes(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("unsupported OS")
@@ -5360,6 +5548,7 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 
 	for _, tc := range []struct {
 		testName          string
+		podMemLimit       *resource.Quantity
 		volumesToDownsize []string
 		volumesToUpsize   []string
 		injectResizeError error
@@ -5372,12 +5561,26 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			volumesToDownsize: []string{"down-vol"},
 			volumesToUpsize:   []string{"up-vol"},
 			expectedCalls: []mockResizeCall{
-				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
-				{volumeName: "up-vol", newSize: resource.NewQuantity(200, resource.BinarySI)},
+				{volumeName: "down-vol"},
+				{volumeName: "up-vol"},
 			},
 			expectedActuated: map[string]*resource.Quantity{
 				"down-vol": resource.NewQuantity(100, resource.BinarySI),
 				"up-vol":   resource.NewQuantity(200, resource.BinarySI),
+			},
+		},
+		{
+			testName:          "Effective volume limit capped by pod memory limit is recorded in actuatedState",
+			podMemLimit:       resource.NewQuantity(150, resource.BinarySI),
+			volumesToDownsize: []string{"down-vol"},
+			volumesToUpsize:   []string{"up-vol"},
+			expectedCalls: []mockResizeCall{
+				{volumeName: "down-vol"},
+				{volumeName: "up-vol"},
+			},
+			expectedActuated: map[string]*resource.Quantity{
+				"down-vol": resource.NewQuantity(100, resource.BinarySI),
+				"up-vol":   resource.NewQuantity(150, resource.BinarySI),
 			},
 		},
 		{
@@ -5386,7 +5589,7 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			volumesToUpsize:   []string{"up-vol"},
 			injectResizeError: fmt.Errorf("resize failed"),
 			expectedCalls: []mockResizeCall{
-				{volumeName: "down-vol", newSize: resource.NewQuantity(100, resource.BinarySI)},
+				{volumeName: "down-vol"},
 			},
 			expectedActuated:  map[string]*resource.Quantity{},
 			expectedResultErr: true,
@@ -5437,6 +5640,14 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 						},
 					},
 				},
+			}
+			if tc.podMemLimit != nil {
+				pod.Spec.Containers = []v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceMemory: *tc.podMemLimit},
+					},
+				}}
 			}
 
 			// Pre-seed initial state for both volumes so we can observe state changes
@@ -5490,12 +5701,6 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 			for idx, expectedCall := range tc.expectedCalls {
 				actualCall := helper.resizeCalls[idx]
 				assert.Equal(t, expectedCall.volumeName, actualCall.volumeName)
-				if expectedCall.newSize == nil {
-					assert.Nil(t, actualCall.newSize)
-				} else {
-					require.NotNil(t, actualCall.newSize)
-					assert.Equal(t, expectedCall.newSize.Value(), actualCall.newSize.Value())
-				}
 			}
 
 			// Check final actuated state
@@ -5515,12 +5720,18 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 }
 
 func TestIsPodResizeInProgress_Volumes(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
 	logger, tCtx := ktesting.NewTestContext(t)
+	nodeAllocatable := resource.MustParse(fakeNodeAllocatableMemory)
 
 	for _, tc := range []struct {
 		testName        string
 		enableGate      bool
+		noCheckpoint    bool
 		specLimit       *resource.Quantity
+		podMemLimit     *resource.Quantity
 		statusLimit     *resource.Quantity
 		expectHasResize bool
 	}{
@@ -5534,6 +5745,7 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 		{
 			testName:        "Spec set, status not set (initial startup safety)",
 			enableGate:      true,
+			noCheckpoint:    true,
 			specLimit:       resource.NewQuantity(100, resource.BinarySI),
 			statusLimit:     nil,
 			expectHasResize: false,
@@ -5553,9 +5765,47 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 			expectHasResize: true,
 		},
 		{
-			testName:        "Spec nil (removed), status set",
+			testName:        "Spec nil (removed), status at old explicit limit (resize in progress)",
 			enableGate:      true,
 			specLimit:       nil,
+			statusLimit:     resource.NewQuantity(200, resource.BinarySI),
+			expectHasResize: true,
+		},
+		{
+			testName:        "Spec set (added), status at node allocatable (uncapped, resize in progress)",
+			enableGate:      true,
+			specLimit:       resource.NewQuantity(100, resource.BinarySI),
+			statusLimit:     &nodeAllocatable,
+			expectHasResize: true,
+		},
+		{
+			testName:        "Spec nil and status at node allocatable (uncapped, no resize in progress)",
+			enableGate:      true,
+			specLimit:       nil,
+			statusLimit:     &nodeAllocatable,
+			expectHasResize: false,
+		},
+		{
+			testName:        "Uncapped volume with pod memory limit matching actuated limit (no resize in progress)",
+			enableGate:      true,
+			specLimit:       nil,
+			podMemLimit:     resource.NewQuantity(200, resource.BinarySI),
+			statusLimit:     resource.NewQuantity(200, resource.BinarySI),
+			expectHasResize: false,
+		},
+		{
+			testName:        "Uncapped volume with pod memory limit differing from actuated limit (resize in progress)",
+			enableGate:      true,
+			specLimit:       nil,
+			podMemLimit:     resource.NewQuantity(200, resource.BinarySI),
+			statusLimit:     resource.NewQuantity(100, resource.BinarySI),
+			expectHasResize: true,
+		},
+		{
+			testName:        "Spec limit exceeds pod memory limit, actuated limit matches pod memory cap (no resize in progress)",
+			enableGate:      true,
+			specLimit:       resource.NewQuantity(300, resource.BinarySI),
+			podMemLimit:     resource.NewQuantity(200, resource.BinarySI),
 			statusLimit:     resource.NewQuantity(200, resource.BinarySI),
 			expectHasResize: false,
 		},
@@ -5584,8 +5834,16 @@ func TestIsPodResizeInProgress_Volumes(t *testing.T) {
 					},
 				},
 			}
+			if tc.podMemLimit != nil {
+				pod.Spec.Containers = []v1.Container{{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourceMemory: *tc.podMemLimit},
+					},
+				}}
+			}
 
-			if tc.statusLimit != nil {
+			if !tc.noCheckpoint {
 				err := m.actuatedState.SetEmptyDirVolumeLimit(logger, pod.UID, "mem-vol", &v1.EmptyDirVolumeSource{
 					Medium:    v1.StorageMediumMemory,
 					SizeLimit: tc.statusLimit,

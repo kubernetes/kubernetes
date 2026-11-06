@@ -665,8 +665,13 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 }
 
 // ResizeEphemeralVolume directly triggers a resize of the specified volume.
-func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *apiresource.Quantity) error {
-	return kl.volumeManager.ResizeEphemeralVolume(pod, volumeName, newSize)
+func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error {
+	return kl.volumeManager.ResizeEphemeralVolume(pod, volumeName)
+}
+
+// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+func (kl *Kubelet) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*apiresource.Quantity, error) {
+	return kl.volumeManager.EffectiveEphemeralVolumeLimit(pod, volumeName)
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
