@@ -57,6 +57,7 @@ const (
 type watcherInput struct {
 	event    *watchCacheEvent
 	interval *watchCacheInterval
+	err      error
 }
 
 // cacheWatcher implements watch.Interface
@@ -469,6 +470,20 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) (builtAt, sen
 	return builtAt, sentAt
 }
 
+func (c *cacheWatcher) sendWatchError(err error) {
+	select {
+	case <-c.done:
+		return
+	default:
+	}
+
+	watchEvent := newWatchErrorEvent(err)
+	select {
+	case c.result <- watchEvent:
+	case <-c.done:
+	}
+}
+
 func (c *cacheWatcher) process(ctx context.Context) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer close(c.result)
@@ -512,6 +527,16 @@ func (c *cacheWatcher) process(ctx context.Context) {
 					return
 				}
 				c.processEvent(item.event, resourceVersion)
+			case item.err != nil:
+				if initialized {
+					klog.ErrorS(nil, "Unexpected error after watch was already initialized", "resource", c.groupResource, "identifier", c.identifier)
+					if consistency.PanicOnCacheInconsistency {
+						panic(fmt.Sprintf("Unexpected error after watch was already initialized, resource: %q, identifier: %q", c.groupResource, c.identifier))
+					}
+					return
+				}
+				c.sendWatchError(item.err)
+				return
 			default:
 				klog.ErrorS(nil, "Unexpected item in watch input", "resource", c.groupResource, "identifier", c.identifier)
 				if consistency.PanicOnCacheInconsistency {
