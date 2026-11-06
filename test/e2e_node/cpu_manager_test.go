@@ -3975,7 +3975,7 @@ func getSandboxCFSQuota(pod *v1.Pod) (string, error) {
 	if !e2enodeCgroupV2Enabled {
 		return "", fmt.Errorf("only Cgroup V2 is supported")
 	}
-	cgPath := filepath.Join(makeCgroupPathForPod(pod, true), "cpu.max")
+	cgPath := filepath.Join(makeCgroupPathForPod(pod, kubeletCfg.CgroupRoot, e2enodeCgroupDriver, true), "cpu.max")
 	data, err := os.ReadFile(cgPath)
 	if err != nil {
 		return "", err
@@ -4011,17 +4011,16 @@ const (
 // example path (cgroup, containerd, v1):
 // /sys/fs/cgroup/cpuset kubepods/burstable pod8e414e92-17c2-41de-81c7-0045bba9103b b5791f89a6971bb4a751ffbebf533399c91630aa2906d7c6b5e239f405f3b97a
 
-func makeCgroupPathForPod(pod *v1.Pod, isV2 bool) string {
+func makeCgroupPathForPod(pod *v1.Pod, cgroupRoot, cgroupDriver string, isV2 bool) string {
 	components := []string{defaultNodeAllocatableCgroup}
 	if pod.Status.QOSClass != v1.PodQOSGuaranteed {
 		components = append(components, strings.ToLower(string(pod.Status.QOSClass)))
 	}
 	components = append(components, "pod"+string(pod.UID))
 
-	cgroupName := cm.NewCgroupName(cm.RootCgroupName, components...)
+	cgroupName := cm.NewCgroupName(cm.ParseCgroupfsToCgroupName(cgroupRoot), components...)
 	cgroupFsName := ""
-	// it's quite ugly to use a global, but it saves us to pass a parameter all across the stack many times
-	if e2enodeCgroupDriver == "systemd" {
+	if cgroupDriver == "systemd" {
 		cgroupFsName = cgroupName.ToSystemd()
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()
@@ -4048,7 +4047,7 @@ func makeCgroupPathForContainer(pod *v1.Pod, ctnName string, isInit, isV2 bool) 
 		cntPath = cntID
 	}
 
-	return filepath.Join(makeCgroupPathForPod(pod, isV2), cntPath), nil
+	return filepath.Join(makeCgroupPathForPod(pod, kubeletCfg.CgroupRoot, e2enodeCgroupDriver, isV2), cntPath), nil
 }
 
 func cpusetFileNameFromVersion(isV2 bool) string {

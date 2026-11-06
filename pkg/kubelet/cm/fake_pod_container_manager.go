@@ -28,8 +28,9 @@ import (
 
 type FakePodContainerManager struct {
 	sync.Mutex
-	CalledFunctions []string
-	Cgroups         map[types.UID]CgroupName
+	CalledFunctions               []string
+	Cgroups                       map[types.UID]CgroupName
+	EnsureWritableCgroupLimitsErr error
 }
 
 var _ PodContainerManager = &FakePodContainerManager{}
@@ -58,6 +59,13 @@ func (m *FakePodContainerManager) EnsureExists(_ klog.Logger, _ *v1.Pod) error {
 	defer m.Unlock()
 	m.CalledFunctions = append(m.CalledFunctions, "EnsureExists")
 	return nil
+}
+
+func (m *FakePodContainerManager) EnsureWritableCgroupLimits(_ *v1.Pod) error {
+	m.Lock()
+	defer m.Unlock()
+	m.CalledFunctions = append(m.CalledFunctions, "EnsureWritableCgroupLimits")
+	return m.EnsureWritableCgroupLimitsErr
 }
 
 func (m *FakePodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {

@@ -270,6 +270,60 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
+var symbolsForCgroupMountMode = sets.New(corev1.CgroupMountModeReadOnly, corev1.CgroupMountModeReadWrite)
+
+// Validate_CgroupMountMode validates an instance of CgroupMountMode according
+// to declarative validation rules in the API schema.
+func Validate_CgroupMountMode(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.CgroupMountMode) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForCgroupMountMode, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_CgroupOptions validates an instance of CgroupOptions according
+// to declarative validation rules in the API schema.
+func Validate_CgroupOptions(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.CgroupOptions) (errs field.ErrorList) {
+
+	{ // field corev1.CgroupOptions.MountMode
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.CgroupMountMode,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CgroupMountMode(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.CgroupOptions) *corev1.CgroupMountMode {
+				return oldObj.MountMode
+			})
+		errs = append(errs, fn(fldPath.Child("mountMode"), obj.MountMode, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
 // Validate_ConfigMap validates an instance of ConfigMap according
 // to declarative validation rules in the API schema.
 func Validate_ConfigMap(
@@ -2516,6 +2570,37 @@ func Validate_SecurityContext(
 	}
 
 	// field corev1.SecurityContext.AppArmorProfile has no validation
+
+	{ // field corev1.SecurityContext.CgroupOptions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.CgroupOptions,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_CgroupOptions(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SecurityContext) *corev1.CgroupOptions {
+				return oldObj.CgroupOptions
+			})
+		errs = append(errs, fn(fldPath.Child("cgroupOptions"), obj.CgroupOptions, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 

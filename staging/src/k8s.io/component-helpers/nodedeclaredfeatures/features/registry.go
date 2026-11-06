@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/cgroupoptions"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
@@ -44,4 +45,5 @@ var AllFeatures = []types.Feature{
 	draoptionalnodeoperations.Feature,
 	podcertificatesmldsa.Feature,
 	securityprofileoci.Feature,
+	cgroupoptions.Feature,
 }
