@@ -235,7 +235,7 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 		},
 	}
 
-	storagetesting.TestCheckResultsInStrictOrder(t, w, expectedWatchEvents)
+	storagetesting.ExpectWatchEventsExact(expectedWatchEvents).Check(t, w)
 	storagetesting.TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
 
