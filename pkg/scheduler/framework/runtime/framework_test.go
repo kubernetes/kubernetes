@@ -40,6 +40,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -6153,5 +6154,42 @@ func newQueuedPodGroupInfoForTest(ns, name string) *framework.QueuedPodGroupInfo
 				},
 			}),
 		},
+	}
+}
+
+// recordingNominator is a PodNominator which cannot hide nominations.
+type recordingNominator struct {
+	fwk.PodNominator
+	calls []string
+}
+
+func (n *recordingNominator) AddNominatedPod(_ klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
+	n.calls = append(n.calls, fmt.Sprintf("add %s %s", pi.GetPod().Name, nominatingInfo.NominatedNodeName))
+}
+
+func (n *recordingNominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
+	n.calls = append(n.calls, "delete "+pod.Name)
+}
+
+// TestHideNominatedPodFallback checks that with a PodNominator which cannot
+// hide nominations, hiding ends the nomination and restoring nominates the
+// pod to its nominated node again.
+func TestHideNominatedPodFallback(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	nominator := &recordingNominator{}
+	f, err := newFrameworkWithQueueSortAndBind(ctx, Registry{}, config.KubeSchedulerProfile{Plugins: &config.Plugins{}}, WithPodNominator(nominator))
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+	nominated := st.MakePod().Name("nominated").NominatedNodeName("node1").Obj()
+	notNominated := st.MakePod().Name("not-nominated").Obj()
+	f.HideNominatedPod(nominated)
+	f.RestoreNominatedPod(logger, mustNewPodInfo(t, nominated))
+	f.RestoreNominatedPod(logger, mustNewPodInfo(t, notNominated))
+	if diff := cmp.Diff([]string{"delete nominated", "add nominated node1"}, nominator.calls); diff != "" {
+		t.Errorf("Unexpected PodNominator calls (-want, +got):\n%s", diff)
 	}
 }

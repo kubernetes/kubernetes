@@ -607,6 +607,36 @@ func (f *frameworkImpl) SetPodNominator(n fwk.PodNominator) {
 	f.PodNominator = n
 }
 
+// nominationHider is implemented by the scheduling queue.
+type nominationHider interface {
+	HideNominatedPod(pod *v1.Pod)
+	RestoreNominatedPod(logger klog.Logger, podInfo fwk.PodInfo)
+}
+
+// HideNominatedPod removes the nomination of a pod which a pod group cycle
+// assumed tentatively in its snapshot. A PodNominator which cannot hide it
+// ends the nomination instead.
+func (f *frameworkImpl) HideNominatedPod(pod *v1.Pod) {
+	if hider, ok := f.PodNominator.(nominationHider); ok {
+		hider.HideNominatedPod(pod)
+		return
+	}
+	f.DeleteNominatedPodIfExists(pod)
+}
+
+// RestoreNominatedPod brings back the nomination which HideNominatedPod
+// removed. A PodNominator which cannot hide nominations gets the nominated
+// node of the pod object again.
+func (f *frameworkImpl) RestoreNominatedPod(logger klog.Logger, podInfo fwk.PodInfo) {
+	if hider, ok := f.PodNominator.(nominationHider); ok {
+		hider.RestoreNominatedPod(logger, podInfo)
+		return
+	}
+	if nodeName := podInfo.GetPod().Status.NominatedNodeName; nodeName != "" {
+		f.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{NominatedNodeName: nodeName, NominatingMode: fwk.ModeOverride})
+	}
+}
+
 func (f *frameworkImpl) SetPodActivator(a fwk.PodActivator) {
 	f.PodActivator = a
 }

@@ -415,6 +415,83 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	}
 }
 
+// TestAssumeAndReserveInSnapshotNomination checks that a tentative placement
+// of a pod group cycle does not end the nomination of the pod: it gets
+// restored on revert, and ends when the pod gets assumed in the cache.
+func TestAssumeAndReserveInSnapshotNomination(t *testing.T) {
+	node1 := st.MakeNode().Name("node1").Obj()
+	pod := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").SchedulerName("default-scheduler").NominatedNodeName("node1").Obj()
+	nominatedCall := "AddAllocation default/pod-nominated node1 assigned="
+
+	tests := []struct {
+		name      string
+		succeed   bool
+		wantCalls []string
+	}{
+		{
+			name:      "reverted",
+			wantCalls: []string{nominatedCall},
+		},
+		{
+			name:    "assumed in the cache",
+			succeed: true,
+			wantCalls: []string{
+				nominatedCall,
+				"PrepareAllocation default/pod-nominated node1 assigned=node1",
+				"AddAllocation default/pod-nominated node1 assigned=node1",
+				"RemoveAllocation default/pod-nominated node1 assigned=",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			plugin := &assumeReserveTestPlugin{
+				fakePodGroupPlugin: &fakePodGroupPlugin{
+					filterStatus: map[string]*fwk.Status{pod.Name: fwk.NewStatus(fwk.Success)},
+				},
+			}
+			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
+			f := newAssumeReserveFixtureWithAllocations(t, ctx, node1, plugin, allocationExtensions, pod)
+			podInfo, err := framework.NewPodInfo(pod)
+			if err != nil {
+				t.Fatalf("Failed to create PodInfo: %v", err)
+			}
+			f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{NominatedNodeName: node1.Name, NominatingMode: fwk.ModeOverride})
+			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+			state := newPodGroupCycleState()
+			scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
+			if err != nil {
+				t.Fatalf("schedulePod failed: %v", err)
+			}
+
+			status, revertFn := f.algorithm.AssumeAndReserveInSnapshot(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
+			if !status.IsSuccess() {
+				t.Fatalf("AssumeAndReserveInSnapshot status = %v, want success", status)
+			}
+			if got := f.fwk.NominatedPodsForNode(logger, node1.Name); len(got) != 0 {
+				t.Errorf("Pod still counts as nominated while it is assumed in the snapshot: %v", got)
+			}
+			if tt.succeed {
+				// Like submitPodGroupResult for a placed pod group.
+				state.SetPodGroupCycleState(nil)
+				if _, _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); !status.IsSuccess() {
+					t.Fatalf("AssumeAndReserveInCache status = %v, want success", status)
+				}
+			} else {
+				revertFn()
+				if got := f.fwk.NominatedPodsForNode(logger, node1.Name); len(got) != 1 {
+					t.Errorf("Nomination not restored on revert: %v", got)
+				}
+			}
+			if diff := cmp.Diff(tt.wantCalls, allocationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 // TestAssumeAndReserveSnapshotSync pins down the difference that makes the two
 // assume paths worth keeping apart: a cache assumption survives the next snapshot
 // refresh, a snapshot-only one does not.

@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -482,6 +483,12 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator fwk.PodNominator)
+	// HideNominatedPod removes the nomination of a pod which a pod group
+	// cycle assumed tentatively in its snapshot, without ending it.
+	HideNominatedPod(pod *v1.Pod)
+	// RestoreNominatedPod brings back the nomination which
+	// HideNominatedPod removed, when the tentative placement gets reverted.
+	RestoreNominatedPod(logger klog.Logger, podInfo fwk.PodInfo)
 	// SetPodActivator sets the PodActivator
 	SetPodActivator(activator fwk.PodActivator)
 	// SetAPICacher sets the APICacher

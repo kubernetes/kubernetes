@@ -951,6 +951,23 @@ func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *v1.Pod) {
 	p.nominator.DeleteNominatedPodIfExists(pod)
 }
 
+// HideNominatedPod removes the nomination of a pod which a pod group cycle
+// assumed tentatively in its snapshot, so that the pod does not count twice,
+// but without ending the nomination: the placement may get reverted.
+// RestoreNominatedPod brings the nomination back. Any other change of the
+// pod's nomination, like the removal when the pod gets assumed in the cache,
+// ends it.
+func (p *PriorityQueue) HideNominatedPod(pod *v1.Pod) {
+	p.nominator.hideNominatedPod(pod)
+}
+
+// RestoreNominatedPod reverts HideNominatedPod.
+func (p *PriorityQueue) RestoreNominatedPod(logger klog.Logger, pi fwk.PodInfo) {
+	p.lock.Lock()
+	defer p.processNominationChangesAndUnlock(logger)
+	p.nominator.restoreNominatedPod(logger, pi)
+}
+
 // Add adds a pod to the active queue. It should be called only when a new pod
 // is added so there is no chance the pod is already in active/unschedulable/backoff queues
 func (p *PriorityQueue) Add(ctx context.Context, pod *v1.Pod) {

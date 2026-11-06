@@ -19,15 +19,20 @@ package queue
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -234,5 +239,149 @@ func TestRenominationToSameNode(t *testing.T) {
 	want := []string{"p ->node1", "p node1->node1"}
 	if diff := cmp.Diff(want, calls); diff != "" {
 		t.Errorf("Unexpected handler calls (-want, +got):\n%s", diff)
+	}
+}
+
+// TestHiddenNominations checks that hiding a nomination for a tentative
+// placement is not a change and that the nomination ends from the hidden
+// node when something else changes it.
+func TestHiddenNominations(t *testing.T) {
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj()
+	assumedOn := func(nodeName string) *v1.Pod {
+		p := pod.DeepCopy()
+		p.Spec.NodeName = nodeName
+		return p
+	}
+	lowPod := st.MakePod().Name("low").Namespace("ns").UID("low").Priority(lowPriority).Obj()
+
+	for name, tc := range map[string]struct {
+		// hideOn is the node of the tentative placement, node2 if empty.
+		hideOn string
+		// change runs after HideNominatedPod hid the nomination of the pod
+		// assumed on hideOn.
+		change        func(t *testing.T, q *PriorityQueue, podStore cache.Store)
+		wantNominated string
+		wantMoved     bool
+		wantCalls     []string
+	}{
+		"restored": {
+			change: func(t *testing.T, q *PriorityQueue, _ cache.Store) {
+				logger, _ := ktesting.NewTestContext(t)
+				q.RestoreNominatedPod(logger, mustPodInfo(t, assumedOn("node2")))
+			},
+			wantNominated: "node1",
+		},
+		"updated-and-restored": {
+			change: func(t *testing.T, q *PriorityQueue, _ cache.Store) {
+				logger, ctx := ktesting.NewTestContext(t)
+				updated := pod.DeepCopy()
+				updated.Labels = map[string]string{"updated": "true"}
+				q.Update(ctx, pod, updated)
+				if got := q.NominatedPodsForNode(logger, "node1"); len(got) != 0 {
+					t.Errorf("Update made the hidden nomination visible: %v", got)
+				}
+				q.RestoreNominatedPod(logger, mustPodInfo(t, assumedOn("node2")))
+			},
+			wantNominated: "node1",
+		},
+		"assumed-in-cache": {
+			change: func(t *testing.T, q *PriorityQueue, _ cache.Store) {
+				q.DeleteNominatedPodIfExists(assumedOn("node2"))
+			},
+			wantMoved: true,
+			wantCalls: []string{"p node1-> assigned=node2"},
+		},
+		"deleted": {
+			change: func(t *testing.T, q *PriorityQueue, _ cache.Store) {
+				logger, _ := ktesting.NewTestContext(t)
+				q.Delete(logger, pod)
+			},
+			wantMoved: true,
+			wantCalls: []string{"p node1-> assigned="},
+		},
+		"nominated-elsewhere": {
+			change: func(t *testing.T, q *PriorityQueue, _ cache.Store) {
+				logger, _ := ktesting.NewTestContext(t)
+				q.AddNominatedPod(logger, mustPodInfo(t, pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node3"})
+			},
+			wantNominated: "node3",
+			wantMoved:     true,
+			wantCalls:     []string{"p node1->node3 assigned="},
+		},
+		"restore-after-pod-got-deleted": {
+			change: func(t *testing.T, q *PriorityQueue, podStore cache.Store) {
+				logger, _ := ktesting.NewTestContext(t)
+				if err := podStore.Delete(pod); err != nil {
+					t.Fatal(err)
+				}
+				q.RestoreNominatedPod(logger, mustPodInfo(t, assumedOn("node2")))
+			},
+			wantMoved: true,
+			wantCalls: []string{"p node1-> assigned="},
+		},
+		// The queue gets the deletion only after the revert.
+		"restore-on-nominated-node-after-pod-got-deleted": {
+			hideOn: "node1",
+			change: func(t *testing.T, q *PriorityQueue, podStore cache.Store) {
+				logger, _ := ktesting.NewTestContext(t)
+				if err := podStore.Delete(pod); err != nil {
+					t.Fatal(err)
+				}
+				q.RestoreNominatedPod(logger, mustPodInfo(t, assumedOn("node1")))
+				q.Delete(logger, pod)
+			},
+			wantMoved: true,
+			wantCalls: []string{"p node1-> assigned="},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			m := makeEmptyQueueingHintMapPerProfile()
+			m[""][framework.EventAssignedPodDelete] = []*QueueingHintFunction{{PluginName: "fooPlugin", QueueingHintFn: queueHintReturnQueue}}
+			var calls []string
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(pod, lowPod), 0)
+			q := NewTestQueueWithInformerFactory(ctx, newDefaultQueueSort(), informerFactory,
+				WithMetricsRecorder(metrics.NewMetricsAsyncRecorder(10, 20*time.Microsecond, ctx.Done())),
+				WithQueueingHintMapPerProfile(m),
+				WithNominationChangeHandler(func(_ klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.AllocationEvent {
+					calls = append(calls, fmt.Sprintf("%s %s->%s assigned=%s", pod.Name, oldNodeName, newNodeName, pod.Spec.NodeName))
+					return nil
+				}))
+			q.Add(ctx, lowPod)
+			if _, err := q.Pop(logger); err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+			if err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, lowPod, "fooPlugin"), q.SchedulingCycle()); err != nil {
+				t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+			}
+			q.Add(ctx, pod)
+			calls = nil
+
+			hideOn := tc.hideOn
+			if hideOn == "" {
+				hideOn = "node2"
+			}
+			q.HideNominatedPod(assumedOn(hideOn))
+			if got := q.NominatedPodsForNode(logger, "node1"); len(got) != 0 {
+				t.Fatalf("Nomination not hidden: %v", got)
+			}
+			if len(calls) != 0 || getUnschedulablePod(q, lowPod) == nil {
+				t.Fatalf("Hiding the nomination ended it: handler calls %v, lower priority pod moved %v", calls, getUnschedulablePod(q, lowPod) == nil)
+			}
+
+			tc.change(t, q, informerFactory.Core().V1().Pods().Informer().GetStore())
+			if got := q.nominatedPodToNode[pod.UID]; got != tc.wantNominated {
+				t.Errorf("Nominated node: got %q, want %q", got, tc.wantNominated)
+			}
+			if moved := getUnschedulablePod(q, lowPod) == nil; moved != tc.wantMoved {
+				t.Errorf("Lower priority pod moved: got %v, want %v", moved, tc.wantMoved)
+			}
+			if diff := cmp.Diff(tc.wantCalls, calls); diff != "" {
+				t.Errorf("Unexpected handler calls (-want, +got):\n%s", diff)
+			}
+			if len(q.hidden) != 0 {
+				t.Errorf("Nominations still hidden: %v", q.hidden)
+			}
+		})
 	}
 }

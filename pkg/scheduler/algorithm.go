@@ -715,7 +715,9 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 		logger.Error(err, "Scheduler snapshot AssumePod failed")
 		return fwk.AsStatus(err), nil
 	}
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+	// The placement is tentative, so the nomination does not end yet: it
+	// gets restored on revert or ends when the pod gets assumed in the cache.
+	schedFramework.HideNominatedPod(assumedPodInfo.Pod)
 
 	revert := func() {
 		if err := a.unreserveAndForgetFromSnapshot(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
@@ -742,12 +744,7 @@ func (a *SchedulingAlgorithm) unreserveAndForgetFromSnapshot(ctx context.Context
 	if err := a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod); err != nil {
 		return err
 	}
-	if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
-		// The assume removed the nomination; reverting a tentative assume restores it.
-		schedFramework.AddNominatedPod(logger, assumedPodInfo.PodInfo, &fwk.NominatingInfo{
-			NominatedNodeName: assumedPodInfo.Pod.Status.NominatedNodeName,
-			NominatingMode:    fwk.ModeOverride,
-		})
-	}
+	// The assume hid the nomination; reverting a tentative assume restores it.
+	schedFramework.RestoreNominatedPod(logger, assumedPodInfo.PodInfo)
 	return nil
 }

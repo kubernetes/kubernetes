@@ -67,6 +67,12 @@ type nominator struct {
 	// needs the activeQ and backoffQ locks, which must not be taken while
 	// nLock is held.
 	changes []nominationChange
+
+	// hidden maps the UIDs of pods whose nomination hideNominatedPod removed
+	// to the node which they are nominated to. Such a nomination has not
+	// ended: restoreNominatedPod brings it back, and any other change of the
+	// pod's nomination starts from that node.
+	hidden map[types.UID]string
 }
 
 func newPodNominator(podLister listersv1.PodLister) *nominator {
@@ -86,6 +92,52 @@ func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string) {
 	}
 }
 
+// takeNodeNameUnlocked returns the node which the pod is nominated to, also
+// if its nomination is hidden, and stops hiding it.
+func (npm *nominator) takeNodeNameUnlocked(uid types.UID) string {
+	if nodeName, ok := npm.hidden[uid]; ok {
+		delete(npm.hidden, uid)
+		return nodeName
+	}
+	return npm.nominatedPodToNode[uid]
+}
+
+// hideNominatedPod removes the nomination of the pod without ending it.
+func (npm *nominator) hideNominatedPod(pod *v1.Pod) {
+	npm.nLock.Lock()
+	defer npm.nLock.Unlock()
+	nodeName, ok := npm.nominatedPodToNode[pod.UID]
+	if !ok {
+		return
+	}
+	npm.deleteUnlocked(pod)
+	if npm.hidden == nil {
+		npm.hidden = make(map[types.UID]string)
+	}
+	npm.hidden[pod.UID] = nodeName
+}
+
+// restoreNominatedPod brings back the nomination which hideNominatedPod
+// removed. The nomination ends if that is not possible anymore, for example
+// because the pod got deleted in the meantime.
+func (npm *nominator) restoreNominatedPod(logger klog.Logger, pi fwk.PodInfo) {
+	npm.nLock.Lock()
+	defer npm.nLock.Unlock()
+	nodeName, ok := npm.hidden[pi.GetPod().UID]
+	if !ok {
+		return
+	}
+	delete(npm.hidden, pi.GetPod().UID)
+	npm.addNominatedPodUnlocked(logger, pi, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nodeName})
+	// The tentative placement got reverted, so the pod is not assumed.
+	pod := pi.GetPod()
+	if pod.Spec.NodeName != "" {
+		pod = pod.DeepCopy()
+		pod.Spec.NodeName = ""
+	}
+	npm.recordChangeUnlocked(pod, nodeName)
+}
+
 // takeChanges returns the recorded changes and forgets them.
 func (npm *nominator) takeChanges() []nominationChange {
 	npm.nLock.Lock()
@@ -101,7 +153,7 @@ func (npm *nominator) takeChanges() []nominationChange {
 // object, to avoid races with the following scheduling cycles.
 func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
 	npm.nLock.Lock()
-	oldNodeName := npm.nominatedPodToNode[pi.GetPod().UID]
+	oldNodeName := npm.takeNodeNameUnlocked(pi.GetPod().UID)
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
 	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" &&
 		oldNodeName == nominatingInfo.NominatedNodeName && npm.nominatedPodToNode[pi.GetPod().UID] == oldNodeName {
@@ -159,6 +211,10 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo fwk.PodInfo) {
 	npm.nLock.Lock()
 	defer npm.nLock.Unlock()
+	if _, ok := npm.hidden[oldPod.UID]; ok {
+		// The pod group cycle which hid the nomination restores or ends it.
+		return
+	}
 	// In some cases, an Update event with no "NominatedNode" present is received right
 	// after a node("NominatedNode") is reserved for this pod in memory.
 	// In this case, we need to keep reserving the NominatedNode when updating the pod pointer.
@@ -187,7 +243,7 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 // DeleteNominatedPodIfExists deletes <pod> from nominatedPods.
 func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
 	npm.nLock.Lock()
-	oldNodeName := npm.nominatedPodToNode[pod.UID]
+	oldNodeName := npm.takeNodeNameUnlocked(pod.UID)
 	npm.deleteUnlocked(pod)
 	npm.recordChangeUnlocked(pod, oldNodeName)
 	npm.nLock.Unlock()
