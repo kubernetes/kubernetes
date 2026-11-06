@@ -3646,6 +3646,7 @@ message PersistentVolumeClaimStatus {
 
   // healthStatus contains the latest controller-reported health information
   // for the volume bound to this claim.
+  // This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
   // +featureGate=CSIVolumeHealth
   // +optional
   // +k8s:optional
@@ -5318,16 +5319,18 @@ message PodStatus {
   // +k8s:listMapKey=resourceClaimName
   repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
 
-  // volumeHealth contains node-reported health for each volume the pod is using.
-  // Populated by the kubelet on the pod's node.
+  // VolumeStatuses contains the status of individual volumes used by this pod.
+  // This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
   // +featureGate=CSIVolumeHealth
   // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
   // +listType=map
   // +listMapKey=name
   // +k8s:optional
   // +k8s:listType=map
   // +k8s:listMapKey=name
-  repeated PodVolumeHealth volumeHealth = 22;
+  repeated PodVolumeStatus volumeStatuses = 23;
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -5368,33 +5371,20 @@ message PodTemplateSpec {
   optional PodSpec spec = 2;
 }
 
-// PodVolumeHealth contains health information for a volume used by a pod,
-// reported by the CSI node plugin via the kubelet.
-message PodVolumeHealth {
+// PodVolumeStatus represents the status of an individual volume used by a pod.
+message PodVolumeStatus {
   // name matches an entry in pod.spec.volumes.
   // +required
   // +k8s:required
   optional string name = 1;
 
-  // healthConditions is the set of adverse conditions reported by
-  // the CSI node plugin for this volume on this node.
-  // At most 16 conditions may be reported.
+  // healthStatus contains health reported by the CSI node plugin for this volume
+  // on the pod's node. Populated by the kubelet.
+  // This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
+  // +featureGate=CSIVolumeHealth
   // +optional
-  // +listType=map
-  // +listMapKey=status
-  // +patchMergeKey=status
-  // +patchStrategy=merge
-  // +listMapKey=reason
   // +k8s:optional
-  // +k8s:listType=map
-  // +k8s:listMapKey=status
-  // +k8s:listMapKey=reason
-  // +k8s:maxItems=16
-  repeated VolumeHealthCondition healthConditions = 2;
-
-  // lastTransitionTime is when the current set of conditions first appeared.
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+  optional VolumeHealthStatus healthStatus = 2;
 }
 
 // PortStatus represents the error condition of a service port
@@ -7374,13 +7364,25 @@ message VolumeDevice {
   optional string devicePath = 2;
 }
 
-// VolumeHealthCondition represents an adverse health condition reported for a volume.
+// VolumeHealthCondition represents a health condition reported for a volume.
+// Both pod and PVC reuse this type to report volume health in their status fields.
 message VolumeHealthCondition {
   // status is the machine-parseable health category.
-  // Possible values:
+  // Possible values are:
+  // - "Unknown": the driver reported an unknown health status, or a status Kubernetes does not recognize. The volume must not be considered healthy.
   // - "Inaccessible": the volume cannot be accessed.
   // - "DataLoss": data loss has been detected on the volume.
   // - "Degraded": the volume is functioning with reduced capability.
+  // - "Healthy": the volume is healthy.
+  //
+  // This field allows additional enum values to be added to VolumeHealthStatusType via CSI spec change.
+  // A future version of a CSI driver may emit health conditions that Kubernetes components are not aware of.
+  //
+  // A writer which does not know how to handle incoming new VolumeHealthStatusType may classify the status
+  // as unknown.
+  //
+  // A reader which does not know how to handle new VolumeHealthStatusType MUST only use it for health reporting
+  // purposes.
   // +required
   // +k8s:required
   optional string status = 1;
@@ -7402,16 +7404,16 @@ message VolumeHealthCondition {
 }
 
 // VolumeHealthStatus contains health information for a volume reported
-// by the CSI controller plugin.
+// by a CSI controller or node plugin.
 message VolumeHealthStatus {
-  // healthConditions is the set of adverse conditions reported by
-  // the CSI controller plugin. An empty list means no adverse condition.
-  // At most 16 conditions may be reported.
+  // healthConditions is the set of health conditions reported by
+  // a CSI plugin. At most 16 conditions may be reported.
+  // An empty list means the CSI driver either does not support volume health
+  // or has not reported it yet. If the driver supports volume health and the
+  // volume is healthy, a Healthy condition is reported.
   // +optional
   // +listType=map
   // +listMapKey=status
-  // +patchMergeKey=status
-  // +patchStrategy=merge
   // +listMapKey=reason
   // +k8s:optional
   // +k8s:listType=map
@@ -7420,7 +7422,8 @@ message VolumeHealthStatus {
   // +k8s:maxItems=16
   repeated VolumeHealthCondition healthConditions = 1;
 
-  // lastTransitionTime is when the current set of conditions first appeared.
+  // lastTransitionTime is when the current set of (status, reason) pairs first appeared.
+  // lastTransitionTime remains unchanged when only message associated with healthConditions change.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 2;
 }

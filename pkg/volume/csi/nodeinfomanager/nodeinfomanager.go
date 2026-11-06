@@ -24,6 +24,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"sync"
 
@@ -97,7 +98,7 @@ type Interface interface {
 	// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
 	// driver with the provided conditions. Other drivers' entries are preserved.
 	// No-ops if the condition identity set for this driver is unchanged.
-	UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error
+	UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error
 }
 
 // NewNodeInfoManager initializes nodeInfoManager
@@ -712,7 +713,7 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 		return err
 	}
 
-	hasModified := false
+	specModified := false
 	// Uninstall CSINodeDriver with name csiDriverName
 	drivers := nodeInfo.Spec.Drivers[:0]
 	for _, driver := range nodeInfo.Spec.Drivers {
@@ -720,28 +721,47 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 			drivers = append(drivers, driver)
 		} else {
 			// Found a driver with name csiDriverName
-			// Set hasModified to true because it will be removed
-			hasModified = true
+			// Set specModified to true because it will be removed
+			specModified = true
 		}
 	}
 
-	if !hasModified {
-		// No changes, don't update
+	if specModified {
+		nodeInfo.Spec.Drivers = drivers
+		nodeInfo, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+		if err != nil {
+			return err // do not wrap error
+		}
+	}
+
+	// Update() ignores status, so the driver's storage health is removed with a
+	// separate status update. On retry the spec is already clean and only this runs.
+	storageHealth, statusModified := withoutStorageHealth(nodeInfo.Status.StorageHealth, csiDriverName)
+	if !statusModified {
 		return nil
 	}
-	nodeInfo.Spec.Drivers = drivers
-
-	_, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
-
+	nodeInfo.Status.StorageHealth = storageHealth
+	_, err = nodeInfoClient.UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 	return err // do not wrap error
+}
 
+// withoutStorageHealth returns health without driverName's entry and whether
+// an entry was removed.
+func withoutStorageHealth(health []storagev1.StorageHealth, driverName string) ([]storagev1.StorageHealth, bool) {
+	remaining := make([]storagev1.StorageHealth, 0, len(health))
+	for _, h := range health {
+		if h.Name != driverName {
+			remaining = append(remaining, h)
+		}
+	}
+	return remaining, len(remaining) != len(health)
 }
 
 // UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
 // driver with the provided conditions. Other drivers' entries are preserved.
 // No-ops if the status, reason, and volume-capability identities for this driver
 // are unchanged.
-func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, conditions []storagev1.StorageHealthCondition) error {
+func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		return nil
 	}
@@ -752,8 +772,8 @@ func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, condit
 	}
 
 	var updateErrs []error
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if err := nim.tryUpdateCSINodeStorageHealth(csiKubeClient, driverName, conditions); err != nil {
+	err := wait.ExponentialBackoffWithContext(ctx, updateBackoff, func(ctx context.Context) (bool, error) {
+		if err := nim.tryUpdateCSINodeStorageHealth(ctx, csiKubeClient, driverName, conditions); err != nil {
 			updateErrs = append(updateErrs, err)
 			return false, nil
 		}
@@ -766,6 +786,7 @@ func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(driverName string, condit
 }
 
 func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
+	ctx context.Context,
 	csiKubeClient clientset.Interface,
 	driverName string,
 	conditions []storagev1.StorageHealthCondition) error {
@@ -773,13 +794,20 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 	nim.lock.Lock()
 	defer nim.lock.Unlock()
 
-	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(ctx, string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	if err = nim.ensureNodeOwnsCSINode(csiKubeClient, nodeInfo); err != nil {
 		return err
+	}
+
+	// A probe that started before the driver was uninstalled must not re-add
+	// its health entry. Uninstall holds nim.lock too, so this check is not racy.
+	if !slices.ContainsFunc(nodeInfo.Spec.Drivers, func(d storagev1.CSINodeDriver) bool { return d.Name == driverName }) {
+		klog.V(4).InfoS("Skipping storage health update for driver not installed in CSINode", "driver", driverName)
+		return nil
 	}
 
 	var existingDriverConds []storagev1.StorageHealthCondition
@@ -796,13 +824,28 @@ func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
 		return nil
 	}
 
+	transitionTimes := make(map[storageHealthIdentity]metav1.Time, len(existingDriverConds))
+	for _, condition := range existingDriverConds {
+		transitionTimes[storageHealthConditionIdentity(condition)] = condition.LastTransitionTime
+	}
+
 	combined := make([]storagev1.StorageHealth, 0, len(otherDriversHealth)+1)
 	combined = append(combined, otherDriversHealth...)
 	if len(conditions) > 0 {
-		combined = append(combined, storagev1.StorageHealth{Name: driverName, HealthConditions: conditions})
+		now := metav1.Now().Rfc3339Copy()
+		updatedConditions := make([]storagev1.StorageHealthCondition, len(conditions))
+		for i, condition := range conditions {
+			updatedConditions[i] = *condition.DeepCopy()
+			transitionTime, exists := transitionTimes[storageHealthConditionIdentity(condition)]
+			if !exists {
+				transitionTime = now
+			}
+			updatedConditions[i].LastTransitionTime = transitionTime
+		}
+		combined = append(combined, storagev1.StorageHealth{Name: driverName, HealthConditions: updatedConditions})
 	}
 	nodeInfo.Status.StorageHealth = combined
-	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+	_, err = csiKubeClient.StorageV1().CSINodes().UpdateStatus(ctx, nodeInfo, metav1.UpdateOptions{})
 	return err
 }
 

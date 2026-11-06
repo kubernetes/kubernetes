@@ -257,7 +257,8 @@ func NewVolumeManager(
 			vm.desiredStateOfWorld,
 			vm.actualStateOfWorld,
 			volumeHealthStatusUpdater,
-			volumeHealthProbeInterval)
+			volumeHealthProbeInterval,
+			volumehealth.DefaultWorkers)
 	}
 	return vm
 }
@@ -300,7 +301,7 @@ type volumeManager struct {
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 
 	// volumeHealthManager periodically probes CSI volume/storage health and
-	// writes PodStatus.VolumeHealth / CSINode.Status.StorageHealth.
+	// writes PodStatus.VolumeStatuses[*].HealthStatus / CSINode.Status.StorageHealth.
 	volumeHealthManager volumehealth.Manager
 
 	// csiMigratedPluginManager keeps track of CSI migration status of plugins

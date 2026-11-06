@@ -102,6 +102,61 @@ func TestPatchPodStatus(t *testing.T) {
 	}
 }
 
+// TestPatchPodStatusVolumeHealth applies the generated patch, because a patch
+// that looks reasonable can still merge conditions sharing a status.
+func TestPatchPodStatusVolumeHealth(t *testing.T) {
+	ns := "ns"
+	name := "name"
+	uid := types.UID("myuid")
+	slowIO := v1.VolumeHealthCondition{Status: v1.VolumeHealthDegraded, Reason: "SlowIO", Message: "io latency high"}
+	pathDegraded := v1.VolumeHealthCondition{Status: v1.VolumeHealthDegraded, Reason: "PathDegraded", Message: "one path down"}
+	statusWith := func(conditions ...v1.VolumeHealthCondition) v1.PodStatus {
+		status := getPodStatus()
+		status.VolumeStatuses = []v1.PodVolumeStatus{{
+			Name:         "vol1",
+			HealthStatus: &v1.VolumeHealthStatus{HealthConditions: conditions},
+		}}
+		return status
+	}
+
+	testCases := []struct {
+		description string
+		oldStatus   v1.PodStatus
+		newStatus   v1.PodStatus
+	}{
+		{
+			description: "add condition with same status and different reason",
+			oldStatus:   statusWith(slowIO),
+			newStatus:   statusWith(slowIO, pathDegraded),
+		},
+		{
+			description: "remove one of two conditions with same status",
+			oldStatus:   statusWith(slowIO, pathDegraded),
+			newStatus:   statusWith(pathDegraded),
+		},
+		{
+			description: "replace reason for same status",
+			oldStatus:   statusWith(slowIO),
+			newStatus:   statusWith(pathDegraded),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			client := fake.NewClientset(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name, UID: uid},
+				Status:     tc.oldStatus,
+			})
+			newPod, _, _, err := PatchPodStatus(context.TODO(), client, ns, name, uid, tc.oldStatus, tc.newStatus)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.newStatus.VolumeStatuses, newPod.Status.VolumeStatuses); diff != "" {
+				t.Errorf("unexpected volume statuses after patch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func getPodStatus() v1.PodStatus {
 	return v1.PodStatus{
 		Phase: v1.PodRunning,

@@ -100,6 +100,7 @@ type PersistentVolumeClaimStatusApplyConfiguration struct {
 	ModifyVolumeStatus *ModifyVolumeStatusApplyConfiguration `json:"modifyVolumeStatus,omitempty"`
 	// healthStatus contains the latest controller-reported health information
 	// for the volume bound to this claim.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	HealthStatus *VolumeHealthStatusApplyConfiguration `json:"healthStatus,omitempty"`
 }
 

@@ -696,17 +696,31 @@ type VolumeNodeResources struct {
 type StorageHealthStatusType string
 
 const (
+	// StorageHealthUnknown indicates that the driver reported an unknown health status, or a status
+	// Kubernetes does not recognize. The storage subsystem should not be considered healthy.
+	StorageHealthUnknown StorageHealthStatusType = "StorageHealthUnknown"
 	// StorageUnreachable indicates the storage backend is unreachable.
 	StorageUnreachable StorageHealthStatusType = "StorageUnreachable"
 	// StorageDegraded indicates the storage backend is functioning with reduced capability.
 	StorageDegraded StorageHealthStatusType = "StorageDegraded"
+	// StorageHealthy indicates that the storage backend is healthy as seen from this node.
+	StorageHealthy StorageHealthStatusType = "StorageHealthy"
 )
 
-// StorageHealthCondition represents an adverse health condition reported
+// StorageHealthCondition represents a health condition reported
 // by a CSI driver for its storage backend on a node.
 type StorageHealthCondition struct {
 	// status is the health status category.
-	// One of "StorageUnreachable", "StorageDegraded".
+	// Possible values are:
+	// - "StorageHealthUnknown": the driver reported an unknown health status, or a status Kubernetes does not recognize; the backend must not be considered healthy.
+	// - "StorageUnreachable": the storage backend is unreachable.
+	// - "StorageDegraded": the storage backend is functioning with reduced capability.
+	// - "StorageHealthy": the storage backend is healthy as seen from this node.
+	//
+	// Additional values may be introduced as the CSI specification evolves.
+	// Writers that do not recognize a status may classify it as StorageHealthUnknown.
+	// Readers that do not recognize a status must use it only for health reporting
+	// and observability.
 	// +required
 	// +k8s:alpha(since: "1.38")=+k8s:required
 	Status StorageHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=StorageHealthStatusType"`
@@ -730,6 +744,7 @@ type StorageHealthCondition struct {
 	// +optional
 	VolumeMode *v1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,5,opt,name=volumeMode,casttype=k8s.io/api/core/v1.PersistentVolumeMode"`
 	// lastTransitionTime is when this condition first appeared at its current state.
+	// lastTransitionTime remains unchanged when only the message changes.
 	// +optional
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,6,opt,name=lastTransitionTime"`
 }
@@ -740,8 +755,11 @@ type StorageHealth struct {
 	// +required
 	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
+	// healthConditions are the storage backend conditions reported by the CSI driver.
 	// At most 16 conditions may be reported.
+	// An empty list means the CSI driver either does not support storage health
+	// or has not reported it yet. If the driver supports storage health and its
+	// storage backend is healthy, the kubelet reports a StorageHealthy condition.
 	// +optional
 	// +listType=atomic
 	// +k8s:alpha(since: "1.38")=+k8s:optional
@@ -752,6 +770,7 @@ type StorageHealth struct {
 // CSINodeStatus contains health and status information for storage on a node.
 type CSINodeStatus struct {
 	// storageHealth contains backend health reports for CSI drivers registered on the node.
+	// This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
 	// +optional
 	// +k8s:optional
 	// +listType=map

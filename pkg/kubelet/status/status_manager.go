@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -162,7 +163,7 @@ type Manager interface {
 	// triggers a status update.
 	SetContainerReadiness(logger klog.Logger, podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
 
-	// SetPodVolumeHealth updates the cached VolumeHealth entry for the given
+	// SetPodVolumeHealth updates the cached HealthStatus for the given
 	// volume name on the pod. conditions is the full desired condition set for
 	// that volume (empty means healthy). Returns true if the cached status changed.
 	SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volumeName string, conditions []v1.VolumeHealthCondition) bool
@@ -594,6 +595,11 @@ func (m *manager) SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volum
 		logger.V(4).Info("Pod has been deleted, no need to update volume health", "podUID", podUID)
 		return false
 	}
+	// A probe started before volume removal may complete after the spec changed.
+	if !slices.ContainsFunc(pod.Spec.Volumes, func(volume v1.Volume) bool { return volume.Name == volumeName }) {
+		logger.V(4).Info("Volume is no longer in pod spec, skipping volume health update", "podUID", podUID, "volumeName", volumeName)
+		return false
+	}
 
 	oldStatus, found := m.podStatuses[pod.UID]
 	if !found {
@@ -605,10 +611,13 @@ func (m *manager) SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volum
 
 	entryIndex := -1
 	var existingConditions []v1.VolumeHealthCondition
-	for i := range oldStatus.status.VolumeHealth {
-		if oldStatus.status.VolumeHealth[i].Name == volumeName {
+	for i := range oldStatus.status.VolumeStatuses {
+		volumeStatus := &oldStatus.status.VolumeStatuses[i]
+		if volumeStatus.Name == volumeName {
 			entryIndex = i
-			existingConditions = oldStatus.status.VolumeHealth[i].HealthConditions
+			if volumeStatus.HealthStatus != nil {
+				existingConditions = volumeStatus.HealthStatus.HealthConditions
+			}
 			break
 		}
 	}
@@ -623,16 +632,16 @@ func (m *manager) SetPodVolumeHealth(logger klog.Logger, podUID types.UID, volum
 
 	// Make sure we're not updating the cached version.
 	status := *oldStatus.status.DeepCopy()
-	newConditions := append([]v1.VolumeHealthCondition(nil), conditions...)
-	now := metav1.Now()
+	healthStatus := &v1.VolumeHealthStatus{
+		HealthConditions:   append([]v1.VolumeHealthCondition(nil), conditions...),
+		LastTransitionTime: metav1.Now(),
+	}
 	if entryIndex >= 0 {
-		status.VolumeHealth[entryIndex].HealthConditions = newConditions
-		status.VolumeHealth[entryIndex].LastTransitionTime = now
+		status.VolumeStatuses[entryIndex].HealthStatus = healthStatus
 	} else {
-		status.VolumeHealth = append(status.VolumeHealth, v1.PodVolumeHealth{
-			Name:               volumeName,
-			HealthConditions:   newConditions,
-			LastTransitionTime: now,
+		status.VolumeStatuses = append(status.VolumeStatuses, v1.PodVolumeStatus{
+			Name:         volumeName,
+			HealthStatus: healthStatus,
 		})
 	}
 
@@ -984,11 +993,32 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		status.StartTime = &now
 	}
 
-	// Preserve volume health across pod status updates. VolumeHealth is set
-	// independently by the volume health manager and is not part of the
-	// status generated from the container runtime.
-	if len(oldStatus.VolumeHealth) > 0 && len(status.VolumeHealth) == 0 {
-		status.VolumeHealth = oldStatus.VolumeHealth
+	// Preserve independently reported health when other status producers omit it,
+	// but do not resurrect health for volumes removed from the pod spec.
+	for _, oldVolumeStatus := range oldStatus.VolumeStatuses {
+		if oldVolumeStatus.HealthStatus == nil {
+			continue
+		}
+		if !slices.ContainsFunc(pod.Spec.Volumes, func(volume v1.Volume) bool { return volume.Name == oldVolumeStatus.Name }) {
+			continue
+		}
+		entryIndex := -1
+		for i := range status.VolumeStatuses {
+			if status.VolumeStatuses[i].Name == oldVolumeStatus.Name {
+				entryIndex = i
+				break
+			}
+		}
+		if entryIndex == -1 {
+			status.VolumeStatuses = append(status.VolumeStatuses, v1.PodVolumeStatus{
+				Name:         oldVolumeStatus.Name,
+				HealthStatus: oldVolumeStatus.HealthStatus.DeepCopy(),
+			})
+			continue
+		}
+		if status.VolumeStatuses[entryIndex].HealthStatus == nil {
+			status.VolumeStatuses[entryIndex].HealthStatus = oldVolumeStatus.HealthStatus.DeepCopy()
+		}
 	}
 
 	// prevent sending unnecessary patches
@@ -1440,8 +1470,10 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	sort.Sort(kubetypes.SortedContainerStatuses(status.EphemeralContainerStatuses))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
-		for i := range status.VolumeHealth {
-			normalizeTimeStamp(&status.VolumeHealth[i].LastTransitionTime)
+		for i := range status.VolumeStatuses {
+			if health := status.VolumeStatuses[i].HealthStatus; health != nil {
+				normalizeTimeStamp(&health.LastTransitionTime)
+			}
 		}
 	}
 
