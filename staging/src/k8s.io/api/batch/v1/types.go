@@ -712,6 +712,10 @@ const (
 	JobFailureTarget JobConditionType = "FailureTarget"
 	// JobSuccessCriteriaMet means the Job has been succeeded.
 	JobSuccessCriteriaMet JobConditionType = "SuccessCriteriaMet"
+	// JobSchedulingBlocked means the controller cannot safely create pods because
+	// the scheduling objects for the Job are missing or have an unsupported
+	// structure.
+	JobSchedulingBlocked JobConditionType = "SchedulingBlocked"
 )
 
 const (
