@@ -110,6 +110,10 @@ type Manager interface {
 
 	// GetAllocatedPods returns all active pods with their allocated resources.
 	GetAllocatedPods() []*v1.Pod
+
+	// GetCheckpointedPods returns independent copies of all checkpointed pods, including
+	// pods not yet known to the pod provider during startup.
+	GetCheckpointedPods() []*v1.Pod
 }
 
 // PodProvider is the subset of Kubelet methods the allocation manager depends on.
@@ -660,6 +664,16 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 
 func (m *manager) GetAllocatedPods() []*v1.Pod {
 	return m.getAllocatedPods(m.podProvider.GetActivePods())
+}
+
+func (m *manager) GetCheckpointedPods() []*v1.Pod {
+	var pods []*v1.Pod
+	for _, uid := range m.allocated.GetPodUIDs() {
+		if pod, ok := m.allocated.GetPod(uid); ok {
+			pods = append(pods, pod)
+		}
+	}
+	return pods
 }
 
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {

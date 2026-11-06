@@ -2022,6 +2022,23 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 		kl.healthChecker.SetHealthCheckers(kl, kl.containerManager.GetHealthCheckers())
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.NotEvictPodOnKubeletRestart) {
+		// Pod workers must not start before runtime-dependent modules are initialized.
+		if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(context.Context) (bool, error) {
+			return kl.runtimeState.runtimeErrors() == nil, nil
+		}); err != nil {
+			return
+		}
+		pendingUpdates, err := kl.restorePodState(ctx, updates)
+		if err != nil {
+			logger.Error(err, "Failed to restore checkpointed pods before starting the sync loop")
+			return
+		}
+		for _, update := range pendingUpdates {
+			kl.dispatchPodUpdate(ctx, update, kl)
+		}
+	}
+
 	kl.syncLoop(ctx, updates, kl)
 }
 
@@ -2785,32 +2802,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			return false
 		}
 
-		switch u.Op {
-		case kubetypes.ADD:
-			logger.V(2).Info("SyncLoop ADD", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
-			// After restarting, kubelet will get all existing pods through
-			// ADD as if they are new pods. These pods will then go through the
-			// admission process and *may* be rejected. This can be resolved
-			// once we have checkpointing.
-			handler.HandlePodAdditions(ctx, u.Pods)
-		case kubetypes.UPDATE:
-			logger.V(2).Info("SyncLoop UPDATE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
-			handler.HandlePodUpdates(ctx, u.Pods)
-		case kubetypes.REMOVE:
-			logger.V(2).Info("SyncLoop REMOVE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
-			handler.HandlePodRemoves(ctx, u.Pods)
-		case kubetypes.RECONCILE:
-			logger.V(4).Info("SyncLoop RECONCILE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
-			handler.HandlePodReconcile(ctx, u.Pods)
-		case kubetypes.DELETE:
-			logger.V(2).Info("SyncLoop DELETE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
-			// DELETE is treated as a UPDATE because of graceful deletion.
-			handler.HandlePodUpdates(ctx, u.Pods)
-		default:
-			logger.Error(nil, "Invalid operation type received", "operation", u.Op)
-		}
-
-		kl.sourcesReady.AddSource(u.Source)
+		kl.dispatchPodUpdate(ctx, u, handler)
 	case e := <-plegCh:
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
@@ -2908,9 +2900,56 @@ func handleProbeSync(ctx context.Context, kl *Kubelet, update proberesults.Updat
 	handler.HandlePodSyncs(ctx, []*v1.Pod{pod})
 }
 
+// dispatchPodUpdate is shared with startup reconciliation so static pod sources
+// can make progress while the API server is unavailable.
+func (kl *Kubelet) dispatchPodUpdate(ctx context.Context, u kubetypes.PodUpdate, handler SyncHandler) {
+	logger := klog.FromContext(ctx)
+	switch u.Op {
+	case kubetypes.ADD:
+		logger.V(2).Info("SyncLoop ADD", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+		handler.HandlePodAdditions(ctx, u.Pods)
+	case kubetypes.UPDATE:
+		logger.V(2).Info("SyncLoop UPDATE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+		handler.HandlePodUpdates(ctx, u.Pods)
+	case kubetypes.REMOVE:
+		logger.V(2).Info("SyncLoop REMOVE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+		handler.HandlePodRemoves(ctx, u.Pods)
+	case kubetypes.RECONCILE:
+		logger.V(4).Info("SyncLoop RECONCILE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+		handler.HandlePodReconcile(ctx, u.Pods)
+	case kubetypes.DELETE:
+		logger.V(2).Info("SyncLoop DELETE", "source", u.Source, "pods", klog.KObjSlice(u.Pods))
+		// DELETE is treated as a UPDATE because of graceful deletion.
+		handler.HandlePodUpdates(ctx, u.Pods)
+	default:
+		logger.Error(nil, "Invalid operation type received", "operation", u.Op)
+	}
+
+	kl.sourcesReady.AddSource(u.Source)
+}
+
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NotEvictPodOnKubeletRestart) {
+		var newPods []*v1.Pod
+		var existingPods []*v1.Pod
+		for _, pod := range pods {
+			if _, found := kl.podManager.GetPodByUID(pod.UID); found {
+				existingPods = append(existingPods, pod)
+			} else {
+				newPods = append(newPods, pod)
+			}
+		}
+		// The first informer ADD also contains pods restored from the checkpoint.
+		// Treat them as updates so they cannot be rejected by a second admission.
+		kl.HandlePodUpdates(ctx, existingPods)
+		pods = newPods
+	}
+	kl.handlePodAdditions(ctx, pods, false)
+}
+
+func (kl *Kubelet) handlePodAdditions(ctx context.Context, pods []*v1.Pod, restored bool) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
@@ -2948,16 +2987,27 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			// Check if we can admit the pod; if not, reject it.
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
-			if ok, reason, message := kl.allocationManager.AddPod(ctx, kl.GetActivePods(), pod); !ok {
-				kl.rejectPod(ctx, pod, reason, message)
-				// We avoid recording the metric in canAdmitPod because it's called
-				// repeatedly during a resize, which would inflate the metric.
-				// Instead, we record the metric here in HandlePodAdditions for new pods
-				// and capture resize events separately.
-				recordAdmissionRejection(reason)
-				continue
+			alreadyAdmitted := restored || (utilfeature.DefaultFeatureGate.Enabled(features.NotEvictPodOnKubeletRestart) &&
+				kubetypes.IsStaticPod(pod) && kl.allocationManager.HasPodAllocatedResources(pod.UID))
+			if alreadyAdmitted && !restored {
+				// Static pod UIDs include the manifest hash. The current manifest
+				// can therefore complete a legacy checkpoint without readmission.
+				allocated, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+				if err := kl.allocationManager.SetAllocatedResources(logger, allocated); err != nil {
+					logger.Error(err, "Unable to checkpoint restored static pod", "pod", klog.KObj(pod))
+				}
+			} else if !alreadyAdmitted {
+				if ok, reason, message := kl.allocationManager.AddPod(ctx, kl.GetActivePods(), pod); !ok {
+					kl.rejectPod(ctx, pod, reason, message)
+					// We avoid recording the metric in canAdmitPod because it's called
+					// repeatedly during a resize, which would inflate the metric.
+					// Instead, we record the metric here in HandlePodAdditions for new pods
+					// and capture resize events separately.
+					recordAdmissionRejection(reason)
+					continue
+				}
+				recordPodLevelResourcesAdmission(pod)
 			}
-			recordPodLevelResourcesAdmission(pod)
 
 			kl.podCertificateManager.TrackPod(ctx, pod)
 

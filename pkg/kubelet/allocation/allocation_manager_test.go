@@ -4285,3 +4285,32 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 		})
 	}
 }
+
+func TestGetCheckpointedPods(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	checkpointDir := t.TempDir()
+	provider := &fakePodProvider{}
+	newManager := func() Manager {
+		return NewManager(checkpointDir, nil, provider,
+			config.NewSourcesReady(func(sets.Set[string]) bool { return false }), record.NewFakeRecorder(1), logger)
+	}
+	manager := newManager()
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod", Name: "pod", Namespace: "default",
+			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.ApiserverSource, "unrelated": "annotation"}},
+		Spec: v1.PodSpec{Containers: []v1.Container{{Name: "c", Image: "image"}}},
+	}
+	require.NoError(t, manager.SetAllocatedResources(logger, pod))
+	restored := newManager()
+	assert.Empty(t, restored.GetAllocatedPods(), "the pod provider has not seen any pods yet")
+	checkpointed := restored.GetCheckpointedPods()
+	require.Len(t, checkpointed, 1)
+	assert.Equal(t, pod.UID, checkpointed[0].UID)
+	assert.Equal(t, pod.Spec, checkpointed[0].Spec)
+	assert.Equal(t, map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.ApiserverSource}, checkpointed[0].Annotations)
+	checkpointed[0].Spec.Containers[0].Image = "changed"
+	checkpointed[0].Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
+	again := restored.GetCheckpointedPods()
+	assert.Equal(t, "image", again[0].Spec.Containers[0].Image)
+	assert.Equal(t, kubetypes.ApiserverSource, again[0].Annotations[kubetypes.ConfigSourceAnnotationKey])
+}

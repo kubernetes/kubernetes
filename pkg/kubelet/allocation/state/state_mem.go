@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // stateMemory never modifies a stored pod. It replaces it with an updated copy that shares whatever
@@ -338,10 +339,15 @@ func (s *stateMemory) removePodVolume(logger klog.Logger, podUID types.UID, volu
 }
 
 func (s *stateMemory) SetPod(logger klog.Logger, pod *v1.Pod) error {
-	// Only the identity and the spec of the pod are kept. The spec is copied because the caller owns the pod.
+	// Only the identity, source and spec are kept. The caller owns the input pod.
 	stored := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace},
 		Spec:       *pod.Spec.DeepCopy(),
+	}
+	// Startup reconciliation must distinguish API pods from static pods, which
+	// cannot be considered deleted merely because they are absent from an API list.
+	if source, ok := pod.Annotations[kubetypes.ConfigSourceAnnotationKey]; ok {
+		stored.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: source}
 	}
 	if s.maskFn != nil {
 		s.maskFn(stored)
