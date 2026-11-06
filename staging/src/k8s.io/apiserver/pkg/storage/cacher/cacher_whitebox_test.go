@@ -1560,7 +1560,7 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Failed to create watch: %v", err)
 					}
-					storagetesting.TestCheckResultsInStrictOrder(t, w, expectedWatchEvents)
+					storagetesting.ExpectWatchEventsExact(expectedWatchEvents).Check(t, w)
 					storagetesting.TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 				})
 			}
