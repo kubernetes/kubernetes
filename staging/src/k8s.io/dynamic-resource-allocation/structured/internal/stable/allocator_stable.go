@@ -1426,6 +1426,15 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
+	// This allocator doesn't support OptionalNodeOperations, so such devices
+	// can't be allocated.
+	if len(device.slice.Spec.SkipNodeOperations) > 0 {
+		if alloc.loggerV7 != nil {
+			alloc.loggerV7.Info("Device requires optional node operations, but the optional node operations feature is not supported", "device", device.id)
+		}
+		return false, nil, nil
+	}
+
 	// Devices that consume counters can not be allocated if the PartitionableDevices feature
 	// is not enabled.
 	if !alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
