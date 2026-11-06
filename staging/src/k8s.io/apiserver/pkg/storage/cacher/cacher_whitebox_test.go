@@ -936,7 +936,15 @@ func TestWatchCacheBypass(t *testing.T) {
 }
 
 func TestEmptyWatchEventCache(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testEmptyWatchEventCache(t)
+		})
+	}
+}
+
+func testEmptyWatchEventCache(t *testing.T) {
 	server, etcdStorage := NewEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 
@@ -1221,6 +1229,15 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 }
 
 func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testCacherDontMissEventsOnReinitialization(t)
+		})
+	}
+}
+
+func testCacherDontMissEventsOnReinitialization(t *testing.T) {
 	makePod := func(i int) *example.Pod {
 		return &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1499,6 +1516,15 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 }
 
 func TestInitialEventsEndBookmark(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testInitialEventsEndBookmark(t)
+		})
+	}
+}
+
+func testInitialEventsEndBookmark(t *testing.T) {
 	for _, listFromCacheSnapshot := range []bool{true, false} {
 		t.Run(fmt.Sprintf("ListFromCacheSnapshot=%v", listFromCacheSnapshot), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
@@ -1598,7 +1624,15 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 }
 
 func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testCacherSendsMultipleWatchBookmarks(t)
+		})
+	}
+}
+
+func testCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1669,6 +1703,15 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 }
 
 func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testDispatchingBookmarkEventsWithConcurrentStop(t)
+		})
+	}
+}
+
+func testDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1689,16 +1732,21 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to add a pod: %v", err)
 	}
+	readyGeneration, _, err := cacher.ready.checkAndReadGeneration()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i := 0; i < 1000; i++ {
 		pred := storage.Everything
 		pred.AllowWatchBookmarks = true
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
+		w, requiredRV, err := cacher.watch(ctx, "/pods/ns", 999, readyGeneration, storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
+		go w.process(ctx, requiredRV)
 		bookmark := &watchCacheEvent{
 			Type:            watch.Bookmark,
 			ResourceVersion: uint64(i),
@@ -1739,7 +1787,15 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 }
 
 func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testBookmarksOnResourceVersionUpdates(t)
+		})
+	}
+}
+
+func testBookmarksOnResourceVersionUpdates(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -1892,7 +1948,15 @@ func TestStartingResourceVersion(t *testing.T) {
 }
 
 func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
-	t.Parallel()
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testDispatchEventWillNotBeBlockedByTimedOutWatcher(t)
+		})
+	}
+}
+
+func testDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2035,6 +2099,15 @@ func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictO
 }
 
 func TestCachingDeleteEvents(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			testCachingDeleteEvents(t)
+		})
+	}
+}
+
+func testCachingDeleteEvents(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2204,8 +2277,13 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 }
 
 func TestCachingObjects(t *testing.T) {
-	t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
-	t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
+			t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+		})
+	}
 }
 
 func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
@@ -2837,7 +2915,6 @@ func TestForgetWatcher(t *testing.T) {
 		testingclock.NewFakeClock(time.Now()),
 		"1",
 		watchSelector{},
-		0,
 	)
 	forgetWatcherFn = forgetWatcher(cacher, w, 0)
 	addWatcher := func(w *cacheWatcher) {
@@ -4044,4 +4121,366 @@ func TestGetListWithShardedListAndWatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+type stalledWatcherResyncScenario struct {
+	name                   string
+	initialPods            []*example.Pod
+	watchKey               string
+	watchOpts              storage.ListOptions
+	burstPods              []*example.Pod
+	expectedInitialEndMark bool
+	expectedPodRVs         []uint64
+	livePod                *example.Pod
+}
+
+func makeStallTestPod(namespace string, rv uint64) *example.Pod {
+	return &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            fmt.Sprintf("pod-%d", rv),
+			Namespace:       namespace,
+			ResourceVersion: strconv.FormatUint(rv, 10),
+		},
+	}
+}
+
+func makeStallTestPodRange(namespace string, startRV, endRV uint64) []*example.Pod {
+	pods := make([]*example.Pod, 0, endRV-startRV+1)
+	for rv := startRV; rv <= endRV; rv++ {
+		pods = append(pods, makeStallTestPod(namespace, rv))
+	}
+	return pods
+}
+
+func startSyncedWatchWithFakeClock(t *testing.T, cacher *Cacher, fakeClock *testingclock.FakeClock, key string, opts storage.ListOptions) watch.Interface {
+	t.Helper()
+	var w watch.Interface
+	var watchErr error
+	watchDone := make(chan struct{})
+	go func() {
+		defer close(watchDone)
+		w, watchErr = cacher.Watch(context.Background(), key, opts)
+	}()
+	require.NoError(t, wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+		fakeClock.Step(watcherResyncPeriod)
+		select {
+		case <-watchDone:
+			return true, nil
+		default:
+			return false, nil
+		}
+	}))
+	require.NoError(t, watchErr)
+	return w
+}
+
+func TestStalledWatcherResync(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.WatchList:             true,
+		features.WatchCacheStallResume: true,
+	})
+	ForceRequestWatchProgressSupport(t)
+
+	bookmarksAllowed := storage.Everything
+	bookmarksAllowed.AllowWatchBookmarks = true
+
+	consecutiveRVs := func(startRV, endRV uint64) []uint64 {
+		rvs := make([]uint64, 0, endRV-startRV+1)
+		for rv := startRV; rv <= endRV; rv++ {
+			rvs = append(rvs, rv)
+		}
+		return rvs
+	}
+
+	scenarios := []stalledWatcherResyncScenario{
+		{
+			name:     "catches up across multiple resync passes and resumes live stream",
+			watchKey: "/pods/ns",
+			watchOpts: storage.ListOptions{
+				ResourceVersion: "100",
+				Predicate:       bookmarksAllowed,
+				Recursive:       true,
+			},
+			burstPods:      makeStallTestPodRange("ns", 101, 155),
+			expectedPodRVs: consecutiveRVs(101, 155),
+			livePod:        makeStallTestPod("ns", 156),
+		},
+		{
+			name:     "skips non-matching scoped history events during resync",
+			watchKey: "/pods/ns",
+			watchOpts: storage.ListOptions{
+				ResourceVersion: "100",
+				Predicate: storage.SelectionPredicate{
+					Label: labels.Everything(),
+					Field: fields.OneTermEqualSelector("metadata.namespace", "ns"),
+				},
+				Recursive: true,
+			},
+			burstPods: slices.Concat(
+				makeStallTestPodRange("ns", 101, 122),
+				makeStallTestPodRange("other-ns", 123, 182),
+				makeStallTestPodRange("ns", 183, 184),
+			),
+			expectedPodRVs: append(consecutiveRVs(101, 122), 183, 184),
+			livePod:        makeStallTestPod("ns", 185),
+		},
+		{
+			name:        "WatchList watcher catches up after stalling on live burst",
+			initialPods: makeStallTestPodRange("ns", 1, 3),
+			watchKey:    "/pods/ns",
+			watchOpts: storage.ListOptions{
+				ResourceVersion:   "100",
+				SendInitialEvents: ptr.To(true),
+				Predicate:         bookmarksAllowed,
+				Recursive:         true,
+			},
+			burstPods:              makeStallTestPodRange("ns", 101, 135),
+			expectedInitialEndMark: true,
+			expectedPodRVs:         append(consecutiveRVs(1, 3), consecutiveRVs(101, 135)...),
+			livePod:                makeStallTestPod("ns", 136),
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			testStalledWatcherResync(t, scenario)
+		})
+	}
+}
+
+func testStalledWatcherResync(t *testing.T, scenario stalledWatcherResyncScenario) {
+	backingStorage := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			podList := listObj.(*example.PodList)
+			podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
+			for _, pod := range scenario.initialPods {
+				podList.Items = append(podList.Items, *pod.DeepCopy())
+			}
+			return nil
+		},
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	cacher, versioner, err := newTestCacherWithoutSyncing(backingStorage, fakeClock)
+	require.NoError(t, err)
+	defer cacher.Stop()
+	require.NoError(t, cacher.Wait(context.Background()))
+
+	t.Log("Start slow watcher and fast peer watcher")
+	slowWatcher := startSyncedWatchWithFakeClock(t, cacher, fakeClock, scenario.watchKey, scenario.watchOpts)
+	defer slowWatcher.Stop()
+	fastWatcher := startSyncedWatchWithFakeClock(t, cacher, fakeClock, "/pods/", storage.ListOptions{
+		ResourceVersion: "100",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	})
+	defer fastWatcher.Stop()
+
+	t.Log("Publish burst while fastWatcher drains each chunk and slowWatcher stalls")
+	for _, pod := range scenario.burstPods {
+		require.NoError(t, cacher.watchCache.Add(pod))
+		select {
+		case event, ok := <-fastWatcher.ResultChan():
+			require.True(t, ok)
+			require.Equal(t, watch.Added, event.Type)
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("timed out waiting for fastWatcher to receive published pod")
+		}
+	}
+
+	var gotPodRVs []uint64
+	var lastObservedRV uint64
+	initialEndBookmarks := 0
+
+	recordEvent := func(event watch.Event) {
+		require.NotEqual(t, watch.Error, event.Type, "unexpected watch error: %#v", event.Object)
+		rv, err := versioner.ObjectResourceVersion(event.Object)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, rv, lastObservedRV, "watch resourceVersion went backwards")
+		lastObservedRV = rv
+
+		if event.Type == watch.Bookmark {
+			accessor, err := meta.Accessor(event.Object)
+			require.NoError(t, err)
+			if accessor.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+				initialEndBookmarks++
+			}
+			return
+		}
+		require.Equal(t, watch.Added, event.Type)
+		gotPodRVs = append(gotPodRVs, rv)
+	}
+
+	t.Log("Drain slowWatcher while stepping background resync ticks until caught up")
+	for len(gotPodRVs) < len(scenario.expectedPodRVs) {
+		select {
+		case event, ok := <-slowWatcher.ResultChan():
+			require.True(t, ok)
+			recordEvent(event)
+		default:
+			time.Sleep(time.Millisecond)
+			fakeClock.Step(watcherResyncPeriod)
+		}
+	}
+
+	require.Equal(t, scenario.expectedPodRVs, gotPodRVs)
+	if scenario.expectedInitialEndMark {
+		require.Equal(t, 1, initialEndBookmarks)
+	} else {
+		require.Zero(t, initialEndBookmarks)
+	}
+
+	t.Log("Verify slowWatcher rejoined live dispatch without further resync ticks")
+	require.NoError(t, cacher.watchCache.Add(scenario.livePod))
+	expectedLiveRV, err := versioner.ObjectResourceVersion(scenario.livePod)
+	require.NoError(t, err)
+	for {
+		select {
+		case event, ok := <-slowWatcher.ResultChan():
+			require.True(t, ok)
+			recordEvent(event)
+			if event.Type == watch.Added {
+				require.Equal(t, expectedLiveRV, gotPodRVs[len(gotPodRVs)-1])
+				return
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("timed out waiting for live event after catchup")
+		}
+	}
+}
+
+type stalledWatcherExpirationScenario struct {
+	name              string
+	clientDisconnects bool
+}
+
+func TestStalledWatcherExpiration(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, true)
+
+	scenarios := []stalledWatcherExpirationScenario{
+		{
+			name:              "drains buffered events before delivering 410 ResourceExpired",
+			clientDisconnects: false,
+		},
+		{
+			name:              "client Stop aborts draining expired watcher without leaking goroutine",
+			clientDisconnects: true,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			testStalledWatcherExpiration(t, scenario)
+		})
+	}
+}
+
+func testStalledWatcherExpiration(t *testing.T, scenario stalledWatcherExpirationScenario) {
+	ignoreRunning := goleak.IgnoreCurrent()
+
+	registry := k8smetrics.NewKubeRegistry()
+	metrics.TerminatedWatchersCounter.Reset()
+	require.NoError(t, registry.Register(metrics.TerminatedWatchersCounter))
+
+	backingStorage := &cachertesting.MockStorage{
+		GetListFn: func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+			podList := listObj.(*example.PodList)
+			podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
+			return nil
+		},
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	cacher, versioner, err := newTestCacherWithoutSyncing(backingStorage, fakeClock)
+	require.NoError(t, err)
+	defer cacher.Stop()
+	require.NoError(t, cacher.Wait(context.Background()))
+
+	opts := storage.ListOptions{
+		ResourceVersion: "100",
+		Predicate: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.OneTermEqualSelector("metadata.namespace", "ns"),
+		},
+		Recursive: true,
+	}
+	slowWatcher := startSyncedWatchWithFakeClock(t, cacher, fakeClock, "/pods/ns", opts)
+	defer slowWatcher.Stop()
+	fastWatcher := startSyncedWatchWithFakeClock(t, cacher, fakeClock, "/pods/ns", opts)
+	defer fastWatcher.Stop()
+
+	t.Log("Fill slowWatcher buffers and stall it while fastWatcher drains each event")
+	const initialBurst = 25
+	const evictionBurst = defaultLowerBoundCapacity
+	for _, pod := range makeStallTestPodRange("ns", 101, 100+initialBurst) {
+		require.NoError(t, cacher.watchCache.Add(pod))
+		select {
+		case event, ok := <-fastWatcher.ResultChan():
+			require.True(t, ok)
+			require.Equal(t, watch.Added, event.Type)
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("timed out waiting for fastWatcher during initial burst")
+		}
+	}
+
+	t.Log("Advance clock past freshness window and evict slowWatcher's resume RV from history")
+	fakeClock.Step(DefaultEventFreshDuration + time.Second)
+	for _, pod := range makeStallTestPodRange("other-ns", 101+initialBurst, 100+initialBurst+evictionBurst) {
+		require.NoError(t, cacher.watchCache.Add(pod))
+	}
+	sentinelRV := uint64(101 + initialBurst + evictionBurst)
+	require.NoError(t, cacher.watchCache.Add(makeStallTestPod("ns", sentinelRV)))
+	select {
+	case event, ok := <-fastWatcher.ResultChan():
+		require.True(t, ok)
+		require.Equal(t, watch.Added, event.Type)
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("timed out waiting for fastWatcher to observe post-eviction sentinel")
+	}
+
+	t.Log("Trigger background resync pass to expire slowWatcher")
+	require.NoError(t, wait.PollUntilContextTimeout(context.Background(), time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+		fakeClock.Step(watcherResyncPeriod)
+		expectedMetric := `
+# HELP apiserver_terminated_watchers_total [ALPHA] Counter of watchers closed due to unresponsiveness broken by resource type.
+# TYPE apiserver_terminated_watchers_total counter
+apiserver_terminated_watchers_total{group="",resource="pods"} 1
+`
+		return testutil.GatherAndCompare(registry, strings.NewReader(expectedMetric), "apiserver_terminated_watchers_total") == nil, nil
+	}))
+
+	if scenario.clientDisconnects {
+		t.Log("Disconnect client without draining ResultChan and verify no goroutine leak")
+		slowWatcher.Stop()
+		fastWatcher.Stop()
+		cacher.Stop()
+		if leakErr := goleak.Find(ignoreRunning); leakErr != nil {
+			require.NotContains(t, leakErr.Error(), "(*cacheWatcher).process")
+		}
+		return
+	}
+
+	t.Log("Verify buffered events are delivered in order followed by 410 ResourceExpired")
+	var drainedRVs []uint64
+	var terminalErrorEvent *watch.Event
+	for event := range slowWatcher.ResultChan() {
+		if event.Type == watch.Error {
+			require.Nil(t, terminalErrorEvent, "expected at most one terminal error event")
+			ev := event
+			terminalErrorEvent = &ev
+			continue
+		}
+		require.Nil(t, terminalErrorEvent, "expected no events after terminal error event")
+		require.Equal(t, watch.Added, event.Type)
+		rv, parseErr := versioner.ObjectResourceVersion(event.Object)
+		require.NoError(t, parseErr)
+		drainedRVs = append(drainedRVs, rv)
+	}
+
+	require.GreaterOrEqual(t, len(drainedRVs), minWatchChanSize)
+	for i, rv := range drainedRVs {
+		require.Equal(t, uint64(101+i), rv)
+	}
+	require.NotNil(t, terminalErrorEvent, "expected terminal 410 watch.Error event")
+	require.True(t, apierrors.IsResourceExpired(apierrors.FromObject(terminalErrorEvent.Object)), "expected ResourceExpired status, got: %#v", terminalErrorEvent.Object)
 }
