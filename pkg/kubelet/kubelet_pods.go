@@ -436,9 +436,6 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 		if err != nil {
 			return nil, cleanupAction, fmt.Errorf("failed to resolve recursive read-only mode: %w", err)
 		}
-		if rro && !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-			return nil, cleanupAction, fmt.Errorf("recursive read-only mount needs feature gate %q to be enabled", features.RecursiveReadOnlyMounts)
-		}
 
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:              mount.Name,
@@ -2350,9 +2347,6 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 }
 
 func makeVolumeMountStatuses(logger klog.Logger, volumeMounts []v1.VolumeMount, supportsRRO bool) []v1.VolumeMountStatus {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-		return nil
-	}
 	var mountStatuses []v1.VolumeMountStatus
 	for _, vol := range volumeMounts {
 		volStatus := v1.VolumeMountStatus{
@@ -2365,12 +2359,7 @@ func makeVolumeMountStatuses(logger klog.Logger, volumeMounts []v1.VolumeMount, 
 			if b, err := resolveRecursiveReadOnly(vol, supportsRRO); err != nil {
 				logger.Error(err, "failed to resolve recursive read-only mode", "mode", *vol.RecursiveReadOnly)
 			} else if b {
-				if utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-					rroMode = v1.RecursiveReadOnlyEnabled
-				} else {
-					logger.Error(nil, "recursive read-only mount needs feature gate to be enabled",
-						"featureGate", features.RecursiveReadOnlyMounts)
-				}
+				rroMode = v1.RecursiveReadOnlyEnabled
 			}
 			volStatus.RecursiveReadOnly = &rroMode
 		}
@@ -3010,7 +2999,6 @@ func (kl *Kubelet) runtimeClassSupportsRecursiveReadOnlyMounts(logger klog.Logge
 }
 
 // runtimeHandlerSupportsRecursiveReadOnlyMounts checks whether the runtime handler supports recursive read-only mounts.
-// The kubelet feature gate is not checked here.
 func runtimeHandlerSupportsRecursiveReadOnlyMounts(logger klog.Logger, runtimeHandlerName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
 	if len(runtimeHandlers) == 0 {
 		// The runtime does not support returning the handler list.
