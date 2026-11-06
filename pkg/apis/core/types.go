@@ -2741,6 +2741,25 @@ type ContainerResizePolicy struct {
 	RestartPolicy ResourceResizeRestartPolicy
 }
 
+// DynamicVolumeRestartPolicy defines the restart behavior applied to a container
+// when its volume mounts are dynamically mutated.
+type DynamicVolumeRestartPolicy string
+
+const (
+	// DynamicVolumeRestartContainer indicates that Kubelet must restart the container
+	// in-place to actuate volume mount additions or removals on a running container.
+	DynamicVolumeRestartContainer DynamicVolumeRestartPolicy = "RestartContainer"
+)
+
+// ContainerDynamicVolumePolicy defines dynamic volume mutation behavior for a container.
+type ContainerDynamicVolumePolicy struct {
+	// RestartPolicy defines whether dynamic volume mount additions or removals
+	// require restarting the container. Supported values: RestartContainer, "".
+	// Defaults to "".
+	// +optional
+	RestartPolicy DynamicVolumeRestartPolicy
+}
+
 // PreemptionPolicy describes a policy for if/when to preempt a pod.
 type PreemptionPolicy string
 
@@ -2874,6 +2893,10 @@ type Container struct {
 	// This field cannot be set on ephemeral containers.
 	// +optional
 	ResizePolicy []ContainerResizePolicy
+	// DynamicVolumePolicy defines dynamic volume mutation behavior for this container.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	DynamicVolumePolicy *ContainerDynamicVolumePolicy
 	// RestartPolicy defines the restart behavior of individual containers in a pod.
 	// This overrides the pod-level restart policy. When this field is not specified,
 	// the restart behavior is defined by the Pod's restart policy and the container type.
@@ -4758,6 +4781,11 @@ type EphemeralContainerCommon struct {
 	// Resources resize policy for the container.
 	// +optional
 	ResizePolicy []ContainerResizePolicy
+	// DynamicVolumePolicy defines dynamic volume mutation behavior for this container.
+	// This field cannot be set on ephemeral containers.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	DynamicVolumePolicy *ContainerDynamicVolumePolicy
 	// Restart policy for the container to manage the restart behavior of each
 	// container within a pod. Must be specified if restartPolicyRules are used.
 	// You cannot set this field on ephemeral containers.
@@ -5014,6 +5042,44 @@ type PodStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	VolumeHealth []PodVolumeHealth
+
+	// VolumeStatuses contains the status of volumes in the pod, tracking whether
+	// volumes are allocated and prepared on the host node. Currently, only
+	// node-local ephemeral volume types supported for dynamic updates (configMap,
+	// secret, projected, emptyDir, and image) are reported.
+	// +featureGate=DynamicNodeLocalEphemeralVolumes
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	VolumeStatuses []PodVolumeStatus
+}
+
+// PodVolumeHostPhase represents the host preparation phase of a volume mounted to a pod.
+type PodVolumeHostPhase string
+
+const (
+	// PodVolumeHostPending indicates that the volume has been added to pod.Spec.Volumes,
+	// and is waiting node allocation or host preparation/mounting by VolumeManager.
+	PodVolumeHostPending PodVolumeHostPhase = "Pending"
+
+	// PodVolumeHostMounted indicates that VolumeManager has successfully prepared and
+	// mounted the volume on the node host (marked ready in ActualStateOfWorld).
+	PodVolumeHostMounted PodVolumeHostPhase = "HostMounted"
+
+	// PodVolumeHostUnmounting indicates that volume removal has been admitted and allocated
+	// by Kubelet, and Kubelet is actively unmounting container bind mounts and executing host TearDownAt.
+	PodVolumeHostUnmounting PodVolumeHostPhase = "Unmounting"
+)
+
+// PodVolumeStatus represents the status of an individual volume in a pod.
+type PodVolumeStatus struct {
+	// Name is the name of the volume matching pod.Spec.Volumes.
+	Name string
+
+	// HostPhase represents the host-level preparation phase of the volume:
+	// Pending, HostMounted, Unmounting.
+	// +optional
+	HostPhase PodVolumeHostPhase
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

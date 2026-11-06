@@ -7143,3 +7143,61 @@ func TestSecurityProfileOCIValidationOption(t *testing.T) {
 		}
 	}
 }
+
+func TestDropDisabledDynamicNodeLocalEphemeralVolumesFields(t *testing.T) {
+	policy := &api.ContainerDynamicVolumePolicy{RestartPolicy: api.DynamicVolumeRestartContainer}
+	volStatuses := []api.PodVolumeStatus{{Name: "v1", HostPhase: api.PodVolumeHostPending}}
+
+	withSpecFields := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers:      []api.Container{{Name: "init", DynamicVolumePolicy: &api.ContainerDynamicVolumePolicy{RestartPolicy: api.DynamicVolumeRestartContainer}}},
+				Containers:          []api.Container{{Name: "c1", DynamicVolumePolicy: &api.ContainerDynamicVolumePolicy{RestartPolicy: api.DynamicVolumeRestartContainer}}},
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "eph", DynamicVolumePolicy: &api.ContainerDynamicVolumePolicy{RestartPolicy: api.DynamicVolumeRestartContainer}}}},
+			},
+			Status: api.PodStatus{
+				VolumeStatuses: []api.PodVolumeStatus{{Name: "v1", HostPhase: api.PodVolumeHostPending}},
+			},
+		}
+	}
+	withoutFields := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers:      []api.Container{{Name: "init"}},
+				Containers:          []api.Container{{Name: "c1"}},
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "eph"}}},
+			},
+		}
+	}
+
+	t.Run("disabled and not in use drops fields across all container types and status", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+		pod := withSpecFields()
+		DropDisabledPodFields(pod, nil)
+		if diff := cmp.Diff(withoutFields(), pod); diff != "" {
+			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+		}
+	})
+
+	t.Run("disabled but already in use in oldPod preserves fields", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+		oldPod := &api.Pod{
+			Spec:   api.PodSpec{Containers: []api.Container{{Name: "c1", DynamicVolumePolicy: policy}}},
+			Status: api.PodStatus{VolumeStatuses: volStatuses},
+		}
+		pod := withSpecFields()
+		DropDisabledPodFields(pod, oldPod)
+		if diff := cmp.Diff(withSpecFields(), pod); diff != "" {
+			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+		}
+	})
+
+	t.Run("enabled preserves fields", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+		pod := withSpecFields()
+		DropDisabledPodFields(pod, nil)
+		if diff := cmp.Diff(withSpecFields(), pod); diff != "" {
+			t.Errorf("unexpected pod (-want, +got):\n%s", diff)
+		}
+	})
+}

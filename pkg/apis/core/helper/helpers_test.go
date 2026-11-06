@@ -479,3 +479,29 @@ func TestHasInvalidLabelValueInNodeSelectorTerms(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSupportedDynamicVolumeSource(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   *core.VolumeSource
+		expected bool
+	}{
+		{name: "nil", source: nil, expected: false},
+		{name: "empty", source: &core.VolumeSource{}, expected: false},
+		{name: "configMap", source: &core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{}}, expected: true},
+		{name: "secret", source: &core.VolumeSource{Secret: &core.SecretVolumeSource{}}, expected: true},
+		{name: "projected", source: &core.VolumeSource{Projected: &core.ProjectedVolumeSource{}}, expected: true},
+		{name: "emptyDir", source: &core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}, expected: true},
+		{name: "image", source: &core.VolumeSource{Image: &core.ImageVolumeSource{}}, expected: true},
+		{name: "hostPath", source: &core.VolumeSource{HostPath: &core.HostPathVolumeSource{}}, expected: false},
+		{name: "pvc", source: &core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{}}, expected: false},
+		{name: "downwardAPI", source: &core.VolumeSource{DownwardAPI: &core.DownwardAPIVolumeSource{}}, expected: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsSupportedDynamicVolumeSource(tc.source); got != tc.expected {
+				t.Errorf("IsSupportedDynamicVolumeSource() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}

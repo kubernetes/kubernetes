@@ -602,3 +602,17 @@ func CalculatePodConditionObservedGeneration(podStatus *v1.PodStatus, generation
 	}
 	return 0
 }
+
+// IsSupportedDynamicVolumeSource reports whether vs is a node-local ephemeral volume source
+// supported by DynamicNodeLocalEphemeralVolumes (ConfigMap, Secret, Projected, EmptyDir, or Image).
+// Note: keep this in sync with k8s.io/kubernetes/pkg/apis/core/helper.IsSupportedDynamicVolumeSource.
+func IsSupportedDynamicVolumeSource(vs *v1.VolumeSource) bool {
+	if vs == nil {
+		return false
+	}
+	return vs.ConfigMap != nil ||
+		vs.Secret != nil ||
+		vs.Projected != nil ||
+		vs.EmptyDir != nil ||
+		vs.Image != nil
+}

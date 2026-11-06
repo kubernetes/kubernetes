@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -102,6 +104,9 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	podutil.DefaultPodLevelResources(pod)
 
 	pod.Status.QOSClass = qos.GetPodQOS(pod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		initPendingVolumeStatuses(pod)
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -255,6 +260,9 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		preservePendingVolumeStatuses(newPod, oldPod)
+	}
 }
 
 // If a client request tries to clear `observedGeneration`, in the pod status or
@@ -515,6 +523,9 @@ func (podDynamicStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	}
 
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		updateDynamicVolumeStatuses(newPod, oldPod)
+	}
 	updatePodGeneration(newPod, oldPod)
 }
 
@@ -1076,5 +1087,109 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
+	}
+}
+
+// initPendingVolumeStatuses seeds Pending entries in pod.Status.VolumeStatuses
+// for supported node-local ephemeral volumes at pod creation time.
+func initPendingVolumeStatuses(pod *api.Pod) {
+	var statuses []api.PodVolumeStatus
+	for i := range pod.Spec.Volumes {
+		vol := &pod.Spec.Volumes[i]
+		if !helper.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+			continue
+		}
+		if slices.ContainsFunc(statuses, func(vs api.PodVolumeStatus) bool { return vs.Name == vol.Name }) {
+			continue
+		}
+		statuses = append(statuses, api.PodVolumeStatus{
+			Name:      vol.Name,
+			HostPhase: api.PodVolumeHostPending,
+		})
+	}
+	if len(statuses) == 0 {
+		return
+	}
+	slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+	pod.Status.VolumeStatuses = statuses
+}
+
+// updateDynamicVolumeStatuses seeds Pending entries in newPod.Status.VolumeStatuses
+// for newly added supported dynamic volumes on /dynamic updates. Keeping removed
+// Pending entries on scheduled pods prevents a volume name from being reused with
+// different parameters before kubelet observes the removal; on unscheduled pods
+// no kubelet owns status, so removed Pending entries are pruned immediately.
+func updateDynamicVolumeStatuses(newPod, oldPod *api.Pod) {
+	statuses := slices.Clone(oldPod.Status.VolumeStatuses)
+	changed := false
+	for i := range newPod.Spec.Volumes {
+		vol := &newPod.Spec.Volumes[i]
+		if !helper.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+			continue
+		}
+		if slices.ContainsFunc(oldPod.Spec.Volumes, func(v api.Volume) bool { return v.Name == vol.Name }) {
+			continue
+		}
+		if slices.ContainsFunc(statuses, func(vs api.PodVolumeStatus) bool { return vs.Name == vol.Name }) {
+			continue
+		}
+		statuses = append(statuses, api.PodVolumeStatus{
+			Name:      vol.Name,
+			HostPhase: api.PodVolumeHostPending,
+		})
+		changed = true
+	}
+	if newPod.Spec.NodeName == "" {
+		before := len(statuses)
+		statuses = slices.DeleteFunc(statuses, func(vs api.PodVolumeStatus) bool {
+			return vs.HostPhase == api.PodVolumeHostPending &&
+				!slices.ContainsFunc(newPod.Spec.Volumes, func(v api.Volume) bool { return v.Name == vs.Name })
+		})
+		changed = changed || len(statuses) != before
+	}
+	if len(statuses) == 0 {
+		newPod.Status.VolumeStatuses = nil
+		return
+	}
+	if changed {
+		slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+	}
+	newPod.Status.VolumeStatuses = statuses
+}
+
+// preservePendingVolumeStatuses retains apiserver-seeded Pending VolumeStatuses
+// across status updates when a volume is still in spec.volumes or when the
+// status update was computed against an older pod generation.
+func preservePendingVolumeStatuses(newPod, oldPod *api.Pod) {
+	if len(oldPod.Status.VolumeStatuses) == 0 {
+		return
+	}
+	var statuses []api.PodVolumeStatus
+	cloned := false
+	for _, oldVS := range oldPod.Status.VolumeStatuses {
+		if oldVS.HostPhase != api.PodVolumeHostPending {
+			continue
+		}
+		if slices.ContainsFunc(newPod.Status.VolumeStatuses, func(vs api.PodVolumeStatus) bool { return vs.Name == oldVS.Name }) {
+			continue
+		}
+		inSpec := slices.ContainsFunc(newPod.Spec.Volumes, func(v api.Volume) bool { return v.Name == oldVS.Name })
+		if inSpec || newPod.Status.ObservedGeneration < oldPod.Generation {
+			if !cloned {
+				statuses = slices.Clone(newPod.Status.VolumeStatuses)
+				cloned = true
+			}
+			statuses = append(statuses, oldVS)
+		}
+	}
+	if cloned {
+		slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+		newPod.Status.VolumeStatuses = statuses
 	}
 }
