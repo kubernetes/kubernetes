@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
@@ -31,7 +32,9 @@ import (
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -93,8 +96,9 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return nil
 	}
 
-	// Only validate updates to the custom "resize" subresource.
-	if a.GetSubresource() != "resize" {
+	// Only validate updates to the subresources that can resize the pod.
+	subresource := a.GetSubresource()
+	if subresource != "resize" && subresource != "dynamic" {
 		return nil
 	}
 	pod, ok := a.GetObject().(*core.Pod)
@@ -117,11 +121,43 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		return nil
 	}
 
+	// The dynamic subresource also permits updates that don't touch resources (e.g. image
+	// updates), which must not be subjected to resize restrictions.
+	if subresource == "dynamic" && !resourcesChanged(oldPod, pod) {
+		return nil
+	}
+
 	if !p.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
 	return p.validatePodResize(pod, a)
+}
+
+// resourcesChanged returns true if the update resizes the pod: the pod-level resources or the
+// resources of a container changed, or a container with resources was added or removed.
+func resourcesChanged(oldPod, pod *core.Pod) bool {
+	if !apiequality.Semantic.DeepEqual(oldPod.Spec.Resources, pod.Spec.Resources) {
+		return true
+	}
+	hasResources := func(c *core.Container) bool {
+		return len(c.Resources.Requests)+len(c.Resources.Limits) > 0
+	}
+	for pair := range pods.ContainerPairs(pod, oldPod, podutil.InitContainers|podutil.Containers) {
+		switch {
+		case pair.Old == nil:
+			if hasResources(pair.New) {
+				return true
+			}
+		case pair.New == nil:
+			if hasResources(pair.Old) {
+				return true
+			}
+		case !apiequality.Semantic.DeepEqual(pair.New.Resources, pair.Old.Resources):
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Plugin) validatePodResize(pod *core.Pod, a admission.Attributes) error {

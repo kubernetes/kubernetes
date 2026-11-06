@@ -631,16 +631,25 @@ func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, fiel
 // * https://github.com/kubernetes/kubernetes/blob/release-1.21/pkg/apis/core/validation/validation.go#L3947-L3949
 func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 	// TODO: invert this logic to only allow specific update types.
-	if len(pod.Spec.Containers) != len(oldPod.Spec.Containers) {
-		return true
-	}
 	if len(pod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
 		return true
 	}
-	for i := 0; i < len(pod.Spec.Containers); i++ {
-		if isSignificantContainerUpdate(&pod.Spec.Containers[i], &oldPod.Spec.Containers[i]) {
+	// Removing a container can't introduce a violation, so only added or changed containers count.
+	// Containers can't be reordered, so they are matched by walking both lists in order.
+	j := 0
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		k := j
+		for k < len(oldPod.Spec.Containers) && oldPod.Spec.Containers[k].Name != c.Name {
+			k++
+		}
+		if k == len(oldPod.Spec.Containers) {
+			return true // Container added
+		}
+		if isSignificantContainerUpdate(c, &oldPod.Spec.Containers[k]) {
 			return true
 		}
+		j = k + 1
 	}
 	for i := 0; i < len(pod.Spec.InitContainers); i++ {
 		if isSignificantContainerUpdate(&pod.Spec.InitContainers[i], &oldPod.Spec.InitContainers[i]) {

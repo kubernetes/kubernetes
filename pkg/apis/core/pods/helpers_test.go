@@ -18,7 +18,10 @@ package pods
 
 import (
 	"reflect"
+	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -232,4 +235,99 @@ func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 				tc.version, tc.label, tc.value, label, value, tc.expectedLabel, tc.expectedValue)
 		}
 	}
+}
+
+func TestContainerPairs(t *testing.T) {
+	containers := func(names ...string) []api.Container {
+		var containers []api.Container
+		for _, name := range names {
+			containers = append(containers, api.Container{Name: name})
+		}
+		return containers
+	}
+	ephemeralContainers := func(names ...string) []api.EphemeralContainer {
+		var containers []api.EphemeralContainer
+		for _, name := range names {
+			containers = append(containers, api.EphemeralContainer{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: name}})
+		}
+		return containers
+	}
+	// pairs returns each pair as "type:new/old", with "-" for a missing container.
+	pairs := func(spec, oldSpec *api.PodSpec, mask ContainerType) []string {
+		name := func(c *api.Container) string {
+			if c == nil {
+				return "-"
+			}
+			return c.Name
+		}
+		typeNames := map[ContainerType]string{InitContainers: "init", Containers: "main", EphemeralContainers: "ephemeral"}
+		var pairs []string
+		for pair, containerType := range ContainerPairs(&api.Pod{Spec: *spec}, &api.Pod{Spec: *oldSpec}, mask) {
+			pairs = append(pairs, typeNames[containerType]+":"+name(pair.New)+"/"+name(pair.Old))
+		}
+		return pairs
+	}
+
+	t.Run("main containers", func(t *testing.T) {
+		tests := []struct {
+			name          string
+			names, old    []string
+			expectedPairs []string
+		}{
+			{name: "no containers"},
+			{name: "unchanged", names: []string{"a", "b"}, old: []string{"a", "b"}, expectedPairs: []string{"a/a", "b/b"}},
+			{name: "added to an empty list", names: []string{"a"}, expectedPairs: []string{"a/-"}},
+			{name: "all removed", old: []string{"a", "b"}, expectedPairs: []string{"-/a", "-/b"}},
+			{name: "added first", names: []string{"x", "a", "b"}, old: []string{"a", "b"}, expectedPairs: []string{"x/-", "a/a", "b/b"}},
+			{name: "added in the middle", names: []string{"a", "x", "b"}, old: []string{"a", "b"}, expectedPairs: []string{"a/a", "x/-", "b/b"}},
+			{name: "added last", names: []string{"a", "b", "x"}, old: []string{"a", "b"}, expectedPairs: []string{"a/a", "b/b", "x/-"}},
+			{name: "removed first", names: []string{"b", "c"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"-/a", "b/b", "c/c"}},
+			{name: "removed in the middle", names: []string{"a", "c"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"a/a", "-/b", "c/c"}},
+			{name: "removed last", names: []string{"a", "b"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"a/a", "b/b", "-/c"}},
+			{name: "replaced", names: []string{"a", "x", "c"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"a/a", "x/-", "-/b", "c/c"}},
+			{
+				name:          "added and removed in several places",
+				names:         []string{"x", "b", "y", "d", "z"},
+				old:           []string{"a", "b", "c", "d", "e"},
+				expectedPairs: []string{"x/-", "-/a", "b/b", "y/-", "-/c", "d/d", "z/-", "-/e"},
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				var expected []string
+				for _, pair := range tc.expectedPairs {
+					expected = append(expected, "main:"+pair)
+				}
+				assert.Equal(t, expected, pairs(&api.PodSpec{Containers: containers(tc.names...)}, &api.PodSpec{Containers: containers(tc.old...)}, Containers))
+			})
+		}
+	})
+
+	t.Run("mask", func(t *testing.T) {
+		spec := &api.PodSpec{
+			InitContainers:      containers("init"),
+			Containers:          containers("a", "x"),
+			EphemeralContainers: ephemeralContainers("debug", "debug2"),
+		}
+		oldSpec := &api.PodSpec{
+			InitContainers:      containers("init"),
+			Containers:          containers("a", "b"),
+			EphemeralContainers: ephemeralContainers("debug"),
+		}
+		initPairs := []string{"init:init/init"}
+		mainPairs := []string{"main:a/a", "main:x/-", "main:-/b"}
+		ephemeralPairs := []string{"ephemeral:debug/debug", "ephemeral:debug2/-"}
+		assert.Equal(t, initPairs, pairs(spec, oldSpec, InitContainers))
+		assert.Equal(t, ephemeralPairs, pairs(spec, oldSpec, EphemeralContainers))
+		assert.Equal(t, slices.Concat(initPairs, mainPairs, ephemeralPairs), pairs(spec, oldSpec, AllContainers))
+	})
+
+	t.Run("pairs point into the specs", func(t *testing.T) {
+		spec := &api.PodSpec{Containers: containers("a")}
+		oldSpec := spec.DeepCopy()
+		for pair := range ContainerPairs(&api.Pod{Spec: *spec}, &api.Pod{Spec: *oldSpec}, Containers) {
+			assert.Same(t, &spec.Containers[0], pair.New)
+			assert.Same(t, &oldSpec.Containers[0], pair.Old)
+		}
+	})
 }

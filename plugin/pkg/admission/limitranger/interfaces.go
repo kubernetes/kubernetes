@@ -25,7 +25,9 @@ import (
 // LimitRangerActions is an interface defining actions to be carried over ranges to identify and manipulate their limits
 type LimitRangerActions interface {
 	// MutateLimit is a pluggable function to set limits on the object.
-	MutateLimit(limitRange *corev1.LimitRange, kind string, obj runtime.Object) error
+	// oldObj is the stored object on a pods/dynamic update, where only the containers that the
+	// update adds are defaulted, nil otherwise.
+	MutateLimit(limitRange *corev1.LimitRange, kind string, obj, oldObj runtime.Object) error
 	// ValidateLimit is a pluggable function to enforce limits on the object.
 	// oldObj is the stored object on an update, nil otherwise.
 	ValidateLimit(limitRange *corev1.LimitRange, kind string, obj, oldObj runtime.Object) error

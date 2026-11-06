@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	certsv1 "k8s.io/api/certificates/v1"
@@ -192,6 +193,11 @@ func podSpecChanged(oldPod, newPod *corev1.Pod) bool {
 	}
 	// Ephemeral containers can add new secret or config map references to the pod.
 	if len(newPod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers) {
+		return true
+	}
+	// Containers added through pods/dynamic can reference new secrets or config maps, and the
+	// references of removed containers must be dropped. Existing containers' references can't change.
+	if !slices.EqualFunc(newPod.Spec.Containers, oldPod.Spec.Containers, func(a, b corev1.Container) bool { return a.Name == b.Name }) {
 		return true
 	}
 	if !apiequality.Semantic.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes) {

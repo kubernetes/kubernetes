@@ -245,6 +245,99 @@ func TestResizeAdmission(t *testing.T) {
 			expectErr:   true,
 			errContains: "node \"missing-node\" not found",
 		},
+		{
+			name:        "Dynamic: successful container add on Linux node",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, *p.Spec.Containers[0].DeepCopy())
+				p.Spec.Containers[1].Name = "added"
+				return p
+			},
+			expectErr: false,
+		},
+		{
+			name:        "Dynamic: reject container add exceeding allocatable",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, *p.Spec.Containers[0].DeepCopy())
+				p.Spec.Containers[1].Name = "added"
+				p.Spec.Containers[1].Resources.Requests[core.ResourceCPU] = resource.MustParse("10")
+				return p
+			},
+			expectErr:   true,
+			errContains: "node didn't have enough allocatable resources: cpu",
+		},
+		{
+			name:        "Dynamic: reject resize exceeding allocatable",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers[0].Resources.Requests[core.ResourceMemory] = resource.MustParse("10Gi")
+				return p
+			},
+			expectErr:   true,
+			errContains: "node didn't have enough allocatable resources: memory",
+		},
+		{
+			name:        "Dynamic: reject container swap on non-Linux node",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers[0].Name = "replacement"
+				return p
+			},
+			expectErr:   true,
+			errContains: "pod resize is only supported on linux nodes",
+		},
+		{
+			name:        "Dynamic: skip validation for adding a container without resources",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, core.Container{Name: "added", Image: "image"})
+				return p
+			},
+			expectErr: false,
+		},
+		{
+			name:        "Dynamic: skip validation if resources are unchanged",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers[0].Image = "new-image"
+				return p
+			},
+			expectErr: false,
+		},
 	}
 
 	for _, tc := range testCases {
