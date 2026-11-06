@@ -1449,10 +1449,6 @@ status:
         image:
           imageRef: imageRefValue
   message: messageValue
-  nodeAllocatableResourceClaimStatuses:
-  - containers:
-    - containersValue
-    resourceClaimName: resourceClaimNameValue
   nominatedNodeName: nominatedNodeNameValue
   observedGeneration: 17
   phase: phaseValue

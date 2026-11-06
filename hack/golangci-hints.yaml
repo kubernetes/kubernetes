@@ -222,7 +222,7 @@ linters:
       ## For ResourceList fields in the core API.
       - text: "field (PersistentVolumeSpec.Capacity|ContainerStatus.AllocatedResources|PodSpec.Overhead|ResourceQuotaSpec.Hard) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
-      - text: "field (ResourceRequirements|VolumeResourceRequirements).(Limits|Requests) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
+      - text: "field (ResourceRequirements|VolumeResourceRequirements|ExtraNodeAllocatableResource).(Limits|Requests) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"
       - text: "field LimitRangeItem.(Max|Min|Default|DefaultRequest|MaxLimitRequestRatio) type ResourceList should not use a map type, use a list type with a unique name/identifier instead"
         path: "staging/src/k8s.io/api/core/v1/types.go"

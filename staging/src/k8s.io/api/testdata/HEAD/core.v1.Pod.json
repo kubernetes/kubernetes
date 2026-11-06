@@ -2245,25 +2245,15 @@
         }
       ]
     },
-    "nodeAllocatableResourceClaimStatuses": [
+    "extraNodeAllocatableResources": [
       {
-        "resourceClaimName": "resourceClaimNameValue",
-        "containers": [
-          "containersValue"
-        ],
-        "mapping": [
-          {
-            "name": "nameValue",
-            "quantity": "0"
-          }
-        ],
-        "overhead": [
-          {
-            "name": "nameValue",
-            "perPod": "0",
-            "perContainer": "0"
-          }
-        ]
+        "containerName": "containerNameValue",
+        "requests": {
+          "requestsKey": "0"
+        },
+        "limits": {
+          "limitsKey": "0"
+        }
       }
     ],
     "volumeStatuses": [
