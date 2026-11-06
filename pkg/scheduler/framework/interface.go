@@ -223,7 +223,8 @@ type NominationChangeResult struct {
 // from any goroutine. Plugins must not call back into the scheduling queue or
 // the API server.
 //
-// Pods of pod groups and shared claims are not supported yet.
+// Pods of pod groups and shared claims are not supported yet: snapshot
+// assumes of pod group cycles don't end the nomination.
 //
 // The interface is internal to kube-scheduler and only used when the
 // DRAPreemption feature gate is enabled. It may change or move into the

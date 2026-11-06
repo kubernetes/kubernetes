@@ -353,7 +353,9 @@ func TestNominationEndsOnAssume(t *testing.T) {
 
 // TestAssumeAndReserveInSnapshot covers the pod group scheduling cycle, where the
 // placement is only tentative: it goes into the snapshot rather than the cache, and
-// the returned revert function has to undo every part of it.
+// the returned revert function has to undo every part of it. The nomination of
+// the pod stays untouched, so that reverting cannot lose it and plugins with
+// NominationExtensions see no changes.
 func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
 	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
@@ -362,19 +364,28 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	tests := []struct {
 		name string
 		pod  *v1.Pod
+		// nominated means that the PodNominator nominates the pod to node1.
+		nominated bool
 	}{
 		{
 			name: "pod group cycle with cache: still assumed in the snapshot only",
 			pod:  pod1,
 		},
 		{
-			name: "pod group cycle: nomination is dropped on assume and restored on revert",
-			pod:  podWithNomination,
+			name:      "pod group cycle: nomination is kept on assume and revert",
+			pod:       podWithNomination,
+			nominated: true,
+		},
+		{
+			name:      "pod group cycle: nomination which the pod object does not show yet is kept on assume and revert",
+			pod:       pod1,
+			nominated: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
 			logger, ctx := ktesting.NewTestContext(t)
 
 			plugin := &assumeReserveTestPlugin{
@@ -382,7 +393,8 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 					filterStatus: map[string]*fwk.Status{tt.pod.Name: fwk.NewStatus(fwk.Success)},
 				},
 			}
-			f := newAssumeReserveFixture(t, ctx, node1, plugin, tt.pod)
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			f := newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, tt.pod)
 
 			podInfo, err := framework.NewPodInfo(tt.pod)
 			if err != nil {
@@ -392,13 +404,18 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 
 			state := newPodGroupCycleState()
 
-			nominated := tt.pod.Status.NominatedNodeName
-			if nominated != "" {
+			if tt.nominated {
 				f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{
-					NominatedNodeName: nominated,
+					NominatedNodeName: node1.Name,
 					NominatingMode:    fwk.ModeOverride,
 				})
 			}
+			isNominated := func() bool {
+				return slices.ContainsFunc(f.fwk.NominatedPodsForNode(logger, node1.Name), func(pi fwk.PodInfo) bool {
+					return pi.GetPod().UID == tt.pod.UID
+				})
+			}
+			callsBefore := nominationExtensions.Calls()
 
 			scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
 			if err != nil {
@@ -424,11 +441,14 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			if !isPodInSnapshot(f.algorithm.nodeInfoSnapshot, node1.Name, tt.pod.Name) {
 				t.Error("pod not assumed in the snapshot during a pod group cycle")
 			}
+			if !f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod.UID) {
+				t.Error("snapshot does not report the pod as assumed")
+			}
 			if tt.pod.Spec.NodeName != "" {
 				t.Errorf("input pod Spec.NodeName mutated = %q, want empty", tt.pod.Spec.NodeName)
 			}
-			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) != 0 {
-				t.Error("expected the nomination to be dropped once the pod was assumed")
+			if got := isNominated(); got != tt.nominated {
+				t.Errorf("pod nominated while assumed in the snapshot: %v, want %v", got, tt.nominated)
 			}
 
 			revertFn()
@@ -436,11 +456,17 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			if isPodInSnapshot(f.algorithm.nodeInfoSnapshot, node1.Name, tt.pod.Name) {
 				t.Error("pod still in the snapshot after revert")
 			}
+			if f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod.UID) {
+				t.Error("snapshot reports the pod as assumed after revert")
+			}
 			if !plugin.unreserved {
 				t.Error("expected Unreserve to be called on revert")
 			}
-			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) == 0 {
-				t.Error("expected the nomination to be restored on revert")
+			if got := isNominated(); got != tt.nominated {
+				t.Errorf("pod nominated after revert: %v, want %v", got, tt.nominated)
+			}
+			if diff := cmp.Diff(callsBefore, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected NominationExtensions calls for the snapshot assume and revert (-want,+got):\n%s", diff)
 			}
 		})
 	}

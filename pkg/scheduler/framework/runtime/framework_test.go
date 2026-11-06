@@ -3761,9 +3761,12 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 		filterPlugin    *TestPlugin
 		pod             *v1.Pod
 		nominatedPod    *v1.Pod
-		node            *v1.Node
-		nodeInfo        *framework.NodeInfo
-		wantStatus      *fwk.Status
+		// nominatedPodAssumed means that a pod group scheduling cycle
+		// assumed the nominated pod in the snapshot.
+		nominatedPodAssumed bool
+		node                *v1.Node
+		nodeInfo            *framework.NodeInfo
+		wantStatus          *fwk.Status
 	}{
 		{
 			name:            "node has no nominated pod",
@@ -3850,6 +3853,22 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			nodeInfo:     framework.NewNodeInfo(pod),
 			wantStatus:   nil,
 		},
+		{
+			// AddPod would fail if the framework added the nominated pod.
+			name: "node has a high-priority nominated pod which a pod group cycle assumed in the snapshot",
+			preFilterPlugin: &TestPlugin{
+				name: "TestPlugin1",
+				inj: injectedResult{
+					PreFilterAddPodStatus: int(fwk.Error),
+				},
+			},
+			pod:                 lowPriorityPod,
+			nominatedPod:        highPriorityPod,
+			nominatedPodAssumed: true,
+			node:                node,
+			nodeInfo:            framework.NewNodeInfo(pod),
+			wantStatus:          nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -3906,7 +3925,15 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile, WithPodNominator(podNominator))
+			snapshot := cache.NewSnapshot(nil, []*v1.Node{tt.node})
+			if tt.nominatedPodAssumed {
+				assumedPod := tt.nominatedPod.DeepCopy()
+				assumedPod.Spec.NodeName = tt.node.Name
+				if err := snapshot.AssumePod(mustNewPodInfo(t, assumedPod)); err != nil {
+					t.Fatalf("Error assuming the nominated pod in the snapshot: %v", err)
+				}
+			}
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile, WithPodNominator(podNominator), WithSnapshotSharedLister(snapshot))
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
