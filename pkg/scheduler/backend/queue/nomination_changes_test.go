@@ -24,15 +24,19 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 // TestNominationChanges checks that the queue lets pods retry which an ended
-// nomination blocked, and only then.
+// nomination blocked, and only then. Without the DRAPreemption feature gate,
+// the queue leaves that to the event handlers.
 func TestNominationChanges(t *testing.T) {
 	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj()
 	withNomination := func(nodeName string) *v1.Pod {
@@ -98,37 +102,44 @@ func TestNominationChanges(t *testing.T) {
 			wantMoved: true,
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			m := makeEmptyQueueingHintMapPerProfile()
-			m[""][framework.EventAssignedPodDelete] = []*QueueingHintFunction{{PluginName: "fooPlugin", QueueingHintFn: queueHintReturnQueue}}
-			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod, lowPod, highPod},
-				WithQueueingHintMapPerProfile(m))
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+				testNominationChange(t, pod, lowPod, highPod, tc.change, tc.wantMoved && draPreemption)
+			})
+		}
+	}
+}
 
-			// lowPod and highPod were rejected while pod was nominated.
-			for _, p := range []*v1.Pod{lowPod, highPod} {
-				q.Add(ctx, p)
-				if _, err := q.Pop(logger); err != nil {
-					t.Fatalf("Pop: %v", err)
-				}
-				if err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, p, "fooPlugin"), q.SchedulingCycle()); err != nil {
-					t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
-				}
-			}
-			// A new nomination does not unblock anything.
-			q.Add(ctx, pod)
-			if getUnschedulablePod(q, lowPod) == nil {
-				t.Fatal("Lower priority pod moved when the pod got nominated")
-			}
+func testNominationChange(t *testing.T, pod, lowPod, highPod *v1.Pod, change func(t *testing.T, q *PriorityQueue), wantMoved bool) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := makeEmptyQueueingHintMapPerProfile()
+	m[""][framework.EventAssignedPodDelete] = []*QueueingHintFunction{{PluginName: "fooPlugin", QueueingHintFn: queueHintReturnQueue}}
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod, lowPod, highPod},
+		WithQueueingHintMapPerProfile(m))
 
-			tc.change(t, q)
-			if moved := getUnschedulablePod(q, lowPod) == nil; moved != tc.wantMoved {
-				t.Errorf("Lower priority pod moved: got %v, want %v", moved, tc.wantMoved)
-			}
-			if getUnschedulablePod(q, highPod) == nil {
-				t.Error("Higher priority pod moved, it did not have to respect the nomination")
-			}
-		})
+	// lowPod and highPod were rejected while pod was nominated.
+	for _, p := range []*v1.Pod{lowPod, highPod} {
+		q.Add(ctx, p)
+		if _, err := q.Pop(logger); err != nil {
+			t.Fatalf("Pop: %v", err)
+		}
+		if err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, p, "fooPlugin"), q.SchedulingCycle()); err != nil {
+			t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+		}
+	}
+	// A new nomination does not unblock anything.
+	q.Add(ctx, pod)
+	if getUnschedulablePod(q, lowPod) == nil {
+		t.Fatal("Lower priority pod moved when the pod got nominated")
+	}
+
+	change(t, q)
+	if moved := getUnschedulablePod(q, lowPod) == nil; moved != wantMoved {
+		t.Errorf("Lower priority pod moved: got %v, want %v", moved, wantMoved)
+	}
+	if getUnschedulablePod(q, highPod) == nil {
+		t.Error("Higher priority pod moved, it did not have to respect the nomination")
 	}
 }
 
@@ -145,6 +156,7 @@ func mustPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
 // nominated node and that the events which it returns let pods with lower or
 // equal priority retry, also when the pod got assumed on its nominated node.
 func TestNominationChangeHandler(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
 	logger, ctx := ktesting.NewTestContext(t)
 	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj()
 	assumed := pod.DeepCopy()
@@ -198,6 +210,7 @@ func TestNominationChangeHandler(t *testing.T) {
 // handler can replace the previous one, without the generic event: the
 // pod keeps occupying the node.
 func TestRenominationToSameNode(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
 	logger, ctx := ktesting.NewTestContext(t)
 	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj()
 	lowPod := st.MakePod().Name("low").Namespace("ns").UID("low").Priority(lowPriority).Obj()
