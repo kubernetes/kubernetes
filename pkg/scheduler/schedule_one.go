@@ -132,7 +132,7 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 
 	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, schedFramework, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
-		sched.FailureHandler(schedulingCycleCtx, schedFramework, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
+		sched.runFailureHandler(schedulingCycleCtx, schedFramework, state, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
@@ -201,14 +201,6 @@ func (sched *Scheduler) prepareForBindingCycle(
 	scheduleResult ScheduleResult,
 ) (*framework.QueuedPodInfo, *fwk.Status) {
 	assumedPodInfo, status := sched.algorithm.AssumeAndReserveInCache(ctx, state, schedFramework, podInfo, scheduleResult)
-	// The nomination ends in this function: the nominator forgets an assumed
-	// pod, and every failure clears the nominated node. Plugins see the node
-	// only if the pod is still assumed when this returns, because a rejected
-	// pod has been unreserved by then and its resources are free again.
-	podWithEndedNomination := podInfo.Pod
-	defer func() {
-		sched.removeNomination(ctx, podWithEndedNomination, "")
-	}()
 	if !status.IsSuccess() {
 		return assumedPodInfo, status
 	}
@@ -240,7 +232,6 @@ func (sched *Scheduler) prepareForBindingCycle(
 
 		return assumedPodInfo, runPermitStatus
 	}
-	podWithEndedNomination = assumedPod
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
 	if len(podsToActivate.Map) != 0 {
@@ -767,6 +758,22 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 	return strconv.Itoa(p.Attempts)
 }
 
+// runFailureHandler calls the FailureHandler for a pod whose scheduling cycle
+// failed. If the FailureHandler is going to nominate the pod, the
+// NominationExtensions of plugins prepare what the cycle selected for the
+// pod first, because the PodNominator calls them without the CycleState and
+// while the scheduling queue is locked. What they prepared gets dropped when
+// the FailureHandler returns.
+func (sched *Scheduler) runFailureHandler(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState,
+	podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
+	// Assigned pods (deferred resizes) don't get nominated.
+	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" && podInfo.Pod.Spec.NodeName == "" {
+		done := schedFramework.RunNominationExtensionsPrepareNomination(ctx, state, podInfo.Pod, nominatingInfo.NominatedNodeName)
+		defer done()
+	}
+	sched.FailureHandler(ctx, schedFramework, podInfo, status, nominatingInfo, start)
+}
+
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
@@ -867,15 +874,6 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
 		sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
-	}
-	// Plugins otherwise learn about a cleared nomination only from the
-	// informer, which never reports it if the API server did not have the
-	// nominated node yet: asynchronous API calls merge a pending patch that
-	// sets it into the one that clears it. This comes after requeueing the
-	// pod, so that it does not get the events which plugins emit for its own
-	// ended nomination.
-	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName == "" {
-		sched.removeNomination(ctx, pod, "")
 	}
 
 	if err == nil {

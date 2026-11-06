@@ -1579,3 +1579,56 @@ informer_queued_items{group="",name="kube-scheduler",resource="pods",version="v1
 		t.Error(err)
 	}
 }
+
+// TestNominationChangeHandler checks that the scheduling queue reaches the
+// NominationExtensions of the pod's profile and gets their events.
+func TestNominationChangeHandler(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	released := framework.NominationEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
+	nominationExtensions := &tf.FakeNominationExtensionsPlugin{ReleaseEvents: []framework.NominationEvent{released}}
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)),
+		},
+		testSchedulerName,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newNominationChangeHandler(profile.Map{testSchedulerName: schedFramework})
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").SchedulerName(testSchedulerName).Obj()
+	otherProfile := st.MakePod().Name("other").Namespace("ns").UID("other").SchedulerName("other-scheduler").Obj()
+	// Only the first nomination to node2 gets what got prepared for it.
+	done := schedFramework.RunNominationExtensionsPrepareNomination(ctx, nil, pod, "node2")
+	defer done()
+
+	if events := handler(logger, pod, "", "node1"); len(events) != 0 {
+		t.Errorf("Unexpected events for a new nomination: %v", events)
+	}
+	if diff := cmp.Diff([]framework.NominationEvent{released}, handler(logger, pod, "node1", "node2")); diff != "" {
+		t.Errorf("Unexpected events for a moved nomination (-want, +got):\n%s", diff)
+	}
+	// Replaces the previous nomination without removing it.
+	if events := handler(logger, pod, "node2", "node2"); len(events) != 0 {
+		t.Errorf("Unexpected events for a renewed nomination: %v", events)
+	}
+	if diff := cmp.Diff([]framework.NominationEvent{released}, handler(logger, pod, "node2", "")); diff != "" {
+		t.Errorf("Unexpected events for an ended nomination (-want, +got):\n%s", diff)
+	}
+	if events := handler(logger, otherProfile, "node1", ""); len(events) != 0 {
+		t.Errorf("Unexpected events for a pod of an unknown profile: %v", events)
+	}
+	want := []string{
+		"PrepareNomination ns/p node2 assigned=",
+		"AddNomination ns/p node1 assigned= prepared=<nil>",
+		"RemoveNomination ns/p node1 assigned=", "AddNomination ns/p node2 assigned= prepared=prepared ns/p node2",
+		"AddNomination ns/p node2 assigned= prepared=<nil>",
+		"RemoveNomination ns/p node2 assigned=",
+	}
+	if diff := cmp.Diff(want, nominationExtensions.Calls()); diff != "" {
+		t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
+	}
+}

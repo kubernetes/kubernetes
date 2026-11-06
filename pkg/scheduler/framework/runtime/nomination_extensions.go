@@ -19,8 +19,10 @@ package runtime
 import (
 	"context"
 	"slices"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -50,30 +52,96 @@ func (f *frameworkImpl) fillNominationExtensions() {
 			f.victimExtensions = append(f.victimExtensions, ext)
 		}
 	}
-}
-
-// RunNominationExtensionsAddNominatedPod calls AddNominatedPod of all plugins.
-func (f *frameworkImpl) RunNominationExtensionsAddNominatedPod(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
-	for _, ext := range f.nominationExtensions {
-		ext.AddNominatedPod(f.nominationExtensionsContext(ctx, ext), state, pod, nodeName)
+	if len(f.nominationExtensions) > 0 {
+		f.preparedNominations = &preparedNominations{byPod: make(map[types.UID]*preparedNomination)}
 	}
 }
 
-// RunNominationExtensionsRemoveNominatedPod calls RemoveNominatedPod of all plugins.
-func (f *frameworkImpl) RunNominationExtensionsRemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string) {
-	for _, ext := range f.nominationExtensions {
-		ext.RemoveNominatedPod(f.nominationExtensionsContext(ctx, ext), pod, nodeName)
+// preparedNominations holds the results of PrepareNomination for nominations
+// which the PodNominator is about to make, by pod UID.
+type preparedNominations struct {
+	mutex sync.Mutex
+	byPod map[types.UID]*preparedNomination
+}
+
+type preparedNomination struct {
+	nodeName string
+	// results has one entry per plugin in nominationExtensions.
+	results []any
+}
+
+// RunNominationExtensionsPrepareNomination calls PrepareNomination of all
+// plugins and keeps the results for the nomination of pod to nodeName until
+// done gets called.
+func (f *frameworkImpl) RunNominationExtensionsPrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (done func()) {
+	p := f.preparedNominations
+	if p == nil {
+		return func() {}
+	}
+	entry := &preparedNomination{nodeName: nodeName, results: make([]any, len(f.nominationExtensions))}
+	for i, ext := range f.nominationExtensions {
+		entry.results[i] = ext.PrepareNomination(f.extensionsContext(ctx, "NominationExtensions", ext), state, pod, nodeName)
+	}
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.byPod[pod.UID] = entry
+	return func() {
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
+		// A later call for the same pod may have replaced the entry.
+		if p.byPod[pod.UID] == entry {
+			delete(p.byPod, pod.UID)
+		}
 	}
 }
 
-func (f *frameworkImpl) nominationExtensionsContext(ctx context.Context, ext fwk.Plugin) context.Context {
-	return extensionContext(ctx, "NominationExtensions", ext)
+// takePreparedNomination returns and drops the results of PrepareNomination
+// for the nomination of the pod to the node, nil if there are none.
+func (f *frameworkImpl) takePreparedNomination(podUID types.UID, nodeName string) []any {
+	p := f.preparedNominations
+	if p == nil {
+		return nil
+	}
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	entry := p.byPod[podUID]
+	if entry == nil || entry.nodeName != nodeName {
+		return nil
+	}
+	delete(p.byPod, podUID)
+	return entry.results
 }
 
-func extensionContext(ctx context.Context, extension string, ext fwk.Plugin) context.Context {
+// RunNominationExtensionsAddNomination calls AddNomination of all plugins,
+// with the results of their PrepareNomination for the nomination, if they are
+// still kept, and returns the events of all of them.
+func (f *frameworkImpl) RunNominationExtensionsAddNomination(ctx context.Context, pod *v1.Pod, nodeName string) []framework.NominationEvent {
+	prepared := f.takePreparedNomination(pod.UID, nodeName)
+	var events []framework.NominationEvent
+	for i, ext := range f.nominationExtensions {
+		var result any
+		if prepared != nil {
+			result = prepared[i]
+		}
+		events = append(events, ext.AddNomination(f.extensionsContext(ctx, "NominationExtensions", ext), pod, nodeName, result).Events...)
+	}
+	return events
+}
+
+// RunNominationExtensionsRemoveNomination calls RemoveNomination of all
+// plugins and returns the events of all of them.
+func (f *frameworkImpl) RunNominationExtensionsRemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) []framework.NominationEvent {
+	var events []framework.NominationEvent
+	for _, ext := range f.nominationExtensions {
+		events = append(events, ext.RemoveNomination(f.extensionsContext(ctx, "NominationExtensions", ext), pod, nodeName).Events...)
+	}
+	return events
+}
+
+func (f *frameworkImpl) extensionsContext(ctx context.Context, kind string, ext fwk.Plugin) context.Context {
 	logger := klog.FromContext(ctx)
 	if !logger.V(4).Enabled() {
 		return ctx
 	}
-	return klog.NewContext(ctx, klog.LoggerWithName(klog.LoggerWithName(logger, extension), ext.Name()))
+	return klog.NewContext(ctx, klog.LoggerWithName(klog.LoggerWithName(logger, kind), ext.Name()))
 }

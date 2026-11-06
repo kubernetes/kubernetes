@@ -323,7 +323,7 @@ func testHoldsConsumableCapacity(tCtx ktesting.TContext) {
 			reserve(st.FromResourceClaim(request("v-claim", "40Gi")).Allocation(share("v", "40Gi")).Obj(), v),
 		}, slice("80Gi"), vx, v, px, p, low)
 		nominate(tCtx, testCtx, px, nodeName, vx)
-		testCtx.p.RemoveNominatedPod(tCtx, px, "")
+		testCtx.p.RemoveNomination(tCtx, px, nodeName)
 		nominate(tCtx, testCtx, p, nodeName, v)
 		updateClaim(tCtx, testCtx, "v-claim", func(claim *resourceapi.ResourceClaim) {
 			claim.Status.ReservedFor = nil
@@ -331,7 +331,7 @@ func testHoldsConsumableCapacity(tCtx ktesting.TContext) {
 		})
 
 		require.False(tCtx, fits(tCtx, testCtx, low), "low priority pod")
-		testCtx.p.RemoveNominatedPod(tCtx, p, "")
+		testCtx.p.RemoveNomination(tCtx, p, nodeName)
 		require.True(tCtx, fits(tCtx, testCtx, low), "without the hold")
 	})
 
@@ -417,7 +417,7 @@ func testJoinVictimClaim(tCtx ktesting.TContext) {
 
 	tCtx.Run("nomination-ended", func(tCtx ktesting.TContext) {
 		testCtx := setup(tCtx)
-		testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
+		testCtx.p.RemoveNomination(tCtx, preemptor, nodeName)
 		_, status := filter(tCtx, testCtx, replacement)
 		require.True(tCtx, status.IsSuccess(), "Filter: %v", status)
 	})
@@ -437,70 +437,76 @@ func testHoldReleaseEvents(tCtx ktesting.TContext) {
 		reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("gpu-0")).Obj(), victim),
 		reserve(preemptionClaim("victim-claim-2").Allocation(preemptionAllocation("gpu-1")).Obj(), victim2),
 	}
-	type event struct {
-		device   string
-		holder   types.UID
-		priority int32
+	deallocate := func(tCtx ktesting.TContext, testCtx *testContext, name string) {
+		updateClaim(tCtx, testCtx, name, func(claim *resourceapi.ResourceClaim) {
+			claim.Status.ReservedFor = nil
+			claim.Status.Allocation = nil
+		})
+	}
+	// renominate is what the PodNominator does when PostFilter nominates
+	// the pod to the same node again: an addition which replaces the
+	// nomination.
+	renominate := func(tCtx ktesting.TContext, testCtx *testContext, victim *v1.Pod) framework.NominationChangeResult {
+		_, prepared := prepareNomination(tCtx, testCtx, preemptor, nodeName, victim)
+		return testCtx.p.AddNomination(tCtx, preemptor, nodeName, prepared)
 	}
 
 	for name, tc := range map[string]struct {
-		change     func(tCtx ktesting.TContext, testCtx *testContext)
-		wantEvents []event
+		change      func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult
+		wantDevices []string
 	}{
-		"deleted": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
+		"removed": {
+			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
+				return testCtx.p.RemoveNomination(tCtx, preemptor, nodeName)
 			},
-			wantEvents: []event{{device: "gpu-0", holder: preemptor.UID, priority: 100}},
+			wantDevices: []string{"gpu-0"},
 		},
-		"stale-node": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				testCtx.p.RemoveNominatedPod(tCtx, preemptor, node2Name)
+		"other-node": {
+			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
+				return testCtx.p.RemoveNomination(tCtx, preemptor, node2Name)
 			},
 		},
 		"assumed-with-held-devices": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				claim, err := testCtx.draManager.ResourceClaims().Get(namespace, "preemptor-claim")
-				tCtx.ExpectNoError(err)
-				claim = claim.DeepCopy()
-				claim.Status.Allocation = preemptionAllocation("gpu-0")
-				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
-				testCtx.p.RemoveNominatedPod(tCtx, fromPod(preemptor).Node(nodeName).Obj(), "")
+			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
+				deallocate(tCtx, testCtx, "victim-claim")
+				assume(tCtx, testCtx, preemptor, nodeName)
+				return testCtx.p.RemoveNomination(tCtx, preemptor, nodeName)
 			},
 		},
 		"assumed-with-other-devices": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				claim, err := testCtx.draManager.ResourceClaims().Get(namespace, "preemptor-claim")
-				tCtx.ExpectNoError(err)
-				claim = claim.DeepCopy()
-				claim.Status.Allocation = preemptionAllocation("gpu-1")
-				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
-				testCtx.p.RemoveNominatedPod(tCtx, fromPod(preemptor).Node(nodeName).Obj(), "")
+			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
+				deallocate(tCtx, testCtx, "victim-claim-2")
+				assume(tCtx, testCtx, preemptor, nodeName)
+				return testCtx.p.RemoveNomination(tCtx, preemptor, nodeName)
 			},
-			wantEvents: []event{{device: "gpu-0", holder: preemptor.UID, priority: 100}},
+			wantDevices: []string{"gpu-0"},
+		},
+		"assumed-and-unreserved": {
+			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
+				deallocate(tCtx, testCtx, "victim-claim")
+				assumed, state := assume(tCtx, testCtx, preemptor, nodeName)
+				testCtx.p.Unreserve(tCtx, state, assumed, nodeName)
+				return testCtx.p.RemoveNomination(tCtx, preemptor, nodeName)
+			},
+			wantDevices: []string{"gpu-0"},
 		},
 		"same-hold-again": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				nominate(tCtx, testCtx, preemptor, nodeName, victim)
+			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
+				return renominate(tCtx, testCtx, victim)
 			},
 		},
 		"different-hold": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				nominate(tCtx, testCtx, preemptor, nodeName, victim2)
+			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
+				return renominate(tCtx, testCtx, victim2)
 			},
-			wantEvents: []event{{device: "gpu-0", holder: preemptor.UID, priority: 100}},
+			wantDevices: []string{"gpu-0"},
 		},
 	} {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, victim2, preemptor})
-			var events []event
-			testCtx.draManager.SetNominationReleaseHandler(func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32) {
-				events = append(events, event{device: claim.Status.Allocation.Devices.Results[0].Device, holder: holderUID, priority: priority})
-			})
 			nominate(tCtx, testCtx, preemptor, nodeName, victim)
 			require.Equal(tCtx, []string{"gpu-0"}, heldDevices(testCtx, preemptor))
-			tc.change(tCtx, testCtx)
-			require.Equal(tCtx, tc.wantEvents, events)
+			require.Equal(tCtx, tc.wantDevices, releasedDevices(tCtx, tc.change(tCtx, testCtx)))
 		})
 	}
 }
@@ -524,8 +530,6 @@ func testNominationWithoutHold(tCtx ktesting.TContext) {
 		reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("gpu-0")).Obj(), victim),
 	}
 	testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, preemptor, replacement})
-	var events int
-	testCtx.draManager.SetNominationReleaseHandler(func(*resourceapi.ResourceClaim, types.UID, int32) { events++ })
 	nominate(tCtx, testCtx, preemptor, nodeName, victim)
 	require.NotNil(tCtx, testCtx.p.nominations.nomination(preemptor.UID), "nomination")
 	require.Empty(tCtx, heldDevices(testCtx, preemptor), "held devices")
@@ -541,8 +545,7 @@ func testNominationWithoutHold(tCtx ktesting.TContext) {
 	status = filterBothPasses(tCtx, testCtx, state, replacement)
 	require.Equal(tCtx, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "resourceclaim of preempted pods is being deallocated"), status, "Filter of a pod which uses the claim of the victim")
 
-	testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
-	require.Zero(tCtx, events, "release events")
+	require.Empty(tCtx, testCtx.p.RemoveNomination(tCtx, preemptor, nodeName).Events, "release events")
 }
 
 func TestHoldsWithFramework(t *testing.T) {
@@ -663,8 +666,8 @@ func testHoldsConcurrency(tCtx ktesting.TContext) {
 	})
 	wg.Go(func() {
 		for range 10 {
-			testCtx.p.RemoveNominatedPod(tCtx, preemptors[1], "")
-			testCtx.p.AddNominatedPod(tCtx, nominationStates[1], preemptors[1], nodes[1].Name)
+			testCtx.p.RemoveNomination(tCtx, preemptors[1], nodes[1].Name)
+			testCtx.p.AddNomination(tCtx, preemptors[1], nodes[1].Name, testCtx.p.PrepareNomination(tCtx, nominationStates[1], preemptors[1], nodes[1].Name))
 		}
 	})
 	wg.Wait()

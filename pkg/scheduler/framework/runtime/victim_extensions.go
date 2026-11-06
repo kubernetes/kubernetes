@@ -25,7 +25,7 @@ import (
 // RunVictimExtensionsAssumeVictim calls AssumeVictim of all plugins.
 func (f *frameworkImpl) RunVictimExtensionsAssumeVictim(ctx context.Context, victim *v1.Pod) {
 	for _, ext := range f.victimExtensions {
-		ext.AssumeVictim(extensionContext(ctx, "VictimExtensions", ext), victim)
+		ext.AssumeVictim(f.extensionsContext(ctx, "VictimExtensions", ext), victim)
 	}
 }
 
@@ -33,7 +33,7 @@ func (f *frameworkImpl) RunVictimExtensionsAssumeVictim(ctx context.Context, vic
 // plugin which reports that the pod is not eligible to preempt.
 func (f *frameworkImpl) RunVictimExtensionsPodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nodeName string) (bool, string) {
 	for _, ext := range f.victimExtensions {
-		if eligible, reason := ext.PodEligibleToPreempt(extensionContext(ctx, "VictimExtensions", ext), pod, nodeName); !eligible {
+		if eligible, reason := ext.PodEligibleToPreempt(f.extensionsContext(ctx, "VictimExtensions", ext), pod, nodeName); !eligible {
 			return false, reason
 		}
 	}

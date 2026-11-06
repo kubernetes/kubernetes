@@ -46,14 +46,16 @@ import (
 
 func TestClaimNominations(t *testing.T) {
 	n := newClaimNominations()
-	n.add("p", &podNomination{nodeName: "a"})
-	n.add("p", &podNomination{nodeName: "b"})
-	require.Equal(t, "b", n.nomination("p").nodeName)
-	// An event about the older nomination must not remove the newer one.
-	n.remove("p", "a")
-	require.NotNil(t, n.nomination("p"))
-	n.remove("p", "b")
+	first := &podNomination{nodeName: "a"}
+	require.Nil(t, n.add("p", first), "nothing replaced")
+	require.Equal(t, first, n.nomination("p"))
+	second := &podNomination{nodeName: "a"}
+	require.Equal(t, first, n.add("p", second), "replaced")
+	// An event about another nomination must not remove this one.
+	require.Nil(t, n.remove("p", "b"))
+	require.Equal(t, second, n.remove("p", "a"))
 	require.Nil(t, n.nomination("p"))
+	require.Nil(t, n.remove("p", "a"), "removed again")
 }
 
 // setupNominations sets up the plugin with the claimNominations store,
@@ -66,8 +68,8 @@ func setupNominations(tCtx ktesting.TContext, claims []*resourceapi.ResourceClai
 }
 
 // nominate runs PreFilter for the preemptor, simulates the removal of the
-// victims, calls AddNominatedPod and then AssumeVictim for each victim, like
-// a successful preemption.
+// victims, prepares and adds the nomination and then calls AssumeVictim for
+// each victim, like a successful preemption.
 func nominate(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
 	state := nominateWithoutAssume(tCtx, testCtx, preemptor, nodeName, victims...)
 	for _, victim := range victims {
@@ -79,6 +81,17 @@ func nominate(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, n
 // nominateWithoutAssume is nominate for a preemption which failed to
 // preempt the victims.
 func nominateWithoutAssume(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
+	tCtx.Helper()
+	state, prepared := prepareNomination(tCtx, testCtx, preemptor, nodeName, victims...)
+	testCtx.p.AddNomination(tCtx, preemptor, nodeName, prepared)
+	return state
+}
+
+// prepareNomination runs PreFilter for the preemptor, simulates the removal
+// of the victims and calls PrepareNomination, like PostFilter followed by
+// the framework when it nominates the preemptor. It returns the CycleState
+// and what PrepareNomination returned.
+func prepareNomination(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) (fwk.CycleState, any) {
 	tCtx.Helper()
 	state := framework.NewCycleState()
 	_, status := testCtx.p.PreFilter(tCtx, state, preemptor, testCtx.nodeInfos)
@@ -99,8 +112,42 @@ func nominateWithoutAssume(tCtx ktesting.TContext, testCtx *testContext, preempt
 		require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo, nodeInfo).IsSuccess(), "RemovePod")
 	}
 	_ = testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo)
-	testCtx.p.AddNominatedPod(tCtx, state, preemptor, nodeName)
-	return state
+	return state, testCtx.p.PrepareNomination(tCtx, state, preemptor, nodeName)
+}
+
+// assume runs PreFilter, Filter and Reserve for the pod on the node, like the
+// scheduling cycle which assumes the pod. It returns the assumed pod and the
+// CycleState.
+func assume(tCtx ktesting.TContext, testCtx *testContext, pod *v1.Pod, nodeName string) (*v1.Pod, fwk.CycleState) {
+	tCtx.Helper()
+	state := framework.NewCycleState()
+	_, status := testCtx.p.PreFilter(tCtx, state, pod, testCtx.nodeInfos)
+	require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+	for _, info := range testCtx.nodeInfos {
+		if info.Node().Name == nodeName {
+			status = testCtx.p.Filter(tCtx, state, pod, info)
+		}
+	}
+	require.True(tCtx, status.IsSuccess(), "Filter: %v", status)
+	assumed := fromPod(pod).Node(nodeName).Obj()
+	status = testCtx.p.Reserve(tCtx, state, assumed, nodeName)
+	require.True(tCtx, status.IsSuccess(), "Reserve: %v", status)
+	return assumed, state
+}
+
+// releasedDevices returns the devices in the events.
+func releasedDevices(tCtx ktesting.TContext, result framework.NominationChangeResult) []string {
+	tCtx.Helper()
+	var devices []string
+	for _, event := range result.Events {
+		require.Equal(tCtx, framework.EventResourceClaimHoldReleased, event.Event, "event")
+		oldClaim, newClaim := event.OldObj.(*resourceapi.ResourceClaim), event.NewObj.(*resourceapi.ResourceClaim)
+		require.Nil(tCtx, newClaim.Status.Allocation, "allocation after release")
+		for _, result := range oldClaim.Status.Allocation.Devices.Results {
+			devices = append(devices, result.Device)
+		}
+	}
+	return devices
 }
 
 func eventually(tCtx ktesting.TContext, what string, condition func() bool) {
@@ -161,19 +208,19 @@ func deletePod(tCtx ktesting.TContext, testCtx *testContext, pod *v1.Pod) {
 	})
 }
 
-func TestAddNominatedPod(t *testing.T) {
-	testAddNominatedPod(ktesting.Init(t))
+func TestPrepareNomination(t *testing.T) {
+	testPrepareNomination(ktesting.Init(t))
 }
 
-func TestAddNominatedPodAfterReprieve(t *testing.T) {
-	testAddNominatedPodAfterReprieve(ktesting.Init(t))
+func TestPrepareNominationAfterReprieve(t *testing.T) {
+	testPrepareNominationAfterReprieve(ktesting.Init(t))
 }
 
-// testAddNominatedPodAfterReprieve checks that AddNominatedPod gets the
+// testPrepareNominationAfterReprieve checks that PrepareNomination gets the
 // victims which SelectVictimsOnNode ends up with, also if the last Filter ran
 // on a copy made by RunFilterPluginsWithNominatedPods for a victim which did
 // not get reprieved.
-func testAddNominatedPodAfterReprieve(tCtx ktesting.TContext) {
+func testPrepareNominationAfterReprieve(tCtx ktesting.TContext) {
 	slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Obj()
 	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
 	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
@@ -226,13 +273,13 @@ func testAddNominatedPodAfterReprieve(tCtx ktesting.TContext) {
 				require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo(victim2), nodeInfo).IsSuccess(), "RemovePod")
 			}
 
-			testCtx.p.AddNominatedPod(tCtx, state, preemptor, nodeName)
+			testCtx.p.AddNomination(tCtx, preemptor, nodeName, testCtx.p.PrepareNomination(tCtx, state, preemptor, nodeName))
 			require.Equal(tCtx, tc.wantVictims, victimsOf(testCtx), "victims of the nomination")
 		})
 	}
 }
 
-func testAddNominatedPod(tCtx ktesting.TContext) {
+func testPrepareNomination(tCtx ktesting.TContext) {
 	slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Obj()
 	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
 	victim2 := preemptionPod("victim2", "victim-claim-2").Node(nodeName).Obj()
@@ -247,7 +294,6 @@ func testAddNominatedPod(tCtx ktesting.TContext) {
 
 	for name, tc := range map[string]struct {
 		preemptor      *v1.Pod
-		deleted        bool
 		wantNomination bool
 	}{
 		"released-claims": {
@@ -257,18 +303,11 @@ func testAddNominatedPod(tCtx ktesting.TContext) {
 		"cannot-release": {
 			preemptor: preemptionPod("preemptor", "preemptor-claim").Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 		},
-		"preemptor-gone": {
-			preemptor: preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj(),
-			deleted:   true,
-		},
 	} {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
-			objs := []apiruntime.Object{slice, victim, victim2, running}
-			if !tc.deleted {
-				objs = append(objs, tc.preemptor)
-			}
-			testCtx := setupNominations(tCtx, claims, objs)
-			nominateWithoutAssume(tCtx, testCtx, tc.preemptor, nodeName, victim, victim2)
+			testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, victim2, running, tc.preemptor})
+			_, prepared := prepareNomination(tCtx, testCtx, tc.preemptor, nodeName, victim, victim2)
+			testCtx.p.AddNomination(tCtx, tc.preemptor, nodeName, prepared)
 
 			nomination := testCtx.p.nominations.nomination(tc.preemptor.UID)
 			require.Equal(tCtx, tc.wantNomination, nomination != nil, "nomination")

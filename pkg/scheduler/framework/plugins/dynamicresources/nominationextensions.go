@@ -33,79 +33,124 @@ import (
 )
 
 // This file implements framework.NominationExtensions (KEP-5690): devices
-// which preemption freed get held for the preemptor on its nominated node.
+// which preemption freed get held for the preemptor while the PodNominator
+// nominates it to the node.
 
 var _ framework.NominationExtensions = &DynamicResources{}
 
-// AddNominatedPod remembers the victims with claims which the preemption
-// simulation removed for the node and which devices the pod is going to get
-// there, so that pods with lower or equal priority don't get them first.
-// Claims of the victims get tracked by AssumeVictim.
-func (pl *DynamicResources) AddNominatedPod(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
+// PrepareNomination returns the nomination of the pod to the node with what
+// the scheduling cycle selected for it: the devices which the preemption
+// simulation found for it with its victims removed, and the victims with
+// claims. It returns nil if preemption cannot release devices for the pod.
+func (pl *DynamicResources) PrepareNomination(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) any {
 	if pl.nominations == nil {
-		return
+		return nil
 	}
 	state, err := getStateData(cs)
-	if err != nil || state.preemption == nil || !state.preemption.root.canRelease {
-		return
+	if err != nil {
+		return nil
 	}
-	logger := klog.FromContext(ctx)
+	nomination := pl.nominationFor(ctx, state, pod, nodeName)
+	if nomination == nil {
+		return nil
+	}
+	klog.FromContext(ctx).V(5).Info("Prepared nomination", "pod", klog.KObj(pod), "node", nodeName, "numHeldClaims", len(nomination.holds))
+	return nomination
+}
 
+// nominationFor returns the nomination of a pod which gets nominated by
+// preemption, nil if preemption cannot release devices for it.
+func (pl *DynamicResources) nominationFor(ctx context.Context, state *stateData, pod *v1.Pod, nodeName string) *podNomination {
+	if state.preemption == nil || !state.preemption.root.canRelease {
+		return nil
+	}
 	sim := state.preemption.simulationFor(nodeName)
 	if sim == nil {
 		sim = state.preemption
 	}
 	p := sim.clone()
-	nomination := &podNomination{
+	return &podNomination{
 		nodeName: nodeName,
 		priority: corev1helpers.PodPriority(pod),
 		victims:  maps.Clone(p.sim.removedPods),
-	}
-	nomination.holds = pl.computeHold(ctx, state, p, nodeName)
-	replaced := pl.nominations.add(pod.UID, nomination)
-	logger.V(5).Info("Recorded nomination", "pod", klog.KObj(pod), "node", nodeName, "numHeldClaims", len(nomination.holds))
-	if replaced != nil && !sameHolds(replaced.holds, nomination.holds) {
-		pl.nominations.released(pod.UID, replaced)
-	}
-
-	// If the pod got deleted before its nomination was recorded, then
-	// RemoveNominatedPod was called too early.
-	if current, err := pl.podLister.Pods(pod.Namespace).Get(pod.Name); err != nil || current.UID != pod.UID {
-		pl.RemoveNominatedPod(ctx, pod, nodeName)
+		holds:    pl.computeHold(ctx, state, p, nodeName),
 	}
 }
 
-// RemoveNominatedPod forgets the nomination of the pod. Claims of its
-// victims are tracked independently of it until they are deallocated.
+// AddNomination records the nomination which PrepareNomination returned. A
+// nomination to the same node again replaces the previous one, whose devices
+// may be free unless the new one holds them too.
 //
-// The devices held for the pod may be free, so pods waiting for devices get
-// another chance, unless the pod got assumed with exactly those devices.
-func (pl *DynamicResources) RemoveNominatedPod(ctx context.Context, pod *v1.Pod, nodeName string) {
-	if pl.nominations == nil {
-		return
+// Without a prepared nomination, for example for one read from the API,
+// nothing changes. If an update of the pod object nominated the pod to the
+// node right before the scheduler did, that update got the prepared
+// nomination, and the scheduler's nomination comes without one.
+func (pl *DynamicResources) AddNomination(ctx context.Context, pod *v1.Pod, nodeName string, prepared any) framework.NominationChangeResult {
+	nomination, _ := prepared.(*podNomination)
+	if pl.nominations == nil || nomination == nil || nomination.nodeName != nodeName {
+		return framework.NominationChangeResult{}
 	}
-	nomination := pl.nominations.remove(pod.UID, nodeName)
-	if nomination == nil || len(nomination.holds) == 0 {
-		return
-	}
-	if pod.Spec.NodeName == nomination.nodeName && pl.allocatedAsHeld(nomination) {
-		return
-	}
-	klog.FromContext(ctx).V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nomination.nodeName)
-	pl.nominations.released(pod.UID, nomination)
+	klog.FromContext(ctx).V(5).Info("Added nomination", "pod", klog.KObj(pod), "node", nodeName, "numHeldClaims", len(nomination.holds))
+	return pl.releasedDevices(ctx, pod, pl.nominations.add(pod.UID, nomination), nomination.holds)
 }
 
-func sameHolds(a, b map[types.UID]heldClaim) bool {
-	if len(a) != len(b) {
-		return false
+// RemoveNomination drops the nomination of the pod. Claims of the victims of
+// the nomination are tracked independently of it until they are
+// deallocated.
+func (pl *DynamicResources) RemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) framework.NominationChangeResult {
+	if pl.nominations == nil {
+		return framework.NominationChangeResult{}
 	}
-	for uid, heldA := range a {
-		heldB, ok := b[uid]
-		if !ok || !sameDevices(heldA.allocation.Devices.Results, heldB.allocation.Devices.Results) {
+	return pl.releasedDevices(ctx, pod, pl.nominations.remove(pod.UID, nodeName), nil)
+}
+
+// releasedDevices returns an event for the devices held for a nomination
+// which ended or got replaced, so that pods waiting for devices get another
+// chance, unless the pod keeps them. It keeps them if the nomination which
+// replaces this one holds them for the same claims (kept), or if its claims
+// use them.
+func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, nomination *podNomination, kept map[types.UID]heldClaim) framework.NominationChangeResult {
+	if nomination == nil {
+		return framework.NominationChangeResult{}
+	}
+	for uid, held := range nomination.holds {
+		if keptClaim, ok := kept[uid]; ok && sameDevices(keptClaim.allocation.Devices.Results, held.allocation.Devices.Results) {
+			continue
+		}
+		if pl.usesHeldDevices(uid, held) {
+			continue
+		}
+		klog.FromContext(ctx).V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nomination.nodeName, "resourceclaim", held.claim)
+		// One event is enough, the queueing hints don't check which
+		// claim got deallocated.
+		return framework.NominationChangeResult{Events: releaseEvents(uid, held)}
+	}
+	return framework.NominationChangeResult{}
+}
+
+// usesHeldDevices returns true if the claim has the held devices, as a
+// pending allocation, like after Reserve, or allocated.
+func (pl *DynamicResources) usesHeldDevices(uid types.UID, held heldClaim) bool {
+	allocation := pl.draManager.ResourceClaims().GetPendingAllocation(uid)
+	if allocation == nil {
+		claim, err := pl.draManager.ResourceClaims().Get(held.claim.Namespace, held.claim.Name)
+		if err != nil || claim.UID != uid {
 			return false
 		}
+		allocation = claim.Status.Allocation
 	}
-	return true
+	return allocation != nil && sameDevices(allocation.Devices.Results, held.allocation.Devices.Results)
+}
+
+// releaseEvents returns the event for a claim whose devices are not used
+// anymore, as if the claim got deallocated.
+func releaseEvents(uid types.UID, held heldClaim) []framework.NominationEvent {
+	claim := &resourceapi.ResourceClaim{}
+	claim.Namespace, claim.Name, claim.UID = held.claim.Namespace, held.claim.Name, uid
+	claim.Status.Allocation = held.allocation
+	deallocated := claim.DeepCopy()
+	deallocated.Status.Allocation = nil
+	return []framework.NominationEvent{{Event: framework.EventResourceClaimHoldReleased, OldObj: claim, NewObj: deallocated}}
 }
 
 // sameDevices compares allocation results without their ShareIDs, which
@@ -118,18 +163,6 @@ func sameDevices(a, b []resourceapi.DeviceRequestAllocationResult) bool {
 		resultA, resultB := a[i], b[i]
 		resultA.ShareID, resultB.ShareID = nil, nil
 		if !apiequality.Semantic.DeepEqual(resultA, resultB) {
-			return false
-		}
-	}
-	return true
-}
-
-// allocatedAsHeld returns true if the pending allocations of all held claims
-// have the held devices.
-func (pl *DynamicResources) allocatedAsHeld(nomination *podNomination) bool {
-	for uid, held := range nomination.holds {
-		pending := pl.draManager.ResourceClaims().GetPendingAllocation(uid)
-		if pending == nil || !sameDevices(pending.Devices.Results, held.allocation.Devices.Results) {
 			return false
 		}
 	}
