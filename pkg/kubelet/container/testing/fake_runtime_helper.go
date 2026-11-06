@@ -41,7 +41,8 @@ type FakeRuntimeHelper struct {
 	PodContainerDir string
 	RuntimeHandlers map[string]kubecontainer.RuntimeHandler
 	Err             error
-	PodStats        map[kubetypes.UID]*statsapi.PodStats
+	PodStats                 map[kubetypes.UID]*statsapi.PodStats
+	WaitForAttachAndMountErr error
 }
 
 func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (*kubecontainer.RunContainerOptions, func(), error) {
@@ -132,6 +133,10 @@ func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod,
 		return stats, nil
 	}
 	return nil, fmt.Errorf("stats for pod %q not found", pod.UID)
+}
+
+func (f *FakeRuntimeHelper) WaitForAttachAndMount(_ context.Context, _ *v1.Pod) error {
+	return f.WaitForAttachAndMountErr
 }
 
 func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) error {

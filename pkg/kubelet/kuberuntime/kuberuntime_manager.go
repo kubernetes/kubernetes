@@ -1704,6 +1704,25 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		podIPs = podStatus.IPs
 	}
 
+	// Concurrently wait for volumes to attach and mount while creating the sandbox.
+	mountCtx, mountCancel := context.WithCancel(ctx)
+	defer mountCancel()
+	mountErrCh := make(chan error, 1)
+	go func() {
+		mountErrCh <- m.runtimeHelper.WaitForAttachAndMount(mountCtx, pod)
+	}()
+
+	var mountErr error
+	waitForVolumes := func() error {
+		if mountErrCh == nil {
+			// waitForVolumes has already been called. Just return the error.
+			return mountErr
+		}
+		mountErr = <-mountErrCh
+		mountErrCh = nil
+		return mountErr
+	}
+
 	// Step 4: Create a sandbox for the pod if necessary.
 	podSandboxID := podContainerChanges.SandboxID
 	if podContainerChanges.CreateSandbox {
@@ -1805,15 +1824,27 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.V(4).Info("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
 		}
 
+		// Wait for volumes to attach and mount before invoking the sandbox ready callback.
+		if err := waitForVolumes(); err != nil {
+			result.Fail(err)
+			return
+		}
+
 		// Step 5: invoke the sandbox ready callback before image pulling .
 		// At this point, dynamic resources are prepared (at PrepareDynamicResources() call above)
-		// and volumes are already mounted (at the kubelet SyncPod() level), so,
+		// and volumes are already mounted (via WaitForAttachAndMount), so,
 		// all requirements (sandbox, networking, volumes) are met to set `PodReadyToStartContainers=True` condition.
 		logger.V(4).Info("Pod sandbox and network ready, invoking callback", "pod", klog.KObj(pod), "podIPs", podIPs)
 		if err := m.runtimeHelper.OnPodSandboxReady(ctx, pod); err != nil {
 			// log the error but continue the pod creation process, to retain the existing behaviour
 			logger.Error(err, "Failed to invoke sandbox ready callback, continuing with pod creation", "pod", klog.KObj(pod))
 		}
+	}
+
+	// In case sandbox was not created in this sync, ensure volumes are attached and mounted before starting containers.
+	if err := waitForVolumes(); err != nil {
+		result.Fail(err)
+		return
 	}
 
 	// the start containers routines depend on pod ip(as in primary pod ip)

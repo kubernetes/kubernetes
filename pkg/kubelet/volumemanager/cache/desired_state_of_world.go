@@ -103,6 +103,9 @@ type DesiredStateOfWorld interface {
 	// GetVolumeName returns the UniqueVolumeName for the given pod, indexed by outerVolumeSpecName.
 	GetVolumeNamesForPod(podName types.UniquePodName) map[string]v1.UniqueVolumeName
 
+	// GetVolumeGIDValuesForPod returns a list of volume GID annotations for the given pod.
+	GetVolumeGIDValuesForPod(podName types.UniquePodName) []string
+
 	// GetVolumesToMount generates and returns a list of volumes that should be
 	// attached to this node and the pods they should be mounted to based on the
 	// current desired state of the world.
@@ -613,6 +616,21 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 		}
 	}
 	return volumesToMount
+}
+
+func (dsw *desiredStateOfWorld) GetVolumeGIDValuesForPod(podName types.UniquePodName) []string {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	var gidValues []string
+	for _, volumeObj := range dsw.volumesToMount {
+		if _, ok := volumeObj.podsToMount[podName]; ok {
+			if volumeObj.volumeGIDValue != "" {
+				gidValues = append(gidValues, volumeObj.volumeGIDValue)
+			}
+		}
+	}
+	return gidValues
 }
 
 func (dsw *desiredStateOfWorld) AddErrorToPod(podName types.UniquePodName, err string) {
