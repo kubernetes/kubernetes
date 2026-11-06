@@ -30,6 +30,9 @@ import SSA.WireContracts
 import SSA.FieldsV1
 import SSA.GoSubset
 import SSA.GoSource
+import SSA.ApplySource
+import SSA.ResetFields
+import SSA.ResetCounterexamples
 import SSA.SourceContracts
 import SSA.PruneSource
 import SSA.OwnedSource

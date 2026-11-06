@@ -47,7 +47,7 @@ return converted, nil`))
 func TestUnsupportedSyntaxCannotDisappear(t *testing.T) {
 	for name, body := range map[string]string{
 		"loop":         "for { return merged, nil }",
-		"else":         "if merged != nil { return merged, nil } else { return pruned, nil }",
+		"else if":      "if merged != nil { return merged, nil } else if pruned != nil { return pruned, nil }",
 		"if init":      "if err := fail(); err != nil { return merged, err }; return pruned, nil",
 		"call":         "return merge(merged, pruned), nil",
 		"literal":      "return 42, nil",
@@ -68,6 +68,60 @@ func TestUnsupportedSyntaxCannotDisappear(t *testing.T) {
 				t.Fatalf("unsupported syntax was accepted: %s", body)
 			}
 		})
+	}
+}
+
+func TestApplyImportsFilterBranchAndActorMapWrite(t *testing.T) {
+	source := []byte("package merge\n" + functions[4].signature + ` {
+var ignoreFilter fieldpath.Filter
+if s.IgnoredFields != nil && s.IgnoreFilter != nil { return nil, nil, fmt.Errorf("both") }
+if s.IgnoredFields != nil {
+  ignoreFilter = fieldpath.NewExcludeSetFilter(s.IgnoredFields[version])
+} else {
+  ignoreFilter = s.IgnoreFilter[version]
+}
+set, err := configObject.ToFieldSet()
+if err != nil { return nil, fieldpath.ManagedFields{}, err }
+if ignoreFilter != nil { set = ignoreFilter.Filter(set) }
+managers[manager] = fieldpath.NewVersionedSet(set, version, true)
+return liveObject, managers, nil
+}`)
+	program, err := importFunction(source, functions[4])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{`(.declareNil "ignoreFilter")`, "(.branchElse", "(.andAlso", `(.mapSet "managers"`, "NewExcludeSetFilter", "(.flag true)", "(.emptyManagedMap)"} {
+		if !strings.Contains(program, expected) {
+			t.Fatalf("Apply import dropped %q: %s", expected, program)
+		}
+	}
+}
+
+func TestMutableApplyMapStillRejectsAliasesAndIterationWrites(t *testing.T) {
+	for _, body := range []string{
+		"alias := managers; return liveObject, managers, nil",
+		"for key, entry := range managers { managers[key] = entry }; return liveObject, managers, nil",
+	} {
+		source := []byte("package merge\n" + functions[4].signature + " {\n" + body + "\n}")
+		if _, err := importFunction(source, functions[4]); err == nil {
+			t.Fatalf("unmodeled mutable-map behavior was accepted: %s", body)
+		}
+	}
+}
+
+func TestBooleanShadowKeepsItsLexicalBinding(t *testing.T) {
+	source := []byte("package merge\n" + functions[4].signature + ` {
+true := force
+set, err := configObject.ToFieldSet()
+managers[manager] = fieldpath.NewVersionedSet(set, version, true)
+return liveObject, managers, err
+}`)
+	program, err := importFunction(source, functions[4])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(program, `(.var "true$1")`) || strings.Contains(program, "(.flag true)") {
+		t.Fatalf("shadowed true was replaced by a Boolean literal: %s", program)
 	}
 }
 

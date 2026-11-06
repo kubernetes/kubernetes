@@ -117,6 +117,15 @@ and source-bound proofs are in `SSA/HandoffCounterexamples.lean`, with actual
 HTTP checks for both policies and a link to existing
 [Kubernetes #134902](https://github.com/kubernetes/kubernetes/issues/134902).
 
+A subresource counterexample concerns valid CRDs with an additional root such
+as `settings`: `/status` can claim unchanged `settings.desired`, despite the
+REST strategy restoring every non-status value. The original main manager's
+next change then conflicts. `ResetCounterexamples` refutes this broader reset
+contract; the HTTP test checks exact leaf claims and unchanged storage after
+rejection. Conventional spec/status reset controls pass. The complete imported
+Apply body explains installation through the configured filter, whose roots
+omit settings; primitive and REST-envelope refinement remain explicit.
+
 ## What is checked
 
 - General core laws: scalar conflicts, equal-value co-ownership, force transfer,
@@ -175,6 +184,7 @@ from the vendored updater into `SSA/GoSource.lean`:
 | `addBackOwnedItemsForVersion` | `SourceContracts.imported_owned_version_matches_spec` |
 | `addBackOwnedItems` | `OwnedSource.imported_owned_items_matches_spec` |
 | `prune` | `PruneSource.imported_prune_matches_spec` |
+| `Apply` | `ApplySource.imported_apply_matches_spec` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -184,6 +194,22 @@ finite manager/version counts. Unsupported syntax, map aliases, mutations of
 iterated maps, unbound globals and changed import bindings are rejected.
 Successful conversion has a non-nil result in the primitive contract; a failed
 conversion retains its optional returned object rather than assuming it is nil.
+
+The complete Apply contract covers reconciliation, merge and extraction errors,
+legacy/current filter selection, snapshotting the old actor set before installing
+the filtered set, prune/update ordering and nil-object returns on a data no-op.
+Both configured filter maps, missing version entries and nil maps are distinct.
+A missing legacy exclusion set is an execution failure, matching its nil-set
+dereference; it is not invented as an ordinary returned API error. Successful
+callbacks have non-nil objects and allocated logical managed maps. Their
+primitive behavior and unmodeled aliasing side effects remain review obligations.
+
+`ResetFields` proves prefix exclusion, filter idempotence and recursive trie
+membership refinement at arbitrary finite depth. The source-level theorem
+`ApplySource.imported_apply_excludes_reset_fields` composes this filter with an
+explicit non-growth contract for the remaining final updater callback. The Go
+filter and updater implementations still need refinement; the theorem does not
+assume the desired conclusion about the whole Apply result.
 
 `PruningRefinement.single_version_pruning_refinement` connects all four imported
 functions to the normalized three-pass model for arbitrary states and field
@@ -294,7 +320,7 @@ in [ci](ci/README.md) requires a separate test-infra activation.
 
 In a Kubernetes checkout, `bash ci/verify-apiserver.sh` additionally runs the
 actual HTTP/etcd empty-container counterexamples, Required/CEL rejection,
-ownership bootstrap and Update-owned list-item omission.
+ownership bootstrap, Update-owned list-item omission and status reset ownership.
 The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
 to Kubernetes integration testing and is unavailable in published apimachinery.
 

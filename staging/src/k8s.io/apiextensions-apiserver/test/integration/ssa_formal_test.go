@@ -138,10 +138,16 @@ func ssaFormalListSchema() *apiextensionsv1.JSONSchemaProps {
 // Discovery readiness suffices because these tests observe state through GET.
 func newSSAFormalResource(t *testing.T, apiClient clientset.Interface, dynamicClient dynamic.Interface, group string, crSchema *apiextensionsv1.JSONSchemaProps) ssaFormalResource {
 	t.Helper()
+	return newSSAFormalResourceWithSubresources(t, apiClient, dynamicClient, group, crSchema, nil)
+}
+
+func newSSAFormalResourceWithSubresources(t *testing.T, apiClient clientset.Interface, dynamicClient dynamic.Interface, group string, crSchema *apiextensionsv1.JSONSchemaProps, subresources *apiextensionsv1.CustomResourceSubresources) ssaFormalResource {
+	t.Helper()
 	crd := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 	crd.Spec.Group = group
 	crd.Name = crd.Spec.Names.Plural + "." + group
 	crd.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: crSchema}
+	crd.Spec.Versions[0].Subresources = subresources
 	crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiClient)
 	if err != nil {
 		t.Fatal(err)
@@ -161,7 +167,7 @@ type ssaFormalResource struct {
 	apiVersion, kind string
 }
 
-func (r ssaFormalResource) apply(t *testing.T, name, manager string, fields map[string]any) (*unstructured.Unstructured, error) {
+func (r ssaFormalResource) apply(t *testing.T, name, manager string, fields map[string]any, subresources ...string) (*unstructured.Unstructured, error) {
 	t.Helper()
 	object := map[string]any{"apiVersion": r.apiVersion, "kind": r.kind, "metadata": map[string]any{"name": name}}
 	for key, value := range fields {
@@ -171,7 +177,7 @@ func (r ssaFormalResource) apply(t *testing.T, name, manager string, fields map[
 	if err != nil {
 		t.Fatal(err)
 	}
-	return r.Patch(context.Background(), name, types.ApplyPatchType, body, metav1.PatchOptions{FieldManager: manager})
+	return r.Patch(context.Background(), name, types.ApplyPatchType, body, metav1.PatchOptions{FieldManager: manager}, subresources...)
 }
 
 // Empty-map intent has a presence claim, but granular pruning can still create null.
@@ -387,6 +393,132 @@ func TestSSAUpdateOwnedListItemPruning(t *testing.T) {
 				if !reflect.DeepEqual(stored.Object, updated.Object) {
 					t.Fatalf("rejected attempt %d changed data, ownership or resourceVersion", attempt)
 				}
+			}
+		})
+	}
+}
+
+// Status strategy restores every non-status root field, but its ownership filter names only spec and metadata.
+func TestSSAStatusResetOwnership(t *testing.T) {
+	tearDown, apiClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	for _, root := range []string{"spec", "settings"} {
+		t.Run(root, func(t *testing.T) {
+			crSchema := &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					root: {
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"desired": {Type: "string"},
+						},
+					},
+					"status": {
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"observed": {Type: "string"},
+						},
+					},
+				},
+			}
+			resource := newSSAFormalResourceWithSubresources(t, apiClient, dynamicClient,
+				"status-"+root+".formal.ssa", crSchema,
+				&apiextensionsv1.CustomResourceSubresources{Status: &apiextensionsv1.CustomResourceSubresourceStatus{}})
+			created, err := resource.apply(t, "example", "A", map[string]any{
+				root: map[string]any{"desired": "one"}, "status": map[string]any{"observed": "forged"},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, exists := created.Object["status"]; exists {
+				t.Fatalf("main-endpoint creation must reset status: %#v", created.Object)
+			}
+
+			// The same literal manager name has separate main/status identities.
+			statusRoot := "must-not-change"
+			if root == "settings" {
+				statusRoot = "one"
+			}
+			withStatus, err := resource.apply(t, "example", "A", map[string]any{
+				root: map[string]any{"desired": statusRoot}, "status": map[string]any{"observed": "ready"},
+			}, "status")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if desired, _, _ := unstructured.NestedString(withStatus.Object, root, "desired"); desired != "one" {
+				t.Fatalf("status request changed %s: %#v", root, withStatus.Object)
+			}
+			if observed, _, _ := unstructured.NestedString(withStatus.Object, "status", "observed"); observed != "ready" {
+				t.Fatalf("status request did not set status: %#v", withStatus.Object)
+			}
+
+			main, status := false, false
+			for _, owner := range withStatus.GetManagedFields() {
+				if owner.Manager != "A" || owner.Operation != metav1.ManagedFieldsOperationApply || owner.FieldsV1 == nil {
+					t.Fatalf("unexpected ownership identity: %#v", owner)
+				}
+				var fields map[string]any
+				if err := json.Unmarshal(owner.FieldsV1.Raw, &fields); err != nil {
+					t.Fatal(err)
+				}
+				_, hasRoot := fields["f:"+root]
+				_, hasStatus := fields["f:status"]
+				if hasRoot && !reflect.DeepEqual(fields["f:"+root], map[string]any{"f:desired": map[string]any{}}) {
+					t.Fatalf("unexpected desired-field ownership: %s", owner.FieldsV1.Raw)
+				}
+				if hasStatus && !reflect.DeepEqual(fields["f:status"], map[string]any{"f:observed": map[string]any{}}) {
+					t.Fatalf("unexpected observed-field ownership: %s", owner.FieldsV1.Raw)
+				}
+				switch owner.Subresource {
+				case "":
+					main = true
+					if !hasRoot || hasStatus {
+						t.Fatalf("main manager acquired status ownership: %s", owner.FieldsV1.Raw)
+					}
+				case "status":
+					status = true
+					if !hasStatus || hasRoot != (root == "settings") {
+						t.Fatalf("unexpected status root ownership: %s", owner.FieldsV1.Raw)
+					}
+				default:
+					t.Fatalf("unexpected subresource: %#v", owner)
+				}
+			}
+			if len(withStatus.GetManagedFields()) != 2 || !main || !status {
+				t.Fatalf("same-name managers must remain distinct across subresources: %#v", withStatus.GetManagedFields())
+			}
+
+			// A status claim on settings blocks a later main-endpoint change that status cannot perform.
+			mainIntent := map[string]any{root: map[string]any{"desired": "two"}}
+			if root == "spec" {
+				mainIntent["status"] = map[string]any{"observed": "forged"}
+			}
+			changed, err := resource.apply(t, "example", "A", mainIntent)
+			if root == "settings" {
+				if !apierrors.IsConflict(err) {
+					t.Fatalf("expected a conflict against the inappropriate status claim: %v", err)
+				}
+				stored, err := resource.Get(context.Background(), "example", metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(stored.Object, withStatus.Object) {
+					t.Fatal("rejected root change modified data, ownership or resourceVersion")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if desired, _, _ := unstructured.NestedString(changed.Object, root, "desired"); desired != "two" {
+				t.Fatalf("main request failed to change spec: %#v", changed.Object)
+			}
+			if observed, _, _ := unstructured.NestedString(changed.Object, "status", "observed"); observed != "ready" {
+				t.Fatalf("main request changed status: %#v", changed.Object)
 			}
 		})
 	}

@@ -58,7 +58,8 @@ guarantees.
 | BASE-09 | Atomic units cannot be partially overwritten; granular sibling fields can be independently managed. | [KEP topology][topology]. | Atoms are opaque scalar cells. The independent bridge corpus exercises both topologies against managedfields. General topology mapping and independent-request commutativity remain unproved. |
 | BASE-10 | Field sets and paths survive serialization round trips. | [Fields round trip][roundtrip], KEP testing plan. | `FieldsV1.root_roundtrip` and `root_membership_roundtrip` prove arbitrary-depth canonical trie/object-grammar round trips, including `{}` and `"."` membership. JSON bytes and path-element parsing remain unproved. The Go bridge additionally checks the real FieldsV1 round trip after every request, including API version and operation. |
 | BASE-11 | API-version conversion preserves the intended correspondence of values and claims. | [ManagedFields version conversion test][conversion]. | Outside the model; no theorem assumes that all schema conversions are invertible. |
-| BASE-12 | Spec/status reset fields do not acquire claims in the other subresource. | [Reset-fields test][reset]. | Outside the model; subresources and reset filters are absent. |
+| BASE-12 | Spec/status reset fields do not acquire claims in the other subresource. | [Reset-fields test][reset]. | `ApplySource.imported_apply_excludes_reset_fields` proves exclusion through the complete imported Apply body, conditional on the configured prefix filter and the final updater's explicit actor-non-growth contract. `ResetFields` proves arbitrary-depth prefix exclusion, idempotence and trie membership refinement. HTTP controls confirm both directions for conventional spec/status fields. The Go filter implementation, updater non-growth and complete subresource envelope remain refinement obligations. |
+| BASE-12b | Every field restored by a subresource's REST strategy is also excluded from that subresource's new claims. | Generalization of BASE-12 to valid CRDs with additional root fields. | **Refuted.** `ResetCounterexamples.broad_status_reset_contract_is_false` gives a reachable co-ownership/conflict witness. The CRD status strategy restores `settings`, but its configured reset roots exclude only spec and metadata. HTTP reproduces a status claim on unchanged `settings.desired`, followed by a conflict on the original main manager's next change. This does not refute the narrower conventional spec/status contract. |
 
 For BASE-04/06, “changed” is the final typed comparison, not merely a different
 request payload. The statements quantify over every foreign manager and both
@@ -176,6 +177,7 @@ In particular:
 | Raw accepted ownership | `WireContracts.foreign_change_conflicts`, `forced_accepts_valid_candidate`, `accepted_foreign_claim_exact`, `force_transfers_changed_claim`, `unchanged_foreign_claim_preserved` | General current/PR results for final accepted data and claims. Typed comparison, field-set operations and Go updater orchestration remain refinement obligations. |
 | Raw acquisition | `WireContracts.unchanged_snapshot_acquisition` | Both current/PR modes, arbitrary structurally valid finite states, fresh actor, normalized unchanged snapshot; all original claims survive. No full-manager premise. |
 | Source helpers | `SourceContracts.imported_dangling_matches_spec`, `imported_owned_version_matches_spec` | Complete Go ASTs, all error/missing-version branches, returned failure payloads and explicit primitive parameters. |
+| Source Apply | `ApplySource.imported_apply_matches_spec`, `imported_apply_excludes_reset_fields` | Complete Go AST, reconciliation/merge/extraction errors, filter choice, old-set snapshot, installation, prune/update ordering and nil-on-no-op return. Reset exclusion requires the stated filter and final updater non-growth contract; the opaque primitives are not thereby verified. |
 | Source version loops | `OwnedSource.imported_owned_items_matches_spec` | Complete Go AST, arbitrary finite manager/version counts, lexical scope, last-applied version first, every lawful remaining-map permutation and all propagated errors. |
 | Source orchestration | `PruneSource.imported_prune_matches_spec` | Complete Go AST of `prune`; nil/empty early exits, initial conversion, both restoration phases, errors and final conversion. Callees are explicit contracts. |
 | Pruning composition | `PruningRefinement.single_version_pruning_refinement` | Realizes all three callee contracts from imported helpers and equates source pruning to the three-pass model, for arbitrary states/field sets and any finite nonempty same-version manager map. Typed/set primitive implementations remain obligations. |
@@ -234,11 +236,16 @@ unbounded finite map loops. Same-version composition realizes the callee
 contracts and specializes the entire pruning path to the normalized model.
 The importer, subset semantics, import/signature checks and primitive contracts
 need human review. Unsupported syntax and unmodeled aliasing are rejected.
-Source digests and generated ASTs are checked by CI; four semantic Go mutations
-must fail in their expected proof modules. The remaining updater functions and
-typed/set primitive implementations are not discharged by this pruning result.
-Version conversion,
-defaulting, schema evolution, reset/subresource filters, duplicate-list behavior,
+Source digests and generated ASTs are checked by CI; five semantic Go mutations
+must fail in their expected proof modules. The fifth imported function is the
+complete Apply body; its source theorem covers orchestration, including reset
+filter selection and installation. Its merge, extraction, reconciliation,
+pruning and final updater callbacks remain explicit contracts. The pruning
+composition realizes the four pruning callees; it does not discharge the
+remaining updater or typed/set implementations. Successful callback values
+are non-nil and logical managed maps are allocated; arbitrary nil-success
+payloads and aliasing side effects are not modeled. Version conversion,
+defaulting, schema evolution, complete subresource envelopes, duplicate-list behavior,
 key defaults and storage concurrency remain integration obligations. The
 adapter rejects unsupported/duplicate shapes rather than silently projecting
 them away. Required-empty-list fullness still needs a representation design;

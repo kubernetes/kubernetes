@@ -62,6 +62,12 @@ var functions = []functionSpec{
 		parameters: []string{"merged", "pruned", "prunedVersion", "managedFields", "applyingManager"},
 		maps:       map[string]string{"managedFields": "managed"},
 	},
+	{
+		name: "Apply", leanName: "applyProgram",
+		signature:  "func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (*typed.TypedValue, fieldpath.ManagedFields, error)",
+		parameters: []string{"liveObject", "configObject", "version", "managers", "manager", "force"},
+		maps:       map[string]string{"managers": "managed-write"},
+	},
 }
 
 func quoted(value string) (string, error) {
@@ -117,6 +123,7 @@ func validateImports(source []byte) error {
 		"fmt":       "fmt",
 		"typed":     "sigs.k8s.io/structured-merge-diff/v6/typed",
 		"fieldpath": "sigs.k8s.io/structured-merge-diff/v6/fieldpath",
+		"value":     "sigs.k8s.io/structured-merge-diff/v6/value",
 	}
 	for _, imported := range file.Imports {
 		path, err := strconv.Unquote(imported.Path.Value)

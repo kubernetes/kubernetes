@@ -21,21 +21,26 @@ namespace SSA.GoSubset
 inductive Expr where
   | var (name : String)
   | text (value : String)
+  | flag (value : Bool)
   | select (receiver : Expr) (field : String)
   | call (receiver : Expr) (method : String) (args : List Expr)
   | neNil (value : Expr)
   | eqNil (value : Expr)
   | orElse (left right : Expr)
+  | andAlso (left right : Expr)
   | index (receiver key : Expr)
   | indexTwo (receiver key : Expr)
   | emptyVersionMap
+  | emptyManagedMap
   | notFlag (value : Expr)
   deriving Repr
 
 inductive Stmt where
   | assign (names : List String) (values : List Expr)
   | declareError (name : String)
+  | declareNil (name : String)
   | branch (condition : Expr) (body : List Stmt)
+  | branchElse (condition : Expr) (body alternative : List Stmt)
   | ret (values : List Expr)
   | mapSet (name : String) (key value : Expr)
   | mapDelete (name : String) (key : Expr)
@@ -52,6 +57,9 @@ abbrev ManagedFields := List (String × ManagerFields)
 def managerLookup : ManagedFields → String → Option ManagerFields
   | [], _ => none
   | (key, value) :: rest, name => if name == key then some value else managerLookup rest name
+
+def managerSet (entries : ManagedFields) (name : String) (entry : ManagerFields) : ManagedFields :=
+  (name, entry) :: entries.filter (fun row => row.1 != name)
 
 abbrev VersionFields := List (String × FieldSet)
 
@@ -96,10 +104,23 @@ structure Ops (Obj Err : Type) where
       Except Err (Option Obj × Option Obj) := fun merged pruned _ _ => .ok (merged, pruned)
   newSet : FieldSet := []
   iteration : VersionIteration := naturalIteration
+  reconcileFields : Obj → ManagedFields → Except Err ManagedFields := fun _ managers => .ok managers
+  mergeObjects : Obj → Obj → Except Err Obj := fun _ config => .ok config
+  pruneObject : Obj → ManagedFields → String → Option (FieldSet × String) → Except Err Obj :=
+    fun object _ _ _ => .ok object
+  finishUpdate : Obj → Obj → String → ManagedFields → String → Bool → Except Err ManagedFields :=
+    fun _ _ _ managers _ _ => .ok managers
+  ignoredFields : Option VersionFields := none
+  ignoreFilters : Option (List (String × (FieldSet → FieldSet))) := none
+  excludeFields : FieldSet → FieldSet → FieldSet := fun fields excluded =>
+    fields.filter (fun path => !excluded.any (fun root => under root path))
+  equalObjects : Obj → Obj → Bool := fun _ _ => false
+  returnInputOnNoop : Bool := false
 
 inductive Value (Obj Err : Type) where
   | object (value : Obj)
   | error (value : Err)
+  | literalError (message : String)
   | nil
   | flag (value : Bool)
   | text (value : String)
@@ -107,12 +128,20 @@ inductive Value (Obj Err : Type) where
   | schema (value : Obj)
   | typeRef (value : Obj)
   | versioned (fields : FieldSet) (version : String)
+  | managerEntry (entry : ManagerFields)
   | managed (managers : ManagedFields)
   | versions (entries : VersionFields)
+  | filters (entries : List (String × (FieldSet → FieldSet)))
+  | fieldFilter (filter : FieldSet → FieldSet)
+  | missingExcludeFilter
+  | comparison
+  | allocator
+  | dataValue (object : Obj)
   | updater
   | converter
   | formatter
   | fieldpathPackage
+  | valuePackage
 
 abbrev Env (Obj Err : Type) := List (String × Value Obj Err)
 
@@ -136,6 +165,23 @@ def fieldOutcome {Obj Err : Type} : Except Err FieldSet → List (Value Obj Err)
   | .ok fields => [.fields fields, .nil]
   | .error error => [.nil, .error error]
 
+def managedOutcome {Obj Err : Type} : Except Err ManagedFields → List (Value Obj Err)
+  | .ok managers => [.managed managers, .nil]
+  | .error error => [.nil, .error error]
+
+def updateOutcome {Obj Err : Type} : Except Err ManagedFields → List (Value Obj Err)
+  | .ok managers => [.managed managers, .comparison, .nil]
+  | .error error => [.nil, .nil, .error error]
+
+def filterLookup : List (String × (FieldSet → FieldSet)) → String → Option (FieldSet → FieldSet)
+  | [], _ => none
+  | (key, filter) :: rest, version => if version == key then some filter else filterLookup rest version
+
+def lastFields {Obj Err : Type} : Value Obj Err → Option (Option (FieldSet × String))
+  | .nil => some none
+  | .versioned fields version => some (some (fields, version))
+  | _ => none
+
 /-- Go conversion can return an object together with an error; callers may return that object. -/
 def optionalObject {Obj Err : Type} : Option Obj → Value Obj Err
   | some object => .object object
@@ -158,7 +204,8 @@ def pairOutcome {Obj Err : Type} : Except Err (Option Obj × Option Obj) → Lis
 
 def isNil {Obj Err : Type} : Value Obj Err → Option Bool
   | .nil => some true
-  | .object _ | .error _ | .fields _ | .versioned _ _ | .managed _ | .versions _ | .updater | .converter => some false
+  | .object _ | .error _ | .literalError _ | .fields _ | .versioned _ _ | .managed _ | .versions _ |
+    .filters _ | .fieldFilter _ | .missingExcludeFilter | .managerEntry _ | .updater | .converter => some false
   | _ => none
 
 /-- Method dispatch keeps JSON/schema/conversion behavior outside the source-control proof. -/
@@ -169,6 +216,8 @@ def call {Obj Err : Type} (ops : Ops Obj Err) : Value Obj Err → String →
   | .object object, "ToFieldSet", [] => .ok (fieldOutcome (ops.toFields object))
   | .object object, "Schema", [] => .ok [.schema object]
   | .object object, "TypeRef", [] => .ok [.typeRef object]
+  | .object object, "AsValue", [] => .ok [.dataValue object]
+  | .object live, "Merge", [.object config] => .ok (outcome (ops.mergeObjects live config))
   | .versioned _ version, "APIVersion", [] => .ok [.text version]
   | .versioned fields _, "Set", [] => .ok [.fields fields]
   | .fields fields, "EnsureNamedFieldsAreMembers", [.schema schema, .typeRef typeRef] =>
@@ -186,8 +235,27 @@ def call {Obj Err : Type} (ops : Ops Obj Err) : Value Obj Err → String →
       | some merged, some pruned => .ok (pairOutcome (ops.ownedVersionItems merged pruned version fields))
       | _, _ => .error "Go owned-items arguments are not typed objects"
   | .fieldpathPackage, "NewSet", [] => .ok [.fields ops.newSet]
+  | .fieldpathPackage, "NewVersionedSet", [.fields fields, .text version, .flag applied] =>
+      .ok [.managerEntry ⟨fields, version, applied⟩]
+  | .fieldpathPackage, "NewExcludeSetFilter", [.fields excluded] =>
+      .ok [.fieldFilter (fun fields => ops.excludeFields fields excluded)]
+  | .fieldpathPackage, "NewExcludeSetFilter", [.nil] => .ok [.missingExcludeFilter]
+  | .fieldFilter filter, "Filter", [.fields fields] => .ok [.fields (filter fields)]
+  | .missingExcludeFilter, "Filter", [.fields _] => .error "Go exclude filter dereferences a nil set"
+  | .updater, "reconcileManagedFieldsWithSchemaChanges", [.object live, .managed managers] =>
+      .ok (managedOutcome (ops.reconcileFields live managers))
+  | .updater, "prune", [.object object, .managed managers, .text actor, last] =>
+      match lastFields last with
+      | some last => .ok (outcome (ops.pruneObject object managers actor last))
+      | none => .error "Go prune last set has an unsupported type"
+  | .updater, "update", [.object live, .object object, .text version, .managed managers, .text actor, .flag force] =>
+      .ok (updateOutcome (ops.finishUpdate live object version managers actor force))
+  | .valuePackage, "NewFreelistAllocator", [] => .ok [.allocator]
+  | .valuePackage, "EqualsUsing", [.allocator, .dataValue live, .dataValue object] =>
+      .ok [.flag (ops.equalObjects live object)]
   | .object object, "RemoveItems", [.fields fields] => .ok [.object (ops.remove object fields)]
   | .formatter, "Errorf", [.text message, .error error] => .ok [.error (ops.wrap message error)]
+  | .formatter, "Errorf", [.text message] => .ok [.literalError message]
   | .formatter, "Errorf", [.text message, .text version, .error error] =>
       .ok [.error (ops.wrapAt message version error)]
   | _, _, _ => .error "Unsupported Go primitive invocation"
@@ -195,6 +263,7 @@ def call {Obj Err : Type} (ops : Ops Obj Err) : Value Obj Err → String →
 def mapIndex {Obj Err : Type} (receiver : Value Obj Err) (key : String) :
     Except String (Value Obj Err × Bool) :=
   match receiver with
+  | .nil => .ok (.nil, false)
   | .managed managers =>
       match managerLookup managers key with
       | some entry => .ok (.versioned entry.fields entry.version, true)
@@ -202,6 +271,10 @@ def mapIndex {Obj Err : Type} (receiver : Value Obj Err) (key : String) :
   | .versions entries =>
       match versionLookup entries key with
       | some fields => .ok (.fields fields, true)
+      | none => .ok (.nil, false)
+  | .filters entries =>
+      match filterLookup entries key with
+      | some filter => .ok (.fieldFilter filter, true)
       | none => .ok (.nil, false)
   | _ => .error "Go map indexing requires a supported map"
 
@@ -220,11 +293,20 @@ def eval {Obj Err : Type} (ops : Ops Obj Err) : Nat → Expr → Env Obj Err →
       match expression with
       | .var name => .ok [lookup env name]
       | .text value => .ok [.text value]
+      | .flag value => .ok [.flag value]
       | .emptyVersionMap => .ok [.versions []]
+      | .emptyManagedMap => .ok [.managed []]
       | .select receiver field => do
           match ← eval ops fuel receiver env with
           | [.updater] =>
               if field == "Converter" then .ok [.converter]
+              else if field == "IgnoredFields" then .ok [match ops.ignoredFields with
+                | none => .nil
+                | some entries => .versions entries]
+              else if field == "IgnoreFilter" then .ok [match ops.ignoreFilters with
+                | none => .nil
+                | some entries => .filters entries]
+              else if field == "returnInputOnNoop" then .ok [.flag ops.returnInputOnNoop]
               else .error "Unsupported Go receiver field"
           | _ => .error "Unsupported Go selector receiver"
       | .call receiver method args => do
@@ -255,6 +337,14 @@ def eval {Obj Err : Type} (ops : Ops Obj Err) : Nat → Expr → Env Obj Err →
               | [.flag value] => .ok [.flag value]
               | _ => .error "Go disjunction is not boolean"
           | _ => .error "Go disjunction is not boolean"
+      | .andAlso left right => do
+          match ← eval ops fuel left env with
+          | [.flag false] => .ok [.flag false]
+          | [.flag true] =>
+              match ← eval ops fuel right env with
+              | [.flag value] => .ok [.flag value]
+              | _ => .error "Go conjunction is not boolean"
+          | _ => .error "Go conjunction is not boolean"
       | .index receiver key => do
           let receiver ← eval ops fuel receiver env
           let key ← eval ops fuel key env
@@ -306,12 +396,15 @@ def exec {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Stmt → Env Obj Er
           let next ← bindNames names values env
           exec ops fuel rest next
       | .declareError name => exec ops fuel rest ((name, .nil) :: env)
+      | .declareNil name => exec ops fuel rest ((name, .nil) :: env)
       | .mapSet name key value => do
           let key ← eval ops fuel key env
           let value ← eval ops fuel value env
           match lookup env name, key, value with
           | .versions entries, [.text key], [.fields fields] =>
               exec ops fuel rest ((name, .versions (versionSet entries key fields)) :: env)
+          | .managed entries, [.text key], [.managerEntry entry] =>
+              exec ops fuel rest ((name, .managed (managerSet entries key entry)) :: env)
           | _, _, _ => .error "Go assignment requires a writable version map"
       | .mapDelete name key => do
           let key ← eval ops fuel key env
@@ -334,6 +427,13 @@ def exec {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Stmt → Env Obj Er
               | .returned values => .ok (.returned values)
               | .next next => exec ops fuel rest next
           | [.flag false] => exec ops fuel rest env
+          | _ => .error "Go conditional is not boolean"
+      | .branchElse condition body alternative => do
+          match ← eval ops fuel condition env with
+          | [.flag condition] =>
+              match ← exec ops fuel (if condition then body else alternative) env with
+              | .returned values => .ok (.returned values)
+              | .next next => exec ops fuel rest next
           | _ => .error "Go conditional is not boolean"
 termination_by fuel _ _ => (fuel, 0, 0)
 

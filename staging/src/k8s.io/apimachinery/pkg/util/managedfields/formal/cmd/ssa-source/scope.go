@@ -43,7 +43,7 @@ type scope struct {
 func rootScope(function functionSpec) *scope {
 	serial := 0
 	globals := &scope{bindings: map[string]binding{}, serial: &serial, depth: -1}
-	for _, name := range []string{"fmt", "nil", "fieldpath", "delete"} {
+	for _, name := range []string{"fmt", "nil", "true", "false", "fieldpath", "value", "delete"} {
 		globals.bindings[name] = binding{name, "builtin"}
 	}
 	root := globals.child()
@@ -96,13 +96,26 @@ func mapName(expression ast.Expr, context *scope, writable bool) (binding, error
 		return binding{}, fmt.Errorf("unsupported Go map receiver %T", expression)
 	}
 	value, ok := context.resolve(name.Name)
-	if !ok || (value.kind != "managed" && value.kind != "versions") {
+	if !ok || (value.kind != "managed" && value.kind != "managed-write" && value.kind != "versions") {
 		return binding{}, fmt.Errorf("unsupported Go map %q", name.Name)
 	}
-	if writable && (value.kind != "versions" || !context.canWrite(value.id)) {
+	if writable && ((value.kind != "versions" && value.kind != "managed-write") || !context.canWrite(value.id)) {
 		return binding{}, fmt.Errorf("mutation of read-only or iterated Go map %q", name.Name)
 	}
 	return value, nil
+}
+
+func readableMap(expression ast.Expr, context *scope) error {
+	if selector, ok := expression.(*ast.SelectorExpr); ok {
+		if receiver, ok := selector.X.(*ast.Ident); ok && receiver.Name == "s" &&
+			(selector.Sel.Name == "IgnoredFields" || selector.Sel.Name == "IgnoreFilter") {
+			if bound, found := context.resolve("s"); found && bound.id == "s" {
+				return nil
+			}
+		}
+	}
+	_, err := mapName(expression, context, false)
+	return err
 }
 
 func renderExpr(expression ast.Expr, context *scope) (string, error) {
@@ -111,6 +124,9 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		value, ok := context.resolve(e.Name)
 		if !ok {
 			return "", fmt.Errorf("unsupported global or unbound Go name %q", e.Name)
+		}
+		if value.kind == "builtin" && (value.id == "true" || value.id == "false") {
+			return "(.flag " + value.id + ")", nil
 		}
 		name, err := quoted(value.id)
 		return "(.var " + name + ")", err
@@ -147,13 +163,17 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(method.Sel.Name)
 		return "(.call " + receiver + " " + name + " " + args + ")", err
 	case *ast.BinaryExpr:
-		if e.Op == token.LOR {
+		if e.Op == token.LOR || e.Op == token.LAND {
 			left, err := renderExpr(e.X, context)
 			if err != nil {
 				return "", err
 			}
 			right, err := renderExpr(e.Y, context)
-			return "(.orElse " + left + " " + right + ")", err
+			operator := "orElse"
+			if e.Op == token.LAND {
+				operator = "andAlso"
+			}
+			return "(." + operator + " " + left + " " + right + ")", err
 		}
 		nilName, ok := e.Y.(*ast.Ident)
 		if (e.Op != token.NEQ && e.Op != token.EQL) || !ok || nilName.Name != "nil" {
@@ -174,7 +194,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		value, err := renderExpr(e.X, context)
 		return "(.notFlag " + value + ")", err
 	case *ast.IndexExpr:
-		if _, err := mapName(e.X, context, false); err != nil {
+		if err := readableMap(e.X, context); err != nil {
 			return "", err
 		}
 		receiver, err := renderExpr(e.X, context)
@@ -188,10 +208,17 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		if err := format.Node(&typ, token.NewFileSet(), e.Type); err != nil {
 			return "", err
 		}
-		if typ.String() != "map[fieldpath.APIVersion]*fieldpath.Set" || len(e.Elts) != 0 {
+		if len(e.Elts) != 0 {
 			return "", fmt.Errorf("unsupported Go composite literal %s", typ.String())
 		}
-		return "(.emptyVersionMap)", nil
+		switch typ.String() {
+		case "map[fieldpath.APIVersion]*fieldpath.Set":
+			return "(.emptyVersionMap)", nil
+		case "fieldpath.ManagedFields":
+			return "(.emptyManagedMap)", nil
+		default:
+			return "", fmt.Errorf("unsupported Go composite literal %s", typ.String())
+		}
 	default:
 		return "", fmt.Errorf("unsupported Go expression %T", expression)
 	}
@@ -222,8 +249,11 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			if !ok || len(value.Names) != 1 || len(value.Values) != 0 {
 				return "", fmt.Errorf("unsupported Go variable declaration")
 			}
-			typ, ok := value.Type.(*ast.Ident)
-			if !ok || typ.Name != "error" || value.Names[0].Name == "_" {
+			var typ bytes.Buffer
+			if err := format.Node(&typ, token.NewFileSet(), value.Type); err != nil {
+				return "", err
+			}
+			if (typ.String() != "error" && typ.String() != "fieldpath.Filter") || value.Names[0].Name == "_" {
 				return "", fmt.Errorf("unsupported Go zero-value type")
 			}
 			name := value.Names[0].Name
@@ -234,7 +264,11 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			items = append(items, "(.declareError "+text+")")
+			constructor := "declareError"
+			if typ.String() == "fieldpath.Filter" {
+				constructor = "declareNil"
+			}
+			items = append(items, "(."+constructor+" "+text+")")
 		case *ast.AssignStmt:
 			if s.Tok != token.ASSIGN && s.Tok != token.DEFINE {
 				return "", fmt.Errorf("unsupported Go assignment operator %s", s.Tok)
@@ -300,7 +334,7 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 					} else {
 						var exists bool
 						value, exists = context.resolve(name.Name)
-						if !exists || value.kind != "" {
+						if !exists || (value.kind != "" && value.kind != "managed-write") {
 							return "", fmt.Errorf("unsupported Go variable assignment %q", name.Name)
 						}
 					}
@@ -314,9 +348,6 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			}
 			items = append(items, "(.assign ["+strings.Join(names, ", ")+"] "+values+")")
 		case *ast.IfStmt:
-			if s.Else != nil {
-				return "", fmt.Errorf("unsupported Go else")
-			}
 			conditionScope := context.child()
 			if s.Init != nil {
 				init, err := renderStatements([]ast.Stmt{s.Init}, conditionScope)
@@ -334,7 +365,19 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			items = append(items, "(.branch "+condition+" "+body+")")
+			if s.Else == nil {
+				items = append(items, "(.branch "+condition+" "+body+")")
+			} else {
+				alternative, ok := s.Else.(*ast.BlockStmt)
+				if !ok {
+					return "", fmt.Errorf("unsupported Go else form %T", s.Else)
+				}
+				other, err := renderStatements(alternative.List, conditionScope.child())
+				if err != nil {
+					return "", err
+				}
+				items = append(items, "(.branchElse "+condition+" "+body+" "+other+")")
+			}
 		case *ast.RangeStmt:
 			if s.Tok != token.DEFINE || s.Key == nil || s.Value == nil {
 				return "", fmt.Errorf("unsupported Go range form")

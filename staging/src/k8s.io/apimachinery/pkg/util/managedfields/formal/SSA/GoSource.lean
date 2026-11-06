@@ -114,4 +114,46 @@ def ownedItemsProgram : List GoSubset.Stmt := [
   (.ret [(.var "pruned"), (.var "nil")])
 ]
 
+def applyProgram : List GoSubset.Stmt := [
+  (.declareError "err"),
+  (.assign ["managers", "err"] [(.call (.var "s") "reconcileManagedFieldsWithSchemaChanges" [(.var "liveObject"), (.var "managers")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.emptyManagedMap), (.var "err")])
+]),
+  (.assign ["newObject", "err"] [(.call (.var "liveObject") "Merge" [(.var "configObject")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.emptyManagedMap), (.call (.var "fmt") "Errorf" [(.text "failed to merge config: %v"), (.var "err")])])
+]),
+  (.assign ["lastSet"] [(.index (.var "managers") (.var "manager"))]),
+  (.assign ["set", "err"] [(.call (.var "configObject") "ToFieldSet" [])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.emptyManagedMap), (.call (.var "fmt") "Errorf" [(.text "failed to get field set: %v"), (.var "err")])])
+]),
+  (.branch (.andAlso (.neNil (.select (.var "s") "IgnoredFields")) (.neNil (.select (.var "s") "IgnoreFilter"))) [
+  (.ret [(.var "nil"), (.var "nil"), (.call (.var "fmt") "Errorf" [(.text "IgnoreFilter and IgnoreFilter may not both be set")])])
+]),
+  (.declareNil "ignoreFilter"),
+  (.branchElse (.neNil (.select (.var "s") "IgnoredFields")) [
+  (.assign ["ignoreFilter"] [(.call (.var "fieldpath") "NewExcludeSetFilter" [(.index (.select (.var "s") "IgnoredFields") (.var "version"))])])
+] [
+  (.assign ["ignoreFilter"] [(.index (.select (.var "s") "IgnoreFilter") (.var "version"))])
+]),
+  (.branch (.neNil (.var "ignoreFilter")) [
+  (.assign ["set"] [(.call (.var "ignoreFilter") "Filter" [(.var "set")])])
+]),
+  (.mapSet "managers" (.var "manager") (.call (.var "fieldpath") "NewVersionedSet" [(.var "set"), (.var "version"), (.flag true)])),
+  (.assign ["newObject", "err"] [(.call (.var "s") "prune" [(.var "newObject"), (.var "managers"), (.var "manager"), (.var "lastSet")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.emptyManagedMap), (.call (.var "fmt") "Errorf" [(.text "failed to prune fields: %v"), (.var "err")])])
+]),
+  (.assign ["managers", "_", "err"] [(.call (.var "s") "update" [(.var "liveObject"), (.var "newObject"), (.var "version"), (.var "managers"), (.var "manager"), (.var "force")])]),
+  (.branch (.neNil (.var "err")) [
+  (.ret [(.var "nil"), (.emptyManagedMap), (.var "err")])
+]),
+  (.branch (.andAlso (.notFlag (.select (.var "s") "returnInputOnNoop")) (.call (.var "value") "EqualsUsing" [(.call (.var "value") "NewFreelistAllocator" []), (.call (.var "liveObject") "AsValue" []), (.call (.var "newObject") "AsValue" [])])) [
+  (.assign ["newObject"] [(.var "nil")])
+]),
+  (.ret [(.var "newObject"), (.var "managers"), (.var "nil")])
+]
+
 end SSA.GoSource

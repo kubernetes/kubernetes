@@ -12,6 +12,7 @@ reported together with the preceding transition that caused it.
 | SSA-01 | Explicitly empty associative list after releasing owned items | First Apply removes the field; identical repetition creates `[]`. Required/CEL presence validation can reject every retry. | Lean refutation and source-bound witness; actual managedfields; both pinned SMD revisions; CRD HTTP/etcd. |
 | SSA-02 | Explicitly empty granular map after releasing an owned child | First Apply produces `null` while retaining the map claim. Optional non-nullable maps cannot be emptied. Nullable maps change on repetition and can cause a conflict for another manager's identical intent. | Lean execution/intent counterexamples and all finite retry counts; source-bound witness; actual managedfields; both pinned SMD revisions; CRD HTTP/etcd. |
 | SSA-03 | Omission after another manager Updates an item child | The item and its foreign-owned child disappear; the list becomes null. A nullable schema accepts this; a non-nullable schema rejects every retry. | Reachable Lean Apply/Update counterexample and source witness; actual managedfields and pinned SMD; nullable/non-nullable CRD HTTP. Existing report: [#134902](https://github.com/kubernetes/kubernetes/issues/134902). |
+| SSA-04 | Status Apply includes an additional non-status root field | The status actor acquires the unchanged field even though the REST strategy resets it. A later main-endpoint change conflicts. | Reachable Lean refutation; complete imported Apply with explicit primitive instances; real CRD HTTP/etcd and conventional spec/status controls. |
 | PR336-01 | Fragmented required ownership followed by partial-manager omission | A partial manager can delete another partial manager's required data. | Lean execution; exact pinned head/base comparison. |
 | PR336-02 | Direct required-map membership shortcut | The classifier calls a manager full without ownership of required children. An invalid item can remain after the actual full owner leaves. | General classifier theorem; concrete Lean execution; actual pinned head/base outcomes. |
 | PR336-03 | Required granular-list ownership | A supplier owning all child items is classified partial because Apply generated no direct list-presence claim. Another partial manager can delete its data. | General classifier fact; populated/empty Lean counterexamples; exact pinned head/base comparison. |
@@ -180,6 +181,77 @@ the refutation of unrestricted foreign-value survival, rejection for every
 finite retry count under the explicit list-or-absent validator, and the imported
 four-function pruning witness with all callees realized. The primitive and
 single-version proof boundaries remain explicit.
+
+## SSA-04: status acquires claims on fields it cannot change
+
+A structural CRD can have root fields other than `spec` and `status`. Enable
+`subresources: {status: {}}` in the CRD version and use this root schema:
+
+```yaml
+type: object
+properties:
+  settings:
+    type: object
+    properties:
+      desired:
+        type: string
+  status:
+    type: object
+    properties:
+      observed:
+        type: string
+```
+
+Apply these requests with the same literal field-manager name `A`, without force:
+
+```yaml
+# Main endpoint, initial Apply.
+apiVersion: example.test/v1
+kind: Example
+metadata:
+  name: demo
+settings:
+  desired: one
+---
+# /status endpoint, next Apply. The non-status value is unchanged.
+apiVersion: example.test/v1
+kind: Example
+metadata:
+  name: demo
+settings:
+  desired: one
+status:
+  observed: ready
+---
+# Main endpoint, next Apply: unexpectedly conflicts with A's /status identity.
+apiVersion: example.test/v1
+kind: Example
+metadata:
+  name: demo
+settings:
+  desired: two
+```
+
+Main and status are separate manager identities even with the same name. After
+the status request, the stored status ownership entry contains both
+`f:settings.f:desired` and `f:status.f:observed`. The status strategy restores
+all old non-status data, but preserves the computed managedFields. Its
+`GetResetFields` names only `metadata` and `spec`; `settings` passes through the
+ownership filter. No webhook, default, conversion or schema migration is needed.
+The main request then returns a conflict; GET confirms unchanged data, claims
+and resourceVersion.
+
+`TestSSAStatusResetOwnership` checks the complete HTTP history. Its conventional
+`spec` control confirms that status cannot change or claim spec, and main cannot
+change or claim status. The independent bridge and both pinned SMD revisions
+check the underlying co-ownership/conflict sequence; they do not simulate REST
+subresource filtering. `ResetCounterexamples` formalizes the broader false
+contract, while `ApplySource` and `ResetFields` retain conditional general
+exclusion results for roots actually present in the filter.
+
+This is BASE-12b in the catalogue. Conventional spec/status exclusion (BASE-12)
+is a narrower obligation and is not refuted by this example. The mismatch is in
+the CRD status strategy's declared reset scope, independently of PR #336.
 
 ## PR336-01: a partial manager can authorize deletion
 

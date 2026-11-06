@@ -11,7 +11,7 @@ SSA_LAKE="${SSA_LAKE:-lake}"
 lean_binary="$("${SSA_LAKE}" env which lean)"
 updater_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/merge)/update.go"
 
-for mutation in dangling owned-version prune owned-items; do
+for mutation in dangling owned-version prune owned-items apply; do
   probe="$formal_root/.lake/source-mutation/$mutation"
   mkdir -p "$probe/SSA"
   cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
@@ -38,6 +38,10 @@ mutations = {
         "delete(managedAtVersion, prunedVersion)",
         'delete(managedAtVersion, "")',
     ),
+    "apply": (
+        "fieldpath.NewVersionedSet(set, version, true)",
+        "fieldpath.NewVersionedSet(fieldpath.NewSet(), version, true)",
+    ),
 }
 source = Path(sys.argv[1]).read_text()
 original, replacement = mutations[sys.argv[3]]
@@ -46,23 +50,24 @@ if source.count(original) != 1:
 Path(sys.argv[2]).write_text(source.replace(original, replacement))
 PY
   go run ./cmd/ssa-source -source "$probe/update.go" >"$probe/SSA/GoSource.lean"
-  for module in SourceContracts PruneSource OwnedSource PruningRefinement; do
+  for module in SourceContracts PruneSource OwnedSource PruningRefinement ApplySource; do
     cp "SSA/$module.lean" "$probe/SSA/$module.lean"
   done
-  for module in GoSource SourceContracts PruneSource OwnedSource PruningRefinement; do
+  for module in GoSource SourceContracts PruneSource OwnedSource PruningRefinement ApplySource; do
     rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
   done
   case "$mutation" in
     dangling|owned-version) expected=SourceContracts ;;
     prune) expected=PruneSource ;;
     owned-items) expected=OwnedSource ;;
+    apply) expected=ApplySource ;;
   esac
   (
     cd "$probe"
     export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
     "$lean_binary" -DwarningAsError=true -o SSA/GoSource.olean SSA/GoSource.lean
     rejected=0
-    for module in SourceContracts PruneSource OwnedSource; do
+    for module in SourceContracts PruneSource OwnedSource ApplySource; do
       if "$lean_binary" -DwarningAsError=true -o "SSA/$module.olean" "SSA/$module.lean" >"$module.log" 2>&1; then
         continue
       fi

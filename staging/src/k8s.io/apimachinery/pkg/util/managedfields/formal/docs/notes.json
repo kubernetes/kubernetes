@@ -562,5 +562,101 @@
     "title": "Imported pruning removes the Update-owned child",
     "meaning": "The complete four-function pruning chain produces the item-removal proposal under every lawful manager-version schedule, with every callee realized.",
     "limits": "Concrete same-version object/field-set witness using normalized typed/set primitives. Final foreign-claim cleanup and HTTP validation are separate checked stages."
+  },
+  "SSA.ApplySource.imported_apply_matches_spec": {
+    "title": "Complete imported Apply control flow",
+    "scope": "general",
+    "meaning": "The complete Go Apply body agrees with an independently factored specification for every explicit primitive outcome.",
+    "limits": "Merge, extraction, reconciliation, pruning and final update remain callbacks. Successful callback objects are non-nil, logical managed maps allocated, and alias side effects absent; this is not an end-to-end Go refinement theorem."
+  },
+  "SSA.ApplySource.imported_apply_success_iff": {
+    "title": "Characterize every returned Apply result",
+    "scope": "helper",
+    "meaning": "A returned source-interpreter result is exactly a result of the independent Apply specification, including nil on a data no-op.",
+    "limits": "Derived from the complete control-flow theorem and inherits its primitive contracts."
+  },
+  "SSA.ApplySource.imported_apply_excludes_reset_fields": {
+    "title": "Configured reset roots stay outside actor ownership",
+    "scope": "general",
+    "meaning": "With the stated prefix filter, every descendant of every reset root is absent from the final actor field set.",
+    "limits": "Conditional on UpdateDoesNotGrowActor for the final updater callback and correct Go realization of the configured filter. Neither remaining implementation obligation is assumed closed."
+  },
+  "SSA.ResetFields.filter_membership": {
+    "title": "Prefix-filter membership",
+    "scope": "general",
+    "meaning": "A path survives precisely when it belonged to the input and no reset root prefixes it.",
+    "limits": "Normalized finite field sets; JSON bytes and actual Go recursive exclusion still require refinement."
+  },
+  "SSA.ResetFields.filter_excludes_descendants": {
+    "title": "Reset exclusion reaches all depths",
+    "scope": "general",
+    "meaning": "No direct reset root or descendant can survive prefix filtering.",
+    "limits": "Arbitrary finite roots and paths; prefix filtering is distinct from ordinary field-set Difference."
+  },
+  "SSA.ResetFields.filter_is_idempotent": {
+    "title": "Reset filtering is idempotent",
+    "scope": "general",
+    "meaning": "Filtering the same field set twice with the same reset roots produces the same list.",
+    "limits": "This is a filter law, not SSA Apply idempotence."
+  },
+  "SSA.ResetFields.filter_preserves_other_top_field": {
+    "title": "Unrelated root membership is retained",
+    "scope": "general",
+    "meaning": "Filtering one named top-level root leaves membership under any different top-level root unchanged, at every finite depth.",
+    "limits": "This explains why spec/metadata exclusion cannot remove a valid settings root."
+  },
+  "SSA.ResetFields.flat_filter_refines_trie": {
+    "title": "Flat reset filter matches trie selection",
+    "scope": "general",
+    "meaning": "Filtered normalized path membership equals recursively selected trie membership.",
+    "limits": "Membership refinement only; empty structural nodes and wire serialization are separate."
+  },
+  "SSA.ResetFields.installed_actor_excludes_reset": {
+    "title": "Installing filtered claims excludes reset fields",
+    "scope": "general",
+    "meaning": "Replacing the actor entry with the filtered extracted set cannot install a reset root or descendant.",
+    "limits": "Concerns installation; the later updater stage requires the separate non-growth premise."
+  },
+  "SSA.ResetFields.update_preserves_reset_exclusion": {
+    "title": "Non-growing update preserves reset exclusion",
+    "scope": "general",
+    "meaning": "An update stage that never grows the actor field set preserves installed prefix exclusion.",
+    "limits": "ActorDoesNotGrow is the remaining local callback contract, not a premise about the entire Apply result."
+  },
+  "SSA.ResetCounterexamples.restoration_preserves_nonstatus_data": {
+    "title": "Status restoration retains every other data cell",
+    "scope": "general",
+    "meaning": "For arbitrary before/proposal states, restoring non-status fields preserves every non-status cell exactly.",
+    "limits": "A normalized REST restoration model. Claims intentionally remain from the proposal; the full Go REST strategy is not imported."
+  },
+  "SSA.ResetCounterexamples.broad_status_reset_contract_is_false": {
+    "title": "Refute ownership exclusion for every REST-reset field",
+    "scope": "execution",
+    "meaning": "A reachable fresh status actor acquires an unchanged settings claim, despite the status strategy restoring every non-status data field.",
+    "limits": "The actual CRD HTTP test independently reproduces the claim and subsequent conflict. This refutes BASE-12b, not conventional spec/status exclusion."
+  },
+  "SSA.ResetCounterexamples.status_acquires_a_reset_field": {
+    "title": "Status can claim a restored settings field",
+    "scope": "execution",
+    "meaning": "The concrete co-ownership request leaves settings unchanged but installs the status actor claim.",
+    "limits": "The API test uses the same literal manager name on main and status; the inner model uses distinct logical identities."
+  },
+  "SSA.ResetCounterexamples.status_claim_blocks_regular_apply": {
+    "title": "The restored-field claim causes a later conflict",
+    "scope": "execution",
+    "meaning": "The original main actor cannot change settings without force once the status actor co-owns it; rejection preserves the state.",
+    "limits": "HTTP GET additionally checks unchanged stored ownership and resourceVersion."
+  },
+  "SSA.ResetCounterexamples.imported_apply_installs_nonstatus_claim": {
+    "title": "Complete imported Apply installs the unwanted claim",
+    "scope": "execution",
+    "meaning": "A concrete normalized primitive instance of the imported Apply body installs settings ownership because the configured roots omit settings.",
+    "limits": "Merge and final update are explicit normalized primitive instances. The real HTTP test is independent evidence, not their general refinement proof."
+  },
+  "SSA.ResetCounterexamples.imported_prune_callback_is_realized": {
+    "title": "Realize fresh status actor pruning in source",
+    "scope": "execution",
+    "meaning": "The imported prune body returns directly when the fresh status actor has no last-applied set.",
+    "limits": "Closes this concrete pruning callback only, not the merge or final updater callbacks."
   }
 }

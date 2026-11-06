@@ -21,7 +21,7 @@ still checked. `ARTIFACTS` selects the log directory, matching Prow conventions.
 Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
-four imported function ASTs must match the checked-in Lean input.
+five imported function ASTs must match the checked-in Lean input.
 
 The required checks are:
 
@@ -40,7 +40,7 @@ The required checks are:
    head and base revisions (Go may install the upstream-required toolchain).
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Four independent semantic mutations of the selected Go source; each must
+10. Five independent semantic mutations of the selected Go source; each must
     invalidate the unchanged theorem in the expected proof module.
 
 No check is optional when invoking this entrypoint. The result establishes the
@@ -84,6 +84,12 @@ B Updates a scalar child without acquiring item membership; A's omission prunes
 the item. A nullable list stores null and loses the claims, while an optional
 non-nullable list rejects every retry with unchanged data, ownership and
 resourceVersion. Empty creation without the optional list is a valid control.
+
+`TestSSAStatusResetOwnership` checks same-name main/status manager separation
+and conventional spec/status reset behavior. Its additional-root variant
+reproduces a status claim on an unchanged `settings.desired` field that the REST
+strategy resets; the original main manager's next change conflicts atomically.
+These four test functions exercise twelve API/schema variants.
 
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;

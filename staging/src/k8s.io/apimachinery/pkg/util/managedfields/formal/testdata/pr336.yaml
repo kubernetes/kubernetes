@@ -421,3 +421,41 @@ cases:
   - manager: A
     apply: {x: one}
     expect: {object: {x: one}, owners: {A: [.x], A@update: [.x]}}
+- name: nonstatus-root-coownership-blocks-another-write
+  semantics: current
+  schema: |
+    types:
+    - name: Document
+      map:
+        fields:
+        - name: apiVersion
+          type: {scalar: string}
+        - name: kind
+          type: {scalar: string}
+        - name: settings
+          type:
+            map:
+              fields:
+              - name: desired
+                type: {scalar: string}
+        - name: status
+          type:
+            map:
+              fields:
+              - name: observed
+                type: {scalar: string}
+  steps:
+  - manager: Main
+    apply: {settings: {desired: one}}
+    expect: {object: {settings: {desired: one}}, owners: {Main: [.settings.desired]}}
+  - manager: Status
+    apply: {settings: {desired: one}, status: {observed: ready}}
+    expect:
+      object: {settings: {desired: one}, status: {observed: ready}}
+      owners: {Main: [.settings.desired], Status: [.settings.desired, .status.observed]}
+  - manager: Main
+    apply: {settings: {desired: two}}
+    expect:
+      error: conflict
+      object: {settings: {desired: one}, status: {observed: ready}}
+      owners: {Main: [.settings.desired], Status: [.settings.desired, .status.observed]}
