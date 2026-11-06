@@ -4137,6 +4137,114 @@ func TestDeferredResizeFit(t *testing.T) {
 	}
 }
 
+func makeExtraNodeAllocatableResources(cpu string) []v1.ExtraNodeAllocatableResource {
+	return []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu)},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu)},
+		},
+		{
+			ContainerName: "c1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu)},
+		},
+	}
+}
+
+func newNodeAllocatableCycleState(extraResources map[string][]v1.ExtraNodeAllocatableResource) fwk.CycleState {
+	cs := framework.NewCycleState()
+	for nodeName, resources := range extraResources {
+		framework.GetOrCreateExtraNodeAllocatableResourcesState(cs).Set(nodeName, "DynamicResources", resources)
+	}
+	return cs
+}
+
+func TestFitFilterWithExtraNodeAllocatableResources(t *testing.T) {
+	testCtx := ktesting.Init(t)
+	nodeName := "node-1"
+	pod := st.MakePod().Name("test-pod").Namespace("test-ns").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+	existingPod := st.MakePod().Name("existing").Namespace("test-ns").Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+
+	tests := []struct {
+		name                              string
+		nodeInfo                          *framework.NodeInfo
+		enableDRANodeAllocatableResources bool
+		extraResources                    map[string][]v1.ExtraNodeAllocatableResource
+		wantStatus                        *fwk.Status
+	}{
+		{
+			name:                              "no entries",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name:                              "entries fit",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("1"),
+			},
+		},
+		{
+			name:                              "entries exceed allocatable",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("2"),
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, getErrReason(v1.ResourceCPU)),
+		},
+		{
+			name:                              "entries exceed free resources but not allocatable",
+			nodeInfo:                          framework.NewNodeInfo(existingPod),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("500m"),
+			},
+			wantStatus: fwk.NewStatus(fwk.Unschedulable, getErrReason(v1.ResourceCPU)),
+		},
+		{
+			name:                              "entries for another node are ignored",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: true,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				"other-node": makeExtraNodeAllocatableResources("2"),
+			},
+		},
+		{
+			name:                              "feature disabled",
+			nodeInfo:                          framework.NewNodeInfo(),
+			enableDRANodeAllocatableResources: false,
+			extraResources: map[string][]v1.ExtraNodeAllocatableResource{
+				nodeName: makeExtraNodeAllocatableResources("2"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.Run(test.name, func(tCtx ktesting.TContext) {
+			node := st.MakeNode().Name(nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
+			test.nodeInfo.SetNode(node)
+
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableDRANodeAllocatableResources: test.enableDRANodeAllocatableResources,
+			})
+			tCtx.ExpectNoError(err, "create fit plugin")
+
+			cycleState := newNodeAllocatableCycleState(test.extraResources)
+			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(tCtx, cycleState, pod, nil)
+			if !preFilterStatus.IsSuccess() {
+				tCtx.Errorf("prefilter failed with status: %v", preFilterStatus)
+			}
+
+			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, pod, test.nodeInfo)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestFitScoreFeatureGates(t *testing.T) {
 	testCtx := ktesting.Init(t)
 
