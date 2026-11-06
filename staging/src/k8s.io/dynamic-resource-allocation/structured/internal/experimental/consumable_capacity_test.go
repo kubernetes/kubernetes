@@ -167,6 +167,7 @@ func testConsumableCapacity(tCtx ktesting.TContext) {
 	tCtx.Run("use-milli", testUseMilli)
 
 	tCtx.Run("cmp-request-over-capacity-fatal-beats-soft", testCmpRequestOverCapacityFatalBeatsSoft)
+	tCtx.Run("cmp-request-over-capacity-conflict-beats-missing", testCmpRequestOverCapacityConflictBeatsMissing)
 }
 
 // testCmpRequestOverCapacityFatalBeatsSoft pins that a representability error takes
@@ -211,6 +212,42 @@ func testCmpRequestOverCapacityFatalBeatsSoft(tCtx ktesting.TContext) {
 		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false)
 		tCtx.Require(ok).To(g.BeFalseBecause("an unrepresentable request must not be considered satisfiable"))
 		tCtx.Require(err).To(g.MatchError(errCapacityRequestNotRepresentable), "a representability error must take precedence over the soft over-capacity mismatch")
+	}
+}
+
+// testCmpRequestOverCapacityConflictBeatsMissing pins that a capacity requested with and
+// without the driver domain is an error even if another requested capacity is missing.
+func testCmpRequestOverCapacityConflictBeatsMissing(tCtx ktesting.TContext) {
+	slice := &draapi.ResourceSlice{}
+	driverName := slice.MakeUniqueString(driverA)
+	device := deviceWithID{
+		Device: &draapi.Device{
+			Capacity: draapi.DeviceCapacities{
+				Nested: map[draapi.UniqueString]map[draapi.UniqueString]*draapi.DeviceCapacity{
+					driverName: {
+						slice.MakeUniqueString(capacity0): {Value: one},
+					},
+				},
+				DriverName: driverName,
+			},
+		},
+		id: DeviceID{
+			Driver: driverName,
+		},
+		slice: slice,
+	}
+	request := &resourceapi.CapacityRequirements{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
+			capacity0:                 one,
+			driverA + "/" + capacity0: one,
+			capacity1:                 one, // not defined by the device
+		},
+	}
+	// Go's map order is unspecified, so run the check repeatedly.
+	for range 64 {
+		_, ok, err := cmpRequestOverCapacity(NewConsumedCapacity(), request, device, NewConsumedCapacity(), false)
+		tCtx.Require(ok).To(g.BeFalseBecause("a conflicting request must not be considered satisfiable"))
+		tCtx.Require(err).To(g.MatchError(g.ContainSubstring("requested both as")), "the conflict must take precedence over the missing capacity")
 	}
 }
 
