@@ -3492,16 +3492,18 @@ func TestEvictionMessage(t *testing.T) {
 	)
 
 	testcase := []struct {
-		name                     string
-		podResources             v1.ResourceRequirements
-		initContainers           []v1.Container
-		containers               []v1.Container
-		ephemeralContainers      []v1.EphemeralContainer
-		podMemoryStats           string
-		containerMemoryStats     []containerMemoryStat
-		expectedContainerMessage []memoryExceededContainer
-		expectedAnnotations      map[string]string
-		podLevelResourcesEnabled bool
+		name                               string
+		podResources                       v1.ResourceRequirements
+		initContainers                     []v1.Container
+		containers                         []v1.Container
+		ephemeralContainers                []v1.EphemeralContainer
+		extraNodeAllocatableResources      []v1.ExtraNodeAllocatableResource
+		podMemoryStats                     string
+		containerMemoryStats               []containerMemoryStat
+		expectedContainerMessage           []memoryExceededContainer
+		expectedAnnotations                map[string]string
+		podLevelResourcesEnabled           bool
+		draNodeAllocatableResourcesEnabled bool
 	}{
 		{
 			name: "No container exceeds memory usage",
@@ -3696,6 +3698,40 @@ func TestEvictionMessage(t *testing.T) {
 			},
 			podLevelResourcesEnabled: true,
 		},
+		{
+			name: "Container with ExtraNodeAllocatableResources only exceeds effective request when usage exceeds spec + DRA",
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newContainer(regular2, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+			},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+				},
+				{
+					ContainerName: regular1,
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+				},
+				{
+					ContainerName: regular2,
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+				},
+			},
+			containerMemoryStats: []containerMemoryStat{
+				{name: regular1, usage: "250Mi"}, // <= 100Mi + 200Mi (not offending)
+				{name: regular2, usage: "350Mi"}, // > 100Mi + 200Mi (offending, effective request 300Mi)
+			},
+			expectedContainerMessage: []memoryExceededContainer{
+				{name: regular2, request: "300Mi", usage: "350Mi"},
+			},
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      regular2,
+				OffendingContainersUsageKey: "350Mi",
+			},
+			draNodeAllocatableResourcesEnabled: true,
+		},
 	}
 
 	threshold := []evictionapi.Threshold{}
@@ -3704,6 +3740,9 @@ func TestEvictionMessage(t *testing.T) {
 		pod := newPodWithInitContainers(podName, 1, tc.podResources, tc.initContainers, tc.containers, nil)
 		if len(tc.ephemeralContainers) > 0 {
 			pod.Spec.EphemeralContainers = tc.ephemeralContainers
+		}
+		if len(tc.extraNodeAllocatableResources) > 0 {
+			pod.Status.ExtraNodeAllocatableResources = tc.extraNodeAllocatableResources
 		}
 		// Create PodMemoryStats with dummy container memory
 		// and override container stats with the provided values.
@@ -3738,6 +3777,9 @@ func TestEvictionMessage(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 				podMessage = fmt.Sprintf(podMessageFmt, pod.Name, tc.podMemoryStats, tc.podResources.Requests.Memory(), v1.ResourceMemory)
 				annotationsKeys = append(annotationsKeys, OffendingPodKey, OffendingPodUsageKey)
+			}
+			if tc.draNodeAllocatableResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 			}
 
 			msg, annotations := evictionMessage(v1.ResourceMemory, pod, statsFn, threshold, observations)
