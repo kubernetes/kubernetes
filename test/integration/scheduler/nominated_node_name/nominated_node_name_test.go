@@ -861,6 +861,428 @@ func TestPodGroupPreemptionAndNominatedNodeNameScenarios(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "NNN is ignored on podgroup that cannot fit on the node",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "4"),
+				},
+				{
+					name: "create gang pg-exceeds",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-exceeds", lowPriority, 2),
+					},
+				},
+				{
+					name: "create pods with NNN in pg-exceeds that together exceed capacity of node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("exceeds-1", "pg-exceeds", lowPriority, "3"),
+							makePodGroupPod("exceeds-2", "pg-exceeds", lowPriority, "3"),
+						},
+						nominatedNodeName: "node1",
+					},
+				},
+				{
+					name: "create gang pg-fits",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-fits", lowPriority, 2),
+					},
+				},
+				{
+					name: "create pods without NNN in pg-fits that fit on node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("fits-1", "pg-fits", lowPriority, "2"),
+							makePodGroupPod("fits-2", "pg-fits", lowPriority, "2"),
+						},
+					},
+				},
+				{
+					name: "schedule pg-exceeds",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-exceeds",
+						podNames:     []string{"exceeds-1", "exceeds-2"},
+					},
+				},
+				{
+					name: "check NNN in pg-exceeds pods gets cleared upon scheduling failure",
+					checkNNN: &checkNNN{
+						podNames:    []string{"exceeds-1", "exceeds-2"},
+						expectedNNN: "",
+					},
+				},
+				{
+					name: "schedule pg-fits",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-fits",
+						podNames:     []string{"fits-1", "fits-2"},
+					},
+				},
+				{
+					name: "verify pg-fits pods are scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"fits-1", "fits-2"},
+						expectedScheduledNode: "node1",
+					},
+				},
+			},
+		},
+		{
+			name: "NNN is ignored on lower priority podgroup when higher priority podgroup without NNN is being scheduled",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "3"),
+				},
+				{
+					name: "create low priority gang pg-low",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-low", lowPriority, 3),
+					},
+				},
+				{
+					name: "create low priority pods in pg-low with NNN",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("low-1", "pg-low", lowPriority, "1"),
+							makePodGroupPod("low-2", "pg-low", lowPriority, "1"),
+							makePodGroupPod("low-3", "pg-low", lowPriority, "1"),
+						},
+						nominatedNodeName: "node1",
+					},
+				},
+				{
+					name: "create high priority gang pg-high",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-high", highPriority, 3),
+					},
+				},
+				{
+					name: "create high priority pods in pg-high without NNN",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("high-1", "pg-high", highPriority, "1"),
+							makePodGroupPod("high-2", "pg-high", highPriority, "1"),
+							makePodGroupPod("high-3", "pg-high", highPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "schedule pg-high",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-high",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify pg-high pods are scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"high-1", "high-2", "high-3"},
+						expectedScheduledNode: "node1",
+					},
+				},
+				{
+					name: "schedule pg-low",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-low",
+						podNames:     []string{"low-1", "low-2", "low-3"},
+					},
+				},
+				{
+					name: "check NNN in pg-low pods gets cleared upon scheduling failure",
+					checkNNN: &checkNNN{
+						podNames:    []string{"low-1", "low-2", "low-3"},
+						expectedNNN: "",
+					},
+				},
+			},
+		},
+		{
+			name: "partial gang podgroup preemption sets NominatedNodeName on placed pods and clears stale NominatedNodeName on unplaced pods",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "2"),
+				},
+				{
+					name:       "create node2",
+					createNode: makeNode("node2", "1"),
+				},
+				{
+					name: "create low-priority pods on node1 and high-priority blocker on node2",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makeScheduledPod("low-1", "node1", lowPriority, "1"),
+							makeScheduledPod("low-2", "node1", lowPriority, "1"),
+							makeScheduledPod("blocker", "node2", highPriority, "1"),
+						},
+					},
+				},
+				{
+					name: "create preemptor gang pg1 with minCount 2",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg1", highPriority, 2),
+					},
+				},
+				{
+					name: "create 3 preemptor pods in pg1 with stale NNN set to node2",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("high-1", "pg1", highPriority, "1"),
+							makePodGroupPod("high-2", "pg1", highPriority, "1"),
+							makePodGroupPod("high-3", "pg1", highPriority, "1"),
+						},
+						nominatedNodeName: "node2",
+					},
+				},
+				{
+					name: "schedule the preemptor PodGroup pg1",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify the preemptor PodGroup pods are unschedulable",
+					verifyPodsUnschedulable: &verifyPodsUnschedulable{
+						podNames: []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "check placed preemptor pods get NNN updated to node1",
+					checkNNN: &checkNNN{
+						podNames:    []string{"high-1", "high-2"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name: "check unplaced preemptor pod has stale NNN cleared",
+					checkNNN: &checkNNN{
+						podNames:    []string{"high-3"},
+						expectedNNN: "",
+					},
+				},
+				{
+					name:               "complete the preemption API calls",
+					completePreemption: "pg1",
+				},
+				{
+					name: "re-enter pg1 in the scheduling cycle",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg1",
+						podNames:     []string{"high-1", "high-2", "high-3"},
+					},
+				},
+				{
+					name: "verify placed pg1 pods are scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"high-1", "high-2"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+				{
+					name: "check unplaced pod high-3 still has empty NNN",
+					checkNNN: &checkNNN{
+						podNames:    []string{"high-3"},
+						expectedNNN: "",
+					},
+				},
+			},
+		},
+		{
+			name: "partial basic podgroup success preserves NNN on initial cycle and clears stale NNN on follow-up cycle",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "4"),
+				},
+				{
+					name: "create basic pg-basic",
+					createPodGroup: &createPodGroup{
+						podGroup: makeBasicPodGroup("pg-basic", lowPriority),
+					},
+				},
+				{
+					name: "create pods in pg-basic with NNN on node1 where only basic-1 fits",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("basic-1", "pg-basic", lowPriority, "2"),
+							makePodGroupPod("basic-2", "pg-basic", lowPriority, "5"),
+						},
+						nominatedNodeName: "node1",
+					},
+				},
+				{
+					name: "create gang pg-fits",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-fits", lowPriority, 1),
+					},
+				},
+				{
+					name: "create pod without NNN in pg-fits that fits remaining capacity on node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("fits-1", "pg-fits", lowPriority, "2"),
+						},
+					},
+				},
+				{
+					name: "schedule pg-basic (partial success cycle)",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-basic",
+						podNames:     []string{"basic-1", "basic-2"},
+					},
+				},
+				{
+					name: "verify basic-1 is scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"basic-1"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+				{
+					name: "check basic-2 preserves NNN on partial-success cycle",
+					checkNNN: &checkNNN{
+						podNames:    []string{"basic-2"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name: "schedule remaining pg-basic pod on immediate follow-up cycle",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-basic",
+						podNames:     []string{"basic-2"},
+					},
+				},
+				{
+					name: "check stale NNN in basic-2 gets cleared after PodGroupPostFilter fails",
+					checkNNN: &checkNNN{
+						podNames:    []string{"basic-2"},
+						expectedNNN: "",
+					},
+				},
+				{
+					name: "schedule pg-fits",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-fits",
+						podNames:     []string{"fits-1"},
+					},
+				},
+				{
+					name: "verify fits-1 is scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"fits-1"},
+						expectedScheduledNode: "node1",
+					},
+				},
+			},
+		},
+		{
+			name: "partial basic composite podgroup success preserves NNN on rejected child and clears stale NNN on follow-up cycle",
+			scenarios: []scenario{
+				{
+					name:       "create node1",
+					createNode: makeNode("node1", "4"),
+				},
+				{
+					name: "create composite pod group cpg",
+					createCompositePodGroup: &createCompositePodGroup{
+						compositePodGroup: makeCompositePodGroup("cpg", lowPriority),
+					},
+				},
+				{
+					name: "create child gang pg-child-1",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg-child-1", "cpg", lowPriority, 1),
+					},
+				},
+				{
+					name: "create child gang pg-child-2",
+					createPodGroup: &createPodGroup{
+						podGroup: makeChildGangPodGroup("pg-child-2", "cpg", lowPriority, 2),
+					},
+				},
+				{
+					name: "create pods in pg-child-1 and pg-child-2 with NNN on node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("c1-pod1", "pg-child-1", lowPriority, "2"),
+							makePodGroupPod("c2-pod1", "pg-child-2", lowPriority, "1"),
+							makePodGroupPod("c2-pod2", "pg-child-2", lowPriority, "5"),
+						},
+						nominatedNodeName: "node1",
+					},
+				},
+				{
+					name: "create gang pg-fits",
+					createPodGroup: &createPodGroup{
+						podGroup: makeGangPodGroup("pg-fits", lowPriority, 1),
+					},
+				},
+				{
+					name: "create pod without NNN in pg-fits that fits remaining capacity on node1",
+					createPods: &createPods{
+						pods: []*v1.Pod{
+							makePodGroupPod("fits-1", "pg-fits", lowPriority, "2"),
+						},
+					},
+				},
+				{
+					name: "schedule cpg (partial success cycle)",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "cpg",
+						podNames:     []string{"c1-pod1", "c2-pod1", "c2-pod2"},
+					},
+				},
+				{
+					name: "verify c1-pod1 is scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"c1-pod1"},
+						expectedScheduledNode: "node1",
+						validateNNNCleared:    true,
+					},
+				},
+				{
+					name: "check pg-child-2 pods preserve NNN on partial-success cycle",
+					checkNNN: &checkNNN{
+						podNames:    []string{"c2-pod1", "c2-pod2"},
+						expectedNNN: "node1",
+					},
+				},
+				{
+					name: "schedule remaining cpg pods on immediate follow-up cycle",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "cpg",
+						podNames:     []string{"c2-pod1", "c2-pod2"},
+					},
+				},
+				{
+					name: "check stale NNN in pg-child-2 pods gets cleared after PodGroupPostFilter fails",
+					checkNNN: &checkNNN{
+						podNames:    []string{"c2-pod1", "c2-pod2"},
+						expectedNNN: "",
+					},
+				},
+				{
+					name: "schedule pg-fits",
+					schedulePodGroup: &schedulePodGroup{
+						podGroupName: "pg-fits",
+						podNames:     []string{"fits-1"},
+					},
+				},
+				{
+					name: "verify fits-1 is scheduled on node1",
+					verifyPodsScheduled: &verifyPodsScheduled{
+						podNames:              []string{"fits-1"},
+						expectedScheduledNode: "node1",
+					},
+				},
+			},
+		},
 	}
 	for _, clearNNNAfterBindingEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("ClearingNominatedNodeNameAfterBinding: %v", clearNNNAfterBindingEnabled), func(t *testing.T) {
@@ -1207,6 +1629,10 @@ func runCompletePreemption(t *testing.T, preemptorName string, lock *sync.Mutex,
 
 func runCheckNNN(t *testing.T, testCtx *testutils.TestContext, action *checkNNN) {
 	cs := testCtx.ClientSet
+	nodes, err := cs.CoreV1().Nodes().List(testCtx.Ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list nodes: %v", err)
+	}
 	for _, podName := range action.podNames {
 		lastFailure := ""
 		if err := wait.PollUntilContextTimeout(testCtx.Ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
@@ -1219,6 +1645,17 @@ func runCheckNNN(t *testing.T, testCtx *testutils.TestContext, action *checkNNN)
 			if action.expectedNNN != pod.Status.NominatedNodeName {
 				lastFailure = fmt.Sprintf("Expected .status.nominatedNodeName %v for pod \"%v\" but got \"%v\"", action.expectedNNN, podName, pod.Status.NominatedNodeName)
 				return false, nil
+			}
+			for _, node := range nodes.Items {
+				nominated := contains(testCtx.Scheduler.SchedulingQueue.NominatedPodsForNode(klog.FromContext(ctx), node.Name), podName)
+				if node.Name == action.expectedNNN && !nominated {
+					lastFailure = fmt.Sprintf("Expected pod %q to be nominated on node %q in PodNominator, but it was not", podName, node.Name)
+					return false, nil
+				}
+				if node.Name != action.expectedNNN && nominated {
+					lastFailure = fmt.Sprintf("Expected pod %q not to be nominated on node %q in PodNominator, but it was", podName, node.Name)
+					return false, nil
+				}
 			}
 
 			return true, nil
