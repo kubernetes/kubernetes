@@ -185,10 +185,10 @@ type corruptObjErrorInterpretingTransformer struct {
 }
 
 func (t *corruptObjErrorInterpretingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
-	// TODO: right now any error is deemed as undecodable, in the future, we
-	// can apply some filter, if need be. For example, any network error
 	out, stale, err := t.Transformer.TransformFromStorage(ctx, data, dataCtx)
-	if err != nil {
+	// An error marked as not data corruption, such as compression's for a frame from
+	// a newer apiserver, doesn't make the object eligible for unsafe deletion.
+	if err != nil && value.IsDataCorruption(err) {
 		err = &corruptObjectError{err: err, errType: untransformable}
 	}
 	return out, stale, err
