@@ -3080,6 +3080,23 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").UID("node1").Obj()
 	node2 := st.MakeNode().Name("node2").UID("node2").Obj()
 
+	makePod := func(name, pgName, nnn string) *v1.Pod {
+		w := st.MakePod().Namespace("default").Name(name).UID(name).PodGroupName(pgName).Priority(100)
+		if nnn != "" {
+			w = w.NominatedNodeName(nnn)
+		}
+		return w.Obj()
+	}
+	makePodGroup := func(name string) *schedulingv1beta1.PodGroup {
+		return st.MakePodGroup().Name(name).Namespace("default").BasicPolicy().Priority(100).Obj()
+	}
+	makeGangPodGroup := func(name string, minCount int32) *schedulingv1beta1.PodGroup {
+		return st.MakePodGroup().Name(name).Namespace("default").MinCount(minCount).Priority(100).Obj()
+	}
+	makeChildPodGroup := func(name string, minCount int32, parentCPGName string) *schedulingv1beta1.PodGroup {
+		return st.MakePodGroup().Name(name).Namespace("default").MinCount(minCount).ParentCompositePodGroup(parentCPGName).Priority(100).Obj()
+	}
+
 	tests := []struct {
 		name                      string
 		tasEnabled                bool
@@ -3094,13 +3111,11 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		expectedNominatingInfos   map[string]*fwk.NominatingInfo
 	}{
 		{
-			name: "partial preemption clears NNN for unplaced extra pod",
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg").Namespace("default").BasicPolicy().Priority(100).Obj(),
-			},
+			name:      "partial preemption clears NNN for unplaced extra pod",
+			podGroups: []*schedulingv1beta1.PodGroup{makePodGroup("pg")},
 			pods: []*v1.Pod{
-				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg").Priority(100).SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg").Priority(100).NominatedNodeName("node2").SchedulerName("test-scheduler").Obj(),
+				makePod("p1", "pg", ""),
+				makePod("p2", "pg", "node2"),
 			},
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
@@ -3119,13 +3134,11 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 			},
 		},
 		{
-			name: "failed preemption clears NNN for evaluated and skipped pods",
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg").Namespace("default").MinCount(2).Priority(100).Obj(),
-			},
+			name:      "failed preemption clears NNN for evaluated and skipped pods",
+			podGroups: []*schedulingv1beta1.PodGroup{makeGangPodGroup("pg", 2)},
 			pods: []*v1.Pod{
-				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
+				makePod("p1", "pg", "node1"),
+				makePod("p2", "pg", "node1"),
 			},
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
@@ -3143,12 +3156,10 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		{
 			name:       "unschedulable and unresolvable root status clears NNN without running PodGroupPostFilter",
 			tasEnabled: true,
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg").Namespace("default").MinCount(2).Priority(100).Obj(),
-			},
+			podGroups:  []*schedulingv1beta1.PodGroup{makeGangPodGroup("pg", 2)},
 			pods: []*v1.Pod{
-				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
+				makePod("p1", "pg", "node1"),
+				makePod("p2", "pg", "node1"),
 			},
 			plugin: &fakePodGroupPlugin{
 				placementGenerateStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "no matching topology domain"),
@@ -3163,12 +3174,10 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		{
 			name:       "partial PodGroup success preserves NNN until PodGroupPostFilter runs",
 			tasEnabled: true,
-			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg").Namespace("default").BasicPolicy().Priority(100).Obj(),
-			},
+			podGroups:  []*schedulingv1beta1.PodGroup{makePodGroup("pg")},
 			pods: []*v1.Pod{
-				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg").Priority(100).SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
+				makePod("p1", "pg", ""),
+				makePod("p2", "pg", "node1"),
 			},
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
@@ -3188,13 +3197,13 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 			cpgEnabled: true,
 			rootCPG:    st.MakeCompositePodGroup().Name("cpg").Namespace("default").BasicPolicy().Priority(100).Obj(),
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").MinCount(1).ParentCompositePodGroup("cpg").Priority(100).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").MinCount(2).ParentCompositePodGroup("cpg").Priority(100).Obj(),
+				makeChildPodGroup("pg1", 1, "cpg"),
+				makeChildPodGroup("pg2", 2, "cpg"),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Priority(100).SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg2").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p3").UID("p3").PodGroupName("pg2").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
+				makePod("p1", "pg1", ""),
+				makePod("p2", "pg2", "node1"),
+				makePod("p3", "pg2", "node1"),
 			},
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
@@ -3216,13 +3225,13 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 			cpgEnabled: true,
 			rootCPG:    st.MakeCompositePodGroup().Name("cpg").Namespace("default").MinGroupCount(1).Priority(100).Obj(),
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").MinCount(1).ParentCompositePodGroup("cpg").Priority(100).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").MinCount(2).ParentCompositePodGroup("cpg").Priority(100).Obj(),
+				makeChildPodGroup("pg1", 1, "cpg"),
+				makeChildPodGroup("pg2", 2, "cpg"),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Priority(100).SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg2").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p3").UID("p3").PodGroupName("pg2").Priority(100).NominatedNodeName("node1").SchedulerName("test-scheduler").Obj(),
+				makePod("p1", "pg1", ""),
+				makePod("p2", "pg2", "node1"),
+				makePod("p3", "pg2", "node1"),
 			},
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
@@ -3244,13 +3253,13 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 			cpgEnabled: true,
 			rootCPG:    st.MakeCompositePodGroup().Name("cpg").Namespace("default").MinGroupCount(1).Priority(100).Obj(),
 			podGroups: []*schedulingv1beta1.PodGroup{
-				st.MakePodGroup().Name("pg1").Namespace("default").MinCount(1).ParentCompositePodGroup("cpg").Priority(100).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").MinCount(2).ParentCompositePodGroup("cpg").Priority(100).Obj(),
+				makeChildPodGroup("pg1", 1, "cpg"),
+				makeChildPodGroup("pg2", 2, "cpg"),
 			},
 			pods: []*v1.Pod{
-				st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg1").Priority(100).SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg2").Priority(100).NominatedNodeName("node2").SchedulerName("test-scheduler").Obj(),
-				st.MakePod().Namespace("default").Name("p3").UID("p3").PodGroupName("pg2").Priority(100).NominatedNodeName("node2").SchedulerName("test-scheduler").Obj(),
+				makePod("p1", "pg1", ""),
+				makePod("p2", "pg2", "node2"),
+				makePod("p3", "pg2", "node2"),
 			},
 			plugin: &fakePodGroupPlugin{
 				filterStatus: map[string]*fwk.Status{
@@ -3477,11 +3486,9 @@ func TestPodGroupCycle_PartialSuccessPreservesOngoingPreemption(t *testing.T) {
 
 	pg := st.MakePodGroup().Name("pg").Namespace("default").BasicPolicy().Priority(100).Obj()
 	p1 := st.MakePod().Namespace("default").Name("p1").UID("p1").PodGroupName("pg").
-		Priority(100).NominatedNodeName("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).
-		SchedulerName("test-scheduler").Obj()
+		Priority(100).NominatedNodeName("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
 	p2 := st.MakePod().Namespace("default").Name("p2").UID("p2").PodGroupName("pg").
-		Priority(100).NominatedNodeName("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).
-		SchedulerName("test-scheduler").Obj()
+		Priority(100).NominatedNodeName("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
 
 	client := clientsetfake.NewClientset(node1, node2, terminatingVictim, otherLowPod, pg, p1, p2)
 	bindChan := setupBindChan(client, 2)
