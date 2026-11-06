@@ -169,11 +169,15 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 // ValidateUpdate performs common and strategy-specific validation for an update operation.
 func ValidateUpdate(ctx context.Context, obj runtime.Object, old runtime.Object, strategy RESTUpdateStrategy) field.ErrorList {
 
-	// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
-	// Ensure some common fields, like UID, are validated for all resources.
-	errs := validateCommonFields(obj, old, strategy)
+	errs := strategy.ValidateUpdate(ctx, obj, old)
 
-	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
+	if len(errs) == 0 {
+		// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
+		// Ensure some common fields, like UID, are validated for all resources.
+		// Run only when strategy validation passes, as ValidateCreate does: most strategies
+		// validate ObjectMeta themselves, and running both reports each metadata error twice.
+		errs = validateCommonFields(obj, old, strategy)
+	}
 	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
 		errs = dv.ValidateDeclaratively(ctx, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(ctx, obj, old))
 	}
