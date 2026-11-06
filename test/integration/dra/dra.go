@@ -147,6 +147,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "Pod", testPod)
 				runSubTest(tCtx, "ListTypeAttributes", testListTypeAttributes)
 				runSubTest(tCtx, "CompatibilityGroups", func(tCtx ktesting.TContext) { testCompatibilityGroups(tCtx, false) })
+				runSubTest(tCtx, "DRANodeAllocatableResources", func(tCtx ktesting.TContext) { testNodeAllocatableResources(tCtx, false) })
 				runSubTest(tCtx, "OptionalNodeOperations", func(tCtx ktesting.TContext) { testOptionalNodeOperations(tCtx, true) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceCompatibilityGroups)
