@@ -17,11 +17,10 @@ limitations under the License.
 package qos
 
 import (
-	"slices"
-
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -138,47 +137,47 @@ func isSidecarContainer(pod *v1.Pod, container *v1.Container) bool {
 
 // getEffectiveContainerMemoryRequest returns the effective container memory request,
 // including DRA memory allocations if the feature is enabled.
-// If multiple containers share a single DRA memory claim, the claim's memory quantity
-// is divided equally among the sharing containers.
 func getEffectiveContainerMemoryRequest(pod *v1.Pod, container *v1.Container) int64 {
 	memReq := container.Resources.Requests.Memory().Value()
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
 		return memReq
 	}
+	return memReq + extraNodeAllocatableMemoryRequest(pod, container.Name)
+}
 
-	var draMemoryShare int64
-	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
-		// Check if this container references the claim
-		if !slices.Contains(claimStatus.Containers, container.Name) {
+// extraNodeAllocatableMemoryRequest returns the memory of the container's
+// pod.Status.ExtraNodeAllocatableResources entry, plus its part of the shared extra memory.
+func extraNodeAllocatableMemoryRequest(pod *v1.Pod, containerName string) int64 {
+	containerReq := resourcehelper.GetExtraNodeAllocatableResourcesRequests(pod, containerName)
+	return containerReq.Memory().Value() + sharedExtraMemory(pod, containerName)
+}
+
+// sharedExtraMemory returns the part of the shared extra memory that counts toward the container,
+// such as a DRA device that several containers use. The containers split it in proportion to how much of it each one can access.
+func sharedExtraMemory(pod *v1.Pod, containerName string) int64 {
+	// containerSharedMemory returns the shared memory that the container can access.
+	containerSharedMemory := func(name string) int64 {
+		accessible := resourcehelper.GetPodScopedExtraNodeAllocatableResourcesRequests(pod, name)[v1.ResourceMemory]
+		return accessible.Value()
+	}
+	accessible := containerSharedMemory(containerName)
+	if accessible == 0 {
+		return 0
+	}
+	var totalAccessible int64
+	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		// Non-restartable init containers finish before the other containers start, so they do not
+		// compete with them for the memory.
+		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
 			continue
 		}
-
-		numRefs := int64(len(claimStatus.Containers))
-
-		// Add Mapping memory resources share. Since mapping resources represent a fixed allocation
-		// shared by all referencing containers in the pod, we divide it equally.
-		for _, mapping := range claimStatus.Mapping {
-			if mapping.Name == v1.ResourceMemory && mapping.Quantity != nil {
-				draMemoryShare += mapping.Quantity.Value() / numRefs
-			}
-		}
-
-		// Add Overhead memory resources share.
-		for _, overhead := range claimStatus.Overhead {
-			if overhead.Name == v1.ResourceMemory {
-				// PerPod overhead is applied once per pod. We split it equally among the
-				// referencing containers.
-				if overhead.PerPod != nil {
-					draMemoryShare += overhead.PerPod.Value() / numRefs
-				}
-				// PerContainer overhead is applied per container
-				// reference. Therefore, each container gets its full share without division.
-				if overhead.PerContainer != nil {
-					draMemoryShare += overhead.PerContainer.Value()
-				}
-			}
-		}
+		totalAccessible += containerSharedMemory(c.Name)
 	}
-
-	return memReq + draMemoryShare
+	podShared := resourcehelper.GetPodScopedExtraNodeAllocatableResourcesRequests(pod, "")
+	podSharedMem := podShared.Memory().Value()
+	// No container gets more than it can access.
+	if podSharedMem >= totalAccessible {
+		return accessible
+	}
+	return int64(float64(accessible) * (float64(podSharedMem) / float64(totalAccessible)))
 }
