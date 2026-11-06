@@ -114,6 +114,8 @@ type DeviceApplyConfiguration struct {
 	// can also be requested through claims and allocated by the DRA driver.
 	// For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory
 	// dependencies of an accelerator device.
+	// When the device is allocated for a pod's claim, the scheduler records these resources
+	// in the pod's `status.extraNodeAllocatableResources`, as described for mapping and overhead.
 	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
 	// Extended resource names are not permitted as keys.
 	NodeAllocatableResources map[apicorev1.ResourceName]NodeAllocatableResourceApplyConfiguration `json:"nodeAllocatableResources,omitempty"`
