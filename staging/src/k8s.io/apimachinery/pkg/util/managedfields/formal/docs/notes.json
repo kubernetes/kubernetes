@@ -658,5 +658,35 @@
     "scope": "execution",
     "meaning": "The imported prune body returns directly when the fresh status actor has no last-applied set.",
     "limits": "Closes this concrete pruning callback only, not the merge or final updater callbacks."
+  },
+  "SSA.ElementDifference.difference_membership": {
+    "title": "Two-pointer difference has exact set membership",
+    "scope": "general",
+    "meaning": "For every finite pair of sorted input lists, an element survives exactly when it occurs on the left and not on the right.",
+    "limits": "Requires the explicit strict-total-order laws. The functional algorithm is connected to the imported Go method by imported_difference_matches."
+  },
+  "SSA.ElementDifference.difference_sublist": {
+    "title": "Difference preserves left-input order and uniqueness",
+    "scope": "general",
+    "meaning": "For any comparator and finite inputs, the output is a sublist of the left input.",
+    "limits": "This is an algorithm theorem; sortedness and uniqueness are inherited when present, rather than assumed for every possible input."
+  },
+  "SSA.ElementDifference.imported_difference_matches": {
+    "title": "Complete imported Go element-set difference",
+    "scope": "general",
+    "meaning": "The complete PathElementSet.Difference AST executes successfully and equals the independently factored two-pointer algorithm for every finite input pair, using a linear fuel bound.",
+    "limits": "The typed interpreter models non-nil input sets, fresh output slices, pure element comparisons and bounded index access. Parser/subset semantics need human review; comparison semantics and the Go compiler/runtime are outside this theorem."
+  },
+  "SSA.ElementDifference.imported_difference_membership": {
+    "title": "Go source computes exact membership difference",
+    "scope": "general",
+    "meaning": "On finite sorted inputs under strict-total-order comparator laws, every returned element belongs precisely to the left input and not to the right input.",
+    "limits": "The actual PathElement.Less/Compare implementation remains a refinement obligation. This is the element component, not the full recursive Set or reset filter."
+  },
+  "SSA.ElementDifference.imported_difference_preserves_order": {
+    "title": "Go element-set result remains sorted",
+    "scope": "general",
+    "meaning": "Whenever the left input is sorted, the imported method returns a sorted list; no ordering premise on the right input is needed for this preservation fact.",
+    "limits": "Exact difference membership still needs both inputs sorted and the comparator laws. Full recursive set composition remains open."
   }
 }

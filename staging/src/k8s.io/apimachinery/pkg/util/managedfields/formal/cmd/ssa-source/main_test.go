@@ -44,6 +44,54 @@ return converted, nil`))
 	}
 }
 
+func TestElementDifferenceImportsTheWholeLoop(t *testing.T) {
+	source := []byte("package fieldpath\n" + elementFunctions[0].signature + ` {
+out := &PathElementSet{}
+i, j := 0, 0
+for i < len(s.members) && j < len(s2.members) {
+  if s.members[i].Less(s2.members[j]) {
+    out.members = append(out.members, s.members[i])
+    i++
+  } else {
+    if !s2.members[j].Less(s.members[i]) { i++ }
+    j++
+  }
+}
+if i < len(s.members) { out.members = append(out.members, s.members[i:]...) }
+return out
+}`)
+	program, err := importFunction(source, elementFunctions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"(.whileLoop", "(.less", "(.increment", "(.fieldSet", "(.sliceFrom", "(.concatenate", "(.appendOne", "(.emptyElementSet)"} {
+		if !strings.Contains(program, expected) {
+			t.Fatalf("element-set import dropped %q: %s", expected, program)
+		}
+	}
+}
+
+func TestElementSetImportsRejectAliasingAndInputMutation(t *testing.T) {
+	for name, body := range map[string]string{
+		"input write":    "s.members = append(s.members, s2.members...); return s",
+		"set alias":      "out := s; return out",
+		"slice alias":    "out := &PathElementSet{}; out.members = s.members; return out",
+		"append alias":   "out := &PathElementSet{}; out.members = append(s.members, s2.members...); return out",
+		"builtin shadow": "len := 1; i := len(s.members); return s",
+		"loop post":      "for i := 0; i < len(s.members); i++ { }; return s",
+		"decrement":      "i := 0; i--; return s",
+		"octal index":    "i := 010; return s",
+		"slice high":     "out := &PathElementSet{}; out.members = append(out.members, s.members[0:1]...); return out",
+	} {
+		t.Run(name, func(t *testing.T) {
+			source := []byte("package fieldpath\n" + elementFunctions[0].signature + " {\n" + body + "\n}")
+			if _, err := importFunction(source, elementFunctions[0]); err == nil {
+				t.Fatalf("unsupported element-set behavior was accepted: %s", body)
+			}
+		})
+	}
+}
+
 func TestUnsupportedSyntaxCannotDisappear(t *testing.T) {
 	for name, body := range map[string]string{
 		"loop":         "for { return merged, nil }",

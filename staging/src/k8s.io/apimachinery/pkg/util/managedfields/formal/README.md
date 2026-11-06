@@ -185,6 +185,7 @@ from the vendored updater into `SSA/GoSource.lean`:
 | `addBackOwnedItems` | `OwnedSource.imported_owned_items_matches_spec` |
 | `prune` | `PruneSource.imported_prune_matches_spec` |
 | `Apply` | `ApplySource.imported_apply_matches_spec` |
+| `PathElementSet.Difference` (`fieldpath/element.go`) | `ElementDifference.imported_difference_matches`, `imported_difference_membership` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -225,6 +226,25 @@ remain explicit primitive contracts. Their Go implementations and the remaining
 updater/request pipeline are further proof obligations. The multi-version
 source orchestration contract does not establish semantic correctness of API
 conversions. No generated AST digest substitutes for those proofs.
+
+`ElementDifference` advances one of those primitive obligations. It imports the
+entire two-pointer Go difference method, including the final slice append. A
+separate typed interpreter checks fresh output allocation, short-circuit bounds,
+safe slice/index access, appending and increments. The source contract supplies
+a linear fuel bound for arbitrary finite input lengths. It then proves exact
+membership difference for sorted inputs under explicit strict-total-order laws
+for the element comparator. The output is a sublist of the left input, so its
+order and uniqueness survive. This is a general proof, not fixture enumeration.
+
+An additional independent comparison executes the real Go method and the
+imported interpreter on all 4,096 subset pairs of six independently ranked
+elements spanning field, key, value and index selectors. Both must also match a
+membership oracle; input membership is checked after every Go call. This bounded
+check supports the interpreter/representation boundary, not a universal proof
+of Go's PathElement comparator. The comparator, `Has`/binary search,
+`SetNodeMap.RecursiveDifference`, the Set wrapper and complete recursive-filter
+composition remain explicit obligations. This component theorem does not prove
+the full field-path operations used by pruning.
 
 `RawSourceCounterexamples` instantiates this complete pruning chain for both
 empty-list transitions, with all callees realized under every lawful map

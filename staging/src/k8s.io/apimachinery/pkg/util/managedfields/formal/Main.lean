@@ -40,7 +40,16 @@ private def checkFixtures (fixtures : List Fixture) : IO UInt32 := do
 
 private def usage : String :=
   "ssa-model --self-test | --list | --fixtures | --trace NAME | --check FILE | --replay FILE\n" ++
-  "--check and --replay accept normalized fixture arrays; use - to read stdin."
+  "--check and --replay accept normalized fixture arrays; --element-difference accepts rank-list pairs. " ++
+  "Use - to read stdin."
+
+private structure ElementCase where
+  left : List Nat
+  right : List Nat
+  deriving FromJson
+
+private def readInput (path : String) : IO String := do
+  if path == "-" then (← IO.getStdin).readToEnd else IO.FS.readFile path
 
 def main (args : List String) : IO UInt32 := do
   let stdout ← IO.getStdout
@@ -64,11 +73,34 @@ def main (args : List String) : IO UInt32 := do
       | none =>
           stderr.putStrLn s!"Unknown scenario '{name}'; run --list to see available scenarios."
           return 2
+  | ["--element-difference",path] =>
+      let text ← readInput path
+      match Json.parse text >>= fromJson? (α := List ElementCase) with
+      | .error message =>
+          stderr.putStrLn s!"Invalid element-set JSON: {message}"
+          return 2
+      | .ok cases =>
+          if cases.isEmpty then
+            stderr.putStrLn "Element-set input is empty; supply at least one pair."
+            return 2
+          let mut reports : List (List Nat) := []
+          for input in cases do
+            match ElementSubset.exec (fun a b => a < b) (input.left.length+input.right.length+19)
+                ElementSource.differenceProgram {left := input.left,right := input.right} with
+            | .ok (.returned [.set result]) => reports := result::reports
+            | .error message =>
+                stderr.putStrLn s!"Imported element-set execution failed: {message}"
+                return 1
+            | _ =>
+                stderr.putStrLn "Imported element-set method did not return a set."
+                return 1
+          stdout.putStrLn (toJson reports.reverse).compress
+          return 0
   | [mode, path] =>
       if mode != "--check" && mode != "--replay" then
         stderr.putStrLn usage
         return 2
-      let text ← if path == "-" then (← IO.getStdin).readToEnd else IO.FS.readFile path
+      let text ← readInput path
       match Json.parse text >>= fromJson? (α := List Fixture) with
       | .ok fixtures =>
           if fixtures.isEmpty then

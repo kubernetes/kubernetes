@@ -38,6 +38,7 @@ type scope struct {
 	serial   *int
 	depth    int
 	readOnly map[string]bool
+	elements bool
 }
 
 func rootScope(function functionSpec) *scope {
@@ -47,15 +48,24 @@ func rootScope(function functionSpec) *scope {
 		globals.bindings[name] = binding{name, "builtin"}
 	}
 	root := globals.child()
+	root.elements = function.elements
+	if function.elements {
+		for _, name := range []string{"len", "append"} {
+			globals.bindings[name] = binding{name, "builtin"}
+		}
+	}
 	for _, parameter := range function.parameters {
 		root.bindings[parameter] = binding{parameter, function.maps[parameter]}
 	}
 	root.bindings["s"] = binding{"s", ""}
+	if function.elements {
+		root.bindings["s"] = binding{"s", "element-input"}
+	}
 	return root
 }
 
 func (s *scope) child() *scope {
-	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}}
+	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements}
 }
 
 func (s *scope) resolve(name string) (binding, bool) {
@@ -131,6 +141,16 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(value.id)
 		return "(.var " + name + ")", err
 	case *ast.BasicLit:
+		if context.elements && e.Kind == token.INT {
+			if len(e.Value) > 1 && e.Value[0] == '0' {
+				return "", fmt.Errorf("unsupported Go non-decimal integer %q", e.Value)
+			}
+			value, err := strconv.ParseUint(e.Value, 10, 64)
+			if err != nil {
+				return "", fmt.Errorf("unsupported Go non-decimal or negative integer %q", e.Value)
+			}
+			return fmt.Sprintf("(.number %d)", value), nil
+		}
 		if e.Kind != token.STRING {
 			return "", fmt.Errorf("unsupported Go literal %s", e.Value)
 		}
@@ -148,6 +168,29 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		field, err := quoted(e.Sel.Name)
 		return "(.select " + receiver + " " + field + ")", err
 	case *ast.CallExpr:
+		if name, ok := e.Fun.(*ast.Ident); ok && context.elements {
+			bound, found := context.resolve(name.Name)
+			if !found || bound.kind != "builtin" {
+				return "", fmt.Errorf("unsupported or shadowed element-set builtin %q", name.Name)
+			}
+			if name.Name == "len" && len(e.Args) == 1 && !e.Ellipsis.IsValid() {
+				value, err := renderExpr(e.Args[0], context)
+				return "(.length " + value + ")", err
+			}
+			if name.Name == "append" && len(e.Args) == 2 {
+				left, err := renderExpr(e.Args[0], context)
+				if err != nil {
+					return "", err
+				}
+				right, err := renderExpr(e.Args[1], context)
+				constructor := "appendOne"
+				if e.Ellipsis.IsValid() {
+					constructor = "concatenate"
+				}
+				return "(." + constructor + " " + left + " " + right + ")", err
+			}
+			return "", fmt.Errorf("unsupported element-set builtin call %q", name.Name)
+		}
 		method, ok := e.Fun.(*ast.SelectorExpr)
 		if !ok || e.Ellipsis.IsValid() {
 			return "", fmt.Errorf("unsupported Go call %T", e.Fun)
@@ -163,6 +206,14 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(method.Sel.Name)
 		return "(.call " + receiver + " " + name + " " + args + ")", err
 	case *ast.BinaryExpr:
+		if context.elements && e.Op == token.LSS {
+			left, err := renderExpr(e.X, context)
+			if err != nil {
+				return "", err
+			}
+			right, err := renderExpr(e.Y, context)
+			return "(.less " + left + " " + right + ")", err
+		}
 		if e.Op == token.LOR || e.Op == token.LAND {
 			left, err := renderExpr(e.X, context)
 			if err != nil {
@@ -188,14 +239,23 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		}
 		return "(.neNil " + value + ")", err
 	case *ast.UnaryExpr:
+		if context.elements && e.Op == token.AND {
+			if composite, ok := e.X.(*ast.CompositeLit); ok && len(composite.Elts) == 0 {
+				if name, ok := composite.Type.(*ast.Ident); ok && name.Name == "PathElementSet" {
+					return "(.emptyElementSet)", nil
+				}
+			}
+		}
 		if e.Op != token.NOT {
 			return "", fmt.Errorf("unsupported Go unary operator %s", e.Op)
 		}
 		value, err := renderExpr(e.X, context)
 		return "(.notFlag " + value + ")", err
 	case *ast.IndexExpr:
-		if err := readableMap(e.X, context); err != nil {
-			return "", err
+		if !context.elements {
+			if err := readableMap(e.X, context); err != nil {
+				return "", err
+			}
 		}
 		receiver, err := renderExpr(e.X, context)
 		if err != nil {
@@ -203,6 +263,16 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		}
 		key, err := renderExpr(e.Index, context)
 		return "(.index " + receiver + " " + key + ")", err
+	case *ast.SliceExpr:
+		if !context.elements || e.Low == nil || e.High != nil || e.Max != nil || e.Slice3 {
+			return "", fmt.Errorf("unsupported Go slice expression")
+		}
+		value, err := renderExpr(e.X, context)
+		if err != nil {
+			return "", err
+		}
+		index, err := renderExpr(e.Low, context)
+		return "(.sliceFrom " + value + " " + index + ")", err
 	case *ast.CompositeLit:
 		var typ bytes.Buffer
 		if err := format.Node(&typ, token.NewFileSet(), e.Type); err != nil {
@@ -274,6 +344,41 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				return "", fmt.Errorf("unsupported Go assignment operator %s", s.Tok)
 			}
 			if len(s.Lhs) == 1 {
+				if field, ok := s.Lhs[0].(*ast.SelectorExpr); ok && context.elements {
+					name, ok := field.X.(*ast.Ident)
+					if !ok || s.Tok != token.ASSIGN || len(s.Rhs) != 1 || field.Sel.Name != "members" {
+						return "", fmt.Errorf("unsupported element-set field assignment")
+					}
+					bound, found := context.resolve(name.Name)
+					if !found || bound.kind != "element-fresh" {
+						return "", fmt.Errorf("element-set writes require a fresh local allocation")
+					}
+					// Appending only to the fresh output prevents input backing-array aliases.
+					call, ok := s.Rhs[0].(*ast.CallExpr)
+					if !ok || len(call.Args) == 0 {
+						return "", fmt.Errorf("element-set member writes must append to their own output")
+					}
+					appendName, ok := call.Fun.(*ast.Ident)
+					base, selected := call.Args[0].(*ast.SelectorExpr)
+					if !ok || appendName.Name != "append" || !selected || base.Sel.Name != "members" {
+						return "", fmt.Errorf("element-set member writes must append to their own output")
+					}
+					baseName, ok := base.X.(*ast.Ident)
+					if !ok {
+						return "", fmt.Errorf("unsupported element-set append receiver")
+					}
+					baseBinding, found := context.resolve(baseName.Name)
+					if !found || baseBinding.id != bound.id {
+						return "", fmt.Errorf("element-set append may not reuse input storage")
+					}
+					value, err := renderExpr(s.Rhs[0], context)
+					if err != nil {
+						return "", err
+					}
+					id, _ := quoted(bound.id)
+					items = append(items, "(.fieldSet "+id+" \"members\" "+value+")")
+					continue
+				}
 				if index, ok := s.Lhs[0].(*ast.IndexExpr); ok {
 					if s.Tok != token.ASSIGN || len(s.Rhs) != 1 {
 						return "", fmt.Errorf("unsupported Go map assignment")
@@ -319,6 +424,11 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				if _, composite := s.Rhs[0].(*ast.CompositeLit); composite {
 					mapKind = "versions"
 				}
+				if context.elements {
+					if fresh, ok := s.Rhs[0].(*ast.UnaryExpr); ok && fresh.Op == token.AND {
+						mapKind = "element-fresh"
+					}
+				}
 			}
 			names := make([]string, 0, len(s.Lhs))
 			for _, target := range s.Lhs {
@@ -347,6 +457,30 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				names = append(names, text)
 			}
 			items = append(items, "(.assign ["+strings.Join(names, ", ")+"] "+values+")")
+		case *ast.IncDecStmt:
+			name, ok := s.X.(*ast.Ident)
+			if !context.elements || !ok || s.Tok != token.INC {
+				return "", fmt.Errorf("unsupported Go increment/decrement")
+			}
+			bound, found := context.resolve(name.Name)
+			if !found || bound.kind != "" {
+				return "", fmt.Errorf("unsupported Go increment target")
+			}
+			id, _ := quoted(bound.id)
+			items = append(items, "(.increment "+id+")")
+		case *ast.ForStmt:
+			if !context.elements || s.Init != nil || s.Post != nil || s.Cond == nil {
+				return "", fmt.Errorf("unsupported Go for loop")
+			}
+			condition, err := renderExpr(s.Cond, context)
+			if err != nil {
+				return "", err
+			}
+			body, err := renderStatements(s.Body.List, context.child())
+			if err != nil {
+				return "", err
+			}
+			items = append(items, "(.whileLoop "+condition+" "+body+")")
 		case *ast.IfStmt:
 			conditionScope := context.child()
 			if s.Init != nil {

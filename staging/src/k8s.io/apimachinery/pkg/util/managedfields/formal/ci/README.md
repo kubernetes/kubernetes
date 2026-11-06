@@ -21,7 +21,8 @@ still checked. `ARTIFACTS` selects the log directory, matching Prow conventions.
 Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
-five imported function ASTs must match the checked-in Lean input.
+five updater ASTs and the element-set Difference AST must match the checked-in
+Lean input, including both complete source-file digests.
 
 The required checks are:
 
@@ -36,11 +37,14 @@ The required checks are:
 6. Ordinary Go tests against independently authored YAML outcomes, including
    actual FieldsV1 ownership serialization between requests.
 7. Live Lean/Go comparison of the corpus and deterministic generated sequences.
+   The imported element-set interpreter also runs against real Go and an
+   independent membership oracle on all 4,096 subset pairs of a six-element
+   domain covering field, key, value and index selectors.
 8. Actual merge tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Five independent semantic mutations of the selected Go source; each must
+10. Six independent semantic mutations of the selected Go sources; each must
     invalidate the unchanged theorem in the expected proof module.
 
 No check is optional when invoking this entrypoint. The result establishes the

@@ -33,6 +33,13 @@ inductive Expr where
   | emptyVersionMap
   | emptyManagedMap
   | notFlag (value : Expr)
+  | number (value : Nat)
+  | length (value : Expr)
+  | less (left right : Expr)
+  | sliceFrom (value index : Expr)
+  | appendOne (values value : Expr)
+  | concatenate (left right : Expr)
+  | emptyElementSet
   deriving Repr
 
 inductive Stmt where
@@ -45,6 +52,9 @@ inductive Stmt where
   | mapSet (name : String) (key value : Expr)
   | mapDelete (name : String) (key : Expr)
   | rangeMap (key value : String) (collection : Expr) (body : List Stmt)
+  | whileLoop (condition : Expr) (body : List Stmt)
+  | increment (name : String)
+  | fieldSet (name field : String) (value : Expr)
   deriving Repr
 
 structure ManagerFields where
@@ -365,6 +375,9 @@ def eval {Obj Err : Type} (ops : Ops Obj Err) : Nat → Expr → Env Obj Err →
           match ← eval ops fuel expression env with
           | [.flag value] => .ok [.flag (!value)]
           | _ => .error "Go negation requires a boolean"
+      | .number _ | .length _ | .less _ _ | .sliceFrom _ _ | .appendOne _ _ |
+        .concatenate _ _ | .emptyElementSet =>
+          .error "Element-set expressions require the element-set interpreter"
 
 def evalAll {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Expr → Env Obj Err →
     Except String (List (Value Obj Err))
@@ -435,6 +448,8 @@ def exec {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Stmt → Env Obj Er
               | .returned values => .ok (.returned values)
               | .next next => exec ops fuel rest next
           | _ => .error "Go conditional is not boolean"
+      | .whileLoop _ _ | .increment _ | .fieldSet _ _ _ =>
+          .error "Element-set statements require the element-set interpreter"
 termination_by fuel _ _ => (fuel, 0, 0)
 
 /-- Statement fuel bounds syntactic nesting, not the number of managers in a finite map. -/

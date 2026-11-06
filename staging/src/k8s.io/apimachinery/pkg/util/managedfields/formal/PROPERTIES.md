@@ -178,6 +178,7 @@ In particular:
 | Raw acquisition | `WireContracts.unchanged_snapshot_acquisition` | Both current/PR modes, arbitrary structurally valid finite states, fresh actor, normalized unchanged snapshot; all original claims survive. No full-manager premise. |
 | Source helpers | `SourceContracts.imported_dangling_matches_spec`, `imported_owned_version_matches_spec` | Complete Go ASTs, all error/missing-version branches, returned failure payloads and explicit primitive parameters. |
 | Source Apply | `ApplySource.imported_apply_matches_spec`, `imported_apply_excludes_reset_fields` | Complete Go AST, reconciliation/merge/extraction errors, filter choice, old-set snapshot, installation, prune/update ordering and nil-on-no-op return. Reset exclusion requires the stated filter and final updater non-growth contract; the opaque primitives are not thereby verified. |
+| Source element difference | `ElementDifference.imported_difference_matches`, `imported_difference_membership`, `imported_difference_preserves_order` | Complete Go AST of `PathElementSet.Difference`; arbitrary finite lengths, short-circuit loop bounds, safe indices, the equal-key branch and final suffix append. Membership correctness assumes sorted inputs and explicit strict-total-order laws for PathElement.Less. Output order is preserved. The actual comparator and recursive Set/SetNodeMap operations remain refinement obligations. |
 | Source version loops | `OwnedSource.imported_owned_items_matches_spec` | Complete Go AST, arbitrary finite manager/version counts, lexical scope, last-applied version first, every lawful remaining-map permutation and all propagated errors. |
 | Source orchestration | `PruneSource.imported_prune_matches_spec` | Complete Go AST of `prune`; nil/empty early exits, initial conversion, both restoration phases, errors and final conversion. Callees are explicit contracts. |
 | Pruning composition | `PruningRefinement.single_version_pruning_refinement` | Realizes all three callee contracts from imported helpers and equates source pruning to the three-pass model, for arbitrary states/field sets and any finite nonempty same-version manager map. Typed/set primitive implementations remain obligations. |
@@ -236,7 +237,7 @@ unbounded finite map loops. Same-version composition realizes the callee
 contracts and specializes the entire pruning path to the normalized model.
 The importer, subset semantics, import/signature checks and primitive contracts
 need human review. Unsupported syntax and unmodeled aliasing are rejected.
-Source digests and generated ASTs are checked by CI; five semantic Go mutations
+Source digests and generated ASTs are checked by CI; six semantic Go mutations
 must fail in their expected proof modules. The fifth imported function is the
 complete Apply body; its source theorem covers orchestration, including reset
 filter selection and installation. Its merge, extraction, reconciliation,
@@ -262,6 +263,18 @@ documented counterexamples, not suppressed comparison discrepancies.
 The original history theorem is a core safety induction; `scoped_history_preserves_invariants` also covers mixed scoped Apply/Update histories. The boundary
 composition theorems and bounded implementation comparisons are additional,
 different forms of evidence.
+
+The first imported set primitive is `PathElementSet.Difference` from the selected
+dependency's `fieldpath/element.go`. Its AST has a separate interpreter for
+fresh output allocation, slices, short-circuit bounds, element comparisons and
+index increments. The general source proof gives a linear fuel bound and the
+membership/order laws; it is not a bounded enumeration. The independent Go check
+additionally covers all 4,096 subset pairs of a fixed six-element domain spanning
+field, key, value and index selectors, including input-membership preservation.
+The actual comparator laws, `Has`/binary search, recursive child-map difference,
+the Set wrapper and their complete composition with Apply remain open. Proving
+this element component does not silently discharge the whole reset filter or
+the normalized full-path set primitives used by pruning.
 
 [kep]: https://github.com/kubernetes/enhancements/blob/7e841ee17c39a07b3aeea71cc76995b662efdeb8/keps/sig-api-machinery/555-server-side-apply/README.md
 [proposal]: https://github.com/kubernetes/enhancements/blob/7e841ee17c39a07b3aeea71cc76995b662efdeb8/keps/sig-api-machinery/555-server-side-apply/README.md#proposal

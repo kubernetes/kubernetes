@@ -66,6 +66,13 @@ func run() error {
 	fmt.Printf("Compared %d cases / %d transitions: %d accepted, %d conflicts, %d proposal differences (seed %d).\n",
 		summary.Cases, summary.Steps, summary.Accepted, summary.Conflicts,
 		summary.Differences, *seed)
+	if *reproducer == "" {
+		pairs, err := bridge.CompareElementDifference(context.Background(), *model)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Imported element-set difference: %d exact Go/interpreter/oracle subset pairs.\n", pairs)
+	}
 	return nil
 }
 

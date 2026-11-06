@@ -44,6 +44,18 @@ func equalSnapshot(want, got Snapshot) error {
 	return nil
 }
 
+func runModel(ctx context.Context, model, mode string, input []byte) ([]byte, error) {
+	command := exec.CommandContext(ctx, model, mode, "-")
+	command.Stdin = bytes.NewReader(input)
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	output, err := command.Output()
+	if err != nil {
+		return nil, fmt.Errorf("Lean %s failed: %w\n%s", mode, err, stderr.String())
+	}
+	return output, nil
+}
+
 // Compare checks both engines against independent expectations and against each
 // other. A documented proposal difference must occur and match both exact oracles.
 func Compare(ctx context.Context, model string, cases []Case) (Summary, error) {
@@ -62,13 +74,9 @@ func Compare(ctx context.Context, model string, cases []Case) (Summary, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, model, "--replay", "-")
-	command.Stdin = bytes.NewReader(input)
-	var stderr bytes.Buffer
-	command.Stderr = &stderr
-	output, err := command.Output()
+	output, err := runModel(ctx, model, "--replay", input)
 	if err != nil {
-		return summary, fmt.Errorf("Lean replay failed: %w\n%s", err, stderr.String())
+		return summary, err
 	}
 	var reports []struct {
 		Name         string `json:"name"`

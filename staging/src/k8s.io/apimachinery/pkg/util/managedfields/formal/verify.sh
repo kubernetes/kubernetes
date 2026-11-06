@@ -31,6 +31,8 @@ updater_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/mer
 go run ./cmd/ssa-source \
   -source "$updater_source" \
   -check SSA/GoSource.lean
+element_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/fieldpath)/element.go"
+go run ./cmd/ssa-source -elements -source "$element_source" -check SSA/ElementSource.lean
 
 "${SSA_LAKE}" clean
 "${SSA_LAKE}" build

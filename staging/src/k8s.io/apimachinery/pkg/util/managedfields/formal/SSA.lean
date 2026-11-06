@@ -42,3 +42,6 @@ import SSA.RawSourceCounterexamples
 import SSA.Bootstrap
 import SSA.ContainerCounterexamples
 import SSA.HandoffCounterexamples
+import SSA.ElementSource
+import SSA.ElementSubset
+import SSA.ElementDifference
