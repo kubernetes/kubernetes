@@ -52,6 +52,7 @@ func testPreemption(tCtx ktesting.TContext) {
 	tCtx.Run("NoSecondPreemption", testPreemptionNoSecondPreemption)
 	tCtx.Run("HoldForPreemptor", testPreemptionHoldForPreemptor)
 	tCtx.Run("NominationCleared", testPreemptionNominationCleared)
+	tCtx.Run("ScheduledElsewhere", testPreemptionScheduledElsewhere)
 	tCtx.Run("HigherPriorityTakesHeldDevice", testPreemptionHigherPriorityTakesHeldDevice)
 	tCtx.Run("VictimInPreBind", testPreemptionVictimInPreBind)
 	tCtx.Run("ConsumableCapacity", testPreemptionConsumableCapacity)
@@ -333,6 +334,41 @@ func testPreemptionNominationCleared(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err, "clear nominated node name")
 	waitForPodScheduled(tCtx, pt.namespace, equal.Name)
 	tCtx.Expect(allocatedDevices(tCtx, equalClaim)).To(gomega.Equal([]string{"device-1"}))
+}
+
+// testPreemptionScheduledElsewhere checks that the device held for a
+// preemptor becomes available when the preemptor gets scheduled on another
+// node: its nomination ends without a change of the nominated node name in
+// the API, only in the scheduler's nominator.
+func testPreemptionScheduledElsewhere(tCtx ktesting.TContext) {
+	pt := newPreemptionTest(tCtx)
+	// All other nodes are used by other tests.
+	newNode := func(name string) string {
+		node := createNode(tCtx, name)
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			tCtx.ExpectNoError(tCtx.Client().CoreV1().Nodes().Delete(tCtx, node.Name, metav1.DeleteOptions{}), "delete node")
+		})
+		return node.Name
+	}
+	holdNode := newNode(pt.namespace + "-hold")
+	preemptor, _ := setupHold(tCtx, pt, holdNode)
+
+	// Only fits on the node with the hold.
+	lowerClaim := createClaim(tCtx, pt.namespace, "", pt.class, st.MakeResourceClaim().Name("lower").Namespace(pt.namespace).Request(pt.class.Name).Obj())
+	lower := st.MakePod().Name("lower").Namespace(pt.namespace).Container("c").
+		NodeSelector(map[string]string{"kubernetes.io/hostname": holdNode}).Obj()
+	lower.Spec.PriorityClassName = pt.priorities["medium"]
+	lower = createPod(tCtx, pt.namespace, "", lower, lowerClaim)
+	expectNotScheduled(tCtx, lower)
+
+	otherNode := newNode(pt.namespace + "-other")
+	pt.devices(tCtx, otherNode, "device-3", "device-4")
+	scheduled := waitForPodScheduled(tCtx, pt.namespace, preemptor.Name)
+	tCtx.Expect(scheduled.Spec.NodeName).To(gomega.Equal(otherNode))
+
+	scheduled = waitForPodScheduled(tCtx, pt.namespace, lower.Name)
+	tCtx.Expect(scheduled.Spec.NodeName).To(gomega.Equal(holdNode))
+	tCtx.Expect(allocatedDevices(tCtx, lowerClaim)).To(gomega.Equal([]string{"device-1"}))
 }
 
 // testPreemptionHigherPriorityTakesHeldDevice checks that a pod with higher
