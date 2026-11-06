@@ -279,6 +279,15 @@ type DriverInfo struct {
 	PerformanceTestOptions *PerformanceTestOptions
 	// [Optional] Scale parameters for volume group snapshot stress tests.
 	VolumeGroupSnapshotStressTestOptions *VolumeGroupSnapshotStressTestOptions
+	// [Optional] Scale parameters for volume cloning stress tests.
+	VolumeCloneStressTestOptions *VolumeCloneStressTestOptions
+}
+
+// VolumeCloneStressTestOptions contains parameters used for volume clone stress tests.
+type VolumeCloneStressTestOptions struct {
+	// Number of clones to create in parallel from a single source PVC.
+	// Values <= 0 are invalid; omit the field to use the test default.
+	NumClones int
 }
 
 // StressTestOptions contains parameters used for stress tests.

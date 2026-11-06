@@ -53,6 +53,10 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
+// defaultNumParallelClones is the default number of parallel clones of a single
+// source PVC. Drivers can override it via DriverInfo.VolumeCloneStressTestOptions.
+const defaultNumParallelClones = 5
+
 // StorageClassTest represents parameters to be used by provisioning tests.
 // Not all parameters are used by all tests.
 type StorageClassTest struct {
@@ -659,8 +663,16 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 
+		numClones := defaultNumParallelClones
+		if opts := dInfo.VolumeCloneStressTestOptions; opts != nil {
+			if opts.NumClones <= 0 {
+				framework.Failf("NumClones in volume clone stress test options must be a positive integer, received: %d", opts.NumClones)
+			}
+			numClones = opts.NumClones
+		}
+
 		var wg sync.WaitGroup
-		for i := range 5 {
+		for i := range numClones {
 			wg.Add(1)
 			go func(i int) {
 				defer ginkgo.GinkgoRecover()
