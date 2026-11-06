@@ -51,6 +51,9 @@ type DeviceTaintSelectorApplyConfiguration struct {
 	// device, for historical reasons, but doing so without setting all
 	// is deprecated and may be rejected in a future release. Set all
 	// explicitly instead.
+	//
+	// This is a beta field and requires enabling the DRADeviceTaintSelectorAll
+	// feature gate.
 	All *bool `json:"all,omitempty"`
 }
 

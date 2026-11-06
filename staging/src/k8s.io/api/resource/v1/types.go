@@ -1127,12 +1127,16 @@ type DeviceTaintSelector struct {
 	// is deprecated and may be rejected in a future release. Set all
 	// explicitly instead.
 	//
+	// This is a beta field and requires enabling the DRADeviceTaintSelectorAll
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceTaintSelectorAll
 	// +k8s:optional
-	// +k8s:alpha(since: "1.38")=+k8s:neq=false
-	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("driver")
-	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("pool")
-	// +k8s:alpha(since: "1.38")=+k8s:dependentForbidden("device")
+	// +k8s:neq=false
+	// +k8s:dependentForbidden("driver")
+	// +k8s:dependentForbidden("pool")
+	// +k8s:dependentForbidden("device")
 	All *bool `json:"all,omitempty" protobuf:"varint,6,opt,name=all"`
 }
 

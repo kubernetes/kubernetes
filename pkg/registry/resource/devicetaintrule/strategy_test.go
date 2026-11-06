@@ -28,7 +28,10 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // synctestEpoch is when the clock inside a synctest bubble starts (part of the
@@ -414,6 +417,74 @@ func TestDeviceTaintRuleEmptySelectorWarning(t *testing.T) {
 					t.Errorf("unexpected warnings from WarningsOnUpdate: %q", updateWarnings)
 				}
 			}
+		})
+	}
+}
+
+func TestDeviceTaintRuleStrategyDropDisabledAll(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+
+	withAll := func(all *bool) *resource.DeviceTaintRule {
+		rule := obj.DeepCopy()
+		rule.Spec.DeviceSelector = &resource.DeviceTaintSelector{All: all}
+		return rule
+	}
+	selectorAll := func(rule *resource.DeviceTaintRule) *bool {
+		if rule.Spec.DeviceSelector == nil {
+			return nil
+		}
+		return rule.Spec.DeviceSelector.All
+	}
+
+	testcases := map[string]struct {
+		gateEnabled bool
+		oldObj      *resource.DeviceTaintRule // nil for create
+		newObj      *resource.DeviceTaintRule
+		expectAll   *bool
+	}{
+		"create-gate-enabled-keeps-all": {
+			gateEnabled: true,
+			newObj:      withAll(new(true)),
+			expectAll:   new(true),
+		},
+		"create-gate-disabled-drops-all": {
+			newObj: withAll(new(true)),
+		},
+		"create-gate-disabled-no-selector": {
+			newObj: obj.DeepCopy(),
+		},
+		"update-gate-enabled-keeps-all": {
+			gateEnabled: true,
+			oldObj:      withAll(nil),
+			newObj:      withAll(new(true)),
+			expectAll:   new(true),
+		},
+		"update-gate-disabled-drops-new-all": {
+			oldObj: withAll(nil),
+			newObj: withAll(new(true)),
+		},
+		"update-gate-disabled-keeps-all-in-use": {
+			oldObj:    withAll(new(true)),
+			newObj:    withAll(new(true)),
+			expectAll: new(true),
+		},
+		"update-gate-disabled-no-selector": {
+			oldObj: obj.DeepCopy(),
+			newObj: obj.DeepCopy(),
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaintSelectorAll, tc.gateEnabled)
+
+			newObj := tc.newObj.DeepCopy()
+			if tc.oldObj == nil {
+				Strategy.PrepareForCreate(ctx, newObj)
+			} else {
+				Strategy.PrepareForUpdate(ctx, newObj, tc.oldObj.DeepCopy())
+			}
+			assert.Equal(t, tc.expectAll, selectorAll(newObj))
 		})
 	}
 }

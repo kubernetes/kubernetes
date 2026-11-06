@@ -2356,7 +2356,11 @@ type DeviceTaintSelector struct {
 	// is deprecated and may be rejected in a future release. Set all
 	// explicitly instead.
 	//
+	// This is a beta field and requires enabling the DRADeviceTaintSelectorAll
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceTaintSelectorAll
 	All *bool
 }
 

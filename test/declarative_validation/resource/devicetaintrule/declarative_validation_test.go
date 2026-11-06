@@ -70,25 +70,25 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"all: false": {
 			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(false)})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "").WithOrigin("neq").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "").WithOrigin("neq"),
 			},
 		},
 		"all: true with driver": {
 			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Driver: new("example.com")})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden").MarkAlpha(),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden"),
 			},
 		},
 		"all: true with pool": {
 			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Pool: new("pool-a")})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "deviceSelector", "pool"), "").WithOrigin("dependentForbidden").MarkAlpha(),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "pool"), "").WithOrigin("dependentForbidden"),
 			},
 		},
 		"all: true with device": {
 			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Device: new("device-a")})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "deviceSelector", "device"), "").WithOrigin("dependentForbidden").MarkAlpha(),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "device"), "").WithOrigin("dependentForbidden"),
 			},
 		},
 		// TODO: Add more test cases

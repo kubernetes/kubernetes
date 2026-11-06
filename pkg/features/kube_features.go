@@ -241,6 +241,14 @@ const (
 	// DeviceTaintRules allow administrators to add taints to devices.
 	DRADeviceTaintRules featuregate.Feature = "DRADeviceTaintRules"
 
+	// owner: @yogeshbendre
+	// kep: http://kep.k8s.io/5055
+	//
+	// Allows DeviceTaintRule.spec.deviceSelector.all to explicitly select all
+	// devices. Validation of the field is declarative only, therefore this
+	// gate depends on DeclarativeValidationBeta.
+	DRADeviceTaintSelectorAll featuregate.Feature = "DRADeviceTaintSelectorAll"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/5055
 	//
@@ -1366,6 +1374,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // locked in 1.38; remove in 1.41
 	},
 
+	DRADeviceTaintSelectorAll: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	DRADeviceTaints: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2388,6 +2400,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRADeviceCompatibilityGroups: {DRAPartitionableDevices},
 
 	DRADeviceTaintRules: {DRADeviceTaints},
+
+	DRADeviceTaintSelectorAll: {genericfeatures.DeclarativeValidationBeta},
 
 	DRADeviceTaints: {},
 
