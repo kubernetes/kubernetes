@@ -33,6 +33,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -1361,6 +1362,85 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 	return nil
 }
 
+func isVolumeMountedInPodSpec(spec *v1.PodSpec, volumeName string) bool {
+	for c := range podutil.ContainerIter(spec, podutil.AllContainers) {
+		if slices.ContainsFunc(c.VolumeMounts, func(vm v1.VolumeMount) bool { return vm.Name == volumeName }) {
+			return true
+		}
+	}
+	return false
+}
+
+// unmountedDynamicVolume returns the name of the first non-image volume referenced by
+// container.VolumeMounts that is neither already mounted by an actuated container nor
+// recorded as mounted on the host in actuatedPod.Spec.Volumes.
+func unmountedDynamicVolume(pod *v1.Pod, container *v1.Container, actuatedPod *v1.Pod) (string, bool) {
+	if actuatedPod == nil {
+		return "", false
+	}
+	for _, vm := range container.VolumeMounts {
+		if isVolumeMountedInPodSpec(&actuatedPod.Spec, vm.Name) {
+			continue
+		}
+		var podVol *v1.Volume
+		for i := range pod.Spec.Volumes {
+			if pod.Spec.Volumes[i].Name == vm.Name {
+				podVol = &pod.Spec.Volumes[i]
+				break
+			}
+		}
+		if podVol != nil && podVol.Image != nil {
+			continue
+		}
+		if !slices.ContainsFunc(actuatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name }) {
+			return vm.Name, true
+		}
+	}
+	return "", false
+}
+
+// computeContainerVolumeMountAction determines whether a running container needs to be restarted
+// in-place due to dynamic volumeMount changes. Returns whether to keep (true) or restart (false)
+// the container, and whether actuation was deferred waiting for a host volume mount.
+func (m *kubeGenericRuntimeManager) computeContainerVolumeMountAction(ctx context.Context, pod, actuatedPod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer, mountDeferred bool) {
+	if actuatedPod == nil {
+		return true, false
+	}
+	if kubeContainerStatus.State != kubecontainer.ContainerStateRunning {
+		return true, false
+	}
+
+	container := &pod.Spec.Containers[containerIdx]
+	if container.DynamicVolumePolicy == nil || container.DynamicVolumePolicy.RestartPolicy != v1.DynamicVolumeRestartContainer {
+		return true, false
+	}
+
+	var actuatedMounts []v1.VolumeMount
+	for c := range podutil.ContainerIter(&actuatedPod.Spec, podutil.Containers) {
+		if c.Name == container.Name {
+			actuatedMounts = c.VolumeMounts
+			break
+		}
+	}
+	if (len(actuatedMounts) == 0 && len(container.VolumeMounts) == 0) || apiequality.Semantic.DeepEqual(actuatedMounts, container.VolumeMounts) {
+		return true, false
+	}
+
+	if volName, unmounted := unmountedDynamicVolume(pod, container, actuatedPod); unmounted {
+		klog.FromContext(ctx).V(4).Info("Deferring container restart for dynamic volumeMount change until volume is mounted on host",
+			"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", volName)
+		return true, true
+	}
+
+	changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
+		name:      kubeContainerStatus.Name,
+		container: container,
+		message:   fmt.Sprintf("Container %s volumeMounts changed, will be restarted", container.Name),
+	}
+	changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
+	return false, false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, restartAllContainers bool) podActions {
 	logger := klog.FromContext(ctx)
@@ -1453,12 +1533,24 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		return changes
 	}
 
+	var actuatedPod *v1.Pod
+	if allowed, _, _ := allocation.IsDynamicNodeLocalEphemeralVolumesAllowed(pod); allowed {
+		if p, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok && p != nil && p.Name != "" {
+			actuatedPod = p
+		}
+	}
+
 	// Ephemeral containers may be started even if initialization is not yet complete.
 	for i := range pod.Spec.EphemeralContainers {
 		c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
 
 		// Ephemeral Containers are never restarted
 		if podStatus.FindContainerStatusByName(c.Name) == nil {
+			if volName, unmounted := unmountedDynamicVolume(pod, c, actuatedPod); unmounted {
+				logger.V(4).Info("Deferring ephemeral container start until dynamic volume is mounted on host",
+					"pod", klog.KObj(pod), "containerName", c.Name, "volumeName", volName)
+				continue
+			}
 			changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
 		}
 	}
@@ -1479,6 +1571,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 	// Number of running containers to keep.
 	keepCount := 0
+	hasDeferredContainerStart := false
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
@@ -1497,8 +1590,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) {
-				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
-				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
 					// If container is in unknown state, we don't know whether it
 					// is actually running or not, always try killing it before
@@ -1511,6 +1602,14 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 						reason: reasonUnknown,
 					}
 				}
+				if volName, unmounted := unmountedDynamicVolume(pod, &container, actuatedPod); unmounted {
+					logger.V(4).Info("Deferring container start until dynamic volume is mounted on host",
+						"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", volName)
+					hasDeferredContainerStart = true
+					continue
+				}
+				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
+				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 			}
 			continue
 		}
@@ -1538,6 +1637,14 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
+		} else if keep, mountDeferred := m.computeContainerVolumeMountAction(ctx, pod, actuatedPod, idx, containerStatus, &changes); !keep || mountDeferred {
+			// When !keep, the container is queued in ContainersToKill and ContainersToStart
+			// (and startingResizedContainer below updates pod cgroups if resized concurrently).
+			// When mountDeferred, keep the container running while VolumeManager prepares the host mount.
+			if mountDeferred {
+				keepCount++
+			}
+			continue
 		} else if !m.computePodResizeAction(ctx, pod, idx, false, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 			continue
@@ -1552,7 +1659,13 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// not kill the entire pod since we expect container to be running eventually.
 		if restart {
 			message = fmt.Sprintf("%s, will be restarted", message)
-			changes.ContainersToStart = append(changes.ContainersToStart, idx)
+			if volName, unmounted := unmountedDynamicVolume(pod, &container, actuatedPod); unmounted {
+				logger.V(4).Info("Deferring container restart until dynamic volume is mounted on host",
+					"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", volName)
+				hasDeferredContainerStart = true
+			} else {
+				changes.ContainersToStart = append(changes.ContainersToStart, idx)
+			}
 		}
 
 		changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
@@ -1567,7 +1680,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	// Check for volume resize actions
 	m.computeVolumeResizeAction(ctx, pod, &changes)
 
-	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
+	if keepCount == 0 && len(changes.ContainersToStart) == 0 && !hasDeferredContainerStart {
 		changes.KillPod = true
 		// To prevent the restartable init containers to keep pod alive, we should
 		// not restart them.

@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	csitrans "k8s.io/csi-translation-lib"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -219,6 +220,7 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			blockVolumePathHandler)),
+		actuatedState: actuatedState,
 	}
 
 	intreeToCSITranslator := csitrans.New()
@@ -309,6 +311,9 @@ type volumeManager struct {
 
 	// intreeToCSITranslator translates in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
+
+	// actuatedState tracks the actuated pod state on the node.
+	actuatedState state.Reader
 }
 
 type VolumeAttachLimitExceededError struct {
@@ -445,6 +450,19 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 	// Remount plugins for which this is true. (Atomically updating volumes,
 	// like Downward API, depend on this to update the contents of the volume).
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && vm.actuatedState != nil {
+		if actuatedPod, ok := vm.actuatedState.GetPodReadOnly(pod.UID); ok && actuatedPod != nil && actuatedPod.Name != "" {
+			// Only block the pod worker on volumes already in use by actuated containers;
+			// newly added dynamic volumes are deferred per-container in computePodActions.
+			expectedVolumes = slices.DeleteFunc(expectedVolumes, func(volName string) bool {
+				return !isVolumeMountedInPod(&actuatedPod.Spec, volName)
+			})
+			if len(expectedVolumes) == 0 {
+				return nil
+			}
+		}
+	}
 
 	err := wait.PollUntilContextTimeout(
 		ctx,
@@ -652,6 +670,15 @@ func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expect
 func getExpectedVolumes(pod *v1.Pod) []string {
 	mounts, devices, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	return mounts.Union(devices).UnsortedList()
+}
+
+func isVolumeMountedInPod(spec *v1.PodSpec, volumeName string) bool {
+	for c := range podutil.ContainerIter(spec, podutil.AllContainers) {
+		if slices.ContainsFunc(c.VolumeMounts, func(vm v1.VolumeMount) bool { return vm.Name == volumeName }) {
+			return true
+		}
+	}
+	return false
 }
 
 // getExtraSupplementalGID returns the value of an extra supplemental GID as
