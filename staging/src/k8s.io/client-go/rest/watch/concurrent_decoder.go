@@ -74,14 +74,17 @@ func newConcurrentWatchEventDecoder(streamDecoder streaming.Decoder, objectDecod
 	}
 	d.waitGroup.Add(3)
 	go func() {
+		defer utilruntime.HandleCrash()
 		defer d.waitGroup.Done()
 		d.eventDecoder.read()
 	}()
 	go func() {
+		defer utilruntime.HandleCrash()
 		defer d.waitGroup.Done()
 		d.scheduleDecoding()
 	}()
 	go func() {
+		defer utilruntime.HandleCrash()
 		defer d.waitGroup.Done()
 		d.collectResults()
 	}()
@@ -157,6 +160,11 @@ func (d *ConcurrentWatchEventDecoder) scheduleDecoding() {
 		d.waitGroup.Add(1)
 		go func(eventResult rawWatchEventResult) {
 			defer d.waitGroup.Done()
+			defer utilruntime.HandleCrash(func(r interface{}) {
+				resultCh <- &decodedWatchEventResult{
+					err: fmt.Errorf("panic decoding watch event object: %v", r),
+				}
+			})
 			resultCh <- d.decodeEvent(eventResult)
 		}(eventResult)
 	}
