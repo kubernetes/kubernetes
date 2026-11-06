@@ -932,6 +932,12 @@ func TestNominatedPlacement(t *testing.T) {
 			want:       rack23,
 		},
 		{
+			name:       "duplicate nominations on the same node match a single-node placement",
+			placements: []*fwk.Placement{rack1, rack2},
+			podGroup:   podGroupWithNominations("node-2", "node-2"),
+			want:       rack2,
+		},
+		{
 			name:       "overlapping placements sharing a nominated node returns nil",
 			placements: []*fwk.Placement{rack12, rack23},
 			podGroup:   podGroupWithNominations("node-2"),
@@ -946,7 +952,8 @@ func TestNominatedPlacement(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := nominatedPlacement(tt.placements, tt.podGroup.PodGroupInfo, tt.podGroup); got != tt.want {
+			_, ctx := ktesting.NewTestContext(t)
+			if got := nominatedPlacement(ctx, tt.placements, tt.podGroup.PodGroupInfo); got != tt.want {
 				t.Errorf("nominatedPlacement() = %v, want %v", got, tt.want)
 			}
 		})
@@ -961,8 +968,9 @@ func TestNominatedPlacementOrderIndependent(t *testing.T) {
 	rack23 := placementWithNodes("rack-23", "node-2", "node-3")
 	pg := podGroupWithNominations("node-2")
 
-	forward := nominatedPlacement([]*fwk.Placement{rack12, rack23}, pg.PodGroupInfo, pg)
-	reverse := nominatedPlacement([]*fwk.Placement{rack23, rack12}, pg.PodGroupInfo, pg)
+	_, ctx := ktesting.NewTestContext(t)
+	forward := nominatedPlacement(ctx, []*fwk.Placement{rack12, rack23}, pg.PodGroupInfo)
+	reverse := nominatedPlacement(ctx, []*fwk.Placement{rack23, rack12}, pg.PodGroupInfo)
 	if forward != nil || reverse != nil {
 		t.Errorf("nominatedPlacement() = %v (forward), %v (reverse), want nil for both", forward, reverse)
 	}
@@ -980,6 +988,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 	nodes := []*v1.Node{
 		st.MakeNode().Name("node1").Obj(),
 		st.MakeNode().Name("node2").Obj(),
+		st.MakeNode().Name("node3").Obj(),
 	}
 
 	podGroupKey := fwk.PodGroupKey("default", "pg")
@@ -988,9 +997,13 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 		placementFeasibleStatuses [][]fwk.Code
 		// nominatedNodeName is written to the pod's status before scheduling.
 		nominatedNodeName string
-		// rootIsCPG makes the scheduling root a CompositePodGroup, which gates off the NNN fast path.
+		// rootIsCPG makes the pod group under test a child of a CompositePodGroup rather than a
+		// standalone root.
 		rootIsCPG bool
-		// expectedHost is the node the gang should land on. Empty means unschedulable.
+		// noScore makes the feasible placement budget one.
+		noScore bool
+		// expectedHost is the node the gang should land on. Empty means no pod is expected
+		// to land; the status, SuggestedHost, and anyScheduled are still asserted.
 		expectedHost   string
 		expectedStatus *fwk.Status
 		expectError    bool
@@ -1058,7 +1071,7 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			nominatedNodeName: nodes[1].Name,
 			expectError:       true,
 		},
-		"CPG root skips the nominated fast path and scores every placement": {
+		"CPG child honors its nominated placement even though it scores lower": {
 			placementPlugin: fakePlacementPlugin{
 				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
 					podGroupKey: {
@@ -1066,9 +1079,10 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 						"placement2": {nodes[1].Name},
 					},
 				},
-				// Same setup as the short-circuit case: placement1 scores higher and the
-				// nomination points at node2. Because the root is a CompositePodGroup, the NNN
-				// fast path is disabled and the higher-scored placement1 (node1) must win.
+				// Same setup as the standalone short-circuit case: placement1 scores higher and
+				// the nomination points at node2. A child's placement is a sub-domain of the one
+				// its parent picked, and the nomination was already paid for by a previous
+				// preemption, so placement2 (node2) must win here too.
 				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
 					podGroupKey: {
 						"placement1": 2,
@@ -1077,6 +1091,111 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 				},
 			},
 			nominatedNodeName: nodes[1].Name,
+			rootIsCPG:         true,
+			expectedHost:      nodes[1].Name,
+		},
+		"CPG child keeps its Success when the nominated placement places no new pod": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {
+						"placement2": {nodes[1].Name},
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			// PlacementFeasible reports Success the way it does for a group whose minCount is
+			// already met by pods scheduled in previous cycles, so the pending pod stays
+			// unplaced. That Success is the child's whole contribution to the parent's
+			// minGroupCount: reporting Unschedulable here instead would fail the CompositePodGroup
+			// and stop its sibling groups from being evaluated. The standalone equivalent of this
+			// case stays Unschedulable and reports the actionable reason.
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			rootIsCPG:                 true,
+			expectedHost:              "",
+		},
+		"CPG child keeps no-progress Success without a scorer": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {"placement2": {nodes[1].Name}},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			rootIsCPG:                 true,
+			noScore:                   true,
+			expectedHost:              "",
+		},
+		"CPG child searches past an infeasible fallback with no scorer": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+						"placement3": {nodes[2].Name},
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[0].Name: fwk.NewStatus(fwk.Unschedulable),
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			// The nominated placement makes no progress. The first ordinary placement also
+			// cannot schedule the pod; the budget of one must still allow trying placement3.
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}, {fwk.Unschedulable}, {fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			rootIsCPG:                 true,
+			noScore:                   true,
+			expectedHost:              nodes[2].Name,
+		},
+		"CPG child falls back to scoring when its nominated placement is infeasible": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
+					podGroupKey: {
+						"placement1": 1,
+						"placement2": 2,
+					},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			// The nominated placement2 is evaluated first and its gang is infeasible there, so it
+			// drops out of the candidates and the gang lands on placement1 despite scoring lower.
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Unschedulable}, {fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			rootIsCPG:                 true,
+			expectedHost:              nodes[0].Name,
+		},
+		"CPG child with a nomination outside every placement scores normally": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {
+						"placement1": {nodes[0].Name},
+						"placement2": {nodes[1].Name},
+					},
+				},
+				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
+					podGroupKey: {
+						"placement1": 2,
+						"placement2": 1,
+					},
+				},
+			},
+			// A nomination left over from a preemption that no longer applies - the node is gone
+			// or belongs to another domain - must not disturb the child's placement choice.
+			nominatedNodeName: "node3",
 			rootIsCPG:         true,
 			expectedHost:      nodes[0].Name,
 		},
@@ -1107,6 +1226,23 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			},
 			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}, {fwk.Success}},
 			nominatedNodeName:         nodes[1].Name,
+			expectedHost:              nodes[0].Name,
+		},
+		"CPG child falls back to a scored placement after a no-progress nomination": {
+			placementPlugin: fakePlacementPlugin{
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					podGroupKey: {"placement1": {nodes[0].Name}, "placement2": {nodes[1].Name}},
+				},
+				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
+					podGroupKey: {"placement1": 1, "placement2": 2},
+				},
+				filterStatus: map[string]*fwk.Status{
+					nodes[1].Name: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+			placementFeasibleStatuses: [][]fwk.Code{{fwk.Success}, {fwk.Success}},
+			nominatedNodeName:         nodes[1].Name,
+			rootIsCPG:                 true,
 			expectedHost:              nodes[0].Name,
 		},
 		"feasible nominated placement that schedules no new pod reports an actionable reason": {
@@ -1145,15 +1281,17 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 				tf.RegisterPlacementGeneratePlugin(orderedPlacementGeneratePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 					return orderedPlacementGeneratePlugin, nil
 				}),
-				tf.RegisterPlacementScorePlugin(tt.placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-					return &tt.placementPlugin, nil
-				}, 1),
 				tf.RegisterFilterPlugin(tt.placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 					return &tt.placementPlugin, nil
 				}),
 				tf.RegisterPlacementFeasiblePlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 					return placementFeasiblePlugin, nil
 				}),
+			}
+			if !tt.noScore {
+				registry = append(registry, tf.RegisterPlacementScorePlugin(tt.placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return &tt.placementPlugin, nil
+				}, 1))
 			}
 
 			snapshot := internalcache.NewEmptySnapshot()
@@ -1177,7 +1315,8 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 				cache.AddNode(logger, node)
 			}
 			testPodGroup := &schedulingv1beta1.PodGroup{
-				ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
+				Name:      "pg",
+				Namespace: "default",
 			}
 			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(testPodGroup))
 
@@ -1190,20 +1329,18 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			childPodGroupInfo := &framework.PodGroupInfo{
 				GenericPodGroup: fwk.NewGenericPodGroup(testPodGroup),
 			}
-			// The root is normally the pod group itself, but for the CPG case it is a separate
-			// CompositePodGroup wrapping the child, which is what gates off the NNN fast path.
+			// The root is normally the pod group itself; when rootIsCPG is true, wrap the
+			// child in a parent CompositePodGroup to test child-group behavior.
 			rootPodGroupInfo := childPodGroupInfo
 			if tt.rootIsCPG {
 				rootPodGroupInfo = framework.NewPodGroupInfo(
-					fwk.NewGenericCompositePodGroup(
-						st.MakeCompositePodGroup().Name("pg").Namespace("default").Obj(),
-					),
+					fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("pg").Namespace("default").Obj()),
 					childPodGroupInfo,
 				)
 			}
 			pgInfo := newQueuedPodGroupInfo(rootPodGroupInfo, queuedPodInfos...)
 
-			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue)
+			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue, WithShufflePlacements(nil))
 			result := podGroupAlgorithm.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), childPodGroupInfo, pgInfo)
 
 			if tt.expectError {
@@ -1223,6 +1360,9 @@ func TestPodGroupSchedulingPlacementAlgorithm_NominatedNode(t *testing.T) {
 			}
 			if got := result.podResults[0].scheduleResult.SuggestedHost; got != tt.expectedHost {
 				t.Fatalf("gang landed on %q, want %q", got, tt.expectedHost)
+			}
+			if got, want := result.anyScheduled, tt.expectedHost != ""; got != want {
+				t.Fatalf("anyScheduled = %v, want %v", got, want)
 			}
 		})
 	}
@@ -3325,6 +3465,571 @@ func TestPodGroupPotentiallyFeasible(t *testing.T) {
 	}
 }
 
+func hierarchyWithNominations(t *testing.T, nominations map[string]string) *framework.QueuedPodGroupInfo {
+	t.Helper()
+	cpg := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+
+	root := framework.NewPodGroupInfo(
+		fwk.NewGenericCompositePodGroup(cpg),
+		&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg1)},
+		&framework.PodGroupInfo{GenericPodGroup: fwk.NewGenericPodGroup(pg2)},
+	)
+
+	return newQueuedPodGroupInfo(root, queuedPodInfosWithNominations(t, nominations)...)
+}
+
+func queuedPodInfosWithNominations(t *testing.T, nominations map[string]string) []*framework.QueuedPodInfo {
+	t.Helper()
+	pInfos := make([]*framework.QueuedPodInfo, 0, len(nominations))
+	for i, pgName := range []string{"pg1", "pg2"} {
+		pod := st.MakePod().Name(fmt.Sprintf("p%d", i+1)).Namespace("default").UID(fmt.Sprintf("p%d", i+1)).
+			PodGroupName(pgName).NominatedNodeName(nominations[pgName]).Obj()
+		podInfo, err := framework.NewPodInfo(pod)
+		if err != nil {
+			t.Fatalf("Failed to create pod info for %s: %v", pgName, err)
+		}
+		pInfos = append(pInfos, &framework.QueuedPodInfo{PodInfo: podInfo})
+	}
+	return pInfos
+}
+
+// nestedHierarchyWithNominations builds a three level hierarchy - cpg over sub1 and sub2, with
+// one leaf pod group under each - so a test can scope the nomination lookup to a nested group
+// rather than the root. nominations is keyed by leaf pod group name, one pod per leaf.
+func nestedHierarchyWithNominations(t *testing.T, nominations map[string]string) *framework.QueuedPodGroupInfo {
+	t.Helper()
+	cpg := st.MakeCompositePodGroup().Name("cpg").Namespace("default").Obj()
+	sub1 := st.MakeCompositePodGroup().Name("sub1").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	sub2 := st.MakeCompositePodGroup().Name("sub2").Namespace("default").ParentCompositePodGroup("cpg").Obj()
+	pg1 := st.MakePodGroup().Name("pg1").Namespace("default").ParentCompositePodGroup("sub1").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").Namespace("default").ParentCompositePodGroup("sub2").Obj()
+
+	root := framework.NewPodGroupInfo(
+		fwk.NewGenericCompositePodGroup(cpg),
+		framework.NewPodGroupInfo(
+			fwk.NewGenericCompositePodGroup(sub1),
+			framework.NewPodGroupInfo(fwk.NewGenericPodGroup(pg1)),
+		),
+		framework.NewPodGroupInfo(
+			fwk.NewGenericCompositePodGroup(sub2),
+			framework.NewPodGroupInfo(fwk.NewGenericPodGroup(pg2)),
+		),
+	)
+
+	return newQueuedPodGroupInfo(root, queuedPodInfosWithNominations(t, nominations)...)
+}
+
+// podGroupInfoByName finds a pod group in the hierarchy by name, or returns nil.
+func podGroupInfoByName(podGroupInfo *framework.PodGroupInfo, name string) *framework.PodGroupInfo {
+	if podGroupInfo.GetName() == name {
+		return podGroupInfo
+	}
+	for _, child := range podGroupInfo.Children() {
+		if found := podGroupInfoByName(child, name); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+// TestHierarchicalNominatedPlacement covers nomination matching at the root and nested levels.
+func TestHierarchicalNominatedPlacement(t *testing.T) {
+	rack1 := placementWithNodes("rack-1", "node-1", "node-2")
+	rack2 := placementWithNodes("rack-2", "node-3", "node-4")
+	rack12 := placementWithNodes("rack-12", "node-1", "node-2", "node-3")
+
+	tests := []struct {
+		name       string
+		placements []*fwk.Placement
+		// nested selects cpg -> {sub1 -> pg1, sub2 -> pg2} instead of the flat cpg -> {pg1, pg2}.
+		nested bool
+		// scope names the pod group whose subtree the nominations are collected from. Empty means
+		// the root, i.e. the whole hierarchy.
+		scope       string
+		nominations map[string]string
+		want        *fwk.Placement
+	}{
+		{
+			name:        "no nominations returns nil",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nominations: map[string]string{},
+			want:        nil,
+		},
+		{
+			name:        "single nomination matches its placement",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nominations: map[string]string{"pg1": "node-3"},
+			want:        rack2,
+		},
+		{
+			name:        "nominations from sibling pod groups in the same placement match it",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-2"},
+			want:        rack1,
+		},
+		{
+			name:        "nominations spanning placements are ambiguous",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        nil,
+		},
+		{
+			name:        "nominated node outside every placement returns nil",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nominations: map[string]string{"pg1": "node-9"},
+			want:        nil,
+		},
+		{
+			name:        "overlapping placements that both host every nomination are ambiguous",
+			placements:  []*fwk.Placement{rack1, rack12},
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-2"},
+			want:        nil,
+		},
+		{
+			name:        "only the placement hosting every nomination matches",
+			placements:  []*fwk.Placement{rack1, rack12},
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        rack12,
+		},
+		{
+			name:        "a nested group matches the nomination of its own leaf",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub1",
+			nominations: map[string]string{"pg1": "node-3"},
+			want:        rack2,
+		},
+		{
+			name:        "a nested group ignores a nomination belonging to a sibling subtree",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub2",
+			nominations: map[string]string{"pg1": "node-3"},
+			want:        nil,
+		},
+		{
+			// The point of scoping to the subtree: these two nominations can never be honored
+			// together, so the root has to fall back to scoring, but each nested group still has
+			// exactly one placement able to host the pods it is responsible for.
+			name:        "nominations in sibling subtrees cannot be honored together",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "cpg",
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        nil,
+		},
+		{
+			name:        "sibling nominations are unambiguous for the first nested group",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub1",
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        rack1,
+		},
+		{
+			name:        "sibling nominations are unambiguous for the second nested group",
+			placements:  []*fwk.Placement{rack1, rack2},
+			nested:      true,
+			scope:       "sub2",
+			nominations: map[string]string{"pg1": "node-1", "pg2": "node-3"},
+			want:        rack2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			queued := hierarchyWithNominations(t, tt.nominations)
+			if tt.nested {
+				queued = nestedHierarchyWithNominations(t, tt.nominations)
+			}
+			scope := queued.PodGroupInfo
+			if tt.scope != "" {
+				scope = podGroupInfoByName(queued.PodGroupInfo, tt.scope)
+				if scope == nil {
+					t.Fatalf("no pod group named %q in the hierarchy", tt.scope)
+				}
+			}
+			if got := nominatedPlacement(ctx, tt.placements, scope); got != tt.want {
+				gotName, wantName := "<nil>", "<nil>"
+				if got != nil {
+					gotName = got.Name
+				}
+				if tt.want != nil {
+					wantName = tt.want.Name
+				}
+				t.Errorf("nominatedPlacement() = %v, want %v", gotName, wantName)
+			}
+		})
+	}
+}
+
+// TestCPGSchedulingPlacementAlgorithm_NominatedNodeName covers the hierarchy-level
+// NominatedNodeName fast path: the placement able to host every nomination is evaluated first and,
+// when the whole subtree lands there, wins without consulting the placement scorers.
+func TestCPGSchedulingPlacementAlgorithm_NominatedNodeName(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.TopologyAwareWorkloadScheduling: true,
+		features.GenericWorkload:                 true,
+		features.CompositePodGroup:               true,
+	})
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node1").Obj(),
+		st.MakeNode().Name("node2").Obj(),
+		st.MakeNode().Name("node3").Obj(),
+		st.MakeNode().Name("node4").Obj(),
+	}
+
+	cpg := st.MakeCompositePodGroup().Name("cpg").MinGroupCount(2).Obj()
+	pg1 := st.MakePodGroup().Name("pg1").ParentCompositePodGroup("cpg").Obj()
+	pg2 := st.MakePodGroup().Name("pg2").ParentCompositePodGroup("cpg").Obj()
+	sub1 := st.MakeCompositePodGroup().Name("sub1").ParentCompositePodGroup("cpg").Obj()
+	sub2 := st.MakeCompositePodGroup().Name("sub2").ParentCompositePodGroup("cpg").Obj()
+	// Make sure pg1 is ordered before pg2.
+	pg1.CreationTimestamp = metav1.NewTime(time.UnixMilli(1))
+	pg2.CreationTimestamp = metav1.NewTime(time.UnixMilli(2))
+
+	childPlacements := map[string][]string{
+		"placement1": {nodes[0].Name},
+		"placement2": {nodes[1].Name},
+		"placement3": {nodes[2].Name},
+		"placement4": {nodes[3].Name},
+	}
+
+	tests := map[string]struct {
+		// nominations maps a pod name to the node it was nominated to by a previous preemption.
+		nominations map[string]string
+		// unqueuedPods are treated as already scheduled: they stay out of the scheduling cycle but
+		// their pod group still contributes to the composite group's quorum.
+		unqueuedPods         []string
+		nested               bool
+		singlePlacement      bool
+		parentFallback       bool
+		rejectEmpty          bool
+		preferNominatedScore bool
+		filterStatus         map[string]*fwk.Status
+		// expectedHosts maps a pod name to the node it must end up on.
+		expectedHosts map[string]string
+		// expectedStatus is the root composite pod group status, when not Success.
+		expectedStatus *fwk.Status
+		// expectSatisfiedSiblingKept asserts that a child pod group which already meets its
+		// minCount keeps its Success status, so it still counts towards the composite quorum.
+		expectSatisfiedSiblingKept bool
+	}{
+		"nominated placement wins even though it scores lower": {
+			// placement1 scores 10 and placement2 scores 1, so only the fast path can land the
+			// hierarchy on placement2. Both children can use their nominated nodes there.
+			nominations:   map[string]string{"p1": nodes[2].Name, "p2": nodes[3].Name},
+			expectedHosts: map[string]string{"p1": nodes[2].Name, "p2": nodes[3].Name},
+		},
+		"nested groups honor nominations in their own subtrees": {
+			nested:        true,
+			nominations:   map[string]string{"p1": nodes[2].Name, "p2": nodes[3].Name},
+			expectedHosts: map[string]string{"p1": nodes[2].Name, "p2": nodes[3].Name},
+		},
+		"infeasible nominated placement falls back to scoring": {
+			nominations: map[string]string{"p1": nodes[2].Name},
+			rejectEmpty: true,
+			filterStatus: map[string]*fwk.Status{
+				nodes[2].Name: fwk.NewStatus(fwk.Unschedulable, "node3 rejected"),
+				nodes[3].Name: fwk.NewStatus(fwk.Unschedulable, "node4 rejected"),
+			},
+			expectedHosts: map[string]string{"p1": nodes[0].Name, "p2": nodes[1].Name},
+		},
+		"nominations spanning placements fall back to scoring": {
+			// No single placement hosts both nominations, so the scorers decide and placement1 wins.
+			nominations:   map[string]string{"p1": nodes[0].Name, "p2": nodes[2].Name},
+			expectedHosts: map[string]string{"p1": nodes[0].Name, "p2": nodes[1].Name},
+		},
+		"parent retries another placement when child nomination starves sibling": {
+			// The root cannot match both nominations to one placement. In placement1, pg1
+			// takes node1 and leaves no room for pg2; placement2 fits both children.
+			nominations:    map[string]string{"p1": nodes[0].Name, "p2": nodes[2].Name},
+			parentFallback: true,
+			rejectEmpty:    true,
+			filterStatus:   map[string]*fwk.Status{nodes[1].Name: fwk.NewStatus(fwk.Unschedulable)},
+			expectedHosts:  map[string]string{"p1": nodes[3].Name, "p2": nodes[2].Name},
+		},
+		"nominated placement that schedules nothing does not short-circuit": {
+			// pg1 is already satisfied and schedules nothing, and pg2 cannot be placed anywhere,
+			// so the nominated placement is feasible without making any progress. The fast path
+			// must not fire, the remaining placements must still be searched, and pg1's Success
+			// must survive instead of being dropped like a standalone PodGroup would drop it.
+			nominations:  map[string]string{"p2": nodes[2].Name},
+			unqueuedPods: []string{"p1"},
+			filterStatus: map[string]*fwk.Status{
+				nodes[0].Name: fwk.NewStatus(fwk.Unschedulable, "node1 rejected"),
+				nodes[1].Name: fwk.NewStatus(fwk.Unschedulable, "node2 rejected"),
+				nodes[2].Name: fwk.NewStatus(fwk.Unschedulable, "node3 rejected"),
+				nodes[3].Name: fwk.NewStatus(fwk.Unschedulable, "node4 rejected"),
+			},
+			expectedStatus:             fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"),
+			expectSatisfiedSiblingKept: true,
+		},
+		"single nominated placement without progress preserves the nested result": {
+			nested:          true,
+			singlePlacement: true,
+			nominations:     map[string]string{"p2": nodes[2].Name},
+			unqueuedPods:    []string{"p1"},
+			filterStatus: map[string]*fwk.Status{
+				nodes[2].Name: fwk.NewStatus(fwk.Unschedulable, "node3 rejected"),
+				nodes[3].Name: fwk.NewStatus(fwk.Unschedulable, "node4 rejected"),
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "no pods were schedulable"),
+		},
+		"nominated placement without progress falls back to one that schedules": {
+			// The nominated placement reports Success without progress. It must not compete with
+			// placement1 even when the scorer would prefer the nominated placement.
+			nominations:          map[string]string{"p2": nodes[2].Name},
+			unqueuedPods:         []string{"p1"},
+			preferNominatedScore: true,
+			filterStatus: map[string]*fwk.Status{
+				nodes[2].Name: fwk.NewStatus(fwk.Unschedulable, "node3 rejected"),
+				nodes[3].Name: fwk.NewStatus(fwk.Unschedulable, "node4 rejected"),
+			},
+			expectedHosts:              map[string]string{"p2": nodes[1].Name},
+			expectSatisfiedSiblingKept: true,
+		},
+		"sibling without queued pods does not block the fast path": {
+			// pg1 is already satisfied and schedules nothing; pg2 still lands inside the
+			// nominated placement, so the hierarchy as a whole made progress and the root fast
+			// path applies. Within it pg2 is a leaf group and honors p2's own nomination, so p2
+			// lands on node3 rather than the higher scoring node4. What this case pins is that
+			// pg1 contributing no queued pod does not stop the hierarchy from short-circuiting
+			// onto placement2.
+			nominations:   map[string]string{"p2": nodes[2].Name},
+			unqueuedPods:  []string{"p1"},
+			expectedHosts: map[string]string{"p2": nodes[2].Name},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			casePG1, casePG2 := pg1.DeepCopy(), pg2.DeepCopy()
+			if tt.nested {
+				casePG1 = st.MakePodGroup().Name("pg1").ParentCompositePodGroup(sub1.Name).Obj()
+				casePG2 = st.MakePodGroup().Name("pg2").ParentCompositePodGroup(sub2.Name).Obj()
+				casePG1.CreationTimestamp = pg1.CreationTimestamp
+				casePG2.CreationTimestamp = pg2.CreationTimestamp
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+			p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg1").NominatedNodeName(tt.nominations["p1"]).Obj()
+			p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg2").NominatedNodeName(tt.nominations["p2"]).Obj()
+			podInfo1, err := framework.NewPodInfo(p1)
+			if err != nil {
+				t.Fatalf("Failed to create pod info 1: %v", err)
+			}
+			podInfo2, err := framework.NewPodInfo(p2)
+			if err != nil {
+				t.Fatalf("Failed to create pod info 2: %v", err)
+			}
+			queuedPodInfo1 := &framework.QueuedPodInfo{PodInfo: podInfo1}
+			queuedPodInfo2 := &framework.QueuedPodInfo{PodInfo: podInfo2}
+
+			unqueued := sets.New[string](tt.unqueuedPods...)
+			placementPlugin := fakePlacementPlugin{
+				name: "FakePlacementPlugin",
+				generatePlacementsResult: map[fwk.EntityKey]map[string][]string{
+					fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name): {
+						"placement1": {nodes[0].Name, nodes[1].Name},
+						"placement2": {nodes[2].Name, nodes[3].Name},
+					},
+					fwk.PodGroupKey(pg1.Namespace, pg1.Name): childPlacements,
+					fwk.PodGroupKey(pg2.Namespace, pg2.Name): childPlacements,
+				},
+				scorePlacementsResult: map[fwk.EntityKey]map[string]int64{
+					fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name): {
+						// Deliberately favours placement1 so that landing on placement2 can only
+						// happen through the nominated placement fast path.
+						"placement1": 10,
+						"placement2": 1,
+					},
+					fwk.PodGroupKey(pg1.Namespace, pg1.Name): {
+						"placement1": 2, "placement2": 1, "placement3": 2, "placement4": 1,
+					},
+					fwk.PodGroupKey(pg2.Namespace, pg2.Name): {
+						"placement1": 1, "placement2": 2, "placement3": 1, "placement4": 2,
+					},
+				},
+				filterStatus:  tt.filterStatus,
+				podPerNode:    true,
+				reservedNodes: sets.New[string](),
+			}
+			if tt.nested {
+				for _, sub := range []*schedulingv1beta1.CompositePodGroup{sub1, sub2} {
+					placementPlugin.generatePlacementsResult[fwk.CompositePodGroupKey(sub.Namespace, sub.Name)] = childPlacements
+					placementPlugin.scorePlacementsResult[fwk.CompositePodGroupKey(sub.Namespace, sub.Name)] = map[string]int64{
+						"placement1": 2, "placement2": 1, "placement3": 1, "placement4": 2,
+					}
+				}
+			}
+			if tt.parentFallback {
+				placementPlugin.generatePlacementsResult[fwk.PodGroupKey(pg1.Namespace, pg1.Name)] = map[string][]string{
+					"placement1": {nodes[0].Name}, "placement4": {nodes[3].Name},
+				}
+				placementPlugin.generatePlacementsResult[fwk.PodGroupKey(pg2.Namespace, pg2.Name)] = map[string][]string{
+					"placement2": {nodes[1].Name}, "placement3": {nodes[2].Name},
+				}
+			} else if tt.nominations["p2"] == nodes[3].Name {
+				placementPlugin.generatePlacementsResult[fwk.PodGroupKey(pg2.Namespace, pg2.Name)] = map[string][]string{
+					"placement2": {nodes[1].Name}, "placement4": {nodes[3].Name},
+				}
+				if tt.nested {
+					placementPlugin.generatePlacementsResult[fwk.CompositePodGroupKey(sub2.Namespace, sub2.Name)] = map[string][]string{
+						"placement2": {nodes[1].Name}, "placement4": {nodes[3].Name},
+					}
+				}
+			}
+			if tt.singlePlacement {
+				delete(placementPlugin.generatePlacementsResult[fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)], "placement1")
+				if tt.nested {
+					delete(placementPlugin.generatePlacementsResult[fwk.CompositePodGroupKey(sub2.Namespace, sub2.Name)], "placement4")
+				}
+			}
+			if tt.preferNominatedScore {
+				placementPlugin.scorePlacementsResult[fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)]["placement2"] = 20
+			}
+			if tt.parentFallback {
+				placementPlugin.scorePlacementsResult[fwk.PodGroupKey(pg1.Namespace, pg1.Name)]["placement3"] = 1
+				placementPlugin.scorePlacementsResult[fwk.PodGroupKey(pg1.Namespace, pg1.Name)]["placement4"] = 2
+			}
+			orderedPlacementGeneratePlugin := &orderedPlacementPlugin{&placementPlugin}
+			placementFeasiblePlugin := &fakePlacementFeasiblePlugin{
+				rejectEmpty:        tt.rejectEmpty || len(tt.expectedHosts) == 2,
+				requireAllChildren: tt.parentFallback,
+			}
+
+			registry := []tf.RegisterPluginFunc{
+				tf.RegisterPlacementGeneratePlugin(orderedPlacementGeneratePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return orderedPlacementGeneratePlugin, nil
+				}),
+				tf.RegisterPlacementScorePlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return &placementPlugin, nil
+				}, 1),
+				tf.RegisterFilterPlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return &placementPlugin, nil
+				}),
+				tf.RegisterReservePlugin(placementPlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return &placementPlugin, nil
+				}),
+				tf.RegisterPlacementFeasiblePlugin(placementFeasiblePlugin.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+					return placementFeasiblePlugin, nil
+				}),
+			}
+
+			snapshot := internalcache.NewEmptySnapshot()
+			schedFwk, err := tf.NewFramework(ctx,
+				append(registry,
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				),
+				"test-scheduler",
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(queue),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create new framework: %v", err)
+			}
+
+			cache := internalcache.New(ctx, nil, true, true /* CompositePodGroup */)
+			for _, node := range nodes {
+				cache.AddNode(logger, node)
+			}
+			cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(casePG1))
+			cache.AddGenericPodGroup(fwk.NewGenericPodGroup(casePG2))
+			if tt.nested {
+				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(sub1))
+				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(sub2))
+			}
+			cache.AddPodGroupMember(p1)
+			cache.AddPodGroupMember(p2)
+
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			rootPGInfo := framework.NewPodGroupInfo(
+				fwk.NewGenericCompositePodGroup(cpg),
+				framework.NewPodGroupInfo(fwk.NewGenericPodGroup(casePG1)),
+				framework.NewPodGroupInfo(fwk.NewGenericPodGroup(casePG2)),
+			)
+			if tt.nested {
+				rootPGInfo = framework.NewPodGroupInfo(
+					fwk.NewGenericCompositePodGroup(cpg),
+					framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(sub1), framework.NewPodGroupInfo(fwk.NewGenericPodGroup(casePG1))),
+					framework.NewPodGroupInfo(fwk.NewGenericCompositePodGroup(sub2), framework.NewPodGroupInfo(fwk.NewGenericPodGroup(casePG2))),
+				)
+			}
+			queued := []*framework.QueuedPodInfo{}
+			if !unqueued.Has(p1.Name) {
+				queued = append(queued, queuedPodInfo1)
+			}
+			if !unqueued.Has(p2.Name) {
+				queued = append(queued, queuedPodInfo2)
+			}
+			cpgInfo := newQueuedPodGroupInfo(rootPGInfo, queued...)
+
+			podGroupAlgorithm := testPodGroupAlgorithm(t, ctx, snapshot, cache, queue,
+				WithShufflePlacements(nil), WithAlgorithmPercentageOfPlacementsToScore(100))
+			results := podGroupAlgorithm.RunRootSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), cpgInfo)
+			rootResult := results[rootPGInfo.GetKey()]
+			if rootResult == nil {
+				t.Fatalf("no result for the composite pod group")
+			}
+
+			if tt.expectSatisfiedSiblingKept {
+				pg1Result := results[fwk.PodGroupKey(pg1.Namespace, pg1.Name)]
+				if pg1Result == nil {
+					t.Fatalf("no result for the already satisfied sibling pod group")
+				}
+				if !pg1Result.status.IsSuccess() {
+					t.Fatalf("already satisfied sibling pod group lost its Success status: %v", pg1Result.status)
+				}
+			}
+			if tt.nested && tt.singlePlacement {
+				sub2Result := results[fwk.CompositePodGroupKey(sub2.Namespace, sub2.Name)]
+				if sub2Result == nil || !sub2Result.status.IsSuccess() || sub2Result.anyScheduled {
+					t.Fatalf("nested group should preserve Success without scheduling a pod, got %+v", sub2Result)
+				}
+			}
+
+			if tt.expectedStatus != nil {
+				if diff := cmp.Diff(tt.expectedStatus, rootResult.status, statusCmpOpt); diff != "" {
+					t.Fatalf("Unexpected root status (-want,+got):\n%s", diff)
+				}
+				return
+			}
+			if !rootResult.status.IsSuccess() {
+				t.Fatalf("Unexpected root status: %v", rootResult.status)
+			}
+
+			gotHosts := map[string]string{}
+			for _, result := range results {
+				for _, podResult := range result.podResults {
+					if podResult.podInfo == nil || podResult.podInfo.Pod == nil {
+						continue
+					}
+					if host := podResult.GetNodeName(); host != "" {
+						gotHosts[podResult.podInfo.Pod.Name] = host
+					}
+				}
+			}
+			if diff := cmp.Diff(tt.expectedHosts, gotHosts); diff != "" {
+				t.Fatalf("Unexpected pod placements (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestNumFeasiblePlacementsToFind(t *testing.T) {
 	makePlacements := func(placementsCount, nodesCount int) []*fwk.Placement {
 		res := make([]*fwk.Placement, placementsCount)
@@ -3781,6 +4486,13 @@ func TestPodGroupSchedulingPlacementAlgorithm_UsesShufflePlacements(t *testing.T
 			percentageLimit:   10,
 			wantCheckedNodes:  sets.New("n7"),
 			wantShuffled:      true,
+		},
+		{
+			name:              "nominated CompositePodGroup placement is used without shuffling",
+			compositePodGroup: true,
+			percentageLimit:   10,
+			nominatedNodeName: "n0",
+			wantCheckedNodes:  sets.New("n0"),
 		},
 		{
 			name:              "no shuffling of CompositePodGroup placements when every placement may be scored",

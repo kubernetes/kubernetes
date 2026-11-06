@@ -442,8 +442,8 @@ func (p *PodGroupSchedulingAlgorithm) schedulePod(
 // podGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the pod group and selects the best one.
 // First it runs placement generator plugins to create a list of placements.
 // Placement is a set of nodes that will be considered when scheduling a pod group.
-// For a standalone PodGroup it evaluates the placement matching the pods' NominatedNodeName first
-// and uses it if the gang is feasible there, short-circuiting the rest. Otherwise it evaluates
+// It evaluates the placement matching the pods' NominatedNodeName first and uses it when the pod
+// group is feasible there and schedules at least one pod, short-circuiting the rest. Otherwise it
 // candidates up to the feasible-placement limit and runs placement scorer plugins to select the best one.
 func (p *PodGroupSchedulingAlgorithm) podGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) (finalResult *PodGroupScheduledResult) {
 	allNodes, err := p.nodeInfoSnapshot.ListNodesInPlacement()
@@ -477,36 +477,22 @@ func (p *PodGroupSchedulingAlgorithm) podGroupSchedulingPlacementAlgorithm(ctx c
 		}
 	}()
 
-	// Try the placement matching the pods' NominatedNodeName first, mirroring pod-by-pod
-	// scheduling, which evaluates the nominated node before all others. A nominated node is
-	// usually set by a previous preemption cycle and is the placement the pod group is
-	// expected to land on, so if the gang is feasible there we use it and skip the rest.
-	//
-	// This fast path is limited to standalone PodGroups. A PodGroup that is part of a
-	// CompositePodGroup defers its feasibility verdict to the CPG root, where a Success status
-	// with nothing scheduled is still meaningful. Short-circuiting on it (or dropping it) here
-	// could wrongly report the whole CPG Unschedulable and stop sibling groups from being
-	// evaluated, so CPG children use the regular placement search.
-	// TODO(kubernetes/kubernetes#140863): extend NNN support to CompositePodGroups.
+	// Try the placement that contains the pods' NominatedNodeName first, as pod-by-pod scheduling
+	// tries a pod's nominated node first. Preemption sets NominatedNodeName on individual pods in a
+	// previous cycle, so the placement containing all nominated nodes is where preemption cleared space.
 	nominatedFeasible := false
-	var nominated *fwk.Placement
-	if queuedPodGroupInfo.GetType() == fwk.PodGroupKeyType {
-		nominated = nominatedPlacement(placements, podGroupInfo, queuedPodGroupInfo)
-	}
+	nominated := nominatedPlacement(ctx, placements, podGroupInfo)
 	if nominated != nil {
 		result := p.evaluatePlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, queuedPodGroupInfo, nominated)
 		if result.status.IsError() {
 			return result
 		}
 		anyResult = result
-		// Honoring the nominated placement matters more than fitting more pods elsewhere: the NNN
-		// was typically set by a prior preemption cycle. This mirrors pod-by-pod NNN, which can
-		// pick a non-optimal node because it skips scoring. The tradeoff: when minCount < len(pods)
-		// we may prefer the nominated placement over one that fits the whole gang. For a standalone
-		// PodGroup a Success status implies at least minCount pods were placed. The anyScheduled
-		// check prevents short-circuiting when the placement is feasible only because minCount pods
-		// were already scheduled in previous cycles (for example minCount=3 with 3 pods already
-		// running), but we failed to place any newly arriving pods on the nominated placement.
+		// When minCount < len(pods) and the nominated placement schedules at least one pod,
+		// honoring NominatedNodeName takes priority over finding a placement that fits more pods.
+		// If the group already meets minCount through running pods and schedules no new pod here
+		// (!result.anyScheduled), search the remaining placements (relevant when a plugin
+		// generates multiple overlapping placements for an already-scheduled group).
 		if result.status.IsSuccess() && result.anyScheduled {
 			successfulResults[nominated] = result
 			nominatedFeasible = true
@@ -541,6 +527,12 @@ func (p *PodGroupSchedulingAlgorithm) podGroupSchedulingPlacementAlgorithm(ctx c
 	}
 
 	if len(successfulResults) == 0 {
+		// A Success here can only come from a nominated placement that met minCount through
+		// already-running pods without scheduling a new pod; no fallback placement succeeded.
+		// Preserve that verdict for a child so it still contributes to its parent's minGroupCount.
+		if queuedPodGroupInfo.GetType() == fwk.CompositePodGroupKeyType && anyResult.status.IsSuccess() {
+			return anyResult
+		}
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// anyResult is the nominated placement's result when one was evaluated, otherwise the first
 		// placement tried. Which one we report is otherwise arbitrary and may change in the future.
@@ -568,13 +560,13 @@ func (p *PodGroupSchedulingAlgorithm) podGroupSchedulingPlacementAlgorithm(ctx c
 // compositePodGroupSchedulingPlacementAlgorithm tries several different combinations for scheduling the child pod groups and selects the best one.
 // First it runs placement generator plugins to create a list of placements.
 // Placement is a set of nodes that will be considered when scheduling a pod group.
-// Then it evaluates candidate placements through compositePodGroupSchedulingDefaultAlgorithm up to the feasible-placement limit.
-// Finally, it runs placement scorer plugins to select the best placement.
+// It evaluates the placement matching the pods' NominatedNodeName in this group's subtree first
+// and uses it when the subtree is feasible there and schedules at least one pod, short-circuiting
+// the rest. Otherwise it evaluates candidates up to the feasible-placement limit and runs placement scorer plugins to select the best one.
 func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, results map[fwk.EntityKey]*PodGroupScheduledResult) (finalResult *PodGroupScheduledResult) {
 	defer func() {
 		results[podGroupInfo.GetKey()] = finalResult
 	}()
-	logger := klog.FromContext(ctx)
 	allNodes, err := p.nodeInfoSnapshot.ListNodesInPlacement()
 	if err != nil {
 		return &PodGroupScheduledResult{
@@ -597,8 +589,6 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 	var anyResultSubtree map[fwk.EntityKey]*PodGroupScheduledResult
 	successfulResults := make(map[*fwk.Placement]map[fwk.EntityKey]*PodGroupScheduledResult)
 
-	placements, numPlacementsToFind := p.placementsToEvaluate(schedFwk, placements)
-
 	parentPlacement := p.nodeInfoSnapshot.GetPlacement()
 	defer func() {
 		p.nodeInfoSnapshot.ForgetPlacement()
@@ -608,21 +598,12 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 		}
 	}()
 
-	for _, placement := range placements {
-		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
-		evaluationStart := time.Now()
-		err := p.nodeInfoSnapshot.AssumePlacement(placement)
-		if err != nil {
-			return &PodGroupScheduledResult{
-				podGroupInfo: podGroupInfo,
-				status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
-			}
-		}
-		placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
-		subtreeResult := map[fwk.EntityKey]*PodGroupScheduledResult{}
-		result, placementRevertFns := p.compositePodGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, root, podGroupInfo, subtreeResult)
-		placementRevertFns.revert()
-
+	// Try the placement that contains all nominated nodes in this group's subtree first, matching
+	// podGroupSchedulingPlacementAlgorithm.
+	nominatedFeasible := false
+	nominated := nominatedPlacement(ctx, placements, podGroupInfo)
+	if nominated != nil {
+		result, subtreeResult := p.evaluateCompositePlacement(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, nominated)
 		if result.status.IsError() {
 			// It is critical to copy the entire subtreeResult into results.
 			// If omitted, the pod results are reconstructed later using the generic parent error
@@ -630,20 +611,41 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 			maps.Copy(results, subtreeResult)
 			return result
 		}
-
-		if anyResultSubtree == nil {
-			anyResultSubtree = subtreeResult
+		anyResultSubtree = subtreeResult
+		// Short-circuit only when the nominated placement is feasible and schedules at least one
+		// new pod in the subtree. When minGroupCount is already satisfied by running pods and
+		// !result.anyScheduled, fall back to the remaining placements.
+		if result.status.IsSuccess() && result.anyScheduled {
+			successfulResults[nominated] = subtreeResult
+			nominatedFeasible = true
 		}
+	}
 
-		evaluationResult := metrics.InfeasibleResult
-		if result.status.IsSuccess() {
-			evaluationResult = metrics.FeasibleResult
-			successfulResults[placement] = subtreeResult
-		}
-		metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), metrics.SinceInSeconds(evaluationStart))
+	if !nominatedFeasible {
+		var numPlacementsToFind int
+		placements, numPlacementsToFind = p.placementsToEvaluate(schedFwk, placements)
+		for _, placement := range placements {
+			if placement == nominated {
+				continue
+			}
+			result, subtreeResult := p.evaluateCompositePlacement(ctx, schedFwk, podGroupCycleState, root, podGroupInfo, placement)
+			if result.status.IsError() {
+				// It is critical to copy the entire subtreeResult into results.
+				// If omitted, the pod results are reconstructed later using the generic parent error
+				// (*podGroupFitError) rather than their original *framework.FitError.
+				maps.Copy(results, subtreeResult)
+				return result
+			}
+			if anyResultSubtree == nil {
+				anyResultSubtree = subtreeResult
+			}
+			if result.status.IsSuccess() {
+				successfulResults[placement] = subtreeResult
+			}
 
-		if len(successfulResults) >= numPlacementsToFind {
-			break
+			if len(successfulResults) >= numPlacementsToFind {
+				break
+			}
 		}
 	}
 
@@ -651,8 +653,14 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 		// We need to send events and set the status for pods in case all simulations were infeasible.
 		// The selection of which simulation we report is arbitrary for now, but may change in the future.
 		anyResultRoot := anyResultSubtree[podGroupInfo.GetKey()]
-		fitError := newPodGroupPlacementFitError(anyResultRoot.status, len(placements))
-		anyResultRoot.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
+		// A Success here can only come from a nominated placement that met minGroupCount
+		// through running pods without scheduling a new pod; no fallback succeeded.
+		// Keep that verdict for a nested group so it counts toward its parent's minGroupCount.
+		// For the root group, RunRootSchedulingAlgorithm converts Success with !anyScheduled to Unschedulable.
+		if !anyResultRoot.status.IsSuccess() {
+			fitError := newPodGroupPlacementFitError(anyResultRoot.status, len(placements))
+			anyResultRoot.status = fwk.NewStatus(fwk.Unschedulable).WithError(fitError)
+		}
 		// It is critical to copy the entire anyResultSubtree into results.
 		// If omitted, the pod results are reconstructed later using the generic parent error
 		// (*podGroupFitError) rather than their original *framework.FitError.
@@ -672,6 +680,29 @@ func (p *PodGroupSchedulingAlgorithm) compositePodGroupSchedulingPlacementAlgori
 
 	maps.Copy(results, successfulResults[bestPlacement])
 	return results[podGroupInfo.GetKey()]
+}
+
+// evaluateCompositePlacement simulates one placement and restores tentative reservations so
+// the caller can compare it with other candidates before assuming the winner.
+func (p *PodGroupSchedulingAlgorithm) evaluateCompositePlacement(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, root *framework.QueuedPodGroupInfo, podGroupInfo *framework.PodGroupInfo, placement *fwk.Placement) (*PodGroupScheduledResult, map[fwk.EntityKey]*PodGroupScheduledResult) {
+	klog.FromContext(ctx).V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
+	evaluationStart := time.Now()
+	if err := p.nodeInfoSnapshot.AssumePlacement(placement); err != nil {
+		return &PodGroupScheduledResult{podGroupInfo: podGroupInfo, status: fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err))}, nil
+	}
+	placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
+	subtreeResult := map[fwk.EntityKey]*PodGroupScheduledResult{}
+	result, placementRevertFns := p.compositePodGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, root, podGroupInfo, subtreeResult)
+	placementRevertFns.revert()
+	if result.status.IsError() {
+		return result, subtreeResult
+	}
+	evaluationResult := metrics.InfeasibleResult
+	if result.status.IsSuccess() {
+		evaluationResult = metrics.FeasibleResult
+	}
+	metrics.ObservePlacementEvaluation(evaluationResult, schedFwk.ProfileName(), metrics.EntityTypeToLabel(podGroupInfo.GetType()), metrics.SinceInSeconds(evaluationStart))
+	return result, subtreeResult
 }
 
 // randShufflePlacements is the default placement shuffler, randomizing placement order in place.
@@ -797,21 +828,21 @@ func newPlacementCycleState(podGroupCycleState *framework.CycleState, placement 
 	return placementCycleState
 }
 
-// nominatedPlacement returns the placement to evaluate first because it holds the pods'
-// NominatedNodeName, or nil when zero or more than one placement matches. A nominated node is
-// typically set by a previous preemption cycle, so preferring its placement mirrors pod-by-pod
-// scheduling, which tries the nominated node before all others.
+// nominatedPlacement returns the placement to evaluate first because it holds every nominated
+// node in podGroupInfo's subtree, or nil when zero or more than one placement matches. A nominated
+// node is typically set by a previous preemption cycle, so preferring its placement mirrors
+// pod-by-pod scheduling, which tries the nominated node before all others.
 //
 // The framework contract permits overlapping placements, so a nominated node can appear in more
 // than one. NNN alone can't tell which placement WAP picked last cycle, so we only take the fast
 // path when exactly one placement matches; otherwise the caller uses the regular placement search.
-func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.PodGroupInfo, queuedPodGroupInfo *framework.QueuedPodGroupInfo) *fwk.Placement {
+func nominatedPlacement(ctx context.Context, placements []*fwk.Placement, podGroupInfo *framework.PodGroupInfo) *fwk.Placement {
 	// Collect nominated nodes across the pods of the currently evaluated pod group node
 	// (podGroupInfo), which for CPG TAS is the CPG or PG carrying the TAS constraints, not the
-	// whole hierarchy rooted at queuedPodGroupInfo.
+	// whole CompositePodGroup hierarchy.
 	nominatedNodes := sets.New[string]()
-	for _, podInfo := range queuedPodGroupInfo.PodInfosForGroup(podGroupInfo.GetKey()) {
-		if nnn := podInfo.Pod.Status.NominatedNodeName; nnn != "" {
+	for _, pod := range podGroupInfo.GetAllUnscheduledPods() {
+		if nnn := pod.Status.NominatedNodeName; nnn != "" {
 			nominatedNodes.Insert(nnn)
 		}
 	}
@@ -821,15 +852,32 @@ func nominatedPlacement(placements []*fwk.Placement, podGroupInfo *framework.Pod
 
 	var matched *fwk.Placement
 	for _, placement := range placements {
+		if len(placement.Nodes) < nominatedNodes.Len() {
+			continue
+		}
+		matchedCount := 0
 		for _, node := range placement.Nodes {
 			if nominatedNodes.Has(node.Node().Name) {
-				if matched != nil {
-					// Overlap: fall back to the regular placement search.
-					return nil
+				matchedCount++
+				if matchedCount == nominatedNodes.Len() {
+					break
 				}
-				matched = placement
-				break
 			}
+		}
+		if matchedCount != nominatedNodes.Len() {
+			continue
+		}
+		if matched != nil {
+			if logger := klog.FromContext(ctx).V(4); logger.Enabled() {
+				logger.Info("Multiple placements contain all nominated nodes, falling back to the regular placement search", "nominatedNodes", sets.List(nominatedNodes), "firstPlacement", matched.Name, "secondPlacement", placement.Name)
+			}
+			return nil
+		}
+		matched = placement
+	}
+	if matched == nil {
+		if logger := klog.FromContext(ctx).V(4); logger.Enabled() {
+			logger.Info("No placement contains all nominated nodes, falling back to the regular placement search", "nominatedNodes", sets.List(nominatedNodes))
 		}
 	}
 	return matched
