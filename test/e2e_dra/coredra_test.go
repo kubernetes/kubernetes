@@ -42,7 +42,7 @@ func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
 
 	return func(tCtx ktesting.TContext) downgradedTestFunc {
 		// Remove pod prepared in step 1.
-		tCtx.ExpectNoError(tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}))
+		tCtx.ExpectNoError(tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{}))
 		tCtx.ExpectNoError(tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{}))
 		tCtx.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(tCtx, tCtx.Client(), pod.Name, namespace, 3*time.Minute))
 
@@ -62,7 +62,7 @@ func coreDRA(tCtx ktesting.TContext, b *drautils.Builder) upgradedTestFunc {
 			// or (even weirder) with
 			//     getting *v1.Pod: pods "tester-2" is forbidden: User "kubernetes-admin" cannot get resource "pods" in API group "" in the namespace "dra-9021"
 			tCtx.Eventually(func(tCtx ktesting.TContext) error {
-				return tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
+				return tCtx.Client().ResourceV1().ResourceClaims(namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 			}).Should(gomega.Succeed(), "delete claim after downgrade")
 			tCtx.Eventually(func(tCtx ktesting.TContext) error {
 				return tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
