@@ -319,6 +319,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
+				if !alloc.features.ConsumableCapacity {
+					return nil, fmt.Errorf("claim %s, constraint #%d: has distinctAttribute, but the DRAConsumableCapacity feature is disabled", klog.KObj(claim), i)
+				}
 				distinctAttribute := string(*constraint.DistinctAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
