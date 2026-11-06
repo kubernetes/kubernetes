@@ -3952,6 +3952,7 @@ message PhotonPersistentDiskVolumeSource {
 // +k8s:supportsSubresource="/status"
 // +k8s:supportsSubresource="/ephemeralcontainers"
 // +k8s:supportsSubresource="/resize"
+// +k8s:supportsSubresource="/dynamic"
 // +k8s:supportsSubresource="/eviction"
 message Pod {
   // metadata is the standard object's metadata.

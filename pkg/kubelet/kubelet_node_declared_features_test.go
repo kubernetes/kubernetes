@@ -17,97 +17,74 @@ limitations under the License.
 package kubelet
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/version"
+	"github.com/stretchr/testify/require"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
-	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-func TestDeclaredFeatureDiscovery(t *testing.T) {
-	podLevelResourcesIPPRFeatureGate := features.InPlacePodLevelResourcesVerticalScaling
-	featureMaxVersion := version.MustParseSemantic("v1.36.0")
-	createMockFeature := func(t *testing.T, name string, cfg *ndf.NodeConfiguration) *ndftesting.MockFeature {
-		mockFeature := ndftesting.NewMockFeature(t)
-		mockFeature.SetName(name)
-		mockFeature.SetMaxVersion(featureMaxVersion)
-		mockFeature.SetDiscover(func(*ndf.NodeConfiguration) bool { return cfg.FeatureGates.Enabled(name) })
-		return mockFeature
+func TestRegisteredFeatureDiscovery(t *testing.T) {
+	gateSpecs := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+
+	discover := func(t *testing.T, gates featuregatetesting.FeatureOverrides, runtimeFeatures *ndf.RuntimeFeatures) []string {
+		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, gates)
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		defer testKubelet.Cleanup()
+		kubelet := testKubelet.kubelet
+		kubelet.nodeDeclaredFeaturesFramework = ndf.New(ndffeatures.AllFeatures)
+		if runtimeFeatures != nil {
+			kubelet.runtimeState.setRuntimeFeatures(&kubecontainer.RuntimeFeatures{
+				UserNamespacesHostNetwork: runtimeFeatures.UserNamespacesHostNetwork,
+				MountOptions:              runtimeFeatures.MountOptions,
+			})
+		}
+		return kubelet.discoverNodeDeclaredFeatures()
 	}
 
-	testcases := []struct {
-		name                         string
-		podLevelResourcesIPPREnabled bool
-		featureDiscovered            bool
-		kubeletVersion               *version.Version
-	}{
-		{
-			name:                         "feature gate enabled, feature discovered",
-			podLevelResourcesIPPREnabled: true,
-			featureDiscovered:            true,
-			kubeletVersion:               featureMaxVersion.SubtractMinor(1),
-		},
-		{
-			name:                         "feature gate enabled, feature not discovered as kubelet version higher than max version",
-			podLevelResourcesIPPREnabled: true,
-			featureDiscovered:            false,
-			kubeletVersion:               featureMaxVersion.AddMinor(1),
-		},
-		{
-			name:                         "feature disabled and not discovered",
-			podLevelResourcesIPPREnabled: false,
-			featureDiscovered:            false,
-			kubeletVersion:               featureMaxVersion.SubtractMinor(1),
-		},
-	}
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, podLevelResourcesIPPRFeatureGate, tc.podLevelResourcesIPPREnabled)
-
-			cfg := &ndf.NodeConfiguration{
-				FeatureGates: FeatureGateAdapter{
-					FeatureGate: utilfeature.DefaultFeatureGate,
-				},
-				Version: tc.kubeletVersion,
+	for _, feature := range ndffeatures.AllFeatures {
+		t.Run(feature.Name(), func(t *testing.T) {
+			reqs := feature.Requirements()
+			if rf := reqs.RequiredRuntimeFeatures; rf != nil {
+				// Only the runtime features that discover sets on the kubelet's runtime state are
+				// reported, so a feature requiring any other runtime feature can't be discovered.
+				reported := ndf.RuntimeFeatures{UserNamespacesHostNetwork: rf.UserNamespacesHostNetwork, MountOptions: rf.MountOptions}
+				if *rf != reported {
+					t.Skipf("the kubelet doesn't report all of the runtime features %s requires: %+v", feature.Name(), *rf)
+				}
 			}
-			registeredFeatures := []ndf.Feature{
-				createMockFeature(t, string(podLevelResourcesIPPRFeatureGate), cfg),
+			allGatesOn := featuregatetesting.FeatureOverrides{}
+			for _, gate := range reqs.EnabledFeatureGates {
+				require.Contains(t, gateSpecs, featuregate.Feature(gate), "unknown feature gate")
+				allGatesOn[featuregate.Feature(gate)] = true
 			}
 
-			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
-			kubelet := testKubelet.kubelet
-			fakeCM := cm.NewFakeContainerManagerWithNodeConfig(cm.NodeConfig{})
-			kubelet.containerManager = fakeCM
-			framework := ndf.New(registeredFeatures)
-			kubelet.nodeDeclaredFeaturesFramework = framework
-			kubelet.version = tc.kubeletVersion
+			t.Run("requirements met", func(t *testing.T) {
+				assert.Contains(t, discover(t, allGatesOn, reqs.RequiredRuntimeFeatures), feature.Name())
+			})
 
-			features := kubelet.discoverNodeDeclaredFeatures()
-			if tc.featureDiscovered {
-				assert.Contains(t, features, string(podLevelResourcesIPPRFeatureGate))
-			} else {
-				assert.NotContains(t, features, string(podLevelResourcesIPPRFeatureGate))
+			for _, gate := range reqs.EnabledFeatureGates {
+				if gateSpecs[featuregate.Feature(gate)].LockToDefault {
+					continue
+				}
+				t.Run(gate+" disabled", func(t *testing.T) {
+					gates := maps.Clone(allGatesOn)
+					gates[featuregate.Feature(gate)] = false
+					assert.NotContains(t, discover(t, gates, reqs.RequiredRuntimeFeatures), feature.Name())
+				})
+			}
+
+			if reqs.RequiredRuntimeFeatures != nil {
+				t.Run("runtime features missing", func(t *testing.T) {
+					assert.NotContains(t, discover(t, allGatesOn, nil), feature.Name())
+				})
 			}
 		})
 	}
-}
-
-func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-
-	framework := ndf.New(ndffeatures.AllFeatures)
-	kubelet.nodeDeclaredFeaturesFramework = framework
-
-	// ExtendWebSocketsToKubelet is GA and locked on, so the kubelet always declares it.
-	features := kubelet.discoverNodeDeclaredFeatures()
-	assert.Contains(t, features, "ExtendWebSocketsToKubelet")
 }

@@ -132,9 +132,9 @@ func (p *Plugin) validatePod(a admission.Attributes) error {
 	}
 
 	// Only validate updates to the main pod spec (subresource == "")
-	// or the custom "resize" subresource.
+	// or the subresources that can mutate it ("resize" and "dynamic").
 	subresource := a.GetSubresource()
-	if subresource != "" && subresource != "resize" {
+	if subresource != "" && subresource != "resize" && subresource != "dynamic" {
 		return nil
 	}
 	pod, ok := a.GetObject().(*core.Pod)

@@ -44,6 +44,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func addPriorityClasses(ctrl *Plugin, priorityClasses []*scheduling.PriorityClass) error {
@@ -1251,5 +1252,30 @@ func TestAdmitCompositePodGroup(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestPodUpdatePreservesPriority verifies that updates through the main resource and pods/dynamic
+// keep the stored priority.
+func TestPodUpdatePreservesPriority(t *testing.T) {
+	ctrl := NewPlugin()
+	oldPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "namespace"},
+		Spec: api.PodSpec{
+			Containers:        []api.Container{{Name: "container"}},
+			PriorityClassName: "default1",
+			Priority:          ptr.To[int32](1000),
+		},
+	}
+	for subresource, expectPriority := range map[string]*int32{"": ptr.To[int32](1000), "dynamic": ptr.To[int32](1000), "status": nil} {
+		pod := oldPod.DeepCopy()
+		pod.Spec.Priority = nil
+		attrs := admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), subresource, admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := ctrl.Admit(t.Context(), attrs, nil); err != nil {
+			t.Fatalf("subresource %q: unexpected error %v", subresource, err)
+		}
+		if diff := cmp.Diff(expectPriority, pod.Spec.Priority); diff != "" {
+			t.Errorf("subresource %q: expected priority %v, got %v", subresource, ptr.Deref(expectPriority, -1), ptr.Deref(pod.Spec.Priority, -1))
+		}
 	}
 }

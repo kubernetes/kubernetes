@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"slices"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -368,4 +369,83 @@ func TestGraphPopulator_UpdatePodVolumes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGraphPopulator_UpdatePodContainers(t *testing.T) {
+	container := func(name, secretName, cmName string) corev1.Container {
+		return corev1.Container{
+			Name: name,
+			Env: []corev1.EnvVar{{
+				Name: "SECRET",
+				ValueFrom: &corev1.EnvVarSource{SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: secretName}, Key: "key",
+				}},
+			}},
+			EnvFrom: []corev1.EnvFromSource{{
+				ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: cmName}},
+			}},
+		}
+	}
+
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	graph := NewGraph()
+	g := &graphPopulator{
+		graph:     graph,
+		podQueue:  newRateLimitingQueue("test_node_authorizer_pod_containers"),
+		podLister: corev1listers.NewPodLister(indexer),
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default", UID: types.UID("uid-1"), Generation: 1},
+		Spec: corev1.PodSpec{
+			NodeName:   "node1",
+			Containers: []corev1.Container{container("c1", "secret1", "cm1")},
+		},
+	}
+	if err := indexer.Add(pod); err != nil {
+		t.Fatalf("failed to add pod to indexer: %v", err)
+	}
+	g.addPod(pod)
+	if !processNextWorkItem(g.podQueue, g.processPodKey) {
+		t.Fatalf("expected initial pod add to be processed")
+	}
+
+	// update applies newPod and checks that the pod has edges from exactly the wanted objects.
+	update := func(newPod *corev1.Pod, want ...string) {
+		t.Helper()
+		if err := indexer.Update(newPod); err != nil {
+			t.Fatalf("failed to update pod in indexer: %v", err)
+		}
+		g.updatePod(pod, newPod)
+		if g.podQueue.Len() != 1 {
+			t.Fatalf("expected queue length 1, got %d", g.podQueue.Len())
+		}
+		if !processNextWorkItem(g.podQueue, g.processPodKey) {
+			t.Fatalf("expected processNextWorkItem to return true")
+		}
+		pod = newPod
+		podVert, ok := graph.getVertexRLocked(podVertexType, "default", "pod")
+		if !ok {
+			t.Fatalf("expected pod vertex")
+		}
+		for _, ref := range []struct {
+			vertexType vertexType
+			name       string
+		}{{secretVertexType, "secret1"}, {secretVertexType, "secret2"}, {configMapVertexType, "cm1"}, {configMapVertexType, "cm2"}} {
+			vert, exists := graph.getVertexRLocked(ref.vertexType, "default", ref.name)
+			hasEdge := exists && graph.graph.HasEdgeFromTo(vert, podVert)
+			if wantEdge := slices.Contains(want, ref.name); hasEdge != wantEdge {
+				t.Errorf("edge from %s %q to pod: got %v, want %v", vertexTypes[ref.vertexType], ref.name, hasEdge, wantEdge)
+			}
+		}
+	}
+
+	added := pod.DeepCopy()
+	added.Generation++
+	added.Spec.Containers = append(added.Spec.Containers, container("c2", "secret2", "cm2"))
+	update(added, "secret1", "secret2", "cm1", "cm2")
+
+	removed := pod.DeepCopy()
+	removed.Generation++
+	removed.Spec.Containers = removed.Spec.Containers[1:]
+	update(removed, "secret2", "cm2")
 }
