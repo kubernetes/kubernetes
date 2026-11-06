@@ -208,7 +208,7 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("expected an old pod but got a %T", a.GetOldObject()))
 		}
-		return s.limitDynamicContainerSecretReferences(pod, oldPod, a)
+		return s.limitDynamicSecretReferences(pod, oldPod, a)
 	default:
 		// we only validate pod specs during create, ephemeral container, and dynamic update requests
 		return nil
@@ -341,14 +341,9 @@ func (s *Plugin) getServiceAccount(namespace string, name string) (*corev1.Servi
 func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
 	mountableSecrets := mountableSecretNames(serviceAccount)
-	for _, volume := range pod.Spec.Volumes {
-		source := volume.VolumeSource
-		if source.Secret == nil {
-			continue
-		}
-		secretName := source.Secret.SecretName
-		if !mountableSecrets.Has(secretName) {
-			return fmt.Errorf("volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", secretName, serviceAccount.Name)
+	for i := range pod.Spec.Volumes {
+		if err := limitVolumeSecretReferences(&pod.Spec.Volumes[i], mountableSecrets, serviceAccount.Name); err != nil {
+			return err
 		}
 	}
 
@@ -392,16 +387,22 @@ func (s *Plugin) limitEphemeralContainerSecretReferences(pod *api.Pod, a admissi
 	return nil
 }
 
-// limitDynamicContainerSecretReferences checks the secret references of containers added through
-// the dynamic subresource. Added containers can't add volumes or image pull secrets.
-func (s *Plugin) limitDynamicContainerSecretReferences(pod, oldPod *api.Pod, a admission.Attributes) error {
-	var added []*api.Container
+// limitDynamicSecretReferences checks the secret references of containers and volumes added
+// through the dynamic subresource.
+func (s *Plugin) limitDynamicSecretReferences(pod, oldPod *api.Pod, a admission.Attributes) error {
+	var addedContainers []*api.Container
 	for pair := range pods.ContainerPairs(pod, oldPod, podutil.Containers) {
 		if pair.Old == nil {
-			added = append(added, pair.New)
+			addedContainers = append(addedContainers, pair.New)
 		}
 	}
-	if len(added) == 0 {
+	var addedSecretVolumes []*api.Volume
+	for pair := range pods.VolumePairs(pod, oldPod) {
+		if pair.New != nil && pair.New.Secret != nil && (pair.Old == nil || pair.Old.Secret == nil || pair.Old.Secret.SecretName != pair.New.Secret.SecretName) {
+			addedSecretVolumes = append(addedSecretVolumes, pair.New)
+		}
+	}
+	if len(addedContainers) == 0 && len(addedSecretVolumes) == 0 {
 		return nil
 	}
 	serviceAccount, err := s.serviceAccountEnforcingMountableSecrets(pod, a)
@@ -409,10 +410,22 @@ func (s *Plugin) limitDynamicContainerSecretReferences(pod, oldPod *api.Pod, a a
 		return err
 	}
 	mountableSecrets := mountableSecretNames(serviceAccount)
-	for _, container := range added {
+	for _, volume := range addedSecretVolumes {
+		if err := limitVolumeSecretReferences(volume, mountableSecrets, serviceAccount.Name); err != nil {
+			return admission.NewForbidden(a, err)
+		}
+	}
+	for _, container := range addedContainers {
 		if err := limitContainerSecretReferences("container", container.Name, container.Env, container.EnvFrom, mountableSecrets, serviceAccount.Name); err != nil {
 			return admission.NewForbidden(a, err)
 		}
+	}
+	return nil
+}
+
+func limitVolumeSecretReferences(volume *api.Volume, mountableSecrets sets.Set[string], serviceAccountName string) error {
+	if volume.Secret != nil && !mountableSecrets.Has(volume.Secret.SecretName) {
+		return fmt.Errorf("volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", volume.Secret.SecretName, serviceAccountName)
 	}
 	return nil
 }

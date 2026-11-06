@@ -350,3 +350,76 @@ func TestDynamicContainers(t *testing.T) {
 		t.Errorf("expected Validate() to ignore an existing container that predates the plugin, got %v", err)
 	}
 }
+
+func TestDynamicImageVolumes(t *testing.T) {
+	oldPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+		Spec: api.PodSpec{
+			Containers: []api.Container{{Name: "existing", Image: "image", ImagePullPolicy: api.PullIfNotPresent}},
+			Volumes: []api.Volume{
+				{Name: "existing-img", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{Reference: "vol-image:v1", PullPolicy: api.PullIfNotPresent}}},
+			},
+		},
+	}
+	newPod := func(addedVol api.Volume) *api.Pod {
+		pod := oldPod.DeepCopy()
+		pod.Spec.Volumes = append(pod.Spec.Volumes, addedVol)
+		return pod
+	}
+	attrs := func(pod *api.Pod, subresource string) admission.Attributes {
+		return admission.NewAttributesRecord(pod, oldPod, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), subresource, admission.Update, &metav1.UpdateOptions{}, false, nil)
+	}
+	handler := &AlwaysPullImages{}
+
+	// Adding an image volume via pods/dynamic forces PullAlways on the added volume while leaving
+	// existing containers and existing image volumes untouched.
+	pod := newPod(api.Volume{
+		Name:         "added-img",
+		VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{Reference: "new-vol-image:v1", PullPolicy: api.PullIfNotPresent}},
+	})
+	if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs(pod, "dynamic"), nil); err != nil {
+		t.Fatalf("Admit() error: %v", err)
+	}
+	if got := pod.Spec.Containers[0].ImagePullPolicy; got != api.PullIfNotPresent {
+		t.Errorf("existing container ImagePullPolicy = %s, want %s", got, api.PullIfNotPresent)
+	}
+	if got := pod.Spec.Volumes[0].Image.PullPolicy; got != api.PullIfNotPresent {
+		t.Errorf("existing image volume PullPolicy = %s, want %s", got, api.PullIfNotPresent)
+	}
+	if got := pod.Spec.Volumes[1].Image.PullPolicy; got != api.PullAlways {
+		t.Errorf("added image volume PullPolicy = %s, want %s", got, api.PullAlways)
+	}
+	if err := handler.Validate(t.Context(), attrs(pod, "dynamic"), nil); err != nil {
+		t.Errorf("expected Validate() to accept admitted pod, got %v", err)
+	}
+
+	// Validate rejects an added image volume whose pullPolicy is not Always, even when reusing an existing image reference.
+	reusedVolRef := newPod(api.Volume{
+		Name:         "reused-img",
+		VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{Reference: "vol-image:v1", PullPolicy: api.PullIfNotPresent}},
+	})
+	if err := handler.Validate(t.Context(), attrs(reusedVolRef, "dynamic"), nil); err == nil {
+		t.Error("expected Validate() to reject an added image volume that reuses an image and doesn't always pull")
+	}
+	if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs(reusedVolRef, "dynamic"), nil); err != nil {
+		t.Fatalf("Admit() error: %v", err)
+	}
+	if got := reusedVolRef.Spec.Volumes[1].Image.PullPolicy; got != api.PullAlways {
+		t.Errorf("added image volume with reused reference PullPolicy = %s, want %s", got, api.PullAlways)
+	}
+
+	// Adding a non-image volume (emptyDir) via pods/dynamic is ignored and does not touch existing pull policies.
+	withEmptyDir := newPod(api.Volume{
+		Name:         "added-empty",
+		VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+	})
+	if err := admissiontesting.WithReinvocationTesting(t, handler).Admit(t.Context(), attrs(withEmptyDir, "dynamic"), nil); err != nil {
+		t.Fatalf("Admit() error: %v", err)
+	}
+	if got := withEmptyDir.Spec.Volumes[0].Image.PullPolicy; got != api.PullIfNotPresent {
+		t.Errorf("existing image volume PullPolicy = %s, want %s", got, api.PullIfNotPresent)
+	}
+	if err := handler.Validate(t.Context(), attrs(withEmptyDir, "dynamic"), nil); err != nil {
+		t.Errorf("expected Validate() to ignore non-image volume addition, got %v", err)
+	}
+}
