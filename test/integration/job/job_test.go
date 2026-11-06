@@ -3832,8 +3832,43 @@ func BenchmarkLargeFailureHandling(b *testing.B) {
 	}
 }
 
-// cleanUp removes the specified pod finalizers, then deletes all pods and the job.
+// cleanUp suspends and deletes the job first to prevent recreation, removes the specified pod finalizers, and deletes remaining pods.
 func cleanUp(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job, podFinalizersToRemove []string) error {
+	ctx, cancel := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	defer cancel()
+
+	jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
+
+	// Custom-managed Jobs are ignored by the built-in controller and don't create Pods.
+	if managedByBuiltInJobController(jobObj) {
+		_, err := updateJob(ctx, jobClient, jobObj.Name, func(j *batchv1.Job) {
+			j.Spec.Suspend = ptr.To(true)
+		})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		// wait for any condition which will indicate "no more pods"
+		if err == nil {
+			if err := waitForAnyJobCondition(ctx, jobClient, jobObj.Name,
+				batchv1.JobSuspended,
+				batchv1.JobFailureTarget,
+				batchv1.JobSuccessCriteriaMet,
+				batchv1.JobFailed,
+				batchv1.JobComplete,
+			); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Set the propagation policy to background to ensure that the job doesn't receive any finalizer at deletion time,
+	// and delete the job first so the controller doesn't create replacement pods while pods are being deleted.
+	if err := jobClient.Delete(ctx, jobObj.Name, metav1.DeleteOptions{
+		PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+	}); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
 	if err := removePodsFinalizers(ctx, clientSet, jobObj.Namespace, podFinalizersToRemove); err != nil {
 		return err
 	}
@@ -3856,10 +3891,28 @@ func cleanUp(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1
 			return err
 		}
 	}
+	return nil
+}
 
-	// Set the propagation policy to background to ensure that the job doesn't receive any finalizer at deletion time
-	return clientSet.BatchV1().Jobs(jobObj.Namespace).Delete(ctx, jobObj.Name, metav1.DeleteOptions{
-		PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+func managedByBuiltInJobController(job *batchv1.Job) bool {
+	return job.Spec.ManagedBy == nil || *job.Spec.ManagedBy == batchv1.JobControllerName
+}
+
+func waitForAnyJobCondition(ctx context.Context, jobClient typedv1.JobInterface, jobName string, conditions ...batchv1.JobConditionType) error {
+	return wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		job, err := jobClient.Get(ctx, jobName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		for _, cond := range conditions {
+			if getJobConditionStatus(ctx, job, cond) == v1.ConditionTrue {
+				return true, nil
+			}
+		}
+		return false, nil
 	})
 }
 
