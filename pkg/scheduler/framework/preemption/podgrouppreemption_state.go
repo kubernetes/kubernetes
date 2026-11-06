@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,7 +35,7 @@ type PodGroupPreemptionState struct {
 	lock sync.RWMutex
 
 	// victimsByNode maps nodeName -> list of potential PreemptionVictims that have
-	// at least one pod scheduled on that node, sorted from most to least important.
+	// at least one pod scheduled on that node, sorted from least to most preferred for preemption.
 	victimsByNode map[string][]fwk.PreemptionVictim
 
 	// condemned tracks the set of PreemptionVictims that assumed preemptor pods require to be evicted.
@@ -95,33 +94,21 @@ func GetPodGroupPreemptionState(state fwk.CycleState) (*PodGroupPreemptionState,
 }
 
 // NewPodGroupPreemptionState initializes dynamic victim tracking state for a PodGroup preemption cycle.
-// The provided potentialVictims slice is expected to be ordered from least important to most important
+// The provided potentialVictims slice is expected to be ordered from most to least preferred for preemption
 // (as returned by PreemptionManager.GenerateVictims).
-// TODO(#142718): Support custom PreemptionManager implementations that do not implement Victim
-// or return non-comparable PreemptionVictim values by respecting GenerateVictims ordering and
-// indexing victims by integer ID instead of storing interface values in sets.Set / slices.Contains.
 func NewPodGroupPreemptionState(potentialVictims []fwk.PreemptionVictim) *PodGroupPreemptionState {
 	victimsByNode := make(map[string][]fwk.PreemptionVictim)
 	for _, v := range slices.Backward(potentialVictims) {
 		for _, pi := range v.Pods() {
 			nodeName := pi.GetPod().Spec.NodeName
+			nodeVictims := victimsByNode[nodeName]
 			// A PodGroup or CompositePodGroup victim can have multiple pods on the same node,
 			// and duplicating it in victimsByNode[nodeName] would double-count its PDB violations
 			// and victim count in CompareVictimSets.
-			if !slices.Contains(victimsByNode[nodeName], v) {
-				victimsByNode[nodeName] = append(victimsByNode[nodeName], v)
+			if len(nodeVictims) == 0 || nodeVictims[len(nodeVictims)-1] != v {
+				victimsByNode[nodeName] = append(nodeVictims, v)
 			}
 		}
-	}
-	for _, victims := range victimsByNode {
-		sort.SliceStable(victims, func(i, j int) bool {
-			vi1, ok1 := victims[i].(Victim)
-			vi2, ok2 := victims[j].(Victim)
-			if ok1 && ok2 {
-				return MoreImportantVictim(vi1, vi2)
-			}
-			return false
-		})
 	}
 	return &PodGroupPreemptionState{
 		victimsByNode: victimsByNode,
@@ -130,7 +117,7 @@ func NewPodGroupPreemptionState(potentialVictims []fwk.PreemptionVictim) *PodGro
 }
 
 // SurvivingVictimsOnNode returns all potential victims on nodeName that have not yet been condemned,
-// sorted from most to least important. The returned slice must not be mutated by callers.
+// sorted from least to most preferred for preemption. The returned slice must not be mutated by callers.
 func (s *PodGroupPreemptionState) SurvivingVictimsOnNode(nodeName string) []fwk.PreemptionVictim {
 	s.lock.RLock()
 	defer s.lock.RUnlock()

@@ -77,14 +77,14 @@ func TestPodGroupPreemptionState(t *testing.T) {
 	}{
 		{
 			name: "multi-node and single-node victims sorted by importance: condemn and revert",
-			// multiNodePG (2 pods) is more important than singleNodePod (1 pod) of equal priority,
-			// so NewPodGroupPreemptionState sorts it first despite singleNodePod appearing later in potentialVictims.
+			// singleNodePod is more important than multiNodePG because it's appearing later in potential victims,
+			// despite having fewer pods.
 			potentialVictims: []fwk.PreemptionVictim{
 				&victimWithPDBViolations{Victim: multiNodePG},
 				&victimWithPDBViolations{Victim: singleNodePod},
 			},
 			wantInitialCounts:      map[string]int{"node1": 2, "node2": 1, "node3": 0},
-			wantInitialPodCounts:   map[string][]int{"node1": {2, 1}, "node2": {2}},
+			wantInitialPodCounts:   map[string][]int{"node1": {1, 2}, "node2": {2}},
 			condemnVictims:         []fwk.PreemptionVictim{&victimWithPDBViolations{Victim: multiNodePG}},
 			wantAfterCondemnCounts: map[string]int{"node1": 1, "node2": 0},
 			revertVictims:          []fwk.PreemptionVictim{&victimWithPDBViolations{Victim: multiNodePG}},
