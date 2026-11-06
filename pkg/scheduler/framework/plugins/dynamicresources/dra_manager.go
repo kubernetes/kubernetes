@@ -54,8 +54,10 @@ type DefaultDRAManager struct {
 	resourceSliceLister   *resourceSliceLister
 	deviceClassLister     *deviceClassLister
 	extendedResourceCache *extendedresourcecache.ExtendedResourceCache
-	// nominations is only set if the DRAPreemption feature is enabled.
-	nominations *claimNominations
+	// nominations and victimClaims are only set if the DRAPreemption
+	// feature is enabled.
+	nominations  *claimNominations
+	victimClaims *victimClaimTracker
 }
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
@@ -77,7 +79,8 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
 		manager.nominations = newClaimNominations()
-		manager.resourceClaimTracker.cache.AddEventHandler(manager.nominations.handlers(logger))
+		manager.victimClaims = newVictimClaimTracker()
+		manager.resourceClaimTracker.cache.AddEventHandler(manager.victimClaims.handlers(logger))
 	}
 
 	// Reacting to events is more efficient than iterating over the list
@@ -91,12 +94,17 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 // implementations of fwk.SharedDRAManager don't support preemption.
 type nominationsProvider interface {
 	nominationStore() *claimNominations
+	victimClaimStore() *victimClaimTracker
 }
 
 var _ nominationsProvider = &DefaultDRAManager{}
 
 func (s *DefaultDRAManager) nominationStore() *claimNominations {
 	return s.nominations
+}
+
+func (s *DefaultDRAManager) victimClaimStore() *victimClaimTracker {
+	return s.victimClaims
 }
 
 // SetNominationReleaseHandler installs the function which gets called with

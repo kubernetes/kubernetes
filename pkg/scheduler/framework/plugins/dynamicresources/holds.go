@@ -115,7 +115,10 @@ func (pl *DynamicResources) holdsOnNode(logger klog.Logger, p *preemptionState, 
 	if holds == nil {
 		return nil
 	}
-	for _, victimClaim := range pl.nominations.victimClaimsOnNode(nodeName) {
+	if pl.victimClaims == nil {
+		return holds
+	}
+	for _, victimClaim := range pl.victimClaims.onNode(nodeName) {
 		if !preemptedFor(victimClaim, holds.victims) || !pl.victimClaimSettling(victimClaim) {
 			continue
 		}

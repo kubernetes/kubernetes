@@ -43,6 +43,7 @@ type recordingNominationExtensions struct {
 }
 
 var _ framework.NominationExtensions = &recordingNominationExtensions{}
+var _ framework.VictimExtensions = &recordingNominationExtensions{}
 
 func (pl *recordingNominationExtensions) Name() string { return pl.name }
 
@@ -58,6 +59,10 @@ func (pl *recordingNominationExtensions) AddNominatedPod(_ context.Context, _ fw
 
 func (pl *recordingNominationExtensions) RemoveNominatedPod(_ context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: remove %s %s %v", pl.name, pod.Name, nodeName, preemptionFailed))
+}
+
+func (pl *recordingNominationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
+	*pl.log = append(*pl.log, fmt.Sprintf("%s: assume %s", pl.name, victim.Name))
 }
 
 func (pl *recordingNominationExtensions) PodEligibleToPreempt(_ context.Context, pod *v1.Pod, nodeName string) (bool, string) {
@@ -91,6 +96,7 @@ func TestNominationExtensions(t *testing.T) {
 			wantCalls: []string{
 				"a: add preemptor node1 1", "b: add preemptor node1 1",
 				"a: remove preemptor node1 true", "b: remove preemptor node1 true",
+				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
 			},
 		},
@@ -102,6 +108,7 @@ func TestNominationExtensions(t *testing.T) {
 			wantCalls: []string{
 				"a: add preemptor node1 1", "b: add preemptor node1 1",
 				"a: remove preemptor node1 true", "b: remove preemptor node1 true",
+				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
 			},
 		},
@@ -113,6 +120,7 @@ func TestNominationExtensions(t *testing.T) {
 			wantCalls: []string{
 				"a: add preemptor node1 1", "b: add preemptor node1 1",
 				"a: remove preemptor node1 true", "b: remove preemptor node1 true",
+				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1",
 			},
 		},
@@ -143,7 +151,8 @@ func TestNominationExtensions(t *testing.T) {
 
 			f.RunNominationExtensionsAddNominatedPod(ctx, nil, pod, "node1", victims)
 			f.RunNominationExtensionsRemoveNominatedPod(ctx, pod, "node1", true)
-			eligible, reason := f.RunNominationExtensionsPodEligibleToPreempt(ctx, pod, "node1")
+			f.RunVictimExtensionsAssumeVictim(ctx, victims[0])
+			eligible, reason := f.RunVictimExtensionsPodEligibleToPreempt(ctx, pod, "node1")
 			if eligible != tc.wantEligible || reason != tc.wantReason {
 				t.Errorf("PodEligibleToPreempt: got (%v, %q), want (%v, %q)", eligible, reason, tc.wantEligible, tc.wantReason)
 			}

@@ -204,8 +204,10 @@ type DynamicResources struct {
 	draManager     fwk.SharedDRAManager
 	podIndexer     cache.Indexer
 	podLister      corelisters.PodLister
-	// nominations is only set if the DRAPreemption feature is enabled.
-	nominations *claimNominations
+	// nominations and victimClaims are only set if the DRAPreemption
+	// feature is enabled.
+	nominations  *claimNominations
+	victimClaims *victimClaimTracker
 }
 
 const (
@@ -265,6 +267,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	if pl.fts.EnableDRAPreemption {
 		if provider, ok := pl.draManager.(nominationsProvider); ok {
 			pl.nominations = provider.nominationStore()
+			pl.victimClaims = provider.victimClaimStore()
 		}
 	}
 

@@ -35,11 +35,13 @@ import (
 const FakeNominationExtensionsName = "FakeNominationExtensions"
 
 var _ schedulerframework.NominationExtensions = &FakeNominationExtensionsPlugin{}
+var _ schedulerframework.VictimExtensions = &FakeNominationExtensionsPlugin{}
 var _ fwk.PreFilterPlugin = &FakeNominationExtensionsPlugin{}
 
 // FakeNominationExtensionsPlugin implements framework.NominationExtensions
-// and records the calls. It is also a PreFilter plugin which skips all pods,
-// so that it can be enabled in a profile.
+// and framework.VictimExtensions and records the calls. It is also a
+// PreFilter plugin which skips all pods, so that it can be enabled in a
+// profile.
 type FakeNominationExtensionsPlugin struct {
 	// PluginName overrides FakeNominationExtensionsName.
 	PluginName string
@@ -89,6 +91,11 @@ func (pl *FakeNominationExtensionsPlugin) AddNominatedPod(_ context.Context, _ f
 // "RemoveNominatedPod <pod> <node> assigned=<pod.spec.nodeName> failed=<preemptionFailed>".
 func (pl *FakeNominationExtensionsPlugin) RemoveNominatedPod(_ context.Context, pod *v1.Pod, nodeName string, preemptionFailed bool) {
 	pl.record(fmt.Sprintf("RemoveNominatedPod %s %s assigned=%s failed=%t", klog.KObj(pod), nodeName, pod.Spec.NodeName, preemptionFailed))
+}
+
+// AssumeVictim records the call as "AssumeVictim <victim>".
+func (pl *FakeNominationExtensionsPlugin) AssumeVictim(_ context.Context, victim *v1.Pod) {
+	pl.record(fmt.Sprintf("AssumeVictim %s", klog.KObj(victim)))
 }
 
 // PodEligibleToPreempt records the call as "PodEligibleToPreempt <pod> <node>".

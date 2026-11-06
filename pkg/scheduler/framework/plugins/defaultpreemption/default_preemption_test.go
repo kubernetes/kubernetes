@@ -2444,7 +2444,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 		nodes               []string
 		features            feature.Features
 		nominatedNodeStatus *fwk.Status
-		// nominationExtensions, if set, is enabled as a plugin with framework.NominationExtensions.
+		// nominationExtensions, if set, is enabled as a plugin with framework.VictimExtensions.
 		nominationExtensions *tf.FakeNominationExtensionsPlugin
 		expected             bool
 		expectedReason       string
@@ -2520,7 +2520,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:                 "NominationExtensions not eligible with nominated node",
+			name:                 "VictimExtensions not eligible with nominated node",
 			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			nodes:                []string{"node1"},
 			features:             feature.Features{EnableDRAPreemption: true},
@@ -2531,7 +2531,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expectedCalls:        []string{"PodEligibleToPreempt p node1"},
 		},
 		{
-			name:                 "NominationExtensions not eligible without nominated node",
+			name:                 "VictimExtensions not eligible without nominated node",
 			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
 			features:             feature.Features{EnableDRAPreemption: true},
 			nominationExtensions: &tf.FakeNominationExtensionsPlugin{NotEligibleReason: "still reclaiming"},
@@ -2540,7 +2540,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expectedCalls:        []string{"PodEligibleToPreempt p "},
 		},
 		{
-			name:                 "NominationExtensions eligible",
+			name:                 "VictimExtensions eligible",
 			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			nodes:                []string{"node1"},
 			features:             feature.Features{EnableDRAPreemption: true},
@@ -2550,7 +2550,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expectedCalls:        []string{"PodEligibleToPreempt p node1"},
 		},
 		{
-			name:                 "NominationExtensions not asked when the nominated node is unresolvable",
+			name:                 "VictimExtensions not asked when the nominated node is unresolvable",
 			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			nodes:                []string{"node1"},
 			features:             feature.Features{EnableDRAPreemption: true},
@@ -2559,7 +2559,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected:             true,
 		},
 		{
-			name:                 "NominationExtensions not asked with DRAPreemption disabled",
+			name:                 "VictimExtensions not asked with DRAPreemption disabled",
 			pod:                  st.MakePod().Name("p").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			nodes:                []string{"node1"},
 			nominatedNodeStatus:  fwk.NewStatus(fwk.Unschedulable),
@@ -2644,7 +2644,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			}
 			if test.nominationExtensions != nil {
 				if diff := cmp.Diff(test.expectedCalls, test.nominationExtensions.Calls()); diff != "" {
-					t.Errorf("unexpected NominationExtensions calls (-want, +got):\n%s", diff)
+					t.Errorf("unexpected VictimExtensions calls (-want, +got):\n%s", diff)
 				}
 			}
 		})
@@ -3111,7 +3111,8 @@ func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod)
 // TestPreemptNominationExtensions checks that plugins with
 // NominationExtensions learn about the nomination before the first victim
 // gets preempted, and that the nomination gets removed when preempting the
-// victims fails.
+// victims fails. Plugins with VictimExtensions learn about the victim only
+// once its deletion succeeded.
 func TestPreemptNominationExtensions(t *testing.T) {
 	metrics.Register()
 	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
@@ -3119,6 +3120,7 @@ func TestPreemptNominationExtensions(t *testing.T) {
 	eligibleCall := "PodEligibleToPreempt default/p "
 	addCall := "AddNominatedPod default/p node1 [default/v]"
 	removeCall := "RemoveNominatedPod default/p node1 assigned= failed=true"
+	assumeCall := "AssumeVictim default/v"
 
 	for name, tc := range map[string]struct {
 		asyncPreemption bool
@@ -3126,7 +3128,7 @@ func TestPreemptNominationExtensions(t *testing.T) {
 		wantCalls       []string
 	}{
 		"sync": {
-			wantCalls: []string{eligibleCall, addCall},
+			wantCalls: []string{eligibleCall, addCall, assumeCall},
 		},
 		"sync-failure": {
 			deleteErr: errors.New("injected delete error"),
@@ -3134,7 +3136,7 @@ func TestPreemptNominationExtensions(t *testing.T) {
 		},
 		"async": {
 			asyncPreemption: true,
-			wantCalls:       []string{eligibleCall, addCall},
+			wantCalls:       []string{eligibleCall, addCall, assumeCall},
 		},
 		"async-failure": {
 			asyncPreemption: true,

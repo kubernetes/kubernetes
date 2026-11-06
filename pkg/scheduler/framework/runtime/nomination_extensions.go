@@ -29,8 +29,9 @@ import (
 )
 
 // fillNominationExtensions collects the plugins which implement
-// framework.NominationExtensions. They are not configured per extension
-// point, so every instantiated plugin of the profile is considered.
+// framework.NominationExtensions or framework.VictimExtensions. They are not
+// configured per extension point, so every instantiated plugin of the
+// profile is considered.
 func (f *frameworkImpl) fillNominationExtensions() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
 		return
@@ -44,6 +45,9 @@ func (f *frameworkImpl) fillNominationExtensions() {
 	for _, name := range names {
 		if ext, ok := f.pluginsMap[name].(framework.NominationExtensions); ok {
 			f.nominationExtensions = append(f.nominationExtensions, ext)
+		}
+		if ext, ok := f.pluginsMap[name].(framework.VictimExtensions); ok {
+			f.victimExtensions = append(f.victimExtensions, ext)
 		}
 	}
 }
@@ -62,21 +66,14 @@ func (f *frameworkImpl) RunNominationExtensionsRemoveNominatedPod(ctx context.Co
 	}
 }
 
-// RunNominationExtensionsPodEligibleToPreempt returns the result of the first
-// plugin which reports that the pod is not eligible to preempt.
-func (f *frameworkImpl) RunNominationExtensionsPodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nodeName string) (bool, string) {
-	for _, ext := range f.nominationExtensions {
-		if eligible, reason := ext.PodEligibleToPreempt(f.nominationExtensionsContext(ctx, ext), pod, nodeName); !eligible {
-			return false, reason
-		}
-	}
-	return true, ""
+func (f *frameworkImpl) nominationExtensionsContext(ctx context.Context, ext fwk.Plugin) context.Context {
+	return extensionContext(ctx, "NominationExtensions", ext)
 }
 
-func (f *frameworkImpl) nominationExtensionsContext(ctx context.Context, ext framework.NominationExtensions) context.Context {
+func extensionContext(ctx context.Context, extension string, ext fwk.Plugin) context.Context {
 	logger := klog.FromContext(ctx)
 	if !logger.V(4).Enabled() {
 		return ctx
 	}
-	return klog.NewContext(ctx, klog.LoggerWithName(klog.LoggerWithName(logger, "NominationExtensions"), ext.Name()))
+	return klog.NewContext(ctx, klog.LoggerWithName(klog.LoggerWithName(logger, extension), ext.Name()))
 }
