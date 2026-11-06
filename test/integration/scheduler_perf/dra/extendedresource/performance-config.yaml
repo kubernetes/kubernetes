@@ -83,7 +83,9 @@
       measurePods: 1000
   - name: Explicit_25classes_5000pods_500nodes
     labels: [performance]
-    threshold: 120
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FExtendedResource%2FExplicit_25classes_5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_extendedresource: 141 # 40% below median of last 20 runs
     params:
       class: example.com/gpu
       classes: 25
@@ -102,7 +104,9 @@
       measurePods: 1000
   - name: Explicit_50classes_5000pods_500nodes
     labels: [performance]
-    threshold: 130
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FExtendedResource%2FExplicit_50classes_5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_extendedresource: 189 # 20% below median of last 20 runs
     params:
       class: example.com/gpu
       classes: 50
@@ -121,7 +125,9 @@
       measurePods: 1000
   - name: Implicit_25classes_5000pods_500nodes
     labels: [performance]
-    threshold: 130
+    threshold:
+      # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FExtendedResource%2FImplicit_25classes_5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+      dra_extendedresource: 155 # 40% below median of last 20 runs
     params:
       class: deviceclass.resource.kubernetes.io/test-class
       classes: 25
