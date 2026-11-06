@@ -18,13 +18,16 @@ package transport
 
 import (
 	"crypto/x509"
+	"errors"
 	"io"
 	"math/rand/v2"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	clientgofeaturegate "k8s.io/client-go/features"
 )
 
 // connectionPool spreads requests across a fixed set of independent
@@ -34,8 +37,14 @@ import (
 // fewer requests in flight ("power of two choices"). A request is in flight
 // until its response body is closed or fully read, so long-running requests
 // such as watches are taken into account.
+//
+// If retryConnectionFailures is set and the picked member fails to connect to
+// the server, the request is sent once more through the backup member. The
+// request wasn't sent to the server, so this is safe for any request whose
+// body can be read again.
 type connectionPool struct {
-	members []*poolMember
+	members                 []*poolMember
+	retryConnectionFailures bool
 	// intn returns a random number in [0, n).
 	intn func(n int) int
 }
@@ -54,14 +63,19 @@ func newConnectionPool(rts []rotatableCARoundTripper) *connectionPool {
 	for i, rt := range rts {
 		members[i] = &poolMember{rt: rt}
 	}
-	return &connectionPool{members: members, intn: rand.IntN}
+	return &connectionPool{
+		members:                 members,
+		retryConnectionFailures: clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.ClientsAllowConnectionPoolFailureAvoidance),
+		intn:                    rand.IntN,
+	}
 }
 
-// pick returns the less loaded of two distinct, randomly chosen members.
-func (p *connectionPool) pick() *poolMember {
+// pick chooses two distinct members at random and returns the less loaded
+// one, and the other one as a backup. With a single member, backup is nil.
+func (p *connectionPool) pick() (picked, backup *poolMember) {
 	n := len(p.members)
 	if n == 1 {
-		return p.members[0]
+		return p.members[0], nil
 	}
 	i := p.intn(n)
 	// Pick j uniformly from the other n-1 members: draw from [0, n-1) and
@@ -72,13 +86,23 @@ func (p *connectionPool) pick() *poolMember {
 	}
 	a, b := p.members[i], p.members[j]
 	if b.inFlight.Load() < a.inFlight.Load() {
-		return b
+		return b, a
 	}
-	return a
+	return a, b
 }
 
 func (p *connectionPool) RoundTrip(req *http.Request) (*http.Response, error) {
-	m := p.pick()
+	m, backup := p.pick()
+	resp, err := p.roundTrip(m, req)
+	if err != nil && p.retryConnectionFailures && backup != nil && isConnectionFailure(err) && req.Context().Err() == nil {
+		if retry, ok := rewindRequest(req); ok {
+			resp, err = p.roundTrip(backup, retry)
+		}
+	}
+	return resp, err
+}
+
+func (p *connectionPool) roundTrip(m *poolMember, req *http.Request) (*http.Response, error) {
 	m.inFlight.Add(1)
 	resp, err := m.rt.RoundTrip(req)
 	if err != nil || resp == nil || resp.Body == nil {
@@ -87,6 +111,34 @@ func (p *connectionPool) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	resp.Body = newInFlightBody(resp.Body, func() { m.inFlight.Add(-1) })
 	return resp, nil
+}
+
+// isConnectionFailure reports whether err is a failure to dial the server, such
+// as a refused connection, a failed DNS lookup or a connect timeout.
+func isConnectionFailure(err error) bool {
+	var opErr *net.OpError
+	return errors.As(err, &opErr) && opErr.Op == "dial"
+}
+
+// rewindRequest returns req with a fresh body, so that it can be sent again,
+// or false if the body can't be read again.
+func rewindRequest(req *http.Request) (*http.Request, bool) {
+	if req.Body == nil || req.Body == http.NoBody {
+		return req, true
+	}
+	if req.GetBody == nil {
+		return nil, false
+	}
+	// The first attempt closed req.Body. GetBody returns a new copy of the
+	// whole body, e.g. for the byte readers client-go uses.
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, false
+	}
+	// Clone shares Body with req, so replace it. Cloning keeps req unmodified.
+	retry := req.Clone(req.Context())
+	retry.Body = body
+	return retry, true
 }
 
 func (p *connectionPool) CloseIdleConnections() {
@@ -103,6 +155,7 @@ func (p *connectionPool) Clone() rotatableCARoundTripper {
 		rts[i] = m.rt.Clone()
 	}
 	clone := newConnectionPool(rts)
+	clone.retryConnectionFailures = p.retryConnectionFailures
 	clone.intn = p.intn
 	return clone
 }
