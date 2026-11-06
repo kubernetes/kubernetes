@@ -123,6 +123,10 @@ type Config struct {
 	Codec runtime.Codec
 
 	Clock clock.WithTicker
+
+	// CompactorPollPeriod specifies how frequently compactor polls storage for compaction revision.
+	// Defaults to 15s when zero.
+	CompactorPollPeriod time.Duration
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -470,7 +474,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
-		cacher.compactor = newCompactor(config.Storage, watchCache, config.Clock)
+		cacher.compactor = newCompactor(config.Storage, watchCache, config.Clock, config.CompactorPollPeriod)
 		go cacher.compactor.Run(stopCh)
 	}
 

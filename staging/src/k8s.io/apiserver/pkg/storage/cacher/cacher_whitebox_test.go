@@ -61,6 +61,7 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -73,6 +74,10 @@ import (
 )
 
 func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
+	return newTestCacherWithoutSyncingAndIndexers(s, c, nil)
+}
+
+func newTestCacherWithoutSyncingAndIndexers(s storage.Interface, c clock.WithTicker, indexers *cache.Indexers) (*Cacher, storage.Versioner, error) {
 	prefix := "/pods/"
 	config := Config{
 		Storage:             s,
@@ -93,9 +98,10 @@ func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cach
 			fieldsSet["spec.nodeName"] = pod.Spec.NodeName
 			return labelsSet, fieldsSet, nil
 		},
+		Indexers:    indexers,
 		NewFunc:     func() runtime.Object { return &example.Pod{} },
 		NewListFunc: func() runtime.Object { return &example.PodList{} },
-		Codec:       codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Codec:       Codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:       c,
 	}
 	cacher, err := NewCacherFromConfig(config)
@@ -104,7 +110,11 @@ func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cach
 }
 
 func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
-	cacher, versioner, err := newTestCacherWithoutSyncing(s, clock.RealClock{})
+	return newTestCacherWithIndexers(s, nil)
+}
+
+func newTestCacherWithIndexers(s storage.Interface, indexers *cache.Indexers) (*Cacher, storage.Versioner, error) {
+	cacher, versioner, err := newTestCacherWithoutSyncingAndIndexers(s, clock.RealClock{}, indexers)
 	if err != nil {
 		return nil, versioner, err
 	}
@@ -116,6 +126,19 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 		return nil, storage.APIObjectVersioner{}, err
 	}
 	return cacher, versioner, nil
+}
+
+func podIndexers() *cache.Indexers {
+	return &cache.Indexers{
+		"f:spec.nodeName": func(obj interface{}) ([]string, error) {
+			pod := obj.(*example.Pod)
+			return []string{pod.Spec.NodeName}, nil
+		},
+		"f:metadata.namespace": func(obj interface{}) ([]string, error) {
+			pod := obj.(*example.Pod)
+			return []string{pod.ObjectMeta.Namespace}, nil
+		},
+	}
 }
 
 func TestShouldDelegateList(t *testing.T) {
@@ -326,7 +349,7 @@ func TestShouldDelegateList(t *testing.T) {
 	// If you were to run only TestGetListCacheBypass you would see that the test fail.
 	// However in CI all test are run and there must be a test(s) that properly
 	// initialize the storage layer so that the mentioned method evaluates to true
-	forceRequestWatchProgressSupport(t)
+	ForceRequestWatchProgressSupport(t)
 
 	consistentListFromCacheOverrides := map[opts]bool{}
 	for _, recursive := range []bool{true, false} {
@@ -455,7 +478,7 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 
 func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, fallbackError, skipStorageFallback bool) (*CacheDelegator, *testingclock.FakeClock, *int, k8smetrics.KubeRegistry) {
 	t.Helper()
-	forceRequestWatchProgressSupport(t)
+	ForceRequestWatchProgressSupport(t)
 	if skipStorageFallback {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
 	}
@@ -632,7 +655,7 @@ func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.ListFromCacheSnapshot: false,
 	})
-	forceRequestWatchProgressSupport(t)
+	ForceRequestWatchProgressSupport(t)
 
 	tests := []struct {
 		name                    string
@@ -778,7 +801,7 @@ func TestGetCacheBypass(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, scenario.consistentGetFromCache)
 			if scenario.watchProgressSupported {
-				forceRequestWatchProgressSupport(t)
+				ForceRequestWatchProgressSupport(t)
 			} else {
 				origChecker := etcdfeature.DefaultFeatureSupportChecker
 				etcdfeature.DefaultFeatureSupportChecker = etcdfeature.NewDefaultFeatureSupportChecker()
@@ -826,8 +849,14 @@ func newTestGetCacheBypass(t *testing.T, delegator *CacheDelegator, result *exam
 }
 
 func TestListMetrics(t *testing.T) {
-	ctx, delegator, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
-	t.Cleanup(terminate)
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacherWithIndexers(backingStorage, podIndexers())
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	storagemetrics.Register()
 	legacyregistry.Reset()
@@ -840,13 +869,13 @@ func TestListMetrics(t *testing.T) {
 	if err := (storage.APIObjectVersioner{}).UpdateObject(pod, 100); err != nil {
 		t.Fatal(err)
 	}
-	if err := delegator.cacher.watchCache.Add(pod); err != nil {
+	if err := cacher.watchCache.Add(pod); err != nil {
 		t.Fatal(err)
 	}
 
 	pred := storagetesting.CreatePodPredicate(fields.ParseSelectorOrDie("spec.nodeName=node"), true, []string{"spec.nodeName"})
 	result := &example.PodList{}
-	if err := delegator.GetList(ctx, "/pods/ns", storage.ListOptions{
+	if err := delegator.GetList(context.Background(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred,
 		Recursive:       true,
@@ -908,7 +937,7 @@ func TestWatchCacheBypass(t *testing.T) {
 
 func TestEmptyWatchEventCache(t *testing.T) {
 	t.Parallel()
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, etcdStorage := NewEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 
 	// add a few objects
@@ -917,7 +946,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i), Namespace: "test-ns"}}
 		out := &example.Pod{}
-		key := computePodKey(pod)
+		key := ComputePodKey(pod)
 		if err := etcdStorage.Create(context.Background(), key, pod, out, 0); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -1126,7 +1155,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 }
 
 func TestCacherDontAcceptRequestsStopped(t *testing.T) {
-	forceRequestWatchProgressSupport(t)
+	ForceRequestWatchProgressSupport(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
@@ -1474,7 +1503,7 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 		t.Run(fmt.Sprintf("ListFromCacheSnapshot=%v", listFromCacheSnapshot), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
-			forceRequestWatchProgressSupport(t)
+			ForceRequestWatchProgressSupport(t)
 
 			backingStorage := &cachertesting.MockStorage{}
 			cacher, _, err := newTestCacher(backingStorage)
@@ -2264,7 +2293,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.WatchList: true,
 	})
-	forceRequestWatchProgressSupport(t)
+	ForceRequestWatchProgressSupport(t)
 
 	scenarios := []struct {
 		name               string
@@ -2857,7 +2886,7 @@ func (b *stopDuringDispatchBudget) returnUnused(_ time.Duration) {
 // Stop, a draining close would leave the watcher goroutine waiting forever to
 // send to a client that is gone.
 func TestWatchListStopDuringDispatch(t *testing.T) {
-	forceRequestWatchProgressSupport(t)
+	ForceRequestWatchProgressSupport(t)
 	// Only this goroutine counts. Etcd clients of earlier tests can start
 	// goroutines at any time, so goleak may report those as well.
 	const watcherGoroutine = "cacher.(*cacheWatcher).process"
@@ -3184,17 +3213,17 @@ func TestComputeListLimit(t *testing.T) {
 	}
 }
 
-// TODO(p0lyn0mial): forceRequestWatchProgressSupport inits the storage layer
+// TODO(p0lyn0mial): ForceRequestWatchProgressSupport inits the storage layer
 // so that tests that require storage.RequestWatchProgress pass
 //
 // In the future we could have a function that would allow for setting the feature
 // only for duration of a test.
-func forceRequestWatchProgressSupport(t *testing.T) {
+func ForceRequestWatchProgressSupport(t testing.TB) {
 	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
 		return
 	}
 
-	server, _ := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, _ := NewEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 	if err := wait.PollUntilContextTimeout(context.Background(), 5*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
 		return etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress), nil
@@ -3204,8 +3233,12 @@ func forceRequestWatchProgressSupport(t *testing.T) {
 }
 
 func TestListIndexer(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
-	t.Cleanup(terminate)
+	backingStorage := &cachertesting.MockStorage{}
+	cacher, _, err := newTestCacherWithIndexers(backingStorage, podIndexers())
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
 	tests := []struct {
 		name               string
 		requestedName      string
@@ -3598,7 +3631,7 @@ func TestListIndexer(t *testing.T) {
 					path += "/" + tt.requestedName
 				}
 			}
-			_, usedIndex, err := cacher.cacher.watchCache.WaitUntilFreshAndGetList(ctx, path, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
+			_, usedIndex, err := cacher.watchCache.WaitUntilFreshAndGetList(context.Background(), path, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

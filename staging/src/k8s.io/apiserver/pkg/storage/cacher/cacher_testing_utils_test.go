@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	example2v1 "k8s.io/apiserver/pkg/apis/example2/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
@@ -42,12 +43,15 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/utils/clock"
 )
 
+const DefaultBookmarkFrequency = defaultBookmarkFrequency
+
 var (
 	scheme   = runtime.NewScheme()
-	codecs   = serializer.NewCodecFactory(scheme)
+	Codecs   = serializer.NewCodecFactory(scheme)
 	errDummy = fmt.Errorf("dummy error")
 )
 
@@ -60,27 +64,27 @@ func init() {
 	utilruntime.Must(metav1.AddMetaToScheme(scheme))
 	scheme.AddUnversionedTypes(corev1.SchemeGroupVersion, &metav1.Status{})
 	pb := protobuf.NewSerializer(scheme, scheme)
-	corev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{corev1.SchemeGroupVersion}, schema.GroupVersions{corev1.SchemeGroupVersion})
-	examplev1ProtoCodec = codecs.CodecForVersions(pb, pb, schema.GroupVersions{examplev1.SchemeGroupVersion}, nil)
+	Corev1ProtoCodec = Codecs.CodecForVersions(pb, pb, schema.GroupVersions{corev1.SchemeGroupVersion}, schema.GroupVersions{corev1.SchemeGroupVersion})
+	Examplev1ProtoCodec = Codecs.CodecForVersions(pb, pb, schema.GroupVersions{examplev1.SchemeGroupVersion}, nil)
 }
 
 var (
-	corev1ProtoCodec    runtime.Codec
-	examplev1ProtoCodec runtime.Codec
+	Corev1ProtoCodec    runtime.Codec
+	Examplev1ProtoCodec runtime.Codec
 )
 
-func newPod() runtime.Object     { return &example.Pod{} }
-func newPodList() runtime.Object { return &example.PodList{} }
+func NewPod() runtime.Object     { return &example.Pod{} }
+func NewPodList() runtime.Object { return &example.PodList{} }
 
-func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	return newEtcdTestStorageWithCodec(t, prefix, examplev1ProtoCodec)
+func NewEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
+	return NewEtcdTestStorageWithCodec(t, prefix, Examplev1ProtoCodec)
 }
 
-func newEtcdTestStorageWithCodec(t testing.TB, prefix string, codec runtime.Codec) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	return newEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer(), storagetesting.PodReverseKeyFunc("/pods/", true))
+func NewEtcdTestStorageWithCodec(t testing.TB, prefix string, codec runtime.Codec) (*etcd3testing.EtcdTestServer, storage.Interface) {
+	return NewEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer(), storagetesting.PodReverseKeyFunc("/pods/", true))
 }
 
-func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Codec, transformer value.Transformer, reverseKeyFunc storage.ReverseKeyFunc) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func NewEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Codec, transformer value.Transformer, reverseKeyFunc storage.ReverseKeyFunc) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	versioner := storage.APIObjectVersioner{}
 	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
@@ -89,8 +93,8 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		server.V3Client,
 		compactor,
 		codec,
-		newPod,
-		newPodList,
+		NewPod,
+		NewPodList,
 		reverseKeyFunc,
 		prefix,
 		"/pods/",
@@ -106,7 +110,7 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 	return server, storage
 }
 
-func computePodKey(obj metav1.Object) string {
+func ComputePodKey(obj metav1.Object) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
@@ -138,7 +142,7 @@ func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, stora
 	return server, s
 }
 
-func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+func CompactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
@@ -176,7 +180,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 	}
 }
 
-func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+func CompactStore(c storage.Interface, client *clientv3.Client) storagetesting.Compaction {
 	var currentVersion int64
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
@@ -195,21 +199,20 @@ func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 		if compactRev != int64(rv) {
 			t.Fatalf("expected compact revision %d, got %d", rv, compactRev)
 		}
-		// Wait for compaction to be observed.
-		if c.cacher.compactor != nil {
-			for c.storage.CompactRevision() != int64(rv) {
+		// Wait for compaction to be observed when snapshot compaction is enabled.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+			for c.CompactRevision() < int64(rv) {
 				select {
 				case <-ctx.Done():
 					t.Fatal(ctx.Err())
 				case <-time.After(5 * time.Millisecond):
 				}
 			}
-			c.cacher.compactor.compactIfNeeded()
 		}
 	}
 }
 
-func increaseRVFunc(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+func IncreaseRVFunc(client *clientv3.Client) storagetesting.IncreaseRVFunc {
 	return func(ctx context.Context, t *testing.T) int64 {
 		resp, err := client.KV.Put(ctx, "increaseRV", "ok")
 		if err != nil {
