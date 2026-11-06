@@ -18,6 +18,7 @@ package route
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
+	"k8s.io/component-base/metrics/testutil"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
@@ -525,7 +527,7 @@ func TestHandleNodeUpdate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudControllerManagerWatchBasedRoutesReconciliation, true)
 
 	cluster := "my-k8s"
-	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}}
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01", ResourceVersion: "1"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}}
 
 	testCases := []struct {
 		description           string
@@ -536,27 +538,29 @@ func TestHandleNodeUpdate(t *testing.T) {
 		{
 			description:           "internal IP updated",
 			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
-			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.2"}}}},
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01", ResourceVersion: "2"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.2"}}}},
 			expectedWorkqueueItem: routesSyncKey,
 		},
 		{
 			description:           "pod CIDR updated",
 			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
-			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.121.0.0/24", PodCIDRs: []string{"10.121.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}},
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01", ResourceVersion: "2"}, Spec: v1.NodeSpec{PodCIDR: "10.121.0.0/24", PodCIDRs: []string{"10.121.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}},
 			expectedWorkqueueItem: routesSyncKey,
 		},
 		{
-			description: "node object not updated",
-			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
-			updatedNode: node,
+			description:           "informer resync with unchanged node",
+			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode:           node,
+			expectedWorkqueueItem: routeCorrectionsKey,
 		},
 		{
 			description: "unrelated node update",
 			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
 			updatedNode: v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "node-1",
-					UID:  "01",
+					Name:            "node-1",
+					UID:             "01",
+					ResourceVersion: "2",
 				},
 				Spec: v1.NodeSpec{
 					PodCIDR:  "10.120.0.0/24",
@@ -598,10 +602,95 @@ func TestHandleNodeUpdate(t *testing.T) {
 
 			rc.handleNodeUpdate(&node, &testCase.updatedNode)
 
-			if testCase.expectedWorkqueueItem != "" {
-				item, shutdown := rc.workqueue.Get()
-				require.False(t, shutdown, "workqueue is shutdown")
-				assert.Equal(t, testCase.expectedWorkqueueItem, item, "unexpected item from workqueue")
+			if testCase.expectedWorkqueueItem == "" {
+				assert.Equal(t, 0, rc.workqueue.Len(), "expected no reconcile to be enqueued")
+				return
+			}
+			require.Equal(t, 1, rc.workqueue.Len(), "expected exactly one reconcile to be enqueued")
+			item, shutdown := rc.workqueue.Get()
+			require.False(t, shutdown, "workqueue is shutdown")
+			assert.Equal(t, testCase.expectedWorkqueueItem, item, "unexpected item from workqueue")
+		})
+	}
+}
+
+func TestProcessNextWorkItemRecordsRouteSync(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudControllerManagerWatchBasedRoutesReconciliation, true)
+
+	cluster := "my-k8s"
+	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}}
+	existingRoute := &cloudprovider.Route{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24"}
+
+	testCases := []struct {
+		description     string
+		key             string
+		initialRoutes   []*cloudprovider.Route
+		cloudErr        error
+		expectedOutcome string
+		expectRequeue   bool
+	}{
+		{
+			description:     "node change creates a missing route",
+			key:             routesSyncKey,
+			expectedOutcome: outcomeChanged,
+		},
+		{
+			description:     "periodic reconcile corrects a missing route",
+			key:             routeCorrectionsKey,
+			expectedOutcome: outcomeChanged,
+		},
+		{
+			description:     "periodic reconcile with routes in sync",
+			key:             routeCorrectionsKey,
+			initialRoutes:   []*cloudprovider.Route{existingRoute},
+			expectedOutcome: outcomeNoop,
+		},
+		{
+			description:     "listing routes fails",
+			key:             routesSyncKey,
+			cloudErr:        errors.New("cloud unavailable"),
+			expectedOutcome: outcomeError,
+			expectRequeue:   true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route), Err: testCase.cloudErr}
+			for _, route := range testCase.initialRoutes {
+				cloud.RouteMap[route.Name] = &fakecloud.Route{ClusterName: cluster, Route: *route}
+			}
+			routes, ok := cloud.Routes()
+			require.True(t, ok, "fakecloud failed to run Routes()")
+			_, cidr, _ := netutils.ParseCIDRSloppy("10.120.0.0/16")
+
+			clientset := fake.NewClientset(node)
+			informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+			nodeInformer := informerFactory.Core().V1().Nodes()
+			require.NoError(t, nodeInformer.Informer().GetIndexer().Add(node))
+
+			rc, err := New(routes, clientset, nodeInformer, cluster, []*net.IPNet{cidr})
+			require.NoError(t, err)
+			defer rc.workqueue.ShutDown()
+			rc.recorder = record.NewFakeRecorder(10)
+
+			counter := routeSyncCount.WithLabelValues(testCase.expectedOutcome, testCase.key)
+			before, err := testutil.GetCounterMetricValue(counter)
+			require.NoError(t, err)
+
+			rc.workqueue.Add(testCase.key)
+			require.True(t, rc.processNextWorkItem(ctx), "worker must keep running after a reconcile")
+
+			after, err := testutil.GetCounterMetricValue(counter)
+			require.NoError(t, err)
+			assert.Equal(t, 1.0, after-before, "route_sync_total{outcome=%q,trigger=%q} not incremented", testCase.expectedOutcome, testCase.key)
+
+			if testCase.expectRequeue {
+				require.Equal(t, 1, rc.workqueue.Len(), "failed reconcile must be requeued")
+				item, _ := rc.workqueue.Get()
+				assert.Equal(t, testCase.key, item, "failed reconcile must be requeued with its trigger key")
+			} else {
+				assert.Equal(t, 0, rc.workqueue.Len(), "successful reconcile must not be requeued")
 			}
 		})
 	}
