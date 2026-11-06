@@ -17,6 +17,7 @@ limitations under the License.
 package cost
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -182,7 +183,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "fieldSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&fieldSelector=metadata.name=pod-000&timeoutSeconds=1",
+			query:              "watch=true&fieldSelector=metadata.name=pod-000",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -190,7 +191,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv=""`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&timeoutSeconds=1",
+			query:              "watch=true",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -198,7 +199,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv="" labelSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			query:              "watch=true&labelSelector=name=small-deployment-00",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -206,7 +207,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv="" nodeSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			query:              "watch=true&fieldSelector=spec.nodeName=kind-worker0",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -214,7 +215,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=0",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=0",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -222,7 +223,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=0 labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=0&labelSelector=name=small-deployment-00",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -230,7 +231,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=0 nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=0&fieldSelector=spec.nodeName=kind-worker0",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -238,7 +239,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=LATEST_RV",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=LATEST_RV&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=LATEST_RV",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -246,7 +247,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=FIRST_RV",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=FIRST_RV&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=FIRST_RV",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -254,7 +255,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=FIRST_RV labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=FIRST_RV&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=FIRST_RV&labelSelector=name=small-deployment-00",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -262,7 +263,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=FIRST_RV nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=FIRST_RV&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=FIRST_RV&fieldSelector=spec.nodeName=kind-worker0",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -270,7 +271,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv="" sendInitialEvents=false`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&sendInitialEvents=false&resourceVersionMatch=NotOlderThan&timeoutSeconds=1",
+			query:              "watch=true&sendInitialEvents=false&resourceVersionMatch=NotOlderThan",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -278,7 +279,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=0 sendInitialEvents=false",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&sendInitialEvents=false&resourceVersionMatch=NotOlderThan&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=0&sendInitialEvents=false&resourceVersionMatch=NotOlderThan",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -286,7 +287,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv="" WatchList`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&timeoutSeconds=1",
+			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -294,7 +295,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv="" WatchList labelSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -302,7 +303,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            `rv="" WatchList nodeSelector`,
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			query:              "watch=true&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -310,7 +311,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=0 WatchList",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -318,7 +319,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=0 WatchList labelSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&labelSelector=name=small-deployment-00",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -326,7 +327,7 @@ func BenchmarkRequestCost(b *testing.B) {
 			options:            "rv=0 WatchList nodeSelector",
 			httpMethod:         http.MethodGet,
 			path:               podsPath,
-			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0&timeoutSeconds=1",
+			query:              "watch=true&resourceVersion=0&sendInitialEvents=true&resourceVersionMatch=NotOlderThan&allowWatchBookmarks=true&fieldSelector=spec.nodeName=kind-worker0",
 			acceptContentTypes: watchFormats,
 		},
 		{
@@ -749,17 +750,33 @@ func runScenarioDryRun(b *testing.B, server http.Handler, sc requestScenario, wf
 	if sc.body != nil {
 		payload = sc.body(wf.accept, pods[0], 0)
 	}
-
 	// Warm lazy schema, converter, sync.Pool, and per-namespace admission
 	// caches before measurements start.
-	runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
+	warmupPath := fullPath
+	if sc.method == "WATCH" {
+		warmupPath += "&timeoutSeconds=1"
+	}
+	sink := newResponseSink(0, nil)
+	runHTTP(context.Background(), b, server, sc.httpMethod, warmupPath, reqContentType, wf.accept, payload, sink)
+	// Instead of waiting for request timeout let's close after same number of writes. Number of writes is more reliable than bytes written due to non-deterministic response size of Format=table.
+	expectedNumberOfWrites := sink.writes
 
 	var totalResponseBytes atomic.Int64
 	runtime.ReadMemStats(startMem)
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
+		var cancel context.CancelFunc = func() {}
+		var ctx context.Context = context.Background()
 		for pb.Next() {
-			n := runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload)
+			var sink *responseSink
+			if sc.method == "WATCH" {
+				ctx, cancel = context.WithCancel(context.Background())
+				sink = newResponseSink(expectedNumberOfWrites, cancel)
+			} else {
+				sink = newResponseSink(0, nil)
+			}
+			n := runHTTP(ctx, b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload, sink)
+			cancel()
 			totalResponseBytes.Add(int64(n))
 		}
 	})
@@ -791,7 +808,8 @@ func runScenarioCommitted(b *testing.B, tCtx ktesting.TContext, server http.Hand
 	}
 
 	ctx := b.Context()
-	runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payloads[1])
+	sink := newResponseSink(0, nil)
+	runHTTP(ctx, b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payloads[1], sink)
 	informer.wait(ctx, b, 1)
 	if sc.httpMethod == http.MethodPost {
 		clearNamespace(tCtx, informer, ephemeralNamespace)
@@ -805,7 +823,8 @@ func runScenarioCommitted(b *testing.B, tCtx ktesting.TContext, server http.Hand
 	for i := range b.N {
 		payload := payloads[i%2]
 		totalRequestBytes += int64(len(payload))
-		totalResponseBytes += int64(runHTTP(b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload))
+		sink := newResponseSink(0, nil)
+		totalResponseBytes += int64(runHTTP(ctx, b, server, sc.httpMethod, fullPath, reqContentType, wf.accept, payload, sink))
 	}
 	informer.wait(ctx, b, int64(b.N))
 	b.StopTimer()
