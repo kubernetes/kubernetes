@@ -1086,7 +1086,8 @@ func NewMainKubelet(ctx context.Context,
 
 	// setup volumeManager
 	var vmPodManager volumemanager.PodManager = klet.podManager
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) ||
+		utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
 		// The volume manager should only ever be aware of the 'allocated' pod.
 		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
 	}
@@ -3696,18 +3697,17 @@ type allocatedPodManager struct {
 }
 
 func (a *allocatedPodManager) getAllocatedPod(pod *v1.Pod) (*v1.Pod, bool) {
-	// TODO: Add a method on the allocation manager for volumeManager to read the allocated pod
-	// without requiring a deep copy or DeepEqual check, especially in preparation for dynamic volumes.
 	if pod == nil {
 		return nil, false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && allocation.PodHasMemoryBackedEmptyDir(pod) {
-		if allocatedPod, ok := a.allocationManager.UpdatePodFromAllocation(pod); ok {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) ||
+		(utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) && allocation.PodHasMemoryBackedEmptyDir(pod)) {
+		if allocatedPod := a.allocationManager.GetAllocatedPod(pod); allocatedPod != nil {
 			return allocatedPod, true
 		}
 	}
-	// When the feature gate is disabled, the pod has no memory-backed emptyDir volumes, or there is
-	// no allocation stored for this pod, return the pod as-is.
+	// When the feature gates are disabled, the pod has no memory-backed emptyDir volumes (without
+	// dynamic volumes enabled), or there is no allocation stored for this pod, return the pod as-is.
 	return pod, true
 }
 

@@ -60,7 +60,19 @@ func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.Pod
 
 	logger := klog.FromContext(ctx)
 	pod := attrs.Pod
-	allocatedPod, _ := h.allocationManager.UpdatePodFromAllocation(pod)
+	allocatedPod := h.allocationManager.GetAllocatedPod(pod)
+	if isDynamicVolumeUpdateRequested(pod, allocatedPod) {
+		if allowed, msg, reason := IsDynamicNodeLocalEphemeralVolumesAllowed(pod); !allowed {
+			logger.V(3).Info(msg, "pod", format.Pod(pod))
+			if isResizeRequested(pod, allocatedPod) {
+				metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
+			}
+			return lifecycle.PodAdmitResult{Admit: false, Reason: v1.PodReasonInfeasible, Message: msg}
+		}
+	}
+	if !isResizeRequested(pod, allocatedPod) {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
 	if resizable, msg, reason := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
 		metrics.PodInfeasibleResizes.WithLabelValues(reason).Inc()
@@ -124,6 +136,23 @@ func disallowResizeForMemoryBackedVolumes(desiredPod, allocatedPod *v1.Pod, cgro
 	}
 
 	return false, "", ""
+}
+
+func isDynamicVolumeUpdateRequested(desiredPod, allocatedPod *v1.Pod) bool {
+	if desiredPod == nil || allocatedPod == nil {
+		return false
+	}
+	for pair := range podutil.VolumePairs(desiredPod, allocatedPod) {
+		if pair.New == nil || pair.Old == nil {
+			return true
+		}
+	}
+	for pair := range podutil.ContainerPairs(desiredPod, allocatedPod, podutil.InitContainers|podutil.Containers) {
+		if pair.New != nil && pair.Old != nil && !apiequality.Semantic.DeepEqual(pair.New.VolumeMounts, pair.Old.VolumeMounts) {
+			return true
+		}
+	}
+	return false
 }
 
 func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desiredPod, allocatedPod *v1.Pod) (bool, string) {

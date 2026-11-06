@@ -6518,10 +6518,37 @@ func TestAllocatedPodManager(t *testing.T) {
 
 	gotPod, found = apm.GetPodByUID(podWithMemVol.UID)
 	require.True(t, found)
+	require.Len(t, gotPod.Spec.Volumes, 1)
+	assert.Same(t, &kl.allocationManager.GetAllocatedPod(desiredPodWithMemVol).Spec.Volumes[0], &gotPod.Spec.Volumes[0])
 	require.NotNil(t, gotPod.Spec.Volumes[0].EmptyDir.SizeLimit)
 	assert.True(t, size100Mi.Equal(*gotPod.Spec.Volumes[0].EmptyDir.SizeLimit))
 
 	gotPods := apm.GetPods()
 	require.Len(t, gotPods, 1)
 	assert.True(t, size100Mi.Equal(*gotPods[0].Spec.Volumes[0].EmptyDir.SizeLimit))
+
+	// With DynamicNodeLocalEphemeralVolumes enabled, even pods without memory-backed emptyDir
+	// volumes return the read-only allocated pod so unallocated dynamic volume additions are hidden.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	desiredWithDynVol := podWithoutMemVol.DeepCopy()
+	desiredWithDynVol.Spec.Volumes = append(desiredWithDynVol.Spec.Volumes, v1.Volume{
+		Name: "dyn-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{SecretName: "my-secret"},
+		},
+	})
+	kl.podManager.SetPods([]*v1.Pod{desiredWithDynVol})
+
+	gotPod, found = apm.GetPodByUID(podWithoutMemVol.UID)
+	require.True(t, found)
+	require.Len(t, gotPod.Spec.Volumes, 1)
+	assert.Same(t, &kl.allocationManager.GetAllocatedPod(desiredWithDynVol).Spec.Volumes[0], &gotPod.Spec.Volumes[0])
+	assert.Equal(t, "disk-vol", gotPod.Spec.Volumes[0].Name)
+
+	gotPods = apm.GetPods()
+	require.Len(t, gotPods, 1)
+	require.Len(t, gotPods[0].Spec.Volumes, 1)
+	assert.Equal(t, "disk-vol", gotPods[0].Spec.Volumes[0].Name)
 }

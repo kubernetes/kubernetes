@@ -34,3 +34,10 @@ func IsInPlacePodLevelResourcesVerticalScalingAllowed(pod *v1.Pod) (allowed bool
 	}
 	return true, "", ""
 }
+
+func IsDynamicNodeLocalEphemeralVolumesAllowed(_ *v1.Pod) (allowed bool, msg, reason string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		return false, "DynamicNodeLocalEphemeralVolumes is disabled", "ephemeral_volumes_feature_gate_off"
+	}
+	return true, "", ""
+}

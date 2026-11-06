@@ -165,6 +165,11 @@ func (sc *stateCheckpoint) GetPod(podUID types.UID) (*v1.Pod, bool) {
 	return sc.cache.GetPod(podUID)
 }
 
+// GetPodReadOnly returns current pod resource information without copying. Callers must not mutate the returned pod.
+func (sc *stateCheckpoint) GetPodReadOnly(podUID types.UID) (*v1.Pod, bool) {
+	return sc.cache.GetPodReadOnly(podUID)
+}
+
 // HasPod returns whether there is resource information for the pod
 func (sc *stateCheckpoint) HasPod(podUID types.UID) bool {
 	return sc.cache.HasPod(podUID)
@@ -279,6 +284,10 @@ func (sc *noopStateCheckpoint) GetPodUIDs() []types.UID {
 }
 
 func (sc *noopStateCheckpoint) GetPod(_ types.UID) (*v1.Pod, bool) {
+	return nil, false
+}
+
+func (sc *noopStateCheckpoint) GetPodReadOnly(_ types.UID) (*v1.Pod, bool) {
 	return nil, false
 }
 

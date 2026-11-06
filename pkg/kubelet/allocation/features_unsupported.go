@@ -27,3 +27,7 @@ func IsInPlacePodVerticalScalingAllowed(_ *v1.Pod) (allowed bool, msg, reason st
 func IsInPlacePodLevelResourcesVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg, reason string) {
 	return false, "In-place pod-level resources resize is not supported on this node", "unsupported_platform"
 }
+
+func IsDynamicNodeLocalEphemeralVolumesAllowed(_ *v1.Pod) (allowed bool, msg, reason string) {
+	return false, "Dynamic node-local ephemeral volumes are not supported on this node", "unsupported_platform"
+}

@@ -71,6 +71,11 @@ type Manager interface {
 	// field that is gated on allocation is pending. Callers must not mutate the returned pod.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
+	// GetAllocatedPod returns a read-only view of pod with its spec replaced by the currently
+	// allocated spec (preserving passthrough fields from pod) without deep-copying or comparing
+	// specs. Callers must not mutate the returned pod. If no allocation is stored, pod is returned as-is.
+	GetAllocatedPod(pod *v1.Pod) *v1.Pod
+
 	// SetAllocatedResources checkpoints the allocation for a pod.
 	SetAllocatedResources(logger klog.Logger, allocatedPod *v1.Pod) error
 
@@ -249,8 +254,10 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 		}
 
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
+		allocatedPod := m.GetAllocatedPod(pod)
+		resizeRequested := isResizeRequested(pod, allocatedPod)
 
-		resizeAllocated, err := m.handlePodResourcesResize(ctx, pod)
+		allocated, err := m.handlePodResourcesResize(ctx, pod)
 		switch {
 		case err != nil:
 			logger.Error(err, "Failed to handle pod resources resize", "pod", klog.KObj(pod))
@@ -260,17 +267,23 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 			newPendingResizes = append(newPendingResizes, uid)
 		case m.statusManager.IsPodResizeInfeasible(uid):
 			logger.V(4).Info("Pod resize is infeasible", "pod", klog.KObj(pod))
-		default:
-			logger.V(4).Info("Pod resize successfully allocated", "pod", klog.KObj(pod))
-			successfulResizes = append(successfulResizes, pod)
-			if isDeferred {
-				metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+		case allocated:
+			logger.V(4).Info("Pod dynamic update successfully allocated", "pod", klog.KObj(pod))
+			if resizeRequested {
+				logger.V(4).Info("Pod resize successfully allocated", "pod", klog.KObj(pod))
+				successfulResizes = append(successfulResizes, pod)
+				if isDeferred {
+					metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+				}
 			}
+		default:
+			// Either desired pod already matched allocated pod (!updated), or a non-resize
+			// dynamic update was rejected by an admit handler (already logged in handlePodResourcesResize).
 		}
 
 		// If the pod resize status has changed, we need to update the pod status.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
-		if resizeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
+		if allocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
 			m.podProvider.SyncPodNow(ctx, pod)
 		}
 	}
@@ -465,6 +478,28 @@ func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 	return &result, true
 }
 
+func (m *manager) GetAllocatedPod(pod *v1.Pod) *v1.Pod {
+	if pod == nil {
+		return nil
+	}
+
+	allocated, ok := m.allocated.GetPodReadOnly(pod.UID)
+	if !ok {
+		return pod
+	}
+
+	// TODO: Remove in v1.39 when the V1 checkpoint format is no longer supported (see migrateV1ToV2).
+	if state.IsMigratedFromV1(allocated) {
+		updated, _ := state.UpdatePodFromV1(pod, allocated)
+		return updated
+	}
+
+	result := *pod
+	result.Spec = allocated.Spec
+	copyPassthroughFields(&result.Spec, &pod.Spec)
+	return &result
+}
+
 // copyPassthroughFields sets the fields of spec that take effect as soon as they change in the pod
 // to their values in desired.
 func copyPassthroughFields(spec, desired *v1.PodSpec) {
@@ -474,20 +509,32 @@ func copyPassthroughFields(spec, desired *v1.PodSpec) {
 	spec.EphemeralContainers = desired.EphemeralContainers
 	// TODO: The image becomes gated with dynamic containers, at which point we
 	// should stop copying the image here.
-	copyImages(spec.Containers, desired.Containers)
-	copyImages(spec.InitContainers, desired.InitContainers)
+	spec.Containers = copyImages(spec.Containers, desired.Containers)
+	spec.InitContainers = copyImages(spec.InitContainers, desired.InitContainers)
 }
 
-// copyImages sets the image of each container to the one of the container with the same name in desired.
-func copyImages(containers, desired []v1.Container) {
+// copyImages returns containers with each container's image set to the one of the container with
+// the same name in desired, cloning the slice only if an image differs so read-only callers do not
+// mutate the backing array of a stored pod.
+func copyImages(containers, desired []v1.Container) []v1.Container {
+	var cloned []v1.Container
 	for i := range containers {
 		for j := range desired {
 			if desired[j].Name == containers[i].Name {
-				containers[i].Image = desired[j].Image
+				if containers[i].Image != desired[j].Image {
+					if cloned == nil {
+						cloned = slices.Clone(containers)
+					}
+					cloned[i].Image = desired[j].Image
+				}
 				break
 			}
 		}
 	}
+	if cloned != nil {
+		return cloned
+	}
+	return containers
 }
 
 // HasPodAllocatedResources returns whether a pod has been allocated resources.
@@ -576,14 +623,22 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		return true, nil
 	}
 
-	if reason != "" && resizeRequested {
-		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
-			eventType := events.ResizeDeferred
-			if reason == v1.PodReasonInfeasible {
-				eventType = events.ResizeInfeasible
+	if reason != "" {
+		if resizeRequested {
+			if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
+				eventType := events.ResizeDeferred
+				if reason == v1.PodReasonInfeasible {
+					eventType = events.ResizeInfeasible
+				}
+				msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
+				m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
 			}
-			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+		} else {
+			// A non-resize dynamic update can be rejected by node-level admit handlers
+			// (e.g., evictionAdmitHandler under memory/disk pressure, shutdownManagerAdmitHandler
+			// during node shutdown, or podResizesAdmitHandler when the feature gate is disabled).
+			// TODO: For beta, introduce a mechanism to retry dynamic volume changes similar to resizes.
+			logger.Info("Pod dynamic update could not be allocated", "pod", klog.KObj(pod), "reason", reason, "message", message)
 		}
 	}
 
