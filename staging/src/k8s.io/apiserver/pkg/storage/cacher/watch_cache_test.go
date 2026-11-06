@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
@@ -1480,13 +1481,14 @@ func BenchmarkWatchCache_updateCache(b *testing.B) {
 }
 
 func TestHistogramCacheReadWait(t *testing.T) {
+	t.Cleanup(metrics.WatchCacheReadWait.Reset)
 	registry := k8smetrics.NewKubeRegistry()
 	if err := registry.Register(metrics.WatchCacheReadWait); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	ctx := context.Background()
 	testedMetrics := "apiserver_watch_cache_read_wait_seconds"
-	store := newTestWatchCache(2, DefaultEventFreshDuration, &cache.Indexers{})
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
 	fakeClock := store.config.clock.(*testingclock.FakeClock)
 
@@ -1497,7 +1499,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 		want            string
 	}{
 		{
-			desc:            "resourceVersion is non-zero",
+			desc:            "resourceVersion is non-zero without requestInfo",
 			resourceVersion: 5,
 			run: func(t *testing.T) {
 				if err := store.Add(makeTestPod("foo", 2)); err != nil {
@@ -1525,22 +1527,66 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			want: `
 		    # HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
         # TYPE apiserver_watch_cache_read_wait_seconds histogram
-	      apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.05"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.1"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.2"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.4"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.6"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.8"} 0
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.25"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.5"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="2"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="3"} 1
-        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="+Inf"} 1
-        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods"} 1
-        apiserver_watch_cache_read_wait_seconds_count{group="",resource="pods"} 1
+	      apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.005"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.025"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.05"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.1"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.2"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.4"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.6"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="0.8"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="1.25"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="1.5"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="3"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="",le="+Inf"} 1
+        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods",verb=""} 1
+        apiserver_watch_cache_read_wait_seconds_count{group="",resource="pods",verb=""} 1
+`,
+		},
+		{
+			desc:            "resourceVersion is non-zero with requestInfo",
+			resourceVersion: 8,
+			run: func(t *testing.T) {
+				reqCtx := request.WithRequestInfo(ctx, &request.RequestInfo{Verb: "list"})
+				listCompleted := make(chan struct{})
+				go func() {
+					defer close(listCompleted)
+					if _, _, err := store.WaitUntilFreshAndGetList(reqCtx, "/prefix/", storage.ListOptions{ResourceVersion: "8", Recursive: true, Predicate: storage.Everything}); err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+				}()
+
+				time.Sleep(10 * time.Millisecond)
+
+				fakeClock.Step(1 * time.Second)
+
+				if err := store.Add(makeTestPod("baz", 8)); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+
+				<-listCompleted
+			},
+			want: `
+		    # HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
+        # TYPE apiserver_watch_cache_read_wait_seconds histogram
+	      apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.005"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.025"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.05"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.1"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.2"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.4"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.6"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="0.8"} 0
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="1.25"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="1.5"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="3"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",verb="LIST",le="+Inf"} 1
+        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods",verb="LIST"} 1
+        apiserver_watch_cache_read_wait_seconds_count{group="",resource="pods",verb="LIST"} 1
 `,
 		},
 		{
