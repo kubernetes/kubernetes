@@ -296,9 +296,12 @@ type VictimExtensions interface {
 	fwk.Plugin
 	// AssumeVictim is called once the preemption of victim is under way: the
 	// API call which deletes it succeeded, it got rejected in memory, or its
-	// deletion had started already. Plugins track what the victim releases
+	// deletion had started already, also when the API server shows that
+	// after a failed call. Plugins track what the victim releases
 	// asynchronously until it got released. Victims whose preemption failed
-	// are not reported, so nothing needs to be undone.
+	// are not reported, so nothing needs to be undone. A preemptor which
+	// preempts asynchronously doesn't get scheduled again before
+	// AssumeVictim was called for its victims whose preemption is under way.
 	//
 	// It may be called concurrently, also after the scheduling cycle which
 	// selected the victim ended.

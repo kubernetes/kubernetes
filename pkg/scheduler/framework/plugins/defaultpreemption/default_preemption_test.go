@@ -3110,7 +3110,8 @@ func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod)
 
 // TestPreemptNominationExtensions checks that preemption asks plugins with
 // VictimExtensions whether the pod may preempt and reports victims once
-// their deletion succeeded, but not when it failed. Preparing the
+// their deletion succeeded, but not when it failed, unless the API server
+// shows the victim deleted nonetheless. Preparing the
 // nomination is up to the framework, once PostFilter nominated the pod.
 func TestPreemptNominationExtensions(t *testing.T) {
 	metrics.Register()
@@ -3122,6 +3123,7 @@ func TestPreemptNominationExtensions(t *testing.T) {
 	for name, tc := range map[string]struct {
 		asyncPreemption bool
 		deleteErr       error
+		deleteApplied   bool
 		wantCalls       []string
 	}{
 		"sync": {
@@ -3140,6 +3142,19 @@ func TestPreemptNominationExtensions(t *testing.T) {
 			deleteErr:       errors.New("injected delete error"),
 			wantCalls:       []string{eligibleCall},
 		},
+		// The API server deleted the victim, but the call failed anyway,
+		// for example because the response got lost.
+		"sync-failure-deleted": {
+			deleteErr:     errors.New("injected delete error"),
+			deleteApplied: true,
+			wantCalls:     []string{eligibleCall, assumeCall},
+		},
+		"async-failure-deleted": {
+			asyncPreemption: true,
+			deleteErr:       errors.New("injected delete error"),
+			deleteApplied:   true,
+			wantCalls:       []string{eligibleCall, assumeCall},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -3151,7 +3166,8 @@ func TestPreemptNominationExtensions(t *testing.T) {
 			defer cancel()
 
 			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
-			client := clientsetfake.NewClientset()
+			// The executor asks the API server whether a victim got deleted after a failed delete call.
+			client := clientsetfake.NewClientset(victim.DeepCopy())
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods().Informer()
 			for _, pod := range []*v1.Pod{preemptor, victim} {
@@ -3165,6 +3181,11 @@ func TestPreemptNominationExtensions(t *testing.T) {
 			deleted := make(chan []string, 1)
 			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				deleted <- nominationExtensions.Calls()
+				if tc.deleteApplied {
+					if err := client.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), victim.Namespace, victim.Name); err != nil {
+						t.Error(err)
+					}
+				}
 				return true, nil, tc.deleteErr
 			})
 

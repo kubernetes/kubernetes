@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -42,9 +44,16 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
+// victimLookupTimeout limits how long the executor waits for the API server
+// to tell whether a victim whose preemption failed got deleted nonetheless.
+const victimLookupTimeout = 10 * time.Second
+
 type pendingVictim struct {
 	namespace string
 	name      string
+	// gatedBeforeAssume is non-nil with DRAPreemption and gets set by
+	// gateUntilAssumed.
+	gatedBeforeAssume *atomic.Bool
 }
 
 // ExecutorPreemptor is an interface that represents a preemptor.
@@ -172,6 +181,45 @@ func (e *Executor) assumeVictim(ctx context.Context, victim *v1.Pod) {
 	}
 }
 
+// preemptVictim preempts the victim and lets plugins track it once its
+// preemption is under way. That includes a failed call after which the API
+// server shows the victim deleted, for example because the response of a
+// successful delete call got lost.
+func (e *Executor) preemptVictim(ctx context.Context, c fwk.PreemptionCandidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
+	preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName)
+	if err != nil {
+		if e.victimDeletionStarted(ctx, victim) {
+			e.assumeVictim(ctx, victim)
+		}
+		return false, err
+	}
+	e.assumeVictim(ctx, victim)
+	return preemptedInMemory, nil
+}
+
+// victimDeletionStarted asks the API server whether the victim is being
+// deleted or gone after its preemption failed. Only plugins with
+// VictimExtensions need to know, so it always returns false without
+// DRAPreemption.
+func (e *Executor) victimDeletionStarted(ctx context.Context, victim *v1.Pod) bool {
+	if !e.fts.EnableDRAPreemption {
+		return false
+	}
+	// ctx gets cancelled when the preemption of another victim fails.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), victimLookupTimeout)
+	defer cancel()
+	pod, err := e.fh.ClientSet().CoreV1().Pods(victim.Namespace).Get(ctx, victim.Name, metav1.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		return true
+	case err != nil:
+		klog.FromContext(ctx).V(2).Info("Cannot check whether the victim got deleted after its preemption failed", "victim", klog.KObj(victim), "err", err)
+		return false
+	default:
+		return pod.UID != victim.UID || pod.DeletionTimestamp != nil
+	}
+}
+
 // ActuatePodPreemption actuates the preemption given preemptorPod to be scheduled on targetNode and a list of victims to be evicted.
 // victims to be evicted.
 func (e *Executor) ActuatePodPreemption(ctx context.Context, candidate fwk.PreemptionCandidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
@@ -225,13 +273,13 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 	errCh := parallelize.NewResultChannel[error]()
 	// PreEnqueue only watches the last victim for completion, so activate when that victim won't emit a deletion event.
 	preemptedLastVictimInMemory := false
+	// With DRAPreemption, PreEnqueue may have held back the preemptor until AssumeVictim ran for the last victim.
+	lastVictimGatedBeforeAssume := false
 	preemptPod := func(index int) {
 		victim := victimPods[index]
-		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
+		if _, err := e.preemptVictim(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
-			return
 		}
-		e.assumeVictim(ctx, victim)
 	}
 
 	e.mu.Lock()
@@ -252,7 +300,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		}()
 		defer func() {
-			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory {
+			if result == metrics.GoroutineResultError || preemptedLastVictimInMemory || lastVictimGatedBeforeAssume {
 				// When API call isn't successful or no victim deletion event will be produced, the preemptor's
 				// Pods may get stuck in the unschedulable pod pool in the worst case.
 				e.fh.Activate(logger, preemptor.Pods())
@@ -297,21 +345,28 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		// re-entry to the scheduling cycle.
 		if preemptLastVictim {
 			lastVictim := victimPods[len(victimPods)-1]
+			pending := pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
+			if e.fts.EnableDRAPreemption {
+				pending.gatedBeforeAssume = &atomic.Bool{}
+			}
 			e.mu.Lock()
-			e.lastVictimsPendingPreemption[preemptor.UID()] = pendingVictim{namespace: lastVictim.Namespace, name: lastVictim.Name}
+			e.lastVictimsPendingPreemption[preemptor.UID()] = pending
 			e.mu.Unlock()
 
-			preemptedInMemory, err := e.PreemptPod(ctx, c, preemptor, lastVictim, pluginName)
+			preemptedInMemory, err := e.preemptVictim(ctx, c, preemptor, lastVictim, pluginName)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption of the last victim")
 				result = metrics.GoroutineResultError
 			} else {
-				e.assumeVictim(ctx, lastVictim)
 				preemptedLastVictimInMemory = preemptedInMemory
 			}
 		}
 		e.mu.Lock()
 		e.preempting.Delete(preemptor.UID())
+		// Read under the lock: once the preemptor is not in preempting anymore, isRunningPreemption doesn't gate it.
+		if pending, ok := e.lastVictimsPendingPreemption[preemptor.UID()]; ok && pending.gatedBeforeAssume != nil {
+			lastVictimGatedBeforeAssume = pending.gatedBeforeAssume.Load()
+		}
 		delete(e.lastVictimsPendingPreemption, preemptor.UID())
 		e.mu.Unlock()
 
@@ -346,11 +401,9 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 			e.assumeVictim(ctx, victim)
 			return
 		}
-		if _, err := e.PreemptPod(ctx, c, preemptor, victim, pluginName); err != nil {
+		if _, err := e.preemptVictim(ctx, c, preemptor, victim, pluginName); err != nil {
 			errCh.SendWithCancel(err, cancel)
-			return
 		}
-		e.assumeVictim(ctx, victim)
 	}, pluginName)
 	if err := errCh.Receive(); err != nil {
 		metricsResult = metrics.GoroutineResultError
@@ -444,13 +497,28 @@ func (e *Executor) isRunningPreemption(uid types.UID) bool {
 	victimPod, err := e.podLister.Pods(victim.namespace).Get(victim.name)
 	if err != nil {
 		// Victim already deleted, preemption is done.
-		return false
+		return victim.gateUntilAssumed()
 	}
 	if victimPod.DeletionTimestamp != nil {
 		// Victim deletion has started, preemption is done.
-		return false
+		return victim.gateUntilAssumed()
 	}
 	// Preemption of the last pod is still ongoing.
+	return true
+}
+
+// gateUntilAssumed is called when the informer shows the victim deleted or
+// terminating. That may happen before the delete call returned and
+// AssumeVictim told plugins that resources of the victim are being released.
+// Until then, PodEligibleToPreempt of VictimExtensions would let the
+// preemptor preempt more pods. With DRAPreemption, it therefore returns true
+// and records that the goroutine has to activate the preemptor when it is
+// done. The event which would have let the preemptor pass may be gone by then.
+func (v pendingVictim) gateUntilAssumed() bool {
+	if v.gatedBeforeAssume == nil {
+		return false
+	}
+	v.gatedBeforeAssume.Store(true)
 	return true
 }
 
