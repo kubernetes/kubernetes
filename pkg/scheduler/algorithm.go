@@ -712,6 +712,9 @@ func (a *SchedulingAlgorithm) UnreserveAndForgetFromCache(ctx context.Context, s
 // AssumeAndReserveInSnapshot assumes the pod into the transient node snapshot and runs Reserve plugins.
 // Returns a revert function to roll back the assumption and reservation from the snapshot if needed.
 //
+// The nomination of the pod stays in the PodNominator, because the assumption is tentative.
+// RunFilterPluginsWithNominatedPods ignores it while the pod is assumed in the snapshot.
+//
 // This method mutates shared snapshot structures (nodeInfoSnapshot) without internal mutex locks.
 // It is not thread-safe; concurrent calls on the same snapshot are unsupported and callers must ensure
 // exclusive access.
@@ -727,7 +730,6 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 		logger.Error(err, "Scheduler snapshot AssumePod failed")
 		return fwk.AsStatus(err), nil
 	}
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
 
 	revert := func() {
 		if err := a.unreserveAndForgetFromSnapshot(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
@@ -741,8 +743,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInSnapshot(ctx context.Context, st
 	return nil, revert
 }
 
-// unreserveAndForgetFromSnapshot runs Unreserve plugins, forgets the pod from the node snapshot,
-// and restores any existing pod nomination.
+// unreserveAndForgetFromSnapshot runs Unreserve plugins and forgets the pod from the node snapshot.
 //
 // This method mutates shared snapshot structures (nodeInfoSnapshot) without internal mutex locks.
 // It is not thread-safe; concurrent calls on the same snapshot are unsupported.
@@ -751,15 +752,5 @@ func (a *SchedulingAlgorithm) unreserveAndForgetFromSnapshot(ctx context.Context
 
 	logger := klog.FromContext(ctx)
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
-	if err := a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod); err != nil {
-		return err
-	}
-	if assumedPodInfo.Pod.Status.NominatedNodeName != "" {
-		// The assume removed the nomination; reverting a tentative assume restores it.
-		schedFramework.AddNominatedPod(logger, assumedPodInfo.PodInfo, &fwk.NominatingInfo{
-			NominatedNodeName: assumedPodInfo.Pod.Status.NominatedNodeName,
-			NominatingMode:    fwk.ModeOverride,
-		})
-	}
-	return nil
+	return a.nodeInfoSnapshot.ForgetPod(logger, assumedPodInfo.Pod)
 }

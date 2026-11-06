@@ -1419,9 +1419,19 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	return status
 }
 
+// assumedPodsLister is implemented by the scheduler's snapshot, which knows
+// the pods that a pod group scheduling cycle assumed in it tentatively.
+type assumedPodsLister interface {
+	IsPodAssumed(uid types.UID) bool
+}
+
 // addGENominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
+//
+// Nominated pods which the pod group scheduling cycle assumed in the snapshot
+// are skipped: they are in the snapshot already, on the node where the cycle
+// placed them, and keep their nomination in case the cycle gets reverted.
 func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state fwk.CycleState, nodeInfo fwk.NodeInfo) (bool, fwk.CycleState, fwk.NodeInfo, error) {
 	if fh == nil {
 		// This may happen only in tests.
@@ -1432,10 +1442,14 @@ func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state f
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
+	assumed, _ := fh.SnapshotSharedLister().(assumedPodsLister)
 	nodeInfoOut := nodeInfo.Snapshot()
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
+		if assumed != nil && assumed.IsPodAssumed(pi.GetPod().UID) {
+			continue
+		}
 		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID {
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)

@@ -231,7 +231,8 @@ type AllocationChangeResult struct {
 // call back into the scheduling queue or the API server.
 //
 // Pods of pod groups and shared claims are not supported yet: snapshot
-// assumes of pod group cycles are not reported.
+// assumes of pod group cycles are not reported. They don't end the
+// nomination either.
 //
 // The interface is internal to kube-scheduler and only used when the
 // DRAPreemption feature gate is enabled. It may change or move into the
