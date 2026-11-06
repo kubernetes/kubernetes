@@ -58,6 +58,8 @@ func testNodeAllocatableResources(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Run("OverheadMappingsInsufficient", testNodeAllocatableResourcesWithOverheadInsufficient)
 	tCtx.Run("ClaimSharingOverhead", testNodeAllocatableResourceClaimSharingOverhead)
 	tCtx.Run("ExtendedResource", testNodeAllocatableExtendedResource)
+	tCtx.Run("PerRequestEntries", testNodeAllocatableResourcesPerRequestEntries)
+	tCtx.Run("ExtendedResourcePerContainerEntries", testNodeAllocatableExtendedResourcePerContainerEntries)
 }
 
 func setupTestEnv(tCtx ktesting.TContext, nodeNum int) *testEnv {
@@ -981,12 +983,16 @@ func testNodeAllocatableExtendedResource(tCtx ktesting.TContext) {
 	// pod stays unschedulable because the pod status patch fails validation.
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	// No container references the claim that the scheduler creates for the extended resource,
-	// so its mapped CPU is only in the pod level entry.
+	// The container that requests the extended resource uses the device of the claim that the
+	// scheduler creates for it, so the mapped CPU is in the limits of that container.
 	expectedStatus := []v1.ExtraNodeAllocatableResource{
 		{
 			ContainerName: "",
 			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		{
+			ContainerName: pod.Spec.Containers[0].Name,
 			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 		},
 	}
@@ -1030,4 +1036,76 @@ func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {
 	pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
 	pod2 = createPod(tCtx, env.namespace, "", pod2, claim) // Pass the existing claim
 	waitForPodScheduled(tCtx, env.namespace, pod2.Name)
+}
+
+func perContainerOverheadDevice(name string) resourceapi.Device {
+	return resourceapi.Device{
+		Name: name,
+		NodeAllocatableResources: map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+			v1.ResourceMemory: {Overhead: &resourceapi.NodeAllocatableOverhead{PerContainer: new(resource.MustParse("50"))}},
+		},
+	}
+}
+
+// Two containers each reference a different request of one claim, so each
+// container gets only the overhead of the device of its request.
+func testNodeAllocatableResourcesPerRequestEntries(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 5)
+	slice := makeSlice(env, []resourceapi.Device{perContainerOverheadDevice("per-request-a"), perContainerOverheadDevice("per-request-b")})
+	env.poolName = env.namespace + "-pool-per-request"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	claimName := "claim-per-request"
+	claim := st.MakeResourceClaim().Name(claimName).Namespace(env.namespace).Request(env.class.Name).Request(env.class.Name).Obj()
+	claim = createClaim(tCtx, env.namespace, "", env.class, claim)
+
+	pod := st.MakePod().Name("pod-per-request").Namespace(env.namespace).Obj()
+	pod.Spec.Containers = []v1.Container{
+		{Name: "c1", Image: "test-image", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: claimName, Request: "req-1"}}}},
+		{Name: "c2", Image: "test-image", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: claimName, Request: "req-2"}}}},
+	}
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod = createPod(tCtx, env.namespace, "", pod, claim)
+
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	overhead := v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+		{ContainerName: "c1", Requests: overhead, Limits: overhead},
+		{ContainerName: "c2", Requests: overhead, Limits: overhead},
+	})
+}
+
+// Two containers each request one device through an extended resource, so
+// each container gets only the overhead of its own device.
+func testNodeAllocatableExtendedResourcePerContainerEntries(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+	env := setupTestEnv(tCtx, 5)
+	resourceName := resourceapi.ResourceDeviceClassPrefix + env.class.Name
+	slice := makeSlice(env, []resourceapi.Device{perContainerOverheadDevice("ext-per-container-a"), perContainerOverheadDevice("ext-per-container-b")})
+	env.poolName = env.namespace + "-pool-ext-per-container"
+	slice.Spec.Pool.Name = env.poolName
+	createSliceAndStartScheduler(tCtx, slice)
+
+	pod := st.MakePod().Name("pod-ext-per-container").Namespace(env.namespace).Container("image").Container("image").Obj()
+	pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": env.nodeName}
+	pod = createPodWithExtendedResource(tCtx, env.namespace, resourceName, "1", pod)
+
+	waitForPodScheduled(tCtx, env.namespace, pod.Name)
+	overhead := v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+		{ContainerName: "con0", Requests: overhead, Limits: overhead},
+		{ContainerName: "con1", Requests: overhead, Limits: overhead},
+	})
 }
