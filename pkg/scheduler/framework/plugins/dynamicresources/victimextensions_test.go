@@ -146,7 +146,7 @@ func testPodEligibleToPreempt(tCtx ktesting.TContext) {
 		pending     bool
 		// preemptionFailed skips AssumeVictim.
 		preemptionFailed bool
-		// change runs after AddNominatedPod and AssumeVictim.
+		// change runs after AddAllocation and AssumeVictim.
 		change     func(tCtx ktesting.TContext, testCtx *testContext)
 		nodeName   string
 		pod        *v1.Pod
@@ -200,7 +200,7 @@ func testPodEligibleToPreempt(tCtx ktesting.TContext) {
 		"nomination-ended": {
 			// The claim still blocks the node.
 			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				testCtx.p.RemoveNominatedPod(tCtx, preemptor, "")
+				testCtx.p.RemoveAllocation(tCtx, preemptor, nodeName)
 			},
 			nodeName:   nodeName,
 			wantReason: notEligible,

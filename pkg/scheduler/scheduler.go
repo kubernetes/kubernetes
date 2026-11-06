@@ -164,6 +164,9 @@ type ScheduleResult struct {
 	FeasibleNodes int
 	// The nominating info for scheduling cycle.
 	nominatingInfo *fwk.NominatingInfo
+	// Events of AllocationExtensions for a pod which failed after it got
+	// assumed, to be moved after the pod went back to the queue.
+	allocationEvents []framework.AllocationEvent
 }
 
 // WithComponentConfigVersion sets the component config version to the
@@ -355,6 +358,11 @@ func New(ctx context.Context,
 		podSigners[profileName] = profile.SignPod
 	}
 
+	var nominationChangeHandler internalqueue.NominationChangeHandler
+	if feature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		nominationChangeHandler = newNominationChangeHandler(profiles)
+	}
+
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[comps.options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
@@ -369,6 +377,7 @@ func New(ctx context.Context,
 		internalqueue.WithMetricsRecorder(comps.metricsRecorder),
 		internalqueue.WithAPIDispatcher(comps.apiDispatcher),
 		internalqueue.WithPodSigners(podSigners),
+		internalqueue.WithNominationChangeHandler(nominationChangeHandler),
 	)
 
 	schedulerCache := comps.GetCache()
@@ -642,4 +651,33 @@ func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) error {
 
 	sched.algorithm = algorithm
 	return nil
+}
+
+// newNominationChangeHandler forwards changes of nominated nodes in the
+// PodNominator to the AllocationExtensions of the pod's profile, as the
+// removal of the old nomination followed by the addition of the new one. It
+// gets called while the scheduling queue is locked.
+func newNominationChangeHandler(profiles profile.Map) internalqueue.NominationChangeHandler {
+	return func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.AllocationEvent {
+		schedFramework, err := profiles.FrameworkForPod(pod)
+		if err != nil {
+			return nil
+		}
+		ctx := klog.NewContext(context.Background(), logger)
+		// Nominations are for pods without a node. A pod whose nomination
+		// ended because it got assumed or bound is passed without its node,
+		// so that plugins can tell these calls from those of the assumed pod.
+		if pod.Spec.NodeName != "" {
+			pod = pod.DeepCopy()
+			pod.Spec.NodeName = ""
+		}
+		var events []framework.AllocationEvent
+		if oldNodeName != "" {
+			events = append(events, schedFramework.RunAllocationExtensionsRemoveAllocation(ctx, pod, oldNodeName)...)
+		}
+		if newNodeName != "" {
+			events = append(events, schedFramework.RunAllocationExtensionsAddAllocation(ctx, pod, newNodeName)...)
+		}
+		return events
+	}
 }

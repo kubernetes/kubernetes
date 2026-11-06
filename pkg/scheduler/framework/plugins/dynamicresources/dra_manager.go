@@ -79,6 +79,9 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
 		manager.nominations = newClaimNominations()
+		if _, err := informerFactory.Core().V1().Pods().Informer().AddEventHandler(manager.nominations.handlers(logger)); err != nil {
+			logger.Error(err, "Failed to watch pods for claim nominations")
+		}
 		manager.victimClaims = newVictimClaimTracker()
 		manager.resourceClaimTracker.cache.AddEventHandler(manager.victimClaims.handlers(logger))
 	}
@@ -105,18 +108,6 @@ func (s *DefaultDRAManager) nominationStore() *claimNominations {
 
 func (s *DefaultDRAManager) victimClaimStore() *victimClaimTracker {
 	return s.victimClaims
-}
-
-// SetNominationReleaseHandler installs the function which gets called with
-// a deallocated claim when devices held for a preemptor become available
-// again without a real claim event. The handler must make pods other than the
-// preemptor with the given priority or lower that wait for devices try
-// again. Must be called before scheduling starts. It does nothing if the
-// DRAPreemption feature is disabled.
-func (s *DefaultDRAManager) SetNominationReleaseHandler(handler func(claim *resourceapi.ResourceClaim, holderUID types.UID, priority int32)) {
-	if s.nominations != nil {
-		s.nominations.releaseHandler = handler
-	}
 }
 
 func (s *DefaultDRAManager) ResourceClaims() fwk.ResourceClaimTracker {

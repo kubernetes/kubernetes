@@ -1579,3 +1579,60 @@ informer_queued_items{group="",name="kube-scheduler",resource="pods",version="v1
 		t.Error(err)
 	}
 }
+
+// TestNominationChangeHandler checks that the scheduling queue reaches the
+// AllocationExtensions of the pod's profile and gets their events.
+func TestNominationChangeHandler(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	released := framework.AllocationEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
+	allocationExtensions := &tf.FakeAllocationExtensionsPlugin{ReleaseEvents: []framework.AllocationEvent{released}}
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			tf.RegisterPreFilterPlugin(allocationExtensions.Name(), tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)),
+		},
+		testSchedulerName,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newNominationChangeHandler(profile.Map{testSchedulerName: schedFramework})
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").SchedulerName(testSchedulerName).Obj()
+	otherProfile := st.MakePod().Name("other").Namespace("ns").UID("other").SchedulerName("other-scheduler").Obj()
+
+	if events := handler(logger, pod, "", "node1"); len(events) != 0 {
+		t.Errorf("Unexpected events for a new nomination: %v", events)
+	}
+	if diff := cmp.Diff([]framework.AllocationEvent{released}, handler(logger, pod, "node1", "node2")); diff != "" {
+		t.Errorf("Unexpected events for a moved nomination (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]framework.AllocationEvent{released}, handler(logger, pod, "node2", "node2")); diff != "" {
+		t.Errorf("Unexpected events for a renewed nomination (-want, +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]framework.AllocationEvent{released}, handler(logger, pod, "node2", "")); diff != "" {
+		t.Errorf("Unexpected events for an ended nomination (-want, +got):\n%s", diff)
+	}
+	if events := handler(logger, otherProfile, "node1", ""); len(events) != 0 {
+		t.Errorf("Unexpected events for a pod of an unknown profile: %v", events)
+	}
+	// The nomination of an assumed pod ends without its node, and the
+	// pod itself stays as it is.
+	assumed := pod.DeepCopy()
+	assumed.Spec.NodeName = "node1"
+	handler(logger, assumed, "node1", "")
+	if assumed.Spec.NodeName != "node1" {
+		t.Errorf("The handler changed the pod's node to %q", assumed.Spec.NodeName)
+	}
+	want := []string{
+		"AddAllocation ns/p node1 assigned=",
+		"RemoveAllocation ns/p node1 assigned=", "AddAllocation ns/p node2 assigned=",
+		"RemoveAllocation ns/p node2 assigned=", "AddAllocation ns/p node2 assigned=",
+		"RemoveAllocation ns/p node2 assigned=",
+		"RemoveAllocation ns/p node1 assigned=",
+	}
+	if diff := cmp.Diff(want, allocationExtensions.Calls()); diff != "" {
+		t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
+	}
+}

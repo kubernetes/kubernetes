@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
@@ -58,6 +59,15 @@ type assumeReserveFixture struct {
 func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	plugin *assumeReserveTestPlugin, pods ...*v1.Pod) *assumeReserveFixture {
 	t.Helper()
+	return newAssumeReserveFixtureWithAllocations(t, ctx, node, plugin, nil, pods...)
+}
+
+// newAssumeReserveFixtureWithAllocations additionally enables
+// allocationExtensions, if not nil, and reports nomination changes to it
+// like the scheduler does.
+func newAssumeReserveFixtureWithAllocations(t *testing.T, ctx context.Context, node *v1.Node,
+	plugin *assumeReserveTestPlugin, allocationExtensions *tf.FakeAllocationExtensionsPlugin, pods ...*v1.Pod) *assumeReserveFixture {
+	t.Helper()
 
 	logger := klog.FromContext(ctx)
 
@@ -72,7 +82,9 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	cache := internalcache.New(ctx, nil, true, false)
 	cache.AddNode(logger, node)
 	snapshot := internalcache.NewEmptySnapshot()
-	queue := internalqueue.NewTestQueueWithObjects(ctx, nil, queued)
+	// Filled in once the framework exists.
+	profiles := profile.Map{}
+	queue := internalqueue.NewTestQueueWithObjects(ctx, nil, queued, internalqueue.WithNominationChangeHandler(newNominationChangeHandler(profiles)))
 
 	registry := frameworkruntime.Registry{
 		queuesort.Name:     queuesort.New,
@@ -90,6 +102,10 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 			Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
 		},
 	}
+	if allocationExtensions != nil {
+		registry[allocationExtensions.Name()] = tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)
+		profileCfg.Plugins.PreFilter = schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: allocationExtensions.Name()}}}
+	}
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithInformerFactory(informerFactory),
@@ -99,6 +115,7 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	if err != nil {
 		t.Fatalf("Failed to create framework: %v", err)
 	}
+	profiles[profileCfg.SchedulerName] = schedFwk
 	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
 		t.Fatalf("Failed to update snapshot: %v", err)
 	}
@@ -163,7 +180,7 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 				t.Fatalf("SuggestedHost = %q, want %q", scheduleResult.SuggestedHost, node1.Name)
 			}
 
-			assumedPodInfo, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
+			assumedPodInfo, _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("status.Code() = %v, want %v", status.Code(), tt.wantStatusCode)
 			}
@@ -197,7 +214,7 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 				if plugin.unreserved {
 					t.Error("expected Unreserve not to be called yet")
 				}
-				if err := f.algorithm.UnreserveAndForgetFromCache(ctx, state, f.fwk, assumedPodInfo, scheduleResult.SuggestedHost); err != nil {
+				if _, err := f.algorithm.UnreserveAndForgetFromCache(ctx, state, f.fwk, assumedPodInfo, scheduleResult.SuggestedHost); err != nil {
 					t.Errorf("UnreserveAndForgetFromCache error: %v", err)
 				}
 				isAssumed, err = f.algorithm.cache.IsAssumedPod(pod1)
@@ -212,6 +229,92 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 				}
 			} else if !plugin.unreserved {
 				t.Error("expected Unreserve to be called on reserve failure")
+			}
+		})
+	}
+}
+
+// TestAssumeAndReserveInCacheAllocations checks how a cache assume reports the
+// allocation of the assumed pod: the assumed pod gets its allocation before the
+// nomination ends, and a Reserve failure ends it again and returns its events.
+func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
+	node1 := st.MakeNode().Name("node1").Obj()
+	released := framework.AllocationEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
+
+	tests := []struct {
+		name          string
+		nominated     bool
+		reserveStatus *fwk.Status
+		wantCalls     []string
+		wantEvents    []framework.AllocationEvent
+	}{
+		{
+			name: "not nominated",
+			wantCalls: []string{
+				"PrepareAllocation default/pod1 node1 assigned=node1",
+				"AddAllocation default/pod1 node1 assigned=node1",
+			},
+		},
+		{
+			name:      "nominated: the assumed pod's allocation comes before the end of the nomination",
+			nominated: true,
+			wantCalls: []string{
+				"AddAllocation default/pod1 node1 assigned=",
+				"PrepareAllocation default/pod1 node1 assigned=node1",
+				"AddAllocation default/pod1 node1 assigned=node1",
+				"RemoveAllocation default/pod1 node1 assigned=",
+			},
+		},
+		{
+			name:          "nominated, reserve failure: the assumed pod's allocation ends after Unreserve",
+			nominated:     true,
+			reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			wantCalls: []string{
+				"AddAllocation default/pod1 node1 assigned=",
+				"PrepareAllocation default/pod1 node1 assigned=node1",
+				"AddAllocation default/pod1 node1 assigned=node1",
+				"RemoveAllocation default/pod1 node1 assigned=",
+				"RemoveAllocation default/pod1 node1 assigned=node1",
+			},
+			wantEvents: []framework.AllocationEvent{released},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").SchedulerName("default-scheduler").Obj()
+
+			plugin := &assumeReserveTestPlugin{
+				fakePodGroupPlugin: &fakePodGroupPlugin{
+					filterStatus: map[string]*fwk.Status{pod1.Name: fwk.NewStatus(fwk.Success)},
+				},
+				reserveStatus: tt.reserveStatus,
+			}
+			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{ReleaseEvents: []framework.AllocationEvent{released}}
+			f := newAssumeReserveFixtureWithAllocations(t, ctx, node1, plugin, allocationExtensions, pod1)
+
+			podInfo, err := framework.NewPodInfo(pod1)
+			if err != nil {
+				t.Fatalf("Failed to create PodInfo: %v", err)
+			}
+			if tt.nominated {
+				f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{NominatedNodeName: node1.Name, NominatingMode: fwk.ModeOverride})
+			}
+			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+			state := framework.NewCycleState()
+			scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
+			if err != nil {
+				t.Fatalf("schedulePod failed: %v", err)
+			}
+
+			_, events, _ := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
+			if diff := cmp.Diff(tt.wantCalls, allocationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantEvents, events); diff != "" {
+				t.Errorf("Unexpected events (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -370,7 +473,7 @@ func TestAssumeAndReserveSnapshotSync(t *testing.T) {
 					t.Fatalf("AssumeAndReserveInSnapshot failed for pod1: %v", status)
 				}
 			} else {
-				if _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); !status.IsSuccess() {
+				if _, _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); !status.IsSuccess() {
 					t.Fatalf("AssumeAndReserveInCache failed for pod1: %v", status)
 				}
 			}
@@ -406,6 +509,8 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		wantStatusCode       fwk.Code
 		wantNominatingInfo   *fwk.NominatingInfo
 		wantPostFilterCalled bool
+		// wantNominationCalls are the calls of AllocationExtensions.
+		wantNominationCalls []string
 	}{
 		{
 			name:                 "failure: algorithm finds no nodes",
@@ -439,11 +544,13 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				NominatingMode:    fwk.ModeOverride,
 			},
 			wantPostFilterCalled: true,
+			wantNominationCalls:  []string{"PrepareAllocation default/pod1 node1 assigned="},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
 			logger, ctx := ktesting.NewTestContext(t)
 			client := clientsetfake.NewClientset(node1, pod1)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -466,17 +573,20 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 				},
 			}
 
+			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
 			registry := frameworkruntime.Registry{
 				queuesort.Name:     queuesort.New,
 				defaultbinder.Name: defaultbinder.New,
 				"AssumeReserveTestPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 					return fakePlugin, nil
 				},
+				allocationExtensions.Name(): tf.NewFakeAllocationExtensionsPlugin(allocationExtensions),
 			}
 			profileCfg := schedulerapi.KubeSchedulerProfile{
 				SchedulerName: "default-scheduler",
 				Plugins: &schedulerapi.Plugins{
 					QueueSort:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
+					PreFilter:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: allocationExtensions.Name()}}},
 					Filter:     schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 					Bind:       schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
@@ -520,6 +630,9 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantNominatingInfo, scheduleResult.nominatingInfo); diff != "" {
 				t.Errorf("Unexpected nominatingInfo (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantNominationCalls, allocationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
 			}
 		})
 	}
