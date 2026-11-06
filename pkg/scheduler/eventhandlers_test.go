@@ -109,9 +109,6 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 		name                  string
 		updateFunc            func(s *Scheduler)
 		wantInActiveOrBackoff sets.Set[string]
-		// wantInActiveOrBackoffWithoutDRAPreemption, if set, replaces
-		// wantInActiveOrBackoff without the DRAPreemption feature gate.
-		wantInActiveOrBackoffWithoutDRAPreemption sets.Set[string]
 	}{
 		{
 			name: "Update of a nominated node name to a different value should trigger rescheduling of lower priority pods",
@@ -121,9 +118,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			// With DRAPreemption, the pod itself does not retry because its nomination changed.
-			wantInActiveOrBackoff:                     sets.New(lowPriorityPod.Name, medPriorityPod.Name),
-			wantInActiveOrBackoffWithoutDRAPreemption: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a nominated node name should trigger rescheduling of lower priority pods",
@@ -133,8 +128,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActiveOrBackoff:                     sets.New(lowPriorityPod.Name, medPriorityPod.Name),
-			wantInActiveOrBackoffWithoutDRAPreemption: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a pod that had nominated node name should trigger rescheduling of lower priority pods",
@@ -160,9 +154,6 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", tt.name, draPreemption), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
 				wantInActiveOrBackoff := tt.wantInActiveOrBackoff
-				if !draPreemption && tt.wantInActiveOrBackoffWithoutDRAPreemption != nil {
-					wantInActiveOrBackoff = tt.wantInActiveOrBackoffWithoutDRAPreemption
-				}
 
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)

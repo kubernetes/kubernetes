@@ -851,10 +851,15 @@ func (p *PriorityQueue) processNominationChangesLocked(logger klog.Logger) {
 		pod := change.pod
 		priority := corev1helpers.PodPriority(pod)
 		preCheck := func(entity framework.QueuedEntityInfo) bool {
-			// The pod itself does not need to retry because its nomination changed.
-			for pInfo := range entity.ForEachPodInfo() {
-				if pInfo.Pod.UID == pod.UID {
-					return false
+			// The pod itself does not need to retry because its own
+			// scheduling cycle changed its nomination. When something else
+			// cleared or changed it, for example preemption for another
+			// pod, it has to look for a node again.
+			if change.ownCycle {
+				for pInfo := range entity.ForEachPodInfo() {
+					if pInfo.Pod.UID == pod.UID {
+						return false
+					}
 				}
 			}
 			return entity.GetPriority() <= priority
