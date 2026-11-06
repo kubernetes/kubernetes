@@ -24,29 +24,40 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 )
 
-// ModelStorage implements storage.Interface on top of Model, so the storage
+const modelWatchResultBufferSize = 100
+
+// ModelStorage implements storage.Interface by synchronizing access to Replay
+// and streaming its recorded history to live watchers, so the storage
 // compatibility scenarios (storagetesting.RunTest*) that etcd3 and cacher run
-// can also be run against the model. It only translates calls into model
-// requests, so passing scenarios validate the model itself. Like the model,
-// it panics on options that aren't supported.
+// can also be run against the model. Like the model, it panics on options that
+// aren't supported.
 type ModelStorage struct {
-	mu    sync.Mutex
-	state *Model
+	mu       sync.Mutex
+	replay   *Replay
+	watchers map[*modelWatcher]struct{}
 }
 
 var _ storage.Interface = (*ModelStorage)(nil)
 
 // NewStorage returns a Storage starting from initialState.
 func NewStorage(initialState *Model) *ModelStorage {
-	return &ModelStorage{state: initialState.Clone()}
+	replay, err := NewReplay(initialState, nil)
+	if err != nil {
+		panic(err)
+	}
+	return &ModelStorage{
+		replay:   replay,
+		watchers: make(map[*modelWatcher]struct{}),
+	}
 }
 
 func (s *ModelStorage) Versioner() storage.Versioner {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.state.Versioner
+	return s.replay.state.Versioner
 }
 
 func (s *ModelStorage) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
@@ -114,8 +125,15 @@ func (s *ModelStorage) Compact(resourceVersion string) error {
 func (s *ModelStorage) execute(req Request, out runtime.Object) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	resp, next, _ := s.state.execute(req)
-	s.state = next
+	resp, change := s.replay.execute(req)
+	if change != nil {
+		for w := range s.watchers {
+			select {
+			case w.notifyChanges <- struct{}{}:
+			default:
+			}
+		}
+	}
 	if resp.Err != nil {
 		return resp.Err
 	}
@@ -126,7 +144,113 @@ func (s *ModelStorage) execute(req Request, out runtime.Object) error {
 }
 
 func (s *ModelStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
-	panic("not implemented")
+	req := WatchRequest{Key: key, Options: opts}
+	s.mu.Lock()
+	initialEvents, nextRV, closed, err := s.replay.watch(req, s.replay.ResourceVersion())
+	if err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	w := &modelWatcher{
+		resultChan:    make(chan watch.Event, modelWatchResultBufferSize),
+		notifyChanges: make(chan struct{}, 1),
+		stopWatcher:   make(chan struct{}),
+	}
+	if !closed && ctx.Err() == nil {
+		s.watchers[w] = struct{}{}
+	}
+	s.mu.Unlock()
+
+	utilflowcontrol.WatchInitialized(ctx)
+	go w.run(ctx, s, req, initialEvents, nextRV, closed)
+	return w, nil
+}
+
+func (s *ModelStorage) removeWatcher(w *modelWatcher) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.watchers, w)
+}
+
+type modelWatcher struct {
+	resultChan    chan watch.Event
+	notifyChanges chan struct{}
+	stopWatcher   chan struct{}
+	stopOnce      sync.Once
+}
+
+func (w *modelWatcher) Stop() {
+	w.stopOnce.Do(func() {
+		close(w.stopWatcher)
+	})
+}
+
+func (w *modelWatcher) ResultChan() <-chan watch.Event {
+	return w.resultChan
+}
+
+func (w *modelWatcher) send(ctx context.Context, ev watch.Event) bool {
+	// Check cancellation before sending so an already-stopped or canceled
+	// watcher never delivers an extra event into its buffered result channel.
+	select {
+	case <-ctx.Done():
+		return false
+	case <-w.stopWatcher:
+		return false
+	default:
+	}
+	select {
+	case w.resultChan <- ev:
+		return true
+	case <-ctx.Done():
+		return false
+	case <-w.stopWatcher:
+		return false
+	}
+}
+
+func (w *modelWatcher) run(ctx context.Context, s *ModelStorage, req WatchRequest, initialEvents []watch.Event, nextRV uint64, closed bool) {
+	defer func() {
+		s.removeWatcher(w)
+		close(w.resultChan)
+	}()
+	for _, ev := range initialEvents {
+		if !w.send(ctx, ev) {
+			return
+		}
+	}
+	if closed {
+		return
+	}
+	for {
+		s.mu.Lock()
+		currentRV := s.replay.ResourceVersion()
+		var events []watch.Event
+		var err error
+		if nextRV <= currentRV {
+			events, err = s.replay.EventsForRVs(req, &ResourceVersionRange{Min: nextRV, Max: currentRV + 1})
+			nextRV = currentRV + 1
+		}
+		s.mu.Unlock()
+
+		for _, ev := range events {
+			if !w.send(ctx, ev) {
+				return
+			}
+		}
+		if err != nil {
+			w.send(ctx, errorWatchEvent(err))
+			return
+		}
+
+		select {
+		case <-w.notifyChanges:
+		case <-ctx.Done():
+			return
+		case <-w.stopWatcher:
+			return
+		}
+	}
 }
 
 func (s *ModelStorage) Stats(ctx context.Context) (storage.Stats, error) {
@@ -142,7 +266,9 @@ func (s *ModelStorage) RequestWatchProgress(ctx context.Context) error {
 }
 
 func (s *ModelStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
-	panic("not implemented")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.replay.ResourceVersion(), nil
 }
 
 func (s *ModelStorage) EnableResourceSizeEstimation(storage.KeysFunc) error {
@@ -152,7 +278,7 @@ func (s *ModelStorage) EnableResourceSizeEstimation(storage.KeysFunc) error {
 func (s *ModelStorage) CompactRevision() int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return int64(s.state.CompactResourceVersion)
+	return int64(s.replay.state.CompactResourceVersion)
 }
 
 func (s *ModelStorage) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {

@@ -81,6 +81,7 @@ type Model struct {
 	Versioner              storage.Versioner
 	NewFunc                func() runtime.Object
 	NewListFunc            func() runtime.Object
+	ReverseKeyFunc         storage.ReverseKeyFunc
 }
 
 func (s *Model) Clone() *Model {
@@ -92,6 +93,7 @@ func (s *Model) Clone() *Model {
 		NewFunc:                s.NewFunc,
 		NewListFunc:            s.NewListFunc,
 		Versioner:              s.Versioner,
+		ReverseKeyFunc:         s.ReverseKeyFunc,
 	}
 	for k, v := range s.Items {
 		if v != nil {
