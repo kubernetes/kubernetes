@@ -37,6 +37,24 @@ func TestIndependentGoCorpus(t *testing.T) {
 	}
 }
 
+func TestManagerIdentityDoesNotAliasOperationOrEscapedNames(t *testing.T) {
+	names := []string{"A", "A@update", `apply("A@update")`, "A B", "管理者", "A\\B", "", string([]byte{0xff})}
+	seen := map[string]string{}
+	for _, operation := range []string{"apply", "update"} {
+		for _, name := range names {
+			identity := managerIdentity(name, operation)
+			input := operation + ":" + name
+			if previous, exists := seen[identity]; exists {
+				t.Fatalf("manager identities collide: %q and %q both encode as %q", previous, input, identity)
+			}
+			seen[identity] = input
+		}
+	}
+	if managerIdentity("A", "") != managerIdentity("A", "apply") {
+		t.Fatal("the default operation must be Apply")
+	}
+}
+
 func TestComparatorRejectsRegressionsAndStaleExceptions(t *testing.T) {
 	expected := Expected{Object: map[string]any{"x": "one"}, Owners: map[string][]string{"A": {".x"}}}
 	snapshot, err := expectedSnapshot(expected)

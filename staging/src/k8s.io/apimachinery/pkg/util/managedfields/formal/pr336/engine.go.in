@@ -86,11 +86,10 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	working := e.fields.Copy()
-	manager := step.Manager
+	manager := managerIdentity(step.Manager, step.Operation)
 	var object *typed.TypedValue
 	var fields fieldpath.ManagedFields
 	if step.Operation == "update" {
-		manager += "@update"
 		object, fields, err = e.updater.Update(e.live, config, "v1", working, manager)
 	} else {
 		object, fields, err = e.updater.Apply(e.live, config, "v1", working, manager, step.Force)

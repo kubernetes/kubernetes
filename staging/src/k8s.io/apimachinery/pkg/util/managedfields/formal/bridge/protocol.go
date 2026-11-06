@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v6/value"
@@ -52,6 +53,28 @@ type Step struct {
 	GoExpect       *Expected      `json:"goExpect,omitempty"`
 	Difference     string         `json:"difference,omitempty"`
 	DifferenceKind string         `json:"differenceKind,omitempty"`
+}
+
+// Escape names outside the plain namespace so a literal @update cannot alias an operation tag.
+func managerIdentity(name, operation string) string {
+	if operation == "" {
+		operation = "apply"
+	}
+	plain := name != ""
+	for _, char := range name {
+		if !(char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z' ||
+			char >= '0' && char <= '9' || char == '-' || char == '_' || char == '.') {
+			plain = false
+			break
+		}
+	}
+	if !plain {
+		return operation + "(" + strconv.Quote(name) + ")"
+	}
+	if operation == "update" {
+		return name + "@update"
+	}
+	return name
 }
 
 // Expected is authored independently of either engine, using ordinary object YAML.
@@ -410,13 +433,10 @@ func normalize(c Case) (fixture, error) {
 		if operation == "" {
 			operation = "apply"
 		}
-		manager := step.Manager
-		if operation == "update" {
-			manager += "@update"
-		}
 		if operation != "apply" && operation != "update" {
 			return out, fmt.Errorf("unknown operation %s", operation)
 		}
+		manager := managerIdentity(step.Manager, operation)
 		r := request{Operation: operation, Manager: manager, Desired: []footprint{}, Writes: []cell{}, Context: []cell{}, Force: step.Force}
 		for _, cell := range cells {
 			kind := cell.Content.Kind

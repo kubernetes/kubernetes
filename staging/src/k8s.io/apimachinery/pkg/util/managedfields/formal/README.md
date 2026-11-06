@@ -231,6 +231,13 @@ request prefix. There is no tolerated `model-gap` category. Intended differences
 between the stronger policy and existing Go require exact independent outcomes
 for both engines.
 
+The adapter keeps operation distinct from the literal manager name. Plain names
+retain readable labels such as `A` and `A@update`; names containing reserved
+characters are quoted with their operation. Thus an Apply manager literally
+named `A@update` is `apply("A@update")`, separate from an Update by `A`.
+Independent cases check acquisition, omission and co-ownership across these
+identities. The comparison still fixes one API version and excludes subresources.
+
 Explicit `bootstrap: true` cases additionally run the actual
 `NewSkipNonAppliedManager` wrapper and the separate `Bootstrap` model.
 This comparison accepts single-version Apply-only histories and also runs

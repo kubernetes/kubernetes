@@ -338,3 +338,21 @@ cases:
   - manager: A
     apply: {}
     expect: {object: {items: null}, owners: {}}
+- name: literal-manager-name-does-not-alias-update-identity
+  semantics: current
+  steps:
+  - operation: update
+    manager: A
+    apply: {x: one}
+    expect: {object: {x: one}, owners: {A@update: [.x]}}
+  - manager: A@update
+    apply: {"y": two}
+    expect:
+      object: {x: one, "y": two}
+      owners: {A@update: [.x], 'apply("A@update")': [.y]}
+  - manager: A@update
+    apply: {}
+    expect: {object: {x: one}, owners: {A@update: [.x]}}
+  - manager: A
+    apply: {x: one}
+    expect: {object: {x: one}, owners: {A: [.x], A@update: [.x]}}

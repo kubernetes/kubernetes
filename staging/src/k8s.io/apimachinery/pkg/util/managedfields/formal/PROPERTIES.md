@@ -222,6 +222,13 @@ treated as leaves). A separate deterministic nullable-container family exercises
 these changes through mixed Apply/Update histories. These corrections close
 observed model discrepancies, not the universal typed-merge refinement.
 
+The adapter audit also found an operation/name alias: literal Apply manager
+`A@update` collided with an Update by `A`. Operation-tagged escaping now preserves
+their distinct identities. Independent Go/pinned cases check both ownership
+and later omission, and collision tests include quoted, Unicode and escaped
+names. This corrects the comparison boundary; it does not prove the complete
+Kubernetes manager-identifier JSON codec or add multi-version/subresource support.
+
 A source-bound refinement covers the four pruning functions, including both
 unbounded finite map loops. Same-version composition realizes the callee
 contracts and specializes the entire pruning path to the normalized model.

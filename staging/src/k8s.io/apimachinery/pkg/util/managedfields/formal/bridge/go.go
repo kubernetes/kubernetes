@@ -182,10 +182,11 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 		if entry.Manager == "" || (entry.Operation != metav1.ManagedFieldsOperationApply && entry.Operation != metav1.ManagedFieldsOperationUpdate) || entry.Subresource != "" {
 			return out, fmt.Errorf("unrepresentable manager identity %s", identifier)
 		}
-		manager := entry.Manager
+		operation := "apply"
 		if entry.Operation == metav1.ManagedFieldsOperationUpdate {
-			manager += "@update"
+			operation = "update"
 		}
+		manager := managerIdentity(entry.Manager, operation)
 		if versioned.Applied() != (entry.Operation == metav1.ManagedFieldsOperationApply) || string(versioned.APIVersion()) != groupVersion.String() {
 			return out, fmt.Errorf("unexpected manager version/operation for %q", manager)
 		}
