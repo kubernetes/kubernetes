@@ -679,7 +679,7 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 
 // nominationEndsAfterPermit returns true with the DRAPreemption feature gate:
 // the nomination of a pod which gets assumed then only ends once Reserve and
-// Permit let it through, so that AllocationExtensions can compare it with
+// Permit let it through, so that NominationExtensions can compare it with
 // what the pod reserved. If they reject it, its nomination gets cleared in
 // handleSchedulingFailure, and the scheduling queue lets the pods retry which
 // the nomination blocked. Without the feature gate, the event handlers do

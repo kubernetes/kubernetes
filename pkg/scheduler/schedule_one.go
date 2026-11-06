@@ -763,7 +763,7 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 
 // runFailureHandler calls the FailureHandler for a pod whose scheduling cycle
 // failed. If the FailureHandler is going to nominate the pod, the
-// AllocationExtensions of plugins prepare what the cycle selected for the
+// NominationExtensions of plugins prepare what the cycle selected for the
 // pod first, because the PodNominator calls them without the CycleState and
 // while the scheduling queue is locked. What they prepared gets dropped when
 // the FailureHandler returns.
@@ -771,7 +771,7 @@ func (sched *Scheduler) runFailureHandler(ctx context.Context, schedFramework fr
 	podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
 	// Assigned pods (deferred resizes) don't get nominated.
 	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" && podInfo.Pod.Spec.NodeName == "" {
-		done := schedFramework.RunAllocationExtensionsPrepareAllocation(ctx, state, podInfo.Pod, nominatingInfo.NominatedNodeName)
+		done := schedFramework.RunNominationExtensionsPrepareNomination(ctx, state, podInfo.Pod, nominatingInfo.NominatedNodeName)
 		defer done()
 	}
 	sched.FailureHandler(ctx, schedFramework, podInfo, status, nominatingInfo, start)

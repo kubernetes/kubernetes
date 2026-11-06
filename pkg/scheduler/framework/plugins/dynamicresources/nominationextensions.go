@@ -32,17 +32,17 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// This file implements framework.AllocationExtensions (KEP-5690): devices
+// This file implements framework.NominationExtensions (KEP-5690): devices
 // which preemption freed get held for the preemptor while the PodNominator
 // nominates it to the node.
 
-var _ framework.AllocationExtensions = &DynamicResources{}
+var _ framework.NominationExtensions = &DynamicResources{}
 
-// PrepareAllocation returns the nomination of the pod to the node with what
+// PrepareNomination returns the nomination of the pod to the node with what
 // the scheduling cycle selected for it: the devices which the preemption
 // simulation found for it with its victims removed, and the victims with
 // claims. It returns nil if preemption cannot release devices for the pod.
-func (pl *DynamicResources) PrepareAllocation(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) any {
+func (pl *DynamicResources) PrepareNomination(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) any {
 	if pl.nominations == nil {
 		return nil
 	}
@@ -50,7 +50,7 @@ func (pl *DynamicResources) PrepareAllocation(ctx context.Context, cs fwk.CycleS
 	if err != nil {
 		return nil
 	}
-	nomination := pl.nominatedAllocation(ctx, state, pod, nodeName)
+	nomination := pl.nominationFor(ctx, state, pod, nodeName)
 	if nomination == nil {
 		return nil
 	}
@@ -58,9 +58,9 @@ func (pl *DynamicResources) PrepareAllocation(ctx context.Context, cs fwk.CycleS
 	return nomination
 }
 
-// nominatedAllocation returns the nomination of a pod which gets nominated by
+// nominationFor returns the nomination of a pod which gets nominated by
 // preemption, nil if preemption cannot release devices for it.
-func (pl *DynamicResources) nominatedAllocation(ctx context.Context, state *stateData, pod *v1.Pod, nodeName string) *podNomination {
+func (pl *DynamicResources) nominationFor(ctx context.Context, state *stateData, pod *v1.Pod, nodeName string) *podNomination {
 	if state.preemption == nil || !state.preemption.root.canRelease {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (pl *DynamicResources) nominatedAllocation(ctx context.Context, state *stat
 	}
 }
 
-// AddAllocation records the nomination which PrepareAllocation returned. A
+// AddNomination records the nomination which PrepareNomination returned. A
 // nomination to the same node again replaces the previous one, whose devices
 // may be free unless the new one holds them too.
 //
@@ -85,21 +85,21 @@ func (pl *DynamicResources) nominatedAllocation(ctx context.Context, state *stat
 // nothing changes. If an update of the pod object nominated the pod to the
 // node right before the scheduler did, that update got the prepared
 // nomination, and the scheduler's nomination comes without one.
-func (pl *DynamicResources) AddAllocation(ctx context.Context, pod *v1.Pod, nodeName string, prepared any) framework.AllocationChangeResult {
+func (pl *DynamicResources) AddNomination(ctx context.Context, pod *v1.Pod, nodeName string, prepared any) framework.NominationChangeResult {
 	nomination, _ := prepared.(*podNomination)
 	if pl.nominations == nil || nomination == nil || nomination.nodeName != nodeName {
-		return framework.AllocationChangeResult{}
+		return framework.NominationChangeResult{}
 	}
 	klog.FromContext(ctx).V(5).Info("Added nomination", "pod", klog.KObj(pod), "node", nodeName, "numHeldClaims", len(nomination.holds))
 	return pl.releasedDevices(ctx, pod, pl.nominations.add(pod.UID, nomination), nomination.holds)
 }
 
-// RemoveAllocation drops the nomination of the pod. Claims of the victims of
+// RemoveNomination drops the nomination of the pod. Claims of the victims of
 // the nomination are tracked independently of it until they are
 // deallocated.
-func (pl *DynamicResources) RemoveAllocation(ctx context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
+func (pl *DynamicResources) RemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) framework.NominationChangeResult {
 	if pl.nominations == nil {
-		return framework.AllocationChangeResult{}
+		return framework.NominationChangeResult{}
 	}
 	return pl.releasedDevices(ctx, pod, pl.nominations.remove(pod.UID, nodeName), nil)
 }
@@ -110,9 +110,9 @@ func (pl *DynamicResources) RemoveAllocation(ctx context.Context, pod *v1.Pod, n
 // replaces this one holds them for the same claims (kept), or if its claims
 // use them: the nomination of an assumed pod ends after Reserve, so the
 // devices which it reserved are pending allocations of its claims then.
-func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, nomination *podNomination, kept map[types.UID]heldClaim) framework.AllocationChangeResult {
+func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, nomination *podNomination, kept map[types.UID]heldClaim) framework.NominationChangeResult {
 	if nomination == nil {
-		return framework.AllocationChangeResult{}
+		return framework.NominationChangeResult{}
 	}
 	for uid, held := range nomination.holds {
 		if keptClaim, ok := kept[uid]; ok && sameDevices(keptClaim.allocation.Devices.Results, held.allocation.Devices.Results) {
@@ -124,9 +124,9 @@ func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, no
 		klog.FromContext(ctx).V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nomination.nodeName, "resourceclaim", held.claim)
 		// One event is enough, the queueing hints don't check which
 		// claim got deallocated.
-		return framework.AllocationChangeResult{Events: releaseEvents(uid, held)}
+		return framework.NominationChangeResult{Events: releaseEvents(uid, held)}
 	}
-	return framework.AllocationChangeResult{}
+	return framework.NominationChangeResult{}
 }
 
 // usesHeldDevices returns true if the claim has the held devices, as a
@@ -145,13 +145,13 @@ func (pl *DynamicResources) usesHeldDevices(uid types.UID, held heldClaim) bool 
 
 // releaseEvents returns the event for a claim whose devices are not used
 // anymore, as if the claim got deallocated.
-func releaseEvents(uid types.UID, held heldClaim) []framework.AllocationEvent {
+func releaseEvents(uid types.UID, held heldClaim) []framework.NominationEvent {
 	claim := &resourceapi.ResourceClaim{}
 	claim.Namespace, claim.Name, claim.UID = held.claim.Namespace, held.claim.Name, uid
 	claim.Status.Allocation = held.allocation
 	deallocated := claim.DeepCopy()
 	deallocated.Status.Allocation = nil
-	return []framework.AllocationEvent{{Event: framework.EventResourceClaimHoldReleased, OldObj: claim, NewObj: deallocated}}
+	return []framework.NominationEvent{{Event: framework.EventResourceClaimHoldReleased, OldObj: claim, NewObj: deallocated}}
 }
 
 // sameDevices compares allocation results without their ShareIDs, which

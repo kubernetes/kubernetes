@@ -5686,11 +5686,11 @@ func TestGetDifferentUIDPreCheck(t *testing.T) {
 	}
 }
 
-// TestRunFailureHandlerPreparesAllocations checks that the nomination which
-// the FailureHandler applies reaches AddAllocation with what PrepareAllocation
+// TestRunFailureHandlerPreparesNominations checks that the nomination which
+// the FailureHandler applies reaches AddNomination with what PrepareNomination
 // returned for it, and that nothing is kept after the call, also when the pod
 // got deleted and therefore not nominated.
-func TestRunFailureHandlerPreparesAllocations(t *testing.T) {
+func TestRunFailureHandlerPreparesNominations(t *testing.T) {
 	nominated := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
 	tests := []struct {
 		name           string
@@ -5702,15 +5702,15 @@ func TestRunFailureHandlerPreparesAllocations(t *testing.T) {
 			name:           "nominated by PostFilter",
 			nominatingInfo: nominated,
 			wantCalls: []string{
-				"PrepareAllocation ns/foo node1 assigned=",
-				"AddAllocation ns/foo node1 assigned= prepared=prepared ns/foo node1",
+				"PrepareNomination ns/foo node1 assigned=",
+				"AddNomination ns/foo node1 assigned= prepared=prepared ns/foo node1",
 			},
 		},
 		{
 			name:           "deleted",
 			nominatingInfo: nominated,
 			deleted:        true,
-			wantCalls:      []string{"PrepareAllocation ns/foo node1 assigned="},
+			wantCalls:      []string{"PrepareNomination ns/foo node1 assigned="},
 		},
 		{
 			name:           "nomination cleared",
@@ -5731,12 +5731,12 @@ func TestRunFailureHandlerPreparesAllocations(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
 			schedFramework, err := tf.NewFramework(ctx,
 				[]tf.RegisterPluginFunc{
 					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-					tf.RegisterPreFilterPlugin(allocationExtensions.Name(), tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)),
+					tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)),
 				},
 				testSchedulerName,
 				frameworkruntime.WithClientSet(client),
@@ -5760,13 +5760,13 @@ func TestRunFailureHandlerPreparesAllocations(t *testing.T) {
 				t.Fatalf("Pop: %v", err)
 			}
 			sched.runFailureHandler(ctx, schedFramework, framework.NewCycleState(), popped.(*framework.QueuedPodInfo), fwk.NewStatus(fwk.Unschedulable, "no fit"), tt.nominatingInfo, time.Now())
-			if diff := cmp.Diff(tt.wantCalls, allocationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			if diff := cmp.Diff(tt.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected NominationExtensions calls (-want,+got):\n%s", diff)
 			}
 
-			schedFramework.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
-			calls := allocationExtensions.Calls()
-			if want := "AddAllocation ns/foo node1 assigned= prepared=<nil>"; calls[len(calls)-1] != want {
+			schedFramework.RunNominationExtensionsAddNomination(ctx, pod, "node1")
+			calls := nominationExtensions.Calls()
+			if want := "AddNomination ns/foo node1 assigned= prepared=<nil>"; calls[len(calls)-1] != want {
 				t.Errorf("A later nomination got %q, want %q", calls[len(calls)-1], want)
 			}
 		})

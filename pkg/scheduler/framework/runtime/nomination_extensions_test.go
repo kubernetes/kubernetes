@@ -35,53 +35,53 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-// recordingAllocationExtensions appends its calls to a log shared by all instances.
-type recordingAllocationExtensions struct {
+// recordingNominationExtensions appends its calls to a log shared by all instances.
+type recordingNominationExtensions struct {
 	name              string
 	notEligibleReason string
 	log               *[]string
 	numPrepared       int
 }
 
-var _ framework.AllocationExtensions = &recordingAllocationExtensions{}
-var _ framework.VictimExtensions = &recordingAllocationExtensions{}
+var _ framework.NominationExtensions = &recordingNominationExtensions{}
+var _ framework.VictimExtensions = &recordingNominationExtensions{}
 
-func (pl *recordingAllocationExtensions) Name() string { return pl.name }
+func (pl *recordingNominationExtensions) Name() string { return pl.name }
 
-func (pl *recordingAllocationExtensions) PreFilter(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+func (pl *recordingNominationExtensions) PreFilter(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
-func (pl *recordingAllocationExtensions) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
+func (pl *recordingNominationExtensions) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
 
-// PrepareAllocation returns "prepared <n> by <name>", counting its calls.
-func (pl *recordingAllocationExtensions) PrepareAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) any {
+// PrepareNomination returns "prepared <n> by <name>", counting its calls.
+func (pl *recordingNominationExtensions) PrepareNomination(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) any {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: prepare %s %s", pl.name, pod.Name, nodeName))
 	pl.numPrepared++
 	return fmt.Sprintf("prepared %d by %s", pl.numPrepared, pl.name)
 }
 
-func (pl *recordingAllocationExtensions) AddAllocation(_ context.Context, pod *v1.Pod, nodeName string, prepared any) framework.AllocationChangeResult {
+func (pl *recordingNominationExtensions) AddNomination(_ context.Context, pod *v1.Pod, nodeName string, prepared any) framework.NominationChangeResult {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: add %s %s %v", pl.name, pod.Name, nodeName, prepared))
-	return framework.AllocationChangeResult{}
+	return framework.NominationChangeResult{}
 }
 
-// RemoveAllocation returns one event per plugin, labeled with its name.
-func (pl *recordingAllocationExtensions) RemoveAllocation(_ context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
+// RemoveNomination returns one event per plugin, labeled with its name.
+func (pl *recordingNominationExtensions) RemoveNomination(_ context.Context, pod *v1.Pod, nodeName string) framework.NominationChangeResult {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: remove %s %s", pl.name, pod.Name, nodeName))
-	return framework.AllocationChangeResult{Events: []framework.AllocationEvent{{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: pl.name}}}}
+	return framework.NominationChangeResult{Events: []framework.NominationEvent{{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update, CustomLabel: pl.name}}}}
 }
 
-func (pl *recordingAllocationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
+func (pl *recordingNominationExtensions) AssumeVictim(_ context.Context, victim *v1.Pod) {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: assume %s", pl.name, victim.Name))
 }
 
-func (pl *recordingAllocationExtensions) PodEligibleToPreempt(_ context.Context, pod *v1.Pod, nodeName string) (bool, string) {
+func (pl *recordingNominationExtensions) PodEligibleToPreempt(_ context.Context, pod *v1.Pod, nodeName string) (bool, string) {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: eligible %s %s", pl.name, pod.Name, nodeName))
 	return pl.notEligibleReason == "", pl.notEligibleReason
 }
 
-func TestAllocationExtensions(t *testing.T) {
+func TestNominationExtensions(t *testing.T) {
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "preemptor"}}
 
 	for name, tc := range map[string]struct {
@@ -153,7 +153,7 @@ func TestAllocationExtensions(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: &config.Plugins{}}
 			if !tc.withoutPlugins {
 				// Registered out of order to check that calls are sorted by name.
-				for _, pl := range []*recordingAllocationExtensions{
+				for _, pl := range []*recordingNominationExtensions{
 					{name: "b", notEligibleReason: tc.notEligible["b"], log: &log},
 					{name: "a", notEligibleReason: tc.notEligible["a"], log: &log},
 				} {
@@ -166,10 +166,10 @@ func TestAllocationExtensions(t *testing.T) {
 				t.Fatalf("create framework: %v", err)
 			}
 
-			done := f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+			done := f.RunNominationExtensionsPrepareNomination(ctx, nil, pod, "node1")
 			defer done()
 			var events []string
-			for _, event := range append(f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1"), f.RunAllocationExtensionsRemoveAllocation(ctx, pod, "node1")...) {
+			for _, event := range append(f.RunNominationExtensionsAddNomination(ctx, pod, "node1"), f.RunNominationExtensionsRemoveNomination(ctx, pod, "node1")...) {
 				events = append(events, event.Event.CustomLabel)
 			}
 			if diff := cmp.Diff(tc.wantEvents, events); diff != "" {
@@ -187,14 +187,14 @@ func TestAllocationExtensions(t *testing.T) {
 	}
 }
 
-func TestPreparedAllocations(t *testing.T) {
+func TestPreparedNominations(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var log []string
-	pl := &recordingAllocationExtensions{name: "a", log: &log}
+	pl := &recordingNominationExtensions{name: "a", log: &log}
 	registry := Registry{pl.name: func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) { return pl, nil }}
 	profile := config.KubeSchedulerProfile{Plugins: &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: pl.name}}}}}
 	f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
@@ -204,22 +204,22 @@ func TestPreparedAllocations(t *testing.T) {
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p", UID: "p"}}
 
 	// Only for the node and only once.
-	done := f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
-	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node2")
-	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
-	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+	done := f.RunNominationExtensionsPrepareNomination(ctx, nil, pod, "node1")
+	f.RunNominationExtensionsAddNomination(ctx, pod, "node2")
+	f.RunNominationExtensionsAddNomination(ctx, pod, "node1")
+	f.RunNominationExtensionsAddNomination(ctx, pod, "node1")
 	done()
 
 	// Dropped by done.
-	done = f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+	done = f.RunNominationExtensionsPrepareNomination(ctx, nil, pod, "node1")
 	done()
-	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+	f.RunNominationExtensionsAddNomination(ctx, pod, "node1")
 
 	// done of an older call keeps the results of a newer one.
-	done = f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
-	doneNewer := f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+	done = f.RunNominationExtensionsPrepareNomination(ctx, nil, pod, "node1")
+	doneNewer := f.RunNominationExtensionsPrepareNomination(ctx, nil, pod, "node1")
 	done()
-	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+	f.RunNominationExtensionsAddNomination(ctx, pod, "node1")
 	doneNewer()
 
 	want := []string{

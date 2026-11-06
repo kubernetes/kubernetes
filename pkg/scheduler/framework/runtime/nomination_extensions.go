@@ -30,11 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-// fillAllocationExtensions collects the plugins which implement
-// framework.AllocationExtensions or framework.VictimExtensions. They are not
+// fillNominationExtensions collects the plugins which implement
+// framework.NominationExtensions or framework.VictimExtensions. They are not
 // configured per extension point, so every instantiated plugin of the
 // profile is considered.
-func (f *frameworkImpl) fillAllocationExtensions() {
+func (f *frameworkImpl) fillNominationExtensions() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
 		return
 	}
@@ -45,42 +45,42 @@ func (f *frameworkImpl) fillAllocationExtensions() {
 	// Sorted for a deterministic call order.
 	slices.Sort(names)
 	for _, name := range names {
-		if ext, ok := f.pluginsMap[name].(framework.AllocationExtensions); ok {
-			f.allocationExtensions = append(f.allocationExtensions, ext)
+		if ext, ok := f.pluginsMap[name].(framework.NominationExtensions); ok {
+			f.nominationExtensions = append(f.nominationExtensions, ext)
 		}
 		if ext, ok := f.pluginsMap[name].(framework.VictimExtensions); ok {
 			f.victimExtensions = append(f.victimExtensions, ext)
 		}
 	}
-	if len(f.allocationExtensions) > 0 {
-		f.preparedAllocations = &preparedAllocations{byPod: make(map[types.UID]*preparedAllocation)}
+	if len(f.nominationExtensions) > 0 {
+		f.preparedNominations = &preparedNominations{byPod: make(map[types.UID]*preparedNomination)}
 	}
 }
 
-// preparedAllocations holds the results of PrepareAllocation for nominations
+// preparedNominations holds the results of PrepareNomination for nominations
 // which the PodNominator is about to make, by pod UID.
-type preparedAllocations struct {
+type preparedNominations struct {
 	mutex sync.Mutex
-	byPod map[types.UID]*preparedAllocation
+	byPod map[types.UID]*preparedNomination
 }
 
-type preparedAllocation struct {
+type preparedNomination struct {
 	nodeName string
-	// results has one entry per plugin in allocationExtensions.
+	// results has one entry per plugin in nominationExtensions.
 	results []any
 }
 
-// RunAllocationExtensionsPrepareAllocation calls PrepareAllocation of all
+// RunNominationExtensionsPrepareNomination calls PrepareNomination of all
 // plugins and keeps the results for the nomination of pod to nodeName until
 // done gets called.
-func (f *frameworkImpl) RunAllocationExtensionsPrepareAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (done func()) {
-	p := f.preparedAllocations
+func (f *frameworkImpl) RunNominationExtensionsPrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (done func()) {
+	p := f.preparedNominations
 	if p == nil {
 		return func() {}
 	}
-	entry := &preparedAllocation{nodeName: nodeName, results: make([]any, len(f.allocationExtensions))}
-	for i, ext := range f.allocationExtensions {
-		entry.results[i] = ext.PrepareAllocation(f.extensionsContext(ctx, "AllocationExtensions", ext), state, pod, nodeName)
+	entry := &preparedNomination{nodeName: nodeName, results: make([]any, len(f.nominationExtensions))}
+	for i, ext := range f.nominationExtensions {
+		entry.results[i] = ext.PrepareNomination(f.extensionsContext(ctx, "NominationExtensions", ext), state, pod, nodeName)
 	}
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -95,10 +95,10 @@ func (f *frameworkImpl) RunAllocationExtensionsPrepareAllocation(ctx context.Con
 	}
 }
 
-// takePreparedAllocation returns and drops the results of PrepareAllocation
+// takePreparedNomination returns and drops the results of PrepareNomination
 // for the nomination of the pod to the node, nil if there are none.
-func (f *frameworkImpl) takePreparedAllocation(podUID types.UID, nodeName string) []any {
-	p := f.preparedAllocations
+func (f *frameworkImpl) takePreparedNomination(podUID types.UID, nodeName string) []any {
+	p := f.preparedNominations
 	if p == nil {
 		return nil
 	}
@@ -112,28 +112,28 @@ func (f *frameworkImpl) takePreparedAllocation(podUID types.UID, nodeName string
 	return entry.results
 }
 
-// RunAllocationExtensionsAddAllocation calls AddAllocation of all plugins,
-// with the results of their PrepareAllocation for the nomination, if they are
+// RunNominationExtensionsAddNomination calls AddNomination of all plugins,
+// with the results of their PrepareNomination for the nomination, if they are
 // still kept, and returns the events of all of them.
-func (f *frameworkImpl) RunAllocationExtensionsAddAllocation(ctx context.Context, pod *v1.Pod, nodeName string) []framework.AllocationEvent {
-	prepared := f.takePreparedAllocation(pod.UID, nodeName)
-	var events []framework.AllocationEvent
-	for i, ext := range f.allocationExtensions {
+func (f *frameworkImpl) RunNominationExtensionsAddNomination(ctx context.Context, pod *v1.Pod, nodeName string) []framework.NominationEvent {
+	prepared := f.takePreparedNomination(pod.UID, nodeName)
+	var events []framework.NominationEvent
+	for i, ext := range f.nominationExtensions {
 		var result any
 		if prepared != nil {
 			result = prepared[i]
 		}
-		events = append(events, ext.AddAllocation(f.extensionsContext(ctx, "AllocationExtensions", ext), pod, nodeName, result).Events...)
+		events = append(events, ext.AddNomination(f.extensionsContext(ctx, "NominationExtensions", ext), pod, nodeName, result).Events...)
 	}
 	return events
 }
 
-// RunAllocationExtensionsRemoveAllocation calls RemoveAllocation of all
+// RunNominationExtensionsRemoveNomination calls RemoveNomination of all
 // plugins and returns the events of all of them.
-func (f *frameworkImpl) RunAllocationExtensionsRemoveAllocation(ctx context.Context, pod *v1.Pod, nodeName string) []framework.AllocationEvent {
-	var events []framework.AllocationEvent
-	for _, ext := range f.allocationExtensions {
-		events = append(events, ext.RemoveAllocation(f.extensionsContext(ctx, "AllocationExtensions", ext), pod, nodeName).Events...)
+func (f *frameworkImpl) RunNominationExtensionsRemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) []framework.NominationEvent {
+	var events []framework.NominationEvent
+	for _, ext := range f.nominationExtensions {
+		events = append(events, ext.RemoveNomination(f.extensionsContext(ctx, "NominationExtensions", ext), pod, nodeName).Events...)
 	}
 	return events
 }

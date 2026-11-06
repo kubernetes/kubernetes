@@ -179,47 +179,47 @@ type RankNodesPlugin interface {
 	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 }
 
-// AllocationEvent describes resources which became available, as the
+// NominationEvent describes resources which became available, as the
 // informer would report it if a pod had released them, for example a
 // ResourceClaim update which removes an allocation.
-type AllocationEvent struct {
+type NominationEvent struct {
 	Event  fwk.ClusterEvent
 	OldObj interface{}
 	NewObj interface{}
 }
 
-// AllocationChangeResult is what a plugin returns when an allocation got
-// added or removed.
-type AllocationChangeResult struct {
+// NominationChangeResult is what a plugin returns when a nomination got
+// added, replaced or removed.
+type NominationChangeResult struct {
 	// Events describe resources which became available because of the
 	// change. The scheduler lets pods with lower or equal priority than the
 	// nominated pod retry with them, like after a real release of those
 	// resources.
-	Events []AllocationEvent
+	Events []NominationEvent
 }
 
-// AllocationExtensions is an optional interface for plugins which keep
+// NominationExtensions is an optional interface for plugins which keep
 // in-memory state about the resources that a pod is going to get on the node
-// which the PodNominator nominates it to ("allocations"), like devices which
-// preemption freed for the pod. A change of the nominated node is a removal
-// followed by an addition. A nomination to the same node again, by a
-// PostFilter plugin, is an addition which replaces the previous one.
+// which the PodNominator nominates it to, like devices which preemption freed
+// for the pod. A change of the nominated node is a removal followed by an
+// addition. A nomination to the same node again, by a PostFilter plugin, is
+// an addition which replaces the previous one.
 //
 // When a nominated pod gets assumed, its nomination only ends once Reserve
-// and Permit let it through, so plugins can compare the allocation with what
-// the pod reserved and return events only for resources which the pod does
-// not keep. If Reserve or Permit reject the pod, the nomination ends when it
+// and Permit let it through, so plugins can compare the resources of the
+// nomination with what the pod reserved and return events only for resources
+// which the pod does not keep. If Reserve or Permit reject the pod, the nomination ends when it
 // gets cleared afterwards, after Unreserve. Assumed pods are accounted for by
 // Reserve and Unreserve, as usual.
 //
-// None of these calls applies allocations for scheduling. That is left to
+// None of these calls applies nominations for scheduling. That is left to
 // PreFilterExtensions: the framework calls AddPod and RemovePod for the
 // nominated pods which apply to the pod being filtered (by priority, not the
 // pod itself, not pods already on the node), and plugins apply the
-// allocation of such a pod there.
+// nomination of such a pod there.
 //
-// PrepareAllocation gets called by the scheduling cycle. AddAllocation and
-// RemoveAllocation get called by the scheduling queue while it is locked,
+// PrepareNomination gets called by the scheduling cycle. AddNomination and
+// RemoveNomination get called by the scheduling queue while it is locked,
 // from any goroutine. Plugins must not call back into the scheduling queue or
 // the API server.
 //
@@ -229,54 +229,54 @@ type AllocationChangeResult struct {
 // The interface is internal to kube-scheduler and only used when the
 // DRAPreemption feature gate is enabled. It may change or move into the
 // framework before KEP-5690 graduates.
-type AllocationExtensions interface {
+type NominationExtensions interface {
 	fwk.Plugin
-	// PrepareAllocation is called right before pod gets nominated to
+	// PrepareNomination is called right before pod gets nominated to
 	// nodeName by a PostFilter plugin of this scheduler, with the CycleState
 	// of the scheduling cycle. It returns what the cycle selected for the
-	// pod on nodeName, nil if nothing. Unlike AddAllocation, it doesn't get
+	// pod on nodeName, nil if nothing. Unlike AddNomination, it doesn't get
 	// called while the scheduling queue is locked, so expensive work belongs
 	// here.
 	//
-	// The framework passes the result to AddAllocation of the same plugin if
+	// The framework passes the result to AddNomination of the same plugin if
 	// the PodNominator nominates the pod to nodeName right afterwards, and
 	// drops it otherwise, for example if the pod got deleted. It exists
 	// because the PodNominator doesn't have the CycleState. It may go away
 	// once nominations carry the information which a cycle selected besides
 	// the node, which may be more than resources, e.g. a topology placement.
-	PrepareAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) any
-	// AddAllocation is called when pod got nominated to nodeName. prepared
-	// is what PrepareAllocation returned for this nomination, nil if nothing
+	PrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) any
+	// AddNomination is called when pod got nominated to nodeName. prepared
+	// is what PrepareNomination returned for this nomination, nil if nothing
 	// got prepared for it, for example for nominations read from the API.
-	// Each result of PrepareAllocation gets passed at most once.
+	// Each result of PrepareNomination gets passed at most once.
 	//
 	// If the pod was nominated to nodeName already, plugins replace the
-	// previous allocation and return events for its resources which the new
-	// one doesn't keep, like RemoveAllocation.
-	AddAllocation(ctx context.Context, pod *v1.Pod, nodeName string, prepared any) AllocationChangeResult
-	// RemoveAllocation is called when the nomination of pod to nodeName
+	// previous nomination and return events for its resources which the new
+	// one doesn't keep, like RemoveNomination.
+	AddNomination(ctx context.Context, pod *v1.Pod, nodeName string, prepared any) NominationChangeResult
+	// RemoveNomination is called when the nomination of pod to nodeName
 	// ended, including when the pod got assumed, bound or deleted. Plugins
-	// return events for the resources of the allocation which become
+	// return events for the resources of the nomination which become
 	// available, as if a pod using them got removed, e.g. ResourceClaim
 	// updates which clear the allocation, and drop it.
-	RemoveAllocation(ctx context.Context, pod *v1.Pod, nodeName string) AllocationChangeResult
+	RemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) NominationChangeResult
 }
 
-// AllocationExtensionsRunner runs the AllocationExtensions of the plugins of
+// NominationExtensionsRunner runs the NominationExtensions of the plugins of
 // a profile. All methods are no-ops when no plugin implements them.
-type AllocationExtensionsRunner interface {
-	// RunAllocationExtensionsPrepareAllocation calls PrepareAllocation of all
+type NominationExtensionsRunner interface {
+	// RunNominationExtensionsPrepareNomination calls PrepareNomination of all
 	// plugins and keeps the results for the nomination of pod to nodeName
 	// until done gets called.
-	RunAllocationExtensionsPrepareAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (done func())
-	// RunAllocationExtensionsAddAllocation calls AddAllocation of all plugins
+	RunNominationExtensionsPrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (done func())
+	// RunNominationExtensionsAddNomination calls AddNomination of all plugins
 	// and returns the events of all of them. Each plugin gets the result of
-	// its PrepareAllocation for the nomination of pod to nodeName, if it is
+	// its PrepareNomination for the nomination of pod to nodeName, if it is
 	// still kept, which drops it.
-	RunAllocationExtensionsAddAllocation(ctx context.Context, pod *v1.Pod, nodeName string) []AllocationEvent
-	// RunAllocationExtensionsRemoveAllocation calls RemoveAllocation of all
+	RunNominationExtensionsAddNomination(ctx context.Context, pod *v1.Pod, nodeName string) []NominationEvent
+	// RunNominationExtensionsRemoveNomination calls RemoveNomination of all
 	// plugins and returns the events of all of them.
-	RunAllocationExtensionsRemoveAllocation(ctx context.Context, pod *v1.Pod, nodeName string) []AllocationEvent
+	RunNominationExtensionsRemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) []NominationEvent
 }
 
 // VictimExtensions is an optional interface for plugins which manage
@@ -328,7 +328,7 @@ type VictimExtensionsRunner interface {
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	fwk.Handle
-	AllocationExtensionsRunner
+	NominationExtensionsRunner
 	VictimExtensionsRunner
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.

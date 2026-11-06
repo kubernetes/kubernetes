@@ -60,14 +60,14 @@ type assumeReserveFixture struct {
 func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	plugin *assumeReserveTestPlugin, pods ...*v1.Pod) *assumeReserveFixture {
 	t.Helper()
-	return newAssumeReserveFixtureWithAllocations(t, ctx, node, plugin, nil, pods...)
+	return newAssumeReserveFixtureWithNominations(t, ctx, node, plugin, nil, pods...)
 }
 
-// newAssumeReserveFixtureWithAllocations additionally enables
-// allocationExtensions, if not nil, and reports nomination changes to it
+// newAssumeReserveFixtureWithNominations additionally enables
+// nominationExtensions, if not nil, and reports nomination changes to it
 // like the scheduler does.
-func newAssumeReserveFixtureWithAllocations(t *testing.T, ctx context.Context, node *v1.Node,
-	plugin *assumeReserveTestPlugin, allocationExtensions *tf.FakeAllocationExtensionsPlugin, pods ...*v1.Pod) *assumeReserveFixture {
+func newAssumeReserveFixtureWithNominations(t *testing.T, ctx context.Context, node *v1.Node,
+	plugin *assumeReserveTestPlugin, nominationExtensions *tf.FakeNominationExtensionsPlugin, pods ...*v1.Pod) *assumeReserveFixture {
 	t.Helper()
 
 	logger := klog.FromContext(ctx)
@@ -103,9 +103,9 @@ func newAssumeReserveFixtureWithAllocations(t *testing.T, ctx context.Context, n
 			Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
 		},
 	}
-	if allocationExtensions != nil {
-		registry[allocationExtensions.Name()] = tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)
-		profileCfg.Plugins.PreFilter = schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: allocationExtensions.Name()}}}
+	if nominationExtensions != nil {
+		registry[nominationExtensions.Name()] = tf.NewFakeNominationExtensionsPlugin(nominationExtensions)
+		profileCfg.Plugins.PreFilter = schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: nominationExtensions.Name()}}}
 	}
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
@@ -238,9 +238,9 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 
 // TestNominationEndsAfterPermit checks that with the DRAPreemption feature
 // gate, the nomination of an assumed pod only ends once Reserve and Permit let
-// it through, so that AllocationExtensions can compare it with what the pod
+// it through, so that NominationExtensions can compare it with what the pod
 // reserved, and that clearing it after a failure lets the pods retry which it
-// blocked. Assuming the pod doesn't involve AllocationExtensions.
+// blocked. Assuming the pod doesn't involve NominationExtensions.
 func TestNominationEndsAfterPermit(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
 
@@ -257,8 +257,8 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 			name:      "nominated: the nomination of the assumed pod ends after Permit",
 			nominated: true,
 			wantCalls: []string{
-				"AddAllocation default/pod1 node1 assigned= prepared=<nil>",
-				"RemoveAllocation default/pod1 node1 assigned=node1",
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=node1",
 			},
 		},
 		{
@@ -266,8 +266,8 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 			nominated:     true,
 			reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"),
 			wantCalls: []string{
-				"AddAllocation default/pod1 node1 assigned= prepared=<nil>",
-				"RemoveAllocation default/pod1 node1 assigned=",
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=",
 			},
 		},
 	}
@@ -284,8 +284,8 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 				},
 				reserveStatus: tt.reserveStatus,
 			}
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
-			f := newAssumeReserveFixtureWithAllocations(t, ctx, node1, plugin, allocationExtensions, pod1)
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			f := newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, pod1)
 
 			podInfo, err := framework.NewPodInfo(pod1)
 			if err != nil {
@@ -311,8 +311,8 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 				// What handleSchedulingFailure does.
 				f.fwk.AddNominatedPod(logger, podInfo, clearNominatedNode)
 			}
-			if diff := cmp.Diff(tt.wantCalls, allocationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			if diff := cmp.Diff(tt.wantCalls, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected NominationExtensions calls (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -355,7 +355,7 @@ func TestNominationEndsOnAssume(t *testing.T) {
 // placement is only tentative: it goes into the snapshot rather than the cache, and
 // the returned revert function has to undo every part of it. The nomination of
 // the pod stays untouched, so that reverting cannot lose it and plugins with
-// AllocationExtensions see no changes.
+// NominationExtensions see no changes.
 func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
 	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
@@ -393,8 +393,8 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 					filterStatus: map[string]*fwk.Status{tt.pod.Name: fwk.NewStatus(fwk.Success)},
 				},
 			}
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
-			f := newAssumeReserveFixtureWithAllocations(t, ctx, node1, plugin, allocationExtensions, tt.pod)
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			f := newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, tt.pod)
 
 			podInfo, err := framework.NewPodInfo(tt.pod)
 			if err != nil {
@@ -415,7 +415,7 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 					return pi.GetPod().UID == tt.pod.UID
 				})
 			}
-			callsBefore := allocationExtensions.Calls()
+			callsBefore := nominationExtensions.Calls()
 
 			scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
 			if err != nil {
@@ -465,8 +465,8 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			if got := isNominated(); got != tt.nominated {
 				t.Errorf("pod nominated after revert: %v, want %v", got, tt.nominated)
 			}
-			if diff := cmp.Diff(callsBefore, allocationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected AllocationExtensions calls for the snapshot assume and revert (-want,+got):\n%s", diff)
+			if diff := cmp.Diff(callsBefore, nominationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected NominationExtensions calls for the snapshot assume and revert (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -78,9 +78,9 @@ type frameworkImpl struct {
 	batchablePlugins          []fwk.SignPlugin
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 	rankNodesPlugins          []framework.RankNodesPlugin
-	allocationExtensions      []framework.AllocationExtensions
+	nominationExtensions      []framework.NominationExtensions
 	victimExtensions          []framework.VictimExtensions
-	preparedAllocations       *preparedAllocations
+	preparedNominations       *preparedNominations
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin
@@ -473,7 +473,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 
 		f.fillEnqueueExtensions(p)
 	}
-	f.fillAllocationExtensions()
+	f.fillNominationExtensions()
 
 	// initialize plugins per individual extension points
 	for _, e := range f.getExtensionPoints(profile.Plugins) {

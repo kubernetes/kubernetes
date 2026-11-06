@@ -29,7 +29,7 @@ import (
 // of preempted pods are tracked separately by victimClaimTracker.
 // DefaultDRAManager owns it, so all profiles share it.
 //
-// AllocationExtensions and queueing hints use it while the scheduling queue
+// NominationExtensions and queueing hints use it while the scheduling queue
 // is locked. Therefore nothing which locks the queue may be called while
 // mutex is locked.
 type claimNominations struct {

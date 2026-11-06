@@ -1967,13 +1967,13 @@ func TestPrepareCandidateAsyncGatesPreemptorUntilAssumeVictim(t *testing.T) {
 
 			mu := &sync.RWMutex{}
 			fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu, activatedCh: make(chan struct{})}
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
 			schedFwk, err := tf.NewFramework(
 				ctx,
 				[]tf.RegisterPluginFunc{
 					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-					tf.RegisterPreFilterPlugin(allocationExtensions.Name(), tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)),
+					tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)),
 				}, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{st.MakeNode().Name("node1").Obj()})),
@@ -2017,7 +2017,7 @@ func TestPrepareCandidateAsyncGatesPreemptorUntilAssumeVictim(t *testing.T) {
 				}
 				observed <- observation{
 					gated: executor.IsPodRunningPreemption(preemptorPod.UID),
-					calls: allocationExtensions.Calls(),
+					calls: nominationExtensions.Calls(),
 				}
 				return true, nil, nil
 			})
@@ -2060,7 +2060,7 @@ func TestPrepareCandidateAsyncGatesPreemptorUntilAssumeVictim(t *testing.T) {
 			if _, activated := fakeActivator.activatedPods[preemptorPod.Name]; activated != tc.wantGated {
 				t.Errorf("Preemptor activated: %v, want %v", activated, tc.wantGated)
 			}
-			if diff := cmp.Diff(tc.wantCalls, allocationExtensions.Calls()); diff != "" {
+			if diff := cmp.Diff(tc.wantCalls, nominationExtensions.Calls()); diff != "" {
 				t.Errorf("Unexpected calls (-want, +got):\n%s", diff)
 			}
 		})

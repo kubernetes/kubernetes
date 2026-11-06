@@ -321,7 +321,7 @@ func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podTo
 	}
 	pod := podInfoToAdd.GetPod()
 	if _, removed := p.sim.removedPods[pod.UID]; !removed {
-		pl.addNomination(p, pod, nodeInfo)
+		pl.addHolds(p, pod, nodeInfo)
 		return nil
 	}
 	p.version++
@@ -334,8 +334,9 @@ func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podTo
 	return nil
 }
 
-// addNomination adds the nomination of the pod for the node, if it has one.
-func (pl *DynamicResources) addNomination(p *preemptionState, pod *v1.Pod, nodeInfo fwk.NodeInfo) {
+// addHolds adds the devices held for the nomination of the pod to the
+// simulation, if the pod is nominated to the node.
+func (pl *DynamicResources) addHolds(p *preemptionState, pod *v1.Pod, nodeInfo fwk.NodeInfo) {
 	if pl.nominations == nil || nodeInfo.Node() == nil {
 		return
 	}

@@ -177,12 +177,12 @@ func TestNominationChangeHandler(t *testing.T) {
 	var calls []string
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod, lowPod, highPod},
 		WithQueueingHintMapPerProfile(m),
-		WithNominationChangeHandler(func(_ klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.AllocationEvent {
+		WithNominationChangeHandler(func(_ klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent {
 			calls = append(calls, fmt.Sprintf("%s %s->%s assigned=%s", pod.Name, oldNodeName, newNodeName, pod.Spec.NodeName))
 			if oldNodeName == "" {
 				return nil
 			}
-			return []framework.AllocationEvent{{Event: claimUpdate}}
+			return []framework.NominationEvent{{Event: claimUpdate}}
 		}))
 	for _, p := range []*v1.Pod{lowPod, highPod} {
 		q.Add(ctx, p)
@@ -227,7 +227,7 @@ func TestRenominationToSameNode(t *testing.T) {
 	var calls []string
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod, lowPod},
 		WithQueueingHintMapPerProfile(m),
-		WithNominationChangeHandler(func(_ klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.AllocationEvent {
+		WithNominationChangeHandler(func(_ klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent {
 			calls = append(calls, fmt.Sprintf("%s %s->%s", pod.Name, oldNodeName, newNodeName))
 			return nil
 		}))
