@@ -175,31 +175,17 @@ func (h *podResizesAdmitHandler) guaranteedPodResourceResizeRequired(pod *v1.Pod
 	return false
 }
 
-// FindVolume returns the volume with the given name from the slice, checking idxHint first for 1:1 common-case alignment.
-func FindVolume(volumes []v1.Volume, name string, idxHint int) *v1.Volume {
-	if len(volumes) > idxHint && volumes[idxHint].Name == name {
-		return &volumes[idxHint]
-	}
-	for i := range volumes {
-		if volumes[i].Name == name {
-			return &volumes[i]
-		}
-	}
-	return nil
-}
-
 // IsMemoryBackedVolumeResizeRequested returns true if any of the pod's memory-backed emptyDir volumes has its size limit changed.
 func IsMemoryBackedVolumeResizeRequested(desiredPod, allocatedPod *v1.Pod) bool {
-	for i, vol := range desiredPod.Spec.Volumes {
-		if !VolHasMemoryBackedEmptyDir(&vol) {
+	for pair := range podutil.VolumePairs(desiredPod, allocatedPod) {
+		if pair.New == nil || pair.Old == nil {
 			continue
 		}
-		allocVol := FindVolume(allocatedPod.Spec.Volumes, vol.Name, i)
-		if allocVol == nil || !VolHasMemoryBackedEmptyDir(allocVol) {
+		if !VolHasMemoryBackedEmptyDir(pair.New) || !VolHasMemoryBackedEmptyDir(pair.Old) {
 			continue
 		}
-		hasLimit, hasAllocLimit := VolHasMemoryBackedEmptyDirSizeLimit(&vol), VolHasMemoryBackedEmptyDirSizeLimit(allocVol)
-		if hasLimit != hasAllocLimit || (hasLimit && !vol.EmptyDir.SizeLimit.Equal(*allocVol.EmptyDir.SizeLimit)) {
+		hasLimit, hasAllocLimit := VolHasMemoryBackedEmptyDirSizeLimit(pair.New), VolHasMemoryBackedEmptyDirSizeLimit(pair.Old)
+		if hasLimit != hasAllocLimit || (hasLimit && !pair.New.EmptyDir.SizeLimit.Equal(*pair.Old.EmptyDir.SizeLimit)) {
 			return true
 		}
 	}

@@ -148,3 +148,89 @@ func TestRemoveString(t *testing.T) {
 		}
 	}
 }
+
+func TestPairsByKey(t *testing.T) {
+	type named struct {
+		name string
+	}
+	makeItems := func(names ...string) []named {
+		var out []named
+		for _, n := range names {
+			out = append(out, named{name: n})
+		}
+		return out
+	}
+	key := func(n *named) string { return n.name }
+	pairs := func(items, oldItems []named) []string {
+		label := func(n *named) string {
+			if n == nil {
+				return "-"
+			}
+			return n.name
+		}
+		var out []string
+		for p := range PairsByKey(items, oldItems, key) {
+			out = append(out, label(p.New)+"/"+label(p.Old))
+		}
+		return out
+	}
+
+	tests := []struct {
+		name      string
+		items     []string
+		oldItems  []string
+		wantPairs []string
+	}{
+		{name: "empty"},
+		{name: "unchanged", items: []string{"a", "b"}, oldItems: []string{"a", "b"}, wantPairs: []string{"a/a", "b/b"}},
+		{name: "added to empty", items: []string{"a"}, wantPairs: []string{"a/-"}},
+		{name: "all removed", oldItems: []string{"a", "b"}, wantPairs: []string{"-/a", "-/b"}},
+		{name: "added first", items: []string{"x", "a", "b"}, oldItems: []string{"a", "b"}, wantPairs: []string{"x/-", "a/a", "b/b"}},
+		{name: "added middle", items: []string{"a", "x", "b"}, oldItems: []string{"a", "b"}, wantPairs: []string{"a/a", "x/-", "b/b"}},
+		{name: "added last", items: []string{"a", "b", "x"}, oldItems: []string{"a", "b"}, wantPairs: []string{"a/a", "b/b", "x/-"}},
+		{name: "removed first", items: []string{"b", "c"}, oldItems: []string{"a", "b", "c"}, wantPairs: []string{"-/a", "b/b", "c/c"}},
+		{name: "removed middle", items: []string{"a", "c"}, oldItems: []string{"a", "b", "c"}, wantPairs: []string{"a/a", "-/b", "c/c"}},
+		{name: "removed last", items: []string{"a", "b"}, oldItems: []string{"a", "b", "c"}, wantPairs: []string{"a/a", "b/b", "-/c"}},
+		{name: "replaced", items: []string{"a", "x", "c"}, oldItems: []string{"a", "b", "c"}, wantPairs: []string{"a/a", "x/-", "-/b", "c/c"}},
+		{
+			name:      "added and removed in several places",
+			items:     []string{"x", "b", "y", "d", "z"},
+			oldItems:  []string{"a", "b", "c", "d", "e"},
+			wantPairs: []string{"x/-", "-/a", "b/b", "y/-", "-/c", "d/d", "z/-", "-/e"},
+		},
+		{name: "reordered", items: []string{"b", "a"}, oldItems: []string{"a", "b"}, wantPairs: []string{"-/a", "b/b", "a/-"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := pairs(makeItems(tc.items...), makeItems(tc.oldItems...))
+			if !reflect.DeepEqual(got, tc.wantPairs) {
+				t.Errorf("got %v, want %v", got, tc.wantPairs)
+			}
+		})
+	}
+
+	t.Run("zero allocations and early break", func(t *testing.T) {
+		items := makeItems("x", "b", "z")
+		oldItems := makeItems("a", "b", "c")
+		allocs := testing.AllocsPerRun(100, func() {
+			for range PairsByKey(items, oldItems, key) {
+			}
+		})
+		if allocs != 0 {
+			t.Errorf("expected 0 allocations, got %v", allocs)
+		}
+		for stopAfter := 1; stopAfter <= 5; stopAfter++ {
+			count := 0
+			for range PairsByKey(items, oldItems, key) {
+				count++
+				if count == stopAfter {
+					break
+				}
+			}
+			if count != stopAfter {
+				t.Errorf("expected %d iterations, got %d", stopAfter, count)
+			}
+		}
+	})
+}

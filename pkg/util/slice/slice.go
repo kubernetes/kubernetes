@@ -18,6 +18,7 @@ limitations under the License.
 package slice
 
 import (
+	"iter"
 	"slices"
 )
 
@@ -73,4 +74,68 @@ func RemoveString(slice []string, s string, modifier func(s string) string) []st
 		newSlice = nil
 	}
 	return newSlice
+}
+
+// Pair is an element in two versions of a slice, matched by key. Old is nil for an element that
+// is only in the new slice (added), and New is nil for one that is only in the old slice (removed).
+type Pair[T any] struct {
+	New, Old *T
+}
+
+// PairsByKey yields the elements of items and oldItems, paired by key without allocating.
+// Elements are assumed not to be reordered; a reordered element is yielded once as removed
+// (New == nil) and once as added (Old == nil).
+func PairsByKey[T any](items, oldItems []T, key func(*T) string) iter.Seq[Pair[T]] {
+	return func(yield func(Pair[T]) bool) {
+		PairByKey(items, oldItems, func(item *T) *T { return item }, key, yield)
+	}
+}
+
+// PairByKey walks items and oldItems in parallel, pairing elements with matching keys assuming
+// relative order is preserved, and calls yield for each matched, added, or removed element.
+// unwrap projects each slice element to *T. PairByKey returns false if yield returned false.
+func PairByKey[E, T any](items, oldItems []E, unwrap func(*E) *T, key func(*T) string, yield func(Pair[T]) bool) bool {
+	i, j := 0, 0
+	for i < len(items) && j < len(oldItems) {
+		item := unwrap(&items[i])
+		oldItem := unwrap(&oldItems[j])
+		itemKey := key(item)
+		if itemKey == key(oldItem) {
+			if !yield(Pair[T]{New: item, Old: oldItem}) {
+				return false
+			}
+			i++
+			j++
+			continue
+		}
+		// Elements aren't reordered, so if item isn't further on in the old slice it was added,
+		// and otherwise everything before it there was removed.
+		k := j + 1
+		for k < len(oldItems) && key(unwrap(&oldItems[k])) != itemKey {
+			k++
+		}
+		if k == len(oldItems) {
+			if !yield(Pair[T]{New: item}) {
+				return false
+			}
+			i++
+			continue
+		}
+		for ; j < k; j++ {
+			if !yield(Pair[T]{Old: unwrap(&oldItems[j])}) {
+				return false
+			}
+		}
+	}
+	for ; i < len(items); i++ {
+		if !yield(Pair[T]{New: unwrap(&items[i])}) {
+			return false
+		}
+	}
+	for ; j < len(oldItems); j++ {
+		if !yield(Pair[T]{Old: unwrap(&oldItems[j])}) {
+			return false
+		}
+	}
+	return true
 }
