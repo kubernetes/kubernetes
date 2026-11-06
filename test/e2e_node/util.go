@@ -94,6 +94,10 @@ var (
 	containerRuntimeUnitName = ""
 	// KubeletConfig is the kubelet configuration the test is running against.
 	kubeletCfg *kubeletconfig.KubeletConfiguration
+	// cgroupDriver is the cgroup driver the kubelet is running with. The kubelet
+	// configuration no longer carries it, so it is resolved from the container
+	// runtime once during suite setup.
+	cgroupDriver string
 )
 
 func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
@@ -452,8 +456,34 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 	}
 }
 
+// getCgroupDriverFromRuntime returns the cgroup driver reported by the container
+// runtime via the CRI RuntimeConfig RPC. The kubelet configuration no longer
+// populates cgroupDriver, so the runtime is the source of truth.
+func getCgroupDriverFromRuntime(ctx context.Context) (string, error) {
+	rs, _, err := getCRIClient(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to the container runtime: %w", err)
+	}
+	resp, err := rs.RuntimeConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get the runtime configuration: %w", err)
+	}
+	linuxConfig := resp.GetLinux()
+	if linuxConfig == nil {
+		return "", fmt.Errorf("the runtime did not report its Linux configuration")
+	}
+	switch linuxConfig.GetCgroupDriver() {
+	case runtimeapi.CgroupDriver_SYSTEMD:
+		return "systemd", nil
+	case runtimeapi.CgroupDriver_CGROUPFS:
+		return "cgroupfs", nil
+	default:
+		return "", fmt.Errorf("the runtime reported an unknown cgroup driver %d", linuxConfig.GetCgroupDriver())
+	}
+}
+
 func toCgroupFsName(cgroupName cm.CgroupName) string {
-	if kubeletCfg.CgroupDriver == "systemd" {
+	if cgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
 	}
 	return cgroupName.ToCgroupfs()

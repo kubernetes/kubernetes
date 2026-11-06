@@ -73,7 +73,7 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity,
 	// convert the cgroup name to its literal form
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
 	cgroupFsName := ""
-	if kubeletCfg.CgroupDriver == "systemd" {
+	if cgroupDriver == "systemd" {
 		cgroupFsName = cgroupName.ToSystemd()
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()

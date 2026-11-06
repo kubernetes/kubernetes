@@ -165,8 +165,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.CgroupsPerQOS == nil {
 		obj.CgroupsPerQOS = ptr.To(true)
 	}
-	if obj.CgroupDriver == "" {
-		obj.CgroupDriver = "cgroupfs"
+	if localFeatureGate.Enabled(features.LegacyCgroupDriverFallback) {
+		if obj.CgroupDriver == "" {
+			obj.CgroupDriver = "cgroupfs"
+		}
 	}
 	if obj.CPUManagerPolicy == "" {
 		obj.CPUManagerPolicy = "none"
