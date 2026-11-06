@@ -323,11 +323,111 @@ func TestContainerPairs(t *testing.T) {
 	})
 
 	t.Run("pairs point into the specs", func(t *testing.T) {
-		spec := &api.PodSpec{Containers: containers("a")}
-		oldSpec := spec.DeepCopy()
-		for pair := range ContainerPairs(&api.Pod{Spec: *spec}, &api.Pod{Spec: *oldSpec}, Containers) {
-			assert.Same(t, &spec.Containers[0], pair.New)
-			assert.Same(t, &oldSpec.Containers[0], pair.Old)
+		pod := &api.Pod{Spec: api.PodSpec{
+			InitContainers:      containers("init"),
+			Containers:          containers("a"),
+			EphemeralContainers: ephemeralContainers("debug"),
+		}}
+		oldPod := pod.DeepCopy()
+		for pair, containerType := range ContainerPairs(pod, oldPod, AllContainers) {
+			if containerType == Containers {
+				assert.Same(t, &pod.Spec.Containers[0], pair.New)
+				assert.Same(t, &oldPod.Spec.Containers[0], pair.Old)
+			}
+		}
+		allocs := testing.AllocsPerRun(100, func() {
+			for range ContainerPairs(pod, oldPod, AllContainers) {
+			}
+		})
+		assert.Zero(t, allocs)
+	})
+}
+
+func TestVolumePairs(t *testing.T) {
+	volumes := func(names ...string) []api.Volume {
+		var vols []api.Volume
+		for _, name := range names {
+			vols = append(vols, api.Volume{Name: name})
+		}
+		return vols
+	}
+	// pairs returns each pair as "new/old", with "-" for a missing volume.
+	pairs := func(pod, oldPod *api.Pod) []string {
+		name := func(v *api.Volume) string {
+			if v == nil {
+				return "-"
+			}
+			return v.Name
+		}
+		var out []string
+		for pair := range VolumePairs(pod, oldPod) {
+			out = append(out, name(pair.New)+"/"+name(pair.Old))
+		}
+		return out
+	}
+
+	tests := []struct {
+		name          string
+		names, old    []string
+		expectedPairs []string
+	}{
+		{name: "no volumes"},
+		{name: "unchanged", names: []string{"a", "b"}, old: []string{"a", "b"}, expectedPairs: []string{"a/a", "b/b"}},
+		{name: "added to an empty list", names: []string{"a"}, expectedPairs: []string{"a/-"}},
+		{name: "all removed", old: []string{"a", "b"}, expectedPairs: []string{"-/a", "-/b"}},
+		{name: "added first", names: []string{"x", "a", "b"}, old: []string{"a", "b"}, expectedPairs: []string{"x/-", "a/a", "b/b"}},
+		{name: "added in the middle", names: []string{"a", "x", "b"}, old: []string{"a", "b"}, expectedPairs: []string{"a/a", "x/-", "b/b"}},
+		{name: "added last", names: []string{"a", "b", "x"}, old: []string{"a", "b"}, expectedPairs: []string{"a/a", "b/b", "x/-"}},
+		{name: "removed first", names: []string{"b", "c"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"-/a", "b/b", "c/c"}},
+		{name: "removed in the middle", names: []string{"a", "c"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"a/a", "-/b", "c/c"}},
+		{name: "removed last", names: []string{"a", "b"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"a/a", "b/b", "-/c"}},
+		{name: "replaced", names: []string{"a", "x", "c"}, old: []string{"a", "b", "c"}, expectedPairs: []string{"a/a", "x/-", "-/b", "c/c"}},
+		{
+			name:          "added and removed in several places",
+			names:         []string{"x", "b", "y", "d", "z"},
+			old:           []string{"a", "b", "c", "d", "e"},
+			expectedPairs: []string{"x/-", "-/a", "b/b", "y/-", "-/c", "d/d", "z/-", "-/e"},
+		},
+		{name: "reordered", names: []string{"b", "a"}, old: []string{"a", "b"}, expectedPairs: []string{"-/a", "b/b", "a/-"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &api.Pod{Spec: api.PodSpec{Volumes: volumes(tc.names...)}}
+			oldPod := &api.Pod{Spec: api.PodSpec{Volumes: volumes(tc.old...)}}
+			assert.Equal(t, tc.expectedPairs, pairs(pod, oldPod))
+		})
+	}
+
+	t.Run("pairs point into the specs and do not allocate", func(t *testing.T) {
+		pod := &api.Pod{Spec: api.PodSpec{Volumes: volumes("a", "x", "c")}}
+		oldPod := &api.Pod{Spec: api.PodSpec{Volumes: volumes("a", "b", "c")}}
+		first := true
+		for pair := range VolumePairs(pod, oldPod) {
+			if first {
+				assert.Same(t, &pod.Spec.Volumes[0], pair.New)
+				assert.Same(t, &oldPod.Spec.Volumes[0], pair.Old)
+				first = false
+			}
+		}
+		allocs := testing.AllocsPerRun(100, func() {
+			for range VolumePairs(pod, oldPod) {
+			}
+		})
+		assert.Zero(t, allocs)
+	})
+
+	t.Run("early break", func(t *testing.T) {
+		pod := &api.Pod{Spec: api.PodSpec{Volumes: volumes("x", "b", "z")}}
+		oldPod := &api.Pod{Spec: api.PodSpec{Volumes: volumes("a", "b", "c")}}
+		for stopAfter := 1; stopAfter <= 5; stopAfter++ {
+			count := 0
+			for range VolumePairs(pod, oldPod) {
+				count++
+				if count == stopAfter {
+					break
+				}
+			}
+			assert.Equal(t, stopAfter, count)
 		}
 	})
 }

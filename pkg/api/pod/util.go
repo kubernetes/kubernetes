@@ -81,6 +81,23 @@ func ContainerIter(podSpec *api.PodSpec, mask ContainerType) iter.Seq2[*api.Cont
 	return pods.ContainerIter(podSpec, mask)
 }
 
+// ContainerPair is a container in two versions of a pod, matched by name.
+type ContainerPair = pods.ContainerPair
+
+// ContainerPairs yields the containers of pod and oldPod of the types in mask, paired by name,
+// with their type.
+func ContainerPairs(pod, oldPod *api.Pod, mask ContainerType) iter.Seq2[ContainerPair, ContainerType] {
+	return pods.ContainerPairs(pod, oldPod, mask)
+}
+
+// VolumePair is a volume in two versions of a pod, matched by name.
+type VolumePair = pods.VolumePair
+
+// VolumePairs yields the volumes of pod and oldPod, paired by name.
+func VolumePairs(pod, oldPod *api.Pod) iter.Seq[VolumePair] {
+	return pods.VolumePairs(pod, oldPod)
+}
+
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
 

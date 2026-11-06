@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 // ContainerType signifies container type
@@ -109,9 +110,7 @@ func ContainerIter(podSpec *v1.PodSpec, mask ContainerType) iter.Seq2[*v1.Contai
 // ContainerPair is a container in two versions of a pod, matched by name. Old is nil for a
 // container that is only in the new pod (added), and New is nil for one that is only in the old
 // pod (removed).
-type ContainerPair struct {
-	New, Old *v1.Container
-}
+type ContainerPair = slice.Pair[v1.Container]
 
 // ContainerPairs yields the containers of pod and oldPod of the types in mask, paired by name,
 // with their type. Containers are only matched within their type, and are assumed not to be
@@ -119,69 +118,50 @@ type ContainerPair struct {
 // Containers, then EphemeralContainers.
 func ContainerPairs(pod, oldPod *v1.Pod, mask ContainerType) iter.Seq2[ContainerPair, ContainerType] {
 	return func(yield func(ContainerPair, ContainerType) bool) {
-		for _, containerType := range []ContainerType{InitContainers, Containers, EphemeralContainers} {
-			if mask&containerType == 0 {
-				continue
-			}
-			if !pairContainers(containersOfType(&pod.Spec, containerType), containersOfType(&oldPod.Spec, containerType), containerType, yield) {
-				return
-			}
+		if mask&InitContainers != 0 && !slice.PairByKey(pod.Spec.InitContainers, oldPod.Spec.InitContainers, identityContainer, containerName, func(p ContainerPair) bool {
+			return yield(p, InitContainers)
+		}) {
+			return
+		}
+		if mask&Containers != 0 && !slice.PairByKey(pod.Spec.Containers, oldPod.Spec.Containers, identityContainer, containerName, func(p ContainerPair) bool {
+			return yield(p, Containers)
+		}) {
+			return
+		}
+		if mask&EphemeralContainers != 0 {
+			slice.PairByKey(pod.Spec.EphemeralContainers, oldPod.Spec.EphemeralContainers, ephemeralAsContainer, containerName, func(p ContainerPair) bool {
+				return yield(p, EphemeralContainers)
+			})
 		}
 	}
 }
 
-func containersOfType(podSpec *v1.PodSpec, containerType ContainerType) []*v1.Container {
-	var containers []*v1.Container
-	for c := range ContainerIter(podSpec, containerType) {
-		containers = append(containers, c)
-	}
-	return containers
+func identityContainer(c *v1.Container) *v1.Container {
+	return c
 }
 
-// pairContainers walks two container lists in parallel, yielding matched, added and removed
-// containers in order. It returns false if yield did.
-func pairContainers(containers, oldContainers []*v1.Container, containerType ContainerType, yield func(ContainerPair, ContainerType) bool) bool {
-	i, j := 0, 0
-	for i < len(containers) && j < len(oldContainers) {
-		c := containers[i]
-		if c.Name == oldContainers[j].Name {
-			if !yield(ContainerPair{New: c, Old: oldContainers[j]}, containerType) {
-				return false
-			}
-			i++
-			j++
-			continue
-		}
-		// Containers aren't reordered, so if c isn't further on in the old list it was added,
-		// and otherwise everything before it there was removed.
-		k := j + 1
-		for k < len(oldContainers) && oldContainers[k].Name != c.Name {
-			k++
-		}
-		if k == len(oldContainers) {
-			if !yield(ContainerPair{New: c}, containerType) {
-				return false
-			}
-			i++
-			continue
-		}
-		for ; j < k; j++ {
-			if !yield(ContainerPair{Old: oldContainers[j]}, containerType) {
-				return false
-			}
-		}
-	}
-	for ; i < len(containers); i++ {
-		if !yield(ContainerPair{New: containers[i]}, containerType) {
-			return false
-		}
-	}
-	for ; j < len(oldContainers); j++ {
-		if !yield(ContainerPair{Old: oldContainers[j]}, containerType) {
-			return false
-		}
-	}
-	return true
+func ephemeralAsContainer(ec *v1.EphemeralContainer) *v1.Container {
+	return (*v1.Container)(&ec.EphemeralContainerCommon)
+}
+
+func containerName(c *v1.Container) string {
+	return c.Name
+}
+
+// VolumePair is a volume in two versions of a pod, matched by name. Old is nil for a volume
+// that is only in the new pod (added), and New is nil for one that is only in the old pod
+// (removed).
+type VolumePair = slice.Pair[v1.Volume]
+
+// VolumePairs yields the volumes of pod and oldPod, paired by name. Volumes are assumed not to
+// be reordered, which validation enforces; a reordered volume is yielded once as removed
+// (New == nil) and once as added (Old == nil).
+func VolumePairs(pod, oldPod *v1.Pod) iter.Seq[VolumePair] {
+	return slice.PairsByKey(pod.Spec.Volumes, oldPod.Spec.Volumes, volumeName)
+}
+
+func volumeName(v *v1.Volume) string {
+	return v.Name
 }
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
