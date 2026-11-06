@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"testing"
 
@@ -540,28 +539,10 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 			state := &stateData{
 				claimHasNodeAllocatableMappedDevice: make(map[types.UID]bool),
 			}
-			if tt.claim != nil {
-				if tt.claim.Status.Allocation != nil {
-					isMapped := false
-					for _, result := range tt.claim.Status.Allocation.Devices.Results {
-						if result.AdminAccess != nil && *result.AdminAccess {
-							continue
-						}
-						device, err := getDeviceFromManager(tt.draManager, &result)
-						if err == nil && device != nil && device.NodeAllocatableResources != nil {
-							for _, mapping := range device.NodeAllocatableResources {
-								if mapping.Mapping != nil {
-									isMapped = true
-									break
-								}
-							}
-						}
-						if isMapped {
-							break
-						}
-					}
-					state.claimHasNodeAllocatableMappedDevice[tt.claim.UID] = isMapped
-				}
+			// Same as PreFilter.
+			if tt.claim != nil && tt.claim.Status.Allocation != nil {
+				slices, _ := tt.draManager.ResourceSlices().ListWithDeviceTaintRules()
+				state.claimHasNodeAllocatableMappedDevice[tt.claim.UID] = allocationHasNodeAllocatableMapping(tt.claim.Status.Allocation, nodeAllocatableSlicesByPool(slices))
 			}
 			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.claim, state, tt.podGroupState)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
@@ -1478,16 +1459,6 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			},
 		},
 		{
-			name:           "Invalid -  Device Not Found",
-			pod:            st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").Containers([]v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}}}}).Obj(),
-			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
-			resourceSlices: apiSlices(makeSlice("slice1", resourceapi.Device{Name: "device1"})),
-			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
-				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "nonexistent-device"),
-			},
-			wantErr: true,
-		},
-		{
 			name: "Extended resource claim - DRA GPU with CPU and memory overhead",
 			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
 				Containers([]v1.Container{{
@@ -1713,7 +1684,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			}
 
 			slices, _ := draManager.ResourceSlices().ListWithDeviceTaintRules()
-			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID, tt.extendedResourceRequestMappings, slices, nil)
+			got, err := pl.buildNodeAllocatableDRAInfo(tt.pod, tt.nodeAllocatableClaimAllocations, claimNametoUID, tt.extendedResourceRequestMappings, nodeAllocatableSlicesByPool(slices))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("buildNodeAllocatableDRAInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2481,91 +2452,6 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 				if !strings.Contains(gotStatus.Message(), tt.wantErrorMessage) {
 					t.Errorf("validatePodLevelResourcesCoverDRA() returned error %q, want it to contain %q", gotStatus.Message(), tt.wantErrorMessage)
 				}
-			}
-		})
-	}
-}
-
-func TestFilterSlicesForNode(t *testing.T) {
-	nodeName := "node1"
-	otherNodeName := "node2"
-	allNodes := true
-
-	tests := []struct {
-		name      string
-		node      *v1.Node
-		slices    []*resourceapi.ResourceSlice
-		wantNames []string
-	}{
-		{
-			name: "matches NodeName exactly",
-			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
-			slices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodename"},
-					Spec: resourceapi.ResourceSliceSpec{
-						NodeName: &nodeName,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "othernode"},
-					Spec: resourceapi.ResourceSliceSpec{
-						NodeName: &otherNodeName,
-					},
-				},
-			},
-			wantNames: []string{"nodename"},
-		},
-		{
-			name: "matches AllNodes",
-			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
-			slices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "allnodes"},
-					Spec: resourceapi.ResourceSliceSpec{
-						AllNodes: &allNodes,
-					},
-				},
-			},
-			wantNames: []string{"allnodes"},
-		},
-		{
-			name: "matches NodeSelector",
-			node: st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj(),
-			slices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "nodeselector"},
-					Spec: resourceapi.ResourceSliceSpec{
-						NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}, st.NodeSelectorTypeMatchExpressions).Obj(),
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "othernodeselector"},
-					Spec: resourceapi.ResourceSliceSpec{
-						NodeSelector: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{otherNodeName}, st.NodeSelectorTypeMatchExpressions).Obj(),
-					},
-				},
-			},
-			wantNames: []string{"nodeselector"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			draManager := &mockDRAManager{resourceSlices: apiSlices(tt.slices...)}
-			got, _ := filterSlicesForNode(draManager, tt.node)
-
-			var gotNames []string
-			for _, slice := range got {
-				gotNames = append(gotNames, slice.Name)
-			}
-
-			// Sort slices to make comparison stable.
-			sort.Strings(gotNames)
-			sort.Strings(tt.wantNames)
-
-			if diff := cmp.Diff(tt.wantNames, gotNames); diff != "" {
-				t.Errorf("filterSlicesForNode() diff (-want +got):\n%s", diff)
 			}
 		})
 	}
