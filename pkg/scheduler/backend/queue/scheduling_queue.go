@@ -484,7 +484,7 @@ func NewPriorityQueue(
 	}
 	pq.activeQ = newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](lessConverted), metrics.NewActiveEntitiesRecorder()), options.metricsRecorder, backoffQPopper)
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
-	pq.nominator = newPodNominator(options.podLister)
+	pq.nominator = newPodNominator(options.podLister, utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption))
 	pq.nominationChangeHandler = options.nominationChangeHandler
 
 	return pq
@@ -834,6 +834,10 @@ func (p *PriorityQueue) processNominationChangesAndUnlock(logger klog.Logger) {
 // generic AssignedPod/Delete event is not needed if the pod got assumed on
 // its nominated node, because then it really uses the resources there.
 //
+// Without the DRAPreemption feature gate, the nominator records no changes
+// and the event handlers let pods retry when the informer reports the end of
+// a nomination.
+//
 // NOTE: this function assumes that p.lock is held, but not the locks of
 // activeQ, backoffQ or the nominator. It gets called by
 // processNominationChangesAndUnlock.
@@ -945,6 +949,11 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.Queu
 // DeleteNominatedPodIfExists removes the nomination of the pod, for example
 // when it got assumed.
 func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *v1.Pod) {
+	if !p.nominator.recordChanges {
+		// Nothing to process, so p.lock is not needed.
+		p.nominator.DeleteNominatedPodIfExists(pod)
+		return
+	}
 	p.lock.Lock()
 	// fwk.PodNominator does not pass a logger.
 	defer p.processNominationChangesAndUnlock(klog.TODO())

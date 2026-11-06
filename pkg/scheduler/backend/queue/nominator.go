@@ -61,6 +61,9 @@ type nominator struct {
 	// nominated.
 	nominatedPodToNode map[types.UID]string
 
+	// recordChanges is true if changes get recorded, which is only the case
+	// with the DRAPreemption feature gate.
+	recordChanges bool
 	// changes are the changes of nominated nodes which the PriorityQueue has
 	// not processed yet. They are recorded under nLock and processed by
 	// PriorityQueue.processNominationChangesAndUnlock, because processing
@@ -69,9 +72,10 @@ type nominator struct {
 	changes []nominationChange
 }
 
-func newPodNominator(podLister listersv1.PodLister) *nominator {
+func newPodNominator(podLister listersv1.PodLister, recordChanges bool) *nominator {
 	return &nominator{
 		podLister:          podLister,
+		recordChanges:      recordChanges,
 		nominatedPods:      make(map[string][]podRef),
 		nominatedPodToNode: make(map[types.UID]string),
 	}
@@ -81,6 +85,9 @@ func newPodNominator(podLister listersv1.PodLister) *nominator {
 // oldNodeName anymore. Removing and re-adding the same nomination, which the
 // nominator does for every update of a pod, is not a change.
 func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string) {
+	if !npm.recordChanges {
+		return
+	}
 	if newNodeName := npm.nominatedPodToNode[pod.UID]; newNodeName != oldNodeName {
 		npm.changes = append(npm.changes, nominationChange{pod: pod, oldNodeName: oldNodeName, newNodeName: newNodeName})
 	}
@@ -103,7 +110,7 @@ func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomina
 	npm.nLock.Lock()
 	oldNodeName := npm.nominatedPodToNode[pi.GetPod().UID]
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
-	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" &&
+	if npm.recordChanges && nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" &&
 		oldNodeName == nominatingInfo.NominatedNodeName && npm.nominatedPodToNode[pi.GetPod().UID] == oldNodeName {
 		// An explicit nomination to the same node may come with resources
 		// selected anew (NominationExtensions.PrepareNomination), so it
