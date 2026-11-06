@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -590,6 +591,14 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 		pgs.assumePod(pod)
 	}
 	return nil
+}
+
+// IsPodAssumed returns true if the pod with the UID got assumed in the
+// snapshot by AssumePod and not forgotten yet, i.e. during a pod group
+// scheduling cycle.
+func (s *Snapshot) IsPodAssumed(uid types.UID) bool {
+	_, ok := s.assumedPodStates[string(uid)]
+	return ok
 }
 
 // ForgetPod forgets a given pod from the snapshot. In addition to removing
