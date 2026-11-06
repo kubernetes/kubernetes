@@ -134,14 +134,22 @@ func (t *informerWaiter) wait(ctx context.Context, tb testutils.TB, target int64
 // captures kube-apiserver handler allocations instead of httptest.ResponseRecorder's
 // growing bytes.Buffer.
 type responseSink struct {
-	header       http.Header
-	code         int
-	bytesWritten int
-	errBody      []byte
+	header            http.Header
+	code              int
+	bytesWritten      int
+	writes            int
+	cancelAfterWrites int
+	cancelRequest     context.CancelFunc
+	errBody           []byte
 }
 
-func newResponseSink() *responseSink {
-	return &responseSink{header: make(http.Header), code: http.StatusOK}
+func newResponseSink(cancelAfterWrites int, cancelRequest context.CancelFunc) *responseSink {
+	return &responseSink{
+		header:            make(http.Header),
+		code:              http.StatusOK,
+		cancelAfterWrites: cancelAfterWrites,
+		cancelRequest:     cancelRequest,
+	}
 }
 
 func (s *responseSink) Header() http.Header { return s.header }
@@ -150,6 +158,7 @@ func (s *responseSink) WriteHeader(code int) { s.code = code }
 
 func (s *responseSink) Write(b []byte) (int, error) {
 	s.bytesWritten += len(b)
+	s.writes++
 	if s.code >= 300 {
 		s.errBody = append(s.errBody, b...)
 	}
@@ -158,13 +167,21 @@ func (s *responseSink) Write(b []byte) (int, error) {
 
 // Flush and CloseNotify satisfy responsewriter.CloseNotifierFlusher so
 // apiserver's responsewriter.WrapForHTTP1Or2 preserves http.Flusher for WATCH.
-func (s *responseSink) Flush() {}
+func (s *responseSink) Flush() {
+	if s.code >= 300 || s.cancelRequest == nil {
+		return
+	}
+	if s.writes >= s.cancelAfterWrites {
+		s.cancelRequest()
+		s.cancelRequest = nil
+	}
+}
 
 func (s *responseSink) CloseNotify() <-chan bool { return nil }
 
-func runHTTP(tb testutils.TB, server http.Handler, method, path, contentType, accept string, body []byte) int {
+func runHTTP(ctx context.Context, tb testutils.TB, server http.Handler, method, path, contentType, accept string, body []byte, sink *responseSink) int {
 	tb.Helper()
-	req := httptest.NewRequest(method, path, bytes.NewReader(body)).WithContext(context.Background())
+	req := httptest.NewRequest(method, path, bytes.NewReader(body)).WithContext(ctx)
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -172,10 +189,12 @@ func runHTTP(tb testutils.TB, server http.Handler, method, path, contentType, ac
 		req.Header.Set("Accept", accept)
 	}
 
-	sink := newResponseSink()
 	server.ServeHTTP(sink, req)
 	if sink.code < 200 || sink.code >= 300 {
 		tb.Fatalf("%s %s (%s) returned HTTP %d: %s", method, path, accept, sink.code, sink.errBody)
+	}
+	if sink.cancelAfterWrites > 0 && sink.writes != sink.cancelAfterWrites {
+		tb.Fatalf("%s %s (%s) delivered %d writes, want %d", method, path, accept, sink.writes, sink.cancelAfterWrites)
 	}
 	return sink.bytesWritten
 }
