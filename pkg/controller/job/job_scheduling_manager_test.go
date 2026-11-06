@@ -18,6 +18,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -619,6 +620,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 		wantUnownedPodGroup         bool
 		wantErr                     bool
 		wantErrContains             string
+		wantBlockReason             string
+		wantBlockMessage            string
 	}{
 		"CronJob-owned Job with spec.scheduling gets a Workload and PodGroup": {
 			job: func() *batch.Job {
@@ -766,7 +769,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingWorkloads: []*schedulingv1beta1.Workload{
 				makeWorkload(workloadName, "someone-else"),
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: ReasonInvalidSchedulingObjects,
 		},
 		"BYO PodGroup at the Job's name is reused without adding an ownerRef": {
 			job:               baseJob,
@@ -806,7 +810,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingPodGroups: []*schedulingv1beta1.PodGroup{
 				makePodGroup(podGroupName, "other-workload"),
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: ReasonInvalidSchedulingObjects,
 		},
 		"unsupported PodGroupTemplate count blocks": {
 			job: baseJob,
@@ -827,7 +832,22 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: ReasonInvalidSchedulingObjects,
+		},
+		"Workload with a bad template count and a foreign controllerRef reports both problems": {
+			job: baseJob,
+			existingWorkloads: []*schedulingv1beta1.Workload{
+				func() *schedulingv1beta1.Workload {
+					wl := makeWorkload(workloadName, "someone-else")
+					wl.Spec.PodGroupTemplates = append(wl.Spec.PodGroupTemplates, schedulingv1beta1.PodGroupTemplate{Name: "extra"})
+					return wl
+				}(),
+			},
+			wantErr:         true,
+			wantBlockReason: ReasonInvalidSchedulingObjects,
+			wantBlockMessage: fmt.Sprintf("workload %s/%s for job %s/%s: has 2 PodGroupTemplates, want exactly 1, controllerRef does not point at job %s/%s",
+				metav1.NamespaceDefault, workloadName, baseJob.Namespace, baseJob.Name, baseJob.Namespace, baseJob.Name),
 		},
 
 		"Workload create error propagates": {
@@ -873,6 +893,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			}(),
 			wantErr:         true,
 			wantErrContains: "missing or has an empty " + apischeduling.WorkloadNameAnnotation,
+			wantBlockReason: ReasonInvalidSchedulingObjects,
 		},
 		"delegated Job without group-template-name blocks before the Workload lookup": {
 			job: func() *batch.Job {
@@ -882,6 +903,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			}(),
 			wantErr:         true,
 			wantErrContains: "missing or has an empty " + apischeduling.GroupTemplateNameAnnotation,
+			wantBlockReason: ReasonInvalidSchedulingObjects,
 		},
 		"delegated Job with an empty group-template-name blocks instead of picking a template": {
 			job: func() *batch.Job {
@@ -892,6 +914,7 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			existingWorkloads: []*schedulingv1beta1.Workload{makeParentWorkload(4)},
 			wantErr:           true,
 			wantErrContains:   "missing or has an empty " + apischeduling.GroupTemplateNameAnnotation,
+			wantBlockReason:   ReasonInvalidSchedulingObjects,
 		},
 		"delegated PodGroup that does not reference the parent template blocks": {
 			job:               delegatedJob,
@@ -904,11 +927,13 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 				}(),
 			},
 			wantErr:         true,
-			wantErrContains: "does not reference workload",
+			wantErrContains: "does not reference Workload",
+			wantBlockReason: ReasonInvalidSchedulingObjects,
 		},
 		"delegated Job whose Workload does not exist yet blocks": {
-			job:     delegatedJob,
-			wantErr: true,
+			job:             delegatedJob,
+			wantErr:         true,
+			wantBlockReason: ReasonSchedulingDependencyNotFound,
 		},
 		"delegated Job whose PodGroupTemplate is missing blocks": {
 			job: delegatedJob,
@@ -919,7 +944,8 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 					return wl
 				}(),
 			},
-			wantErr: true,
+			wantErr:         true,
+			wantBlockReason: ReasonSchedulingDependencyNotFound,
 		},
 		"standalone BYO Workload is used and only the PodGroup is created": {
 			job: func() *batch.Job {
@@ -972,6 +998,20 @@ func TestEnsureWorkloadAndPodGroup(t *testing.T) {
 			// The shared fixture Jobs must not leak state across cases.
 			job := tc.job.DeepCopy()
 			pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, tc.pods)
+			blockedErr, blocked := errors.AsType[*schedulingBlockedError](err)
+			if tc.wantBlockReason != "" {
+				if !blocked {
+					t.Fatalf("error = %v, want it to wrap *schedulingBlockedError", err)
+				}
+				if blockedErr.reason != tc.wantBlockReason {
+					t.Errorf("blocked reason = %q, want %q", blockedErr.reason, tc.wantBlockReason)
+				}
+				if tc.wantBlockMessage != "" && blockedErr.message != tc.wantBlockMessage {
+					t.Errorf("blocked message = %q, want %q", blockedErr.message, tc.wantBlockMessage)
+				}
+			} else if blocked {
+				t.Fatalf("unexpected schedulingBlockedError: %v", err)
+			}
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

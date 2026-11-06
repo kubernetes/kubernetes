@@ -19,6 +19,7 @@ package job
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -39,11 +40,16 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-// managementMode describes which scheduling objects the Job controller
-// manages for a given Job.
-type managementMode int
-
 const (
+	// ReasonSchedulingDependencyNotFound means an external Workload or its
+	// PodGroupTemplate selected by the Job is not available yet.
+	ReasonSchedulingDependencyNotFound = "SchedulingDependencyNotFound"
+	// ReasonInvalidSchedulingObjects means the Job's delegation annotations or
+	// an existing Workload or PodGroup are invalid for the Job.
+	ReasonInvalidSchedulingObjects = "InvalidSchedulingObjects"
+	// ReasonSchedulingObjectsValid means SchedulingBlocked was cleared.
+	ReasonSchedulingObjectsValid = "SchedulingObjectsValid"
+
 	// the controller manages no scheduling objects, either the feature
 	// is off, the user brought their own PodGroup, or a parent controller
 	// owns both objects without delegating.
@@ -56,6 +62,21 @@ const (
 	// user pre-created) and the controller owns only the runtime PodGroup.
 	managePodGroupOnly
 )
+
+// managementMode describes which scheduling objects the Job controller
+// manages for a given Job.
+type managementMode int
+
+// schedulingBlockedError is returned when the Job's scheduling objects block pod
+// creation until the user fixes them.
+type schedulingBlockedError struct {
+	reason  string
+	message string
+}
+
+func (e *schedulingBlockedError) Error() string {
+	return fmt.Sprintf("scheduling blocked (%s): %s", e.reason, e.message)
+}
 
 // getManagementMode computes which scheduling objects the Job controller
 // manages for the Job.
@@ -234,6 +255,30 @@ func createStrategicMergePatch(original, updated, dataStruct any) ([]byte, error
 	return strategicpatch.CreateTwoWayMergePatch(oldData, newData, dataStruct)
 }
 
+// ensureSchedulingObjectsAndCondition reports whether the condition changed.
+// The Warning event is emitted only on that change.
+func (jm *Controller) ensureSchedulingObjectsAndCondition(ctx context.Context, job *batch.Job, pods []*v1.Pod) (*schedulingv1beta1.PodGroup, bool, error) {
+	pg, err := jm.ensureWorkloadAndPodGroup(ctx, job, pods)
+	blockedErr, blocked := errors.AsType[*schedulingBlockedError](err)
+	if err != nil && !blocked {
+		return nil, false, err
+	}
+
+	var changed bool
+	if blocked {
+		job.Status.Conditions, changed = ensureJobConditionStatus(job.Status.Conditions, batch.JobSchedulingBlocked,
+			v1.ConditionTrue, blockedErr.reason, blockedErr.message, jm.clock.Now())
+		if changed {
+			jm.recorder.Event(job, v1.EventTypeWarning, blockedErr.reason, blockedErr.message)
+		}
+	} else {
+		// No-op unless SchedulingBlocked=True was recorded by an earlier sync.
+		job.Status.Conditions, changed = ensureJobConditionStatus(job.Status.Conditions, batch.JobSchedulingBlocked,
+			v1.ConditionFalse, ReasonSchedulingObjectsValid, "Scheduling objects for the Job are valid", jm.clock.Now())
+	}
+	return pg, changed, err
+}
+
 func (jm *Controller) getWorkload(namespace, name string) (*schedulingv1beta1.Workload, error) {
 	if jm.workloadLister == nil {
 		return nil, fmt.Errorf("workload lister is not configured")
@@ -267,10 +312,16 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 	workloadName := job.Annotations[apischeduling.WorkloadNameAnnotation]
 	templateName := job.Annotations[apischeduling.GroupTemplateNameAnnotation]
 	if workloadName == "" {
-		return nil, fmt.Errorf("job %s/%s is missing or has an empty %s annotation", job.Namespace, job.Name, apischeduling.WorkloadNameAnnotation)
+		return nil, &schedulingBlockedError{
+			reason:  ReasonInvalidSchedulingObjects,
+			message: fmt.Sprintf("Job %s/%s is missing or has an empty %s annotation", job.Namespace, job.Name, apischeduling.WorkloadNameAnnotation),
+		}
 	}
 	if templateName == "" {
-		return nil, fmt.Errorf("job %s/%s is missing or has an empty %s annotation", job.Namespace, job.Name, apischeduling.GroupTemplateNameAnnotation)
+		return nil, &schedulingBlockedError{
+			reason:  ReasonInvalidSchedulingObjects,
+			message: fmt.Sprintf("Job %s/%s is missing or has an empty %s annotation", job.Namespace, job.Name, apischeduling.GroupTemplateNameAnnotation),
+		}
 	}
 	parentWorkload, err := jm.getWorkload(job.Namespace, workloadName)
 	if err != nil {
@@ -279,14 +330,20 @@ func (jm *Controller) getOrCreateDelegatedPodGroup(ctx context.Context,
 	if parentWorkload == nil {
 		logger.V(2).Info("Named Workload not found yet for delegated Job, will retry",
 			"job", klog.KObj(job), "workload", workloadName)
-		return nil, fmt.Errorf("workload %s/%s not found for job %s", job.Namespace, workloadName, job.Name)
+		return nil, &schedulingBlockedError{
+			reason:  ReasonSchedulingDependencyNotFound,
+			message: fmt.Sprintf("Workload %s/%s not found for Job %s", job.Namespace, workloadName, job.Name),
+		}
 	}
 
 	template := getPodGroupTemplateByName(parentWorkload, templateName)
 	if template == nil {
 		logger.V(2).Info("Delegated PodGroupTemplate not found in Workload, will retry",
 			"job", klog.KObj(job), "workload", klog.KObj(parentWorkload), "template", templateName)
-		return nil, fmt.Errorf("podGroupTemplate %q not found in workload %s/%s for job %s", templateName, parentWorkload.Namespace, parentWorkload.Name, job.Name)
+		return nil, &schedulingBlockedError{
+			reason:  ReasonSchedulingDependencyNotFound,
+			message: fmt.Sprintf("PodGroupTemplate %q not found in Workload %s/%s for Job %s", templateName, parentWorkload.Namespace, parentWorkload.Name, job.Name),
+		}
 	}
 
 	// The external Workload is never linked as an owner.
@@ -323,7 +380,7 @@ func isNewJob(job *batch.Job, pods []*v1.Pod) bool {
 }
 
 // getOrCreateWorkload returns the Workload for this root Job, looked up by the
-// deterministic name. An unsupported object at that name returns an error.
+// deterministic name. An unsupported object at that name blocks the Job.
 // Returns (nil, nil) when no Workload exists and canCreate is false.
 func (jm *Controller) getOrCreateWorkload(ctx context.Context,
 	job *batch.Job, canCreate bool) (*schedulingv1beta1.Workload, error) {
@@ -339,7 +396,7 @@ func (jm *Controller) getOrCreateWorkload(ctx context.Context,
 		return jm.createWorkloadForJob(ctx, job)
 	}
 	if err := validateWorkloadStructure(job, wl); err != nil {
-		return nil, err
+		return nil, &schedulingBlockedError{reason: ReasonInvalidSchedulingObjects, message: err.Error()}
 	}
 	return wl, nil
 }
@@ -375,7 +432,8 @@ func podGroupMatchesTemplate(pg *schedulingv1beta1.PodGroup, workloadName, templ
 }
 
 // getOrCreatePodGroup returns the Job's PodGroup for the Workload's template
-// templateName, looked up by the deterministic name.
+// templateName, looked up by the deterministic name. An object at that name
+// that does not reference the template blocks the Job.
 func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 	workload *schedulingv1beta1.Workload, templateName string,
 	canCreate, linkWorkloadOwner bool) (*schedulingv1beta1.PodGroup, error) {
@@ -387,8 +445,11 @@ func (jm *Controller) getOrCreatePodGroup(ctx context.Context, job *batch.Job,
 		return nil, err
 	}
 	if pg != nil && !podGroupMatchesTemplate(pg, workload.Name, templateName) {
-		return nil, fmt.Errorf("podGroup %s/%s does not reference workload %q template %q",
-			pg.Namespace, pg.Name, workload.Name, templateName)
+		return nil, &schedulingBlockedError{
+			reason: ReasonInvalidSchedulingObjects,
+			message: fmt.Sprintf("PodGroup %s/%s does not reference Workload %q template %q",
+				pg.Namespace, pg.Name, workload.Name, templateName),
+		}
 	}
 	if pg == nil && canCreate {
 		return jm.createPodGroup(ctx, job, workload, templateName, linkWorkloadOwner)
@@ -434,9 +495,7 @@ func generateWorkload(job *batch.Job) (*schedulingv1beta1.Workload, error) {
 func (jm *Controller) createWorkloadForJob(ctx context.Context, job *batch.Job) (*schedulingv1beta1.Workload, error) {
 	workload, err := generateWorkload(job)
 	if err != nil {
-		jm.recorder.Eventf(job, v1.EventTypeWarning, "FailedWorkloadCompilation",
-			"Failed to compile Workload for Job %s: %v", job.Name, err)
-		return nil, err
+		return nil, fmt.Errorf("compiling Workload for Job %s/%s: %w", job.Namespace, job.Name, err)
 	}
 
 	created, err := jm.kubeClient.SchedulingV1beta1().Workloads(job.Namespace).Create(ctx, workload, metav1.CreateOptions{})
