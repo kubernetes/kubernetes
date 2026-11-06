@@ -259,7 +259,7 @@ var (
 			Name:           "consistent_read_total",
 			Help:           "Counter for consistent reads from cache.",
 			StabilityLevel: compbasemetrics.ALPHA,
-		}, []string{"group", "resource", "success", "fallback"})
+		}, []string{"group", "resource", "verb", "success", "fallback"})
 
 	StorageConsistencyCheckTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
