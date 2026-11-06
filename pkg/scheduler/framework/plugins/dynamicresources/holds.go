@@ -27,12 +27,12 @@ import (
 )
 
 // This file implements holding devices for nominated preemptors (KEP-5690):
-// when Filter checks a node, the devices which preemption freed for other
-// pods nominated to the node with at least the priority of the pod being
-// scheduled count as allocated, so that it does not take them. Those are the
-// nominated pods which RunFilterPluginsWithNominatedPods adds in its first
-// pass. The holds come from the claim nominations instead of AddPod, so that
-// its second pass, whose result gets stored for Reserve, sees them as well.
+// when Filter checks a node, the devices which preemption freed for the
+// nominated pods which RunFilterPluginsWithNominatedPods added through
+// AddPod in its first pass count as allocated, so that the pod being
+// scheduled does not take them. Those are the pods nominated to the node
+// with at least its priority. Its second pass, whose result gets stored for
+// Reserve, reuses the allocation of the first pass (see heldResultFor).
 //
 // Holds never free devices, they only add the held devices to the state
 // without them: exclusively allocated devices and shared devices are added,
@@ -62,16 +62,14 @@ type nodeHolds struct {
 
 // holdsOnNode returns the devices held on the node which the pod of the
 // preemption state must not get, nil if no nomination applies: those held
-// for other pods nominated to the node with at least its priority.
+// for the nominated pods which got added to the state.
 func (pl *DynamicResources) holdsOnNode(logger klog.Logger, p *preemptionState, nodeName string) *nodeHolds {
-	if p == nil || pl.nominations == nil {
+	if p == nil {
 		return nil
 	}
 	var holds *nodeHolds
-	for holderUID, nomination := range pl.nominations.nominationsOnNode(nodeName) {
-		// The hold of the pod itself is what it is going to get, or gets
-		// replaced when it preempts again.
-		if holderUID == p.root.podUID || nomination.priority < p.root.priority {
+	for holderUID, nomination := range p.sim.held {
+		if nomination.nodeName != nodeName {
 			continue
 		}
 		if holds == nil {
@@ -192,10 +190,20 @@ func (h *nodeHolds) deallocating(uid types.UID) bool {
 }
 
 // computeHold allocates the claims of the preemptor on the node in the
-// simulation where its victims are removed and the devices of other
-// nominated pods with at least its priority are held.
+// simulation p where its victims are removed and the devices of other
+// nominated pods with at least its priority are held, like in the first
+// pass of RunFilterPluginsWithNominatedPods. p gets modified.
 func (pl *DynamicResources) computeHold(ctx context.Context, state *stateData, p *preemptionState, nodeName string) map[types.UID]heldClaim {
 	logger := klog.FromContext(ctx)
+	for holderUID, nomination := range pl.nominations.nominationsOnNode(nodeName) {
+		if holderUID == p.root.podUID || nomination.priority < p.root.priority {
+			continue
+		}
+		if p.sim.held == nil {
+			p.sim.held = make(map[types.UID]*podNomination)
+		}
+		p.sim.held[holderUID] = nomination
+	}
 	nodeInfo, err := pl.fh.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		logger.V(5).Info("No hold, node not found", "node", nodeName, "err", err)

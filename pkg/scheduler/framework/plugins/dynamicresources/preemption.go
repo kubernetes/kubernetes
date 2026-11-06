@@ -53,6 +53,9 @@ type preemptionState struct {
 	// parent is the state which this one is a copy of, nil for the state
 	// created by PreFilter.
 	parent *preemptionState
+	// version changes whenever sim changes. parentVersion is the version
+	// of the parent when the copy was made.
+	version, parentVersion uint64
 }
 
 // preemptionRoot holds what the simulation needs from PreFilter. Apart from
@@ -94,6 +97,16 @@ type preemptionRoot struct {
 	sharesKnown bool
 	// filtered is the state with which Filter ran last for each node.
 	filtered map[string]*preemptionState
+	// heldResults are the allocations which Filter found last for each
+	// node with devices held for nominated pods.
+	heldResults map[string]heldResult
+}
+
+// heldResult is an allocation which Filter found with devices held for
+// nominated pods, which got added to state.
+type heldResult struct {
+	state       *preemptionState
+	allocations []resourceapi.AllocationResult
 }
 
 // simulation records what RemovePod and AddPod changed in one copy of the
@@ -105,6 +118,9 @@ type simulation struct {
 	// what got released. Entries are never modified, only replaced, because
 	// copies of the simulation share them.
 	released map[types.UID]*releasedClaim
+	// held maps the UIDs of the nominated pods which got added to their
+	// nomination. The devices held for them count as allocated.
+	held map[types.UID]*podNomination
 }
 
 // releasedClaim is a claim which gets deallocated once the removed pods are gone.
@@ -126,9 +142,44 @@ func (p *preemptionState) clone() *preemptionState {
 		sim: simulation{
 			removedPods: maps.Clone(p.sim.removedPods),
 			released:    maps.Clone(p.sim.released),
+			held:        maps.Clone(p.sim.held),
 		},
-		parent: p,
+		parent:        p,
+		parentVersion: p.version,
 	}
+}
+
+// recordHeldResult is called by Filter when it found an allocation for the
+// node with devices held for nominated pods.
+func (p *preemptionState) recordHeldResult(nodeName string, allocations []resourceapi.AllocationResult) {
+	p.root.mutex.Lock()
+	defer p.root.mutex.Unlock()
+	if p.root.heldResults == nil {
+		p.root.heldResults = make(map[string]heldResult)
+	}
+	p.root.heldResults[nodeName] = heldResult{state: p, allocations: allocations}
+}
+
+// heldResultFor returns the allocation which Filter found for the node with
+// a direct copy of p to which nominated pods got added, nil if there is none
+// or p changed since then.
+//
+// RunFilterPluginsWithNominatedPods first runs Filter with such a copy, then
+// with p itself. The result of the second pass gets stored for Reserve, so
+// it must not take the devices held for the nominated pods which it does
+// not add. Only the claims which the pod shares with other pods would need
+// the second pass to allocate without the nominated pods.
+func (p *preemptionState) heldResultFor(nodeName string) []resourceapi.AllocationResult {
+	if p == nil {
+		return nil
+	}
+	p.root.mutex.Lock()
+	defer p.root.mutex.Unlock()
+	result := p.root.heldResults[nodeName]
+	if result.state == nil || result.state.parent != p || result.state.parentVersion != p.version {
+		return nil
+	}
+	return result.allocations
 }
 
 // filteredNode is called by Filter for each node it checks.
@@ -199,13 +250,19 @@ func (pl *DynamicResources) RemovePod(ctx context.Context, cs fwk.CycleState, po
 		return statusError(klog.FromContext(ctx), err)
 	}
 	p := state.preemption
-	if p == nil || !p.root.canRelease {
+	if p == nil {
 		return nil
 	}
-	if nodeInfo.Node() == nil {
+	pod := podInfoToRemove.GetPod()
+	if _, held := p.sim.held[pod.UID]; held {
+		delete(p.sim.held, pod.UID)
+		p.version++
 		return nil
 	}
-	pl.removePod(klog.FromContext(ctx), p, podInfoToRemove.GetPod(), nodeInfo.Node().Name)
+	if !p.root.canRelease || nodeInfo.Node() == nil {
+		return nil
+	}
+	pl.removePod(klog.FromContext(ctx), p, pod, nodeInfo.Node().Name)
 	return nil
 }
 
@@ -221,6 +278,7 @@ func (pl *DynamicResources) removePod(logger klog.Logger, p *preemptionState, po
 		p.sim.released = make(map[types.UID]*releasedClaim)
 	}
 	p.sim.removedPods[pod.UID] = types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	p.version++
 	for _, claim := range pl.claimsOfPod(pod) {
 		if released := p.sim.released[claim.UID]; released != nil {
 			// Released because of other removed pods, now this one
@@ -248,10 +306,10 @@ func (pl *DynamicResources) removePod(logger klog.Logger, p *preemptionState, po
 	}
 }
 
-// AddPod reverts RemovePod. Pods which were not removed are ignored, like the
-// nominated pods which RunFilterPluginsWithNominatedPods adds in its first
-// pass: Filter takes the devices held for them from the claim nominations,
-// so that its second pass sees them as well.
+// AddPod reverts RemovePod. A nominated pod, which
+// RunFilterPluginsWithNominatedPods adds in its first pass, gets its
+// nomination added: the devices held for it on the node count as allocated.
+// Which nominated pods get added is up to the framework.
 func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	state, err := getStateData(cs)
 	if err != nil {
@@ -263,8 +321,10 @@ func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podTo
 	}
 	pod := podInfoToAdd.GetPod()
 	if _, removed := p.sim.removedPods[pod.UID]; !removed {
+		pl.addNomination(p, pod, nodeInfo)
 		return nil
 	}
+	p.version++
 	delete(p.sim.removedPods, pod.UID)
 	for uid, released := range p.sim.released {
 		if released.consumers.Has(pod.UID) {
@@ -272,6 +332,22 @@ func (pl *DynamicResources) AddPod(ctx context.Context, cs fwk.CycleState, podTo
 		}
 	}
 	return nil
+}
+
+// addNomination adds the nomination of the pod for the node, if it has one.
+func (pl *DynamicResources) addNomination(p *preemptionState, pod *v1.Pod, nodeInfo fwk.NodeInfo) {
+	if pl.nominations == nil || nodeInfo.Node() == nil {
+		return
+	}
+	nomination := pl.nominations.nomination(pod.UID)
+	if nomination == nil || nomination.nodeName != nodeInfo.Node().Name {
+		return
+	}
+	if p.sim.held == nil {
+		p.sim.held = make(map[types.UID]*podNomination)
+	}
+	p.sim.held[pod.UID] = nomination
+	p.version++
 }
 
 // claimsOfPod returns the existing claims referenced by the pod.

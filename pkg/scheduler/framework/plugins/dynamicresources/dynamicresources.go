@@ -1113,11 +1113,19 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			}
 			claimsToAllocate = append(claimsToAllocate, claim)
 		}
-		allocator, allocatedState, err := pl.allocatorForNode(ctx, state, node.Name, holds)
-		if err != nil {
-			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
+		var allocationResult []resourceapi.AllocationResult
+		var allocatedState *structured.AllocatedState
+		if heldResult := state.preemption.heldResultFor(node.Name); holds == nil && heldResult != nil {
+			// The second pass of RunFilterPluginsWithNominatedPods.
+			allocationResult, err = slices.Clone(heldResult), nil
+		} else {
+			var allocator structured.Allocator
+			allocator, allocatedState, err = pl.allocatorForNode(ctx, state, node.Name, holds)
+			if err != nil {
+				return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node))
+			}
+			allocationResult, err = allocator.Allocate(allocCtx, node, claimsToAllocate)
 		}
-		allocationResult, err := allocator.Allocate(allocCtx, node, claimsToAllocate)
 		switch {
 		case errors.Is(err, context.DeadlineExceeded):
 			// Timeouts are potentially transient. Return Error
@@ -1161,6 +1169,10 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
 			}
 			return status
+		}
+
+		if holds != nil {
+			state.preemption.recordHeldResult(node.Name, allocationResult)
 		}
 
 		// Reserve uses this information.
