@@ -1486,7 +1486,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResultWithSkipNodeOperations(req0, driverA, pool1, device1, resourceapi.SkipNodeOperationAll),
 			)},
 		},
-		"optional-node-operations-missing-feature": {
+		"optional-node-operations-missing-capability": {
 			features:         Features{OptionalNodeOperations: true},
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
