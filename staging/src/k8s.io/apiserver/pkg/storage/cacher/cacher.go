@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
@@ -563,6 +564,26 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 }
 
 func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64, readyGeneration int, opts storage.ListOptions) (*cacheWatcher, error) {
+	watchList := isListWatchRequest(opts)
+	startTime := time.Now()
+	var resourceVersionTime, cacheFreshTime, cacheIntervalTime, registerTime time.Duration
+	var requiredResourceVersion uint64
+	defer func() {
+		total := time.Since(startTime)
+		if !watchList || total < 500*time.Millisecond {
+			return
+		}
+		rvSource := "request"
+		if opts.ResourceVersion == "" {
+			rvSource = "default"
+			if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+				rvSource = "etcd"
+			}
+		}
+		other := total - resourceVersionTime - cacheFreshTime - cacheIntervalTime - registerTime
+		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-CACHE-SETUP", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "total", total, "rvSource", rvSource, "requestedRV", opts.ResourceVersion, "requiredRV", requiredResourceVersion, "rvLookup", resourceVersionTime, "cacheFresh", cacheFreshTime, "cacheInterval", cacheIntervalTime, "register", registerTime, "other", other)
+	}()
+
 	span := tracing.SpanFromContext(ctx)
 
 	eventFilter := newWatchEventFilter(key, opts, c.groupResource)
@@ -582,7 +603,10 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	}
 
 	// Determine the ResourceVersion to which the watch cache must be synchronized
-	requiredResourceVersion, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
+	phaseStart := time.Now()
+	var err error
+	requiredResourceVersion, err = c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
+	resourceVersionTime = time.Since(phaseStart)
 	if err != nil {
 		return nil, err
 	}
@@ -616,6 +640,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	// on return from this function.
 	// Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
 	// underlying watchCache is calling processEvent under its lock.
+	phaseStart = time.Now()
 	c.watchCache.RLock()
 	span.AddEvent("watchCache locked acquired")
 	defer c.watchCache.RUnlock()
@@ -628,11 +653,15 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		span.AddEvent("watchCache fresh enough")
 	}
 
+	cacheFreshTime = time.Since(phaseStart)
+	phaseStart = time.Now()
 	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher)
+	cacheIntervalTime = time.Since(phaseStart)
 	if err != nil {
 		return nil, err
 	}
 
+	phaseStart = time.Now()
 	c.Lock()
 	defer c.Unlock()
 
@@ -654,6 +683,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	}
 	c.registerWatcherLocked(watcher, c.watcherIdx, cacheInterval)
 	c.watcherIdx++
+	registerTime = time.Since(phaseStart)
 	return watcher, nil
 }
 
@@ -1378,13 +1408,26 @@ func isListWatchRequest(opts storage.ListOptions) bool {
 //	if ResourceVersionmatch != nil => ResourceVersionMatch = NotOlderThan & SendInitialEvents != nil
 func (c *Cacher) getWatchCacheResourceVersion(ctx context.Context, parsedWatchResourceVersion uint64, opts storage.ListOptions) (uint64, error) {
 	if len(opts.ResourceVersion) != 0 {
+		if isListWatchRequest(opts) {
+			httplog.AddKeyValue(ctx, "watchlist_rv_source", "request")
+			httplog.AddKeyValue(ctx, "watchlist_requested_rv", opts.ResourceVersion)
+			httplog.AddKeyValue(ctx, "watchlist_rv_lookup", time.Duration(0))
+		}
 		return parsedWatchResourceVersion, nil
 	}
 	// legacy case
 	if opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
 		return 0, nil
 	}
+	start := time.Now()
 	rv, err := c.storage.GetCurrentResourceVersion(ctx)
+	if isListWatchRequest(opts) {
+		duration := time.Since(start)
+		httplog.AddKeyValue(ctx, "watchlist_rv_source", "etcd")
+		httplog.AddKeyValue(ctx, "watchlist_requested_rv", opts.ResourceVersion)
+		httplog.AddKeyValue(ctx, "watchlist_rv_lookup", duration)
+		klog.FromContext(ctx).V(2).Info("TRACE-WATCHLIST-RV", "resource", c.groupResource, "auditID", audit.GetAuditIDTruncated(ctx), "source", "etcd", "requestedRV", opts.ResourceVersion, "duration", duration, "resourceVersion", rv, "err", err)
+	}
 	return rv, err
 }
 
