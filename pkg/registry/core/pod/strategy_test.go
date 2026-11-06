@@ -5477,15 +5477,17 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
-			description: "preserve old NodeAllocatableResourceClaimStatuses when misbehaving client clears them on terminating pod",
+			description: "preserve old ExtraNodeAllocatableResources when misbehaving client clears them on terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod", DeletionTimestamp: &metav1.Time{}},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+						},
 					},
 				},
 			},
@@ -5496,22 +5498,26 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+						},
 					},
 				},
 			},
 		},
 		{
-			description: "preserve old NodeAllocatableResourceClaimStatuses when omitted on non-terminating pod",
+			description: "preserve old ExtraNodeAllocatableResources when omitted on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+						},
 					},
 				},
 			},
@@ -5522,35 +5528,39 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+						},
 					},
 				},
 			},
 		},
 		{
-			description: "allow explicit empty-slice removal of NodeAllocatableResourceClaimStatuses on non-terminating pod",
+			description: "allow explicit empty-slice removal of ExtraNodeAllocatableResources on non-terminating pod",
 			features: map[featuregate.Feature]bool{
 				features.DRANodeAllocatableResources: true,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
-						{ResourceClaimName: "pod-node-claim"},
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+						},
 					},
 				},
 			},
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{},
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{},
 				},
 			},
 			expected: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{},
+					ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{},
 				},
 			},
 		},

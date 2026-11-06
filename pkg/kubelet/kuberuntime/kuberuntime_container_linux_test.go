@@ -670,13 +670,15 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	// Burstable + 256Mi DRA Memory (DRA version of pod1)
 	pod5 := pod1.DeepCopy()
 	pod5.Status = v1.PodStatus{
-		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+		ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 			{
-				ResourceClaimName: "memory-claim",
-				Containers:        []string{"foo"},
-				Mapping: []v1.NodeAllocatableMappedResources{
-					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
-				},
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+			{
+				ContainerName: "foo",
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
 			},
 		},
 	}
@@ -684,13 +686,15 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	// BestEffort + 256Mi DRA Memory (DRA version of pod3)
 	pod6 := pod3.DeepCopy()
 	pod6.Status = v1.PodStatus{
-		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+		ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 			{
-				ResourceClaimName: "memory-claim",
-				Containers:        []string{"foo"},
-				Mapping: []v1.NodeAllocatableMappedResources{
-					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
-				},
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+			{
+				ContainerName: "foo",
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
 			},
 		},
 	}
@@ -698,13 +702,15 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	// Guaranteed + 256Mi DRA Memory (DRA version of pod4)
 	pod7 := pod4.DeepCopy()
 	pod7.Status = v1.PodStatus{
-		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+		ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 			{
-				ResourceClaimName: "memory-claim",
-				Containers:        []string{"foo"},
-				Mapping: []v1.NodeAllocatableMappedResources{
-					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
-				},
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+			{
+				ContainerName: "foo",
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
 			},
 		},
 	}
@@ -712,13 +718,15 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	// Burstable with DRA and missing limits in spec (DRA version of pod2)
 	pod8 := pod2.DeepCopy()
 	pod8.Status = v1.PodStatus{
-		NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+		ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 			{
-				ResourceClaimName: "memory-claim",
-				Containers:        []string{"foo"},
-				Mapping: []v1.NodeAllocatableMappedResources{
-					{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("256Mi"))},
-				},
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+			{
+				ContainerName: "foo",
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
 			},
 		},
 	}
@@ -1544,34 +1552,34 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 	m.cpuCFSQuota = true
 
 	tests := []struct {
-		name                        string
-		draNodeAllocatable          bool
-		podLevelResources           bool
-		podLimits                   v1.ResourceList
-		podRequests                 v1.ResourceList
-		containerLimits             v1.ResourceList
-		containerRequests           v1.ResourceList
-		actuatedContainerLimits     v1.ResourceList
-		backfilledContainerRequests v1.ResourceList
-		claimStatuses               []v1.NodeAllocatableResourceClaimStatus
-		expectedCPUShares           int64
-		expectedCPUQuota            int64
-		expectedMemoryLimit         int64
-		expectedHugepages           map[string]uint64
+		name                          string
+		draNodeAllocatable            bool
+		podLevelResources             bool
+		podLimits                     v1.ResourceList
+		podRequests                   v1.ResourceList
+		containerLimits               v1.ResourceList
+		containerRequests             v1.ResourceList
+		actuatedContainerLimits       v1.ResourceList
+		backfilledContainerRequests   v1.ResourceList
+		extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
+		expectedCPUShares             int64
+		expectedCPUQuota              int64
+		expectedMemoryLimit           int64
+		expectedHugepages             map[string]uint64
 	}{
 		{
 			name:               "feature gate DRANodeAllocatableResources disabled",
 			draNodeAllocatable: false,
 			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("500Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "cpu-memory-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(2 * 1000)),       // spec 2 CPUs (requests omitted defaults to limits)
@@ -1584,15 +1592,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			draNodeAllocatable: true,
 			containerRequests:  v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi")},
 			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("500Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "cpu-memory-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(1 * 1000)),           // spec 1 CPU (does not include DRA)
@@ -1605,15 +1613,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			draNodeAllocatable: true,
 			podLevelResources:  true,
 			podLimits:          v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("1Gi"), "hugepages-2Mi": resource.MustParse("4Mi")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "cpu-memory-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(4 * 1000)),       // pod spec 4 CPUs (no container requests, fallbacks to pod level, DRA does not change the behavior)
@@ -1624,15 +1632,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 		{
 			name:               "container limits omitted + pod level limits omitted + DRA allocations",
 			draNodeAllocatable: true,
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "cpu-memory-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(0)),            // default, DRA does not change the behavior when spec values are omitted
@@ -1671,20 +1679,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			name:               "multiple claims for the same resource",
 			draNodeAllocatable: true,
 			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "cpu-claim-1",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
 				},
 				{
-					ResourceClaimName: "cpu-claim-2",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-					},
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(2 * 1000)),             // since request is omitted in the spec, we fallback to setting it to spec limit (without DRA inflated values)
@@ -1696,13 +1699,16 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			name:               "per-pod and per-container DRA overhead",
 			draNodeAllocatable: true,
 			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "overhead-claim",
-					Containers:        []string{"c1"},
-					Overhead: []v1.NodeAllocatableOverheadResources{
-						{Name: v1.ResourceCPU, PerPod: new(resource.MustParse("1")), PerContainer: new(resource.MustParse("2"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(1 * 1000)),             // since request is omitted in the spec, we fallback to setting it to spec limit (without DRA inflated values)
@@ -1714,18 +1720,16 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			name:               "combined mapping and overhead DRA allocations",
 			draNodeAllocatable: true,
 			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("500Mi")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "combined-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-					},
-					Overhead: []v1.NodeAllocatableOverheadResources{
-						{Name: v1.ResourceCPU, PerPod: new(resource.MustParse("1")), PerContainer: new(resource.MustParse("2"))},
-						{Name: v1.ResourceMemory, PerPod: new(resource.MustParse("100Mi")), PerContainer: new(resource.MustParse("200Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("600Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("600Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("200Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("600Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(2 * 1000)),               // since request is omitted in the spec, we fallback to setting it to spec limit (without DRA inflated values)
@@ -1738,13 +1742,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			draNodeAllocatable: true,
 			podLevelResources:  true,
 			podLimits:          v1.ResourceList{"hugepages-2Mi": resource.MustParse("4Mi")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "hugepage-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(0)),
@@ -1757,13 +1763,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			draNodeAllocatable: true,
 			podLevelResources:  true,
 			podLimits:          v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("1Gi")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "hugepage-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(4 * 1000)),
@@ -1777,13 +1785,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 			podLevelResources:  true,
 			podLimits:          v1.ResourceList{"hugepages-2Mi": resource.MustParse("4Mi")},
 			containerLimits:    v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "hugepage-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("1Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{"hugepages-2Mi": resource.MustParse("1Mi")},
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("1Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("1Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(0)),
@@ -1794,13 +1804,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 		{
 			name:               "hugepages omitted at pod and container level + DRA allocations",
 			draNodeAllocatable: true,
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "hugepage-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(0)),
@@ -1818,15 +1830,15 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 				v1.ResourceCPU:    resource.MustParse("4"),
 				v1.ResourceMemory: resource.MustParse("1Gi"),
 			},
-			claimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "cpu-memory-claim",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{
-						{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("1"))},
-						{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-						{Name: "hugepages-2Mi", Quantity: new(resource.MustParse("2Mi"))},
-					},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("300Mi"), "hugepages-2Mi": resource.MustParse("2Mi")},
 				},
 			},
 			expectedCPUShares:   int64(cm.MilliCPUToShares(4 * 1000)),
@@ -1859,7 +1871,7 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: tc.claimStatuses,
+					ExtraNodeAllocatableResources: tc.extraNodeAllocatableResources,
 				},
 			}
 

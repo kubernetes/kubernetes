@@ -236,13 +236,15 @@ func TestQoSContainerCgroup(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{UID: "99999999", Name: "besteffort-pod-with-dra", Namespace: "test"},
 					Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "foo", Image: "busybox"}}},
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 							{
-								ResourceClaimName: "direct-claim",
-								Containers:        []string{"foo"},
-								Mapping: []v1.NodeAllocatableMappedResources{
-									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-								},
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+								Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+							},
+							{
+								ContainerName: "foo",
+								Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
 							},
 						},
 					},
@@ -299,13 +301,15 @@ func TestQoSContainerCgroup(t *testing.T) {
 						},
 					},
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 							{
-								ResourceClaimName: "direct-claim",
-								Containers:        []string{"foo"},
-								Mapping: []v1.NodeAllocatableMappedResources{
-									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-								},
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+								Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+							},
+							{
+								ContainerName: "foo",
+								Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
 							},
 						},
 					},
@@ -367,13 +371,15 @@ func TestQoSContainerCgroup(t *testing.T) {
 						},
 					},
 					Status: v1.PodStatus{
-						NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 							{
-								ResourceClaimName: "direct-claim",
-								Containers:        []string{"foo"},
-								Mapping: []v1.NodeAllocatableMappedResources{
-									{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("128Mi"))},
-								},
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+								Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+							},
+							{
+								ContainerName: "foo",
+								Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
 							},
 						},
 					},

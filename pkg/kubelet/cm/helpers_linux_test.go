@@ -496,13 +496,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
 						},
 					},
 				},
@@ -529,17 +531,16 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-claim",
-							Containers:        []string{"c1"},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceMemory,
-									PerPod:       new(resource.MustParse("300Mi")),
-									PerContainer: new(resource.MustParse("100Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},
@@ -565,26 +566,16 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "combined-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("100Mi"))},
-							},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceCPU,
-									PerPod:       new(resource.MustParse("1")),
-									PerContainer: new(resource.MustParse("1500m")),
-								},
-								{
-									Name:         v1.ResourceMemory,
-									PerPod:       new(resource.MustParse("300Mi")),
-									PerContainer: new(resource.MustParse("100Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("4500m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4500m"), v1.ResourceMemory: resource.MustParse("500Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1500m"), v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4500m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 						},
 					},
 				},
@@ -626,20 +617,16 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-claim",
-							Containers:        []string{"ic1"},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceCPU,
-									PerContainer: new(resource.MustParse("2")),
-								},
-								{
-									Name:         v1.ResourceMemory,
-									PerContainer: new(resource.MustParse("300Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+						},
+						{
+							ContainerName: "ic1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
 						},
 					},
 				},
@@ -673,13 +660,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
 						},
 					},
 				},
@@ -704,13 +693,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "hugepage-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"), Quantity: new(resource.MustParse("2Gi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi")},
+							Limits:        v1.ResourceList{v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceName(v1.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi")},
 						},
 					},
 				},
@@ -744,14 +735,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("300Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
 						},
 					},
 				},
@@ -783,20 +775,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim-1",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("100m"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
 						},
 						{
-							ResourceClaimName: "direct-claim-2",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("200m"))},
-							},
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
 						},
 					},
 				},
@@ -835,17 +822,21 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "overhead-claim",
-							Containers:        []string{"c1", "c2"},
-							Overhead: []v1.NodeAllocatableOverheadResources{
-								{
-									Name:         v1.ResourceMemory,
-									PerPod:       new(resource.MustParse("200Mi")),
-									PerContainer: new(resource.MustParse("100Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+						},
+						{
+							ContainerName: "c2",
+							Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
 						},
 					},
 				},
@@ -883,14 +874,19 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "shared-direct-claim",
-							Containers:        []string{"c1", "c2"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("400Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c2",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},
@@ -919,14 +915,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("400Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},
@@ -955,14 +952,15 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "direct-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("2"))},
-								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("400Mi"))},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("400Mi")},
 						},
 					},
 				},

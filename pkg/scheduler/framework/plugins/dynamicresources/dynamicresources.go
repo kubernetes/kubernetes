@@ -169,9 +169,9 @@ type nodeAllocation struct {
 	// containerResourceRequestMappings has the container, extended resource, and device request mappings
 	// calculated at the Filter phase, and used at the PreBind phase.
 	containerResourceRequestMappings []v1.ContainerExtendedResourceRequest
-	// nodeAllocatableResourceClaimStatuses stores the calculated node allocatable resource allocations through DRA.
+	// extraNodeAllocatableResources stores the calculated node allocatable resource allocations through DRA.
 	// This is populated during Filter stage and passed to PreBind.
-	nodeAllocatableResourceClaimStatuses []v1.NodeAllocatableResourceClaimStatus
+	extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
@@ -1011,7 +1011,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
-	var nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
+	var extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 	allocationsMap := make(map[types.UID]*resourceapi.AllocationResult)
 	if state.allocator != nil {
 		allocCtx := ctx
@@ -1110,14 +1110,14 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 
 	if pl.fts.EnableDRANodeAllocatableResources {
 		var status *fwk.Status
-		nodeAllocatableClaimStatus, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
+		extraNodeAllocatableResources, status = pl.calculateAndCheckNodeAllocatableResources(ctx, state, pod, nodeInfo, allocationsMap)
 		if status != nil {
 			return status
 		}
 	}
 
 	// Store information in state while holding the mutex.
-	if state.allocator != nil || len(unavailableClaims) > 0 || len(nodeAllocatableClaimStatus) > 0 {
+	if state.allocator != nil || len(unavailableClaims) > 0 || len(extraNodeAllocatableResources) > 0 {
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
 	}
@@ -1137,12 +1137,12 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
 
-	if state.allocator != nil || len(nodeAllocatableClaimStatus) > 0 {
+	if state.allocator != nil || len(extraNodeAllocatableResources) > 0 {
 		state.nodeAllocations[node.Name] = nodeAllocation{
-			allocationResults:                    allocations,
-			extendedResourceClaim:                nodeExtendedResourceClaim,
-			containerResourceRequestMappings:     containerResourceRequestMappings,
-			nodeAllocatableResourceClaimStatuses: nodeAllocatableClaimStatus,
+			allocationResults:                allocations,
+			extendedResourceClaim:            nodeExtendedResourceClaim,
+			containerResourceRequestMappings: containerResourceRequestMappings,
+			extraNodeAllocatableResources:    extraNodeAllocatableResources,
 		}
 	}
 
@@ -1634,8 +1634,8 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 
 	if pl.fts.EnableDRANodeAllocatableResources {
 		nodeAllocations, ok := state.nodeAllocations[nodeName]
-		if ok && len(nodeAllocations.nodeAllocatableResourceClaimStatuses) > 0 {
-			pl.clearNodeAllocatableResourceClaimStatus(ctx, pod)
+		if ok && len(nodeAllocations.extraNodeAllocatableResources) > 0 {
+			pl.clearExtraNodeAllocatableResources(ctx, pod)
 		}
 	}
 }
@@ -1677,8 +1677,8 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	if pl.fts.EnableDRANodeAllocatableResources {
 		nodeAllocations, ok := state.nodeAllocations[nodeName]
-		if ok && len(nodeAllocations.nodeAllocatableResourceClaimStatuses) > 0 {
-			if status := pl.patchNodeAllocatableResourceClaimStatus(ctx, pod, nodeAllocations.nodeAllocatableResourceClaimStatuses, state.claims.extendedResourceClaim()); status != nil {
+		if ok && len(nodeAllocations.extraNodeAllocatableResources) > 0 {
+			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, nodeAllocations.extraNodeAllocatableResources, state.claims.extendedResourceClaim()); status != nil {
 				return status
 			}
 		}

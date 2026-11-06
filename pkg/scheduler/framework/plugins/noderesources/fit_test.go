@@ -3095,21 +3095,22 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{{
-								Name:     v1.ResourceCPU,
-								Quantity: new(resource.MustParse("50m")),
-							}},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
 						},
 					},
 				},
 			},
 			expected: &preFilterState{
 				Resource: framework.Resource{
-					MilliCPU: 150, // NodeAllocatableResourceClaimStatus + standard request
+					MilliCPU: 150, // ExtraNodeAllocatableResources + standard request
 					Memory:   1024 * 1024 * 1024,
 				},
 			},
@@ -3143,14 +3144,15 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{{
-								Name:     v1.ResourceCPU,
-								Quantity: new(resource.MustParse("50m")),
-							}},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+						},
+						{
+							ContainerName: "c1",
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
 						},
 					},
 				},
@@ -3191,15 +3193,16 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
-							Overhead: []v1.NodeAllocatableOverheadResources{{
-								Name:         v1.ResourceCPU,
-								PerPod:       new(resource.MustParse("50m")),
-								PerContainer: new(resource.MustParse("50m")),
-							}},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
 						},
 					},
 				},
@@ -3240,19 +3243,16 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "node-allocatable-claim",
-							Containers:        []string{"c1"},
-							Mapping: []v1.NodeAllocatableMappedResources{{
-								Name:     v1.ResourceCPU,
-								Quantity: new(resource.MustParse("50m")),
-							}},
-							Overhead: []v1.NodeAllocatableOverheadResources{{
-								Name:         v1.ResourceCPU,
-								PerPod:       new(resource.MustParse("50m")),
-								PerContainer: new(resource.MustParse("50m")),
-							}},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("150m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("150m")},
+						},
+						{
+							ContainerName: "c1",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("150m")},
 						},
 					},
 				},

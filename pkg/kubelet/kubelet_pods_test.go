@@ -6209,19 +6209,11 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					},
 				},
 				Status: v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
-							ResourceClaimName: "dra-claim",
-							Mapping: []v1.NodeAllocatableMappedResources{
-								{
-									Name:     v1.ResourceCPU,
-									Quantity: new(resource.MustParse("50m")),
-								},
-								{
-									Name:     v1.ResourceMemory,
-									Quantity: new(resource.MustParse("50Mi")),
-								},
-							},
+							ContainerName: "",
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m"), v1.ResourceMemory: resource.MustParse("50Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m"), v1.ResourceMemory: resource.MustParse("50Mi")},
 						},
 					},
 				},
