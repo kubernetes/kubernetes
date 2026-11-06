@@ -19,6 +19,7 @@ package features
 import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dynamicvolumes"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/podcertificatesmldsa"
@@ -44,4 +45,5 @@ var AllFeatures = []types.Feature{
 	draoptionalnodeoperations.Feature,
 	podcertificatesmldsa.Feature,
 	securityprofileoci.Feature,
+	dynamicvolumes.Feature,
 }
