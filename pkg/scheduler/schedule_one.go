@@ -907,6 +907,9 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		Message:            errMsg,
 	}, nominatingInfo); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
+		if nominatingInfo.Mode() == fwk.ModeOverride && sched.SchedulingQueue != nil {
+			sched.SchedulingQueue.NominationNotPersisted(pod, nominatingInfo.NominatedNodeName)
+		}
 	}
 }
 

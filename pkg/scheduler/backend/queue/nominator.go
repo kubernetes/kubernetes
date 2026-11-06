@@ -61,9 +61,14 @@ type nominator struct {
 	// nominated.
 	nominatedPodToNode map[types.UID]string
 
-	// recordChanges is true if changes get recorded, which is only the case
-	// with the DRAPreemption feature gate.
-	recordChanges bool
+	// draPreemption is true with the DRAPreemption feature gate. Only then
+	// changes and expected nominations get recorded.
+	draPreemption bool
+	// expected maps the UIDs of pods which the scheduler nominated, or whose
+	// nomination it cleared, to the nominated node name which the pod
+	// objects from the informer don't show yet. Until they do, other values
+	// in them are older than the nomination in memory and get ignored.
+	expected map[types.UID]string
 	// changes are the changes of nominated nodes which the PriorityQueue has
 	// not processed yet. They are recorded under nLock and processed by
 	// PriorityQueue.processNominationChangesAndUnlock, because processing
@@ -72,10 +77,11 @@ type nominator struct {
 	changes []nominationChange
 }
 
-func newPodNominator(podLister listersv1.PodLister, recordChanges bool) *nominator {
+func newPodNominator(podLister listersv1.PodLister, draPreemption bool) *nominator {
 	return &nominator{
 		podLister:          podLister,
-		recordChanges:      recordChanges,
+		draPreemption:      draPreemption,
+		expected:           make(map[types.UID]string),
 		nominatedPods:      make(map[string][]podRef),
 		nominatedPodToNode: make(map[types.UID]string),
 	}
@@ -85,7 +91,7 @@ func newPodNominator(podLister listersv1.PodLister, recordChanges bool) *nominat
 // oldNodeName anymore. Removing and re-adding the same nomination, which the
 // nominator does for every update of a pod, is not a change.
 func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string) {
-	if !npm.recordChanges {
+	if !npm.draPreemption {
 		return
 	}
 	if newNodeName := npm.nominatedPodToNode[pod.UID]; newNodeName != oldNodeName {
@@ -110,7 +116,7 @@ func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomina
 	npm.nLock.Lock()
 	oldNodeName := npm.nominatedPodToNode[pi.GetPod().UID]
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
-	if npm.recordChanges && nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" &&
+	if npm.draPreemption && nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" &&
 		oldNodeName == nominatingInfo.NominatedNodeName && npm.nominatedPodToNode[pi.GetPod().UID] == oldNodeName {
 		// An explicit nomination to the same node may come with resources
 		// selected anew (AllocationExtensions.PrepareAllocation), so it
@@ -119,7 +125,61 @@ func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomina
 	} else {
 		npm.recordChangeUnlocked(pi.GetPod(), oldNodeName)
 	}
+	if npm.draPreemption {
+		npm.expectUnlocked(pi.GetPod(), nominatingInfo)
+	}
 	npm.nLock.Unlock()
+}
+
+// expectUnlocked records the nominated node name which the scheduler set and
+// which the pod object does not show yet. The scheduler is going to set it
+// in the API.
+func (npm *nominator) expectUnlocked(pod *v1.Pod, nominatingInfo *fwk.NominatingInfo) {
+	if nominatingInfo.Mode() != fwk.ModeOverride {
+		return
+	}
+	nodeName := nominatingInfo.NominatedNodeName
+	if nominatedNodeName(pod) == nodeName || nodeName != "" && npm.nominatedPodToNode[pod.UID] != nodeName {
+		// Nothing to wait for, or the pod did not get nominated.
+		delete(npm.expected, pod.UID)
+		return
+	}
+	npm.expected[pod.UID] = nodeName
+}
+
+// pendingUnlocked returns the nominated node name which the scheduler set
+// and true if the pod object does not show it yet. Once it does, the pod
+// object is up-to-date again.
+func (npm *nominator) pendingUnlocked(pod *v1.Pod) (string, bool) {
+	expected, ok := npm.expected[pod.UID]
+	if !ok {
+		return "", false
+	}
+	if nominatedNodeName(pod) == expected {
+		delete(npm.expected, pod.UID)
+		return "", false
+	}
+	return expected, true
+}
+
+// expects returns true if the scheduler set nodeName as the nominated node
+// name of the pod and the pod object does not show it yet.
+func (npm *nominator) expects(uid types.UID, nodeName string) bool {
+	npm.nLock.RLock()
+	defer npm.nLock.RUnlock()
+	expected, ok := npm.expected[uid]
+	return ok && expected == nodeName
+}
+
+// forgetExpected is called when setting nodeName as the nominated node name
+// of the pod in the API failed. The pod objects are up-to-date again, unless
+// the scheduler set another nominated node name in the meantime.
+func (npm *nominator) forgetExpected(uid types.UID, nodeName string) {
+	npm.nLock.Lock()
+	defer npm.nLock.Unlock()
+	if expected, ok := npm.expected[uid]; ok && expected == nodeName {
+		delete(npm.expected, uid)
+	}
 }
 
 func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
@@ -132,6 +192,9 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi fwk.PodInfo
 		nodeName = nominatingInfo.NominatedNodeName
 	} else if nominatingInfo.Mode() == fwk.ModeNoop {
 		nodeName = pi.GetPod().Status.NominatedNodeName
+		if expected, pending := npm.pendingUnlocked(pi.GetPod()); pending {
+			nodeName = expected
+		}
 	}
 
 	// Empty nodeName clears nomination; do not key nominatedPods by "".
@@ -170,11 +233,17 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	// after a node("NominatedNode") is reserved for this pod in memory.
 	// In this case, we need to keep reserving the NominatedNode when updating the pod pointer.
 	var nominatingInfo *fwk.NominatingInfo
-	// We won't fall into below `if` block if the Update event represents:
-	// (1) NominatedNode info is added
-	// (2) NominatedNode info is updated
-	// (3) NominatedNode info is removed
-	if nominatedNodeName(oldPod) == "" && nominatedNodeName(newPodInfo.GetPod()) == "" {
+	if expected, pending := npm.pendingUnlocked(newPodInfo.GetPod()); pending {
+		// The pod object is older than the nomination in memory.
+		nominatingInfo = &fwk.NominatingInfo{
+			NominatingMode:    fwk.ModeOverride,
+			NominatedNodeName: expected,
+		}
+	} else if nominatedNodeName(oldPod) == "" && nominatedNodeName(newPodInfo.GetPod()) == "" {
+		// We won't fall into this block if the Update event represents:
+		// (1) NominatedNode info is added
+		// (2) NominatedNode info is updated
+		// (3) NominatedNode info is removed
 		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok {
 			// This is the only case we should continue reserving the NominatedNode
 			nominatingInfo = &fwk.NominatingInfo{
@@ -196,6 +265,7 @@ func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
 	npm.nLock.Lock()
 	oldNodeName := npm.nominatedPodToNode[pod.UID]
 	npm.deleteUnlocked(pod)
+	delete(npm.expected, pod.UID)
 	npm.recordChangeUnlocked(pod, oldNodeName)
 	npm.nLock.Unlock()
 }

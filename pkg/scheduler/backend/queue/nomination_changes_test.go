@@ -17,20 +17,27 @@ limitations under the License.
 package queue
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -247,5 +254,188 @@ func TestRenominationToSameNode(t *testing.T) {
 	want := []string{"p ->node1", "p node1->node1"}
 	if diff := cmp.Diff(want, calls); diff != "" {
 		t.Errorf("Unexpected handler calls (-want, +got):\n%s", diff)
+	}
+}
+
+// TestNominationExpectations checks that pod objects which don't show the
+// nominated node name which the scheduler set yet don't override it. Without
+// the DRAPreemption feature gate, they do.
+func TestNominationExpectations(t *testing.T) {
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	withNomination := func(nodeName string) *v1.Pod {
+		p := pod.DeepCopy()
+		p.Status.NominatedNodeName = nodeName
+		return p
+	}
+	withLabel := func(p *v1.Pod) *v1.Pod {
+		p = p.DeepCopy()
+		p.Labels = map[string]string{"updated": "true"}
+		return p
+	}
+	type step struct {
+		do func(t *testing.T, q *PriorityQueue)
+		// want and wantWithoutDRAPreemption are the nominated node in memory
+		// after the step.
+		want, wantWithoutDRAPreemption string
+	}
+	nominate := func(p *v1.Pod, nodeName string) func(t *testing.T, q *PriorityQueue) {
+		return func(t *testing.T, q *PriorityQueue) {
+			logger, _ := ktesting.NewTestContext(t)
+			q.AddNominatedPod(logger, mustPodInfo(t, p), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nodeName})
+		}
+	}
+	// keep is what handleSchedulingFailure does when PostFilter did not
+	// nominate the pod.
+	keep := func(p *v1.Pod) func(t *testing.T, q *PriorityQueue) {
+		return func(t *testing.T, q *PriorityQueue) {
+			logger, _ := ktesting.NewTestContext(t)
+			q.AddNominatedPod(logger, mustPodInfo(t, p), nil)
+		}
+	}
+	update := func(oldPod, newPod *v1.Pod) func(t *testing.T, q *PriorityQueue) {
+		return func(t *testing.T, q *PriorityQueue) {
+			_, ctx := ktesting.NewTestContext(t)
+			q.Update(ctx, oldPod, newPod)
+		}
+	}
+	notPersisted := func(nodeName string) func(t *testing.T, q *PriorityQueue) {
+		return func(t *testing.T, q *PriorityQueue) {
+			q.NominationNotPersisted(pod, nodeName)
+		}
+	}
+
+	for name, steps := range map[string][]step{
+		"kept-with-stale-pod": {
+			{do: nominate(pod, "node1"), want: "node1", wantWithoutDRAPreemption: "node1"},
+			{do: keep(pod), want: "node1", wantWithoutDRAPreemption: ""},
+		},
+		"updated-with-stale-pod": {
+			{do: nominate(withNomination("node0"), "node1"), want: "node1", wantWithoutDRAPreemption: "node1"},
+			{do: update(withNomination("node0"), withLabel(withNomination("node0"))), want: "node1", wantWithoutDRAPreemption: "node0"},
+			{do: update(withNomination("node0"), withNomination("node1")), want: "node1", wantWithoutDRAPreemption: "node1"},
+			// Once the pod object showed it, it is up-to-date again.
+			{do: update(withNomination("node1"), withNomination("")), want: "", wantWithoutDRAPreemption: ""},
+		},
+		"cleared-with-stale-pod": {
+			{do: nominate(withNomination("node1"), "node1"), want: "node1", wantWithoutDRAPreemption: "node1"},
+			{do: nominate(withNomination("node1"), ""), want: "", wantWithoutDRAPreemption: ""},
+			{do: update(withNomination("node1"), withLabel(withNomination("node1"))), want: "", wantWithoutDRAPreemption: "node1"},
+			{do: update(withNomination("node1"), withNomination("")), want: "", wantWithoutDRAPreemption: ""},
+		},
+		"not-persisted": {
+			{do: nominate(pod, "node1"), want: "node1", wantWithoutDRAPreemption: "node1"},
+			{do: notPersisted("node1"), want: "node1", wantWithoutDRAPreemption: "node1"},
+			{do: keep(pod), want: "", wantWithoutDRAPreemption: ""},
+		},
+		"older-nomination-not-persisted": {
+			{do: nominate(pod, "node1"), want: "node1", wantWithoutDRAPreemption: "node1"},
+			{do: nominate(pod, "node2"), want: "node2", wantWithoutDRAPreemption: "node2"},
+			{do: notPersisted("node1"), want: "node2", wantWithoutDRAPreemption: "node2"},
+			{do: keep(pod), want: "node2", wantWithoutDRAPreemption: ""},
+		},
+	} {
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+				_, ctx := ktesting.NewTestContext(t)
+				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod})
+				for i, step := range steps {
+					step.do(t, q)
+					want := step.want
+					if !draPreemption {
+						want = step.wantWithoutDRAPreemption
+					}
+					q.nominator.nLock.RLock()
+					nodeName := q.nominator.nominatedPodToNode[pod.UID]
+					q.nominator.nLock.RUnlock()
+					if nodeName != want {
+						t.Errorf("step %d: nominated node %q, want %q", i, nodeName, want)
+					}
+				}
+				q.Delete(klog.FromContext(ctx), pod)
+				if len(q.nominator.expected) > 0 {
+					t.Errorf("expected nominations left after deleting the pod: %v", q.nominator.expected)
+				}
+			})
+		}
+	}
+}
+
+// TestPatchPodStatusOverwritten checks that an update of the nominated node
+// name which got overwritten by another one lets the nominator take it from
+// pod objects again.
+func TestPatchPodStatusOverwritten(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	logger, ctx := ktesting.NewTestContext(t)
+	client := clientsetfake.NewClientset(pod)
+	apiDispatcher := apidispatcher.New(client, 1, apicalls.Relevances)
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithAPIDispatcher(apiDispatcher))
+
+	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+	q.AddNominatedPod(logger, mustPodInfo(t, pod), nominatingInfo)
+	onFinish, err := q.PatchPodStatus(pod, nil, nominatingInfo)
+	if err != nil {
+		t.Fatalf("PatchPodStatus: %v", err)
+	}
+	// Like preemption clearing the nomination of another pod, before the
+	// dispatcher executed the first call.
+	if _, err := q.PatchPodStatus(pod, nil, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride}); err != nil {
+		t.Fatalf("PatchPodStatus: %v", err)
+	}
+	apiDispatcher.Run(logger)
+	defer apiDispatcher.Close()
+	select {
+	case err := <-onFinish:
+		if !errors.Is(err, fwk.ErrCallOverwritten) {
+			t.Fatalf("Unexpected result of the call: %v", err)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("Call did not finish")
+	}
+	if q.nominator.expects(pod.UID, "node1") {
+		t.Error("Nomination still expected")
+	}
+}
+
+// TestPatchPodStatusNotPersisted checks that a failed asynchronous update of
+// the nominated node name lets the nominator take it from pod objects again.
+func TestPatchPodStatusNotPersisted(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+
+	for name, patchErr := range map[string]error{
+		"succeeded": nil,
+		"failed":    errors.New("injected patch error"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			client := clientsetfake.NewClientset(pod)
+			client.PrependReactor("patch", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
+				return patchErr != nil, nil, patchErr
+			})
+			apiDispatcher := apidispatcher.New(client, 1, apicalls.Relevances)
+			apiDispatcher.Run(logger)
+			defer apiDispatcher.Close()
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithAPIDispatcher(apiDispatcher))
+
+			q.AddNominatedPod(logger, mustPodInfo(t, pod), nominatingInfo)
+			onFinish, err := q.PatchPodStatus(pod, nil, nominatingInfo)
+			if err != nil {
+				t.Fatalf("PatchPodStatus: %v", err)
+			}
+			select {
+			case err := <-onFinish:
+				if (err != nil) != (patchErr != nil) {
+					t.Fatalf("Unexpected result of the call: %v", err)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("Call did not finish")
+			}
+			if expected := q.nominator.expects(pod.UID, "node1"); expected != (patchErr == nil) {
+				t.Errorf("Nomination still expected: %v", expected)
+			}
+		})
 	}
 }
