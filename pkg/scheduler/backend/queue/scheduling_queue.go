@@ -28,6 +28,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -166,6 +167,10 @@ type SchedulingQueue interface {
 	// IncompletePodGroupPodsPods returns all the pods belonging to pod groups
 	// waiting for their API objects (PodGroups) to be observed.
 	IncompletePodGroupPodsPods() []*v1.Pod
+	// NominationNotPersisted is called when setting the nominated node name
+	// of the pod to nodeName in the API failed, after AddNominatedPod set it
+	// in memory.
+	NominationNotPersisted(pod *v1.Pod, nodeName string)
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -949,7 +954,7 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.Queu
 // DeleteNominatedPodIfExists removes the nomination of the pod, for example
 // when it got assumed.
 func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *v1.Pod) {
-	if !p.nominator.recordChanges {
+	if !p.nominator.draPreemption {
 		// Nothing to process, so p.lock is not needed.
 		p.nominator.DeleteNominatedPodIfExists(pod)
 		return
@@ -2105,10 +2110,38 @@ func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodConditio
 	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, conditions, nominatingInfo), fwk.APICallOptions{
 		OnFinish: onFinish,
 	})
+	expected := nominatingInfo.Mode() == fwk.ModeOverride && p.nominator.expects(pod.UID, nominatingInfo.NominatedNodeName)
 	if fwk.IsUnexpectedError(err) {
+		if expected {
+			p.NominationNotPersisted(pod, nominatingInfo.NominatedNodeName)
+		}
 		return onFinish, err
 	}
-	return onFinish, nil
+	if !expected {
+		return onFinish, nil
+	}
+	// The nominator ignores the nominated node name in pod objects until
+	// they show this one, which never happens if the call fails. A call
+	// which got overwritten by a newer one may not set it either, for
+	// example when preemption cleared the nomination.
+	result := make(chan error, 1)
+	go func() {
+		select {
+		case err := <-onFinish:
+			if fwk.IsUnexpectedError(err) || errors.Is(err, fwk.ErrCallOverwritten) {
+				p.NominationNotPersisted(pod, nominatingInfo.NominatedNodeName)
+			}
+			result <- err
+		case <-p.stop:
+		}
+	}()
+	return result, nil
+}
+
+// NominationNotPersisted lets the nominator take the nominated node name from
+// pod objects again, unless the scheduler nominated the pod again.
+func (p *PriorityQueue) NominationNotPersisted(pod *v1.Pod, nodeName string) {
+	p.nominator.forgetExpected(pod.UID, nodeName)
 }
 
 // Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
