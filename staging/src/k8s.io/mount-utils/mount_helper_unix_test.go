@@ -76,6 +76,7 @@ func TestParseMountInfo(t *testing.T) {
 39 28 0:35 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:21 - cgroup cgroup rw,memory
 40 28 0:36 / /sys/fs/cgroup/perf_event rw,nosuid,nodev,noexec,relatime shared:22 - cgroup cgroup rw,perf_event
 761 60 8:0 / /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface-default/127.0.0.1:3260-iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c-lun-0 rw,relatime shared:421 - ext4 /dev/sda rw,context="system_u:object_r:container_file_t:s0:c314,c894",data=ordered
+7334 25 0:5118 / /tmp/cni-sysfs rw,relatime shared:396150 - sysfs  rw
 `
 	filename := writeFile(t, info)
 
@@ -201,6 +202,23 @@ func TestParseMountInfo(t *testing.T) {
 				FsType:         "ext4",
 				MountOptions:   []string{"rw", "relatime"},
 				SuperOptions:   []string{"rw", "context=\"system_u:object_r:container_file_t:s0:c314,c894\"", "data=ordered"},
+			},
+		},
+		{
+			"empty mount source",
+			7334,
+			MountInfo{
+				ID:             7334,
+				ParentID:       25,
+				Major:          0,
+				Minor:          5118,
+				Root:           "/",
+				Source:         "",
+				MountPoint:     "/tmp/cni-sysfs",
+				OptionalFields: []string{"shared:396150"},
+				FsType:         "sysfs",
+				MountOptions:   []string{"rw", "relatime"},
+				SuperOptions:   []string{"rw"},
 			},
 		},
 	}

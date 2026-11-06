@@ -40,16 +40,17 @@ import (
 
 func TestReadProcMountsFrom(t *testing.T) {
 	successCase := `/dev/0 /path/to/0 type0 flags 0 0
-/dev/1    /path/to/1   type1	flags 1 1
+/dev/1 /path/to/1 type1 flags 1 1
 /dev/2 /path/to/2 type2 flags,1,2=3 2 2
+ /tmp/cni-sysfs sysfs rw,relatime 0 0
 `
 	// NOTE: readProcMountsFrom has been updated to using fnv.New32a()
 	mounts, err := parseProcMounts([]byte(successCase))
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if len(mounts) != 3 {
-		t.Fatalf("expected 3 mounts, got %d", len(mounts))
+	if len(mounts) != 4 {
+		t.Fatalf("expected 4 mounts, got %d", len(mounts))
 	}
 	mp := MountPoint{"/dev/0", "/path/to/0", "type0", []string{"flags"}, 0, 0}
 	if !mountPointsEqual(&mounts[0], &mp) {
@@ -63,11 +64,17 @@ func TestReadProcMountsFrom(t *testing.T) {
 	if !mountPointsEqual(&mounts[2], &mp) {
 		t.Errorf("got unexpected MountPoint[2]: %#v", mounts[2])
 	}
+	mp = MountPoint{"", "/tmp/cni-sysfs", "sysfs", []string{"rw", "relatime"}, 0, 0}
+	if !mountPointsEqual(&mounts[3], &mp) {
+		t.Errorf("got unexpected MountPoint[3]: %#v", mounts[3])
+	}
 
 	errorCases := []string{
 		"/dev/0 /path/to/mount\n",
 		"/dev/1 /path/to/mount type flags a 0\n",
 		"/dev/2 /path/to/mount type flags 0 b\n",
+		" /path/to/mount type flags 0\n",
+		" /path/to/mount type flags 0 0 extra\n",
 	}
 	for _, ec := range errorCases {
 		_, err := parseProcMounts([]byte(ec))
