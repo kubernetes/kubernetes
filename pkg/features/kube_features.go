@@ -1033,6 +1033,12 @@ const (
 	// kubelet can request a service account token for.
 	ServiceAccountNodeAudienceRestriction featuregate.Feature = "ServiceAccountNodeAudienceRestriction"
 
+	// owner: @everettraven
+	// issue: https://github.com/kubernetes/kubernetes/issues/141838
+	//
+	// Adds support for using ML-DSA private keys for generating service account tokens and adding support for ML-DSA signing algorithms for service account external JWT.
+	ServiceAccountTokenMLDSA featuregate.Feature = "ServiceAccountTokenMLDSA"
+
 	// owner: @jpbetz
 	//
 	// When enabled, the apiserver ignores changes to status fields in writes to the ServiceCIDR root resource.
@@ -1950,6 +1956,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ServiceAccountTokenMLDSA: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.38")},
+	},
+
 	ServiceCIDRStatusFieldWiping: {
 		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Deprecated},
@@ -2613,6 +2624,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	SecurityProfileOCI: {},
 
 	ServiceAccountNodeAudienceRestriction: {},
+
+	ServiceAccountTokenMLDSA: {},
 
 	ServiceCIDRStatusFieldWiping: {},
 

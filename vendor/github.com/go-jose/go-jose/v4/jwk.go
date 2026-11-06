@@ -51,6 +51,11 @@ type rawJSONWebKey struct {
 	Y   *byteBuffer `json:"y,omitempty"`
 	N   *byteBuffer `json:"n,omitempty"`
 	E   *byteBuffer `json:"e,omitempty"`
+	// AKP (RFC 9964). "pub" is the encoded public key; "priv" is the 32-byte
+	// seed. An AKP key has no "crv" / "alg" identifies the parameter set, and is
+	// REQUIRED.
+	Pub  *byteBuffer `json:"pub,omitempty"`
+	Priv *byteBuffer `json:"priv,omitempty"`
 	// -- Following fields are only used for private keys --
 	// RSA uses D, P and Q, while ECDSA uses only D. Fields Dp, Dq, and Qi are
 	// completely optional. Therefore for RSA/ECDSA, D != nil is a contract that
@@ -122,7 +127,11 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 	case []byte:
 		raw, err = fromSymmetricKey(key)
 	default:
-		return nil, fmt.Errorf("go-jose/go-jose: unknown key type '%s'", reflect.TypeOf(key))
+		var ok bool
+		raw, ok, err = mldsaRawJWK(k.Key)
+		if !ok {
+			return nil, fmt.Errorf("go-jose/go-jose: unknown key type '%s'", reflect.TypeOf(key))
+		}
 	}
 
 	if err != nil {
@@ -130,8 +139,18 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 	}
 
 	raw.Kid = k.KeyID
-	raw.Alg = k.Algorithm
 	raw.Use = k.Use
+
+	if raw.Kty == "AKP" {
+		// RFC 9964 requires "alg" on every AKP key, and mldsaRawJWK already
+		// derived it from the key's parameter set. Rather than let a caller's
+		// Algorithm silently overwrite it, treat a disagreement as an error.
+		if k.Algorithm != "" && k.Algorithm != raw.Alg {
+			return nil, fmt.Errorf("go-jose/go-jose: JWK algorithm %q does not match ML-DSA key parameter set %q", k.Algorithm, raw.Alg)
+		}
+	} else {
+		raw.Alg = k.Algorithm
+	}
 
 	for _, cert := range k.Certificates {
 		raw.X5c = append(raw.X5c, base64.StdEncoding.EncodeToString(cert.Raw))
@@ -177,7 +196,7 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON reads a key from its JSON representation.
 //
-// Returns ErrUnsupportedKeyType for unrecognized or unsupported "kty" header values.
+// Returns ErrUnsupportedKeyType for unsupported key types or parameters.
 //
 // Directly unmarshaling a JWK is not safe for untrusted input.
 func (k *JSONWebKey) UnmarshalJSON(data []byte) error {
@@ -197,7 +216,7 @@ func (k *JSONWebKey) unmarshalJSON(data []byte, allowPrivate bool) (err error) {
 
 	if !allowPrivate &&
 		(raw.K != nil || raw.D != nil || raw.P != nil || raw.Q != nil ||
-			raw.Dp != nil || raw.Dq != nil || raw.Qi != nil) {
+			raw.Dp != nil || raw.Dq != nil || raw.Qi != nil || raw.Priv != nil) {
 		return errors.New("go-jose/go-jose: JWK contains private parameters")
 	}
 
@@ -273,6 +292,14 @@ func (k *JSONWebKey) unmarshalJSON(data []byte, allowPrivate bool) (err error) {
 				keyPub = key
 			}
 		}
+	case "AKP":
+		key, err = mldsaParseJWK(&raw, certPub)
+		if err != nil {
+			return err
+		}
+		// mldsaParseJWK compared certPub using (*mldsa.PublicKey).Equal, so the
+		// generic comparison below only needs to confirm that a leaf key exists.
+		keyPub = certPub
 	case "":
 		// kty MUST be present
 		return fmt.Errorf("go-jose/go-jose: missing json web key type")
@@ -446,7 +473,11 @@ func (k *JSONWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
 	case OpaqueSigner:
 		return key.Public().Thumbprint(hash)
 	default:
-		return nil, fmt.Errorf("go-jose/go-jose: unknown key type '%s'", reflect.TypeOf(key))
+		var ok bool
+		input, ok, err = mldsaThumbprintInput(k.Key)
+		if !ok {
+			return nil, fmt.Errorf("go-jose/go-jose: unknown key type '%s'", reflect.TypeOf(key))
+		}
 	}
 
 	if err != nil {
@@ -464,7 +495,7 @@ func (k *JSONWebKey) IsPublic() bool {
 	case *ecdsa.PublicKey, *rsa.PublicKey, ed25519.PublicKey:
 		return true
 	default:
-		return false
+		return mldsaIsPublic(k.Key)
 	}
 }
 
@@ -482,7 +513,11 @@ func (k *JSONWebKey) Public() JSONWebKey {
 	case ed25519.PrivateKey:
 		ret.Key = key.Public()
 	default:
-		return JSONWebKey{} // returning invalid key
+		pub, ok := mldsaPublicOf(k.Key)
+		if !ok {
+			return JSONWebKey{} // returning invalid key
+		}
+		ret.Key = pub
 	}
 	return ret
 }
@@ -518,7 +553,7 @@ func (k *JSONWebKey) Valid() bool {
 			return false
 		}
 	default:
-		return false
+		return mldsaValid(k.Key)
 	}
 	return true
 }
@@ -542,7 +577,7 @@ func rsaPublicKey(N, E *byteBuffer) (*rsa.PublicKey, error) {
 
 	n := N.bigInt()
 	if n.BitLen() > MaxRSAModulusBits {
-		return nil, fmt.Errorf("go-jose/go-jose: invalid RSA key, modulus too large")
+		return nil, ErrUnsupportedKeyType
 	}
 
 	e := new(big.Int).SetBytes(E.bytes())
@@ -591,7 +626,7 @@ func (key rawJSONWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
 	case "P-521":
 		curve = elliptic.P521()
 	default:
-		return nil, fmt.Errorf("go-jose/go-jose: unsupported elliptic curve '%s'", key.Crv)
+		return nil, ErrUnsupportedKeyType
 	}
 
 	if key.X == nil || key.Y == nil {
@@ -798,7 +833,7 @@ func (key rawJSONWebKey) ecPrivateKey() (*ecdsa.PrivateKey, error) {
 	case "P-521":
 		curve = elliptic.P521()
 	default:
-		return nil, fmt.Errorf("go-jose/go-jose: unsupported elliptic curve '%s'", key.Crv)
+		return nil, ErrUnsupportedKeyType
 	}
 
 	var missing []string
