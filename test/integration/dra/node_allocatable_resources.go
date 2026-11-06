@@ -112,25 +112,24 @@ func expectPodUnschedulable(tCtx ktesting.TContext, pod *v1.Pod, reason string) 
 	}))))
 }
 
-func verifyPodNodeAllocatableStatus(tCtx ktesting.TContext, namespace, podName string, expectedStatus []v1.NodeAllocatableResourceClaimStatus) {
+func verifyPodNodeAllocatableStatus(tCtx ktesting.TContext, namespace, podName string, expectedStatus []v1.ExtraNodeAllocatableResource) {
 	tCtx.Helper()
 	var statusMatchers []gtypes.GomegaMatcher
 	for _, expected := range expectedStatus {
 		statusMatchers = append(statusMatchers, gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-			"ResourceClaimName": gomega.ContainSubstring(expected.ResourceClaimName),
-			"Containers":        gomega.Equal(expected.Containers),
-			"Mapping":           gomega.Equal(expected.Mapping),
-			"Overhead":          gomega.Equal(expected.Overhead),
+			"ContainerName": gomega.Equal(expected.ContainerName),
+			"Requests":      gomega.Equal(expected.Requests),
+			"Limits":        gomega.Equal(expected.Limits),
 		}))
 	}
-	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.NodeAllocatableResourceClaimStatus {
+	tCtx.Eventually(func(tCtx ktesting.TContext) []v1.ExtraNodeAllocatableResource {
 		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, podName, metav1.GetOptions{})
 		if err != nil {
 			tCtx.Logf("Error getting pod: %v", err)
 			return nil
 		}
-		return pod.Status.NodeAllocatableResourceClaimStatuses
-	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.ConsistOf(statusMatchers), "pod node allocatable resource claim status")
+		return pod.Status.ExtraNodeAllocatableResources
+	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.ConsistOf(statusMatchers), "pod extra node allocatable resources")
 }
 
 func createPodWithNodeAllocatableClaim(tCtx ktesting.TContext, env *testEnv, claimName, podName string, numContainers int) (*v1.Pod, *resourceapi.ResourceClaim) {
@@ -222,14 +221,21 @@ func testNodeAllocatableResourcesConsumablePool(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claim.Name,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Mapping: []v1.NodeAllocatableMappedResources{
-			{Name: v1.ResourceCPU, Quantity: new(resource.MustParse(nodeCPUCapacity))},
-			{Name: v1.ResourceMemory, Quantity: new(resource.MustParse(nodeMemoryCapacity))},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
+		},
+		{
+			ContainerName: "my-container-2",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity), v1.ResourceMemory: resource.MustParse(nodeMemoryCapacity)},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 
 	anotherPod := st.MakePod().Name("another-pod").Namespace(env.namespace).Obj()
@@ -296,13 +302,21 @@ func testNodeAllocatableResourcesIndividualDevices(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claim.Name,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Mapping: []v1.NodeAllocatableMappedResources{
-			{Name: v1.ResourceCPU, Quantity: new(numCPUsPerDevice)},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
+			Limits:        v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
+		},
+		{
+			ContainerName: "my-container-2",
+			Limits:        v1.ResourceList{v1.ResourceCPU: numCPUsPerDevice},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
@@ -625,14 +639,17 @@ func testNodeAllocatableResourcesWithClaimTemplate(tCtx ktesting.TContext) {
 
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: podName, // The genereate claim based on template contains pod name
-		Containers:        []string{"c1"},
-		Mapping: []v1.NodeAllocatableMappedResources{
-			{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("10"))},
-			{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("100"))},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("10"), v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10"), v1.ResourceMemory: resource.MustParse("100")},
 		},
-	}}
+		{
+			ContainerName: "c1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10"), v1.ResourceMemory: resource.MustParse("100")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
@@ -682,14 +699,13 @@ func testNodeAllocatableUnreferencedClaimInPod(tCtx ktesting.TContext) {
 	// and that the pod status correctly lists the allocated claim with an empty container list.
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        nil,
-		Mapping: []v1.NodeAllocatableMappedResources{{
-			Name:     v1.ResourceCPU,
-			Quantity: new(resource.MustParse(nodeCPUCapacity)),
-		}},
-	}}
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity)},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse(nodeCPUCapacity)},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
@@ -741,16 +757,21 @@ func testNodeAllocatableResourcesWithOverheadPerPod(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Overhead: []v1.NodeAllocatableOverheadResources{
-			{
-				Name:   v1.ResourceMemory,
-				PerPod: new(resource.MustParse("100")),
-			},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+		{
+			ContainerName: "my-container-2",
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
@@ -802,16 +823,23 @@ func testNodeAllocatableResourcesWithOverheadPerContainer(tCtx ktesting.TContext
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Overhead: []v1.NodeAllocatableOverheadResources{
-			{
-				Name:         v1.ResourceMemory,
-				PerContainer: new(resource.MustParse("50")),
-			},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("100")},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+		},
+		{
+			ContainerName: "my-container-2",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
@@ -864,17 +892,23 @@ func testNodeAllocatableResourcesWithOverheadBoth(tCtx ktesting.TContext) {
 		"node allocatable claim allocation",
 	)
 
-	expectedStatus := []v1.NodeAllocatableResourceClaimStatus{{
-		ResourceClaimName: claimName,
-		Containers:        []string{"my-container-1", "my-container-2"},
-		Overhead: []v1.NodeAllocatableOverheadResources{
-			{
-				Name:         v1.ResourceMemory,
-				PerPod:       new(resource.MustParse("100")),
-				PerContainer: new(resource.MustParse("50")),
-			},
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("200")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("200")},
 		},
-	}}
+		{
+			ContainerName: "my-container-1",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("150")},
+		},
+		{
+			ContainerName: "my-container-2",
+			Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("50")},
+			Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("150")},
+		},
+	}
 	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
@@ -947,28 +981,16 @@ func testNodeAllocatableExtendedResource(tCtx ktesting.TContext) {
 	// pod stays unschedulable because the pod status patch fails validation.
 	waitForPodScheduled(tCtx, env.namespace, pod.Name)
 
-	// The node allocatable status must reference the real extended-resource
-	// claim name (recorded in ExtendedResourceClaimStatus), never the in-memory
-	// placeholder "<extended-resources>".
-	tCtx.Eventually(func(tCtx ktesting.TContext) error {
-		p, err := tCtx.Client().CoreV1().Pods(env.namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if p.Status.ExtendedResourceClaimStatus == nil {
-			return fmt.Errorf("pod has no ExtendedResourceClaimStatus yet")
-		}
-		realClaimName := p.Status.ExtendedResourceClaimStatus.ResourceClaimName
-		if len(p.Status.NodeAllocatableResourceClaimStatuses) == 0 {
-			return fmt.Errorf("pod has no NodeAllocatableResourceClaimStatuses yet")
-		}
-		for _, s := range p.Status.NodeAllocatableResourceClaimStatuses {
-			if s.ResourceClaimName != realClaimName {
-				return fmt.Errorf("node allocatable status references claim name %q, want real extended resource claim name %q", s.ResourceClaimName, realClaimName)
-			}
-		}
-		return nil
-	}).WithTimeout(30*time.Second).WithPolling(200*time.Millisecond).Should(gomega.Succeed(), "node allocatable status should reference the real extended resource claim name")
+	// No container references the claim that the scheduler creates for the extended resource,
+	// so its mapped CPU is only in the pod level entry.
+	expectedStatus := []v1.ExtraNodeAllocatableResource{
+		{
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+	}
+	verifyPodNodeAllocatableStatus(tCtx, env.namespace, pod.Name, expectedStatus)
 }
 
 func testNodeAllocatableResourceClaimSharingOverhead(tCtx ktesting.TContext) {
