@@ -469,12 +469,11 @@ func testHoldReleaseEvents(tCtx ktesting.TContext) {
 		})
 	}
 	// renominate is what the PodNominator does when PostFilter nominates
-	// the pod to the same node again.
+	// the pod to the same node again: an addition which replaces the
+	// nomination.
 	renominate := func(tCtx ktesting.TContext, testCtx *testContext, victim *v1.Pod) framework.AllocationChangeResult {
-		prepareNomination(tCtx, testCtx, preemptor, nodeName, victim)
-		result := testCtx.p.RemoveAllocation(tCtx, preemptor, nodeName)
-		testCtx.p.AddAllocation(tCtx, preemptor, nodeName)
-		return result
+		_, prepared := prepareNomination(tCtx, testCtx, preemptor, nodeName, victim)
+		return testCtx.p.AddAllocation(tCtx, preemptor, nodeName, prepared)
 	}
 
 	for name, tc := range map[string]struct {
@@ -756,8 +755,7 @@ func testHoldsConcurrency(tCtx ktesting.TContext) {
 	wg.Go(func() {
 		for range 10 {
 			testCtx.p.RemoveAllocation(tCtx, preemptors[1], nodes[1].Name)
-			testCtx.p.PrepareAllocation(tCtx, nominationStates[1], preemptors[1], nodes[1].Name)
-			testCtx.p.AddAllocation(tCtx, preemptors[1], nodes[1].Name)
+			testCtx.p.AddAllocation(tCtx, preemptors[1], nodes[1].Name, testCtx.p.PrepareAllocation(tCtx, nominationStates[1], preemptors[1], nodes[1].Name))
 		}
 	})
 	wg.Wait()

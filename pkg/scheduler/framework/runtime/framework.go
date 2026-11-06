@@ -80,6 +80,7 @@ type frameworkImpl struct {
 	rankNodesPlugins          []framework.RankNodesPlugin
 	allocationExtensions      []framework.AllocationExtensions
 	victimExtensions          []framework.VictimExtensions
+	preparedAllocations       *preparedAllocations
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
 	placementFeasiblePlugins   []fwk.PlacementFeasiblePlugin

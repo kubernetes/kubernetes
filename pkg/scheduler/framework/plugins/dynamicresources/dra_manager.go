@@ -79,9 +79,6 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
 		manager.nominations = newClaimNominations()
-		if _, err := informerFactory.Core().V1().Pods().Informer().AddEventHandler(manager.nominations.handlers(logger)); err != nil {
-			logger.Error(err, "Failed to watch pods for claim nominations")
-		}
 		manager.victimClaims = newVictimClaimTracker()
 		manager.resourceClaimTracker.cache.AddEventHandler(manager.victimClaims.handlers(logger))
 	}

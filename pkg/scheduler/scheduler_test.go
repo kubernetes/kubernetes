@@ -1601,6 +1601,9 @@ func TestNominationChangeHandler(t *testing.T) {
 	handler := newNominationChangeHandler(profile.Map{testSchedulerName: schedFramework})
 	pod := st.MakePod().Name("p").Namespace("ns").UID("p").SchedulerName(testSchedulerName).Obj()
 	otherProfile := st.MakePod().Name("other").Namespace("ns").UID("other").SchedulerName("other-scheduler").Obj()
+	// Only the first nomination to node2 gets what got prepared for it.
+	done := schedFramework.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node2")
+	defer done()
 
 	if events := handler(logger, pod, "", "node1"); len(events) != 0 {
 		t.Errorf("Unexpected events for a new nomination: %v", events)
@@ -1608,8 +1611,9 @@ func TestNominationChangeHandler(t *testing.T) {
 	if diff := cmp.Diff([]framework.AllocationEvent{released}, handler(logger, pod, "node1", "node2")); diff != "" {
 		t.Errorf("Unexpected events for a moved nomination (-want, +got):\n%s", diff)
 	}
-	if diff := cmp.Diff([]framework.AllocationEvent{released}, handler(logger, pod, "node2", "node2")); diff != "" {
-		t.Errorf("Unexpected events for a renewed nomination (-want, +got):\n%s", diff)
+	// Replaces the previous nomination without removing it.
+	if events := handler(logger, pod, "node2", "node2"); len(events) != 0 {
+		t.Errorf("Unexpected events for a renewed nomination: %v", events)
 	}
 	if diff := cmp.Diff([]framework.AllocationEvent{released}, handler(logger, pod, "node2", "")); diff != "" {
 		t.Errorf("Unexpected events for an ended nomination (-want, +got):\n%s", diff)
@@ -1618,9 +1622,10 @@ func TestNominationChangeHandler(t *testing.T) {
 		t.Errorf("Unexpected events for a pod of an unknown profile: %v", events)
 	}
 	want := []string{
-		"AddAllocation ns/p node1 assigned=",
-		"RemoveAllocation ns/p node1 assigned=", "AddAllocation ns/p node2 assigned=",
-		"RemoveAllocation ns/p node2 assigned=", "AddAllocation ns/p node2 assigned=",
+		"PrepareAllocation ns/p node2 assigned=",
+		"AddAllocation ns/p node1 assigned= prepared=<nil>",
+		"RemoveAllocation ns/p node1 assigned=", "AddAllocation ns/p node2 assigned= prepared=prepared ns/p node2",
+		"AddAllocation ns/p node2 assigned= prepared=<nil>",
 		"RemoveAllocation ns/p node2 assigned=",
 	}
 	if diff := cmp.Diff(want, allocationExtensions.Calls()); diff != "" {

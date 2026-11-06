@@ -45,43 +45,17 @@ import (
 )
 
 func TestClaimNominations(t *testing.T) {
-	t.Run("confirm-and-remove", func(t *testing.T) {
-		n := newClaimNominations()
-		n.prepare("p", &podNomination{nodeName: "a"})
-		require.Nil(t, n.confirm("p", "b"), "candidate for another node")
-		require.NotNil(t, n.confirm("p", "a"), "candidate for the node")
-		require.Equal(t, "a", n.nomination("p").nodeName)
-		// An event about another nomination must not remove this one.
-		removed, _ := n.removeNomination("p", "b")
-		require.Nil(t, removed)
-		removed, newer := n.removeNomination("p", "a")
-		require.NotNil(t, removed)
-		require.Nil(t, newer)
-		require.Nil(t, n.nomination("p"))
-		// Nominated to the same node again, it gets the same devices.
-		require.Equal(t, removed, n.confirm("p", "a"), "removed nomination is the candidate")
-	})
-
-	t.Run("newer-candidate", func(t *testing.T) {
-		n := newClaimNominations()
-		n.prepare("p", &podNomination{nodeName: "a"})
-		n.confirm("p", "a")
-		newer := &podNomination{nodeName: "a"}
-		n.prepare("p", newer)
-		_, got := n.removeNomination("p", "a")
-		require.Equal(t, newer, got)
-		require.Equal(t, newer, n.confirm("p", "a"))
-	})
-
-	t.Run("forget-candidate", func(t *testing.T) {
-		n := newClaimNominations()
-		n.prepare("p", &podNomination{nodeName: "a"})
-		n.forgetCandidate("p")
-		require.Nil(t, n.confirm("p", "a"))
-		n.prepare("p", &podNomination{nodeName: "a"})
-		n.prepare("p", nil)
-		require.Nil(t, n.confirm("p", "a"))
-	})
+	n := newClaimNominations()
+	first := &podNomination{nodeName: "a"}
+	require.Nil(t, n.add("p", first), "nothing replaced")
+	require.Equal(t, first, n.nomination("p"))
+	second := &podNomination{nodeName: "a"}
+	require.Equal(t, first, n.add("p", second), "replaced")
+	// An event about another nomination must not remove this one.
+	require.Nil(t, n.remove("p", "b"))
+	require.Equal(t, second, n.remove("p", "a"))
+	require.Nil(t, n.nomination("p"))
+	require.Nil(t, n.remove("p", "a"), "removed again")
 }
 
 // setupNominations sets up the plugin with the claimNominations store,
@@ -94,8 +68,8 @@ func setupNominations(tCtx ktesting.TContext, claims []*resourceapi.ResourceClai
 }
 
 // nominate runs PreFilter for the preemptor, simulates the removal of the
-// victims, prepares and confirms the nomination and then calls AssumeVictim
-// for each victim, like a successful preemption.
+// victims, prepares and adds the nomination and then calls AssumeVictim for
+// each victim, like a successful preemption.
 func nominate(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
 	state := nominateWithoutAssume(tCtx, testCtx, preemptor, nodeName, victims...)
 	for _, victim := range victims {
@@ -108,15 +82,16 @@ func nominate(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, n
 // preempt the victims.
 func nominateWithoutAssume(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
 	tCtx.Helper()
-	state := prepareNomination(tCtx, testCtx, preemptor, nodeName, victims...)
-	testCtx.p.AddAllocation(tCtx, preemptor, nodeName)
+	state, prepared := prepareNomination(tCtx, testCtx, preemptor, nodeName, victims...)
+	testCtx.p.AddAllocation(tCtx, preemptor, nodeName, prepared)
 	return state
 }
 
 // prepareNomination runs PreFilter for the preemptor, simulates the removal
 // of the victims and calls PrepareAllocation, like PostFilter followed by
-// the framework when it nominates the preemptor.
-func prepareNomination(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) fwk.CycleState {
+// the framework when it nominates the preemptor. It returns the CycleState
+// and what PrepareAllocation returned.
+func prepareNomination(tCtx ktesting.TContext, testCtx *testContext, preemptor *v1.Pod, nodeName string, victims ...*v1.Pod) (fwk.CycleState, any) {
 	tCtx.Helper()
 	state := framework.NewCycleState()
 	_, status := testCtx.p.PreFilter(tCtx, state, preemptor, testCtx.nodeInfos)
@@ -137,8 +112,7 @@ func prepareNomination(tCtx ktesting.TContext, testCtx *testContext, preemptor *
 		require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo, nodeInfo).IsSuccess(), "RemovePod")
 	}
 	_ = testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo)
-	testCtx.p.PrepareAllocation(tCtx, state, preemptor, nodeName)
-	return state
+	return state, testCtx.p.PrepareAllocation(tCtx, state, preemptor, nodeName)
 }
 
 // assume runs PreFilter, Filter and Reserve for the pod on the node, like the
@@ -299,8 +273,7 @@ func testPrepareNominationAfterReprieve(tCtx ktesting.TContext) {
 				require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo(victim2), nodeInfo).IsSuccess(), "RemovePod")
 			}
 
-			testCtx.p.PrepareAllocation(tCtx, state, preemptor, nodeName)
-			testCtx.p.AddAllocation(tCtx, preemptor, nodeName)
+			testCtx.p.AddAllocation(tCtx, preemptor, nodeName, testCtx.p.PrepareAllocation(tCtx, state, preemptor, nodeName))
 			require.Equal(tCtx, tc.wantVictims, victimsOf(testCtx), "victims of the nomination")
 		})
 	}
@@ -321,7 +294,6 @@ func testPrepareNomination(tCtx ktesting.TContext) {
 
 	for name, tc := range map[string]struct {
 		preemptor      *v1.Pod
-		deleted        bool
 		wantNomination bool
 	}{
 		"released-claims": {
@@ -331,24 +303,11 @@ func testPrepareNomination(tCtx ktesting.TContext) {
 		"cannot-release": {
 			preemptor: preemptionPod("preemptor", "preemptor-claim").Priority(100).PreemptionPolicy(v1.PreemptNever).Obj(),
 		},
-		"preemptor-gone": {
-			// Deleted between PrepareAllocation and AddAllocation.
-			preemptor: preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj(),
-			deleted:   true,
-		},
 	} {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, victim2, running, tc.preemptor})
-			prepareNomination(tCtx, testCtx, tc.preemptor, nodeName, victim, victim2)
-			if tc.deleted {
-				deletePod(tCtx, testCtx, tc.preemptor)
-				eventually(tCtx, "candidate dropped", func() bool {
-					testCtx.p.nominations.mutex.RLock()
-					defer testCtx.p.nominations.mutex.RUnlock()
-					return testCtx.p.nominations.candidates[tc.preemptor.UID] == nil
-				})
-			}
-			testCtx.p.AddAllocation(tCtx, tc.preemptor, nodeName)
+			_, prepared := prepareNomination(tCtx, testCtx, tc.preemptor, nodeName, victim, victim2)
+			testCtx.p.AddAllocation(tCtx, tc.preemptor, nodeName, prepared)
 
 			nomination := testCtx.p.nominations.nomination(tc.preemptor.UID)
 			require.Equal(tCtx, tc.wantNomination, nomination != nil, "nomination")

@@ -5685,3 +5685,90 @@ func TestGetDifferentUIDPreCheck(t *testing.T) {
 		})
 	}
 }
+
+// TestRunFailureHandlerPreparesAllocations checks that the nomination which
+// the FailureHandler applies reaches AddAllocation with what PrepareAllocation
+// returned for it, and that nothing is kept after the call, also when the pod
+// got deleted and therefore not nominated.
+func TestRunFailureHandlerPreparesAllocations(t *testing.T) {
+	nominated := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+	tests := []struct {
+		name           string
+		nominatingInfo *fwk.NominatingInfo
+		deleted        bool
+		wantCalls      []string
+	}{
+		{
+			name:           "nominated by PostFilter",
+			nominatingInfo: nominated,
+			wantCalls: []string{
+				"PrepareAllocation ns/foo node1 assigned=",
+				"AddAllocation ns/foo node1 assigned= prepared=prepared ns/foo node1",
+			},
+		},
+		{
+			name:           "deleted",
+			nominatingInfo: nominated,
+			deleted:        true,
+			wantCalls:      []string{"PrepareAllocation ns/foo node1 assigned="},
+		},
+		{
+			name:           "nomination cleared",
+			nominatingInfo: clearNominatedNode,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			pod := st.MakePod().Name("foo").Namespace("ns").UID("foo").SchedulerName(testSchedulerName).Obj()
+			client := clientsetfake.NewClientset(pod)
+			if tt.deleted {
+				client = clientsetfake.NewClientset()
+			}
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
+			schedFramework, err := tf.NewFramework(ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+					tf.RegisterPreFilterPlugin(allocationExtensions.Name(), tf.NewFakeAllocationExtensionsPlugin(allocationExtensions)),
+				},
+				testSchedulerName,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar),
+				internalqueue.WithNominationChangeHandler(newNominationChangeHandler(profile.Map{testSchedulerName: schedFramework})))
+			sched := &Scheduler{client: client, SchedulingQueue: queue}
+			sched.FailureHandler = sched.handleSchedulingFailure
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			queue.Add(ctx, pod)
+			popped, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+			sched.runFailureHandler(ctx, schedFramework, framework.NewCycleState(), popped.(*framework.QueuedPodInfo), fwk.NewStatus(fwk.Unschedulable, "no fit"), tt.nominatingInfo, time.Now())
+			if diff := cmp.Diff(tt.wantCalls, allocationExtensions.Calls()); diff != "" {
+				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
+			}
+
+			schedFramework.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+			calls := allocationExtensions.Calls()
+			if want := "AddAllocation ns/foo node1 assigned= prepared=<nil>"; calls[len(calls)-1] != want {
+				t.Errorf("A later nomination got %q, want %q", calls[len(calls)-1], want)
+			}
+		})
+	}
+}

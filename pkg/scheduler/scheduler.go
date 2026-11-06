@@ -652,8 +652,9 @@ func (sched *Scheduler) initAlgorithm(opts ...AlgorithmOption) error {
 
 // newNominationChangeHandler forwards changes of nominated nodes in the
 // PodNominator to the AllocationExtensions of the pod's profile, as the
-// removal of the old nomination followed by the addition of the new one. It
-// gets called while the scheduling queue is locked.
+// removal of the old nomination followed by the addition of the new one, or
+// as an addition which replaces a nomination to the same node. It gets called
+// while the scheduling queue is locked.
 func newNominationChangeHandler(profiles profile.Map) internalqueue.NominationChangeHandler {
 	return func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.AllocationEvent {
 		schedFramework, err := profiles.FrameworkForPod(pod)
@@ -662,7 +663,7 @@ func newNominationChangeHandler(profiles profile.Map) internalqueue.NominationCh
 		}
 		ctx := klog.NewContext(context.Background(), logger)
 		var events []framework.AllocationEvent
-		if oldNodeName != "" {
+		if oldNodeName != "" && oldNodeName != newNodeName {
 			events = append(events, schedFramework.RunAllocationExtensionsRemoveAllocation(ctx, pod, oldNodeName)...)
 		}
 		if newNodeName != "" {

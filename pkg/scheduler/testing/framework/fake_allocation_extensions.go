@@ -78,15 +78,17 @@ func (pl *FakeAllocationExtensionsPlugin) PreFilterExtensions() fwk.PreFilterExt
 }
 
 // PrepareAllocation records the call as
-// "PrepareAllocation <pod> <node> assigned=<pod.spec.nodeName>".
-func (pl *FakeAllocationExtensionsPlugin) PrepareAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
+// "PrepareAllocation <pod> <node> assigned=<pod.spec.nodeName>" and returns
+// "prepared <pod> <node>".
+func (pl *FakeAllocationExtensionsPlugin) PrepareAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) any {
 	pl.record(fmt.Sprintf("PrepareAllocation %s %s assigned=%s", klog.KObj(pod), nodeName, pod.Spec.NodeName))
+	return fmt.Sprintf("prepared %s %s", klog.KObj(pod), nodeName)
 }
 
 // AddAllocation records the call as
-// "AddAllocation <pod> <node> assigned=<pod.spec.nodeName>".
-func (pl *FakeAllocationExtensionsPlugin) AddAllocation(_ context.Context, pod *v1.Pod, nodeName string) schedulerframework.AllocationChangeResult {
-	pl.record(fmt.Sprintf("AddAllocation %s %s assigned=%s", klog.KObj(pod), nodeName, pod.Spec.NodeName))
+// "AddAllocation <pod> <node> assigned=<pod.spec.nodeName> prepared=<prepared>".
+func (pl *FakeAllocationExtensionsPlugin) AddAllocation(_ context.Context, pod *v1.Pod, nodeName string, prepared any) schedulerframework.AllocationChangeResult {
+	pl.record(fmt.Sprintf("AddAllocation %s %s assigned=%s prepared=%v", klog.KObj(pod), nodeName, pod.Spec.NodeName, prepared))
 	return schedulerframework.AllocationChangeResult{}
 }
 

@@ -40,6 +40,7 @@ type recordingAllocationExtensions struct {
 	name              string
 	notEligibleReason string
 	log               *[]string
+	numPrepared       int
 }
 
 var _ framework.AllocationExtensions = &recordingAllocationExtensions{}
@@ -53,12 +54,15 @@ func (pl *recordingAllocationExtensions) PreFilter(context.Context, fwk.CycleSta
 
 func (pl *recordingAllocationExtensions) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
 
-func (pl *recordingAllocationExtensions) PrepareAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
+// PrepareAllocation returns "prepared <n> by <name>", counting its calls.
+func (pl *recordingAllocationExtensions) PrepareAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) any {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: prepare %s %s", pl.name, pod.Name, nodeName))
+	pl.numPrepared++
+	return fmt.Sprintf("prepared %d by %s", pl.numPrepared, pl.name)
 }
 
-func (pl *recordingAllocationExtensions) AddAllocation(_ context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
-	*pl.log = append(*pl.log, fmt.Sprintf("%s: add %s %s", pl.name, pod.Name, nodeName))
+func (pl *recordingAllocationExtensions) AddAllocation(_ context.Context, pod *v1.Pod, nodeName string, prepared any) framework.AllocationChangeResult {
+	*pl.log = append(*pl.log, fmt.Sprintf("%s: add %s %s %v", pl.name, pod.Name, nodeName, prepared))
 	return framework.AllocationChangeResult{}
 }
 
@@ -103,7 +107,7 @@ func TestAllocationExtensions(t *testing.T) {
 			wantEvents:   []string{"a", "b"},
 			wantCalls: []string{
 				"a: prepare preemptor node1", "b: prepare preemptor node1",
-				"a: add preemptor node1", "b: add preemptor node1",
+				"a: add preemptor node1 prepared 1 by a", "b: add preemptor node1 prepared 1 by b",
 				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
@@ -117,7 +121,7 @@ func TestAllocationExtensions(t *testing.T) {
 			wantEvents:   []string{"a", "b"},
 			wantCalls: []string{
 				"a: prepare preemptor node1", "b: prepare preemptor node1",
-				"a: add preemptor node1", "b: add preemptor node1",
+				"a: add preemptor node1 prepared 1 by a", "b: add preemptor node1 prepared 1 by b",
 				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1", "b: eligible preemptor node1",
@@ -131,7 +135,7 @@ func TestAllocationExtensions(t *testing.T) {
 			wantEvents:   []string{"a", "b"},
 			wantCalls: []string{
 				"a: prepare preemptor node1", "b: prepare preemptor node1",
-				"a: add preemptor node1", "b: add preemptor node1",
+				"a: add preemptor node1 prepared 1 by a", "b: add preemptor node1 prepared 1 by b",
 				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
 				"a: eligible preemptor node1",
@@ -162,7 +166,8 @@ func TestAllocationExtensions(t *testing.T) {
 				t.Fatalf("create framework: %v", err)
 			}
 
-			f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+			done := f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+			defer done()
 			var events []string
 			for _, event := range append(f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1"), f.RunAllocationExtensionsRemoveAllocation(ctx, pod, "node1")...) {
 				events = append(events, event.Event.CustomLabel)
@@ -179,5 +184,56 @@ func TestAllocationExtensions(t *testing.T) {
 				t.Errorf("unexpected calls (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestPreparedAllocations(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var log []string
+	pl := &recordingAllocationExtensions{name: "a", log: &log}
+	registry := Registry{pl.name: func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) { return pl, nil }}
+	profile := config.KubeSchedulerProfile{Plugins: &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: pl.name}}}}}
+	f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+	if err != nil {
+		t.Fatalf("create framework: %v", err)
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p", UID: "p"}}
+
+	// Only for the node and only once.
+	done := f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node2")
+	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+	done()
+
+	// Dropped by done.
+	done = f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+	done()
+	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+
+	// done of an older call keeps the results of a newer one.
+	done = f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+	doneNewer := f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
+	done()
+	f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1")
+	doneNewer()
+
+	want := []string{
+		"a: prepare p node1",
+		"a: add p node2 <nil>",
+		"a: add p node1 prepared 1 by a",
+		"a: add p node1 <nil>",
+		"a: prepare p node1",
+		"a: add p node1 <nil>",
+		"a: prepare p node1",
+		"a: prepare p node1",
+		"a: add p node1 prepared 4 by a",
+	}
+	if diff := cmp.Diff(want, log); diff != "" {
+		t.Errorf("unexpected calls (-want, +got):\n%s", diff)
 	}
 }
