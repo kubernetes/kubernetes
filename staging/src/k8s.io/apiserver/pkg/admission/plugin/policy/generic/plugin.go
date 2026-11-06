@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,6 +28,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/coverage"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -90,6 +92,9 @@ type Plugin[H any] struct {
 	// apiServerID is the identity of this API server instance, used for metrics labeling.
 	apiServerID string
 
+	// coverageRequirements holds the injected admission coverage requirements; empty disables coverage checks.
+	coverageRequirements []coverage.Requirement
+
 	informerFactory informers.SharedInformerFactory
 	client          kubernetes.Interface
 	restMapper      meta.RESTMapper
@@ -115,6 +120,7 @@ var (
 	_ initializer.WantsAPIServerID                 = &Plugin[any]{}
 	_ initializer.WantsUnconditionalAuthorizer     = &Plugin[any]{}
 	_ initializer.WantsExcludedAdmissionResources  = &Plugin[any]{}
+	_ initializer.WantsAdmissionCoverage           = &Plugin[any]{}
 	_ admission.InitializationValidator            = &Plugin[any]{}
 )
 
@@ -169,6 +175,18 @@ func (c *Plugin[H]) SetEnabled(enabled bool) {
 
 func (c *Plugin[H]) SetExcludedAdmissionResources(excludedResources []schema.GroupResource) {
 	c.excludedResources.Insert(excludedResources...)
+}
+
+// SetAdmissionCoverage implements the WantsAdmissionCoverage interface.
+// It only stores reqs: initializers run in no particular order, so the API and
+// static source factories read it with GetAdmissionCoverage in ValidateInitialization.
+func (c *Plugin[H]) SetAdmissionCoverage(reqs []coverage.Requirement) {
+	c.coverageRequirements = slices.Clone(reqs)
+}
+
+// GetAdmissionCoverage returns the injected admission coverage requirements, or nil.
+func (c *Plugin[H]) GetAdmissionCoverage() []coverage.Requirement {
+	return c.coverageRequirements
 }
 
 // SetStaticManifestsDir sets the directory containing static policy manifests.
@@ -226,6 +244,9 @@ func (c *Plugin[H]) ValidateInitialization() error {
 	}
 	if c.authorizer == nil {
 		return errors.New("missing authorizer")
+	}
+	if err := coverage.Validate(c.coverageRequirements); err != nil {
+		return fmt.Errorf("invalid admission coverage requirements: %w", err)
 	}
 
 	// Guard: if static manifests dir is set but feature gate is off, return an error
