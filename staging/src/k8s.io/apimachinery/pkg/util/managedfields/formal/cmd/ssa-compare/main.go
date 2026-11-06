@@ -67,11 +67,11 @@ func run() error {
 		summary.Cases, summary.Steps, summary.Accepted, summary.Conflicts,
 		summary.Differences, *seed)
 	if *reproducer == "" {
-		pairs, err := bridge.CompareElementDifference(context.Background(), *model)
+		pairs, err := bridge.CompareElementAlgebra(context.Background(), *model)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Imported element-set difference: %d exact Go/interpreter/oracle subset pairs.\n", pairs)
+		fmt.Printf("Imported element-set algebra: %d exact Go/interpreter/oracle subset pairs.\n", pairs)
 	}
 	return nil
 }

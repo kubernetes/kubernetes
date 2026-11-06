@@ -176,7 +176,8 @@ The Go primitive and updater refinement obligations remain open in the catalogue
 ## Binding proofs to source
 
 `cmd/ssa-source` uses Go's parser to import complete bodies and checked signatures
-from the vendored updater into `SSA/GoSource.lean`:
+from the selected updater and element-set sources into `SSA/GoSource.lean` and
+`SSA/ElementSource.lean`:
 
 | Source function | Kernel-checked contract |
 | --- | --- |
@@ -185,7 +186,7 @@ from the vendored updater into `SSA/GoSource.lean`:
 | `addBackOwnedItems` | `OwnedSource.imported_owned_items_matches_spec` |
 | `prune` | `PruneSource.imported_prune_matches_spec` |
 | `Apply` | `ApplySource.imported_apply_matches_spec` |
-| `PathElementSet.Difference` (`fieldpath/element.go`) | `ElementDifference.imported_difference_matches`, `imported_difference_membership` |
+| `PathElementSet.Difference`, `Union`, `Intersection` (`fieldpath/element.go`) | `ElementAlgebra.imported_matches`, `imported_membership`, `imported_preserves_order`, `imported_preserves_uniqueness` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -227,24 +228,32 @@ updater/request pipeline are further proof obligations. The multi-version
 source orchestration contract does not establish semantic correctness of API
 conversions. No generated AST digest substitutes for those proofs.
 
-`ElementDifference` advances one of those primitive obligations. It imports the
-entire two-pointer Go difference method, including the final slice append. A
-separate typed interpreter checks fresh output allocation, short-circuit bounds,
-safe slice/index access, appending and increments. The source contract supplies
-a linear fuel bound for arbitrary finite input lengths. It then proves exact
-membership difference for sorted inputs under explicit strict-total-order laws
-for the element comparator. The output is a sublist of the left input, so its
-order and uniqueness survive. This is a general proof, not fixture enumeration.
+`ElementAlgebra` proves the three element-set operations from their complete
+Go bodies with one shared loop induction. The typed interpreter checks fresh
+output allocation, short-circuit bounds, safe slice/index access, append and
+increments. All operations have a linear fuel bound for arbitrary finite inputs
+and comparators. Union preserves Go's choice of the right representative on an
+equal-key branch; this control-flow theorem needs no equality assumption.
 
-An additional independent comparison executes the real Go method and the
-imported interpreter on all 4,096 subset pairs of six independently ranked
-elements spanning field, key, value and index selectors. Both must also match a
-membership oracle; input membership is checked after every Go call. This bounded
-check supports the interpreter/representation boundary, not a universal proof
-of Go's PathElement comparator. The comparator, `Has`/binary search,
-`SetNodeMap.RecursiveDifference`, the Set wrapper and complete recursive-filter
-composition remain explicit obligations. This component theorem does not prove
-the full field-path operations used by pruning.
+Exact difference/union/intersection membership and sorted, duplicate-free outputs
+then follow under the stated sorted-input and strict-total-order premises.
+`ElementOrder.nat_strict_order` constructs those laws for the rank comparator
+used by the executable comparison. The existing `ElementDifference` theorem
+names remain specializations, including the stronger difference-only order
+preservation law that needs neither comparator laws nor a sorted right input.
+These are general proofs rather than fixture enumeration.
+
+An independent comparison executes all three real Go methods and the imported
+interpreter on all 4,096 subset pairs of six independently ranked elements per
+operation: 12,288 operation/pair cases in total. The elements span field, key,
+value and index selectors. Boolean membership oracles independently constrain
+the results; input size and membership are checked after every Go call. Each
+method has a semantic source mutation that its shared proof must reject.
+This bounded evidence supports the interpreter/representation boundary, not a
+universal proof of Go's PathElement comparator. The comparator, `Has`/binary
+search, recursive Set/SetNodeMap operations and complete filter composition
+remain explicit obligations. These component theorems do not prove the full
+field-path operations used by pruning.
 
 `RawSourceCounterexamples` instantiates this complete pruning chain for both
 empty-list transitions, with all callees realized under every lawful map

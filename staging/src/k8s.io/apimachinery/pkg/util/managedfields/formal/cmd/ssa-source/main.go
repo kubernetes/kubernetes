@@ -46,6 +46,16 @@ var elementFunctions = []functionSpec{
 		signature:  "func (s *PathElementSet) Difference(s2 *PathElementSet) *PathElementSet",
 		parameters: []string{"s2"}, maps: map[string]string{"s2": "element-input"}, elements: true,
 	},
+	{
+		name: "Union", leanName: "unionProgram",
+		signature:  "func (s *PathElementSet) Union(s2 *PathElementSet) *PathElementSet",
+		parameters: []string{"s2"}, maps: map[string]string{"s2": "element-input"}, elements: true,
+	},
+	{
+		name: "Intersection", leanName: "intersectionProgram",
+		signature:  "func (s *PathElementSet) Intersection(s2 *PathElementSet) *PathElementSet",
+		parameters: []string{"s2"}, maps: map[string]string{"s2": "element-input"}, elements: true,
+	},
 }
 
 var functions = []functionSpec{

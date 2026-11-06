@@ -40,10 +40,11 @@ private def checkFixtures (fixtures : List Fixture) : IO UInt32 := do
 
 private def usage : String :=
   "ssa-model --self-test | --list | --fixtures | --trace NAME | --check FILE | --replay FILE\n" ++
-  "--check and --replay accept normalized fixture arrays; --element-difference accepts rank-list pairs. " ++
+  "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin."
 
 private structure ElementCase where
+  operation : Option ElementAlgebra.Operation := none
   left : List Nat
   right : List Nat
   deriving FromJson
@@ -51,6 +52,32 @@ private structure ElementCase where
 private def readInput (path : String) : IO String := do
   if path == "-" then (← IO.getStdin).readToEnd else IO.FS.readFile path
 
+private def runElements (path : String) (override : Option ElementAlgebra.Operation) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let text ← readInput path
+  match Json.parse text >>= fromJson? (α := List ElementCase) with
+  | .error message =>
+      stderr.putStrLn s!"Invalid element-set JSON: {message}"
+      return 2
+  | .ok cases =>
+      if cases.isEmpty then
+        stderr.putStrLn "Element-set input is empty; supply at least one pair."
+        return 2
+      let mut reports : List (List Nat) := []
+      for input in cases do
+        let operation := override.getD (input.operation.getD .difference)
+        match ElementSubset.exec (fun a b => a < b) (input.left.length+input.right.length+19)
+            (ElementAlgebra.program operation) {left := input.left,right := input.right} with
+        | .ok (.returned [.set result]) => reports := result::reports
+        | .error message =>
+            stderr.putStrLn s!"Imported element-set execution failed: {message}"
+            return 1
+        | _ =>
+            stderr.putStrLn "Imported element-set method did not return a set."
+            return 1
+      stdout.putStrLn (toJson reports.reverse).compress
+      return 0
 def main (args : List String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
@@ -73,29 +100,8 @@ def main (args : List String) : IO UInt32 := do
       | none =>
           stderr.putStrLn s!"Unknown scenario '{name}'; run --list to see available scenarios."
           return 2
-  | ["--element-difference",path] =>
-      let text ← readInput path
-      match Json.parse text >>= fromJson? (α := List ElementCase) with
-      | .error message =>
-          stderr.putStrLn s!"Invalid element-set JSON: {message}"
-          return 2
-      | .ok cases =>
-          if cases.isEmpty then
-            stderr.putStrLn "Element-set input is empty; supply at least one pair."
-            return 2
-          let mut reports : List (List Nat) := []
-          for input in cases do
-            match ElementSubset.exec (fun a b => a < b) (input.left.length+input.right.length+19)
-                ElementSource.differenceProgram {left := input.left,right := input.right} with
-            | .ok (.returned [.set result]) => reports := result::reports
-            | .error message =>
-                stderr.putStrLn s!"Imported element-set execution failed: {message}"
-                return 1
-            | _ =>
-                stderr.putStrLn "Imported element-set method did not return a set."
-                return 1
-          stdout.putStrLn (toJson reports.reverse).compress
-          return 0
+  | ["--element-difference",path] => runElements path (some .difference)
+  | ["--element-algebra",path] => runElements path none
   | [mode, path] =>
       if mode != "--check" && mode != "--replay" then
         stderr.putStrLn usage

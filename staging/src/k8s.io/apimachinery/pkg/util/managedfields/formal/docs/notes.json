@@ -675,7 +675,7 @@
     "title": "Complete imported Go element-set difference",
     "scope": "general",
     "meaning": "The complete PathElementSet.Difference AST executes successfully and equals the independently factored two-pointer algorithm for every finite input pair, using a linear fuel bound.",
-    "limits": "The typed interpreter models non-nil input sets, fresh output slices, pure element comparisons and bounded index access. Parser/subset semantics need human review; comparison semantics and the Go compiler/runtime are outside this theorem."
+    "limits": "The typed interpreter models non-nil input sets, fresh output slices, pure element comparisons and bounded index access. Parser/subset semantics need human review; comparison semantics and the Go compiler/runtime are outside this theorem. The original statement now specializes the shared ElementAlgebra source induction."
   },
   "SSA.ElementDifference.imported_difference_membership": {
     "title": "Go source computes exact membership difference",
@@ -686,7 +686,79 @@
   "SSA.ElementDifference.imported_difference_preserves_order": {
     "title": "Go element-set result remains sorted",
     "scope": "general",
-    "meaning": "Whenever the left input is sorted, the imported method returns a sorted list; no ordering premise on the right input is needed for this preservation fact.",
+    "meaning": "Whenever the left input is sorted, the imported Difference method returns a sorted list; the shared proof preserves the original absence of comparator-law and sorted-right premises.",
     "limits": "Exact difference membership still needs both inputs sorted and the comparator laws. Full recursive set composition remains open."
+  },
+  "SSA.ElementAlgebra.compute_membership": {
+    "title": "All three set-membership laws",
+    "scope": "general",
+    "meaning": "For arbitrary finite sorted inputs, the common two-pointer algorithm computes difference, union or intersection membership exactly.",
+    "limits": "Requires the explicit strict-total-order comparator laws. The algorithm is separately equated to each complete imported Go body."
+  },
+  "SSA.ElementAlgebra.compute_left_sublist": {
+    "title": "Difference and intersection retain left-input order",
+    "scope": "general",
+    "meaning": "For every comparator and input pair, each non-union operation returns a sublist of the left input.",
+    "limits": "No sortedness or comparator laws are needed. Union can add right-input elements and has a separate ordering proof."
+  },
+  "SSA.ElementAlgebra.union_pairwise": {
+    "title": "Union preserves sorted representation",
+    "scope": "general",
+    "meaning": "Strictly sorted inputs under a lawful comparator yield a strictly sorted union.",
+    "limits": "This is the common algorithm theorem; imported_matches supplies the source connection."
+  },
+  "SSA.ElementAlgebra.imported_matches": {
+    "title": "Three complete imported Go methods share one source proof",
+    "scope": "general",
+    "meaning": "For every finite input pair and comparator, complete imported Difference, Union and Intersection execute successfully and equal the common algorithm, with a linear fuel bound.",
+    "limits": "Includes the actual right representative emitted by Union on equal comparisons, all suffix branches and safe indexing. The typed interpreter models non-nil sets, fresh output slices and pure comparisons; parser/semantics require human review."
+  },
+  "SSA.ElementAlgebra.imported_membership": {
+    "title": "Exact set membership in every imported result",
+    "scope": "general",
+    "meaning": "Every returned Difference, Union or Intersection result obeys its standard left/right membership law at arbitrary finite sizes.",
+    "limits": "Requires sorted inputs and explicit comparator-order laws. Actual PathElement.Less/Compare and recursive Set/SetNodeMap refinement remain open."
+  },
+  "SSA.ElementAlgebra.imported_preserves_order": {
+    "title": "Imported results preserve strict ordering",
+    "scope": "general",
+    "meaning": "Each complete imported method returns a strictly sorted result from strictly sorted inputs under the comparator laws.",
+    "limits": "The legacy difference-only specialization retains the stronger frame with no comparator-law or sorted-right premise."
+  },
+  "SSA.ElementAlgebra.imported_preserves_uniqueness": {
+    "title": "Imported results retain unique element keys",
+    "scope": "general",
+    "meaning": "The three imported operations cannot produce duplicate element keys from sorted canonical inputs under the comparator laws.",
+    "limits": "Derived through strict ordering and irreflexivity; this is a representation guarantee, not an extra independent SSA correctness claim."
+  },
+  "SSA.ElementOrder.head_absent": {
+    "title": "Head absent",
+    "scope": "helper",
+    "meaning": "A strict sorted head cannot reoccur in its tail.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.before_all": {
+    "title": "Before all",
+    "scope": "helper",
+    "meaning": "An element preceding a sorted head precedes every member of that list.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.before_absent": {
+    "title": "Before absent",
+    "scope": "helper",
+    "meaning": "An element preceding a sorted head is absent from that list.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.sorted_unique": {
+    "title": "Sorted unique",
+    "scope": "helper",
+    "meaning": "Irreflexive strict ordering implies unique list members.",
+    "limits": "Generic comparator helper, not an independent SSA guarantee."
+  },
+  "SSA.ElementOrder.nat_strict_order": {
+    "title": "Construct the comparison harness ordering laws",
+    "scope": "helper",
+    "meaning": "Natural rank comparison constructively satisfies every StrictOrder premise used by the executable comparison.",
+    "limits": "This witnesses consistency and applicability for the rank domain; it does not prove the actual Go PathElement comparator implementation."
   }
 }

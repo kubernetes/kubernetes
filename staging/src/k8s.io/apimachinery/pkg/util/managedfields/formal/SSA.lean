@@ -45,3 +45,5 @@ import SSA.HandoffCounterexamples
 import SSA.ElementSource
 import SSA.ElementSubset
 import SSA.ElementDifference
+import SSA.ElementOrder
+import SSA.ElementAlgebra

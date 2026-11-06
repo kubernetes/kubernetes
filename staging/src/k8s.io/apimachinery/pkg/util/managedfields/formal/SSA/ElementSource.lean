@@ -30,4 +30,45 @@ def differenceProgram : List GoSubset.Stmt := [
   (.ret [(.var "out")])
 ]
 
+def unionProgram : List GoSubset.Stmt := [
+  (.assign ["out"] [(.emptyElementSet)]),
+  (.assign ["i", "j"] [(.number 0), (.number 0)]),
+  (.whileLoop (.andAlso (.less (.var "i") (.length (.select (.var "s") "members"))) (.less (.var "j") (.length (.select (.var "s2") "members")))) [
+  (.branchElse (.call (.index (.select (.var "s") "members") (.var "i")) "Less" [(.index (.select (.var "s2") "members") (.var "j"))]) [
+  (.fieldSet "out" "members" (.appendOne (.select (.var "out") "members") (.index (.select (.var "s") "members") (.var "i")))),
+  (.increment "i")
+] [
+  (.fieldSet "out" "members" (.appendOne (.select (.var "out") "members") (.index (.select (.var "s2") "members") (.var "j")))),
+  (.branch (.notFlag (.call (.index (.select (.var "s2") "members") (.var "j")) "Less" [(.index (.select (.var "s") "members") (.var "i"))])) [
+  (.increment "i")
+]),
+  (.increment "j")
+])
+]),
+  (.branch (.less (.var "i") (.length (.select (.var "s") "members"))) [
+  (.fieldSet "out" "members" (.concatenate (.select (.var "out") "members") (.sliceFrom (.select (.var "s") "members") (.var "i"))))
+]),
+  (.branch (.less (.var "j") (.length (.select (.var "s2") "members"))) [
+  (.fieldSet "out" "members" (.concatenate (.select (.var "out") "members") (.sliceFrom (.select (.var "s2") "members") (.var "j"))))
+]),
+  (.ret [(.var "out")])
+]
+
+def intersectionProgram : List GoSubset.Stmt := [
+  (.assign ["out"] [(.emptyElementSet)]),
+  (.assign ["i", "j"] [(.number 0), (.number 0)]),
+  (.whileLoop (.andAlso (.less (.var "i") (.length (.select (.var "s") "members"))) (.less (.var "j") (.length (.select (.var "s2") "members")))) [
+  (.branchElse (.call (.index (.select (.var "s") "members") (.var "i")) "Less" [(.index (.select (.var "s2") "members") (.var "j"))]) [
+  (.increment "i")
+] [
+  (.branch (.notFlag (.call (.index (.select (.var "s2") "members") (.var "j")) "Less" [(.index (.select (.var "s") "members") (.var "i"))])) [
+  (.fieldSet "out" "members" (.appendOne (.select (.var "out") "members") (.index (.select (.var "s") "members") (.var "i")))),
+  (.increment "i")
+]),
+  (.increment "j")
+])
+]),
+  (.ret [(.var "out")])
+]
+
 end SSA.ElementSource

@@ -87,42 +87,45 @@ PY
   printf 'The unchanged Lean theorems correctly rejected the %s Go source mutation.\n' "$mutation"
 done
 
-# The element-set proof must detect a changed comparison on the equal-key branch.
-probe="$formal_root/.lake/source-mutation/element-difference"
-mkdir -p "$probe/SSA"
-cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
-element_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/fieldpath)/element.go"
-python3 - "$element_source" "$probe/element.go" <<'PY'
+# Each element method must fail its shared proof when its equal-key guard is flipped.
+for method in Difference Union Intersection; do
+  probe="$formal_root/.lake/source-mutation/element-$method"
+  mkdir -p "$probe/SSA"
+  cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
+  element_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/fieldpath)/element.go"
+  python3 - "$element_source" "$probe/element.go" "$method" <<'PY_MUTATION'
 import sys
 from pathlib import Path
 
 source = Path(sys.argv[1]).read_text()
-start = source.index("func (s *PathElementSet) Difference(")
+method = sys.argv[3]
+start = source.index(f"func (s *PathElementSet) {method}(")
 end = source.index("\n}\n", start) + 2
 body = source[start:end]
 original = "if !s2.members[j].Less(s.members[i]) {"
 if body.count(original) != 1:
-    raise SystemExit("Cannot locate unique element-difference mutation; update verify-source.sh.")
+    raise SystemExit(f"Cannot locate unique element-{method} mutation; update verify-source.sh.")
 body = body.replace(original, "if s2.members[j].Less(s.members[i]) {")
 Path(sys.argv[2]).write_text(source[:start] + body + source[end:])
-PY
-go run ./cmd/ssa-source -elements -source "$probe/element.go" >"$probe/SSA/ElementSource.lean"
-cp SSA/ElementDifference.lean "$probe/SSA/ElementDifference.lean"
-for module in ElementSource ElementDifference; do
-  rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
+PY_MUTATION
+  go run ./cmd/ssa-source -elements -source "$probe/element.go" >"$probe/SSA/ElementSource.lean"
+  cp SSA/ElementAlgebra.lean "$probe/SSA/ElementAlgebra.lean"
+  for module in ElementSource ElementAlgebra; do
+    rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
+  done
+  (
+    cd "$probe"
+    export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
+    "$lean_binary" -DwarningAsError=true -o SSA/ElementSource.olean SSA/ElementSource.lean
+    if "$lean_binary" -DwarningAsError=true -o SSA/ElementAlgebra.olean SSA/ElementAlgebra.lean >ElementAlgebra.log 2>&1; then
+      printf 'Element-%s mutation unexpectedly satisfied the unchanged theorem.\n' "$method" >&2
+      exit 1
+    fi
+    if ! grep -Eq 'unsolved goals|Tactic.*failed' ElementAlgebra.log; then
+      cat ElementAlgebra.log >&2
+      printf 'Element-%s mutation failed for an unrelated reason.\n' "$method" >&2
+      exit 1
+    fi
+  )
+  printf 'The unchanged Lean theorems correctly rejected the element-%s Go source mutation.\n' "$method"
 done
-(
-  cd "$probe"
-  export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
-  "$lean_binary" -DwarningAsError=true -o SSA/ElementSource.olean SSA/ElementSource.lean
-  if "$lean_binary" -DwarningAsError=true -o SSA/ElementDifference.olean SSA/ElementDifference.lean >ElementDifference.log 2>&1; then
-    printf 'Element-difference mutation unexpectedly satisfied the unchanged theorem.\n' >&2
-    exit 1
-  fi
-  if ! grep -Eq 'unsolved goals|Tactic.*failed' ElementDifference.log; then
-    cat ElementDifference.log >&2
-    printf 'Element-difference mutation failed for an unrelated reason.\n' >&2
-    exit 1
-  fi
-)
-printf 'The unchanged Lean theorems correctly rejected the element-difference Go source mutation.\n'

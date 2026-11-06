@@ -24,7 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DECLARATION = re.compile(
-    r"^(?P<private>private )?(?P<kind>theorem|def|inductive|structure|abbrev)\s+(?P<name>[\w.]+)",
+    r"^(?:@\[[^\]\n]*\]\s*)*(?P<private>private )?(?P<kind>theorem|def|inductive|structure|abbrev)\s+(?P<name>[\w.]+)",
     re.MULTILINE,
 )
 ALLOWED_AXIOMS = {"propext", "Quot.sound", "Classical.choice"}
