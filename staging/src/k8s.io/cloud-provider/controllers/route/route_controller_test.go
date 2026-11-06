@@ -683,7 +683,7 @@ func TestProcessNextWorkItemRecordsRouteSync(t *testing.T) {
 
 			after, err := testutil.GetCounterMetricValue(counter)
 			require.NoError(t, err)
-			assert.Equal(t, 1.0, after-before, "route_sync_total{outcome=%q,trigger=%q} not incremented", testCase.expectedOutcome, testCase.key)
+			assert.InDelta(t, 1.0, after-before, 0.001, "route_sync_total{outcome=%q,trigger=%q} not incremented", testCase.expectedOutcome, testCase.key)
 
 			if testCase.expectRequeue {
 				require.Equal(t, 1, rc.workqueue.Len(), "failed reconcile must be requeued")
