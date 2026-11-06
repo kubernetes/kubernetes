@@ -329,11 +329,7 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 					},
 				}
 				otherPod.Status = v1.PodStatus{
-					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
-						{
-							ResourceClaimName: claimName,
-						},
-					},
+					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{},
 				}
 				ni.AddPod(otherPod)
 				return ni
@@ -671,13 +667,13 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 		claims                          []*resourceapi.ResourceClaim
 		resourceSlices                  []*draapi.ResourceSlice
 		nodeAllocatableClaimAllocations map[v1.ObjectReference]*resourceapi.AllocationResult
-		want                            []v1.NodeAllocatableResourceClaimStatus
+		want                            []v1.ExtraNodeAllocatableResource
 		wantErr                         bool
 	}{
 		{
 			name: "empty",
 			pod:  &v1.Pod{},
-			want: []v1.NodeAllocatableResourceClaimStatus{},
+			want: []v1.ExtraNodeAllocatableResource{},
 		},
 		{
 			name: "one container, one claim, per instance quantity",
@@ -694,15 +690,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "node-allocatable-claim", UID: "claim-uid"}: allocResult("pool1", "cpu0"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "node-allocatable-claim",
-
-				Containers: []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("1")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				},
+			},
 		},
 		{
 			name: "Pod with Standard and DRA CPU and Memory Request",
@@ -726,17 +724,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 					"dra.example.com/memory": resource.MustParse("8Gi"),
 				}),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "node-allocatable-claim",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("4")),
-				}, {
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("8Gi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("8Gi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("8Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("8Gi")},
+				},
+			},
 		},
 		{
 			name: "Fungible GPU/CPU claim - GPU selected",
@@ -754,7 +752,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "fungible-claim", UID: "claim-uid"}: allocResult("pool1", "gpu0"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{},
+			want: []v1.ExtraNodeAllocatableResource{},
 		},
 		{
 			name: "Fungible GPU/CPU claim - CPU selected",
@@ -774,14 +772,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 					"dra.example.com/cpu": resource.MustParse("30"),
 				}),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "fungible-claim",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("30")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("30")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("30")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("30")},
+				},
+			},
 		},
 		{
 			name: "Combined CPU request and Auxiliary Request",
@@ -808,24 +809,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 				}),
 				{Name: "gpu-claim", UID: "gpu-claim-uid"}: allocResult("pool1", "gpu0"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "cpu-claim",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("10")),
-				}},
-			}, {
-				ResourceClaimName: "gpu-claim",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("2")),
-				}, {
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("4Gi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("12"), v1.ResourceMemory: resource.MustParse("4Gi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("12"), v1.ResourceMemory: resource.MustParse("4Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("12"), v1.ResourceMemory: resource.MustParse("4Gi")},
+				},
+			},
 		},
 		{
 			name: "Pod Level Resources with shared CPU claim and sidecar containers",
@@ -850,14 +844,21 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 					"dra.example.com/cpu": resource.MustParse("10"),
 				}),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "cpu-claim",
-				Containers:        []string{"c1", "c2"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("10")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+				},
+				{
+					ContainerName: "c2",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+				},
+			},
 		},
 		{
 			name: "Multiple Claims per Container",
@@ -883,21 +884,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 					"dra.example.com/memory": resource.MustParse("8Gi"),
 				}),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("4")),
-				}},
-			}, {
-				ResourceClaimName: "claim2",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("8Gi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("8Gi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("8Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("8Gi")},
+				},
+			},
 		},
 		{
 			name: "Unreferenced Claims",
@@ -911,14 +908,13 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 					"dra.example.com/cpu": resource.MustParse("4"),
 				}),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "unref-claim",
-				Containers:        []string{},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("4")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+				},
+			},
 		},
 		{
 			name: "Unreferenced Claims with Overhead",
@@ -942,16 +938,13 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "unref-claim",
-				Containers:        []string{},
-				Mapping:           []v1.NodeAllocatableMappedResources{},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerPod:       new(resource.MustParse("1Gi")),
-					PerContainer: new(resource.MustParse("500Mi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
 		},
 		{
 			name: "Unreferenced Claims with Overhead Per Container Only",
@@ -974,15 +967,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "unref-claim", UID: "unref-claim-uid"}: allocResult("pool1", "device1"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "unref-claim",
-				Containers:        []string{},
-				Mapping:           []v1.NodeAllocatableMappedResources{},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerContainer: new(resource.MustParse("500Mi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{},
 		},
 		{
 			name: "Combined Capacity and PerAllocatedUnitQuantity",
@@ -1009,14 +994,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1", map[resourceapi.QualifiedName]resource.Quantity{"dra.example.com/cores": resource.MustParse("4")}),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("8")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+				},
+			},
 		},
 		{
 			name:           "Capacity Key Missing in Allocation - Should be Ignored",
@@ -1026,7 +1014,7 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "cpu0", map[resourceapi.QualifiedName]resource.Quantity{"dra.example.com/wrong": resource.MustParse("4")}),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{},
+			want: []v1.ExtraNodeAllocatableResource{},
 		},
 		{
 			name: "Overhead Mappings",
@@ -1053,16 +1041,18 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping:           []v1.NodeAllocatableMappedResources{},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerPod:       new(resource.MustParse("1Gi")),
-					PerContainer: new(resource.MustParse("500Mi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1524Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1524Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1524Mi")},
+				},
+			},
 		},
 		{
 			name: "Overhead Mappings - Only PerPod",
@@ -1088,15 +1078,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping:           []v1.NodeAllocatableMappedResources{},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:   v1.ResourceMemory,
-					PerPod: new(resource.MustParse("1Gi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
 		},
 		{
 			name: "Overhead Mappings - Only PerContainer",
@@ -1122,15 +1114,18 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping:           []v1.NodeAllocatableMappedResources{},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerContainer: new(resource.MustParse("500Mi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+				},
+			},
 		},
 		{
 			name: "Overhead Mappings - Multiple Containers",
@@ -1163,16 +1158,23 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1", "c2"},
-				Mapping:           []v1.NodeAllocatableMappedResources{},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerPod:       new(resource.MustParse("1Gi")),
-					PerContainer: new(resource.MustParse("500Mi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2024Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2024Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1524Mi")},
+				},
+				{
+					ContainerName: "c2",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1524Mi")},
+				},
+			},
 		},
 		{
 			name: "Combined direct mapped and overhead mappings for the same resource",
@@ -1202,19 +1204,18 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "device1"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("2Gi")),
-				}},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerPod:       new(resource.MustParse("1Gi")),
-					PerContainer: new(resource.MustParse("500Mi")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("3572Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("3572Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("3572Mi")},
+				},
+			},
 		},
 		{
 			name: "device with both mapped and overhead",
@@ -1229,19 +1230,18 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
 				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "combined-device"),
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("2")),
-				}},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceCPU,
-					PerPod:       new(resource.MustParse("1")),
-					PerContainer: new(resource.MustParse("500m")),
-				}},
-			}},
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("3500m")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3500m")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3500m")},
+				},
+			},
 		},
 		{
 			name: "Driver name collision with same pool and device name",
@@ -1303,15 +1303,18 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 					},
 				},
 			},
-			want: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "claim1",
-				Containers:        []string{"c1"},
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name: v1.ResourceCPU,
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
 					// Extract quantity correctly from "driver-b.example.com",
-					Quantity: new(resource.MustParse("8")),
-				}},
-			}},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")},
+				},
+			},
 		},
 		{
 			name:           "Invalid -  Device Not Found",
@@ -1359,18 +1362,6 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			if err != nil {
 				return
 			}
-			normalizeSlices := func(claimStatuses []v1.NodeAllocatableResourceClaimStatus) {
-				for i := range claimStatuses {
-					if claimStatuses[i].Mapping == nil {
-						claimStatuses[i].Mapping = []v1.NodeAllocatableMappedResources{}
-					}
-					if claimStatuses[i].Overhead == nil {
-						claimStatuses[i].Overhead = []v1.NodeAllocatableOverheadResources{}
-					}
-				}
-			}
-			normalizeSlices(got)
-			normalizeSlices(tt.want)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf(`buildNodeAllocatableDRAInfo() diff (-want +got):
 %s`, diff)
@@ -1382,21 +1373,22 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 func TestExtractPodNodeAllocatableResourceClaimStatus(t *testing.T) {
 	logger := klog.TODO()
 	nodeName := "node-a"
-	original := []v1.NodeAllocatableResourceClaimStatus{
+	original := []v1.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: specialClaimInMemName,
-			Containers:        []string{"c1"},
-			Mapping: []v1.NodeAllocatableMappedResources{{
-				Name:     v1.ResourceCPU,
-				Quantity: new(resource.MustParse("1")),
-			}},
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+		},
+		{
+			ContainerName: "c1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 		},
 	}
 
 	t.Run("no cycle state", func(t *testing.T) {
-		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, framework.NewCycleState(), nodeName)
+		got := ExtractPodExtraNodeAllocatableResources(logger, framework.NewCycleState(), nodeName)
 		if got != nil {
-			t.Errorf("ExtractPodNodeAllocatableResourceClaimStatus() = %v, want nil", got)
+			t.Errorf("ExtractPodExtraNodeAllocatableResources() = %v, want nil", got)
 		}
 	})
 
@@ -1404,12 +1396,12 @@ func TestExtractPodNodeAllocatableResourceClaimStatus(t *testing.T) {
 		state := framework.NewCycleState()
 		state.Write(stateKey, &stateData{
 			nodeAllocations: map[string]nodeAllocation{
-				nodeName: {nodeAllocatableResourceClaimStatuses: cloneNodeAllocatableResourceClaimStatuses(original)},
+				nodeName: {extraNodeAllocatableResources: cloneExtraNodeAllocatableResources(original)},
 			},
 		})
-		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, state, "other-node")
+		got := ExtractPodExtraNodeAllocatableResources(logger, state, "other-node")
 		if got != nil {
-			t.Errorf("ExtractPodNodeAllocatableResourceClaimStatus() = %v, want nil", got)
+			t.Errorf("ExtractPodExtraNodeAllocatableResources() = %v, want nil", got)
 		}
 	})
 
@@ -1417,23 +1409,23 @@ func TestExtractPodNodeAllocatableResourceClaimStatus(t *testing.T) {
 		state := framework.NewCycleState()
 		draState := &stateData{
 			nodeAllocations: map[string]nodeAllocation{
-				nodeName: {nodeAllocatableResourceClaimStatuses: cloneNodeAllocatableResourceClaimStatuses(original)},
+				nodeName: {extraNodeAllocatableResources: cloneExtraNodeAllocatableResources(original)},
 			},
 		}
 		state.Write(stateKey, draState)
 
-		got := ExtractPodNodeAllocatableResourceClaimStatus(logger, state, nodeName)
+		got := ExtractPodExtraNodeAllocatableResources(logger, state, nodeName)
 		if diff := cmp.Diff(original, got); diff != "" {
-			t.Errorf("ExtractPodNodeAllocatableResourceClaimStatus() diff (-want +got):\n%s", diff)
+			t.Errorf("ExtractPodExtraNodeAllocatableResources() diff (-want +got):\n%s", diff)
 		}
 		if len(got) == 0 {
-			t.Fatal("ExtractPodNodeAllocatableResourceClaimStatus() returned empty status")
+			t.Fatal("ExtractPodExtraNodeAllocatableResources() returned empty status")
 		}
 
-		got[0].ResourceClaimName = "mutated-by-caller"
-		got[0].Mapping[0].Quantity.Add(resource.MustParse("1"))
+		got[0].ContainerName = "mutated-by-caller"
+		got[0].Requests[v1.ResourceCPU] = resource.MustParse("2")
 
-		inState := draState.nodeAllocations[nodeName].nodeAllocatableResourceClaimStatuses
+		inState := draState.nodeAllocations[nodeName].extraNodeAllocatableResources
 		if diff := cmp.Diff(original, inState); diff != "" {
 			t.Errorf("mutating extracted status changed cycle state (-want +got):\n%s", diff)
 		}
@@ -1442,30 +1434,14 @@ func TestExtractPodNodeAllocatableResourceClaimStatus(t *testing.T) {
 
 func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
-	placeholderStatus := []v1.NodeAllocatableResourceClaimStatus{
-		{
-			ResourceClaimName: specialClaimInMemName,
-			Containers:        []string{"c1"},
-			Mapping: []v1.NodeAllocatableMappedResources{{
-				Name:     v1.ResourceCPU,
-				Quantity: new(resource.MustParse("1")),
-			}},
-		},
-	}
-	realClaim := &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "real-claim-name"}}
 
 	tests := []struct {
-		name                               string
-		assumedPodStatus                   v1.PodStatus
-		finalPodNodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus
-		extendedClaim                      *resourceapi.ResourceClaim
-		wantPatch                          bool
-		wantClaimNameInPatch               string
-		wantClaimNameNotInPatch            string
-		wantAssumedClaimName               string
-		wantComputedClaimName              string
-		setPatchError                      error
-		wantStatus                         *fwk.Status
+		name                                  string
+		assumedPodStatus                      v1.PodStatus
+		finalPodExtraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
+		wantPatch                             bool
+		setPatchError                         error
+		wantStatus                            *fwk.Status
 	}{
 		{
 			name:       "no node allocatable resource claims for this pod",
@@ -1475,25 +1451,27 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 		{
 			name: "assumed pod status same as new status",
 			assumedPodStatus: v1.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim1",
-						Containers:        []string{"c1"},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(resource.MustParse("1")),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 					},
 				},
 			},
-			finalPodNodeAllocatableClaimStatus: []v1.NodeAllocatableResourceClaimStatus{
+			finalPodExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "claim1",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{{
-						Name:     v1.ResourceCPU,
-						Quantity: new(resource.MustParse("1")),
-					}},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 				},
 			},
 			wantPatch:  true,
@@ -1502,25 +1480,27 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 		{
 			name: "assumed pod status different from new status",
 			assumedPodStatus: v1.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim1",
-						Containers:        []string{"c1"},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(resource.MustParse("1")),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 					},
 				},
 			},
-			finalPodNodeAllocatableClaimStatus: []v1.NodeAllocatableResourceClaimStatus{
+			finalPodExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "claim1",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{{
-						Name:     v1.ResourceCPU,
-						Quantity: new(resource.MustParse("2")),
-					}},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
 				},
 			},
 			wantPatch:  false,
@@ -1529,61 +1509,32 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 		{
 			name: "pod status patch error",
 			assumedPodStatus: v1.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim1",
-						Containers:        []string{"c1"},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(resource.MustParse("1")),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 					},
 				},
 			},
-			finalPodNodeAllocatableClaimStatus: []v1.NodeAllocatableResourceClaimStatus{
+			finalPodExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "claim1",
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{{
-						Name:     v1.ResourceCPU,
-						Quantity: new(resource.MustParse("1")),
-					}},
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+				},
+				{
+					ContainerName: "c1",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 				},
 			},
 			wantPatch:     true,
 			setPatchError: errors.New("inject patch error"),
-			wantStatus:    statusError(klog.TODO(), fmt.Errorf("updating pod test-ns/test-pod NodeAllocatableResourceClaimStatuses: %w", errors.New("inject patch error"))),
-		},
-		{
-			name:                               "placeholder rewritten after DeepEqual, assumed pod unchanged",
-			assumedPodStatus:                   v1.PodStatus{NodeAllocatableResourceClaimStatuses: placeholderStatus},
-			finalPodNodeAllocatableClaimStatus: cloneNodeAllocatableResourceClaimStatuses(placeholderStatus),
-			extendedClaim:                      realClaim,
-			wantPatch:                          true,
-			wantClaimNameInPatch:               "real-claim-name",
-			wantClaimNameNotInPatch:            specialClaimInMemName,
-			wantAssumedClaimName:               specialClaimInMemName,
-			wantComputedClaimName:              "real-claim-name",
-			wantStatus:                         nil,
-		},
-		{
-			name:             "mismatch still fails when a real extended claim exists",
-			assumedPodStatus: v1.PodStatus{NodeAllocatableResourceClaimStatuses: placeholderStatus},
-			finalPodNodeAllocatableClaimStatus: []v1.NodeAllocatableResourceClaimStatus{
-				{
-					ResourceClaimName: specialClaimInMemName,
-					Containers:        []string{"c1"},
-					Mapping: []v1.NodeAllocatableMappedResources{{
-						Name:     v1.ResourceCPU,
-						Quantity: new(resource.MustParse("2")),
-					}},
-				},
-			},
-			extendedClaim:         realClaim,
-			wantPatch:             false,
-			wantAssumedClaimName:  specialClaimInMemName,
-			wantComputedClaimName: specialClaimInMemName,
-			wantStatus:            statusError(klog.TODO(), errors.New("assumed pod status does not match calculated status to be patched")),
+			wantStatus:    statusError(klog.TODO(), fmt.Errorf("updating pod test-ns/test-pod ExtraNodeAllocatableResources: %w", errors.New("inject patch error"))),
 		},
 	}
 
@@ -1604,50 +1555,30 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 					return true, nil, tt.setPatchError
 				})
 			}
-			status := pl.patchNodeAllocatableResourceClaimStatus(ctx, podToUpdate, tt.finalPodNodeAllocatableClaimStatus, tt.extendedClaim)
+			status := pl.patchExtraNodeAllocatableResources(ctx, podToUpdate, tt.finalPodExtraNodeAllocatableResources)
 
 			if tt.wantStatus != nil && status != nil {
 				if tt.wantStatus.Code() != status.Code() {
-					t.Errorf("patchNodeAllocatableResourceClaimStatus() status code = %v, want %v", status.Code(), tt.wantStatus.Code())
+					t.Errorf("patchExtraNodeAllocatableResources() status code = %v, want %v", status.Code(), tt.wantStatus.Code())
 				}
 				if tt.wantStatus.AsError().Error() != status.AsError().Error() {
-					t.Errorf("patchNodeAllocatableResourceClaimStatus() status error = %v, want %v", status.AsError().Error(), tt.wantStatus.AsError().Error())
+					t.Errorf("patchExtraNodeAllocatableResources() status error = %v, want %v", status.AsError().Error(), tt.wantStatus.AsError().Error())
 				}
 			} else if tt.wantStatus != status {
-				t.Errorf("patchNodeAllocatableResourceClaimStatus() status = %v, want %v", status, tt.wantStatus)
+				t.Errorf("patchExtraNodeAllocatableResources() status = %v, want %v", status, tt.wantStatus)
 			}
 
 			actions := fakeClient.Actions()
 			gotPatch := false
-			var patchBody string
 			for _, action := range actions {
 				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
 					gotPatch = true
-					patchBody = string(action.(clienttesting.PatchAction).GetPatch())
 					break
 				}
 			}
 
 			if gotPatch != tt.wantPatch {
-				t.Errorf("patchNodeAllocatableResourceClaimStatus() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
-			}
-			if tt.wantClaimNameInPatch != "" && !strings.Contains(patchBody, tt.wantClaimNameInPatch) {
-				t.Errorf("patch %s does not contain claim name %q", patchBody, tt.wantClaimNameInPatch)
-			}
-			if tt.wantClaimNameNotInPatch != "" && strings.Contains(patchBody, tt.wantClaimNameNotInPatch) {
-				t.Errorf("patch %s still contains claim name %q", patchBody, tt.wantClaimNameNotInPatch)
-			}
-			if tt.wantAssumedClaimName != "" {
-				got := podToUpdate.Status.NodeAllocatableResourceClaimStatuses[0].ResourceClaimName
-				if got != tt.wantAssumedClaimName {
-					t.Errorf("assumed pod ResourceClaimName = %q, want %q", got, tt.wantAssumedClaimName)
-				}
-			}
-			if tt.wantComputedClaimName != "" {
-				got := tt.finalPodNodeAllocatableClaimStatus[0].ResourceClaimName
-				if got != tt.wantComputedClaimName {
-					t.Errorf("computed status ResourceClaimName = %q, want %q", got, tt.wantComputedClaimName)
-				}
+				t.Errorf("patchExtraNodeAllocatableResources() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
 			}
 		})
 	}
@@ -1669,14 +1600,15 @@ func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 		{
 			name: "status cleared",
 			initialPodStatus: v1.PodStatus{
-				NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 					{
-						ResourceClaimName: "claim1",
-						Containers:        []string{"c1"},
-						Mapping: []v1.NodeAllocatableMappedResources{{
-							Name:     v1.ResourceCPU,
-							Quantity: new(resource.MustParse("1")),
-						}},
+						ContainerName: "",
+						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+					{
+						ContainerName: "c1",
+						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 					},
 				},
 			},
@@ -1697,7 +1629,7 @@ func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 				fts:       feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate),
 			}
 
-			pl.clearNodeAllocatableResourceClaimStatus(ctx, podToUpdate)
+			pl.clearExtraNodeAllocatableResources(ctx, podToUpdate)
 
 			actions := fakeClient.Actions()
 			gotPatch := false
@@ -1708,7 +1640,7 @@ func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 					if patchAction.GetPatchType() != types.MergePatchType {
 						t.Errorf("patch type = %q, want %q", patchAction.GetPatchType(), types.MergePatchType)
 					}
-					wantPatch := `{"metadata":{"uid":"pod-uid"},"status":{"nodeAllocatableResourceClaimStatuses":[]}}`
+					wantPatch := `{"metadata":{"uid":"pod-uid"},"status":{"extraNodeAllocatableResources":[]}}`
 					if diff := cmp.Diff(wantPatch, string(patchAction.GetPatch())); diff != "" {
 						t.Errorf("clear patch mismatch (-want +got):\n%s", diff)
 					}
@@ -1717,7 +1649,7 @@ func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 			}
 
 			if gotPatch != tt.wantPatch {
-				t.Errorf("clearNodeAllocatableResourceClaimStatus() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+				t.Errorf("clearExtraNodeAllocatableResources() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
 			}
 		})
 	}
@@ -1894,9 +1826,9 @@ func TestNodeFitsNativeResources(t *testing.T) {
 
 func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 	tests := []struct {
-		name                  string
-		pod                   *v1.Pod
-		nodeAllocatableStatus []v1.NodeAllocatableResourceClaimStatus
+		name                          string
+		pod                           *v1.Pod
+		extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
 
 		wantStatusCode   fwk.Code
 		wantErrorMessage string
@@ -1914,16 +1846,13 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("500m")),
-				}, {
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("512Mi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("512Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("512Mi")},
+				},
+			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1945,16 +1874,13 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("500m")),
-				}, {
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("512Mi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("512Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("512Mi")},
+				},
+			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -1976,16 +1902,13 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("300m")),
-				}, {
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("512Mi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("512Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m"), v1.ResourceMemory: resource.MustParse("512Mi")},
+				},
+			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level request for cpu is insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -2008,16 +1931,13 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("100m")),
-				}, {
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("100Mi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("100Mi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m"), v1.ResourceMemory: resource.MustParse("100Mi")},
+				},
+			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -2049,16 +1969,13 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				},
 			},
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Mapping: []v1.NodeAllocatableMappedResources{{
-					Name:     v1.ResourceCPU,
-					Quantity: new(resource.MustParse("1")),
-				}, {
-					Name:     v1.ResourceMemory,
-					Quantity: new(resource.MustParse("1Gi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -2081,15 +1998,18 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Containers:        []string{"c1"},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerPod:       new(resource.MustParse("1Gi")),
-					PerContainer: new(resource.MustParse("1Gi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				},
+			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -2112,15 +2032,18 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Containers:        []string{"c1"},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerPod:       new(resource.MustParse("1Gi")),
-					PerContainer: new(resource.MustParse("1Gi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				},
+			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level request for memory is insufficient to cover the aggregated container and node-allocatable DRA requests",
 		},
@@ -2142,14 +2065,18 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Containers:        []string{"c1"},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerContainer: new(resource.MustParse("512Mi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+				},
+			},
 			wantStatusCode: fwk.Success,
 		},
 		{
@@ -2170,14 +2097,18 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 					},
 				}}).
 				Obj(),
-			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
-				ResourceClaimName: "dra-claim",
-				Containers:        []string{"c1"},
-				Overhead: []v1.NodeAllocatableOverheadResources{{
-					Name:         v1.ResourceMemory,
-					PerContainer: new(resource.MustParse("1Gi")),
-				}},
-			}},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
 			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
 			wantErrorMessage: "pod level limit for memory is insufficient to cover the limit and DRA overhead for container c1",
 		},
@@ -2217,7 +2148,7 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 			pl := &DynamicResources{
 				fts: feature.Features{EnablePodLevelResources: true},
 			}
-			tt.pod.Status.NodeAllocatableResourceClaimStatuses = tt.nodeAllocatableStatus
+			tt.pod.Status.ExtraNodeAllocatableResources = tt.extraNodeAllocatableResources
 			gotStatus := pl.validatePodLevelResourcesCoverDRA(tt.pod)
 			if diff := cmp.Diff(tt.wantStatusCode, gotStatus.Code()); diff != "" {
 				t.Errorf("validatePodLevelResourcesCoverDRA() returned diff (-want +got):\n%s", diff)
@@ -2311,71 +2242,6 @@ func TestFilterSlicesForNode(t *testing.T) {
 
 			if diff := cmp.Diff(tt.wantNames, gotNames); diff != "" {
 				t.Errorf("filterSlicesForNode() diff (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestReplaceSpecialClaimNameInStatus(t *testing.T) {
-	claim := func(name string) *resourceapi.ResourceClaim {
-		return &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	}
-
-	tests := []struct {
-		name          string
-		extendedClaim *resourceapi.ResourceClaim
-		statuses      []v1.NodeAllocatableResourceClaimStatus
-		want          []v1.NodeAllocatableResourceClaimStatus
-	}{
-		{
-			name:          "placeholder replaced with real claim name",
-			extendedClaim: claim("real-claim-name"),
-			statuses: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: specialClaimInMemName},
-			},
-			want: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: "real-claim-name"},
-			},
-		},
-		{
-			name:          "only placeholder entries are rewritten",
-			extendedClaim: claim("real-claim-name"),
-			statuses: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: "user-claim"},
-				{ResourceClaimName: specialClaimInMemName},
-			},
-			want: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: "user-claim"},
-				{ResourceClaimName: "real-claim-name"},
-			},
-		},
-		{
-			name:          "nil extended claim is a no-op",
-			extendedClaim: nil,
-			statuses: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: specialClaimInMemName},
-			},
-			want: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: specialClaimInMemName},
-			},
-		},
-		{
-			name:          "claim not yet created in API server is a no-op",
-			extendedClaim: claim(specialClaimInMemName),
-			statuses: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: specialClaimInMemName},
-			},
-			want: []v1.NodeAllocatableResourceClaimStatus{
-				{ResourceClaimName: specialClaimInMemName},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			replaceSpecialClaimNameInStatus(tt.extendedClaim, tt.statuses)
-			if diff := cmp.Diff(tt.want, tt.statuses); diff != "" {
-				t.Errorf("replaceSpecialClaimNameInStatus() diff (-want +got):\n%s", diff)
 			}
 		})
 	}

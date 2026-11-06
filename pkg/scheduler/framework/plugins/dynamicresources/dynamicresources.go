@@ -1678,7 +1678,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	if pl.fts.EnableDRANodeAllocatableResources {
 		nodeAllocations, ok := state.nodeAllocations[nodeName]
 		if ok && len(nodeAllocations.extraNodeAllocatableResources) > 0 {
-			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, nodeAllocations.extraNodeAllocatableResources, state.claims.extendedResourceClaim()); status != nil {
+			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, nodeAllocations.extraNodeAllocatableResources); status != nil {
 				return status
 			}
 		}

@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
@@ -41,14 +41,13 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-// ExtractPodNodeAllocatableResourceClaimStatus returns a copy of the node-allocatable
+// ExtractPodExtraNodeAllocatableResources returns a copy of the node-allocatable
 // claim status stored in state for the given node.
 //
 // A copy is required because assume() assigns the result onto the cached pod.
-// Sharing the cycle-state slice would make later in-place updates (replacing the
-// extended-resource placeholder claim name) silently mutate the scheduler cache
-// and would make the DeepEqual check in patchNodeAllocatableResourceClaimStatus a no-op.
-func ExtractPodNodeAllocatableResourceClaimStatus(logger klog.Logger, state fwk.CycleState, nodeName string) []v1.NodeAllocatableResourceClaimStatus {
+// Sharing the cycle-state slice would make later in-place updates silently mutate the scheduler cache
+// and would make the DeepEqual check in patchExtraNodeAllocatableResources a no-op.
+func ExtractPodExtraNodeAllocatableResources(logger klog.Logger, state fwk.CycleState, nodeName string) []v1.ExtraNodeAllocatableResource {
 	s, err := state.Read(names.DynamicResources)
 	if err != nil {
 		// DynamicResources plugin didn't run or no state
@@ -62,17 +61,17 @@ func ExtractPodNodeAllocatableResourceClaimStatus(logger klog.Logger, state fwk.
 	}
 
 	if nodeAlloc, exists := draState.nodeAllocations[nodeName]; exists {
-		return cloneNodeAllocatableResourceClaimStatuses(nodeAlloc.nodeAllocatableResourceClaimStatuses)
+		return cloneExtraNodeAllocatableResources(nodeAlloc.extraNodeAllocatableResources)
 	}
 
 	return nil
 }
 
-func cloneNodeAllocatableResourceClaimStatuses(in []v1.NodeAllocatableResourceClaimStatus) []v1.NodeAllocatableResourceClaimStatus {
+func cloneExtraNodeAllocatableResources(in []v1.ExtraNodeAllocatableResource) []v1.ExtraNodeAllocatableResource {
 	if in == nil {
 		return nil
 	}
-	out := make([]v1.NodeAllocatableResourceClaimStatus, len(in))
+	out := make([]v1.ExtraNodeAllocatableResource, len(in))
 	for i := range in {
 		in[i].DeepCopyInto(&out[i])
 	}
@@ -82,7 +81,7 @@ func cloneNodeAllocatableResourceClaimStatuses(in []v1.NodeAllocatableResourceCl
 // calculateAndCheckNodeAllocatableResources calculates the total node-allocatable resources (e.g., CPU, memory)
 // requested by a pod, considering both its standard container requests and any additional resources
 // derived from its DRA claims. It then checks if this aggregated demand fits within the node's remaining allocatable capacity.
-func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx context.Context, state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocations map[types.UID]*resourceapi.AllocationResult) ([]v1.NodeAllocatableResourceClaimStatus, *fwk.Status) {
+func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx context.Context, state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocations map[types.UID]*resourceapi.AllocationResult) ([]v1.ExtraNodeAllocatableResource, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
 	nodeAllocatableClaims := []*resourceapi.ResourceClaim{}
@@ -119,7 +118,7 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 		return nil, nil // No nodeAllocatable resources to check
 	}
 
-	totalPodDemand, nodeAllocatableClaimStatus, status := pl.getPodNodeAllocatableResourceFootprint(logger, pod, allocations, nodeAllocatableClaims, nodeSlices, nodeInfo.Node())
+	totalPodDemand, extraNodeAllocatableResources, status := pl.getPodNodeAllocatableResourceFootprint(logger, pod, allocations, nodeAllocatableClaims, nodeSlices, nodeInfo.Node())
 	if status != nil {
 		logger.V(5).Info("calculateAndCheckNodeAllocatableResources: getPodNodeAllocatableResourceFootprint failed", "status", status)
 		return nil, status
@@ -129,7 +128,7 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 		return nil, status
 	}
 	logger.V(5).Info("Pod fits on node ( including DRA Node Allocatable Resources)", "pod", klog.KObj(pod), "node", nodeInfo.Node().Name)
-	return nodeAllocatableClaimStatus, nil
+	return extraNodeAllocatableResources, nil
 }
 
 func getDeviceFromManager(draManager fwk.SharedDRAManager, result *resourceapi.DeviceRequestAllocationResult) (*draapi.Device, error) {
@@ -258,7 +257,7 @@ func addDeviceMapping(
 func addDeviceOverhead(
 	resourceName v1.ResourceName,
 	newOverhead *resourceapi.NodeAllocatableOverhead,
-	totalResources map[v1.ResourceName]v1.NodeAllocatableOverheadResources,
+	totalResources map[v1.ResourceName]resourceapi.NodeAllocatableOverhead,
 ) {
 	if newOverhead.PerPod == nil && newOverhead.PerContainer == nil {
 		return
@@ -266,7 +265,7 @@ func addDeviceOverhead(
 
 	current, exists := totalResources[resourceName]
 	if !exists {
-		current = v1.NodeAllocatableOverheadResources{Name: resourceName}
+		current = resourceapi.NodeAllocatableOverhead{}
 	}
 
 	if newOverhead.PerPod != nil {
@@ -289,17 +288,30 @@ func addDeviceOverhead(
 	totalResources[resourceName] = current
 }
 
-// buildNodeAllocatableDRAInfo processes the node allocatable resource allocations for a pod.
-// It translates the allocated devices and quantities from DRA claims into a list of v1.NodeAllocatableResourceClaimStatus.
-func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocatableClaimAllocations map[v1.ObjectReference]*resourceapi.AllocationResult, claimNametoUID map[string]types.UID, slices []*draapi.ResourceSlice, node *v1.Node) ([]v1.NodeAllocatableResourceClaimStatus, error) {
-	if len(nodeAllocatableClaimAllocations) == 0 {
-		return []v1.NodeAllocatableResourceClaimStatus{}, nil
+// addResourceList adds the quantities in newList to list.
+func addResourceList(list, newList v1.ResourceList) {
+	for name, quantity := range newList {
+		q := list[name]
+		q.Add(quantity)
+		list[name] = q
 	}
-	claimToStatus := make(map[types.UID]v1.NodeAllocatableResourceClaimStatus)
+}
+
+// buildNodeAllocatableDRAInfo processes the node allocatable resource allocations for a pod.
+// It translates the allocated devices and quantities from DRA claims into a list of ExtraNodeAllocatableResource
+func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocatableClaimAllocations map[v1.ObjectReference]*resourceapi.AllocationResult, claimNametoUID map[string]types.UID, slices []*draapi.ResourceSlice, node *v1.Node) ([]v1.ExtraNodeAllocatableResource, error) {
+	if len(nodeAllocatableClaimAllocations) == 0 {
+		return []v1.ExtraNodeAllocatableResource{}, nil
+	}
+	// The pod contribution of a claim is its mapping and perPod overhead, which the pod uses once.
+	// The perContainer contribution is its perContainer overhead, which each container that references
+	// the claim uses.
+	claimPodContribution := make(map[types.UID]v1.ResourceList)
+	claimPerContainerContribution := make(map[types.UID]v1.ResourceList)
 
 	for key, alloc := range nodeAllocatableClaimAllocations {
 		totalDirectMappedResourcesPerClaim := make(map[v1.ResourceName]resource.Quantity)
-		totalOverheadResourcesPerClaim := make(map[v1.ResourceName]v1.NodeAllocatableOverheadResources)
+		totalOverheadResourcesPerClaim := make(map[v1.ResourceName]resourceapi.NodeAllocatableOverhead)
 
 		for _, result := range alloc.Devices.Results {
 			device, err := getDeviceFromSlices(slices, &result, node)
@@ -322,57 +334,59 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 			}
 		}
 
-		if len(totalDirectMappedResourcesPerClaim) > 0 || len(totalOverheadResourcesPerClaim) > 0 {
-			status := v1.NodeAllocatableResourceClaimStatus{
-				ResourceClaimName: key.Name,
-				Containers:        []string{},
-				Mapping:           []v1.NodeAllocatableMappedResources{},
-				Overhead:          []v1.NodeAllocatableOverheadResources{},
+		podContribution := v1.ResourceList{}
+		addResourceList(podContribution, totalDirectMappedResourcesPerClaim)
+		perContainerContribution := v1.ResourceList{}
+		for name, overhead := range totalOverheadResourcesPerClaim {
+			if overhead.PerPod != nil {
+				addResourceList(podContribution, v1.ResourceList{name: *overhead.PerPod})
 			}
-
-			for name, quantity := range totalDirectMappedResourcesPerClaim {
-				q := quantity.DeepCopy()
-				status.Mapping = append(status.Mapping, v1.NodeAllocatableMappedResources{
-					Name:     name,
-					Quantity: &q,
-				})
+			if overhead.PerContainer != nil {
+				addResourceList(perContainerContribution, v1.ResourceList{name: *overhead.PerContainer})
 			}
-			for _, overhead := range totalOverheadResourcesPerClaim {
-				status.Overhead = append(status.Overhead, overhead)
-			}
-
-			sort.Slice(status.Mapping, func(i, j int) bool {
-				return status.Mapping[i].Name < status.Mapping[j].Name
-			})
-			sort.Slice(status.Overhead, func(i, j int) bool {
-				return status.Overhead[i].Name < status.Overhead[j].Name
-			})
-			claimToStatus[key.UID] = status
 		}
+		claimPodContribution[key.UID] = podContribution
+		claimPerContainerContribution[key.UID] = perContainerContribution
 	}
 
+	var containerEntries []v1.ExtraNodeAllocatableResource
+	containerRequests := make(map[string]v1.ResourceList)
 	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		requests := v1.ResourceList{}
+		limits := v1.ResourceList{}
+		// A container can reference a claim more than once, for different requests in the claim.
+		claimUIDs := sets.New[types.UID]()
 		for _, podClaim := range container.Resources.Claims {
-			if claimUID, ok := claimNametoUID[podClaim.Name]; ok {
-				if nodeAllocatableClaimStatus, ok := claimToStatus[claimUID]; ok {
-					nodeAllocatableClaimStatus.Containers = append(nodeAllocatableClaimStatus.Containers, container.Name)
-					claimToStatus[claimUID] = nodeAllocatableClaimStatus
-				}
+			if claimUID, ok := claimNametoUID[podClaim.Name]; ok && !claimUIDs.Has(claimUID) {
+				claimUIDs.Insert(claimUID)
+				addResourceList(requests, claimPerContainerContribution[claimUID])
+				addResourceList(limits, claimPerContainerContribution[claimUID])
+				// The container has access to the pod resources, so we bump up the limits.
+				// It is not in the requests, because we cannot count the pod entry once per each container referencing the claim.
+				addResourceList(limits, claimPodContribution[claimUID])
 			}
 		}
+		if len(limits) > 0 {
+			entry := v1.ExtraNodeAllocatableResource{ContainerName: container.Name, Limits: limits}
+			if len(requests) > 0 {
+				entry.Requests = requests
+			}
+			containerEntries = append(containerEntries, entry)
+		}
+		containerRequests[container.Name] = requests
+	}
+	// The pod entry has the pod contribution of each claim once, plus the container's requests
+	// with init containers at their peak.
+	podRequests := resourcehelper.AggregateContainerRequestsFromSource(pod, containerRequests)
+	for _, podContribution := range claimPodContribution {
+		addResourceList(podRequests, podContribution)
+	}
+	if len(podRequests) == 0 {
+		return []v1.ExtraNodeAllocatableResource{}, nil
 	}
 
-	nodeAllocatableClaimInfoList := make([]v1.NodeAllocatableResourceClaimStatus, 0, len(claimToStatus))
-	for _, status := range claimToStatus {
-		nodeAllocatableClaimInfoList = append(nodeAllocatableClaimInfoList, status)
-	}
-
-	// Sort the results for consistent output.
-	sort.Slice(nodeAllocatableClaimInfoList, func(i, j int) bool {
-		return nodeAllocatableClaimInfoList[i].ResourceClaimName < nodeAllocatableClaimInfoList[j].ResourceClaimName
-	})
-
-	return nodeAllocatableClaimInfoList, nil
+	podEntry := v1.ExtraNodeAllocatableResource{Requests: podRequests, Limits: podRequests.DeepCopy()}
+	return append([]v1.ExtraNodeAllocatableResource{podEntry}, containerEntries...), nil
 }
 
 // validateNodeAllocatableDRAClaimSharing ensures that a node-allocatable DRA claim is not already in use by another pod on this node.
@@ -413,15 +427,15 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 	if !pl.fts.EnablePodLevelResources || pod.Spec.Resources == nil {
 		return nil
 	}
-	if len(pod.Status.NodeAllocatableResourceClaimStatuses) == 0 {
+	if len(pod.Status.ExtraNodeAllocatableResources) == 0 {
 		return nil
 	}
 
 	if pod.Spec.Resources.Requests != nil {
 		// Calculate Sum(Containers) + DRA + overhead resources. Skip pod level resources for this sum
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:            true,
+			UseExtraNodeAllocatableResources: true,
 		}
 		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
 
@@ -442,8 +456,8 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 
 	if pod.Spec.Resources.Limits != nil {
 		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    true,
-			UseDRANodeAllocatableResourceClaimStatus: true,
+			SkipPodLevelResources:            true,
+			UseExtraNodeAllocatableResources: true,
 		}
 		limitsWithoutPodLevel := resourcehelper.AggregateContainerLimits(pod, opts)
 
@@ -465,9 +479,9 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 		}
 
 		// Individual Container limits + DRA overheads must be <= Pod-level limits.
-		containerDRAAllocations := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
+		containerExtraNodeAllocatableLimits := make(map[string]v1.ResourceList, len(pod.Spec.Containers))
 		for _, ctr := range pod.Spec.Containers {
-			containerDRAAllocations[ctr.Name] = resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+			containerExtraNodeAllocatableLimits[ctr.Name] = resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, ctr.Name)
 		}
 
 		for _, ctr := range pod.Spec.Containers {
@@ -482,9 +496,9 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 					continue
 				}
 
-				draResAllocation := containerDRAAllocations[ctr.Name][resourceName]
+				extraNodeAllocatableLimit := containerExtraNodeAllocatableLimits[ctr.Name][resourceName]
 				effectiveLimit := ctrLimit.DeepCopy()
-				effectiveLimit.Add(draResAllocation)
+				effectiveLimit.Add(extraNodeAllocatableLimit)
 
 				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
 					return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name))
@@ -497,7 +511,7 @@ func (pl *DynamicResources) validatePodLevelResourcesCoverDRA(pod *v1.Pod) *fwk.
 }
 
 // getPodNodeAllocatableResourceFootprint determines the total nodeAllocatable resource demand of a pod.
-func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, pod *v1.Pod, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim, slices []*draapi.ResourceSlice, node *v1.Node) (*framework.Resource, []v1.NodeAllocatableResourceClaimStatus, *fwk.Status) {
+func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.Logger, pod *v1.Pod, allocations map[types.UID]*resourceapi.AllocationResult, nodeAllocatableClaims []*resourceapi.ResourceClaim, slices []*draapi.ResourceSlice, node *v1.Node) (*framework.Resource, []v1.ExtraNodeAllocatableResource, *fwk.Status) {
 	nodeAllocatableDRAAllocations := make(map[v1.ObjectReference]*resourceapi.AllocationResult)
 	// Add pre-allocated claims
 	for _, claim := range nodeAllocatableClaims {
@@ -521,19 +535,19 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 		return nil, nil, statusError(logger, fmt.Errorf("processing pod resource claims: %w", err))
 	}
 
-	nodeAllocatableStatus, err := pl.buildNodeAllocatableDRAInfo(pod, nodeAllocatableDRAAllocations, claimNametoUID, slices, node)
+	extraNodeAllocatableResources, err := pl.buildNodeAllocatableDRAInfo(pod, nodeAllocatableDRAAllocations, claimNametoUID, slices, node)
 	if err != nil {
 		return nil, nil, statusError(logger, err)
 	}
 
 	// Calculate the final totalPodDemand to be used for node fitting
 	optsTotal := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources:                    !pl.fts.EnablePodLevelResources,
-		UseDRANodeAllocatableResourceClaimStatus: true,
+		SkipPodLevelResources:            !pl.fts.EnablePodLevelResources,
+		UseExtraNodeAllocatableResources: true,
 	}
 	// Perform shallow copy - we only use the resource information from container and pod spec to calculatate the resource foot print.
 	podCopy := *pod
-	podCopy.Status.NodeAllocatableResourceClaimStatuses = nodeAllocatableStatus
+	podCopy.Status.ExtraNodeAllocatableResources = extraNodeAllocatableResources
 	totalPodDemandRes := resourcehelper.PodRequests(&podCopy, optsTotal)
 
 	// The API validation in pkg/apis/core/validation/validation.go only checks pod.Spec.Resources against container
@@ -545,7 +559,7 @@ func (pl *DynamicResources) getPodNodeAllocatableResourceFootprint(logger klog.L
 	totalPodDemand := framework.NewResource(totalPodDemandRes)
 	logger.V(5).Info("Total Pod Demand After DRA", "pod", klog.KObj(pod), "demand", totalPodDemand)
 
-	return totalPodDemand, nodeAllocatableStatus, nil
+	return totalPodDemand, extraNodeAllocatableResources, nil
 }
 
 // insufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
@@ -632,71 +646,43 @@ func (pl *DynamicResources) nodeFitsResources(nodeInfo fwk.NodeInfo, podRequest 
 	return nil
 }
 
-// replaceSpecialClaimNameInStatus rewrites the in-memory placeholder claim name
-// specialClaimInMemName ("<extended-resources>") in the given node-allocatable
-// statuses to the actual name of the extended-resource ResourceClaim created in
-// the API server during PreBind.
-//
-// It is a no-op when there is no extended-resource claim (extendedClaim == nil)
-// or the claim has not yet been created in the API server (its name is still a
-// special claim name). Statuses that do not carry the placeholder name are left
-// untouched. The statuses slice is mutated in place.
-func replaceSpecialClaimNameInStatus(extendedClaim *resourceapi.ResourceClaim, statuses []v1.NodeAllocatableResourceClaimStatus) {
-	if extendedClaim == nil || isSpecialClaimName(extendedClaim.Name) {
-		return
-	}
-	for i := range statuses {
-		if statuses[i].ResourceClaimName == specialClaimInMemName {
-			statuses[i].ResourceClaimName = extendedClaim.Name
-		}
-	}
-}
+func (pl *DynamicResources) patchExtraNodeAllocatableResources(ctx context.Context, pod *v1.Pod, extraNodeAllocatableResources []v1.ExtraNodeAllocatableResource) *fwk.Status {
 
-func (pl *DynamicResources) patchNodeAllocatableResourceClaimStatus(ctx context.Context, pod *v1.Pod, nodeAllocatableClaimStatus []v1.NodeAllocatableResourceClaimStatus, extendedClaim *resourceapi.ResourceClaim) *fwk.Status {
-
-	if len(nodeAllocatableClaimStatus) == 0 {
+	if len(extraNodeAllocatableResources) == 0 {
 		return nil
 	}
 	logger := klog.FromContext(ctx)
 
-	// The incoming 'pod' is from the scheduler cache and would have NodeAllocatableResourceClaimStatus
+	// The incoming 'pod' is from the scheduler cache and would have ExtraNodeAllocatableResources
 	// pre-populated in the assume phase without persisting to the API server.
 	// schedutil.PatchPodStatus skips patching if the old and new status are identical.
 	// To ensure the status is persisted to the API server we clear it in the baseStatus, forcing a patch.
 	baseStatus := pod.Status.DeepCopy()
-	if !apiequality.Semantic.DeepEqual(baseStatus.NodeAllocatableResourceClaimStatuses, nodeAllocatableClaimStatus) {
-		logger.V(5).Info("NodeAllocatableResourceClaimStatuses difference: assumed pod status does not match calculated status", "pod", klog.KObj(pod))
+	if !apiequality.Semantic.DeepEqual(baseStatus.ExtraNodeAllocatableResources, extraNodeAllocatableResources) {
+		logger.V(5).Info("ExtraNodeAllocatableResources difference: assumed pod status does not match calculated status", "pod", klog.KObj(pod))
 		return statusError(logger, errors.New("assumed pod status does not match calculated status to be patched"))
 	}
 
-	// After bindClaim, the in-memory placeholder "<extended-resources>" must be
-	// replaced with the real claim name before the status is persisted. This
-	// must run after the DeepEqual check: assume() copied the Filter-time
-	// status (still using the placeholder) onto the cached pod, so comparing
-	// after the rename would fail even when the assumed and calculated
-	// allocations match.
-	replaceSpecialClaimNameInStatus(extendedClaim, nodeAllocatableClaimStatus)
-
-	baseStatus.NodeAllocatableResourceClaimStatuses = nil
+	baseStatus.ExtraNodeAllocatableResources = nil
 
 	targetStatus := pod.Status.DeepCopy()
 
-	targetStatus.NodeAllocatableResourceClaimStatuses = nodeAllocatableClaimStatus
+	targetStatus.ExtraNodeAllocatableResources = extraNodeAllocatableResources
 	if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
-		return statusError(logger, fmt.Errorf("updating pod %s/%s NodeAllocatableResourceClaimStatuses: %w", pod.Namespace, pod.Name, err))
+		return statusError(logger, fmt.Errorf("updating pod %s/%s ExtraNodeAllocatableResources: %w", pod.Namespace, pod.Name, err))
 	}
-	logger.V(5).Info("Patched pod status with NodeAllocatableResourceClaimStatuses", "pod", klog.KObj(pod), "status", targetStatus.NodeAllocatableResourceClaimStatuses)
+	logger.V(5).Info("Patched pod status with ExtraNodeAllocatableResources", "pod", klog.KObj(pod), "status", targetStatus.ExtraNodeAllocatableResources)
 
 	return nil
 }
 
-func (pl *DynamicResources) clearNodeAllocatableResourceClaimStatus(ctx context.Context, pod *v1.Pod) {
-	if len(pod.Status.NodeAllocatableResourceClaimStatuses) == 0 {
+func (pl *DynamicResources) clearExtraNodeAllocatableResources(ctx context.Context, pod *v1.Pod) {
+	if len(pod.Status.ExtraNodeAllocatableResources) == 0 {
 		return
 	}
 
 	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Clearing NodeAllocatableResourceClaimStatuses on Unreserve", "pod", klog.KObj(pod))
+	logger.V(5).Info("Clearing ExtraNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
 
 	// An explicit empty list distinguishes an intentional clear from an old
 	// client omitting a field that it does not know about. PatchPodStatus cannot
@@ -705,10 +691,10 @@ func (pl *DynamicResources) clearNodeAllocatableResourceClaimStatus(ctx context.
 	// The uid is included as a precondition so the patch cannot silently apply
 	// to a different pod object if this one got deleted and recreated with the
 	// same name in the meantime.
-	patch := fmt.Appendf(nil, `{"metadata":{"uid":%q},"status":{"nodeAllocatableResourceClaimStatuses":[]}}`, pod.UID)
+	patch := fmt.Appendf(nil, `{"metadata":{"uid":%q},"status":{"extraNodeAllocatableResources":[]}}`, pod.UID)
 	if _, err := pl.clientset.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
-		logger.Error(err, "Failed to clear NodeAllocatableResourceClaimStatuses on Unreserve", "pod", klog.KObj(pod))
+		logger.Error(err, "Failed to clear ExtraNodeAllocatableResources on Unreserve", "pod", klog.KObj(pod))
 	} else {
-		logger.V(5).Info("Cleared NodeAllocatableResourceClaimStatuses", "pod", klog.KObj(pod))
+		logger.V(5).Info("Cleared ExtraNodeAllocatableResources", "pod", klog.KObj(pod))
 	}
 }
