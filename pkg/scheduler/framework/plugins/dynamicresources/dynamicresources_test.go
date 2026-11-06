@@ -4547,6 +4547,10 @@ func testPlugin(tCtx ktesting.TContext) {
 						Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 					},
+					{
+						ContainerName: tc.pod.Spec.Containers[0].Name,
+						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
 				}
 			},
 			classes: []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
@@ -4567,6 +4571,10 @@ func testPlugin(tCtx ktesting.TContext) {
 								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 							},
+							{
+								ContainerName: podWithExtendedResourceName.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+							},
 						},
 					},
 				},
@@ -4584,6 +4592,10 @@ func testPlugin(tCtx ktesting.TContext) {
 									{
 										ContainerName: "",
 										Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+									},
+									{
+										ContainerName: p.Spec.Containers[0].Name,
 										Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
 									},
 								}
