@@ -11,6 +11,7 @@ reported together with the preceding transition that caused it.
 | --- | --- | --- | --- |
 | SSA-01 | Explicitly empty associative list after releasing owned items | First Apply removes the field; identical repetition creates `[]`. Required/CEL presence validation can reject every retry. | Lean refutation and source-bound witness; actual managedfields; both pinned SMD revisions; CRD HTTP/etcd. |
 | SSA-02 | Explicitly empty granular map after releasing an owned child | First Apply produces `null` while retaining the map claim. Optional non-nullable maps cannot be emptied. Nullable maps change on repetition and can cause a conflict for another manager's identical intent. | Lean execution/intent counterexamples and all finite retry counts; source-bound witness; actual managedfields; both pinned SMD revisions; CRD HTTP/etcd. |
+| SSA-03 | Omission after another manager Updates an item child | The item and its foreign-owned child disappear; the list becomes null. A nullable schema accepts this; a non-nullable schema rejects every retry. | Reachable Lean Apply/Update counterexample and source witness; actual managedfields and pinned SMD; nullable/non-nullable CRD HTTP. Existing report: [#134902](https://github.com/kubernetes/kubernetes/issues/134902). |
 | PR336-01 | Fragmented required ownership followed by partial-manager omission | A partial manager can delete another partial manager's required data. | Lean execution; exact pinned head/base comparison. |
 | PR336-02 | Direct required-map membership shortcut | The classifier calls a manager full without ownership of required children. An invalid item can remain after the actual full owner leaves. | General classifier theorem; concrete Lean execution; actual pinned head/base outcomes. |
 | PR336-03 | Required granular-list ownership | A supplier owning all child items is classified partial because Apply generated no direct list-presence claim. Another partial manager can delete its data. | General classifier fact; populated/empty Lean counterexamples; exact pinned head/base comparison. |
@@ -138,6 +139,47 @@ The Lean module is [SSA/ContainerCounterexamples.lean](../SSA/ContainerCounterex
 The `explicit-empty-map-becomes-null-before-repetition` case is present in both
 [baseline](../testdata/bridge.yaml) and [pinned-upstream](../testdata/pr336.yaml)
 corpora. `TestSSAEmptyGranularMapPresence` runs through the actual API server.
+
+## SSA-03: an Update-owned child does not retain its item
+
+A applies:
+
+```yaml
+endpoints:
+- name: db
+  host: old
+```
+
+B then Updates the object, changing `host` to `new`. B owns
+`endpoints[name="db"].host`, but does not acquire the item's membership. A
+still owns that membership. A applies an object omitting `endpoints`, without
+force. Raw SMD returns:
+
+```yaml
+endpoints: null
+```
+
+The item and B's host claim are gone. This formally refutes BASE-07's broad
+handoff wording without the existing conditional theorems' lifetime premise.
+Owning a child through Update is different from acquiring the item through
+Apply. This trace concerns baseline SSA and also occurs on both pinned SMD
+revisions without extra required metadata.
+
+For an optional **non-nullable** list, actual HTTP rejects the generated null,
+preserving data, claims and resourceVersion. Every identical retry fails from
+the same state, even though creating an object without that optional list is
+valid. With `nullable: true` on the list schema, HTTP accepts the null and the
+loss of the old claims. These are the two policies checked by
+`TestSSAUpdateOwnedListItemPruning`.
+
+This is the behavior discussed in existing Kubernetes
+[#134902](https://github.com/kubernetes/kubernetes/issues/134902), which was
+closed by lifecycle automation rather than a linked production fix.
+`SSA/HandoffCounterexamples.lean` proves the reachable ownership transition,
+the refutation of unrestricted foreign-value survival, rejection for every
+finite retry count under the explicit list-or-absent validator, and the imported
+four-function pruning witness with all callees realized. The primitive and
+single-version proof boundaries remain explicit.
 
 ## PR336-01: a partial manager can authorize deletion
 

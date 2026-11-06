@@ -46,20 +46,7 @@ func TestSSAEmptyAssociativeListPresence(t *testing.T) {
 
 	for _, policy := range []string{"optional", "required", "cel"} {
 		t.Run(policy, func(t *testing.T) {
-			crSchema := &apiextensionsv1.JSONSchemaProps{
-				Type: "object",
-				Properties: map[string]apiextensionsv1.JSONSchemaProps{
-					"endpoints": {
-						Type: "array", XListType: ptr.To("map"), XListMapKeys: []string{"name"},
-						Items: &apiextensionsv1.JSONSchemaPropsOrArray{Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object", Required: []string{"name"},
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"name": {Type: "string"}, "host": {Type: "string"},
-							},
-						}},
-					},
-				},
-			}
+			crSchema := ssaFormalListSchema()
 			if policy == "required" {
 				crSchema.Required = []string{"endpoints"}
 			}
@@ -128,6 +115,23 @@ func TestSSAEmptyAssociativeListPresence(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func ssaFormalListSchema() *apiextensionsv1.JSONSchemaProps {
+	return &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
+			"endpoints": {
+				Type: "array", XListType: ptr.To("map"), XListMapKeys: []string{"name"},
+				Items: &apiextensionsv1.JSONSchemaPropsOrArray{Schema: &apiextensionsv1.JSONSchemaProps{
+					Type: "object", Required: []string{"name"},
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"name": {Type: "string"}, "host": {Type: "string"},
+					},
+				}},
+			},
+		},
 	}
 }
 
@@ -280,6 +284,108 @@ func TestSSAEmptyGranularMapPresence(t *testing.T) {
 				}
 				if len(owners) != 2 || !seen["A"] || !seen["B"] {
 					t.Fatalf("expected co-ownership after repair: %#v", owners)
+				}
+			}
+		})
+	}
+}
+
+// A child Update claim does not keep the released item; nullability decides whether storage accepts the result.
+func TestSSAUpdateOwnedListItemPruning(t *testing.T) {
+	tearDown, apiClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	for _, policy := range []string{"nonnullable", "nullable"} {
+		t.Run(policy, func(t *testing.T) {
+			crSchema := ssaFormalListSchema()
+			listSchema := crSchema.Properties["endpoints"]
+			listSchema.Nullable = policy == "nullable"
+			crSchema.Properties["endpoints"] = listSchema
+			resource := newSSAFormalResource(t, apiClient, dynamicClient, "updater-"+policy+".formal.ssa", crSchema)
+
+			// Omitting the optional list is a valid creation intent under both policies.
+			if _, err := resource.apply(t, "created-without-list", "A", map[string]any{}); err != nil {
+				t.Fatalf("creation without the list must succeed: %v", err)
+			}
+			created, err := resource.apply(t, "example", "A", map[string]any{
+				"endpoints": []any{map[string]any{"name": "db", "host": "old"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			replacement := created.DeepCopy()
+			if err := unstructured.SetNestedSlice(replacement.Object,
+				[]any{map[string]any{"name": "db", "host": "new"}}, "endpoints"); err != nil {
+				t.Fatal(err)
+			}
+			updated, err := resource.Update(context.Background(), replacement, metav1.UpdateOptions{FieldManager: "B"})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// B acquires host by Update while A retains the item's membership.
+			seen := map[string]bool{}
+			for _, owner := range updated.GetManagedFields() {
+				seen[owner.Manager] = true
+				if owner.FieldsV1 == nil {
+					t.Fatalf("missing fields for owner %s", owner.Manager)
+				}
+				var fields map[string]any
+				if err := json.Unmarshal(owner.FieldsV1.Raw, &fields); err != nil {
+					t.Fatal(err)
+				}
+				itemFields, exists, err := unstructured.NestedMap(fields, "f:endpoints", `k:{"name":"db"}`)
+				if err != nil || !exists {
+					t.Fatalf("missing item fields for owner %s: %s", owner.Manager, owner.FieldsV1.Raw)
+				}
+				_, membership := itemFields["."]
+				_, host := itemFields["f:host"]
+				switch owner.Manager {
+				case "A":
+					if owner.Operation != metav1.ManagedFieldsOperationApply || !membership || host {
+						t.Fatalf("unexpected A ownership: %#v", owner)
+					}
+				case "B":
+					if owner.Operation != metav1.ManagedFieldsOperationUpdate || membership || !host {
+						t.Fatalf("unexpected B ownership: %#v", owner)
+					}
+				default:
+					t.Fatalf("unexpected owner: %#v", owner)
+				}
+			}
+			if len(updated.GetManagedFields()) != 2 || !seen["A"] || !seen["B"] {
+				t.Fatalf("expected A item membership and B host ownership: %#v", updated.GetManagedFields())
+			}
+
+			for attempt := 1; attempt <= 3; attempt++ {
+				proposed, err := resource.apply(t, "example", "A", map[string]any{})
+				if policy == "nullable" {
+					if err != nil {
+						t.Fatal(err)
+					}
+					if value, exists := proposed.Object["endpoints"]; !exists || value != nil {
+						t.Fatalf("expected the list to collapse to null: %#v", proposed.Object)
+					}
+					if len(proposed.GetManagedFields()) != 0 {
+						t.Fatalf("removed item must lose its old claims: %#v", proposed.GetManagedFields())
+					}
+					if proposed.GetResourceVersion() == updated.GetResourceVersion() {
+						t.Fatal("accepted deletion must change resourceVersion")
+					}
+					break
+				}
+				if !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "endpoints") {
+					t.Fatalf("attempt %d must reject the generated null list: %v", attempt, err)
+				}
+				stored, err := resource.Get(context.Background(), "example", metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(stored.Object, updated.Object) {
+					t.Fatalf("rejected attempt %d changed data, ownership or resourceVersion", attempt)
 				}
 			}
 		})

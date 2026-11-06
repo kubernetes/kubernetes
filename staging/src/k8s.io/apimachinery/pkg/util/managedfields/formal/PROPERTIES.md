@@ -53,7 +53,7 @@ guarantees.
 | BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | `WireContracts.foreign_change_conflicts` proves the conflict result for current/PR modes, valid initial shape, a normalized non-forced request and a changed foreign-owned final target. `accepted_nonforce_foreign_unchanged` proves the converse safety direction. Go typed comparison and the remaining updater orchestration still need refinement. Update is a separate transition. |
 | BASE-05 | Asserting the same values cannot alone cause an ownership conflict. | Shared-ownership cases; KEP cooperative-management goal. | `Contracts.equal_writes_do_not_conflict`. Other guards may still reject the request. |
 | BASE-06 | Force transfers conflicting value claims, while equal-value claims may remain shared. | [Apply/Update/force test][conflict]. | Current/PR `WireContracts.force_transfers_changed_claim`, `unchanged_foreign_claim_preserved` and `accepted_foreign_claim_exact` now characterize claims in the final accepted result. `forced_accepts_valid_candidate` proves progress through the conflict gate while retaining structural checks. Typed comparison/sets and the Go updater remain implementation obligations. The separate proposed-core results concern its own ownership phase. |
-| BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | `Contracts.shared_omission_preserves_value` and `Contracts.handoff_preserves_full_successor` prove safety under explicit ownership and lifetime assumptions. `Progress.unchanged_snapshot_acquisition` proves fresh-manager acquisition; Update now has its own transition. Arbitrary validator-constrained release progress remains conditional. |
+| BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | **Refuted without an item-lifetime premise.** `HandoffCounterexamples.unrestricted_foreign_omission_safety_is_false` gives a reachable Apply/Update history: B owns a scalar child but not its item, and A's non-forced omission removes both. Nullable CRD HTTP accepts that deletion; non-nullable validation rejects the generated null. The conditional `Contracts.shared_omission_preserves_value` / `handoff_preserves_full_successor` retain their explicit lifetime assumptions. General Go refinement of those positive laws remains open. |
 | BASE-08 | Repeating the same intent by the same manager without intervening writes is observationally idempotent. | [Semantic no-op test][noop], [defaulted CRD no-op test][default-noop]. | **Refuted as an unrestricted baseline law.** `Counterexamples.raw_apply_is_not_unconditionally_idempotent` supplies an empty-associative-list witness, reproduced through CRD HTTP and both pinned SMD revisions. `Contracts.accepted_apply_idempotent` proves the stronger proposed item-core transition only. See [the counterexample](docs/baseline-empty-list.md). |
 | BASE-09 | Atomic units cannot be partially overwritten; granular sibling fields can be independently managed. | [KEP topology][topology]. | Atoms are opaque scalar cells. The independent bridge corpus exercises both topologies against managedfields. General topology mapping and independent-request commutativity remain unproved. |
 | BASE-10 | Field sets and paths survive serialization round trips. | [Fields round trip][roundtrip], KEP testing plan. | `FieldsV1.root_roundtrip` and `root_membership_roundtrip` prove arbitrary-depth canonical trie/object-grammar round trips, including `{}` and `"."` membership. JSON bytes and path-element parsing remain unproved. The Go bridge additionally checks the real FieldsV1 round trip after every request, including API version and operation. |
@@ -66,6 +66,17 @@ Apply/Update ownership flags. Presence of the final target is explicit; a
 removed target instead loses its claim by `removed_foreign_claim_dropped`.
 These general wire-model proofs do not close the Go implementation obligations
 listed in their rows.
+
+BASE-07's counterexample starts from an empty object. A applies
+`items: [{name: db, host: old}]`; B uses Update to set `host: new`. B acquires
+only the host leaf, while A retains item membership. A then applies `{}` without
+force. Raw SSA produces `items: null`, with neither the item nor B's host claim.
+This is distinct from B acquiring item membership through Apply. The known
+[Kubernetes #134902](https://github.com/kubernetes/kubernetes/issues/134902)
+documents the resulting non-nullable-list validation failure. The new HTTP
+test checks both schema policies and unchanged storage after every rejected
+retry; the source witness realizes all four imported pruning functions under
+every lawful version-map schedule and normalized primitives.
 
 No unrestricted commutativity or confluence is asserted. Conflicting requests,
 force transfers, shared lifetime boundaries, and cross-field validation can make
@@ -176,6 +187,7 @@ In particular:
 | Empty-map intent loss | `ContainerCounterexamples.empty_map_first_apply_creates_null`, `applied_empty_map_intent_is_not_preserved` | An explicit map claim survives while the asserted empty object becomes null. Confirmed on both pinned SMD revisions and through CRD HTTP. |
 | Optional-map retry failure | `ContainerCounterexamples.nonnullable_map_retries_never_empty` | Every finite retry count under object-or-absent validation. The actual optional non-nullable map schema rejects the produced null; no required-field rule is needed. |
 | Empty-map conflict/default controls | `empty_map_can_conflict_with_identical_previous_intent`, `empty_object_default_repairs_this_proposal` | Concrete stored-null conflict, co-ownership after repair and a specific default mutator. HTTP tests exercise nullable/CEL/defaulted/atomic variants; these are not universal defaulting theorems. |
+| Handoff counterexample | `HandoffCounterexamples.unrestricted_foreign_omission_safety_is_false`, `nonnullable_list_omission_retries_fail`, `imported_pruning_removes_update_child` | Reachable Apply/Update history; foreign scalar ownership alone does not protect its item. Lean, actual Go, both pinned SMD revisions and nullable/non-nullable HTTP tests check the trace. Positive safety still needs lifetime premises. |
 
 `SSA/Counterexamples.lean` kernel-checks the raw PR fragmentation, partial-owner
 deletion, required-map shortcut, required-list failure, and opposite roles in

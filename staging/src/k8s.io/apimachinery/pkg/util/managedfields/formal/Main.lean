@@ -18,7 +18,7 @@ import SSA
 open Lean SSA
 
 private def allFixtures := SSA.Examples.fixtures ++ SSA.Counterexamples.fixtures ++
-  SSA.ContainerCounterexamples.fixtures
+  SSA.ContainerCounterexamples.fixtures ++ SSA.HandoffCounterexamples.fixtures
 
 private def report (fixture : Fixture) : Json :=
   Json.mkObj [

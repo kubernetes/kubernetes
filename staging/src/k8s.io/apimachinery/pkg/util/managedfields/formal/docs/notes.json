@@ -541,5 +541,26 @@
     "title": "A claim acquired from null survives a new map child",
     "meaning": "For every encoded scalar payload, B can add a map child while the direct member A acquired from null remains at the map path.",
     "limits": "One fixed map/child shape and manager pair. Actual Go controls cover both maps and lists; the empty-map alternative conflicts. This corrects a model discrepancy rather than identifying another SSA bug."
+  },
+  "SSA.HandoffCounterexamples.update_acquires_child_without_item": {
+    "title": "Update acquires a child without acquiring its item",
+    "meaning": "Starting from A’s Apply, B’s Update takes ownership of the changed host leaf. A retains item membership, which B never acquires.",
+    "limits": "Concrete reachable history; actual Go and HTTP ownership assertions reproduce both operation flags and the distinct claims."
+  },
+  "SSA.HandoffCounterexamples.unrestricted_foreign_omission_safety_is_false": {
+    "title": "Foreign scalar ownership alone cannot guarantee handoff safety",
+    "meaning": "A’s non-forced omission removes an Update-owned scalar belonging to B when A releases the containing item. The request writes no value at B’s path. This refutes unrestricted BASE-07.",
+    "limits": "The statement intentionally has no item-lifetime premise. Conditional shared-omission and full-successor theorems retain theirs. Nullable HTTP accepts the deletion; non-nullable HTTP rejects its null result."
+  },
+  "SSA.HandoffCounterexamples.nonnullable_list_omission_retries_fail": {
+    "scope": "general",
+    "title": "Non-nullable list omission fails after every retry count",
+    "meaning": "Induction proves that every finite repetition preserves the pre-omission state under the explicit list-or-absent validator, because pruning proposes null.",
+    "limits": "One Apply/Update history, arbitrary finite retry count. Real HTTP checks optional non-nullable and nullable list schemas, including unchanged data, ownership and resourceVersion on rejection."
+  },
+  "SSA.HandoffCounterexamples.imported_pruning_removes_update_child": {
+    "title": "Imported pruning removes the Update-owned child",
+    "meaning": "The complete four-function pruning chain produces the item-removal proposal under every lawful manager-version schedule, with every callee realized.",
+    "limits": "Concrete same-version object/field-set witness using normalized typed/set primitives. Final foreign-claim cleanup and HTTP validation are separate checked stages."
   }
 }

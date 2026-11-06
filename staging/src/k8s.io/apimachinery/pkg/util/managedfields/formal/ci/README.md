@@ -79,6 +79,12 @@ The same entrypoint also runs `TestSSAEmptyGranularMapPresence`: optional
 non-nullable rejection, nullable null/empty divergence, identical-intent
 conflict, CEL rejection, an empty-object default and an atomic-map control.
 
+`TestSSAUpdateOwnedListItemPruning` checks the separate Update/Apply handoff:
+B Updates a scalar child without acquiring item membership; A's omission prunes
+the item. A nullable list stores null and loses the claims, while an optional
+non-nullable list rejects every retry with unchanged data, ownership and
+resourceVersion. Empty creation without the optional list is a valid control.
+
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;
 the ordinary apiextensions integration suite also discovers the HTTP test.

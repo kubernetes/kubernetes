@@ -106,8 +106,16 @@ Apply of `settings: {}` produces `settings: null`. An optional non-nullable map
 then cannot be emptied; with nullable maps, another manager's identical empty
 intent conflicts until the original actor repairs the value by repeating its
 request. Real HTTP tests also cover CEL, atomic-map and defaulting controls.
-The [bug register](docs/ssa-bugs.md) separates both baseline bugs from the three
+The [bug register](docs/ssa-bugs.md) separates baseline bugs from the three
 PR #336 classifier/deletion failures and links each to its proof and reproducer.
+
+A reachable Apply/Update history additionally refutes unrestricted handoff
+safety: B's Update owns a child without item membership, then A's omission
+removes that item and child. A nullable list schema accepts the resulting null;
+an optional non-nullable schema rejects every identical retry. The concrete
+and source-bound proofs are in `SSA/HandoffCounterexamples.lean`, with actual
+HTTP checks for both policies and a link to existing
+[Kubernetes #134902](https://github.com/kubernetes/kubernetes/issues/134902).
 
 ## What is checked
 
@@ -278,7 +286,8 @@ comparisons, and rejects a stale HTML explorer. No check is skipped. Prow setup
 in [ci](ci/README.md) requires a separate test-infra activation.
 
 In a Kubernetes checkout, `bash ci/verify-apiserver.sh` additionally runs the
-actual HTTP/etcd counterexample, Required/CEL rejection and ownership bootstrap.
+actual HTTP/etcd empty-container counterexamples, Required/CEL rejection,
+ownership bootstrap and Update-owned list-item omission.
 The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
 to Kubernetes integration testing and is unavailable in published apimachinery.
 
