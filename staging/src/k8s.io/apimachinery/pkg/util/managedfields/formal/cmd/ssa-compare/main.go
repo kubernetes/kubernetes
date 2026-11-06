@@ -30,7 +30,7 @@ func run() error {
 	corpusPath := flag.String("corpus", "testdata/bridge.yaml", "independent YAML corpus")
 	reproducer := flag.String("reproducer", "", "replay a failing request prefix without adding generated sequences")
 	seed := flag.Int64("seed", 336, "deterministic generated-sequence seed")
-	count := flag.Int("generated", 64, "sequences per scalar, structural and bootstrap family")
+	count := flag.Int("generated", 64, "sequences per scalar, structural, nullable-container and bootstrap family")
 	steps := flag.Int("steps", 32, "requests per generated sequence")
 	flag.Parse()
 	if *model == "" || *count < 0 || *steps < 1 || flag.NArg() != 0 {
@@ -56,6 +56,7 @@ func run() error {
 	if *reproducer == "" {
 		cases = append(cases, bridge.GeneratedScalarCases(*seed, *count, *steps)...)
 		cases = append(cases, bridge.GeneratedStructuralCases(*seed, *count, *steps)...)
+		cases = append(cases, bridge.GeneratedNullableContainerCases(*seed, *count, *steps)...)
 		cases = append(cases, bridge.GeneratedBootstrapCases(*seed, *count, *steps)...)
 	}
 	summary, err := bridge.Compare(context.Background(), *model, cases)

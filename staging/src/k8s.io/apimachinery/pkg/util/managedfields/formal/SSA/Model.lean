@@ -169,9 +169,10 @@ def schemaValid (schema : Schema) : Bool :=
     (prefixes item.path).all (fun p =>
       !isItemPath p || schema.any (fun ancestor => ancestor.path == p)))
 
+/-- A direct member acquired from null may remain when the granular container gains children. -/
 def targetExists (s : State) (target : Footprint) : Bool :=
   match target.kind with
-  | .value => s.hasValue target.path
+  | .value => s.hasValue target.path || s.hasContainer target.path
   | .presence => s.hasContainer target.path ||
       s.cells.any (fun cell => cell.path == target.path && cell.content == .value "null")
   | .item => s.hasItem target.path

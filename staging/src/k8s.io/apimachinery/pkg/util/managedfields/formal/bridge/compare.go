@@ -275,6 +275,47 @@ func GeneratedStructuralCases(seed int64, count, steps int) []Case {
 	return cases
 }
 
+// GeneratedNullableContainerCases exercises type changes of granular containers,
+// including direct membership acquired from null and later shared with children.
+func GeneratedNullableContainerCases(seed int64, count, steps int) []Case {
+	random := rand.New(rand.NewSource(seed))
+	cases := make([]Case, 0, count)
+	for i := 0; i < count; i++ {
+		c := Case{Name: fmt.Sprintf("nullable-container-seed-%d-case-%d", seed, i), Semantics: "current"}
+		for j := 0; j < steps; j++ {
+			object := map[string]any{}
+			switch random.Intn(5) {
+			case 1:
+				object["settings"] = nil
+			case 2:
+				object["settings"] = map[string]any{}
+			case 3:
+				object["settings"] = map[string]any{"left": fmt.Sprintf("v%d", random.Intn(3))}
+			case 4:
+				object["settings"] = map[string]any{"right": fmt.Sprintf("v%d", random.Intn(3))}
+			}
+			switch random.Intn(4) {
+			case 1:
+				object["items"] = nil
+			case 2:
+				object["items"] = []any{}
+			case 3:
+				object["items"] = []any{map[string]any{"name": "db", "host": fmt.Sprintf("v%d", random.Intn(3))}}
+			}
+			operation := "apply"
+			if random.Intn(5) == 0 {
+				operation = "update"
+			}
+			c.Steps = append(c.Steps, Step{
+				Operation: operation, Manager: []string{"A", "B", "C"}[random.Intn(3)],
+				Force: random.Intn(3) == 0, Apply: object,
+			})
+		}
+		cases = append(cases, c)
+	}
+	return cases
+}
+
 // GeneratedBootstrapCases exercises the default Apply wrapper on the same
 // structural domain. Non-Apply histories need a model of probabilistic tracking.
 func GeneratedBootstrapCases(seed int64, count, steps int) []Case {

@@ -335,3 +335,54 @@ cases:
     expect:
       object: {items: [{name: db, conn: null}]}
       owners: {A: ['.items[name="db"]', '.items[name="db"].conn']}
+- name: null-map-member-survives-adding-a-child
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: null}
+    expect: {object: {settings: null}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {left: live}}
+    expect: {object: {settings: {left: live}}, owners: {A: [.settings], B: [.settings.left]}}
+- name: null-map-member-conflicts-with-an-empty-map
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: null}
+    expect: {object: {settings: null}, owners: {A: [.settings]}}
+  - manager: B
+    apply: {settings: {}}
+    expect: {error: conflict, object: {settings: null}, owners: {A: [.settings]}}
+- name: null-list-member-survives-adding-an-item
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: null}
+    expect: {object: {items: null}, owners: {A: [.items]}}
+  - manager: B
+    apply: {items: [{name: db, host: live}]}
+    expect:
+      object: {items: [{name: db, host: live}]}
+      owners: {A: [.items], B: ['.items[name="db"]', '.items[name="db"].host']}
+- name: null-map-operand-retains-foreign-children
+  semantics: current
+  steps:
+  - manager: A
+    apply: {settings: {left: live}}
+    expect: {object: {settings: {left: live}}, owners: {A: [.settings.left]}}
+  - manager: B
+    apply: {settings: null}
+    expect: {object: {settings: {left: live}}, owners: {A: [.settings.left], B: [.settings]}}
+- name: null-list-operand-retains-foreign-items
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: live}]}
+    expect:
+      object: {items: [{name: db, host: live}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: null}
+    expect:
+      object: {items: [{name: db, host: live}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host'], B: [.items]}

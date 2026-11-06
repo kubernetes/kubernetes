@@ -18,6 +18,14 @@ Internal list ordering is not an API observation. Intended equivalence compares
 cells and claims by membership. Storage resource versions, timestamps, defaulting,
 and conversion need their own observational model.
 
+The completion target is a proof or a counterexample for every catalogue entry.
+A positive model theorem does not close the corresponding implementation
+obligation while its Go primitives or request stages remain unverified. A
+counterexample can close an unrestricted claim when its Lean witness and an
+independent execution of the implementation agree. A narrower positive theorem
+is recorded alongside a refutation, rather than substituted for the original
+claim. Definition and guard theorems remain identified as such.
+
 ## Sources
 
 The normative starting point is [KEP-555: Server-Side Apply][kep]. The KEP's
@@ -42,15 +50,22 @@ guarantees.
 | BASE-01 | Owned scalar intent is retained; empty/null containers need phase-specific treatment. | KEP goals; typed merge/leaf tests linked in its testing plan. | `Contracts.accepted_preserves_intent` proves the proposed core statement. The separate current/PR pruning model preserves actual SMD empty/null behavior; it does not inherit that stronger exact-container conclusion. |
 | BASE-02 | An omitted exclusively owned scalar disappears. | [Exclusive omission test][exclusive]. | `Contracts.exclusive_omission_removes_value`; applies to non-defaulted scalar cells in the candidate result. It does not claim the final API value stays absent after defaulting. |
 | BASE-03 | An omitted shared scalar survives while another owner remains. | [Shared omission test][shared]. | `Contracts.shared_omission_preserves_value`, with explicit no-overwrite and no-ancestor-deletion assumptions. The latter matters for the proposed extension. |
-| BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | `Contracts.foreign_change_conflicts` for normalized Apply. Update is modeled separately in `SSA/Update.lean`. |
+| BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | `WireContracts.foreign_change_conflicts` proves the conflict result for current/PR modes, valid initial shape, a normalized non-forced request and a changed foreign-owned final target. `accepted_nonforce_foreign_unchanged` proves the converse safety direction. Go typed comparison and the remaining updater orchestration still need refinement. Update is a separate transition. |
 | BASE-05 | Asserting the same values cannot alone cause an ownership conflict. | Shared-ownership cases; KEP cooperative-management goal. | `Contracts.equal_writes_do_not_conflict`. Other guards may still reject the request. |
-| BASE-06 | Force transfers conflicting value claims, while equal-value claims may remain shared. | [Apply/Update/force test][conflict]. | `Contracts.force_transfers_changed_claim` and `Contracts.unchanged_foreign_claim_preserved` concern `updatedClaims`; subsequent lifetime deletion can still remove a subtree, and acceptance requires valid values and complete item ownership. |
+| BASE-06 | Force transfers conflicting value claims, while equal-value claims may remain shared. | [Apply/Update/force test][conflict]. | Current/PR `WireContracts.force_transfers_changed_claim`, `unchanged_foreign_claim_preserved` and `accepted_foreign_claim_exact` now characterize claims in the final accepted result. `forced_accepts_valid_candidate` proves progress through the conflict gate while retaining structural checks. Typed comparison/sets and the Go updater remain implementation obligations. The separate proposed-core results concern its own ownership phase. |
 | BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | `Contracts.shared_omission_preserves_value` and `Contracts.handoff_preserves_full_successor` prove safety under explicit ownership and lifetime assumptions. `Progress.unchanged_snapshot_acquisition` proves fresh-manager acquisition; Update now has its own transition. Arbitrary validator-constrained release progress remains conditional. |
 | BASE-08 | Repeating the same intent by the same manager without intervening writes is observationally idempotent. | [Semantic no-op test][noop], [defaulted CRD no-op test][default-noop]. | **Refuted as an unrestricted baseline law.** `Counterexamples.raw_apply_is_not_unconditionally_idempotent` supplies an empty-associative-list witness, reproduced through CRD HTTP and both pinned SMD revisions. `Contracts.accepted_apply_idempotent` proves the stronger proposed item-core transition only. See [the counterexample](docs/baseline-empty-list.md). |
 | BASE-09 | Atomic units cannot be partially overwritten; granular sibling fields can be independently managed. | [KEP topology][topology]. | Atoms are opaque scalar cells. The independent bridge corpus exercises both topologies against managedfields. General topology mapping and independent-request commutativity remain unproved. |
 | BASE-10 | Field sets and paths survive serialization round trips. | [Fields round trip][roundtrip], KEP testing plan. | `FieldsV1.root_roundtrip` and `root_membership_roundtrip` prove arbitrary-depth canonical trie/object-grammar round trips, including `{}` and `"."` membership. JSON bytes and path-element parsing remain unproved. The Go bridge additionally checks the real FieldsV1 round trip after every request, including API version and operation. |
 | BASE-11 | API-version conversion preserves the intended correspondence of values and claims. | [ManagedFields version conversion test][conversion]. | Outside the model; no theorem assumes that all schema conversions are invertible. |
 | BASE-12 | Spec/status reset fields do not acquire claims in the other subresource. | [Reset-fields test][reset]. | Outside the model; subresources and reset filters are absent. |
+
+For BASE-04/06, “changed” is the final typed comparison, not merely a different
+request payload. The statements quantify over every foreign manager and both
+Apply/Update ownership flags. Presence of the final target is explicit; a
+removed target instead loses its claim by `removed_foreign_claim_dropped`.
+These general wire-model proofs do not close the Go implementation obligations
+listed in their rows.
 
 No unrestricted commutativity or confluence is asserted. Conflicting requests,
 force transfers, shared lifetime boundaries, and cross-field validation can make
@@ -147,6 +162,7 @@ In particular:
 | Raw pruning | `remove_items_has_no_selected_descendant` | Selected subtrees are absent; unselected empty container slots may become null. |
 | Raw ownership | `WireContracts.merged_foreign_claim`, `candidate_foreign_claim_exact` | Foreign claims participate in pruning before transfer; final survival is characterized exactly. These are current/PR wire-model laws. |
 | Raw conflicts/force | `WireContracts.accepted_nonforce_foreign_unchanged`, `candidate_force_independent`, `accepted_also_succeeds_forced` | The final pruned result is compared with original ownership. Force changes the conflict gate, not the candidate. |
+| Raw accepted ownership | `WireContracts.foreign_change_conflicts`, `forced_accepts_valid_candidate`, `accepted_foreign_claim_exact`, `force_transfers_changed_claim`, `unchanged_foreign_claim_preserved` | General current/PR results for final accepted data and claims. Typed comparison, field-set operations and Go updater orchestration remain refinement obligations. |
 | Raw acquisition | `WireContracts.unchanged_snapshot_acquisition` | Both current/PR modes, arbitrary structurally valid finite states, fresh actor, normalized unchanged snapshot; all original claims survive. No full-manager premise. |
 | Source helpers | `SourceContracts.imported_dangling_matches_spec`, `imported_owned_version_matches_spec` | Complete Go ASTs, all error/missing-version branches, returned failure payloads and explicit primitive parameters. |
 | Source version loops | `OwnedSource.imported_owned_items_matches_spec` | Complete Go AST, arbitrary finite manager/version counts, lexical scope, last-applied version first, every lawful remaining-map permutation and all propagated errors. |
@@ -182,6 +198,17 @@ closed. General structural theorems cover the former, and the force/unclaim
 regression agrees with current managedfields for the latter. The broader
 comparison also led to explicit modeling of implicit key leaves, named fields,
 three-pass restoration, null promotion and final ownership updates.
+
+The catalogue audit additionally found that a direct member acquired by applying
+null remains valid when another manager adds children to that granular map or
+list. FieldSet members have no permanent value/presence type. The quantified
+null-map control in `ContainerCounterexamples` and explicit Go controls
+cover that transition; the empty-map conflict remains a contrasting case.
+`wireMergeCell` also models typed merge's distinction between nonempty granular
+containers (where null is a merge operand) and empty/null containers (which are
+treated as leaves). A separate deterministic nullable-container family exercises
+these changes through mixed Apply/Update histories. These corrections close
+observed model discrepancies, not the universal typed-merge refinement.
 
 A source-bound refinement covers the four pruning functions, including both
 unbounded finite map loops. Same-version composition realizes the callee

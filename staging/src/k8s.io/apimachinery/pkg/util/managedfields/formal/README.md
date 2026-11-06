@@ -83,6 +83,12 @@ representation. Pinned list/map null controls caught and closed an earlier
 model mismatch. API validity of null is checked separately; mapping nullable
 required containers into the stronger policy needs additional shape metadata.
 
+That direct claim can also survive when another manager adds children to a
+previously null granular container. It is not permanently tied to null's value
+tag. The comparison corpus includes populated-map/list and empty-map controls,
+and a separate generated nullable-container family. Raw typed merge preserves
+nonempty granular structure when null is supplied; empty/null pairs are leaves.
+
 ## Baseline counterexample
 
 Unconditional immediate idempotence is false for current SSA: after A owns a
@@ -143,6 +149,12 @@ non-forced requests do not modify foreign-owned final targets, and forcing an
 already successful request preserves its result. Fresh unchanged snapshot
 acquisition is also proved directly for both raw modes; it requires only
 structural validity, not the proposed full-manager invariant.
+
+The accepted-result laws additionally prove that a changed foreign final target
+conflicts without force; force admits a structurally valid candidate; changed
+foreign claims disappear; and unchanged final targets retain co-ownership.
+These statements concern the raw model, not just the proposed stronger core.
+The Go primitive and updater refinement obligations remain open in the catalogue.
 
 ## Binding proofs to source
 

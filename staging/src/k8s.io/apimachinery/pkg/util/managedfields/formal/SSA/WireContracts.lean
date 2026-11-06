@@ -21,6 +21,43 @@ namespace SSA.WireContracts
 /-- These contracts concern the current/PR pruning transition, not the proposed item core. -/
 def raw (mode : Semantics) : Prop := mode = .current ∨ mode = .predrag
 
+/-- A successful raw Apply returns the actual pruning/ownership candidate. -/
+theorem accepted_candidate (mode : Semantics) (schema : Schema)
+    (before after : State) (r : Request) (modeRaw : raw mode)
+    (accepted : applyWith mode schema before r = .ok after) :
+    after = candidateWith mode schema before r := by
+  rcases modeRaw with rfl | rfl <;>
+    simp only [applyWith] at accepted
+  all_goals repeat first | split at accepted | contradiction
+  all_goals exact (Except.ok.inj accepted).symm
+
+/-- A valid normalized request changing a final foreign-owned target conflicts without force. -/
+theorem foreign_change_conflicts (mode : Semantics) (schema : Schema)
+    (before : State) (r : Request) (claim : Claim) (cell : Cell)
+    (modeRaw : raw mode) (initial : shapeValid schema before = true)
+    (norm : normalized r = true) (nonforce : r.force = false)
+    (owned : claim ∈ before.claims) (foreign : claim.manager ≠ r.manager)
+    (present : cell ∈ (wirePruned mode schema before r).cells)
+    (samePath : cell.path = claim.target.path)
+    (changed : modifiedCell before (wirePruned mode schema before r) cell = true) :
+    applyWith mode schema before r = .error .conflict := by
+  have conflict : wireConflicts before before (wirePruned mode schema before r) r.manager = true := by
+    exact List.any_eq_true.mpr ⟨claim, owned, Bool.and_eq_true_iff.mpr
+      ⟨bne_iff_ne.mpr foreign,
+        List.any_eq_true.mpr ⟨cell, present, by simp [samePath, changed]⟩⟩⟩
+  rcases modeRaw with rfl | rfl <;>
+    simp [applyWith, initial, norm, nonforce, conflict]
+
+/-- Force removes the conflict gate, while structural validity is still required. -/
+theorem forced_accepts_valid_candidate (mode : Semantics) (schema : Schema)
+    (before : State) (r : Request) (modeRaw : raw mode)
+    (initial : shapeValid schema before = true) (norm : normalized r = true)
+    (forced : r.force = true)
+    (validResult : shapeValid schema (candidateWith mode schema before r) = true) :
+    applyWith mode schema before r = .ok (candidateWith mode schema before r) := by
+  rcases modeRaw with rfl | rfl <;>
+    simp [applyWith, initial, norm, forced, validResult]
+
 /-- Pruning sees all foreign claims, even on a forced request. Go transfers them afterwards. -/
 theorem merged_foreign_claim (before : State) (r : Request) (claim : Claim)
     (foreign : claim.manager ≠ r.manager) :
@@ -69,6 +106,72 @@ theorem candidate_foreign_claim_exact (mode : Semantics) (schema : Schema)
     simp only [candidateWith, List.mem_filter, pruningClaims,
       merged_foreign_claim before r claim foreign] <;>
     simp [foreign]
+
+/-- Accepted raw results have the pruned data, independently of ownership transfer. -/
+theorem accepted_cells (mode : Semantics) (schema : Schema)
+    (before after : State) (r : Request) (modeRaw : raw mode)
+    (accepted : applyWith mode schema before r = .ok after) :
+    after.cells = (wirePruned mode schema before r).cells := by
+  rw [accepted_candidate mode schema before after r modeRaw accepted]
+  rcases modeRaw with rfl | rfl <;> rfl
+
+/-- This characterizes retained, transferred and removed foreign claims in the accepted result. -/
+theorem accepted_foreign_claim_exact (mode : Semantics) (schema : Schema)
+    (before after : State) (r : Request) (claim : Claim) (modeRaw : raw mode)
+    (accepted : applyWith mode schema before r = .ok after)
+    (foreign : claim.manager ≠ r.manager) :
+    claim ∈ after.claims ↔ claim ∈ before.claims ∧
+      after.cells.any (fun cell => cell.path == claim.target.path) = true ∧
+      after.cells.any (fun cell => cell.path == claim.target.path &&
+        modifiedCell before after cell) = false := by
+  have cells := accepted_cells mode schema before after r modeRaw accepted
+  have claims := accepted_candidate mode schema before after r modeRaw accepted
+  have exactClaim := candidate_foreign_claim_exact mode schema before r claim modeRaw foreign
+  simpa only [← claims, ← cells, modifiedCell] using exactClaim
+
+/-- A successful forced value change removes every old foreign claim on that target. -/
+theorem force_transfers_changed_claim (mode : Semantics) (schema : Schema)
+    (before after : State) (r : Request) (claim : Claim) (cell : Cell)
+    (modeRaw : raw mode) (accepted : applyWith mode schema before r = .ok after)
+    (foreign : claim.manager ≠ r.manager) (present : cell ∈ after.cells)
+    (samePath : cell.path = claim.target.path)
+    (changed : modifiedCell before after cell = true) :
+    claim ∉ after.claims := by
+  intro retained
+  have noChange := ((accepted_foreign_claim_exact mode schema before after r claim
+    modeRaw accepted foreign).mp retained).2.2
+  have found : after.cells.any (fun cell => cell.path == claim.target.path &&
+      modifiedCell before after cell) = true :=
+    List.any_eq_true.mpr ⟨cell, present, by simp [samePath, changed]⟩
+  simp [noChange] at found
+
+/-- Equal final values preserve foreign co-ownership, including when force is enabled. -/
+theorem unchanged_foreign_claim_preserved (mode : Semantics) (schema : Schema)
+    (before after : State) (r : Request) (claim : Claim) (modeRaw : raw mode)
+    (accepted : applyWith mode schema before r = .ok after)
+    (owned : claim ∈ before.claims) (foreign : claim.manager ≠ r.manager)
+    (present : after.cells.any (fun cell => cell.path == claim.target.path) = true)
+    (unchanged : ∀ cell ∈ after.cells, cell.path = claim.target.path →
+      modifiedCell before after cell = false) :
+    claim ∈ after.claims := by
+  apply (accepted_foreign_claim_exact mode schema before after r claim modeRaw accepted foreign).mpr
+  refine ⟨owned, present, Bool.eq_false_iff.mpr ?_⟩
+  intro found
+  obtain ⟨cell, member, matched⟩ := List.any_eq_true.mp found
+  have parts := Bool.and_eq_true_iff.mp matched
+  simp [unchanged cell member (eq_of_beq parts.1)] at parts
+
+/-- Pruning an entire target also removes its old foreign claim. -/
+theorem removed_foreign_claim_dropped (mode : Semantics) (schema : Schema)
+    (before after : State) (r : Request) (claim : Claim) (modeRaw : raw mode)
+    (accepted : applyWith mode schema before r = .ok after)
+    (foreign : claim.manager ≠ r.manager)
+    (absent : after.cells.any (fun cell => cell.path == claim.target.path) = false) :
+    claim ∉ after.claims := by
+  intro retained
+  have present := ((accepted_foreign_claim_exact mode schema before after r claim
+    modeRaw accepted foreign).mp retained).2.1
+  simp [absent] at present
 
 /-- An accepted request without force cannot modify a foreign-owned final target. -/
 theorem accepted_nonforce_no_conflicts (mode : Semantics) (schema : Schema)
@@ -134,6 +237,20 @@ theorem self_comparison_unchanged (before : State) (cell : Cell)
       (List.mem_of_find?_eq_some found) present samePath
     simp [same]
 
+/-- A typed merge with an unchanged snapshot does not change any stored cell. -/
+theorem wire_merge_existing_cell (before : State) (cell : Cell)
+    (unique : (before.cells.map (·.path)).Nodup) (present : cell ∈ before.cells) :
+    wireMergeCell before cell = cell := by
+  unfold wireMergeCell
+  split
+  · rfl
+  · rename_i old found
+    have samePath : old.path = cell.path := eq_of_beq
+      (List.find?_some (p := fun old : Cell => old.path == cell.path) found)
+    have same := Contracts.cells_unique_by_path before.cells unique old cell
+      (List.mem_of_find?_eq_some found) present samePath
+    simp [same]
+
 /-- Raw SSA also admits fresh co-ownership; success does not rely on the stronger full guard. -/
 theorem unchanged_snapshot_acquisition (mode : Semantics) (schema : Schema)
     (before : State) (r : Request) (modeRaw : raw mode)
@@ -167,6 +284,12 @@ theorem unchanged_snapshot_acquisition (mode : Semantics) (schema : Schema)
   have sameMerge : wireMerged before r = after := by
     simp only [wireMerged, merged, oldEmpty, List.append_nil, oldClaims]
     rw [snapshot]
+    have cellsSame : before.cells.map (wireMergeCell before) = before.cells := by
+      have fixed : before.cells.map (wireMergeCell before) = before.cells.map id := by
+        apply List.map_congr_left
+        exact fun cell present => wire_merge_existing_cell before cell unique present
+      simpa using fixed
+    rw [cellsSame]
   have noLast : ensureNamed r.named (claimFields
       (before.claims.filter (fun claim => claim.manager == r.manager))) = [] := by
     simp only [noPrevious, claimFields, List.flatMap_nil, ensureNamed, List.any_nil, List.nil_append]

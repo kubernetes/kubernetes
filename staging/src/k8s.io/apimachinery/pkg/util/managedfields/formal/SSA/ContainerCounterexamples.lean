@@ -100,6 +100,17 @@ theorem empty_map_second_apply_repairs_data :
     second.cells = [mapCell] ∧ first.claims = second.claims := by
   exact ⟨rfl,by decide⟩
 
+/-- FieldSet members do not retain the data type from the request that acquired them. -/
+theorem null_member_survives_a_new_map_child (encodedValue : String) :
+    applyWith .current []
+      { cells := [nullCell],claims := [⟨"A",⟨settings,.value⟩,true⟩] }
+      { manager := "B",writes := [⟨left,.value encodedValue⟩],context := [mapCell],
+        desired := [⟨left,.value⟩],named } =
+      .ok {
+        cells := [⟨left,.value encodedValue⟩,mapCell]
+        claims := [⟨"A",⟨settings,.value⟩,true⟩,⟨"B",⟨left,.value⟩,true⟩] } := by
+  rfl
+
 /-- This loss of intent is independent of whether a direct presence claim exists. -/
 theorem applied_empty_map_intent_is_not_preserved :
     mapCell ∈ (emptyMap "A").writes ∧ mapCell ∉ first.cells := by decide

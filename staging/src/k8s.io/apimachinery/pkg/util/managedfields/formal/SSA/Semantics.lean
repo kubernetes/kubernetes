@@ -83,10 +83,23 @@ def wireConflicts (owners before after : State) (actor : String) : Bool :=
   owners.claims.any (fun claim => claim.manager != actor && after.cells.any
     (fun cell => cell.path == claim.target.path && modifiedCell before after cell))
 
+/-- Typed merge descends into a nonempty granular container even when the new operand is null. -/
+def wireMergeCell (before : State) (cell : Cell) : Cell :=
+  match before.cells.find? (fun old => old.path == cell.path) with
+  | none => cell
+  | some old =>
+      if (old.content == .object || old.content == .collection) &&
+          cell.content == .value "null" &&
+          before.cells.any (fun child => properUnder cell.path child.path)
+      then old
+      else cell
+
 /-- Go prunes with the original foreign claims, including under force; transfer follows pruning. -/
 def wireMerged (before : State) (r : Request) : State :=
   let data := merged before r
-  { data with claims := before.claims.filter (fun claim => claim.manager != r.manager) ++
+  { data with
+    cells := data.cells.map (wireMergeCell before)
+    claims := before.claims.filter (fun claim => claim.manager != r.manager) ++
       r.desired.map (fun target => ⟨r.manager,target,true⟩) }
 
 def wirePruned (mode : Semantics) (schema : Schema) (before : State) (r : Request) : State :=

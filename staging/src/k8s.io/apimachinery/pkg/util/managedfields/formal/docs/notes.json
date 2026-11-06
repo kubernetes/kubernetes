@@ -496,5 +496,50 @@
     "title": "Explicit null retains membership that an empty granular list lacks",
     "meaning": "A supplies a required children field as null. Its direct member causes the actual PR to retain A’s item when partial B leaves. The same trace matches both pinned revisions.",
     "limits": "A contrasting ownership control that corrected a model mismatch. API admission may reject null; no nullable-schema validity theorem is asserted here."
+  },
+  "SSA.WireContracts.accepted_candidate": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.accepted_cells": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.wire_merge_existing_cell": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.foreign_change_conflicts": {
+    "title": "Changing a foreign final target conflicts without force",
+    "meaning": "For either raw mode, a structurally valid initial state and a normalized non-forced request, any modified final cell with an original foreign owner forces the conflict result.",
+    "limits": "The comparison is against the final pruned data. A removed target is a separate case. Typed comparison and Go updater refinement remain open."
+  },
+  "SSA.WireContracts.forced_accepts_valid_candidate": {
+    "title": "Force admits a structurally valid raw candidate",
+    "meaning": "A normalized forced request from a valid initial shape succeeds if its final candidate has valid shape, regardless of ownership conflicts.",
+    "limits": "Current/PR model theorem, before API defaulting or admission. Force does not bypass schema, CEL or webhook validation."
+  },
+  "SSA.WireContracts.accepted_foreign_claim_exact": {
+    "title": "Exact foreign ownership after raw Apply",
+    "meaning": "An original foreign claim survives precisely when its final path remains and no final cell at that path is modified by the typed comparison.",
+    "limits": "Arbitrary finite normalized raw states in either mode. This characterizes final ownership, not just a provisional ownership phase; Go primitives and the updater still require refinement."
+  },
+  "SSA.WireContracts.force_transfers_changed_claim": {
+    "title": "A changed final target loses its old foreign claims",
+    "meaning": "After successful raw Apply, an old foreign claim cannot remain on a final target whose typed value changed.",
+    "limits": "Current/PR transition. Without force such a request conflicts; the acceptance premise allows this transfer law to apply after a successful forced change."
+  },
+  "SSA.WireContracts.unchanged_foreign_claim_preserved": {
+    "title": "Equal final values preserve foreign co-ownership",
+    "meaning": "An original foreign claim survives a successful raw Apply when its target path remains and the typed comparison reports no modification there, including with force enabled.",
+    "limits": "Final values are compared to stored values. Equal request payloads alone do not satisfy this premise if pruning changes their result."
+  },
+  "SSA.WireContracts.removed_foreign_claim_dropped": {
+    "title": "A removed target loses its foreign claim",
+    "meaning": "A successful raw Apply cannot leave an original foreign claim whose target path has disappeared.",
+    "limits": "This is ownership cleanup, not permission to delete foreign data. The cause and legality of the removal require separate properties."
+  },
+  "SSA.ContainerCounterexamples.null_member_survives_a_new_map_child": {
+    "scope": "general",
+    "title": "A claim acquired from null survives a new map child",
+    "meaning": "For every encoded scalar payload, B can add a map child while the direct member A acquired from null remains at the map path.",
+    "limits": "One fixed map/child shape and manager pair. Actual Go controls cover both maps and lists; the empty-map alternative conflicts. This corrects a model discrepancy rather than identifying another SSA bug."
   }
 }
