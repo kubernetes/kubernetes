@@ -33,6 +33,7 @@ func TestPodResizeCompletedMsg(t *testing.T) {
 	tests := []struct {
 		name               string
 		containers         []testContainer
+		podResources       *testResources
 		observedGeneration int64
 		expected           string
 	}{{
@@ -61,6 +62,25 @@ func TestPodResizeCompletedMsg(t *testing.T) {
 		}},
 		observedGeneration: 3,
 		expected:           `Pod resize completed: {"containers":[{"name":"c0","resources":{}}],"generation":3}`,
+	}, {
+		name: "with pod-level resources",
+		containers: []testContainer{{
+			resources: testResources{50, 50, 50, 50},
+		}},
+		podResources:       &testResources{200, 400, 200, 400},
+		observedGeneration: 2,
+		expected:           `Pod resize completed: {"resources":{"limits":{"cpu":"400m","memory":"400"},"requests":{"cpu":"200m","memory":"200"}},"containers":[{"name":"c0","resources":{"limits":{"cpu":"50m","memory":"50"},"requests":{"cpu":"50m","memory":"50"}}}],"generation":2}`,
+	}, {
+		name: "with pod-level resources and several containers",
+		containers: []testContainer{{
+			resources: testResources{cpuReq: 100, cpuLim: 200},
+			sidecar:   true,
+		}, {
+			resources: testResources{memReq: 100, memLim: 200},
+		}},
+		podResources:       &testResources{200, 400, 200, 400},
+		observedGeneration: 2,
+		expected:           `Pod resize completed: {"resources":{"limits":{"cpu":"400m","memory":"400"},"requests":{"cpu":"200m","memory":"200"}},"initContainers":[{"name":"c0","resources":{"limits":{"cpu":"200m"},"requests":{"cpu":"100m"}}}],"containers":[{"name":"c1","resources":{"limits":{"memory":"200"},"requests":{"memory":"100"}}}],"generation":2}`,
 	}}
 
 	for _, test := range tests {
@@ -81,6 +101,10 @@ func TestPodResizeCompletedMsg(t *testing.T) {
 					pod.Spec.Containers = append(pod.Spec.Containers, container)
 				}
 			}
+			if test.podResources != nil {
+				req := mkRequirements(*test.podResources)
+				pod.Spec.Resources = &req
+			}
 
 			msg := PodResizeCompletedMsg(logger, pod, test.observedGeneration)
 			assert.Equal(t, test.expected, msg)
@@ -94,6 +118,7 @@ func TestPodResizeStartedMsg(t *testing.T) {
 		name               string
 		allocated          []testContainer
 		actual             []testContainer
+		podResources       *testResources
 		observedGeneration int64
 		expected           string
 	}{
@@ -117,6 +142,13 @@ func TestPodResizeStartedMsg(t *testing.T) {
 			},
 			observedGeneration: 2,
 			expected:           `Pod resize started: {"initContainers":[{"name":"c0","resources":{"limits":{"cpu":"200m"},"requests":{"cpu":"100m"}}}],"containers":[{"name":"c1","resources":{"limits":{"memory":"200"},"requests":{"memory":"100"}}},{"name":"c2","resources":{"requests":{"cpu":"200m","memory":"100"}}}],"generation":2}`,
+		}, {
+			name:               "with pod-level resources",
+			allocated:          []testContainer{{resources: testResources{20, 20, 20, 20}}},
+			actual:             []testContainer{{resources: testResources{50, 50, 50, 50}}},
+			podResources:       &testResources{200, 400, 200, 400},
+			observedGeneration: 2,
+			expected:           `Pod resize started: {"resources":{"limits":{"cpu":"400m","memory":"400"},"requests":{"cpu":"200m","memory":"200"}},"containers":[{"name":"c0","resources":{"limits":{"cpu":"20m","memory":"20"},"requests":{"cpu":"20m","memory":"20"}}}],"generation":2}`,
 		},
 	}
 
@@ -152,6 +184,10 @@ func TestPodResizeStartedMsg(t *testing.T) {
 					allocatedPod.Spec.Containers = append(allocatedPod.Spec.Containers, allocated)
 				}
 			}
+			if test.podResources != nil {
+				req := mkRequirements(*test.podResources)
+				allocatedPod.Spec.Resources = &req
+			}
 
 			msg := PodResizeStartedMsg(logger, allocatedPod, test.observedGeneration)
 			assert.Equal(t, test.expected, msg)
@@ -165,6 +201,7 @@ func TestPodResizeErrorMsg(t *testing.T) {
 		name               string
 		allocated          []testContainer
 		actual             []testContainer
+		podResources       *testResources
 		observedGeneration int64
 		errMsg             string
 		expected           string
@@ -191,6 +228,14 @@ func TestPodResizeErrorMsg(t *testing.T) {
 			observedGeneration: 2,
 			errMsg:             "some error occurred",
 			expected:           `Pod resize error: {"initContainers":[{"name":"c0","resources":{"limits":{"cpu":"200m"},"requests":{"cpu":"100m"}}}],"containers":[{"name":"c1","resources":{"limits":{"memory":"200"},"requests":{"memory":"100"}}},{"name":"c2","resources":{"requests":{"cpu":"200m","memory":"100"}}}],"generation":2,"error":"some error occurred"}`,
+		}, {
+			name:               "with pod-level resources",
+			allocated:          []testContainer{{resources: testResources{20, 20, 20, 20}}},
+			actual:             []testContainer{{resources: testResources{50, 50, 50, 50}}},
+			podResources:       &testResources{200, 400, 200, 400},
+			observedGeneration: 2,
+			errMsg:             "some error occurred",
+			expected:           `Pod resize error: {"resources":{"limits":{"cpu":"400m","memory":"400"},"requests":{"cpu":"200m","memory":"200"}},"containers":[{"name":"c0","resources":{"limits":{"cpu":"20m","memory":"20"},"requests":{"cpu":"20m","memory":"20"}}}],"generation":2,"error":"some error occurred"}`,
 		},
 	}
 
@@ -226,6 +271,10 @@ func TestPodResizeErrorMsg(t *testing.T) {
 					allocatedPod.Spec.Containers = append(allocatedPod.Spec.Containers, allocated)
 				}
 			}
+			if test.podResources != nil {
+				req := mkRequirements(*test.podResources)
+				allocatedPod.Spec.Resources = &req
+			}
 
 			msg := PodResizeErrorMsg(logger, allocatedPod, test.observedGeneration, test.errMsg)
 			assert.Equal(t, test.expected, msg)
@@ -239,6 +288,7 @@ func TestPodResizePendingMsg(t *testing.T) {
 		name               string
 		desired            []testContainer
 		allocated          []testContainer
+		podResources       *testResources
 		reason             string
 		message            string
 		observedGeneration int64
@@ -268,6 +318,15 @@ func TestPodResizePendingMsg(t *testing.T) {
 			reason:             "Infeasible",
 			message:            "In-place resize of containers with swap is not supported",
 			expected:           `Pod resize Infeasible: {"initContainers":[{"name":"c0","resources":{"limits":{"cpu":"200m"},"requests":{"cpu":"100m"}}}],"containers":[{"name":"c1","resources":{"limits":{"memory":"200"},"requests":{"memory":"100"}}},{"name":"c2","resources":{"requests":{"cpu":"200m","memory":"100"}}}],"generation":2,"error":"In-place resize of containers with swap is not supported"}`,
+		}, {
+			name:               "with pod-level resources",
+			desired:            []testContainer{{resources: testResources{20, 20, 20, 20}}},
+			allocated:          []testContainer{{resources: testResources{50, 50, 50, 50}}},
+			podResources:       &testResources{200, 400, 200, 400},
+			observedGeneration: 2,
+			reason:             "Deferred",
+			message:            "Node didn't have enough resource: memory",
+			expected:           `Pod resize Deferred: {"resources":{"limits":{"cpu":"400m","memory":"400"},"requests":{"cpu":"200m","memory":"200"}},"containers":[{"name":"c0","resources":{"limits":{"cpu":"20m","memory":"20"},"requests":{"cpu":"20m","memory":"20"}}}],"generation":2,"error":"Node didn't have enough resource: memory"}`,
 		},
 	}
 
@@ -302,6 +361,10 @@ func TestPodResizePendingMsg(t *testing.T) {
 				} else {
 					pod.Spec.Containers = append(pod.Spec.Containers, desired)
 				}
+			}
+			if test.podResources != nil {
+				req := mkRequirements(*test.podResources)
+				pod.Spec.Resources = &req
 			}
 
 			msg := PodResizePendingMsg(logger, pod, test.reason, test.message, test.observedGeneration)
