@@ -1283,8 +1283,8 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
 	device := &slice.Spec.Devices[deviceIndex]
 	if !alloc.features.DeviceBindingAndStatus &&
-		len(device.BindingConditions) > 0 {
-		// Devices with binding conditions are not supported, feature is off.
+		(len(device.BindingConditions) > 0 || device.BindsToNode) {
+		// Devices with binding conditions or which bind to a node are not supported, feature is off.
 		return false, nil
 	}
 
