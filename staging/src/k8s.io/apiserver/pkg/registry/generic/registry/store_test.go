@@ -625,6 +625,72 @@ func TestStoreList(t *testing.T) {
 	}
 }
 
+// A cluster-wide list whose field selector pins a single namespace paginates within that
+// namespace: page 1 encodes the continue key relative to the namespace-scoped key prefix, and
+// continued pages must re-derive the same scope to decode the key back into the namespace.
+// Otherwise objects are either repeated or skipped depending on how their names sort against
+// the namespace name (https://github.com/kubernetes/kubernetes/issues/143868).
+func TestStoreListClusterWideNamespaceFieldSelectorPaging(t *testing.T) {
+	namespacedAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		pod := obj.(*example.Pod)
+		return labels.Set{"name": pod.Name}, fields.Set{
+			"metadata.name":      pod.Name,
+			"metadata.namespace": pod.Namespace,
+		}, nil
+	}
+	pods := []*example.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "a1"}, Spec: example.PodSpec{NodeName: "machine"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "a2"}, Spec: example.PodSpec{NodeName: "machine"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "z1"}, Spec: example.PodSpec{NodeName: "machine"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "z2"}, Spec: example.PodSpec{NodeName: "machine"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "z3"}, Spec: example.PodSpec{NodeName: "machine"}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "z4"}, Spec: example.PodSpec{NodeName: "machine"}},
+	}
+
+	for _, cacheEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cacheEnabled=%t", cacheEnabled), func(t *testing.T) {
+			destroyFunc, registry := newTestGenericStoreRegistryWithCacherAttrsFunc(t, scheme, cacheEnabled, namespacedAttrs)
+			defer destroyFunc()
+
+			for _, pod := range pods {
+				createCtx := genericapirequest.WithNamespace(genericapirequest.NewContext(), pod.Namespace)
+				if err := storagetesting.CreateObjList(registry.KeyRootFunc(createCtx), registry.Storage.Storage, []runtime.Object{pod.DeepCopy()}); err != nil {
+					t.Fatalf("Unexpected error %v", err)
+				}
+			}
+
+			clusterWideCtx := genericapirequest.NewContext()
+			var gotNames []string
+			continueValue := ""
+			for page := 0; ; page++ {
+				if page > 10 {
+					t.Fatal("pagination did not terminate")
+				}
+				list, err := registry.ListPredicate(clusterWideCtx, storage.SelectionPredicate{
+					Field:    fields.OneTermEqualSelector("metadata.namespace", "test"),
+					GetAttrs: namespacedAttrs,
+				}, &metainternalversion.ListOptions{Limit: 2, Continue: continueValue})
+				if err != nil {
+					t.Fatalf("page %d: unexpected error %v", page, err)
+				}
+				podList := list.(*example.PodList)
+				for _, pod := range podList.Items {
+					gotNames = append(gotNames, pod.Name)
+				}
+				continueValue = podList.ListMeta.Continue
+				if continueValue == "" {
+					break
+				}
+			}
+
+			wantNames := []string{"a1", "a2", "z1", "z2"}
+			if !reflect.DeepEqual(gotNames, wantNames) {
+				t.Errorf("paged cluster-wide list of namespace=test with limit 2 returned %v, want %v", gotNames, wantNames)
+			}
+		})
+	}
+}
+
 // TestStoreListResourceVersion tests that if List with ResourceVersion > 0, it will wait until
 // the results are as fresh as given version.
 func TestStoreListResourceVersion(t *testing.T) {
@@ -2719,6 +2785,10 @@ func TestStoreWatch(t *testing.T) {
 }
 
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
+	return newTestGenericStoreRegistryWithCacherAttrsFunc(t, scheme, hasCacheEnabled, getPodAttrs)
+}
+
+func newTestGenericStoreRegistryWithCacherAttrsFunc(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool, attrsFunc storage.AttrFunc) (factory.DestroyFunc, *Store) {
 	return newTestStoreRegistry(
 		t,
 		scheme,
@@ -2726,10 +2796,11 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		func() runtime.Object { return &example.Pod{} },
 		func() runtime.Object { return &example.PodList{} },
 		hasCacheEnabled,
+		attrsFunc,
 	)
 }
 
-func newTestStoreRegistry(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
+func newTestStoreRegistry(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, hasCacheEnabled bool, attrsFunc storage.AttrFunc) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods/"
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
@@ -2752,7 +2823,7 @@ func newTestStoreRegistry(t *testing.T, scheme *runtime.Scheme, codec runtime.Co
 			EventsHistoryWindow: cacherstorage.DefaultEventFreshDuration,
 			ResourcePrefix:      podPrefix,
 			KeyFunc:             keyFuncs.objectKeyFunc,
-			GetAttrsFunc:        getPodAttrs,
+			GetAttrsFunc:        attrsFunc,
 			NewFunc:             newFunc,
 			NewListFunc:         newListFunc,
 			Codec:               sc.Codec,
