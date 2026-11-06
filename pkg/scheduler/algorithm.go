@@ -671,7 +671,9 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 	// Before the nomination ends, so that resources which the pod keeps
 	// never look released.
 	events := schedFramework.RunAllocationExtensionsAddAllocation(ctx, assumedPodInfo.Pod, host)
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+	if !nominationEndsAfterPermit() {
+		schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+	}
 
 	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); !status.IsSuccess() {
 		forgetEvents, err := a.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, host)
@@ -681,6 +683,16 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 		return assumedPodInfo, append(events, forgetEvents...), status
 	}
 	return assumedPodInfo, events, nil
+}
+
+// nominationEndsAfterPermit returns true with the DRAPreemption feature gate:
+// the nomination of a pod which gets assumed then only ends once Reserve and
+// Permit let it through. If they reject it, its nomination gets cleared in
+// handleSchedulingFailure, and the scheduling queue lets the pods retry which
+// the nomination blocked. Without the feature gate, the event handlers do
+// that when the informer reports the cleared nominated node name.
+func nominationEndsAfterPermit() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption)
 }
 
 // UnreserveAndForgetFromCache runs Unreserve plugins, forgets the pod from the scheduler cache

@@ -237,6 +237,9 @@ func (sched *Scheduler) prepareForBindingCycle(
 
 		return assumedPodInfo, allocationEvents, runPermitStatus
 	}
+	if nominationEndsAfterPermit() {
+		schedFramework.DeleteNominatedPodIfExists(assumedPod)
+	}
 	sched.moveAllocationEvents(klog.FromContext(ctx), assumedPod, allocationEvents)
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
