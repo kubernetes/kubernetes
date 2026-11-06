@@ -27,11 +27,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -50,12 +52,13 @@ import (
 
 // filterBothPasses runs Filter on the worker node like
 // RunFilterPluginsWithNominatedPods when it adds nominated pods: first on a
-// copy of the state, then on the state itself. Holds don't depend on the
-// pods which it adds, so both passes must agree.
+// copy of the state with the nominated pods added, then on the state itself.
+// The second pass reuses the allocation of the first one, so both passes
+// must agree.
 func filterBothPasses(tCtx ktesting.TContext, testCtx *testContext, cs fwk.CycleState, pod *v1.Pod) *fwk.Status {
 	tCtx.Helper()
 	nodeInfo := testCtx.nodeInfos[0]
-	passOne := cs.Clone()
+	passOne := addNominatedPods(tCtx, testCtx, cs, pod, nodeInfo)
 	if status := testCtx.p.Filter(tCtx, passOne, pod, nodeInfo); !status.IsSuccess() {
 		return status
 	}
@@ -64,6 +67,28 @@ func filterBothPasses(tCtx ktesting.TContext, testCtx *testContext, cs fwk.Cycle
 	require.True(tCtx, status.IsSuccess(), "pass 2 after pass 1 succeeded: %v", status)
 	require.Equal(tCtx, devices, pickedDevices(tCtx, cs), "devices picked by pass 1 and pass 2")
 	return status
+}
+
+// addNominatedPods returns a copy of the state with the pods added which
+// RunFilterPluginsWithNominatedPods adds in its first pass: those which have
+// a nomination for the node and at least the priority of the pod. The
+// confirmed nominations of the plugin stand in for the PodNominator.
+func addNominatedPods(tCtx ktesting.TContext, testCtx *testContext, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) fwk.CycleState {
+	tCtx.Helper()
+	passOne := cs.Clone()
+	pods, err := testCtx.p.podLister.List(labels.Everything())
+	tCtx.ExpectNoError(err)
+	for _, nominated := range pods {
+		nomination := testCtx.p.nominations.nomination(nominated.UID)
+		if nomination == nil || nomination.nodeName != nodeInfo.Node().Name ||
+			nominated.UID == pod.UID || corev1helpers.PodPriority(nominated) < corev1helpers.PodPriority(pod) {
+			continue
+		}
+		podInfo, err := framework.NewPodInfo(nominated)
+		tCtx.ExpectNoError(err)
+		require.True(tCtx, testCtx.p.AddPod(tCtx, passOne, pod, podInfo, nodeInfo).IsSuccess(), "AddPod")
+	}
+	return passOne
 }
 
 // pickedDevices returns the devices which the last successful Filter on
@@ -548,6 +573,67 @@ func testNominationWithoutHold(tCtx ktesting.TContext) {
 	require.Empty(tCtx, testCtx.p.RemoveNomination(tCtx, preemptor, nodeName).Events, "release events")
 }
 
+func TestHoldsThroughAddPod(t *testing.T) {
+	testHoldsThroughAddPod(ktesting.Init(t))
+}
+
+// testHoldsThroughAddPod checks that only nominations which AddPod added
+// hold devices, and that the second pass of RunFilterPluginsWithNominatedPods
+// reuses the allocation of the first one only while its state is unchanged.
+func testHoldsThroughAddPod(tCtx ktesting.TContext) {
+	slice := st.MakeResourceSlice(nodeName, driver).Device("gpu-0").Device("gpu-1").Obj()
+	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
+	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
+	low := preemptionPod("low", "low-claim").Priority(50).Obj()
+	other := preemptionPod("other", "other-claim").Priority(100).Obj()
+	claims := []*resourceapi.ResourceClaim{
+		preemptionClaim("preemptor-claim").Obj(),
+		preemptionClaim("low-claim").Obj(),
+		preemptionClaim("other-claim").Obj(),
+		reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("gpu-0")).Obj(), victim),
+	}
+	testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, preemptor, low, other})
+	nominate(tCtx, testCtx, preemptor, nodeName, victim)
+	require.Equal(tCtx, []string{"gpu-0"}, heldDevices(testCtx, preemptor))
+	updateClaim(tCtx, testCtx, "victim-claim", func(claim *resourceapi.ResourceClaim) {
+		claim.Status.ReservedFor = nil
+		claim.Status.Allocation = nil
+	})
+	nodeInfo := testCtx.nodeInfos[0]
+	podInfo := func(pod *v1.Pod) fwk.PodInfo {
+		podInfo, err := framework.NewPodInfo(pod)
+		tCtx.ExpectNoError(err)
+		return podInfo
+	}
+	filter := func(cs fwk.CycleState) []string {
+		tCtx.Helper()
+		status := testCtx.p.Filter(tCtx, cs, low, nodeInfo)
+		require.True(tCtx, status.IsSuccess(), "Filter: %v", status)
+		return pickedDevices(tCtx, cs)
+	}
+	state := framework.NewCycleState()
+	_, status := testCtx.p.PreFilter(tCtx, state, low, testCtx.nodeInfos)
+	require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
+
+	// Pods without a nomination for the node don't hold anything.
+	passOne := state.Clone()
+	require.True(tCtx, testCtx.p.AddPod(tCtx, passOne, low, podInfo(other), nodeInfo).IsSuccess(), "AddPod")
+	require.True(tCtx, testCtx.p.AddPod(tCtx, passOne, low, podInfo(preemptor), testCtx.nodeInfos[1]).IsSuccess(), "AddPod")
+	require.Equal(tCtx, []string{"gpu-0"}, filter(passOne), "without nominations for the node")
+
+	passOne = state.Clone()
+	require.True(tCtx, testCtx.p.AddPod(tCtx, passOne, low, podInfo(preemptor), nodeInfo).IsSuccess(), "AddPod")
+	require.Equal(tCtx, []string{"gpu-1"}, filter(passOne), "first pass")
+	require.Equal(tCtx, []string{"gpu-1"}, filter(state), "second pass")
+	require.True(tCtx, testCtx.p.RemovePod(tCtx, passOne, low, podInfo(preemptor), nodeInfo).IsSuccess(), "RemovePod")
+	require.Equal(tCtx, []string{"gpu-0"}, filter(passOne), "nomination removed again")
+
+	// The second pass of another simulation on the same state, for example
+	// after preemption removed a pod, allocates again.
+	require.True(tCtx, testCtx.p.RemovePod(tCtx, state, low, podInfo(victim), nodeInfo).IsSuccess(), "RemovePod")
+	require.Equal(tCtx, []string{"gpu-0"}, filter(state), "second pass after a change")
+}
+
 func TestHoldsWithFramework(t *testing.T) {
 	testHoldsWithFramework(ktesting.Init(t))
 }
@@ -651,7 +737,7 @@ func testHoldsConcurrency(tCtx ktesting.TContext) {
 	statuses := make([]*fwk.Status, numNodes)
 	for i, nodeInfo := range testCtx.nodeInfos {
 		wg.Go(func() {
-			if status := testCtx.p.Filter(tCtx, state.Clone(), low, nodeInfo); !status.IsSuccess() {
+			if status := testCtx.p.Filter(tCtx, addNominatedPods(tCtx, testCtx, state, low, nodeInfo), low, nodeInfo); !status.IsSuccess() {
 				statuses[i] = status
 				return
 			}
