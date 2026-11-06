@@ -19,14 +19,18 @@ package reconciler
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -34,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/mount-utils"
 )
 
@@ -171,6 +176,40 @@ func (rc *reconciler) unmountVolumes(logger klog.Logger) {
 			}
 		}
 	}
+	// Volumes whose TearDown is a no-op and have no per-pod directory on disk (such as Image
+	// volumes after a kubelet restart) are not reconstructed into actualStateOfWorld, so remove
+	// them from actuatedState once absent from desired and actual state and no longer mounted by
+	// any actuated container.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && rc.actuatedState != nil {
+		for _, uid := range rc.actuatedState.GetPodUIDs() {
+			actuatedPod, ok := rc.actuatedState.GetPodReadOnly(uid)
+			if !ok || actuatedPod == nil {
+				continue
+			}
+			podName := volumetypes.UniquePodName(uid)
+			for _, vol := range actuatedPod.Spec.Volumes {
+				if VolumeRequiresUnmount(vol) {
+					continue
+				}
+				if !rc.desiredStateOfWorld.VolumeExistsWithSpecName(podName, vol.Name) &&
+					!rc.actualStateOfWorld.VolumeExistsWithSpecName(podName, vol.Name) &&
+					!isVolumeMountedInActuatedPod(actuatedPod, vol.Name) {
+					if err := rc.actuatedState.RemovePodVolume(logger, uid, vol.Name); err != nil {
+						logger.Error(err, "Failed to remove unmounted volume from actuated state", "podUID", uid, "volumeName", vol.Name)
+					}
+				}
+			}
+		}
+	}
+}
+
+func isVolumeMountedInActuatedPod(actuatedPod *v1.Pod, volumeName string) bool {
+	for c := range pod.ContainerIter(&actuatedPod.Spec, pod.AllContainers) {
+		if slices.ContainsFunc(c.VolumeMounts, func(vm v1.VolumeMount) bool { return vm.Name == volumeName }) {
+			return true
+		}
+	}
+	return false
 }
 
 func (rc *reconciler) mountOrAttachVolumes(logger klog.Logger) {

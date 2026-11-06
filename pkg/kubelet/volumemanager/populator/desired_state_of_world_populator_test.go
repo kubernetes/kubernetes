@@ -35,7 +35,9 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -1644,4 +1646,102 @@ func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.Pe
 		volumePluginMgr:          fakeVolumePluginMgr,
 	}
 	return dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider
+}
+
+func TestDynamicVolumesAddAndRemove(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	logger, tCtx := ktesting.NewTestContext(t)
+	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	dswp.actuatedState = actuatedState
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dyn-pod",
+			UID:       "dyn-pod-uid",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					VolumeMounts: []v1.VolumeMount{
+						{Name: "vol1", MountPath: "/mnt/vol1"},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	fakePodManager.AddPod(testPod)
+	uniquePodName := util.GetUniquePodName(testPod)
+
+	// Step 1: Initial pod volume processing
+	dswp.findAndAddNewPods(tCtx)
+	require.True(t, dswp.podPreviouslyProcessed(uniquePodName))
+	require.Contains(t, dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName), "vol1")
+
+	// Step 2: Dynamically add vol2 to the already-processed running pod
+	podWithVol2 := testPod.DeepCopy()
+	podWithVol2.Spec.Volumes = append(podWithVol2.Spec.Volumes, v1.Volume{
+		Name: "vol2",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	})
+	podWithVol2.Spec.Containers[0].VolumeMounts = append(podWithVol2.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+		Name:      "vol2",
+		MountPath: "/mnt/vol2",
+	})
+	fakePodManager.UpdatePod(podWithVol2)
+
+	dswp.findAndAddNewPods(tCtx)
+	volNames := dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.Contains(t, volNames, "vol2")
+
+	// Record both mounts as actuated on container c1
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, podWithVol2.Spec.Containers[0]))
+
+	// Step 3: Unmounting vol2 from c1 while keeping vol2 in pod.Spec.Volumes preserves vol2 in DSW
+	podVol2Unmounted := podWithVol2.DeepCopy()
+	podVol2Unmounted.Spec.Containers[0].VolumeMounts = testPod.Spec.Containers[0].VolumeMounts
+	fakePodManager.UpdatePod(podVol2Unmounted)
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, podVol2Unmounted.Spec.Containers[0]))
+	dswp.findAndRemoveDeletedPods(logger)
+
+	volNames = dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.Contains(t, volNames, "vol2")
+
+	// Step 4: Dynamically remove vol2 from pod.Spec.Volumes while c1 still mounts vol2 in actuatedState
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, podWithVol2.Spec.Containers[0]))
+	fakePodManager.UpdatePod(testPod)
+	dswp.findAndRemoveDeletedPods(logger)
+
+	// vol2 must remain in DSW while still in use by actuatedState
+	volNames = dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.Contains(t, volNames, "vol2")
+
+	// Step 5: Container c1 restarts without vol2 -> actuatedState no longer references vol2
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, testPod.Spec.Containers[0]))
+	dswp.findAndRemoveDeletedPods(logger)
+
+	volNames = dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.NotContains(t, volNames, "vol2")
+	require.True(t, dswp.podPreviouslyProcessed(uniquePodName))
 }

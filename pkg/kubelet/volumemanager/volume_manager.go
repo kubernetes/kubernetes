@@ -235,7 +235,8 @@ func NewVolumeManager(
 		vm.actualStateOfWorld,
 		csiMigratedPluginManager,
 		intreeToCSITranslator,
-		volumePluginMgr)
+		volumePluginMgr,
+		actuatedState)
 	vm.reconciler = reconciler.NewReconciler(
 		kubeClient,
 		controllerAttachDetachEnabled,
