@@ -3980,6 +3980,7 @@ type PrefixTransformerModifier func(*PrefixTransformer) value.Transformer
 type InterfaceWithPrefixTransformer interface {
 	storage.Interface
 
+	UnderlyingStorage() storage.Interface
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
@@ -6350,8 +6351,8 @@ func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store Interfa
 	if revertTransformer != nil {
 		revertTransformer()
 		if !isDelete {
-			// Stored bytes now carry the rotated prefix and cannot be read with the original prefix alone.
-			require.True(t, storage.IsInternalError(store.Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
+			// Stored bytes now carry the rotated prefix and cannot be read from underlying storage with the original prefix alone.
+			require.True(t, storage.IsInternalError(store.UnderlyingStorage().Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
 		}
 	}
 }

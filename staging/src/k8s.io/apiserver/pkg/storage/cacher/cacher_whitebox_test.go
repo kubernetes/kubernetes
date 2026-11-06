@@ -398,12 +398,15 @@ func mustAtoi(s string) int {
 func TestConsistentReadFallback(t *testing.T) {
 	tcs := []struct {
 		name                string
+		getOnly             bool
+		notFound            bool
 		skipStorageFallback bool
 		watchCacheRV        string
 		storageRV           string
 		fallbackError       bool
 
 		expectError             bool
+		expectNotFound          bool
 		expectTooManyRequests   bool
 		expectRV                string
 		expectBlock             bool
@@ -423,10 +426,41 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 `,
 		},
 		{
+			name:                    "Success NotFound",
+			getOnly:                 true,
+			notFound:                true,
+			watchCacheRV:            "42",
+			storageRV:               "42",
+			expectError:             true,
+			expectNotFound:          true,
+			expectRequestsToStorage: 1,
+			expectMetric: `
+# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
+# TYPE apiserver_watch_cache_consistent_read_total counter
+apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true"} 1
+`,
+		},
+		{
 			name:                    "Fallback",
 			watchCacheRV:            "2",
 			storageRV:               "42",
 			expectRV:                "42",
+			expectBlock:             true,
+			expectRequestsToStorage: 2,
+			expectMetric: `
+# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
+# TYPE apiserver_watch_cache_consistent_read_total counter
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true"} 1
+`,
+		},
+		{
+			name:                    "Fallback NotFound",
+			getOnly:                 true,
+			notFound:                true,
+			watchCacheRV:            "2",
+			storageRV:               "42",
+			expectError:             true,
+			expectNotFound:          true,
 			expectBlock:             true,
 			expectRequestsToStorage: 2,
 			expectMetric: `
@@ -468,9 +502,15 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Run("GetList", func(t *testing.T) {
+			if !tc.getOnly {
+				t.Run("GetList", func(t *testing.T) {
+					delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
+					testConsistentListFallback(t, delegator, fakeClock, requestToStorageCount, registry, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+				})
+			}
+			t.Run("Get", func(t *testing.T) {
 				delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
-				testConsistentListFallback(t, delegator, fakeClock, requestToStorageCount, registry, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+				testConsistentGetFallback(t, delegator, fakeClock, requestToStorageCount, registry, tc.notFound, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectNotFound, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
 			})
 		})
 	}
@@ -479,6 +519,7 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, fallbackError, skipStorageFallback bool) (*CacheDelegator, *testingclock.FakeClock, *int, k8smetrics.KubeRegistry) {
 	t.Helper()
 	ForceRequestWatchProgressSupport(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
 	if skipStorageFallback {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
 	}
@@ -530,6 +571,24 @@ func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, f
 		podList.ResourceVersion = storageRV
 		return nil
 	}
+	backingStorage.GetFn = func(_ context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+		requestToStorageCount += 1
+		if fallbackError {
+			return errDummy
+		}
+		if key != "/pods/ns/pod1" {
+			return storage.NewKeyNotFoundError(key, int64(mustAtoi(storageRV)))
+		}
+		pod := objPtr.(*example.Pod)
+		*pod = example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod1",
+				Namespace:       "ns",
+				ResourceVersion: storageRV,
+			},
+		}
+		return nil
+	}
 	backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
 		requestToStorageCount += 1
 		rv, err := strconv.Atoi(storageRV)
@@ -542,6 +601,28 @@ func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, f
 }
 
 func testConsistentListFallback(t *testing.T, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, expectRV string, expectBlock, expectError, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
+	t.Helper()
+	testConsistentReadFallback(t, fakeClock, requestToStorageCount, registry, func() (string, error) {
+		result := &example.PodList{}
+		err := delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
+		return result.ResourceVersion, err
+	}, expectRV, expectBlock, expectError, false, expectTooManyRequests, expectRequestsToStorage, expectMetric)
+}
+
+func testConsistentGetFallback(t *testing.T, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, notFound bool, expectRV string, expectBlock, expectError, expectNotFound, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
+	t.Helper()
+	key := "/pods/ns/pod1"
+	if notFound {
+		key = "/pods/ns/missing"
+	}
+	testConsistentReadFallback(t, fakeClock, requestToStorageCount, registry, func() (string, error) {
+		result := &example.Pod{}
+		err := delegator.Get(context.TODO(), key, storage.GetOptions{ResourceVersion: ""}, result)
+		return result.ResourceVersion, err
+	}, expectRV, expectBlock, expectError, expectNotFound, expectTooManyRequests, expectRequestsToStorage, expectMetric)
+}
+
+func testConsistentReadFallback(t *testing.T, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, readFn func() (string, error), expectRV string, expectBlock, expectError, expectNotFound, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
 	t.Helper()
 	ctx, clockStepCancelFn := context.WithTimeout(context.TODO(), time.Minute)
 	defer clockStepCancelFn()
@@ -562,18 +643,20 @@ func testConsistentListFallback(t *testing.T, delegator *CacheDelegator, fakeClo
 	}
 
 	start := fakeClock.Now()
-	result := &example.PodList{}
-	err := delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
+	gotRV, err := readFn()
 	clockStepCancelFn()
 	duration := fakeClock.Since(start)
 	if (err != nil) != expectError {
 		t.Fatalf("Unexpected error err: %v", err)
 	}
+	if expectNotFound && !storage.IsNotFound(err) {
+		t.Fatalf("Unexpected error, got: %v, want NotFound", err)
+	}
 	if expectTooManyRequests && !apierrors.IsTooManyRequests(err) {
 		t.Fatalf("Unexpected error, got: %v, want TooManyRequests", err)
 	}
-	if result.ResourceVersion != expectRV {
-		t.Fatalf("Unexpected List response RV, got: %q, want: %q", result.ResourceVersion, expectRV)
+	if gotRV != expectRV {
+		t.Fatalf("Unexpected response RV, got: %q, want: %q", gotRV, expectRV)
 	}
 	if *requestToStorageCount != expectRequestsToStorage {
 		t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", *requestToStorageCount, expectRequestsToStorage)
@@ -782,7 +865,7 @@ func TestGetCacheBypass(t *testing.T) {
 			name:                   "ConsistentGetFromCache=true,RequestWatchProgress=true",
 			consistentGetFromCache: true,
 			watchProgressSupported: true,
-			expectConsistentBypass: true,
+			expectConsistentBypass: false,
 		},
 		{
 			name:                   "ConsistentGetFromCache=true,RequestWatchProgress=false",
