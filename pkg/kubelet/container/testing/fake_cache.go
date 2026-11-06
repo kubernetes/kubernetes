@@ -44,8 +44,7 @@ func (c *fakeCache) GetNewerThan(ctx context.Context, id types.UID, minTime time
 	return c.Get(ctx, id)
 }
 
-func (c *fakeCache) Set(id types.UID, status *container.PodStatus, err error, timestamp time.Time) (updated bool) {
-	return true
+func (c *fakeCache) Set(id types.UID, status *container.PodStatus, err error, timestamp time.Time) {
 }
 
 func (c *fakeCache) Delete(id types.UID) {
