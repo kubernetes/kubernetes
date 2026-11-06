@@ -63,9 +63,9 @@ func IsPodEligibleForSwap(pod *v1.Pod) (bool, int64) {
 		return false, 0
 	}
 	opts := resourcehelper.PodResourcesOptions{
-		ExcludeOverhead:                          true,
-		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
-		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+		ExcludeOverhead:                  true,
+		SkipPodLevelResources:            !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+		UseExtraNodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
 	}
 	reqs := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

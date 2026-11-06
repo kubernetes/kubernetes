@@ -608,27 +608,29 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	extendedResourceClaimPod.Status.ExtendedResourceClaimStatus = &api.PodExtendedResourceClaimStatus{ResourceClaimName: "myclaim"}
 
 	nodeAllocatableResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	nodeAllocatableResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+	nodeAllocatableResourceClaimPod.Status.ExtraNodeAllocatableResources = []api.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: "myclaim",
-			Containers:        []string{"mycontainer"},
-			Mapping: []api.NodeAllocatableMappedResources{{
-				Name:     api.ResourceCPU,
-				Quantity: new(resource.MustParse("1")),
-			}},
+			ContainerName: "",
+			Requests:      api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+			Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
+		},
+		{
+			ContainerName: "mycontainer",
+			Limits:        api.ResourceList{api.ResourceCPU: resource.MustParse("1")},
 		},
 	}
 
 	nodeAllocatableOverheadResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	nodeAllocatableOverheadResourceClaimPod.Status.NodeAllocatableResourceClaimStatuses = []api.NodeAllocatableResourceClaimStatus{
+	nodeAllocatableOverheadResourceClaimPod.Status.ExtraNodeAllocatableResources = []api.ExtraNodeAllocatableResource{
 		{
-			ResourceClaimName: "myclaim",
-			Containers:        []string{"mycontainer"},
-			Overhead: []api.NodeAllocatableOverheadResources{{
-				Name:         api.ResourceMemory,
-				PerPod:       new(resource.MustParse("1Gi")),
-				PerContainer: new(resource.MustParse("500Mi")),
-			}},
+			ContainerName: "",
+			Requests:      api.ResourceList{api.ResourceMemory: resource.MustParse("1524Mi")},
+			Limits:        api.ResourceList{api.ResourceMemory: resource.MustParse("1524Mi")},
+		},
+		{
+			ContainerName: "mycontainer",
+			Requests:      api.ResourceList{api.ResourceMemory: resource.MustParse("500Mi")},
+			Limits:        api.ResourceList{api.ResourceMemory: resource.MustParse("1524Mi")},
 		},
 	}
 
@@ -1195,13 +1197,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid update of pod's node allocatable resource claim status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update node allocatable resource claim statuses",
+			err:        "cannot update extra node allocatable resources",
 		},
 		{
 			name:       "forbid update of pod's node allocatable overhead resource claim status",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nodeAllocatableOverheadResourceClaimPod, claimpod, podKind, nodeAllocatableOverheadResourceClaimPod.Namespace, nodeAllocatableOverheadResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update node allocatable resource claim statuses",
+			err:        "cannot update extra node allocatable resources",
 		},
 
 		// My node object

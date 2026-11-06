@@ -938,12 +938,11 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		Status: api.PodStatus{
-			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+			ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Mapping: []api.NodeAllocatableMappedResources{
-						{Name: api.ResourceMemory, Quantity: new(resource.MustParse("100Mi"))},
-					},
+					ContainerName: "",
+					Requests:      api.ResourceList{api.ResourceMemory: resource.MustParse("100Mi")},
+					Limits:        api.ResourceList{api.ResourceMemory: resource.MustParse("100Mi")},
 				},
 			},
 		},
@@ -968,15 +967,11 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 		},
 		Status: api.PodStatus{
-			NodeAllocatableResourceClaimStatuses: []api.NodeAllocatableResourceClaimStatus{
+			ExtraNodeAllocatableResources: []api.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "node-allocatable-claim",
-					Overhead: []api.NodeAllocatableOverheadResources{
-						{
-							Name:   api.ResourceMemory,
-							PerPod: new(resource.MustParse("100Mi")),
-						},
-					},
+					ContainerName: "",
+					Requests:      api.ResourceList{api.ResourceMemory: resource.MustParse("100Mi")},
+					Limits:        api.ResourceList{api.ResourceMemory: resource.MustParse("100Mi")},
 				},
 			},
 		},

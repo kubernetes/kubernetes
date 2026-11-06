@@ -60,21 +60,21 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 	})
 
 	tests := []struct {
-		name                                  string
-		nodeCapacityCPU                       string
-		nodeCapacityMem                       string
-		nodeCapacityPods                      string
-		nodePreemptionPolicy                  *v1.NodePodPreemptionPolicy
-		existingPods                          []*v1.Pod
-		existingPodAllocatedCPU               map[string]string
-		terminatingByPreemptionPods           map[string]bool
-		preemptorConfig                       *testutils.PausePodConfig
-		preemptorNodeAllocatableClaimStatuses []v1.NodeAllocatableResourceClaimStatus
-		expectEvictedNames                    []string
-		resizePodWhileVictimTerminating       string
-		resizePodNewCPU                       string
-		expectEvaluationCompletedImmediately  bool
-		expectFailedSchedulingEvent           bool
+		name                                   string
+		nodeCapacityCPU                        string
+		nodeCapacityMem                        string
+		nodeCapacityPods                       string
+		nodePreemptionPolicy                   *v1.NodePodPreemptionPolicy
+		existingPods                           []*v1.Pod
+		existingPodAllocatedCPU                map[string]string
+		terminatingByPreemptionPods            map[string]bool
+		preemptorConfig                        *testutils.PausePodConfig
+		preemptorExtraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
+		expectEvictedNames                     []string
+		resizePodWhileVictimTerminating        string
+		resizePodNewCPU                        string
+		expectEvaluationCompletedImmediately   bool
+		expectFailedSchedulingEvent            bool
 	}{
 		{
 			name:            "preempt single low priority pod",
@@ -307,7 +307,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 			expectEvaluationCompletedImmediately: true,
 		},
 		{
-			name:            "DRA node-allocatable resource claim statuses accounted for during deferred resize preemption",
+			name:            "DRA extra node allocatable resources accounted for during deferred resize preemption",
 			nodeCapacityCPU: "300m",
 			nodeCapacityMem: "300",
 			existingPods: []*v1.Pod{
@@ -331,14 +331,14 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 					Claims: []v1.ResourceClaim{{Name: "dra-cpu-claim"}},
 				},
 			},
-			preemptorNodeAllocatableClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+			preemptorExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 				{
-					ResourceClaimName: "dra-cpu-claim",
-					Containers:        []string{"preemptor-pod"},
-					Mapping: []v1.NodeAllocatableMappedResources{{
-						Name:     v1.ResourceCPU,
-						Quantity: new(resource.MustParse("100m")),
-					}},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+				},
+				{
+					ContainerName: "preemptor-pod",
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
 				},
 			},
 			expectEvictedNames: []string{"victim-1"},
@@ -581,7 +581,7 @@ func TestDeferredResizePodPreemption(t *testing.T) {
 					},
 				},
 			}
-			preemptorPod.Status.NodeAllocatableResourceClaimStatuses = tt.preemptorNodeAllocatableClaimStatuses
+			preemptorPod.Status.ExtraNodeAllocatableResources = tt.preemptorExtraNodeAllocatableResources
 			preemptorPod, err = cs.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, preemptorPod, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to update status of preemptor pod: %v", err)
