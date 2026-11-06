@@ -126,6 +126,11 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 }
 
 func matchesResourceRules(namedRules []v1.NamedRuleWithOperations, matchPolicy *v1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
+	// Empty rules never match; return before the equivalence lookup allocates.
+	if len(namedRules) == 0 {
+		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil
+	}
+
 	matchKind := attr.GetKind()
 	matchResource := attr.GetResource()
 
