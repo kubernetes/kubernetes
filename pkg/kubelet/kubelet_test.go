@@ -459,7 +459,8 @@ func newTestKubeletWithImageList(
 		volumetest.NewBlockVolumePathHandler(),
 		kubelet.statusManager,
 		0,
-		kubelet.actuatedState)
+		kubelet.actuatedState,
+		nil)
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
@@ -6785,4 +6786,81 @@ func TestCollectSecurityProfiles(t *testing.T) {
 			assert.Equal(t, tc.collections, gc.collections)
 		})
 	}
+}
+
+func TestSyncTerminatedPodClearsDynamicVolumeStatuses(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	pod := podWithUIDNameNs("pod-term-dyn-vol", "pod-term-dyn-vol", "default")
+	pod.Spec = v1.PodSpec{
+		RestartPolicy: v1.RestartPolicyNever,
+		Containers: []v1.Container{
+			{
+				Name:  "c1",
+				Image: "busybox",
+				VolumeMounts: []v1.VolumeMount{
+					{Name: "vol-img", MountPath: "/mnt/img"},
+					{Name: "vol-pending", MountPath: "/mnt/pending"},
+				},
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				Name: "vol-img",
+				VolumeSource: v1.VolumeSource{
+					Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/pause:3.10"},
+				},
+			},
+			{
+				Name: "vol-pending",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		},
+	}
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	initialActuated := pod.DeepCopy()
+	initialActuated.Spec.Volumes = nil
+	require.NoError(t, kl.actuatedState.SetPod(logger, initialActuated))
+	require.NoError(t, kl.actuatedState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
+
+	stoppedPodStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:       kubecontainer.ContainerID{Type: "test", ID: "c1-id"},
+				Name:     "c1",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+		},
+	}
+
+	// Before SyncTerminatedPod cleans up actuatedState, a terminal status generation
+	// reports still-actuated dynamic volumes as Unmounting and omits unmounted ones.
+	beforeUnmount := kl.generateAPIPodStatus(tCtx, pod, stoppedPodStatus, TerminatedPod)
+	assert.Equal(t, v1.PodSucceeded, beforeUnmount.Phase)
+	assert.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-img", HostPhase: v1.PodVolumeHostUnmounting},
+	}, beforeUnmount.VolumeStatuses)
+
+	require.NoError(t, kl.SyncTerminatedPod(tCtx, pod, stoppedPodStatus))
+
+	finalStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	require.True(t, found)
+	assert.Equal(t, v1.PodSucceeded, finalStatus.Phase)
+	assert.Empty(t, finalStatus.VolumeStatuses)
+
+	vols, _ := kl.actuatedState.GetPodVolumes(pod.UID)
+	assert.Empty(t, vols)
 }

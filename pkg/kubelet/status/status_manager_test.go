@@ -2070,6 +2070,62 @@ func TestNormalizeStatusVolumeHealth(t *testing.T) {
 	}
 }
 
+func TestVolumeStatusesHealthAndHostPhaseCoexist(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	logger, _ := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Spec.Volumes = []v1.Volume{{Name: "z-csi"}, {Name: "a-dyn"}}
+	m := newTestManager(&fake.Clientset{})
+	m.podManager.(mutablePodManager).AddPod(pod)
+
+	// VolumeManager reports HostPhase for dynamic volume a-dyn.
+	m.SetPodStatus(logger, pod, v1.PodStatus{
+		VolumeStatuses: []v1.PodVolumeStatus{
+			{Name: "a-dyn", HostPhase: v1.PodVolumeHostMounted},
+		},
+	})
+	verifyUpdates(t, m, 1)
+
+	// CSI health probe reports HealthStatus for z-csi without clobbering a-dyn HostPhase.
+	conditions := []v1.VolumeHealthCondition{{Status: v1.VolumeHealthDegraded, Reason: "SlowIO"}}
+	require.True(t, m.SetPodVolumeHealth(logger, pod.UID, "z-csi", conditions))
+	verifyUpdates(t, m, 1)
+
+	got := expectPodStatus(t, m, pod)
+	require.Len(t, got.VolumeStatuses, 2)
+	assert.Equal(t, "a-dyn", got.VolumeStatuses[0].Name)
+	assert.Equal(t, v1.PodVolumeHostMounted, got.VolumeStatuses[0].HostPhase)
+	assert.Nil(t, got.VolumeStatuses[0].HealthStatus)
+	assert.Equal(t, "z-csi", got.VolumeStatuses[1].Name)
+	require.NotNil(t, got.VolumeStatuses[1].HealthStatus)
+	assert.Equal(t, conditions, got.VolumeStatuses[1].HealthStatus.HealthConditions)
+
+	// Subsequent runtime status update omitting HealthStatus preserves z-csi HealthStatus alongside a-dyn HostPhase.
+	m.SetPodStatus(logger, pod, v1.PodStatus{
+		VolumeStatuses: []v1.PodVolumeStatus{
+			{Name: "a-dyn", HostPhase: v1.PodVolumeHostUnmounting},
+		},
+	})
+	verifyUpdates(t, m, 1)
+	gotAfter := expectPodStatus(t, m, pod)
+	require.Len(t, gotAfter.VolumeStatuses, 2)
+	assert.Equal(t, v1.PodVolumeHostUnmounting, gotAfter.VolumeStatuses[0].HostPhase)
+	require.NotNil(t, gotAfter.VolumeStatuses[1].HealthStatus)
+	assert.Equal(t, conditions, gotAfter.VolumeStatuses[1].HealthStatus.HealthConditions)
+
+	// TerminatePod clears dynamic HostPhase entries while preserving CSI HealthStatus.
+	m.TerminatePod(logger, pod)
+	verifyUpdates(t, m, 1)
+	gotTerminated := expectPodStatus(t, m, pod)
+	require.Len(t, gotTerminated.VolumeStatuses, 1)
+	assert.Equal(t, "z-csi", gotTerminated.VolumeStatuses[0].Name)
+	assert.Empty(t, gotTerminated.VolumeStatuses[0].HostPhase)
+	require.NotNil(t, gotTerminated.VolumeStatuses[0].HealthStatus)
+	assert.Equal(t, conditions, gotTerminated.VolumeStatuses[0].HealthStatus.HealthConditions)
+}
+
 func TestSetContainerStartup(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}

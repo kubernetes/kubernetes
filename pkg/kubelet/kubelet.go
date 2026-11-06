@@ -1105,6 +1105,16 @@ func NewMainKubelet(ctx context.Context,
 		vmPodManager = &allocatedPodManager{baseManager: klet.podManager, allocationManager: klet.allocationManager}
 	}
 
+	var triggerPodSync func(klog.Logger, types.UID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		triggerPodSync = func(logger klog.Logger, podUID types.UID) {
+			if klet.pleg != nil {
+				klet.RequestPodReinspect(podUID)
+				klet.RequestPodRelist(logger, podUID)
+			}
+		}
+	}
+
 	klet.volumeManager = volumemanager.NewVolumeManager(
 		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
@@ -1119,7 +1129,8 @@ func NewMainKubelet(ctx context.Context,
 		volumepathhandler.NewBlockVolumePathHandler(),
 		klet.statusManager,
 		kubeCfg.VolumeStatsAggPeriod.Duration,
-		actuatedState)
+		actuatedState,
+		triggerPodSync)
 
 	boMax, base := newCrashLoopBackOff(kubeCfg)
 
@@ -2647,6 +2658,16 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		return err
 	}
 	logger.V(3).Info("Pod termination cleaned up volume paths", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && kl.actuatedState != nil {
+		if vols, ok := kl.actuatedState.GetPodVolumes(pod.UID); ok {
+			for _, vol := range vols {
+				if err := kl.actuatedState.RemovePodVolume(logger, pod.UID, vol.Name); err != nil {
+					logger.Error(err, "Failed to remove volume from actuated state for terminated pod", "pod", klog.KObj(pod), "podUID", pod.UID, "volumeName", vol.Name)
+				}
+			}
+		}
+	}
 
 	// After volume unmount is complete, let the secret and configmap managers know we're done with this pod
 	if kl.secretManager != nil {
