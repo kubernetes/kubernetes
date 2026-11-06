@@ -204,6 +204,104 @@ func TestKillContainer(t *testing.T) {
 	}
 }
 
+func TestKillRemovedContainerRestoresSpecFromLabels(t *testing.T) {
+	setup := func(t *testing.T) (ktesting.TContext, *apitest.FakeRuntimeService, *kubeGenericRuntimeManager, *v1.Pod, kubecontainer.ContainerID, *fakeHTTP) {
+		tCtx := ktesting.Init(t)
+		fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+		require.NoError(t, err)
+
+		gracePeriod := int64(30)
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "pod1_id",
+				Name:      "pod1",
+				Namespace: "default",
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: &gracePeriod,
+				Containers: []v1.Container{
+					{
+						Name:  "keep-container",
+						Image: "busybox",
+					},
+					{
+						Name:                   "removed-container",
+						Image:                  "busybox",
+						TerminationMessagePath: "/dev/termination-log-custom",
+						Ports: []v1.ContainerPort{
+							{
+								Name:          "http",
+								ContainerPort: 8080,
+							},
+						},
+						Lifecycle: &v1.Lifecycle{
+							PreStop: &v1.LifecycleHandler{
+								HTTPGet: &v1.HTTPGetAction{
+									Host: "testHost.com",
+									Port: intstr.FromString("http"),
+									Path: "/GracefulExit",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		_, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
+		require.Len(t, fakeContainers, 2)
+		removedContainerID := kubecontainer.ContainerID{
+			Type: apitest.FakeRuntimeName,
+			ID:   fakeContainers[1].Id,
+		}
+
+		fakeHTTPClient := &fakeHTTP{}
+		fakePodStatusProvider := fakePodStatusProvider{
+			pod: &kubecontainer.Pod{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+			status: &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				IPs:       []string{"127.0.0.1"},
+			},
+		}
+		m.runner = lifecycle.NewHandlerRunner(
+			fakeHTTPClient,
+			&containertest.FakeContainerCommandRunner{},
+			fakePodStatusProvider,
+			nil,
+		)
+
+		pod.Spec.Containers = pod.Spec.Containers[:1]
+		return tCtx, fakeRuntime, m, pod, removedContainerID, fakeHTTPClient
+	}
+
+	t.Run("executes PreStop hook using restored container spec and ports", func(t *testing.T) {
+		tCtx, fakeRuntime, m, pod, removedContainerID, fakeHTTPClient := setup(t)
+		err := m.killContainer(tCtx, pod, removedContainerID, "removed-container", "Container removed-container removed from pod spec", "", nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, fakeHTTPClient.req)
+		assert.Equal(t, "http://testHost.com:8080/GracefulExit", fakeHTTPClient.req.URL.String())
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_EXITED, fakeRuntime.Containers[removedContainerID.ID].State)
+	})
+
+	t.Run("preserves live pod grace period over restored pod annotation", func(t *testing.T) {
+		tCtx, fakeRuntime, m, pod, removedContainerID, fakeHTTPClient := setup(t)
+		zeroGrace := int64(0)
+		pod.DeletionGracePeriodSeconds = &zeroGrace
+		pod.Spec.TerminationGracePeriodSeconds = &zeroGrace
+
+		err := m.killContainer(tCtx, pod, removedContainerID, "removed-container", "Container removed-container removed from pod spec", "", nil, nil)
+		require.NoError(t, err)
+		assert.Nil(t, fakeHTTPClient.req, "PreStop hook should not run when live pod grace period is 0")
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_EXITED, fakeRuntime.Containers[removedContainerID.ID].State)
+	})
+}
+
 // TestToKubeContainerStatus tests the converting the CRI container status to
 // the internal type (i.e., toKubeContainerStatus()) for containers in
 // different states.

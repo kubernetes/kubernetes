@@ -17,6 +17,7 @@ limitations under the License.
 package allocation
 
 import (
+	"cmp"
 	"context"
 	"path/filepath"
 	"slices"
@@ -427,7 +428,7 @@ func (m *manager) GetPodLevelResourceAllocation(podUID types.UID) (*v1.ResourceR
 //   - passthrough: they take effect as soon as they change in the pod, e.g. tolerations.
 //   - gated on allocation: they take their allocated value, so that a change only takes effect once it is
 //     allocated (admitted and checkpointed) as a whole. Today the only gated fields that can change
-//     are resources.
+//     are resources, and with DynamicContainers also the images and the set of main containers.
 //   - immutable fields: they are classified as 'gated on allocation' too, since which value they take then does
 //     not matter, and this requires fewer changes as we make more fields mutable over time.
 //
@@ -472,10 +473,10 @@ func copyPassthroughFields(spec, desired *v1.PodSpec) {
 	spec.Tolerations = desired.Tolerations
 	spec.TerminationGracePeriodSeconds = desired.TerminationGracePeriodSeconds
 	spec.EphemeralContainers = desired.EphemeralContainers
-	// TODO: The image becomes gated with dynamic containers, at which point we
-	// should stop copying the image here.
-	copyImages(spec.Containers, desired.Containers)
-	copyImages(spec.InitContainers, desired.InitContainers)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		copyImages(spec.Containers, desired.Containers)
+		copyImages(spec.InitContainers, desired.InitContainers)
+	}
 }
 
 // copyImages sets the image of each container to the one of the container with the same name in desired.
@@ -550,11 +551,6 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		return false, nil
 	}
 
-	resizeRequested := isResizeRequested(pod, allocatedPod)
-	if !resizeRequested {
-		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
-	}
-
 	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
 	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.podProvider.GetActivePods()), pod, lifecycle.ResizeOperation)
 	if fit {
@@ -562,7 +558,13 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			return false, err
 		}
-		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
+		resizeRequested := isResizeRequested(pod, allocatedPod)
+		resolution := metrics.DeferredResizeResolutionAccepted
+		if !resizeRequested {
+			// Any resize that was pending has been reverted, even if other changes were allocated.
+			resolution = metrics.DeferredResizeResolutionReverted
+		}
+		m.statusManager.ClearPodResizePendingCondition(pod.UID, resolution)
 
 		if resizeRequested {
 			// Clear any errors that may have been surfaced from a previous resize and update the
@@ -576,7 +578,8 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		return true, nil
 	}
 
-	if reason != "" && resizeRequested {
+	// TODO(KEP-5972): Revisit reporting blocked changes that aren't resizes as PodResizePending.
+	if reason != "" {
 		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
 			eventType := events.ResizeDeferred
 			if reason == v1.PodReasonInfeasible {
@@ -590,20 +593,27 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	return false, nil
 }
 
+func containerHasResources(c *v1.Container) bool {
+	return len(c.Resources.Requests) > 0 || len(c.Resources.Limits) > 0
+}
+
 // isResizeRequested returns whether the desired pod asks for a change to the resources of its
 // containers, to its pod-level resources, or to the size limit of one of its memory-backed emptyDir
-// volumes. Any other field that is gated on allocation can differ too, but that is not a resize.
+// volumes. With DynamicContainers, adding or removing a main container that has resources is a
+// resize too. Any other field that is gated on allocation can differ too, but that is not a resize.
 func isResizeRequested(desired, allocated *v1.Pod) bool {
-	// TODO: Adjust this function when dynamic containers is implemented, to check for added/removed containers
-	// that will also cause a resize.
 	if !apiequality.Semantic.DeepEqual(desired.Spec.Resources, allocated.Spec.Resources) {
 		return true
 	}
-	for c := range podutil.ContainerIter(&desired.Spec, podutil.InitContainers|podutil.Containers) {
-		for ac := range podutil.ContainerIter(&allocated.Spec, podutil.AllContainers) {
-			if ac.Name == c.Name && !apiequality.Semantic.DeepEqual(c.Resources, ac.Resources) {
+	dynamicContainers := utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)
+	for pair := range podutil.ContainerPairs(desired, allocated, podutil.InitContainers|podutil.Containers) {
+		if pair.New != nil && pair.Old != nil {
+			if !apiequality.Semantic.DeepEqual(pair.New.Resources, pair.Old.Resources) {
 				return true
 			}
+		} else if dynamicContainers && containerHasResources(cmp.Or(pair.New, pair.Old)) {
+			// The container was added or removed.
+			return true
 		}
 	}
 	for _, vol := range desired.Spec.Volumes {

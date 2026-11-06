@@ -2180,9 +2180,13 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		pod.Spec.Containers,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		false,
+		podutil.Containers,
 		podRestarting,
 	)
+	if unallocated := kl.unallocatedContainerStatuses(pod); len(unallocated) > 0 {
+		apiPodStatus.ContainerStatuses = append(apiPodStatus.ContainerStatuses, unallocated...)
+		sort.Sort(kubetypes.SortedContainerStatuses(apiPodStatus.ContainerStatuses))
+	}
 	apiPodStatus.InitContainerStatuses = kl.convertToAPIContainerStatuses(
 		ctx,
 		pod, podStatus,
@@ -2190,7 +2194,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		pod.Spec.InitContainers,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		true,
+		podutil.InitContainers,
 		podRestarting,
 	)
 	var ecSpecs []v1.Container
@@ -2207,7 +2211,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		ecSpecs,
 		imageVolumeNames,
 		len(pod.Spec.InitContainers) > 0,
-		false,
+		podutil.EphemeralContainers,
 		podRestarting,
 	)
 
@@ -2221,6 +2225,38 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 	}
 
 	return &apiPodStatus
+}
+
+// unallocatedContainerStatuses returns a Waiting status for each main container that was added to
+// the pod but isn't allocated yet, i.e. isn't in allocatedPod. The kubelet doesn't run these
+// containers until they are allocated.
+func (kl *Kubelet) unallocatedContainerStatuses(allocatedPod *v1.Pod) []v1.ContainerStatus {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		return nil
+	}
+	apiPod, ok := kl.podManager.GetPodByUID(allocatedPod.UID)
+	if !ok {
+		return nil
+	}
+	// No other status can have the name of an unallocated container: validation rejects adding a
+	// container whose name is still in the pod's statuses, and a removed container's status goes
+	// away only together with its runtime container.
+	var statuses []v1.ContainerStatus
+	for pair := range podutil.ContainerPairs(apiPod, allocatedPod, podutil.Containers) {
+		if pair.Old != nil {
+			continue
+		}
+		c := pair.New
+		statuses = append(statuses, v1.ContainerStatus{
+			Name:  c.Name,
+			Image: c.Image,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{
+				Reason:  kubecontainer.ContainerReasonUnallocated,
+				Message: "The container has not been allocated by the kubelet yet",
+			}},
+		})
+	}
+	return statuses
 }
 
 func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequirements {
@@ -2344,9 +2380,20 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	return resources
 }
 
+// hasContainer returns whether the pod spec has a container with the given name among the
+// container types in mask.
+func hasContainer(pod *v1.Pod, name string, mask podutil.ContainerType) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, mask) {
+		if c.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
-func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers, isInitContainer bool, podRestarting bool) []v1.ContainerStatus {
+func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers bool, containerType podutil.ContainerType, podRestarting bool) []v1.ContainerStatus {
 	logger := klog.FromContext(ctx)
 	convertContainerStatus := func(cs *kubecontainer.Status, oldStatus *v1.ContainerStatus) *v1.ContainerStatus {
 		cid := cs.ID.String()
@@ -2721,8 +2768,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 	containerSeen := map[string]int{}
 	for _, cStatus := range containerStatusesCopy {
 		cName := cStatus.Name
-		if _, ok := statuses[cName]; !ok {
-			// This would also ignore the infra container.
+		// Names are unique across container types, and only regular containers can be removed
+		// from the spec, so a regular container that isn't in the spec at all was removed.
+		removed := containerType == podutil.Containers &&
+			!slices.ContainsFunc(containers, func(c v1.Container) bool { return c.Name == cName }) &&
+			!hasContainer(pod, cName, podutil.InitContainers|podutil.EphemeralContainers)
+		// statuses starts out with an entry for each container in the spec list for this type.
+		if _, ok := statuses[cName]; !ok && !removed {
 			continue
 		}
 		if containerSeen[cName] >= 2 {
@@ -2765,6 +2817,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		}
 
 		if containerSeen[cName] == 0 {
+			// This also creates the entry for a container removed from the spec.
+			// It is never carried over from the old status, so it goes away with the
+			// runtime container, which kuberuntime prunes beyond maxRemovedContainers.
+			// TODO(KEP-5972): revisit ContainerStateUnknown handling for removed containers.
 			statuses[cName] = status
 		} else {
 			statuses[cName].LastTerminationState = status.State
@@ -2774,7 +2830,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {
-		if isInitContainer {
+		if containerType == podutil.InitContainers {
 			// If the init container is terminated with exit code 0, it won't be restarted.
 			// TODO(random-liu): Handle this in a cleaner way.
 			s := podStatus.FindContainerStatusByName(container.Name)
@@ -2836,7 +2892,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 
 	// Sort the container statuses since clients of this interface expect the list
 	// of containers in a pod has a deterministic order.
-	if isInitContainer {
+	if containerType == podutil.InitContainers {
 		return kubetypes.SortStatusesOfInitContainers(pod, statuses)
 	}
 	containerStatuses := make([]v1.ContainerStatus, 0, len(statuses))

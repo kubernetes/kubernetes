@@ -1297,7 +1297,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           ContainerRequestedResizesKey,
-			Help:           "Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			Help:           "Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase', 'decrease', 'add_container' or 'remove_container'.",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource", "requirement", "operation"},

@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -53,6 +54,7 @@ import (
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -4250,6 +4252,10 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
+			containerType := podutil.Containers
+			if test.isInitContainer {
+				containerType = podutil.InitContainers
+			}
 			containerStatuses := kl.convertToAPIContainerStatuses(
 				tCtx,
 				test.pod,
@@ -4258,7 +4264,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				test.containers,
 				nil,
 				test.hasInitContainers,
-				test.isInitContainer,
+				containerType,
 				test.podRestarting,
 			)
 			for i, status := range containerStatuses {
@@ -4445,7 +4451,7 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 				test.pod.Spec.Containers,
 				sets.New(imageVolumeName),
 				false,
-				false,
+				podutil.Containers,
 				false,
 			)
 			for i, status := range containerStatuses {
@@ -6163,9 +6169,9 @@ func Test_generateAPIPodStatusOnKubeletRestart(t *testing.T) {
 			}
 
 			// On the first sync after a kubelet restart there is no readiness worker yet,
-			// because SyncPod calls generateAPIPodStatus before probeManager.AddPod.
+			// because SyncPod calls generateAPIPodStatus before probeManager.SyncPod.
 			if !tc.firstSyncAfterKubeletRestart {
-				kl.probeManager.AddPod(tCtx, pod)
+				kl.probeManager.SyncPod(tCtx, pod)
 				t.Cleanup(func() { kl.probeManager.RemovePod(pod) })
 			}
 
@@ -7014,8 +7020,223 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
 	for i := 0; i < 2; i++ {
 		go func() {
-			kl.convertToAPIContainerStatuses(tCtx, pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, false, false)
+			kl.convertToAPIContainerStatuses(tCtx, pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, nil, false, podutil.Containers, false)
 		}()
+	}
+}
+
+func TestConvertToAPIContainerStatusesByType(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		InitContainers: []v1.Container{{Name: "init"}},
+		Containers:     []v1.Container{{Name: "main"}},
+		EphemeralContainers: []v1.EphemeralContainer{{
+			EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"},
+		}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	now := time.Now()
+	status := func(name, id string, state kubecontainer.State, age time.Duration) *kubecontainer.Status {
+		return &kubecontainer.Status{
+			Name:      name,
+			ID:        kubecontainer.ContainerID{Type: "test", ID: id},
+			State:     state,
+			CreatedAt: now.Add(-age),
+		}
+	}
+	inSpec := []*kubecontainer.Status{
+		status("init", "init-id", kubecontainer.ContainerStateExited, 3*time.Minute),
+		status("main", "main-id", kubecontainer.ContainerStateRunning, 2*time.Minute),
+		status("debug", "debug-id", kubecontainer.ContainerStateRunning, time.Minute),
+	}
+
+	// Each expected map is container name -> container ID.
+	tests := []struct {
+		name              string
+		statuses          []*kubecontainer.Status
+		expectedMain      map[string]string
+		expectedInit      map[string]string
+		expectedEphemeral map[string]string
+	}{{
+		name:              "in-spec containers",
+		statuses:          inSpec,
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}, {
+		name:              "container missing from the spec",
+		statuses:          append(append([]*kubecontainer.Status{}, inSpec...), status("removed", "removed-id", kubecontainer.ContainerStateExited, time.Minute)),
+		expectedInit:      map[string]string{"init": "test://init-id"},
+		expectedMain:      map[string]string{"main": "test://main-id", "removed": "test://removed-id"},
+		expectedEphemeral: map[string]string{"debug": "test://debug-id"},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			podStatus := &kubecontainer.PodStatus{
+				ID:                pod.UID,
+				Name:              pod.Name,
+				Namespace:         pod.Namespace,
+				ContainerStatuses: test.statuses,
+			}
+			var ecSpecs []v1.Container
+			for i := range pod.Spec.EphemeralContainers {
+				ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+			}
+			for _, tc := range []struct {
+				containerType podutil.ContainerType
+				containers    []v1.Container
+				expected      map[string]string
+			}{
+				{podutil.InitContainers, pod.Spec.InitContainers, test.expectedInit},
+				{podutil.Containers, pod.Spec.Containers, test.expectedMain},
+				{podutil.EphemeralContainers, ecSpecs, test.expectedEphemeral},
+			} {
+				statuses := kl.convertToAPIContainerStatuses(tCtx, pod, podStatus, nil, tc.containers, nil, true, tc.containerType, false)
+				actual := map[string]string{}
+				for _, s := range statuses {
+					actual[s.Name] = s.ContainerID
+				}
+				assert.Equal(t, tc.expected, actual, "container type %v", tc.containerType)
+			}
+		})
+	}
+}
+
+// A container removed from the spec is no longer allocated and its resources no longer count, so
+// its status has no resources, even if its old status had some from when it was in the spec.
+func TestConvertToAPIContainerStatusesRemovedContainerResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		Containers:    []v1.Container{{Name: "main"}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	cpu := v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")}
+	oldStatuses := []v1.ContainerStatus{{
+		Name:               "removed",
+		ContainerID:        "test://removed-id",
+		State:              v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+		Resources:          &v1.ResourceRequirements{Requests: cpu, Limits: cpu},
+		AllocatedResources: cpu,
+	}}
+	now := time.Now()
+	for _, state := range []kubecontainer.State{kubecontainer.ContainerStateRunning, kubecontainer.ContainerStateExited} {
+		t.Run(string(state), func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			podStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:      "removed",
+					ID:        kubecontainer.ContainerID{Type: "test", ID: "removed-id"},
+					State:     state,
+					CreatedAt: now.Add(-time.Minute),
+					// The CRI reports the resources of a running container.
+					Resources: &kubecontainer.ContainerResources{CPURequest: ptr.To(resource.MustParse("100m"))},
+				}},
+			}
+			statuses := testKubelet.kubelet.convertToAPIContainerStatuses(tCtx, pod, podStatus, oldStatuses, pod.Spec.Containers, nil, false, podutil.Containers, false)
+			removed, ok := podutil.GetContainerStatus(statuses, "removed")
+			require.True(t, ok)
+			assert.Nil(t, removed.Resources)
+			assert.Nil(t, removed.AllocatedResources)
+		})
+	}
+}
+
+func TestGenerateAPIPodStatusUnallocatedContainers(t *testing.T) {
+	unallocated := func(name, image string) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:  name,
+			Image: image,
+			State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{
+				Reason:  kubecontainer.ContainerReasonUnallocated,
+				Message: "The container has not been allocated by the kubelet yet",
+			}},
+		}
+	}
+	tests := []struct {
+		name              string
+		dynamicContainers bool
+		// apiContainers are the main containers of the pod in the API. The allocated pod only has c1.
+		apiContainers []v1.Container
+		// expectedUnallocated are the statuses expected besides the one of c1.
+		expectedUnallocated []v1.ContainerStatus
+	}{{
+		name:                "container added",
+		dynamicContainers:   true,
+		apiContainers:       []v1.Container{{Name: "c1", Image: "i1"}, {Name: "c0", Image: "i0"}, {Name: "c2", Image: "i2"}},
+		expectedUnallocated: []v1.ContainerStatus{unallocated("c0", "i0"), unallocated("c2", "i2")},
+	}, {
+		name:                "container added while another is removed",
+		dynamicContainers:   true,
+		apiContainers:       []v1.Container{{Name: "c2", Image: "i2"}},
+		expectedUnallocated: []v1.ContainerStatus{unallocated("c2", "i2")},
+	}, {
+		name:              "container added with the gate disabled",
+		dynamicContainers: false,
+		apiContainers:     []v1.Container{{Name: "c1", Image: "i1"}, {Name: "c2", Image: "i2"}},
+	}, {
+		name:              "nothing pending",
+		dynamicContainers: true,
+		apiContainers:     []v1.Container{{Name: "c1", Image: "i1"}},
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.dynamicContainers {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, test.dynamicContainers)
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			allocatedPod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+			allocatedPod.Spec = v1.PodSpec{
+				Containers:    []v1.Container{{Name: "c1", Image: "i1"}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			}
+			apiPod := allocatedPod.DeepCopy()
+			apiPod.Spec.Containers = test.apiContainers
+			kl.podManager.SetPods([]*v1.Pod{apiPod})
+
+			podStatus := &kubecontainer.PodStatus{
+				ID:        allocatedPod.UID,
+				Name:      allocatedPod.Name,
+				Namespace: allocatedPod.Namespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					Name:  "c1",
+					ID:    kubecontainer.ContainerID{Type: "test", ID: "c1-id"},
+					State: kubecontainer.ContainerStateRunning,
+					Image: "i1",
+				}},
+			}
+			status := kl.generateAPIPodStatus(tCtx, allocatedPod, podStatus, SyncPod)
+
+			var names []string
+			var unallocatedStatuses []v1.ContainerStatus
+			for _, s := range status.ContainerStatuses {
+				names = append(names, s.Name)
+				if s.Name == "c1" {
+					assert.NotNil(t, s.State.Running, "c1 is running")
+					continue
+				}
+				s.Ready = false // The fake prober marks every container ready.
+				unallocatedStatuses = append(unallocatedStatuses, s)
+			}
+			assert.True(t, slices.IsSorted(names), "statuses are sorted: %v", names)
+			assert.Equal(t, test.expectedUnallocated, unallocatedStatuses)
+			assert.Equal(t, v1.PodRunning, status.Phase)
+		})
 	}
 }
 
@@ -7579,7 +7800,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				hasExclusiveCPUs := kubelet.containerManager.ContainerHasExclusiveCPUs(logger, tPod, &tPod.Spec.Containers[0])
 				assert.Equal(t, tc.MockHasExclusiveCPUs, hasExclusiveCPUs)
 			}
-			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, false, false)
+			cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, nil, false, podutil.Containers, false)
 			actual := cStatuses[0]
 			// Explicitly test AllocatedResources and Resources separately for debuggability.
 			assert.Equal(t, tc.Expected.AllocatedResources, actual.AllocatedResources, "AllocatedResources")
@@ -7679,7 +7900,7 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 		tPod := testPod.DeepCopy()
 		t.Logf("TestCase: %q", tdesc)
 
-		cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, false, false)
+		cStatuses := kubelet.convertToAPIContainerStatuses(tCtx, tPod, tc.testPodStatus, tPod.Status.ContainerStatuses, tPod.Spec.Containers, nil, false, podutil.Containers, false)
 
 		assert.Equal(t, tc.expectedContainerStatus, cStatuses)
 	}
@@ -10258,4 +10479,54 @@ func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
 			assert.Equal(t, tc.expectInProgress, cachedInProgress, "PodResizeInProgress in statusManager")
 		})
 	}
+}
+
+// Statuses of containers removed from the spec follow their runtime
+// containers: once a runtime container is gone (garbage collected, or pruned
+// by kuberuntime beyond maxRemovedContainers), its status is gone too, even
+// though the old API status still has it.
+func TestConvertStatusToAPIStatusRemovedContainers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	now := time.Now()
+	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+	pod.Spec = v1.PodSpec{
+		Containers:    []v1.Container{{Name: "main"}},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{{
+			Name:      "main",
+			ID:        kubecontainer.ContainerID{Type: "test", ID: "main"},
+			State:     kubecontainer.ContainerStateRunning,
+			CreatedAt: now.Add(-time.Hour),
+			StartedAt: now.Add(-time.Hour),
+		}, {
+			Name:       "removed",
+			ID:         kubecontainer.ContainerID{Type: "test", ID: "removed"},
+			State:      kubecontainer.ContainerStateExited,
+			CreatedAt:  now.Add(-time.Hour),
+			StartedAt:  now.Add(-time.Hour),
+			FinishedAt: now.Add(-time.Minute),
+		}},
+	}
+	terminated := v1.ContainerState{Terminated: &v1.ContainerStateTerminated{FinishedAt: metav1.NewTime(now)}}
+	oldStatus := v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+		{Name: "removed", ContainerID: "test://removed", State: terminated},
+		// "gc" was removed and its runtime container has since been deleted.
+		{Name: "gc", ContainerID: "test://gc", State: terminated},
+	}}
+
+	status := testKubelet.kubelet.convertStatusToAPIStatus(tCtx, pod, podStatus, oldStatus)
+	var names []string
+	for _, s := range status.ContainerStatuses {
+		names = append(names, s.Name)
+	}
+	assert.Equal(t, []string{"main", "removed"}, names)
 }
