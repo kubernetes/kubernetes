@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/mldsa"
-	"crypto/x509"
+	"crypto/rsa"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -29,7 +30,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/keyutil"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -58,89 +59,69 @@ import (
 // utilities for loading JOSE keys.
 
 func loadRSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
-	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
-		key, err := x509.ParsePKCS1PrivateKey(b)
-		if err != nil {
-			return nil, err
-		}
-		return key.Public(), nil
-	})
+	return loadPublicKey[*rsa.PublicKey](t, filepath, alg)
 }
 
 func loadRSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
-	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
-		return x509.ParsePKCS1PrivateKey(b)
-	})
+	return loadPrivateKey[*rsa.PrivateKey](t, filepath, alg)
 }
 
 func loadECDSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
-	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
-		key, err := x509.ParseECPrivateKey(b)
-		if err != nil {
-			return nil, err
-		}
-		return key.Public(), nil
-	})
+	return loadPublicKey[*ecdsa.PublicKey](t, filepath, alg)
 }
 
 func loadECDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
-	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
-		return x509.ParseECPrivateKey(b)
-	})
+	return loadPrivateKey[*ecdsa.PrivateKey](t, filepath, alg)
 }
 
 func loadMLDSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
-	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
-		key, err := x509.ParsePKCS8PrivateKey(b)
-		if err != nil {
-			return nil, err
-		}
-
-		mldsaKey, ok := key.(*mldsa.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("loaded key is not an ML-DSA private key, got %T", key)
-		}
-
-		return mldsaKey.PublicKey(), nil
-	})
+	return loadPublicKey[*mldsa.PublicKey](t, filepath, alg)
 }
 
 func loadMLDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
-	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
-		key, err := x509.ParsePKCS8PrivateKey(b)
-		if err != nil {
-			return nil, err
-		}
-
-		mldsaKey, ok := key.(*mldsa.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("loaded key is not an ML-DSA private key, got %T", key)
-		}
-
-		return mldsaKey, nil
-	})
+	return loadPrivateKey[*mldsa.PrivateKey](t, filepath, alg)
 }
 
-func loadKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm, unmarshal func([]byte) (interface{}, error)) *jose.JSONWebKey {
-	data, err := os.ReadFile(filepath)
+func loadPrivateKey[T crypto.PrivateKey](t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	key, err := keyutil.PrivateKeyFromFile(filepath)
 	if err != nil {
-		t.Fatalf("load file: %v", err)
+		t.Fatalf("getting private key from file: %v", err)
 	}
-	block, _ := pem.Decode(data)
-	if block == nil {
-		t.Fatalf("file contained no PEM encoded data: %s", filepath)
+
+	_, ok := key.(T)
+	if !ok {
+		t.Fatalf("expected key type %T but got type %T", *new(T), key)
 	}
-	priv, err := unmarshal(block.Bytes)
-	if err != nil {
-		t.Fatalf("unmarshal key: %v", err)
-	}
-	key := &jose.JSONWebKey{Key: priv, Use: "sig", Algorithm: string(alg)}
-	thumbprint, err := key.Thumbprint(crypto.SHA256)
+
+	jwk := &jose.JSONWebKey{Key: key, Use: "sig", Algorithm: string(alg)}
+	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
 	if err != nil {
 		t.Fatalf("computing thumbprint: %v", err)
 	}
-	key.KeyID = hex.EncodeToString(thumbprint)
-	return key
+	jwk.KeyID = hex.EncodeToString(thumbprint)
+	return jwk
+}
+
+func loadPublicKey[T crypto.PublicKey](t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	keys, err := keyutil.PublicKeysFromFile(filepath)
+	if err != nil {
+		t.Fatalf("getting public keys from file: %v", err)
+	}
+
+	key := keys[0]
+
+	_, ok := key.(T)
+	if !ok {
+		t.Fatalf("expected key type %T but got type %T", *new(T), key)
+	}
+
+	jwk := &jose.JSONWebKey{Key: key, Use: "sig", Algorithm: string(alg)}
+	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
+	if err != nil {
+		t.Fatalf("computing thumbprint: %v", err)
+	}
+	jwk.KeyID = hex.EncodeToString(thumbprint)
+	return jwk
 }
 
 // staticKeySet implements oidc.KeySet.
@@ -4665,7 +4646,6 @@ func TestUnmarshalClaim(t *testing.T) {
 				var n int
 				err := c.unmarshalClaim("aud", &n)
 				return n, err
-
 			},
 			wantErr: true,
 		},
