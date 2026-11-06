@@ -439,3 +439,67 @@ func TestPatchPodStatusNotPersisted(t *testing.T) {
 		})
 	}
 }
+
+// TestNominationChangeOfPodItself checks that a pod whose nomination got
+// changed by something else than its own scheduling cycle, for example
+// preemption for another pod, retries.
+func TestNominationChangeOfPodItself(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj()
+	withNomination := func(nodeName string) *v1.Pod {
+		p := pod.DeepCopy()
+		p.Status.NominatedNodeName = nodeName
+		return p
+	}
+
+	for name, tc := range map[string]struct {
+		change    func(t *testing.T, q *PriorityQueue)
+		wantMoved bool
+	}{
+		"cleared-by-update": {
+			change: func(t *testing.T, q *PriorityQueue) {
+				_, ctx := ktesting.NewTestContext(t)
+				q.Update(ctx, pod, withNomination(""))
+			},
+			wantMoved: true,
+		},
+		"changed-by-update": {
+			change: func(t *testing.T, q *PriorityQueue) {
+				_, ctx := ktesting.NewTestContext(t)
+				q.Update(ctx, pod, withNomination("node2"))
+			},
+			wantMoved: true,
+		},
+		"cleared-by-own-cycle": {
+			change: func(t *testing.T, q *PriorityQueue) {
+				logger, _ := ktesting.NewTestContext(t)
+				q.AddNominatedPod(logger, mustPodInfo(t, pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride})
+			},
+		},
+		"nominated-elsewhere-by-own-cycle": {
+			change: func(t *testing.T, q *PriorityQueue) {
+				logger, _ := ktesting.NewTestContext(t)
+				q.AddNominatedPod(logger, mustPodInfo(t, pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"})
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			m := makeEmptyQueueingHintMapPerProfile()
+			m[""][framework.EventAssignedPodDelete] = []*QueueingHintFunction{{PluginName: "fooPlugin", QueueingHintFn: queueHintReturnQueue}}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithQueueingHintMapPerProfile(m))
+			q.Add(ctx, pod)
+			if _, err := q.Pop(logger); err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+			if err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, pod, "fooPlugin"), q.SchedulingCycle()); err != nil {
+				t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+			}
+
+			tc.change(t, q)
+			if moved := getUnschedulablePod(q, pod) == nil; moved != tc.wantMoved {
+				t.Errorf("Pod moved: got %v, want %v", moved, tc.wantMoved)
+			}
+		})
+	}
+}
