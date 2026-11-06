@@ -48,55 +48,39 @@ func TestClaimNominations(t *testing.T) {
 	t.Run("confirm-and-remove", func(t *testing.T) {
 		n := newClaimNominations()
 		n.prepare("p", &podNomination{nodeName: "a"})
-		require.Nil(t, n.confirm("p", "b", false), "candidate for another node")
-		require.Nil(t, n.confirm("p", "a", true), "candidate of a nominated pod for an assumed one")
-		require.NotNil(t, n.confirm("p", "a", false), "candidate for the node")
+		require.Nil(t, n.confirm("p", "b"), "candidate for another node")
+		require.NotNil(t, n.confirm("p", "a"), "candidate for the node")
 		require.Equal(t, "a", n.nomination("p").nodeName)
 		// An event about another nomination must not remove this one.
 		removed, _ := n.removeNomination("p", "b")
 		require.Nil(t, removed)
-		removed, kept := n.removeNomination("p", "a")
+		removed, newer := n.removeNomination("p", "a")
 		require.NotNil(t, removed)
-		require.Nil(t, kept)
+		require.Nil(t, newer)
 		require.Nil(t, n.nomination("p"))
 		// Nominated to the same node again, it gets the same devices.
-		require.Equal(t, removed, n.confirm("p", "a", false), "removed nomination is the candidate")
+		require.Equal(t, removed, n.confirm("p", "a"), "removed nomination is the candidate")
 	})
 
 	t.Run("newer-candidate", func(t *testing.T) {
 		n := newClaimNominations()
 		n.prepare("p", &podNomination{nodeName: "a"})
-		n.confirm("p", "a", false)
+		n.confirm("p", "a")
 		newer := &podNomination{nodeName: "a"}
 		n.prepare("p", newer)
-		_, kept := n.removeNomination("p", "a")
-		require.Equal(t, newer, kept)
-		require.Equal(t, newer, n.confirm("p", "a", false))
-	})
-
-	t.Run("assumed", func(t *testing.T) {
-		n := newClaimNominations()
-		n.prepare("p", &podNomination{nodeName: "a"})
-		n.confirm("p", "a", false)
-		assumed := &podNomination{nodeName: "a", assumed: true}
-		n.prepare("p", assumed)
-		require.Equal(t, assumed, n.confirm("p", "a", true))
-		_, kept := n.removeNomination("p", "a")
-		require.Equal(t, assumed, kept)
-		require.Nil(t, n.confirm("p", "a", false), "no candidate kept for an assumed pod")
-		require.Nil(t, n.removeAssumed("p", "b"), "assumed on another node")
-		require.Equal(t, assumed, n.removeAssumed("p", "a"))
-		require.Nil(t, n.removeAssumed("p", "a"))
+		_, got := n.removeNomination("p", "a")
+		require.Equal(t, newer, got)
+		require.Equal(t, newer, n.confirm("p", "a"))
 	})
 
 	t.Run("forget-candidate", func(t *testing.T) {
 		n := newClaimNominations()
 		n.prepare("p", &podNomination{nodeName: "a"})
 		n.forgetCandidate("p")
-		require.Nil(t, n.confirm("p", "a", false))
+		require.Nil(t, n.confirm("p", "a"))
 		n.prepare("p", &podNomination{nodeName: "a"})
 		n.prepare("p", nil)
-		require.Nil(t, n.confirm("p", "a", false))
+		require.Nil(t, n.confirm("p", "a"))
 	})
 }
 
@@ -157,10 +141,10 @@ func prepareNomination(tCtx ktesting.TContext, testCtx *testContext, preemptor *
 	return state
 }
 
-// assume runs PreFilter and Filter for the pod on the node and then
-// PrepareAllocation and AddAllocation for the assumed pod, like
-// AssumeAndReserveInCache. It returns the assumed pod.
-func assume(tCtx ktesting.TContext, testCtx *testContext, pod *v1.Pod, nodeName string) *v1.Pod {
+// assume runs PreFilter, Filter and Reserve for the pod on the node, like the
+// scheduling cycle which assumes the pod. It returns the assumed pod and the
+// CycleState.
+func assume(tCtx ktesting.TContext, testCtx *testContext, pod *v1.Pod, nodeName string) (*v1.Pod, fwk.CycleState) {
 	tCtx.Helper()
 	state := framework.NewCycleState()
 	_, status := testCtx.p.PreFilter(tCtx, state, pod, testCtx.nodeInfos)
@@ -172,9 +156,9 @@ func assume(tCtx ktesting.TContext, testCtx *testContext, pod *v1.Pod, nodeName 
 	}
 	require.True(tCtx, status.IsSuccess(), "Filter: %v", status)
 	assumed := fromPod(pod).Node(nodeName).Obj()
-	testCtx.p.PrepareAllocation(tCtx, state, assumed, nodeName)
-	testCtx.p.AddAllocation(tCtx, assumed, nodeName)
-	return assumed
+	status = testCtx.p.Reserve(tCtx, state, assumed, nodeName)
+	require.True(tCtx, status.IsSuccess(), "Reserve: %v", status)
+	return assumed, state
 }
 
 // releasedDevices returns the devices in the events.
@@ -375,56 +359,6 @@ func testPrepareNomination(tCtx ktesting.TContext) {
 					victim2.UID: {Namespace: namespace, Name: victim2.Name},
 				}, nomination.victims)
 			}
-		})
-	}
-}
-
-func TestAssumedAllocation(t *testing.T) {
-	testAssumedAllocation(ktesting.Init(t))
-}
-
-// testAssumedAllocation checks when removing the allocation of an assumed
-// pod releases its devices: only when they did not get persisted, like
-// after Unreserve.
-func testAssumedAllocation(tCtx ktesting.TContext) {
-	slice := st.MakeResourceSlice(nodeName, driver).Device("gpu-0").Obj()
-	pod := preemptionPod("pod", "pod-claim").Obj()
-	claims := []*resourceapi.ResourceClaim{preemptionClaim("pod-claim").Obj()}
-
-	for name, tc := range map[string]struct {
-		change      func(tCtx ktesting.TContext, testCtx *testContext)
-		wantDevices []string
-	}{
-		"forgotten": {
-			wantDevices: []string{"gpu-0"},
-		},
-		"pending": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				claim, err := testCtx.draManager.ResourceClaims().Get(namespace, "pod-claim")
-				tCtx.ExpectNoError(err)
-				claim = claim.DeepCopy()
-				claim.Status.Allocation = preemptionAllocation("gpu-0")
-				tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim))
-			},
-		},
-		"bound": {
-			change: func(tCtx ktesting.TContext, testCtx *testContext) {
-				updateClaim(tCtx, testCtx, "pod-claim", func(claim *resourceapi.ResourceClaim) {
-					claim.Status.Allocation = preemptionAllocation("gpu-0")
-				})
-			},
-		},
-	} {
-		tCtx.Run(name, func(tCtx ktesting.TContext) {
-			testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, pod})
-			assumed := assume(tCtx, testCtx, pod, nodeName)
-			if tc.change != nil {
-				tc.change(tCtx, testCtx)
-			}
-			require.Empty(tCtx, testCtx.p.RemoveAllocation(tCtx, assumed, node2Name).Events, "assumed on another node")
-			require.Empty(tCtx, testCtx.p.RemoveAllocation(tCtx, pod, nodeName).Events, "nomination instead of assumed pod")
-			require.Equal(tCtx, tc.wantDevices, releasedDevices(tCtx, testCtx.p.RemoveAllocation(tCtx, assumed, nodeName)))
-			require.Empty(tCtx, testCtx.p.RemoveAllocation(tCtx, assumed, nodeName).Events, "removed again")
 		})
 	}
 }

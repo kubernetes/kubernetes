@@ -29,9 +29,8 @@ import (
 
 // claimNominations is what the DynamicResources plugin remembers about the
 // devices which pods are going to get before that got persisted (KEP-5690):
-// those of preempted pods which nominated preemptors are waiting for, and
-// those which assumed pods keep when their nomination ends. Claims of
-// preempted pods are tracked separately by victimClaimTracker.
+// those of preempted pods which nominated preemptors are waiting for. Claims
+// of preempted pods are tracked separately by victimClaimTracker.
 // DefaultDRAManager owns it, so all profiles share it.
 //
 // AllocationExtensions and queueing hints use it while the scheduling queue
@@ -45,18 +44,12 @@ type claimNominations struct {
 	// pods maps the UIDs of nominated preemptors to their confirmed
 	// nomination.
 	pods map[types.UID]*podNomination
-	// assumed maps the UIDs of assumed pods to the devices which Filter
-	// selected for them.
-	assumed map[types.UID]*podNomination
 }
 
-// podNomination is what a pod is going to get on a node, either as a
-// nominated preemptor or as an assumed pod.
+// podNomination is what a nominated preemptor is going to get on a node.
 type podNomination struct {
 	nodeName string
 	priority int32
-	// assumed is true for the devices of an assumed pod.
-	assumed bool
 	// victims are the pods with claims which got preempted for the
 	// nomination.
 	victims map[types.UID]types.NamespacedName
@@ -76,7 +69,6 @@ func newClaimNominations() *claimNominations {
 	return &claimNominations{
 		candidates: make(map[types.UID]*podNomination),
 		pods:       make(map[types.UID]*podNomination),
-		assumed:    make(map[types.UID]*podNomination),
 	}
 }
 
@@ -91,11 +83,11 @@ func (n *claimNominations) prepare(podUID types.UID, candidate *podNomination) {
 	n.candidates[podUID] = candidate
 }
 
-// confirm turns the candidate of the pod into its nomination or its assumed
-// devices, if it is for the node. It returns the confirmed candidate.
-func (n *claimNominations) confirm(podUID types.UID, nodeName string, assumed bool) *podNomination {
-	// Most calls are for pods without a candidate, for example for each
-	// assumed pod without claims, which don't need to block readers.
+// confirm turns the candidate of the pod into its nomination, if it is for
+// the node. It returns the confirmed candidate.
+func (n *claimNominations) confirm(podUID types.UID, nodeName string) *podNomination {
+	// Most calls are for pods without a candidate, which don't need to
+	// block readers.
 	n.mutex.RLock()
 	_, ok := n.candidates[podUID]
 	n.mutex.RUnlock()
@@ -105,25 +97,19 @@ func (n *claimNominations) confirm(podUID types.UID, nodeName string, assumed bo
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 	candidate := n.candidates[podUID]
-	if candidate == nil || candidate.nodeName != nodeName || candidate.assumed != assumed {
+	if candidate == nil || candidate.nodeName != nodeName {
 		return nil
 	}
 	delete(n.candidates, podUID)
-	if assumed {
-		n.assumed[podUID] = candidate
-	} else {
-		n.pods[podUID] = candidate
-	}
+	n.pods[podUID] = candidate
 	return candidate
 }
 
 // removeNomination drops the nomination of the pod for the node and returns
-// it, together with the devices which the pod keeps on the node, if any:
-// those of the pod assumed there or those of a newer candidate for the same
-// node. Without a newer candidate, the nomination becomes the candidate
-// again, so that nominating the pod to the node again restores it, unless
-// the pod got assumed.
-func (n *claimNominations) removeNomination(podUID types.UID, nodeName string) (removed, kept *podNomination) {
+// it, together with a newer candidate for the same node, if any. Without a
+// newer candidate, the nomination becomes the candidate again, so that
+// nominating the pod to the node again restores it.
+func (n *claimNominations) removeNomination(podUID types.UID, nodeName string) (removed, newer *podNomination) {
 	n.mutex.RLock()
 	_, ok := n.pods[podUID]
 	n.mutex.RUnlock()
@@ -137,37 +123,14 @@ func (n *claimNominations) removeNomination(podUID types.UID, nodeName string) (
 		return nil, nil
 	}
 	delete(n.pods, podUID)
-	assumed := n.assumed[podUID]
 	candidate := n.candidates[podUID]
 	switch {
-	case assumed != nil && assumed.nodeName == nodeName:
-		kept = assumed
-	case candidate != nil && !candidate.assumed && candidate.nodeName == nodeName:
-		kept = candidate
-	}
-	if candidate == nil && assumed == nil {
+	case candidate == nil:
 		n.candidates[podUID] = removed
+	case candidate.nodeName == nodeName:
+		newer = candidate
 	}
-	return removed, kept
-}
-
-// removeAssumed drops the devices of the assumed pod on the node and returns
-// them.
-func (n *claimNominations) removeAssumed(podUID types.UID, nodeName string) *podNomination {
-	n.mutex.RLock()
-	_, ok := n.assumed[podUID]
-	n.mutex.RUnlock()
-	if !ok {
-		return nil
-	}
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-	assumed := n.assumed[podUID]
-	if assumed == nil || assumed.nodeName != nodeName {
-		return nil
-	}
-	delete(n.assumed, podUID)
-	return assumed
+	return removed, newer
 }
 
 // nomination returns the confirmed nomination of the pod, nil if there is

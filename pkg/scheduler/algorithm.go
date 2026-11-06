@@ -653,41 +653,34 @@ func (a *SchedulingAlgorithm) FindAllNodesThatFitPod(ctx context.Context, state 
 
 // AssumeAndReserveInCache assumes the pod into the scheduler cache and runs Reserve plugins.
 // If Reserve plugins fail, the assumption is rolled back from the cache.
-//
-// The returned events come from AllocationExtensions. The caller lets pods
-// retry with them, after the pod itself went back to the queue if it failed.
 func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state fwk.CycleState,
 	schedFramework framework.Framework, podInfo *framework.QueuedPodInfo,
-	scheduleResult ScheduleResult) (*framework.QueuedPodInfo, []framework.AllocationEvent, *fwk.Status) {
+	scheduleResult ScheduleResult) (*framework.QueuedPodInfo, *fwk.Status) {
 
 	logger := klog.FromContext(ctx)
 	host := scheduleResult.SuggestedHost
 	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
-	schedFramework.RunAllocationExtensionsPrepareAllocation(ctx, state, assumedPodInfo.Pod, host)
 	if err := a.cache.AssumePod(logger, assumedPodInfo.Pod); err != nil {
 		logger.Error(err, "Scheduler cache AssumePod failed")
-		return assumedPodInfo, nil, fwk.AsStatus(err)
+		return assumedPodInfo, fwk.AsStatus(err)
 	}
-	// Before the nomination ends, so that resources which the pod keeps
-	// never look released.
-	events := schedFramework.RunAllocationExtensionsAddAllocation(ctx, assumedPodInfo.Pod, host)
 	if !nominationEndsAfterPermit() {
 		schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
 	}
 
 	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); !status.IsSuccess() {
-		forgetEvents, err := a.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, host)
-		if err != nil {
+		if err := a.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, host); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "UnreserveAndForgetFromCache failed")
 		}
-		return assumedPodInfo, append(events, forgetEvents...), status
+		return assumedPodInfo, status
 	}
-	return assumedPodInfo, events, nil
+	return assumedPodInfo, nil
 }
 
 // nominationEndsAfterPermit returns true with the DRAPreemption feature gate:
 // the nomination of a pod which gets assumed then only ends once Reserve and
-// Permit let it through. If they reject it, its nomination gets cleared in
+// Permit let it through, so that AllocationExtensions can compare it with
+// what the pod reserved. If they reject it, its nomination gets cleared in
 // handleSchedulingFailure, and the scheduling queue lets the pods retry which
 // the nomination blocked. Without the feature gate, the event handlers do
 // that when the informer reports the cleared nominated node name.
@@ -695,18 +688,15 @@ func nominationEndsAfterPermit() bool {
 	return utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption)
 }
 
-// UnreserveAndForgetFromCache runs Unreserve plugins, forgets the pod from the scheduler cache
-// and returns the events of AllocationExtensions for the allocation which the assumed pod held.
+// UnreserveAndForgetFromCache runs Unreserve plugins and forgets the pod from the scheduler cache.
 func (a *SchedulingAlgorithm) UnreserveAndForgetFromCache(ctx context.Context, state fwk.CycleState,
-	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) ([]framework.AllocationEvent, error) {
+	schedFramework framework.Framework, assumedPodInfo *framework.QueuedPodInfo, nodeName string) error {
 
 	logger := klog.FromContext(ctx)
 	schedFramework.RunReservePluginsUnreserve(ctx, state, assumedPodInfo.Pod, nodeName)
 	// No nomination restore here: a pod that fails after a cache assume goes back
 	// through handleSchedulingFailure, which re-adds the nomination itself.
-	err := a.cache.ForgetPod(logger, assumedPodInfo.Pod)
-	// Unreserve released what the pod held, also if forgetting it failed.
-	return schedFramework.RunAllocationExtensionsRemoveAllocation(ctx, assumedPodInfo.Pod, nodeName), err
+	return a.cache.ForgetPod(logger, assumedPodInfo.Pod)
 }
 
 // AssumeAndReserveInSnapshot assumes the pod into the transient node snapshot and runs Reserve plugins.

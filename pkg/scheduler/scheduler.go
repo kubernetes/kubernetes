@@ -164,9 +164,6 @@ type ScheduleResult struct {
 	FeasibleNodes int
 	// The nominating info for scheduling cycle.
 	nominatingInfo *fwk.NominatingInfo
-	// Events of AllocationExtensions for a pod which failed after it got
-	// assumed, to be moved after the pod went back to the queue.
-	allocationEvents []framework.AllocationEvent
 }
 
 // WithComponentConfigVersion sets the component config version to the
@@ -664,13 +661,6 @@ func newNominationChangeHandler(profiles profile.Map) internalqueue.NominationCh
 			return nil
 		}
 		ctx := klog.NewContext(context.Background(), logger)
-		// Nominations are for pods without a node. A pod whose nomination
-		// ended because it got assumed or bound is passed without its node,
-		// so that plugins can tell these calls from those of the assumed pod.
-		if pod.Spec.NodeName != "" {
-			pod = pod.DeepCopy()
-			pod.Spec.NodeName = ""
-		}
 		var events []framework.AllocationEvent
 		if oldNodeName != "" {
 			events = append(events, schedFramework.RunAllocationExtensionsRemoveAllocation(ctx, pod, oldNodeName)...)

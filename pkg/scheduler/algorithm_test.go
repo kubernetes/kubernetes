@@ -182,7 +182,7 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 				t.Fatalf("SuggestedHost = %q, want %q", scheduleResult.SuggestedHost, node1.Name)
 			}
 
-			assumedPodInfo, _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
+			assumedPodInfo, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("status.Code() = %v, want %v", status.Code(), tt.wantStatusCode)
 			}
@@ -216,7 +216,7 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 				if plugin.unreserved {
 					t.Error("expected Unreserve not to be called yet")
 				}
-				if _, err := f.algorithm.UnreserveAndForgetFromCache(ctx, state, f.fwk, assumedPodInfo, scheduleResult.SuggestedHost); err != nil {
+				if err := f.algorithm.UnreserveAndForgetFromCache(ctx, state, f.fwk, assumedPodInfo, scheduleResult.SuggestedHost); err != nil {
 					t.Errorf("UnreserveAndForgetFromCache error: %v", err)
 				}
 				isAssumed, err = f.algorithm.cache.IsAssumedPod(pod1)
@@ -236,51 +236,39 @@ func TestAssumeAndReserveInCache(t *testing.T) {
 	}
 }
 
-// TestAssumeAndReserveInCacheAllocations checks how a cache assume reports the
-// allocation of the assumed pod: the assumed pod gets its allocation before the
-// nomination ends, and a Reserve failure ends it again and returns its events.
-// The nomination only ends once Reserve and Permit let the pod through, so
-// that clearing it after a failure lets the pods retry which it blocked.
-func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
+// TestNominationEndsAfterPermit checks that with the DRAPreemption feature
+// gate, the nomination of an assumed pod only ends once Reserve and Permit let
+// it through, so that AllocationExtensions can compare it with what the pod
+// reserved, and that clearing it after a failure lets the pods retry which it
+// blocked. Assuming the pod doesn't involve AllocationExtensions.
+func TestNominationEndsAfterPermit(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
-	released := framework.AllocationEvent{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}}
 
 	tests := []struct {
 		name          string
 		nominated     bool
 		reserveStatus *fwk.Status
 		wantCalls     []string
-		wantEvents    []framework.AllocationEvent
 	}{
 		{
 			name: "not nominated",
-			wantCalls: []string{
-				"PrepareAllocation default/pod1 node1 assigned=node1",
-				"AddAllocation default/pod1 node1 assigned=node1",
-			},
 		},
 		{
-			name:      "nominated: the assumed pod's allocation comes before the end of the nomination",
+			name:      "nominated: the nomination of the assumed pod ends after Permit",
 			nominated: true,
 			wantCalls: []string{
 				"AddAllocation default/pod1 node1 assigned=",
-				"PrepareAllocation default/pod1 node1 assigned=node1",
-				"AddAllocation default/pod1 node1 assigned=node1",
-				"RemoveAllocation default/pod1 node1 assigned=",
+				"RemoveAllocation default/pod1 node1 assigned=node1",
 			},
 		},
 		{
-			name:          "nominated, reserve failure: the assumed pod's allocation ends after Unreserve, the nomination when it gets cleared",
+			name:          "nominated, reserve failure: the nomination ends when it gets cleared",
 			nominated:     true,
 			reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"),
 			wantCalls: []string{
 				"AddAllocation default/pod1 node1 assigned=",
-				"PrepareAllocation default/pod1 node1 assigned=node1",
-				"AddAllocation default/pod1 node1 assigned=node1",
-				"RemoveAllocation default/pod1 node1 assigned=node1",
 				"RemoveAllocation default/pod1 node1 assigned=",
 			},
-			wantEvents: []framework.AllocationEvent{released},
 		},
 	}
 
@@ -296,7 +284,7 @@ func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
 				},
 				reserveStatus: tt.reserveStatus,
 			}
-			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{ReleaseEvents: []framework.AllocationEvent{released}}
+			allocationExtensions := &tf.FakeAllocationExtensionsPlugin{}
 			f := newAssumeReserveFixtureWithAllocations(t, ctx, node1, plugin, allocationExtensions, pod1)
 
 			podInfo, err := framework.NewPodInfo(pod1)
@@ -314,7 +302,7 @@ func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
 			}
 
 			sched := &Scheduler{SchedulingQueue: f.queue, algorithm: f.algorithm}
-			_, events, status := sched.prepareForBindingCycle(ctx, state, f.fwk, queuedPodInfo, framework.NewPodsToActivate(), scheduleResult)
+			_, status := sched.prepareForBindingCycle(ctx, state, f.fwk, queuedPodInfo, framework.NewPodsToActivate(), scheduleResult)
 			nominated := len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0
 			if wantNominated := tt.nominated && !status.IsSuccess(); nominated != wantNominated {
 				t.Errorf("Pod nominated after the scheduling cycle: got %v, want %v", nominated, wantNominated)
@@ -325,9 +313,6 @@ func TestAssumeAndReserveInCacheAllocations(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantCalls, allocationExtensions.Calls()); diff != "" {
 				t.Errorf("Unexpected AllocationExtensions calls (-want,+got):\n%s", diff)
-			}
-			if diff := cmp.Diff(tt.wantEvents, events); diff != "" {
-				t.Errorf("Unexpected events (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -358,7 +343,7 @@ func TestNominationEndsOnAssume(t *testing.T) {
 	if err != nil {
 		t.Fatalf("schedulePod failed: %v", err)
 	}
-	if _, _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); status.IsSuccess() {
+	if _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); status.IsSuccess() {
 		t.Fatal("Reserve did not fail")
 	}
 	if nominated := f.fwk.NominatedPodsForNode(logger, node1.Name); len(nominated) > 0 {
@@ -545,7 +530,7 @@ func TestAssumeAndReserveSnapshotSync(t *testing.T) {
 					t.Fatalf("AssumeAndReserveInSnapshot failed for pod1: %v", status)
 				}
 			} else {
-				if _, _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); !status.IsSuccess() {
+				if _, status := f.algorithm.AssumeAndReserveInCache(ctx, state, f.fwk, queuedPodInfo, scheduleResult); !status.IsSuccess() {
 					t.Fatalf("AssumeAndReserveInCache failed for pod1: %v", status)
 				}
 			}

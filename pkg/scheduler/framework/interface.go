@@ -192,47 +192,38 @@ type AllocationEvent struct {
 // added or removed.
 type AllocationChangeResult struct {
 	// Events describe resources which became available because of the
-	// change. The scheduler lets other pods retry with them, like after a
-	// real release of those resources: for a nominated pod only pods with
-	// lower or equal priority, for an assumed pod all pods.
+	// change. The scheduler lets pods with lower or equal priority than the
+	// nominated pod retry with them, like after a real release of those
+	// resources.
 	Events []AllocationEvent
 }
 
 // AllocationExtensions is an optional interface for plugins which keep
-// in-memory state about the resources that a pod is going to get on a node
-// before that got persisted ("allocations"), like a ResourceClaim
-// allocation reserved for a pod which is not bound yet.
+// in-memory state about the resources that a pod is going to get on the node
+// which the PodNominator nominates it to ("allocations"), like devices which
+// preemption freed for the pod. A change of the nominated node is a removal
+// followed by an addition.
 //
-// A pod holds an allocation in one of two states, which pod.Spec.NodeName
-// tells apart:
-//   - nominated (Spec.NodeName empty): while the PodNominator nominates
-//     the pod to the node. A change of the nominated node is a removal
-//     followed by an addition. The pod is passed without Spec.NodeName also
-//     when its nomination ends because it got assumed or bound.
-//   - assumed (Spec.NodeName set): from when the pod got assumed in the
-//     scheduler cache until it got bound or forgotten.
+// When a nominated pod gets assumed, its nomination only ends once Reserve
+// and Permit let it through, so plugins can compare the allocation with what
+// the pod reserved and return events only for resources which the pod does
+// not keep. If Reserve or Permit reject the pod, the nomination ends when it
+// gets cleared afterwards, after Unreserve. Assumed pods are accounted for by
+// Reserve and Unreserve, as usual.
 //
-// When a nominated pod gets assumed, AddAllocation of the assumed pod comes
-// before RemoveAllocation of the nomination, so resources which the pod
-// keeps never look released. Plugins return events only for resources
-// which lose their last holder without having been persisted; persisted
-// ones get released by the API server, e.g. by a ResourceClaim
-// deallocation.
+// None of these calls applies allocations for scheduling. That is left to
+// PreFilterExtensions: the framework calls AddPod and RemovePod for the
+// nominated pods which apply to the pod being filtered (by priority, not the
+// pod itself, not pods already on the node), and plugins apply the confirmed
+// allocation of such a pod there.
 //
-// None of these calls applies allocations for scheduling. For nominated
-// pods that is left to PreFilterExtensions: the framework calls AddPod and
-// RemovePod for the nominated pods which apply to the pod being filtered
-// (by priority, not the pod itself, not pods already on the node), and
-// plugins apply the confirmed allocation of such a pod there. Assumed pods
-// are accounted for by Reserve, as usual.
-//
-// The calls come from the scheduling queue while it is locked, from the
-// scheduling cycle and from binding cycles, concurrently. Plugins must not
-// call back into the scheduling queue or the API server.
+// PrepareAllocation gets called by the scheduling cycle. AddAllocation and
+// RemoveAllocation get called by the scheduling queue while it is locked,
+// from any goroutine. Plugins must not call back into the scheduling queue or
+// the API server.
 //
 // Pods of pod groups and shared claims are not supported yet: snapshot
-// assumes of pod group cycles are not reported. They don't end the
-// nomination either.
+// assumes of pod group cycles don't end the nomination.
 //
 // The interface is internal to kube-scheduler and only used when the
 // DRAPreemption feature gate is enabled. It may change or move into the
@@ -240,33 +231,30 @@ type AllocationChangeResult struct {
 type AllocationExtensions interface {
 	fwk.Plugin
 	// PrepareAllocation is called right before pod gets nominated to
-	// nodeName by a PostFilter plugin of this scheduler, or assumed on
-	// nodeName (Spec.NodeName set). Plugins record the resources which the
-	// cycle selected for the pod on nodeName in state as the pod's
-	// "candidate" allocation, so that AddAllocation can confirm it. A later
-	// PrepareAllocation for the same pod replaces the candidate. The
-	// nomination or assume may still not happen, for example if the pod
-	// got deleted, so plugins drop candidates when the pod is deleted.
+	// nodeName by a PostFilter plugin of this scheduler. Plugins record the
+	// resources which the cycle selected for the pod on nodeName in state as
+	// the pod's "candidate" allocation, so that AddAllocation can confirm it.
+	// A later PrepareAllocation for the same pod replaces the candidate. The
+	// nomination may still not happen, for example if the pod got deleted,
+	// so plugins drop candidates when the pod is deleted.
 	//
 	// It exists only because AddAllocation gets called without CycleState,
 	// which the PodNominator doesn't have. It may go away once nominations
 	// carry the information which a cycle selected besides the node, which
 	// may be more than resources, e.g. a topology placement.
 	PrepareAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
-	// AddAllocation is called when pod got nominated (Spec.NodeName empty)
-	// or assumed (Spec.NodeName set) on nodeName. Plugins confirm the
-	// candidate allocation prepared for nodeName, if any. Nominations made
-	// by others, for example read from the API, have no candidate.
+	// AddAllocation is called when pod got nominated to nodeName. Plugins
+	// confirm the candidate allocation prepared for nodeName, if any.
+	// Nominations made by others, for example read from the API, have no
+	// candidate.
 	//
 	// The result is empty for now. It is meant for waking up pods whose
 	// allocations conflict with the new one.
 	AddAllocation(ctx context.Context, pod *v1.Pod, nodeName string) AllocationChangeResult
 	// RemoveAllocation is called when the nomination of pod to nodeName
-	// ended (Spec.NodeName empty), including when the pod got assumed,
-	// bound or deleted, or when the assumed pod (Spec.NodeName set) got
-	// bound or forgotten. A forgotten pod went through Unreserve already.
-	// Plugins return events for the resources of the confirmed allocation
-	// which become available, as if a pod using them got removed, e.g.
+	// ended, including when the pod got assumed, bound or deleted. Plugins
+	// return events for the resources of the confirmed allocation which
+	// become available, as if a pod using them got removed, e.g.
 	// ResourceClaim updates which clear the allocation, and drop it. They
 	// may keep it as the candidate, unless a newer one exists, so that a
 	// nomination which gets added back to the same node gets it again.

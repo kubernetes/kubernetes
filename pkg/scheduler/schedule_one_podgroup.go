@@ -920,11 +920,10 @@ func (sched *Scheduler) submitPodGroupResult(ctx context.Context, schedFwk frame
 				podCtx.state.SetPodGroupCycleState(nil)
 				podCtx.state.SetPlacementCycleState(nil)
 				// Schedule result is applied for pod and its binding cycle executes.
-				assumedPodInfo, allocationEvents, status := sched.prepareForBindingCycle(ctx, podCtx.state, schedFwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
+				assumedPodInfo, status := sched.prepareForBindingCycle(ctx, podCtx.state, schedFwk, pInfo, podCtx.podsToActivate, podResult.scheduleResult)
 				if !status.IsSuccess() {
 					// In such unlikely situation just reject this pod.
 					sched.FailureHandler(ctx, schedFwk, pInfo, status, clearNominatedNode, podSchedulingStart)
-					sched.moveAllocationEvents(podCtx.logger, pInfo.Pod, allocationEvents)
 					unschedulablePods++
 					continue
 				}

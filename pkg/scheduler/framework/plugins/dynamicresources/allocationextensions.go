@@ -34,16 +34,13 @@ import (
 
 // This file implements framework.AllocationExtensions (KEP-5690): devices
 // which preemption freed get held for the preemptor while the PodNominator
-// nominates it to the node, and an assumed pod keeps the devices which
-// Filter selected for it until it got bound or forgotten.
+// nominates it to the node.
 
 var _ framework.AllocationExtensions = &DynamicResources{}
 
 // PrepareAllocation records what the scheduling cycle selected for the pod on
-// the node as its candidate. For a pod which gets nominated, those are the
-// devices which the preemption simulation found for it with its victims
-// removed and the victims with claims. For a pod which gets assumed, those
-// are the devices which Filter selected for it.
+// the node as its candidate: the devices which the preemption simulation
+// found for it with its victims removed and the victims with claims.
 func (pl *DynamicResources) PrepareAllocation(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
 	if pl.nominations == nil {
 		return
@@ -52,15 +49,10 @@ func (pl *DynamicResources) PrepareAllocation(ctx context.Context, cs fwk.CycleS
 	if err != nil {
 		return
 	}
-	var candidate *podNomination
-	if pod.Spec.NodeName != "" {
-		candidate = assumedAllocation(state, nodeName)
-	} else {
-		candidate = pl.nominatedAllocation(ctx, state, pod, nodeName)
-	}
+	candidate := pl.nominatedAllocation(ctx, state, pod, nodeName)
 	pl.nominations.prepare(pod.UID, candidate)
 	if candidate != nil {
-		klog.FromContext(ctx).V(5).Info("Prepared allocation", "pod", klog.KObj(pod), "node", nodeName, "assumed", candidate.assumed, "numHeldClaims", len(candidate.holds))
+		klog.FromContext(ctx).V(5).Info("Prepared allocation", "pod", klog.KObj(pod), "node", nodeName, "numHeldClaims", len(candidate.holds))
 	}
 }
 
@@ -83,94 +75,59 @@ func (pl *DynamicResources) nominatedAllocation(ctx context.Context, state *stat
 	}
 }
 
-// assumedAllocation returns the candidate of a pod which gets assumed: the
-// devices which Filter selected for it on the node and which Reserve is
-// going to use, nil if there are none.
-func assumedAllocation(state *stateData, nodeName string) *podNomination {
-	state.mutex.Lock()
-	allocations, ok := state.nodeAllocations[nodeName]
-	state.mutex.Unlock()
-	if !ok || len(allocations.allocationResults) == 0 {
-		return nil
-	}
-	holds := make(map[types.UID]heldClaim)
-	extendedResourceClaim := state.claims.extendedResourceClaim()
-	// Matched like in Reserve.
-	allocIndex := 0
-	for _, claim := range state.claims.toAllocate() {
-		if allocIndex >= len(allocations.allocationResults) {
-			break
-		}
-		allocation := allocations.allocationResults[allocIndex]
-		allocIndex++
-		if claim == extendedResourceClaim {
-			continue
-		}
-		holds[claim.UID] = heldClaim{
-			claim:      types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
-			allocation: &allocation,
-		}
-	}
-	if len(holds) == 0 {
-		return nil
-	}
-	return &podNomination{nodeName: nodeName, assumed: true, holds: holds}
-}
-
 // AddAllocation confirms the candidate of the pod for the node: the devices
-// held for a nominated pod (pod.Spec.NodeName empty), or the devices of an
-// assumed pod.
+// held for the nominated pod.
 func (pl *DynamicResources) AddAllocation(ctx context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
 	if pl.nominations == nil {
 		return framework.AllocationChangeResult{}
 	}
-	if confirmed := pl.nominations.confirm(pod.UID, nodeName, pod.Spec.NodeName != ""); confirmed != nil {
-		klog.FromContext(ctx).V(5).Info("Confirmed allocation", "pod", klog.KObj(pod), "node", nodeName, "assumed", confirmed.assumed, "numHeldClaims", len(confirmed.holds))
+	if confirmed := pl.nominations.confirm(pod.UID, nodeName); confirmed != nil {
+		klog.FromContext(ctx).V(5).Info("Confirmed allocation", "pod", klog.KObj(pod), "node", nodeName, "numHeldClaims", len(confirmed.holds))
 	}
 	return framework.AllocationChangeResult{}
 }
 
-// RemoveAllocation drops the nomination of a nominated pod (pod.Spec.NodeName
-// empty) or the devices of an assumed pod. Claims of the victims of a
-// nomination are tracked independently of it until they are deallocated.
+// RemoveAllocation drops the nomination of the pod. Claims of the victims of
+// the nomination are tracked independently of it until they are
+// deallocated.
 //
-// The devices held for a nominated pod may be free, so pods waiting for
-// devices get another chance, unless the pod keeps them because it got
-// assumed with them or nominated to the node again. The devices of an
-// assumed pod are free if Unreserve released them before they got
-// persisted.
+// The devices held for the pod may be free, so pods waiting for devices get
+// another chance, unless the pod keeps them: it got nominated to the node
+// again with the same devices, or it got assumed with them. The nomination of
+// an assumed pod ends after Reserve, so the devices which it reserved are
+// pending allocations of its claims then.
 func (pl *DynamicResources) RemoveAllocation(ctx context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
 	if pl.nominations == nil {
 		return framework.AllocationChangeResult{}
 	}
-	logger := klog.FromContext(ctx)
-	if pod.Spec.NodeName != "" {
-		assumed := pl.nominations.removeAssumed(pod.UID, nodeName)
-		if assumed == nil {
-			return framework.AllocationChangeResult{}
-		}
-		for _, held := range assumed.holds {
-			claim, err := pl.draManager.ResourceClaims().Get(held.claim.Namespace, held.claim.Name)
-			if err != nil || claim.Status.Allocation != nil || pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID) != nil {
-				continue
-			}
-			logger.V(5).Info("Released devices of assumed pod", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", held.claim)
-			return framework.AllocationChangeResult{Events: releaseEvents(claim.UID, held)}
-		}
+	nomination, newer := pl.nominations.removeNomination(pod.UID, nodeName)
+	if nomination == nil || newer != nil && covers(newer.holds, nomination.holds) {
 		return framework.AllocationChangeResult{}
 	}
-
-	nomination, kept := pl.nominations.removeNomination(pod.UID, nodeName)
-	if nomination == nil || len(nomination.holds) == 0 || kept != nil && covers(kept.holds, nomination.holds) {
-		return framework.AllocationChangeResult{}
-	}
-	logger.V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nodeName)
 	for uid, held := range nomination.holds {
+		if pl.usesHeldDevices(uid, held) {
+			continue
+		}
+		klog.FromContext(ctx).V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", held.claim)
 		// One event is enough, the queueing hints don't check which
 		// claim got deallocated.
 		return framework.AllocationChangeResult{Events: releaseEvents(uid, held)}
 	}
 	return framework.AllocationChangeResult{}
+}
+
+// usesHeldDevices returns true if the claim has the held devices, as a
+// pending allocation, like after Reserve, or allocated.
+func (pl *DynamicResources) usesHeldDevices(uid types.UID, held heldClaim) bool {
+	allocation := pl.draManager.ResourceClaims().GetPendingAllocation(uid)
+	if allocation == nil {
+		claim, err := pl.draManager.ResourceClaims().Get(held.claim.Namespace, held.claim.Name)
+		if err != nil || claim.UID != uid {
+			return false
+		}
+		allocation = claim.Status.Allocation
+	}
+	return allocation != nil && sameDevices(allocation.Devices.Results, held.allocation.Devices.Results)
 }
 
 // releaseEvents returns the event for a claim whose devices are not used
