@@ -37,7 +37,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -2300,87 +2299,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
-	v1beta1Tests := func() {
-		nodes := drautils.NewNodes(f, 1, 1)
-		maxAllocations := 1
-		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(maxAllocations))
-		b := drautils.NewBuilder(f, driver)
-		// We have to set the parameters *before* creating the class.
-		b.ClassParameters = `{"x":"y"}`
-		expectedEnv := []string{"admin_x", "y"}
-		_, expected := b.ParametersEnv()
-		expectedEnv = append(expectedEnv, expected...)
-
-		ginkgo.It("supports simple ResourceClaim", func(ctx context.Context) {
-			tCtx := f.TContext(ctx)
-			pod, template := b.PodInlineWithV1beta1()
-			b.Create(tCtx, pod, template)
-			b.TestPod(tCtx, pod, expectedEnv...)
-		})
-
-		f.It("supports requests with alternatives", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
-			tCtx := f.TContext(ctx)
-			claimName := "external-multiclaim"
-			parameters, _ := b.ParametersEnv()
-			claim := &resourcev1beta1.ResourceClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: claimName,
-				},
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{{
-							Name: "request-1",
-							FirstAvailable: []resourcev1beta1.DeviceSubRequest{
-								{
-									Name:            "sub-request-1",
-									DeviceClassName: b.ClassName(),
-									AllocationMode:  resourcev1beta1.DeviceAllocationModeExactCount,
-									Count:           2,
-								},
-								{
-									Name:            "sub-request-2",
-									DeviceClassName: b.ClassName(),
-									AllocationMode:  resourcev1beta1.DeviceAllocationModeExactCount,
-									Count:           1,
-								},
-							},
-						}},
-						Config: []resourcev1beta1.DeviceClaimConfiguration{{
-							DeviceConfiguration: resourcev1beta1.DeviceConfiguration{
-								Opaque: &resourcev1beta1.OpaqueDeviceConfiguration{
-									Driver: driver.Name,
-									Parameters: runtime.RawExtension{
-										Raw: []byte(parameters),
-									},
-								},
-							},
-						}},
-					},
-				},
-			}
-			pod := b.PodExternal("")
-			podClaimName := "resource-claim"
-			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
-				{
-					Name:              podClaimName,
-					ResourceClaimName: &claimName,
-				},
-			}
-			b.Create(tCtx, claim, pod)
-			b.TestPod(tCtx, pod, expectedEnv...)
-
-			var allocatedResourceClaim *resourcev1beta1.ResourceClaim
-			gomega.Eventually(ctx, func(ctx context.Context) (*resourcev1beta1.ResourceClaim, error) {
-				var err error
-				allocatedResourceClaim, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-				return allocatedResourceClaim, err
-			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourcev1beta1.AllocationResult)(nil)))
-			results := allocatedResourceClaim.Status.Allocation.Devices.Results
-			gomega.Expect(results).To(gomega.HaveLen(1))
-			gomega.Expect(results[0].Request).To(gomega.Equal("request-1/sub-request-2"))
-		})
-	}
-
 	v1beta2Tests := func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		maxAllocations := 1
@@ -2860,7 +2778,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), consumableCapacityTests)
 
-	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta1 API", v1beta1Tests)
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
