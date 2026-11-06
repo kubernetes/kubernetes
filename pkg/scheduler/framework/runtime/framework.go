@@ -1871,6 +1871,14 @@ func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, signature fwk.
 	f.batch.StoreScheduleResults(ctx, signature, hintedNode, chosenNode, otherNodes, cycleCount)
 }
 
+func (f *frameworkImpl) IsBatchingDisabled() bool {
+	return f.batch.IsDisabled()
+}
+
+func (f *frameworkImpl) SetBatchingDisabled(disabled bool) {
+	f.batch.SetDisabled(disabled)
+}
+
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a
 // failure (bool) if any of the plugins returns an error. It also returns an
 // error containing the rejection message or the error occurred in the plugin.

@@ -19,6 +19,8 @@ package scheduler
 import (
 	"context"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -804,7 +806,7 @@ func TestFindNodesThatPassFiltersBudget(t *testing.T) {
 			}
 
 			got, err := algo.findNodesThatPassFilters(
-				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind)
+				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind, true /* allowRankNodes */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned error: %v", err)
 			}
@@ -863,7 +865,7 @@ func TestFindNodesThatPassFiltersEmptyNodes(t *testing.T) {
 			diagnosis := framework.Diagnosis{
 				NodeToStatus: framework.NewDefaultNodeToStatus(),
 			}
-			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1)
+			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1, true /* allowRankNodes */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned unexpected error: %v", err)
 			}
@@ -982,12 +984,13 @@ func newPodGroupCycleState() *framework.CycleState {
 }
 
 type rankNodesTestPlugin struct {
+	lock             sync.Mutex
 	name             string
 	ranksByNode      map[string]int
-	rankStatus       *fwk.Status
 	preFilterResult  *fwk.PreFilterResult
 	rejectedNodes    sets.Set[string]
 	scoresByNode     map[string]int64
+	filterHook       func(nodeName string)
 	rankInputOrder   []string
 	filteredNodes    []string
 	rankNodesInvoked bool
@@ -1019,9 +1022,6 @@ func (p *rankNodesTestPlugin) RankNodes(ctx context.Context, state fwk.CycleStat
 	for i, n := range nodes {
 		p.rankInputOrder[i] = n.Node().Name
 	}
-	if p.rankStatus != nil {
-		return nil, p.rankStatus
-	}
 	ranked := make([]framework.NodeWithRank, len(nodes))
 	for i, n := range nodes {
 		ranked[i] = framework.NodeWithRank{
@@ -1043,7 +1043,12 @@ func (p *rankNodesTestPlugin) PreFilterExtensions() fwk.PreFilterExtensions { re
 
 func (p *rankNodesTestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	nodeName := nodeInfo.Node().Name
+	p.lock.Lock()
 	p.filteredNodes = append(p.filteredNodes, nodeName)
+	p.lock.Unlock()
+	if p.filterHook != nil {
+		p.filterHook(nodeName)
+	}
 	if p.rejectedNodes.Has(nodeName) {
 		return fwk.NewStatus(fwk.Unschedulable, "rejected by rankNodesTestPlugin")
 	}
@@ -1066,15 +1071,19 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 
 	tests := []struct {
 		name                 string
+		extraNodes           []*v1.Node
 		podGroupCycle        bool
+		findAllNodes         bool
+		parallelism          int
 		nominatedNodeName    string
 		initialStartNodeIdx  int
 		ranksByNode          map[string]int
-		rankStatus           *fwk.Status
 		preFilterResult      *fwk.PreFilterResult
 		rejectedNodes        sets.Set[string]
 		scoresByNode         map[string]int64
+		filterHook           func(nodeName string)
 		wantSuggestedHost    string
+		wantFeasibleNodes    int
 		wantFilteredNodes    []string
 		wantRankInputOrder   []string
 		wantRankInputSet     sets.Set[string]
@@ -1094,7 +1103,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				"node3": 10,
 			},
 			wantSuggestedHost:    "node3",
-			wantFilteredNodes:    []string{"node3", "node1", "node2"},
+			wantFilteredNodes:    []string{"node3"},
 			wantRankInputOrder:   []string{"node1", "node2", "node3"},
 			wantRankNodesInvoked: true,
 		},
@@ -1133,7 +1142,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				"node2": 10,
 			},
 			wantSuggestedHost:    "node2",
-			wantFilteredNodes:    []string{"node2", "node1"},
+			wantFilteredNodes:    []string{"node2"},
 			wantRankInputSet:     sets.New("node1", "node2"),
 			wantRankNodesInvoked: true,
 		},
@@ -1152,7 +1161,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				"node3": 10,
 			},
 			wantSuggestedHost:    "node2",
-			wantFilteredNodes:    []string{"node2", "node1", "node3"},
+			wantFilteredNodes:    []string{"node2", "node1"},
 			wantRankInputOrder:   []string{"node2", "node3", "node1"},
 			wantRankNodesInvoked: true,
 		},
@@ -1186,6 +1195,56 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			wantFilteredNodes:    []string{"node2"},
 			wantRankNodesInvoked: false,
 		},
+		{
+			name:          "parallel Filter commits lower-rank node even when higher-rank node finishes Filter first",
+			extraNodes:    []*v1.Node{st.MakeNode().Name("node4").Obj()},
+			podGroupCycle: true,
+			parallelism:   2,
+			ranksByNode: map[string]int{
+				"node1": 0,
+				"node2": 1,
+				"node3": 1,
+				"node4": 2,
+			},
+			scoresByNode: map[string]int64{
+				"node1": 10,
+				"node2": 100,
+				"node3": 100,
+				"node4": 100,
+			},
+			filterHook: func() func(nodeName string) {
+				otherNodeCompleted := make(chan struct{})
+				var otherNodesStarted atomic.Int32
+				return func(nodeName string) {
+					if nodeName == "node1" {
+						// Block the rank-0 node until the second worker has completely
+						// finished checkNode for node2 (rank 1) and started node3.
+						<-otherNodeCompleted
+						return
+					}
+					if otherNodesStarted.Add(1) == 2 {
+						close(otherNodeCompleted)
+					}
+				}
+			}(),
+			wantSuggestedHost:    "node1",
+			wantFeasibleNodes:    1,
+			wantFilteredNodes:    []string{"node1", "node2", "node3"},
+			wantRankInputOrder:   []string{"node1", "node2", "node3", "node4"},
+			wantRankNodesInvoked: true,
+		},
+		{
+			name:          "FindAllNodesThatFitPod skips RankNodes and evaluates all nodes in pod group cycle",
+			podGroupCycle: true,
+			findAllNodes:  true,
+			ranksByNode: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 0,
+			},
+			wantFilteredNodes:    []string{"node1", "node2", "node3"},
+			wantRankNodesInvoked: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1196,14 +1255,14 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			plugin := &rankNodesTestPlugin{
 				name:            names.DefaultPreemption,
 				ranksByNode:     tt.ranksByNode,
-				rankStatus:      tt.rankStatus,
 				preFilterResult: tt.preFilterResult,
 				rejectedNodes:   tt.rejectedNodes,
 				scoresByNode:    tt.scoresByNode,
+				filterHook:      tt.filterHook,
 			}
 
 			cache := internalcache.New(ctx, nil, true, false)
-			for _, node := range allNodes {
+			for _, node := range slices.Concat(allNodes, tt.extraNodes) {
 				cache.AddNode(logger, node)
 			}
 			snapshot := internalcache.NewEmptySnapshot()
@@ -1234,16 +1293,21 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				},
 			}
 
+			parallelism := 1
+			if tt.parallelism > 0 {
+				parallelism = tt.parallelism
+			}
 			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
-				frameworkruntime.WithParallelism(1),
+				frameworkruntime.WithParallelism(parallelism),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
+			schedFwk.SetBatchingDisabled(true)
 
-			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false))
+			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false), WithCurrentCycleProvider(func() int64 { return 1 }))
 			if err != nil {
 				t.Fatalf("Failed to create algorithm: %v", err)
 			}
@@ -1262,12 +1326,25 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				state = newPodGroupCycleState()
 			}
 
-			res, err := algo.SchedulePod(ctx, schedFwk, state, queuedPodInfo)
-			if err != nil {
-				t.Fatalf("SchedulePod failed: %v", err)
-			}
-			if res.SuggestedHost != tt.wantSuggestedHost {
-				t.Errorf("SuggestedHost = %q, want %q", res.SuggestedHost, tt.wantSuggestedHost)
+			if tt.findAllNodes {
+				feasibleNodes, _, err := algo.FindAllNodesThatFitPod(ctx, state, schedFwk, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("FindAllNodesThatFitPod failed: %v", err)
+				}
+				if len(feasibleNodes) != len(tt.wantFilteredNodes) {
+					t.Errorf("len(feasibleNodes) = %d, want %d", len(feasibleNodes), len(tt.wantFilteredNodes))
+				}
+			} else {
+				res, err := algo.SchedulePod(ctx, schedFwk, state, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod failed: %v", err)
+				}
+				if res.SuggestedHost != tt.wantSuggestedHost {
+					t.Errorf("SuggestedHost = %q, want %q", res.SuggestedHost, tt.wantSuggestedHost)
+				}
+				if tt.wantFeasibleNodes > 0 && res.FeasibleNodes != tt.wantFeasibleNodes {
+					t.Errorf("FeasibleNodes = %d, want %d", res.FeasibleNodes, tt.wantFeasibleNodes)
+				}
 			}
 			if plugin.rankNodesInvoked != tt.wantRankNodesInvoked {
 				t.Errorf("rankNodesInvoked = %v, want %v", plugin.rankNodesInvoked, tt.wantRankNodesInvoked)
@@ -1282,8 +1359,14 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 					t.Errorf("Unexpected rankInputSet (-want, +got):\n%s", diff)
 				}
 			}
-			if diff := cmp.Diff(tt.wantFilteredNodes, plugin.filteredNodes); diff != "" {
-				t.Errorf("Unexpected filteredNodes (-want, +got):\n%s", diff)
+			if tt.wantFilteredNodes != nil {
+				if tt.parallelism > 1 {
+					if diff := cmp.Diff(sets.New(tt.wantFilteredNodes...), sets.New(plugin.filteredNodes...)); diff != "" {
+						t.Errorf("Unexpected filteredNodes set (-want, +got):\n%s", diff)
+					}
+				} else if diff := cmp.Diff(tt.wantFilteredNodes, plugin.filteredNodes); diff != "" {
+					t.Errorf("Unexpected filteredNodes (-want, +got):\n%s", diff)
+				}
 			}
 		})
 	}

@@ -3222,6 +3222,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			registerPlugins: []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterFilterPlugin("MatchFilter", tf.NewMatchFilterPlugin),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []*v1.Node{
@@ -3444,6 +3445,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					"PreFilter",
 					"Filter",
 				),
+				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []*v1.Node{
