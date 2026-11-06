@@ -205,8 +205,12 @@ type NominationChangeResult struct {
 // addition. A nomination to the same node again, by a PostFilter plugin, is
 // an addition which replaces the previous one.
 //
-// When a nominated pod gets assumed, its nomination ends. Assumed pods are
-// accounted for by Reserve and Unreserve, as usual.
+// When a nominated pod gets assumed, its nomination only ends once Reserve
+// and Permit let it through, so plugins can compare the resources of the
+// nomination with what the pod reserved and return events only for resources
+// which the pod does not keep. If Reserve or Permit reject the pod, the nomination ends when it
+// gets cleared afterwards, after Unreserve. Assumed pods are accounted for by
+// Reserve and Unreserve, as usual.
 //
 // None of these calls applies nominations for scheduling. That is left to
 // PreFilterExtensions: the framework calls AddPod and RemovePod for the
