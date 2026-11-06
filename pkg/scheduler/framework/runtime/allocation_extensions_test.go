@@ -53,11 +53,7 @@ func (pl *recordingAllocationExtensions) PreFilter(context.Context, fwk.CycleSta
 
 func (pl *recordingAllocationExtensions) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
 
-func (pl *recordingAllocationExtensions) PrepareAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) {
-	*pl.log = append(*pl.log, fmt.Sprintf("%s: prepare %s %s", pl.name, pod.Name, nodeName))
-}
-
-func (pl *recordingAllocationExtensions) AddAllocation(_ context.Context, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
+func (pl *recordingAllocationExtensions) AddAllocation(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeName string) framework.AllocationChangeResult {
 	*pl.log = append(*pl.log, fmt.Sprintf("%s: add %s %s", pl.name, pod.Name, nodeName))
 	return framework.AllocationChangeResult{}
 }
@@ -102,7 +98,6 @@ func TestAllocationExtensions(t *testing.T) {
 			wantEligible: true,
 			wantEvents:   []string{"a", "b"},
 			wantCalls: []string{
-				"a: prepare preemptor node1", "b: prepare preemptor node1",
 				"a: add preemptor node1", "b: add preemptor node1",
 				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
@@ -116,7 +111,6 @@ func TestAllocationExtensions(t *testing.T) {
 			wantReason:   "still reclaiming",
 			wantEvents:   []string{"a", "b"},
 			wantCalls: []string{
-				"a: prepare preemptor node1", "b: prepare preemptor node1",
 				"a: add preemptor node1", "b: add preemptor node1",
 				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
@@ -130,7 +124,6 @@ func TestAllocationExtensions(t *testing.T) {
 			wantReason:   "reason a",
 			wantEvents:   []string{"a", "b"},
 			wantCalls: []string{
-				"a: prepare preemptor node1", "b: prepare preemptor node1",
 				"a: add preemptor node1", "b: add preemptor node1",
 				"a: remove preemptor node1", "b: remove preemptor node1",
 				"a: assume victim", "b: assume victim",
@@ -162,9 +155,8 @@ func TestAllocationExtensions(t *testing.T) {
 				t.Fatalf("create framework: %v", err)
 			}
 
-			f.RunAllocationExtensionsPrepareAllocation(ctx, nil, pod, "node1")
 			var events []string
-			for _, event := range append(f.RunAllocationExtensionsAddAllocation(ctx, pod, "node1"), f.RunAllocationExtensionsRemoveAllocation(ctx, pod, "node1")...) {
+			for _, event := range append(f.RunAllocationExtensionsAddAllocation(ctx, nil, pod, "node1"), f.RunAllocationExtensionsRemoveAllocation(ctx, pod, "node1")...) {
 				events = append(events, event.Event.CustomLabel)
 			}
 			if diff := cmp.Diff(tc.wantEvents, events); diff != "" {
@@ -180,4 +172,49 @@ func TestAllocationExtensions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNominatingCycleState(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var log []string
+	pl := &recordingAllocationExtensions{name: "a", log: &log}
+	registry := Registry{pl.name: func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) { return pl, nil }}
+	profile := config.KubeSchedulerProfile{Plugins: &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: pl.name}}}}}
+	f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+	if err != nil {
+		t.Fatalf("create framework: %v", err)
+	}
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p", UID: "p"}}
+	state := framework.NewCycleState()
+
+	done := f.SetNominatingCycleState(pod, "node1", state)
+	if got := f.TakeNominatingCycleState(pod, "node2"); got != nil {
+		t.Error("Got the state set for another node")
+	}
+	if got := f.TakeNominatingCycleState(pod, "node1"); got != state {
+		t.Errorf("Got state %v, want the one which was set", got)
+	}
+	if got := f.TakeNominatingCycleState(pod, "node1"); got != nil {
+		t.Error("Got the state a second time")
+	}
+	done()
+
+	done = f.SetNominatingCycleState(pod, "node1", state)
+	done()
+	if got := f.TakeNominatingCycleState(pod, "node1"); got != nil {
+		t.Error("Got the state after done")
+	}
+
+	newer := framework.NewCycleState()
+	done = f.SetNominatingCycleState(pod, "node1", state)
+	doneNewer := f.SetNominatingCycleState(pod, "node1", newer)
+	done()
+	if got := f.TakeNominatingCycleState(pod, "node1"); got != newer {
+		t.Errorf("Got state %v, want the newer one", got)
+	}
+	doneNewer()
 }

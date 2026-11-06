@@ -1601,6 +1601,9 @@ func TestNominationChangeHandler(t *testing.T) {
 	handler := newNominationChangeHandler(profile.Map{testSchedulerName: schedFramework})
 	pod := st.MakePod().Name("p").Namespace("ns").UID("p").SchedulerName(testSchedulerName).Obj()
 	otherProfile := st.MakePod().Name("other").Namespace("ns").UID("other").SchedulerName("other-scheduler").Obj()
+	// Only the first nomination to node2 gets the state.
+	done := schedFramework.SetNominatingCycleState(pod, "node2", framework.NewCycleState())
+	defer done()
 
 	if events := handler(logger, pod, "", "node1"); len(events) != 0 {
 		t.Errorf("Unexpected events for a new nomination: %v", events)
@@ -1626,9 +1629,9 @@ func TestNominationChangeHandler(t *testing.T) {
 		t.Errorf("The handler changed the pod's node to %q", assumed.Spec.NodeName)
 	}
 	want := []string{
-		"AddAllocation ns/p node1 assigned=",
-		"RemoveAllocation ns/p node1 assigned=", "AddAllocation ns/p node2 assigned=",
-		"RemoveAllocation ns/p node2 assigned=", "AddAllocation ns/p node2 assigned=",
+		"AddAllocation ns/p node1 assigned= state=nil",
+		"RemoveAllocation ns/p node1 assigned=", "AddAllocation ns/p node2 assigned= state=set",
+		"RemoveAllocation ns/p node2 assigned=", "AddAllocation ns/p node2 assigned= state=nil",
 		"RemoveAllocation ns/p node2 assigned=",
 		"RemoveAllocation ns/p node1 assigned=",
 	}

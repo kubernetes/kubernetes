@@ -19,8 +19,10 @@ package runtime
 import (
 	"context"
 	"slices"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -50,21 +52,68 @@ func (f *frameworkImpl) fillAllocationExtensions() {
 			f.victimExtensions = append(f.victimExtensions, ext)
 		}
 	}
+	if len(f.allocationExtensions) > 0 {
+		f.nominatingCycleStates = &nominatingCycleStates{states: make(map[types.UID]*nominatingCycleState)}
+	}
 }
 
-// RunAllocationExtensionsPrepareAllocation calls PrepareAllocation of all plugins.
-func (f *frameworkImpl) RunAllocationExtensionsPrepareAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
-	for _, ext := range f.allocationExtensions {
-		ext.PrepareAllocation(f.extensionsContext(ctx, "AllocationExtensions", ext), state, pod, nodeName)
+// nominatingCycleStates holds the CycleState of scheduling cycles whose
+// nominations the PodNominator is about to apply. It is nil when no plugin
+// implements framework.AllocationExtensions.
+type nominatingCycleStates struct {
+	mutex  sync.Mutex
+	states map[types.UID]*nominatingCycleState
+}
+
+type nominatingCycleState struct {
+	nodeName string
+	state    fwk.CycleState
+}
+
+// SetNominatingCycleState makes state available to the AddAllocation call
+// for the nomination of pod to nodeName until done gets called.
+func (f *frameworkImpl) SetNominatingCycleState(pod *v1.Pod, nodeName string, state fwk.CycleState) (done func()) {
+	c := f.nominatingCycleStates
+	if c == nil || nodeName == "" || state == nil {
+		return func() {}
 	}
+	entry := &nominatingCycleState{nodeName: nodeName, state: state}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.states[pod.UID] = entry
+	return func() {
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
+		// A later call for the same pod may have replaced the entry.
+		if c.states[pod.UID] == entry {
+			delete(c.states, pod.UID)
+		}
+	}
+}
+
+// TakeNominatingCycleState returns the state set for the nomination of pod to
+// nodeName and drops it, so that only the first AddAllocation for it gets it.
+func (f *frameworkImpl) TakeNominatingCycleState(pod *v1.Pod, nodeName string) fwk.CycleState {
+	c := f.nominatingCycleStates
+	if c == nil {
+		return nil
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	entry, ok := c.states[pod.UID]
+	if !ok || entry.nodeName != nodeName {
+		return nil
+	}
+	delete(c.states, pod.UID)
+	return entry.state
 }
 
 // RunAllocationExtensionsAddAllocation calls AddAllocation of all plugins and
 // returns the events of all of them.
-func (f *frameworkImpl) RunAllocationExtensionsAddAllocation(ctx context.Context, pod *v1.Pod, nodeName string) []framework.AllocationEvent {
+func (f *frameworkImpl) RunAllocationExtensionsAddAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) []framework.AllocationEvent {
 	var events []framework.AllocationEvent
 	for _, ext := range f.allocationExtensions {
-		events = append(events, ext.AddAllocation(f.extensionsContext(ctx, "AllocationExtensions", ext), pod, nodeName).Events...)
+		events = append(events, ext.AddAllocation(f.extensionsContext(ctx, "AllocationExtensions", ext), state, pod, nodeName).Events...)
 	}
 	return events
 }

@@ -223,67 +223,62 @@ type AllocationChangeResult struct {
 // pods that is left to PreFilterExtensions: the framework calls AddPod and
 // RemovePod for the nominated pods which apply to the pod being filtered
 // (by priority, not the pod itself, not pods already on the node), and
-// plugins apply the confirmed allocation of such a pod there. Assumed pods
-// are accounted for by Reserve, as usual.
+// plugins apply the allocation of such a pod there. Assumed pods are
+// accounted for by Reserve, as usual.
 //
 // The calls come from the scheduling queue while it is locked, from the
 // scheduling cycle and from binding cycles, concurrently. Plugins must not
 // call back into the scheduling queue or the API server.
 //
 // Pods of pod groups and shared claims are not supported yet: snapshot
-// assumes of pod group cycles are not reported.
+// assumes of pod group cycles are not reported, and nominations of pod
+// group pods get no CycleState.
 //
 // The interface is internal to kube-scheduler and only used when the
 // DRAPreemption feature gate is enabled. It may change or move into the
 // framework before KEP-5690 graduates.
 type AllocationExtensions interface {
 	fwk.Plugin
-	// PrepareAllocation is called right before pod gets nominated to
-	// nodeName by a PostFilter plugin of this scheduler, or assumed on
-	// nodeName (Spec.NodeName set). Plugins record the resources which the
-	// cycle selected for the pod on nodeName in state as the pod's
-	// "candidate" allocation, so that AddAllocation can confirm it. A later
-	// PrepareAllocation for the same pod replaces the candidate. The
-	// nomination or assume may still not happen, for example if the pod
-	// got deleted, so plugins drop candidates when the pod is deleted.
-	//
-	// It exists only because AddAllocation gets called without CycleState,
-	// which the PodNominator doesn't have. It may go away once nominations
-	// carry the information which a cycle selected besides the node, which
-	// may be more than resources, e.g. a topology placement.
-	PrepareAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 	// AddAllocation is called when pod got nominated (Spec.NodeName empty)
-	// or assumed (Spec.NodeName set) on nodeName. Plugins confirm the
-	// candidate allocation prepared for nodeName, if any. Nominations made
-	// by others, for example read from the API, have no candidate.
+	// or assumed (Spec.NodeName set) on nodeName. state is the CycleState
+	// of the scheduling cycle which selected nodeName for the pod. Plugins
+	// take the allocation which they computed for nodeName from it, like
+	// in Reserve. For a nomination by a PostFilter plugin, it is the state
+	// which PostFilter got. state is nil for nominations which the cycle
+	// that just ended did not make, for example ones read from the API.
+	// Plugins must not keep state beyond the call.
 	//
 	// The result is empty for now. It is meant for waking up pods whose
 	// allocations conflict with the new one.
-	AddAllocation(ctx context.Context, pod *v1.Pod, nodeName string) AllocationChangeResult
+	AddAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) AllocationChangeResult
 	// RemoveAllocation is called when the nomination of pod to nodeName
 	// ended (Spec.NodeName empty), including when the pod got assumed,
 	// bound or deleted, or when the assumed pod (Spec.NodeName set) got
 	// bound or forgotten. A forgotten pod went through Unreserve already.
-	// Plugins return events for the resources of the confirmed allocation
-	// which become available, as if a pod using them got removed, e.g.
-	// ResourceClaim updates which clear the allocation, and drop it. They
-	// may keep it as the candidate, unless a newer one exists, so that a
-	// nomination which gets added back to the same node gets it again.
+	// Plugins return events for the resources of the allocation which
+	// become available, as if a pod using them got removed, e.g.
+	// ResourceClaim updates which clear the allocation, and drop it.
 	//
 	// An explicit nomination to the same node by a PostFilter plugin is
 	// reported as a removal followed by an addition, so that the previous
-	// confirmed allocation gets released and replaced.
+	// allocation gets released and replaced.
 	RemoveAllocation(ctx context.Context, pod *v1.Pod, nodeName string) AllocationChangeResult
 }
 
 // AllocationExtensionsRunner runs the AllocationExtensions of the plugins of
 // a profile. All methods are no-ops when no plugin implements them.
 type AllocationExtensionsRunner interface {
-	// RunAllocationExtensionsPrepareAllocation calls PrepareAllocation of all plugins.
-	RunAllocationExtensionsPrepareAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
+	// SetNominatingCycleState makes state available to the AddAllocation
+	// call for the nomination of pod to nodeName until done gets called.
+	// The PodNominator applies nominations in the FailureHandler, which has
+	// no CycleState, so callers set it around that call.
+	SetNominatingCycleState(pod *v1.Pod, nodeName string, state fwk.CycleState) (done func())
+	// TakeNominatingCycleState returns the state set for the nomination of
+	// pod to nodeName and drops it. It returns nil if there is none.
+	TakeNominatingCycleState(pod *v1.Pod, nodeName string) fwk.CycleState
 	// RunAllocationExtensionsAddAllocation calls AddAllocation of all plugins
 	// and returns the events of all of them.
-	RunAllocationExtensionsAddAllocation(ctx context.Context, pod *v1.Pod, nodeName string) []AllocationEvent
+	RunAllocationExtensionsAddAllocation(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) []AllocationEvent
 	// RunAllocationExtensionsRemoveAllocation calls RemoveAllocation of all
 	// plugins and returns the events of all of them.
 	RunAllocationExtensionsRemoveAllocation(ctx context.Context, pod *v1.Pod, nodeName string) []AllocationEvent

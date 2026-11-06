@@ -663,14 +663,13 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 	logger := klog.FromContext(ctx)
 	host := scheduleResult.SuggestedHost
 	assumedPodInfo := a.prepareAssumedPod(logger, state, podInfo, host)
-	schedFramework.RunAllocationExtensionsPrepareAllocation(ctx, state, assumedPodInfo.Pod, host)
 	if err := a.cache.AssumePod(logger, assumedPodInfo.Pod); err != nil {
 		logger.Error(err, "Scheduler cache AssumePod failed")
 		return assumedPodInfo, nil, fwk.AsStatus(err)
 	}
 	// Before the nomination ends, so that resources which the pod keeps
 	// never look released.
-	events := schedFramework.RunAllocationExtensionsAddAllocation(ctx, assumedPodInfo.Pod, host)
+	events := schedFramework.RunAllocationExtensionsAddAllocation(ctx, state, assumedPodInfo.Pod, host)
 	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
 
 	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); !status.IsSuccess() {

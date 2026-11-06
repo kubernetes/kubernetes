@@ -676,7 +676,8 @@ func newNominationChangeHandler(profiles profile.Map) internalqueue.NominationCh
 			events = append(events, schedFramework.RunAllocationExtensionsRemoveAllocation(ctx, pod, oldNodeName)...)
 		}
 		if newNodeName != "" {
-			events = append(events, schedFramework.RunAllocationExtensionsAddAllocation(ctx, pod, newNodeName)...)
+			state := schedFramework.TakeNominatingCycleState(pod, newNodeName)
+			events = append(events, schedFramework.RunAllocationExtensionsAddAllocation(ctx, state, pod, newNodeName)...)
 		}
 		return events
 	}

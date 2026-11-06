@@ -132,7 +132,7 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 
 	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, schedFramework, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
-		sched.FailureHandler(schedulingCycleCtx, schedFramework, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
+		sched.runFailureHandler(schedulingCycleCtx, schedFramework, state, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		sched.moveAllocationEvents(logger, pod, scheduleResult.allocationEvents)
 		return
 	}
@@ -310,13 +310,6 @@ func (sched *Scheduler) schedulingAlgorithm(
 		var nominatingInfo *fwk.NominatingInfo
 		if result != nil {
 			nominatingInfo = result.NominatingInfo
-		}
-		// The PodNominator nominates the pod in handleSchedulingFailure,
-		// which has no CycleState, so plugins take what this cycle selected
-		// for the node now. Assigned pods (deferred resizes) don't get
-		// nominated.
-		if status.IsSuccess() && nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" && pod.Spec.NodeName == "" {
-			schedFramework.RunAllocationExtensionsPrepareAllocation(ctx, state, pod, nominatingInfo.NominatedNodeName)
 		}
 		return ScheduleResult{nominatingInfo: nominatingInfo}, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 	}
@@ -908,6 +901,18 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	}, nominatingInfo); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod", "pod", klog.KObj(pod))
 	}
+}
+
+// runFailureHandler calls the FailureHandler while state, the CycleState of
+// the failed cycle, is available to AddAllocation of the nomination which the
+// FailureHandler applies.
+func (sched *Scheduler) runFailureHandler(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState,
+	podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
+	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" {
+		done := schedFramework.SetNominatingCycleState(podInfo.Pod, nominatingInfo.NominatedNodeName, state)
+		defer done()
+	}
+	sched.FailureHandler(ctx, schedFramework, podInfo, status, nominatingInfo, start)
 }
 
 // truncateMessage truncates a message if it hits the noteLengthLimit.
