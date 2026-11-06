@@ -35,12 +35,16 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -1644,4 +1648,330 @@ func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.Pe
 		volumePluginMgr:          fakeVolumePluginMgr,
 	}
 	return dswp, fakePodManager, fakesDSW, fakeRuntime, fakeStateProvider
+}
+
+func TestDynamicVolumesAddAndRemove(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	logger, tCtx := ktesting.NewTestContext(t)
+	dswp, fakePodManager, _ := prepareDswpWithVolume(t)
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	dswp.actuatedState = actuatedState
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dyn-pod",
+			UID:       "dyn-pod-uid",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					VolumeMounts: []v1.VolumeMount{
+						{Name: "vol1", MountPath: "/mnt/vol1"},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	fakePodManager.AddPod(testPod)
+	uniquePodName := util.GetUniquePodName(testPod)
+
+	// Step 1: Initial pod volume processing
+	dswp.findAndAddNewPods(tCtx)
+	require.True(t, dswp.podPreviouslyProcessed(uniquePodName))
+	require.Contains(t, dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName), "vol1")
+
+	// Step 2: Dynamically add vol2 with dynamic container c2 to the already-processed running pod
+	podWithVol2 := testPod.DeepCopy()
+	podWithVol2.Spec.Volumes = append(podWithVol2.Spec.Volumes, v1.Volume{
+		Name: "vol2",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	})
+	podWithVol2.Spec.Containers = append(podWithVol2.Spec.Containers, v1.Container{
+		Name:  "c2",
+		Image: "busybox",
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "vol2",
+			MountPath: "/mnt/vol2",
+		}},
+	})
+	fakePodManager.UpdatePod(podWithVol2)
+	dswp.ReprocessPod(uniquePodName)
+
+	dswp.findAndAddNewPods(tCtx)
+	volNames := dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.Contains(t, volNames, "vol2")
+
+	// Record both volumes as mounted on the host and actuated on containers c1 and c2
+	require.NoError(t, actuatedState.SetPodVolume(logger, testPod.UID, testPod.Spec.Volumes[0]))
+	require.NoError(t, actuatedState.SetPodVolume(logger, testPod.UID, podWithVol2.Spec.Volumes[1]))
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, podWithVol2.Spec.Containers[0]))
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, podWithVol2.Spec.Containers[1]))
+
+	// Step 3: Removing dynamic container c2 while keeping vol2 unreferenced in pod.Spec.Volumes preserves vol2 in DSW
+	podVol2Unmounted := podWithVol2.DeepCopy()
+	podVol2Unmounted.Spec.Containers = testPod.Spec.Containers
+	fakePodManager.UpdatePod(podVol2Unmounted)
+	require.NoError(t, actuatedState.RemoveContainers(logger, testPod.UID, pod.Containers, "c2"))
+	dswp.findAndRemoveDeletedPods(logger)
+
+	volNames = dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.Contains(t, volNames, "vol2")
+
+	// Step 3b: A dynamically added volume that never mounted on the host (not in actuatedPod.Spec.Volumes)
+	// is removed from DSW when its dynamic container is removed even if kept unreferenced in pod.Spec.Volumes.
+	podWithPendingVol := podVol2Unmounted.DeepCopy()
+	podWithPendingVol.Spec.Volumes = append(podWithPendingVol.Spec.Volumes, v1.Volume{
+		Name:         "vol-pending",
+		VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "missing-cm"}}},
+	})
+	podWithPendingVol.Spec.Containers = append(podWithPendingVol.Spec.Containers, v1.Container{
+		Name:  "c-pending",
+		Image: "busybox",
+		VolumeMounts: []v1.VolumeMount{{
+			Name:      "vol-pending",
+			MountPath: "/mnt/pending",
+		}},
+	})
+	fakePodManager.UpdatePod(podWithPendingVol)
+	dswp.ReprocessPod(uniquePodName)
+	dswp.findAndAddNewPods(tCtx)
+	require.Contains(t, dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName), "vol-pending")
+
+	podPendingUnreferenced := podWithPendingVol.DeepCopy()
+	podPendingUnreferenced.Spec.Containers = testPod.Spec.Containers
+	fakePodManager.UpdatePod(podPendingUnreferenced)
+	dswp.findAndRemoveDeletedPods(logger)
+	require.NotContains(t, dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName), "vol-pending")
+
+	// Step 4: Jointly remove dynamic container c2 and vol2 from pod.Spec while c2 still mounts vol2 in actuatedState
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, podWithVol2.Spec.Containers[1]))
+	fakePodManager.UpdatePod(testPod)
+	dswp.findAndRemoveDeletedPods(logger)
+
+	// vol2 must remain in DSW while still in use by terminating removed container c2 in actuatedState
+	volNames = dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.Contains(t, volNames, "vol2")
+
+	// Step 5: Removed container c2 terminates and its actuated VolumeMounts are cleared -> actuatedState no longer references vol2
+	require.NoError(t, actuatedState.SetContainer(logger, testPod.UID, pod.Containers, v1.Container{Name: "c2", Image: "busybox"}))
+	dswp.findAndRemoveDeletedPods(logger)
+
+	volNames = dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, volNames, "vol1")
+	require.NotContains(t, volNames, "vol2")
+	require.True(t, dswp.podPreviouslyProcessed(uniquePodName))
+
+	// Step 6: Simulate kubelet restart with a fresh DSWP while:
+	//   (a) vol2 and c2 were removed from pod.Spec, but terminating container c2 still mounts vol2 in actuatedState; and
+	//   (b) vol3 was mounted on the host (in actuatedState.Spec.Volumes) and kept unreferenced in pod.Spec.Volumes after its container was removed.
+	restartedDswp, restartedPodManager, _ := prepareDswpWithVolume(t)
+	restartedActuated := state.NewStateMemory(logger, nil, nil)
+	restartedDswp.actuatedState = restartedActuated
+
+	vol3 := v1.Volume{Name: "vol3", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	podAfterRestart := testPod.DeepCopy()
+	podAfterRestart.Spec.Volumes = append(podAfterRestart.Spec.Volumes, vol3)
+	restartedPodManager.AddPod(podAfterRestart)
+
+	require.NoError(t, restartedActuated.SetPodVolume(logger, testPod.UID, testPod.Spec.Volumes[0]))
+	require.NoError(t, restartedActuated.SetPodVolume(logger, testPod.UID, podWithVol2.Spec.Volumes[1]))
+	require.NoError(t, restartedActuated.SetPodVolume(logger, testPod.UID, vol3))
+	require.NoError(t, restartedActuated.SetContainer(logger, testPod.UID, pod.Containers, testPod.Spec.Containers[0]))
+	require.NoError(t, restartedActuated.SetContainer(logger, testPod.UID, pod.Containers, podWithVol2.Spec.Containers[1]))
+
+	restartedDswp.findAndAddNewPods(tCtx)
+	restartedVolNames := restartedDswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, restartedVolNames, "vol1")
+	require.Contains(t, restartedVolNames, "vol2", "removed volume still mounted by terminating removed container must populate DSW across kubelet restart")
+	require.Contains(t, restartedVolNames, "vol3", "host-mounted volume kept unreferenced in pod.Spec.Volumes must populate DSW across kubelet restart")
+
+	// Once removed container c2 stops and clears its actuated mounts, findAndRemoveDeletedPods drops vol2 while retaining vol3 (still in pod.Spec.Volumes).
+	require.NoError(t, restartedActuated.SetContainer(logger, testPod.UID, pod.Containers, v1.Container{Name: "c2", Image: "busybox"}))
+	restartedDswp.findAndRemoveDeletedPods(logger)
+	restartedVolNames = restartedDswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+	require.Contains(t, restartedVolNames, "vol1")
+	require.NotContains(t, restartedVolNames, "vol2")
+	require.Contains(t, restartedVolNames, "vol3")
+
+	// Step 7: A pod seen via ReprocessPod (from SyncPod/WaitForAttachAndMount) whose PVC/PV lookup
+	// fails must be marked processed after that tick and not reprocessed on subsequent 100ms DSWP
+	// ticks until ReprocessPod is called again (avoiding a 10 Hz apiserver GET hot loop).
+	pluginPVOmittingClient(dswp)
+	missingPVCPod := createPodWithVolume("missing-pv-pod", "dswp-test-volume-name", "file-bound", []v1.Container{{
+		Name:         "c1",
+		VolumeMounts: []v1.VolumeMount{{Name: "dswp-test-volume-name", MountPath: "/mnt/pvc"}},
+	}})
+	fakePodManager.AddPod(missingPVCPod)
+	missingPodName := util.GetUniquePodName(missingPVCPod)
+
+	dswp.ReprocessPod(missingPodName)
+	dswp.findAndAddNewPods(tCtx)
+	require.NotEmpty(t, dswp.desiredStateOfWorld.PopPodErrors(missingPodName))
+	require.True(t, dswp.podPreviouslyProcessed(missingPodName), "failing pod seen via ReprocessPod must be marked processed to rate-limit retries")
+
+	dswp.findAndAddNewPods(tCtx)
+	require.Empty(t, dswp.desiredStateOfWorld.PopPodErrors(missingPodName), "processed failing pod must not be reprocessed until ReprocessPod is called")
+
+	// Step 8: Coalesced volume source swap under the same outer volume name (configMap -> emptyDir)
+	// removes the stale configmap UniqueVolumeName entry from DSW while keeping the new emptyDir entry.
+	pluginMgr := &volume.VolumePluginMgr{}
+	plugins := append([]volume.VolumePlugin{}, configmap.ProbeVolumePlugins()...)
+	plugins = append(plugins, emptydir.ProbeVolumePlugins()...)
+	require.NoError(t, pluginMgr.InitPlugins(plugins, nil, volumetesting.NewFakeVolumeHost(t, t.TempDir(), fake.NewSimpleClientset(), nil)))
+	swapDswp, swapPodMgr, swapDSW, _, _ := createDswpWithVolumeWithCustomPluginMgr(nil, nil, pluginMgr)
+	swapDswp.actuatedState = state.NewStateMemory(logger, nil, nil)
+
+	swapPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "swap-pod", UID: "swap-uid", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{{
+				Name:         "vol-swap",
+				VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm1"}}},
+			}},
+			Containers: []v1.Container{{
+				Name:         "c1",
+				VolumeMounts: []v1.VolumeMount{{Name: "vol-swap", MountPath: "/mnt/swap"}},
+			}},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
+	}
+	swapPodMgr.AddPod(swapPod)
+	swapPodName := util.GetUniquePodName(swapPod)
+	swapDswp.findAndAddNewPods(tCtx)
+	require.Len(t, swapDSW.GetVolumesToMount(), 1)
+	oldUniqueName := swapDSW.GetVolumesToMount()[0].VolumeName
+
+	swappedPod := swapPod.DeepCopy()
+	swappedPod.Spec.Volumes[0] = v1.Volume{
+		Name:         "vol-swap",
+		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+	}
+	swapPodMgr.UpdatePod(swappedPod)
+	swapDswp.ReprocessPod(swapPodName)
+	swapDswp.findAndAddNewPods(tCtx)
+	require.Len(t, swapDSW.GetVolumesToMount(), 2)
+
+	swapDswp.findAndRemoveDeletedPods(logger)
+	remaining := swapDSW.GetVolumesToMount()
+	require.Len(t, remaining, 1)
+	require.NotEqual(t, oldUniqueName, remaining[0].VolumeName, "stale configMap DSW entry must be removed after coalesced swap to emptyDir")
+
+	// Step 9: Pod runtime termination (ShouldPodRuntimeBeRemoved == true) must remove a
+	// dynamically removed volume from DSW even if SyncPod never ran again to clear the
+	// removed container's actuated VolumeMounts.
+	termDswp, termPodMgr, termDSW, _, termStateProvider := createDswpWithVolumeWithCustomPluginMgr(nil, nil, pluginMgr)
+	termActuated := state.NewStateMemory(logger, nil, nil)
+	termDswp.actuatedState = termActuated
+	termStateProvider.removed = make(map[kubetypes.UID]struct{})
+
+	termPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "term-pod", UID: "term-uid", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+				{Name: "vol2", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+			},
+			Containers: []v1.Container{
+				{Name: "c1", Image: "busybox", VolumeMounts: []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}},
+				{Name: "c2", Image: "busybox", VolumeMounts: []v1.VolumeMount{{Name: "vol2", MountPath: "/mnt/vol2"}}},
+			},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
+	}
+	termPodMgr.AddPod(termPod)
+	termPodName := util.GetUniquePodName(termPod)
+	termDswp.findAndAddNewPods(tCtx)
+	require.Len(t, termDSW.GetVolumesToMount(), 2)
+	for _, vtm := range termDSW.GetVolumesToMount() {
+		require.NoError(t, termDswp.actualStateOfWorld.MarkVolumeAsAttached(logger, vtm.VolumeName, vtm.VolumeSpec, "", ""))
+		require.NoError(t, termDswp.actualStateOfWorld.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+			PodName:          termPodName,
+			PodUID:           termPod.UID,
+			Pod:              termPod,
+			VolumeName:       vtm.VolumeName,
+			VolumeSpec:       vtm.VolumeSpec,
+			VolumeMountState: operationexecutor.VolumeMounted,
+		}))
+	}
+	require.NoError(t, termActuated.SetPod(logger, termPod))
+
+	// Dynamically remove c2 and vol2 from pod.Spec while c2 is still recorded in actuatedState.
+	termPodRemovedVol2 := termPod.DeepCopy()
+	termPodRemovedVol2.Spec.Volumes = termPod.Spec.Volumes[:1]
+	termPodRemovedVol2.Spec.Containers = termPod.Spec.Containers[:1]
+	termPodMgr.UpdatePod(termPodRemovedVol2)
+
+	// While pod runtime is still running, vol2 stays in DSW until c2 stops.
+	termDswp.findAndRemoveDeletedPods(logger)
+	require.Contains(t, termDSW.GetVolumeNamesForPod(termPodName), "vol2")
+
+	// Once all pod containers have terminated (ShouldPodRuntimeBeRemoved == true), both vol1 and
+	// vol2 must be removed from DSW even though actuatedState still lists c2's VolumeMounts.
+	termStateProvider.removed[termPod.UID] = struct{}{}
+	termDswp.findAndRemoveDeletedPods(logger)
+	require.Empty(t, termDSW.GetVolumeNamesForPod(termPodName), "pod termination must not leak dynamically removed volume in DSW")
+	require.False(t, termDswp.podPreviouslyProcessed(termPodName))
+
+	// Step 10: ReprocessPod race with an in-flight findAndAddNewPods stale GetPods() snapshot
+	// or concurrent processPodVolumes call must never strand newly added dynamic volumes.
+	raceDswp, racePodMgr, raceDSW, _, _ := createDswpWithVolumeWithCustomPluginMgr(nil, nil, pluginMgr)
+	racePodInitial := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "race-pod", UID: "race-uid", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes:    []v1.Volume{{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}},
+			Containers: []v1.Container{{Name: "c1", Image: "busybox", VolumeMounts: []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}}},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
+	}
+	racePodMgr.AddPod(racePodInitial)
+	racePodName := util.GetUniquePodName(racePodInitial)
+	raceDswp.findAndAddNewPods(tCtx)
+	require.True(t, raceDswp.podPreviouslyProcessed(racePodName))
+
+	// Case 10a: Pod is updated in podManager and ReprocessPod is called, then an already-in-flight
+	// findAndAddNewPods iteration invokes processPodVolumes with the stale pre-update pod pointer.
+	racePodUpdated := racePodInitial.DeepCopy()
+	racePodUpdated.Spec.Volumes = append(racePodUpdated.Spec.Volumes, v1.Volume{
+		Name:         "vol2",
+		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+	})
+	racePodUpdated.Spec.Containers = append(racePodUpdated.Spec.Containers, v1.Container{
+		Name:         "c2",
+		Image:        "busybox",
+		VolumeMounts: []v1.VolumeMount{{Name: "vol2", MountPath: "/mnt/vol2"}},
+	})
+	racePodMgr.UpdatePod(racePodUpdated)
+	raceDswp.ReprocessPod(racePodName)
+	raceDswp.processPodVolumes(tCtx, racePodInitial)
+	require.Contains(t, raceDSW.GetVolumeNamesForPod(racePodName), "vol2", "processPodVolumes must refresh stale GetPods() snapshot via GetPodByUID")
+	require.True(t, raceDswp.podPreviouslyProcessed(racePodName))
+
+	// Case 10b: Concurrent ReprocessPod while processPodVolumes is already mid-flight must prevent
+	// the stale pass from marking the pod processed.
+	raceDswp.ReprocessPod(racePodName)
+	processed, seq := raceDswp.podProcessedState(racePodName)
+	require.False(t, processed)
+	raceDswp.ReprocessPod(racePodName)
+	require.False(t, raceDswp.markPodProcessedIfUnchanged(racePodName, seq), "stale sequence must not mark pod processed after concurrent ReprocessPod")
+	require.False(t, raceDswp.podPreviouslyProcessed(racePodName))
 }

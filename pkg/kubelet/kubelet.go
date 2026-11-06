@@ -3250,6 +3250,14 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
 			allocatedPod, _ := kl.allocationManager.GetAllocatedPod(pod)
+			if !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
+				if kl.secretManager != nil {
+					kl.secretManager.RegisterPod(allocatedPod)
+				}
+				if kl.configMapManager != nil {
+					kl.configMapManager.RegisterPod(allocatedPod)
+				}
+			}
 			kl.podCertificateManager.TrackPod(ctx, allocatedPod)
 		}
 
