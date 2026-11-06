@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -576,7 +577,7 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
-	ForceRequestWatchProgressSupport(t)
+	cachertesting.ForceRequestWatchProgressSupport(t)
 	ctx := context.Background()
 	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
