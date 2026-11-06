@@ -387,7 +387,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 	// Earlier releases narrowed the exponent to int32. An exponent too big for
 	// int32 wrapped around. We track this in maybeOverflowedExponent so we can
-	// preserve the behavior of earlier releases in the below parser code.
+	// preserve the error-returning behavior of earlier releases in the below parser code.
 	maybeOverflowedExponent := int32(parsedExponent)
 	// Saturate so scale arithmetic can't overflow. The 2x multiplier to math.MaxInt32
 	// gives room for an out of range exponent that is reduced by digits after the decimal point.
