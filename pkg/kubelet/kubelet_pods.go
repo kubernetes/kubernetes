@@ -2225,6 +2225,11 @@ func (kl *Kubelet) convertStatusToAPIStatus(ctx context.Context, pod *v1.Pod, po
 		apiPodStatus.AllocatedResources = resourcehelper.PodRequests(pod, opts)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && kl.volumeManager != nil {
+		desiredPod, _ := kl.podManager.GetPodByUID(pod.UID)
+		apiPodStatus.VolumeStatuses = kl.volumeManager.GetPodVolumeStatuses(pod, desiredPod)
+	}
+
 	return &apiPodStatus
 }
 
