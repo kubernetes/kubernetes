@@ -92,8 +92,7 @@ func (*resourceClaimTemplateStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 func (s *resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	// AuthorizedForAdmin isn't needed here because the spec is immutable.
-	errorList := validation.ValidateResourceClaimTemplate(obj.(*resource.ResourceClaimTemplate))
-	return append(errorList, validation.ValidateResourceClaimTemplateUpdate(obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate))...)
+	return validation.ValidateResourceClaimTemplateUpdate(obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate))
 }
 
 func (*resourceClaimTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

@@ -41,10 +41,15 @@ func init() {
 			},
 			"metadata.generation": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueInvalid", Origin: "monotonic"},
+				{ErrorType: "FieldValueInvalid", Origin: "update"},
 			},
 			"metadata.managedFields[*].operation": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
+			},
+			"metadata.namespace": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"metadata.ownerReferences[*].apiVersion": {
 				{ErrorType: "FieldValueRequired"},
@@ -61,8 +66,24 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.backoffLimit": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.backoffLimitPerIndex": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
+			"spec.completions": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.maxFailedIndexes": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.parallelism": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.scheduling": {
 				{ErrorType: "FieldValueForbidden"},
@@ -107,6 +128,49 @@ func init() {
 			"spec.scheduling.schedulingPolicy.gang.minCount": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"spec.template.spec.activeDeadlineSeconds": {
+				{ErrorType: "FieldValueInvalid", Origin: "maximum"},
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"spec.template.spec.containers": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.containers[*].securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.template.spec.containers[*].securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.containers[*].securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.containers[*].securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.containers[*].securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.ephemeralContainers[*].securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.ephemeralContainers[*].securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.template.spec.evictionResponders": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -122,11 +186,50 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.template.spec.initContainers[*].securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.template.spec.initContainers[*].securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.initContainers[*].securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.initContainers[*].securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.initContainers[*].securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.template.spec.schedulingGroup": {
 				{ErrorType: "FieldValueForbidden", Origin: "dependentForbidden"},
 			},
+			"spec.template.spec.securityContext.seccompProfile.oci": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+			},
+			"spec.template.spec.securityContext.seccompProfile.oci.baseProfile.localhostProfile": {
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.securityContext.seccompProfile.oci.baseProfile.type": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.template.spec.securityContext.seccompProfile.oci.ref": {
+				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
+			},
+			"spec.template.spec.securityContext.seccompProfile.type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"spec.template.spec.tolerations[*].key": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-label-key"},
+			},
+			"spec.ttlSecondsAfterFinished": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 		},
 	)

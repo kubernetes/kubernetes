@@ -69,7 +69,16 @@ func (enc *encoder) binwrite(v any) {
 // are aligned properly as required by the D-Bus spec.
 func (enc *encoder) Encode(vs ...any) (err error) {
 	defer func() {
-		err, _ = recover().(error)
+		v := recover()
+		if v == nil {
+			return
+		}
+		e, ok := v.(error)
+		if !ok {
+			// Not ours; re-panic.
+			panic(v)
+		}
+		err = e
 	}()
 	for _, v := range vs {
 		enc.encode(reflect.ValueOf(v), 0)
@@ -148,7 +157,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			panic(err)
 		}
 		enc.pos += n
-	case reflect.Ptr:
+	case reflect.Pointer:
 		enc.encode(v.Elem(), depth)
 	case reflect.Slice, reflect.Array:
 		// Lookahead offset: 4 bytes for uint32 length (with alignment),
@@ -163,7 +172,7 @@ func (enc *encoder) encode(v reflect.Value, depth int) {
 			bufenc.encode(v.Index(i), depth+1)
 		}
 
-		if buf.Len() > 1<<26 {
+		if buf.Len() > maxArrayLen {
 			panic(FormatError("input exceeds array size limitation"))
 		}
 

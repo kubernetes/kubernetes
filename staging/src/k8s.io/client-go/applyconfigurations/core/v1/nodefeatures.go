@@ -25,7 +25,7 @@ package v1
 // The features contained in the NodeFeatures should depend only on the cri implementation
 // independent of runtime handlers.
 type NodeFeaturesApplyConfiguration struct {
-	// SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+	// supplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
 	SupplementalGroupsPolicy *bool `json:"supplementalGroupsPolicy,omitempty"`
 }
 

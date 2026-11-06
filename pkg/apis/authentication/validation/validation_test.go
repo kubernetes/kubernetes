@@ -42,7 +42,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "valid: no attestations, no bound object",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 				},
 			},
 		},
@@ -50,7 +50,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "valid: correct admissionReviewAPIGroups with webhook bound object ref",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://example.com"},
 					BoundObjectRef:    webhookRef,
 					Attestations: map[string]authentication.AttestationValue{
@@ -63,7 +63,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: empty attestation value",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://example.com"},
 					BoundObjectRef:    webhookRef,
 					Attestations: map[string]authentication.AttestationValue{
@@ -77,7 +77,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: unknown key",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://example.com"},
 					BoundObjectRef:    webhookRef,
 					Attestations: map[string]authentication.AttestationValue{
@@ -92,7 +92,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: multiple values for admissionReviewAPIGroups",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://example.com"},
 					BoundObjectRef: &authentication.BoundObjectReference{
 						Kind:       "MutatingWebhookConfiguration",
@@ -111,7 +111,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: empty string value",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://example.com"},
 					BoundObjectRef:    webhookRef,
 					Attestations: map[string]authentication.AttestationValue{
@@ -126,7 +126,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			tr: &authentication.TokenRequest{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					BoundObjectRef: &authentication.BoundObjectReference{
 						Kind:       "Pod",
 						APIVersion: "v1",
@@ -144,7 +144,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: attestations without bound object ref",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Attestations: map[string]authentication.AttestationValue{
 						authentication.AttestationAdmissionReviewAPIGroups: {"apps"},
 					},
@@ -156,7 +156,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: webhook bound object with no attestations",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://example.com"},
 					BoundObjectRef:    webhookRef,
 				},
@@ -167,7 +167,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: webhook bound object missing admissionReviewAPIGroups",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://example.com"},
 					BoundObjectRef:    webhookRef,
 					Attestations: map[string]authentication.AttestationValue{
@@ -181,7 +181,7 @@ func TestValidateTokenRequestAttestations(t *testing.T) {
 			name: "invalid: multiple audiences with webhook bound object",
 			tr: &authentication.TokenRequest{
 				Spec: authentication.TokenRequestSpec{
-					ExpirationSeconds: validExpiration,
+					ExpirationSeconds: &validExpiration,
 					Audiences:         []string{"https://a.com", "https://b.com"},
 					BoundObjectRef:    webhookRef,
 					Attestations: map[string]authentication.AttestationValue{

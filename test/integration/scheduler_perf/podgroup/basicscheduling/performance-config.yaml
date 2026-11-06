@@ -143,3 +143,9 @@
     featureGates:
       TopologyAwareWorkloadScheduling: true
       CompositePodGroup: true
+  - name: 5000Nodes_10Groups_50000Pods_5000PerGroup
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPodGroups: 10
+      podsPerGroup: 5000

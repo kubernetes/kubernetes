@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/server/healthz"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 )
 
 // Some of these tests capture log output. Don't reduce the verbosity or they will fail!
@@ -156,9 +156,6 @@ func TestHealthCheckerStart(t *testing.T) {
 		tCtx.SyncTest(tt.name, func(tCtx ktesting.TContext) {
 			tCtx = ktesting.Init(tCtx, initoption.BufferLogs(true))
 			logger := tCtx.Logger()
-			defer func() {
-				tCtx.Cancel("test has completed")
-			}()
 
 			// Mock SdWatchdogEnabled to return a valid value
 			mockClient := &mockWatchdogClient{

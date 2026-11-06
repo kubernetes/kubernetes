@@ -255,6 +255,8 @@ var (
 		"MakeIPTablesUtilChains",
 		"RotateCertificates",
 		"ServerTLSBootstrap",
+		"ClientCertificateKeyAlgorithm",
+		"ServerCertificateKeyAlgorithm",
 		"StaticPodURL",
 		"StaticPodURLHeader[*][*]",
 		"MaxOpenFiles",

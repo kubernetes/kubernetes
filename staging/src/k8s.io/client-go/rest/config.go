@@ -102,6 +102,15 @@ type Config struct {
 	// server.
 	DisableCompression bool
 
+	// MinConnectionPoolSize, if greater than 1, spreads requests to the server
+	// across at least this many independent transports, each with its own
+	// connections, preferring the one with fewer requests in flight. More
+	// connections may be opened, for example when a connection reaches the
+	// server's limit of concurrent HTTP/2 streams. Values <= 1 keep the default
+	// of a single shared transport. Ignored if Transport is set or if the
+	// ClientsAllowConnectionPool feature gate is disabled.
+	MinConnectionPoolSize int
+
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options. Use WrapTransport
 	// to provide additional per-server middleware behavior.
@@ -318,6 +327,12 @@ type ContentConfig struct {
 	// TODO: NegotiatedSerializer will be phased out as internal clients are removed
 	//   from Kubernetes.
 	NegotiatedSerializer runtime.NegotiatedSerializer
+	// DropManagedFields asks the server to omit metadata.managedFields from responses,
+	// and strips it from decoded objects when the server returns it anyway.
+	// Leave it unset for clients that read managedFields, such as callers of the Extract
+	// functions of apply configurations. It has no effect unless the
+	// ManagedFieldsOptOutClient feature gate is enabled.
+	DropManagedFields bool
 }
 
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
@@ -394,6 +409,7 @@ func RESTClientForConfigAndClient(config *Config, httpClient *http.Client) (*RES
 		ContentType:        config.ContentType,
 		GroupVersion:       gv,
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
+		DropManagedFields:  config.DropManagedFields,
 	}
 
 	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
@@ -476,6 +492,7 @@ func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Cl
 		ContentType:        config.ContentType,
 		GroupVersion:       gv,
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
+		DropManagedFields:  config.DropManagedFields,
 	}
 
 	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
@@ -651,6 +668,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		WarningHandlerWithContext: config.WarningHandlerWithContext,
 		UserAgent:                 config.UserAgent,
 		DisableCompression:        config.DisableCompression,
+		MinConnectionPoolSize:     config.MinConnectionPoolSize,
 		QPS:                       config.QPS,
 		Burst:                     config.Burst,
 		Timeout:                   config.Timeout,
@@ -691,6 +709,7 @@ func CopyConfig(config *Config) *Config {
 		},
 		UserAgent:                 config.UserAgent,
 		DisableCompression:        config.DisableCompression,
+		MinConnectionPoolSize:     config.MinConnectionPoolSize,
 		Transport:                 config.Transport,
 		WrapTransport:             config.WrapTransport,
 		QPS:                       config.QPS,

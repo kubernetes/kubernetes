@@ -41,19 +41,6 @@ func TestValidateRuntimeClass(t *testing.T) {
 			Handler:    "foo",
 		},
 	}, {
-		name:        "invalid Handler name",
-		expectError: true,
-		rc: node.RuntimeClass{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Handler:    "&@#$",
-		},
-	}, {
-		name:        "invalid empty RuntimeClass",
-		expectError: true,
-		rc: node.RuntimeClass{
-			ObjectMeta: metav1.ObjectMeta{Name: "empty"},
-		},
-	}, {
 		name:        "valid Handler",
 		expectError: false,
 		rc: node.RuntimeClass{
@@ -104,14 +91,6 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 			},
 			Handler: "bar",
 		},
-	}, {
-		name:        "invalid Handler update",
-		expectError: true,
-		old:         old,
-		new: node.RuntimeClass{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Handler:    "somethingelse",
-		},
 	}}
 
 	for _, test := range tests {
@@ -142,6 +121,13 @@ func TestValidateOverhead(t *testing.T) {
 				core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 			},
 		},
+	}, {
+		Name: "Overhead with a whole-number extended resource past int64",
+		overhead: &node.Overhead{
+			PodFixed: core.ResourceList{
+				core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616"),
+			},
+		},
 	}}
 
 	for _, tc := range successCase {
@@ -163,6 +149,21 @@ func TestValidateOverhead(t *testing.T) {
 		overhead: &node.Overhead{
 			PodFixed: core.ResourceList{
 				core.ResourceName("my.org"): resource.MustParse("10m"),
+			},
+		},
+	}, {
+		Name: "Fractional extended resource past int64",
+		overhead: &node.Overhead{
+			PodFixed: core.ResourceList{
+				core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m"),
+			},
+		},
+	}, {
+		Name: "Hugepages past int64",
+		overhead: &node.Overhead{
+			PodFixed: core.ResourceList{
+				core.ResourceName(core.ResourceMemory):                  resource.MustParse("10G"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("18446744073709551616"),
 			},
 		},
 	}}

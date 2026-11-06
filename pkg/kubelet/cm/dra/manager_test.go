@@ -53,12 +53,12 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/ptr"
 
+	"k8s.io/ktesting"
 	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -91,7 +91,6 @@ type fakeDRADriverGRPCServer struct {
 var gatherWithoutDurations = metricstestutil.GathererFunc(func() ([]*metricstestutil.MetricFamily, error) {
 	got, err := kubeletmetrics.GetGather().Gather()
 	for _, mf := range got {
-
 		for _, m := range mf.Metric {
 			if m.Histogram == nil {
 				continue
@@ -220,6 +219,7 @@ func (m *mockWatchResourcesClient) CloseSend() error             { return nil }
 func (m *mockWatchResourcesClient) RecvMsg(v interface{}) error {
 	return fmt.Errorf("RecvMsg not implemented")
 }
+
 func (m *mockWatchResourcesClient) SendMsg(v interface{}) error {
 	return fmt.Errorf("SendMsg not implemented")
 }
@@ -1235,8 +1235,10 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 			kubeletmetrics.DRAOperationsDuration.Reset()
 			kubeletmetrics.DRAGRPCOperationsDuration.Reset()
 			defer func() {
-				require.NoError(t,
-					metricstestutil.GatherAndCompare(gatherWithoutDurations,
+				require.NoError(
+					t,
+					metricstestutil.GatherAndCompare(
+						gatherWithoutDurations,
 						strings.NewReader(test.expectedMetric),
 						kubeletmetrics.DRAOperationsDuration.FQName(),
 						kubeletmetrics.DRAGRPCOperationsDuration.FQName(),
@@ -1370,7 +1372,8 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	err = manager.PrepareResources(tCtx, firstPod)
 	require.NoError(t, err)
 
-	assert.Equal(t, uint32(1),
+	assert.Equal(
+		t, uint32(1),
 		draServerInfo.server.prepareResourceCalls.Load(),
 		"first pod should trigger one prepare call",
 	)
@@ -1382,7 +1385,8 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 	require.NoError(t, err)
 
 	// second pod triggered exactly one prepare call (new claim only) + previous one call
-	assert.Equal(t, uint32(2),
+	assert.Equal(
+		t, uint32(2),
 		draServerInfo.server.prepareResourceCalls.Load(),
 		"second pod should trigger one prepare call for the new claim",
 	)
@@ -1392,6 +1396,94 @@ func TestPrepareResourcesWithPreparedAndNewClaim(t *testing.T) {
 		require.True(t, exists, "claim %s should exist in cache", claimName)
 		assert.True(t, claimInfo.prepared, "claim %s should be marked as prepared", claimName)
 	}
+}
+
+// TestPrepareResourcesAfterRestartIsIdempotent is a regression test for
+// https://github.com/kubernetes/kubernetes/issues/140471: re-preparing an
+// already-prepared claim after a kubelet restart used to append the
+// NodePrepareResources response onto the checkpoint-restored device list
+// instead of replacing it, so the device list (and the checkpoint) doubled
+// on every restart. A second Manager built on the same state directory
+// simulates the restart, since it restores ClaimInfo from the checkpoint
+// with prepared=false.
+func TestPrepareResourcesAfterRestartIsIdempotent(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	fakeKubeClient := fake.NewClientset()
+	stateDir := t.TempDir()
+
+	pod := genTestPodWithClaims(claimName)
+	claim := genTestClaim(claimName, driverName, deviceName, string(pod.ObjectMeta.UID))
+	_, err := fakeKubeClient.ResourceV1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	resp := genPrepareResourcesResponse(claim.UID)
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, resp, nil, nil)
+	require.NoError(t, err)
+	defer draServerInfo.teardownFn()
+
+	startManager := func() *Manager {
+		t.Helper()
+		m, err := NewManager(logger, fakeKubeClient, stateDir)
+		require.NoError(t, err)
+		m.initDRAPluginManager(tCtx, getFakeNode, time.Second)
+		require.NoError(t, m.GetWatcherHandler().RegisterPlugin(
+			tCtx, driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil))
+		return m
+	}
+
+	firstManager := startManager()
+	require.NoError(t, firstManager.PrepareResources(tCtx, pod))
+	require.Equal(t, uint32(1), draServerInfo.server.prepareResourceCalls.Load(),
+		"first prepare should call NodePrepareResources once")
+
+	claimInfo, exists := firstManager.cache.get(claim.Name, namespace)
+	require.True(t, exists)
+	require.Len(t, claimInfo.DriverState[driverName].Devices, 1, "one device after first prepare")
+
+	// Stop the first Manager so the second one below can take over the same
+	// state directory, as a restarted kubelet would.
+	firstManager.Stop()
+
+	// After the restart the driver reports a different CDI device ID. If
+	// re-prepare replaced the restored devices with the response, the cache
+	// holds only the new ID; if it appended, both IDs would be present; if it
+	// skipped NodePrepareResources, only the old ID would remain.
+	restartedCDIID := cdiID + "-restarted"
+	restartedResp := genPrepareResourcesResponse(claim.UID)
+	restartedResp.Claims[string(claim.UID)].Devices[0].CdiDeviceIds = []string{restartedCDIID}
+	draServerInfo.server.prepareResourcesResponse = restartedResp
+
+	// The second Manager restores ClaimInfo from the checkpoint, always with
+	// prepared=false, so PrepareResources calls NodePrepareResources again.
+	secondManager := startManager()
+
+	restoredClaimInfo, exists := secondManager.cache.get(claim.Name, namespace)
+	require.True(t, exists, "claim info should be restored from checkpoint")
+	assert.False(t, restoredClaimInfo.prepared, "restored claim info is never marked prepared")
+
+	require.NoError(t, secondManager.PrepareResources(tCtx, pod))
+	require.Equal(t, uint32(2), draServerInfo.server.prepareResourceCalls.Load(),
+		"re-prepare after restart must call NodePrepareResources again")
+
+	claimInfo, exists = secondManager.cache.get(claim.Name, namespace)
+	require.True(t, exists)
+	devices := claimInfo.DriverState[driverName].Devices
+	require.Len(t, devices, 1, "device list must stay at one entry after restart + re-prepare, not double")
+	assert.Equal(t, []string{restartedCDIID}, devices[0].CDIDeviceIDs,
+		"re-prepare must replace the checkpoint-restored device with the driver's new response")
+
+	// The original bug grew the checkpoint, not just the in-memory cache, so
+	// restart once more and check what was actually persisted.
+	secondManager.Stop()
+	thirdManager := startManager()
+	defer thirdManager.Stop()
+
+	persistedClaimInfo, exists := thirdManager.cache.get(claim.Name, namespace)
+	require.True(t, exists, "claim info should be restored from checkpoint")
+	persisted := persistedClaimInfo.DriverState[driverName].Devices
+	require.Len(t, persisted, 1, "checkpoint must hold one device after restart + re-prepare, not two")
+	assert.Equal(t, []string{restartedCDIID}, persisted[0].CDIDeviceIDs,
+		"checkpoint must hold the device from the re-prepare response")
 }
 
 // TestPrepareResourcesWithUnpreparingClaim is a regression test for the race
@@ -1655,8 +1747,10 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="Unprepare
 			kubeletmetrics.DRAOperationsDuration.Reset()
 			kubeletmetrics.DRAGRPCOperationsDuration.Reset()
 			defer func() {
-				require.NoError(t,
-					metricstestutil.GatherAndCompare(gatherWithoutDurations,
+				require.NoError(
+					t,
+					metricstestutil.GatherAndCompare(
+						gatherWithoutDurations,
 						strings.NewReader(test.expectedMetric),
 						kubeletmetrics.DRAOperationsDuration.FQName(),
 						kubeletmetrics.DRAGRPCOperationsDuration.FQName(),
@@ -1991,7 +2085,6 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 				t.Errorf("GoRoutine %d: pod: %s: UnprepareResources failed: %+v", goRoutineNum, pod.Name, err)
 				return
 			}
-
 		}(t, i)
 	}
 	wgStart.Done() // Start executing goroutines
@@ -2543,17 +2636,35 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 						ClaimName: directClaimName,
 						PodUIDs:   sets.New("pod-direct-uid"),
 						DriverState: map[string]state.DriverState{
-							"test-driver": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-a"}}},
+							"test-driver-b": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-b"}}},
+							"test-driver-a": {Devices: []state.Device{{PoolName: "pool", DeviceName: "dev-a"}}},
 						},
 					},
 				},
 			},
-			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "container1"}}},
+			initialStatus: &v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{
+				Name: "container1",
+				AllocatedResourcesStatus: []v1.ResourceStatus{{
+					Name: "vendor.com/device",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev-b", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "dev-a", Health: v1.ResourceHealthStatusHealthy},
+					},
+				}},
+			}}},
 			expectedAllocatedResourcesStatus: []v1.ResourceStatus{
 				{
 					Name: "claim:claim1",
 					Resources: []v1.ResourceHealth{
-						{ResourceID: "test-driver/pool/dev-a", Health: v1.ResourceHealthStatusHealthy, Message: ptr.To("Device is operating normally")},
+						{ResourceID: "test-driver-a/pool/dev-a", Health: v1.ResourceHealthStatusHealthy, Message: new("Device is operating normally")},
+						{ResourceID: "test-driver-b/pool/dev-b", Health: v1.ResourceHealthStatusHealthy, Message: new("Device is operating normally")},
+					},
+				},
+				{
+					Name: "vendor.com/device",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev-a", Health: v1.ResourceHealthStatusHealthy},
+						{ResourceID: "dev-b", Health: v1.ResourceHealthStatusHealthy},
 					},
 				},
 			},

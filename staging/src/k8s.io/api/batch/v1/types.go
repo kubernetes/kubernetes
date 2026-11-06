@@ -18,7 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -103,6 +103,7 @@ type JobList struct {
 
 // CompletionMode specifies how Pod completions of a Job are tracked.
 // +enum
+// +k8s:validation-gen-nolint
 type CompletionMode string
 
 const (
@@ -120,6 +121,7 @@ const (
 
 // PodFailurePolicyAction specifies how a Pod failure is handled.
 // +enum
+// +k8s:validation-gen-nolint
 type PodFailurePolicyAction string
 
 const (
@@ -144,6 +146,7 @@ const (
 )
 
 // +enum
+// +k8s:validation-gen-nolint
 type PodFailurePolicyOnExitCodesOperator string
 
 const (
@@ -153,6 +156,7 @@ const (
 
 // PodReplacementPolicy specifies the policy for creating pod replacements.
 // +enum
+// +k8s:validation-gen-nolint
 type PodReplacementPolicy string
 
 const (
@@ -316,6 +320,8 @@ type JobSpec struct {
 	// i.e. when the work left to do is less than max parallelism.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	Parallelism *int32 `json:"parallelism,omitempty" protobuf:"varint,1,opt,name=parallelism"`
 
 	// completions specifies the desired number of successfully finished pods the
@@ -325,6 +331,8 @@ type JobSpec struct {
 	// pod signals the success of the job.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
 	// activeDeadlineSeconds specifies the duration in seconds relative to the startTime that the job
@@ -333,6 +341,8 @@ type JobSpec struct {
 	// update), this timer will effectively be stopped and reset when the Job is
 	// resumed again.
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
 
 	// podFailurePolicy specifies the policy of handling failed pods. In particular, it allows to
@@ -359,6 +369,8 @@ type JobSpec struct {
 	// Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified.
 	// When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,7,opt,name=backoffLimit"`
 
 	// backoffLimitPerIndex specifies the limit for the number of retries within an
@@ -368,6 +380,8 @@ type JobSpec struct {
 	// be set when Job's completionMode=Indexed, and the Pod's restart
 	// policy is Never. The field is immutable.
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	BackoffLimitPerIndex *int32 `json:"backoffLimitPerIndex,omitempty" protobuf:"varint,12,opt,name=backoffLimitPerIndex"`
 
 	// maxFailedIndexes specifies the maximal number of failed indexes before marking the Job as
@@ -380,7 +394,8 @@ type JobSpec struct {
 	// less than or equal to 10^4 when is completions greater than 10^5.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("backoffLimitPerIndex")
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
+	// +k8s:beta(since: "1.38")=+k8s:dependentRequired("backoffLimitPerIndex")
 	MaxFailedIndexes *int32 `json:"maxFailedIndexes,omitempty" protobuf:"varint,13,opt,name=maxFailedIndexes"`
 
 	// TODO enabled it when https://github.com/kubernetes/kubernetes/issues/28486 has been fixed
@@ -421,6 +436,8 @@ type JobSpec struct {
 	// the Job won't be automatically deleted. If this field is set to zero,
 	// the Job becomes eligible to be deleted immediately after it finishes.
 	// +optional
+	// +k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=0
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 
 	// completionMode specifies how Pod completions are tracked. It can be
@@ -487,8 +504,9 @@ type JobSpec struct {
 	// When set, it specifies the scheduling policy (basic or gang), topology
 	// constraints, disruption mode, and shared resource claims.
 	// When omitted, the Job defaults to the basic scheduling policy, which behaves
-	// as standard pod-by-pod scheduling.
-	// This field is alpha-level and requires the WorkloadWithJob feature gate.
+	// as standard pod-by-pod scheduling. This field is gated by the WorkloadWithJob
+	// feature gate.
+	//
 	// This field is immutable, including whether it is set at all, only
 	// policy.gang.minCount may be changed after creation.
 	//
@@ -514,7 +532,7 @@ type JobSchedulingConfiguration struct {
 	// +k8s:optional
 	// +k8s:update=NoSet
 	// +k8s:update=NoUnset
-	SchedulingPolicy *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
+	SchedulingPolicy *schedulingv1.WorkloadPodGroupSchedulingPolicy `json:"schedulingPolicy,omitempty" protobuf:"bytes,1,opt,name=schedulingPolicy"`
 
 	// schedulingConstraints defines scheduling constraints (e.g. topology)
 	// for the Job's pods.
@@ -523,7 +541,7 @@ type JobSchedulingConfiguration struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	SchedulingConstraints *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
+	SchedulingConstraints *schedulingv1.WorkloadPodGroupSchedulingConstraints `json:"schedulingConstraints,omitempty" protobuf:"bytes,2,opt,name=schedulingConstraints"`
 
 	// disruptionMode defines the mode in which the Job's pods can be disrupted.
 	// One of Single, All.
@@ -533,7 +551,7 @@ type JobSchedulingConfiguration struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:immutable
-	DisruptionMode *schedulingv1alpha3.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
+	DisruptionMode *schedulingv1.WorkloadPodGroupDisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,3,opt,name=disruptionMode"`
 
 	// resourceClaims defines which ResourceClaims may be shared among Pods in
 	// the Job. Pods consume the devices allocated to a PodGroup's claim by
@@ -554,7 +572,7 @@ type JobSchedulingConfiguration struct {
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=4
 	// +k8s:immutable
-	ResourceClaims []schedulingv1alpha3.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
+	ResourceClaims []schedulingv1.WorkloadPodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 }
 
 // JobStatus represents the current state of a Job.
@@ -799,7 +817,7 @@ type CronJobSpec struct {
 
 	// schedule is the schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// timeZone is the time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
@@ -853,6 +871,7 @@ type CronJobSpec struct {
 // If none of the following policies is specified, the default one
 // is AllowConcurrent.
 // +enum
+// +k8s:validation-gen-nolint
 type ConcurrencyPolicy string
 
 const (

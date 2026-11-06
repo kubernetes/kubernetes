@@ -23,9 +23,9 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func workloadResourceClaimsDriverResources(nodes *drautils.Nodes) map[string]resourceslice.DriverResources {

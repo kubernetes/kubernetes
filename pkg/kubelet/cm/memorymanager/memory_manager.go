@@ -105,10 +105,14 @@ type Manager interface {
 	GetMemory(logger klog.Logger, podUID, containerName string) []state.Block
 
 	// GetPodMemory returns the memory allocated by a pod from NUMA nodes
-	GetPodMemory(podUID string) []state.Block
+	GetPodMemory(logger klog.Logger, podUID string) []state.Block
 
 	// GetResourceIsolationLevel returns the isolation level of the container.
 	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
+
+	// CanAllocateExclusively reports whether the configured policy supports exclusive
+	// assignment of the resource for eligible workloads, regardless of available capacity.
+	CanAllocateExclusively(res v1.ResourceName) bool
 }
 
 type manager struct {
@@ -433,7 +437,7 @@ func (m *manager) removeStaleState(logger klog.Logger) {
 	activeContainers := make(map[string]map[string]struct{})
 	for _, pod := range activePods {
 		activeContainers[string(pod.UID)] = make(map[string]struct{})
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 			activeContainers[string(pod.UID)][container.Name] = struct{}{}
 		}
 	}
@@ -567,7 +571,7 @@ func (m *manager) GetMemory(_ klog.Logger, podUID, containerName string) []state
 }
 
 // GetPodMemory returns the memory allocated by a pod from NUMA nodes
-func (m *manager) GetPodMemory(podUID string) []state.Block {
+func (m *manager) GetPodMemory(_ klog.Logger, podUID string) []state.Block {
 	return m.state.GetPodMemoryBlocks(podUID)
 }
 
@@ -582,4 +586,11 @@ func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container
 	}
 
 	return cmqos.ResourceIsolationContainer
+}
+
+func (m *manager) CanAllocateExclusively(res v1.ResourceName) bool {
+	if res != v1.ResourceMemory && !corev1helper.IsHugePageResourceName(res) {
+		return false
+	}
+	return m.policy.CanAllocateExclusively()
 }

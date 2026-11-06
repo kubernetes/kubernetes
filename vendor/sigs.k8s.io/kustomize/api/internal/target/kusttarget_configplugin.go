@@ -315,6 +315,13 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 						return nil, errors.WrapPrefixf(err, "failed to merge template fieldSpec")
 					}
 				}
+				// merge spec/volumeClaimTemplates[]/metadata fieldSpecs if includeVolumeClaimTemplates flag is true
+				if label.IncludeVolumeClaimTemplates {
+					fss, err = fss.MergeAll(tc.VolumeClaimTemplateLabels)
+					if err != nil {
+						return nil, errors.WrapPrefixf(err, "failed to merge volumeClaimTemplate fieldSpec")
+					}
+				}
 				// only add to metadata by default
 				fss, err = fss.MergeOne(types.FieldSpec{Path: "metadata/labels", CreateIfNotPresent: true})
 			}

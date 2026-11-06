@@ -10,6 +10,7 @@ ALL_COVERAGE_MOD_DIRS := $(shell find . -type f -name 'go.mod' -exec dirname {} 
 
 GO = go
 TIMEOUT = 60
+GO_VERSION := $(shell awk '/^go [0-9]/ {print $$2; exit}' go.mod)
 
 # User to run as in docker images.
 DOCKER_USER=$(shell id -u):$(shell id -g)
@@ -19,7 +20,7 @@ DEPENDENCIES_DOCKERFILE=./dependencies.Dockerfile
 
 .PHONY: precommit ci
 precommit: generate toolchain-check license-check misspell go-mod-tidy golangci-lint-fix verify-readmes verify-mods test-default
-ci: generate toolchain-check license-check lint vanity-import-check verify-readmes verify-mods build test-default check-clean-work-tree test-coverage
+ci: generate toolchain-check license-check lint verify-readmes verify-mods build test-default check-clean-work-tree test-coverage
 
 # Tools
 
@@ -59,9 +60,6 @@ $(TOOLS)/gocovmerge: PACKAGE=github.com/wadey/gocovmerge
 STRINGER = $(TOOLS)/stringer
 $(TOOLS)/stringer: PACKAGE=golang.org/x/tools/cmd/stringer
 
-PORTO = $(TOOLS)/porto
-$(TOOLS)/porto: PACKAGE=github.com/jcchavezs/porto/cmd/porto
-
 GOTMPL = $(TOOLS)/gotmpl
 $(GOTMPL): PACKAGE=go.opentelemetry.io/build-tools/gotmpl
 
@@ -71,8 +69,13 @@ $(GORELEASE): PACKAGE=golang.org/x/exp/cmd/gorelease
 GOVULNCHECK = $(TOOLS)/govulncheck
 $(TOOLS)/govulncheck: PACKAGE=golang.org/x/vuln/cmd/govulncheck
 
+AFFECTEDMODS = $(TOOLS)/affectedmods
+AFFECTEDMODS_FILES := $(sort $(shell find $(TOOLS_MOD_DIR)/affectedmods -type f))
+$(TOOLS)/affectedmods: PACKAGE=go.opentelemetry.io/otel/$(TOOLS_MOD_DIR)/affectedmods
+$(TOOLS)/affectedmods: $(AFFECTEDMODS_FILES)
+
 .PHONY: tools
-tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(PORTO) $(VERIFYREADMES) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
+tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(VERIFYREADMES) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE) $(AFFECTEDMODS)
 
 # Virtualized python tools via docker
 
@@ -110,7 +113,7 @@ $(CODESPELL): PACKAGE=codespell
 # Generate
 
 .PHONY: generate
-generate: go-generate vanity-import-fix
+generate: go-generate
 
 .PHONY: go-generate
 go-generate: $(OTEL_GO_MOD_DIRS:%=go-generate/%)
@@ -120,20 +123,18 @@ go-generate/%: $(STRINGER) $(GOTMPL)
 		&& cd $(DIR) \
 		&& PATH="$(TOOLS):$${PATH}" $(GO) generate ./...
 
-.PHONY: vanity-import-fix
-vanity-import-fix: $(PORTO)
-	@$(PORTO) --include-internal -w .
-
 # Generate go.work file for local development.
 .PHONY: go-work
 go-work: $(CROSSLINK)
-	$(CROSSLINK) work --root=$(shell pwd) --go=1.22.7
+	$(CROSSLINK) work --root=$(shell pwd) --go=$(GO_VERSION)
 
 # Build
 
-.PHONY: build
+.PHONY: build cross-build
 
 build: $(OTEL_GO_MOD_DIRS:%=build/%) $(OTEL_GO_MOD_DIRS:%=build-tests/%)
+# Cross-platform builds cannot execute the binaries produced by build-tests (go test), so use a compile-only target.
+cross-build: $(OTEL_GO_MOD_DIRS:%=build/%)
 build/%: DIR=$*
 build/%:
 	@echo "$(GO) build $(DIR)/..." \
@@ -169,6 +170,9 @@ test/%:
 		| grep -v third_party \
 		| xargs $(GO) test -timeout $(TIMEOUT)s $(ARGS)
 
+.PHONY: test-tools
+test-tools: test/$(TOOLS_MOD_DIR)
+
 COVERAGE_MODE    = atomic
 COVERAGE_PROFILE = coverage.out
 .PHONY: test-coverage
@@ -193,14 +197,22 @@ benchmark/%:
 
 # sdk/metric is split into two shards to work around CodSpeed limitations.
 # See https://github.com/CodSpeedHQ/codspeed-go/issues/56
-BENCHMARK_SHARDS := $(filter-out ./sdk/metric,$(OTEL_GO_MOD_DIRS)) ./sdk/metric/root ./sdk/metric/internal
-benchmark/./sdk/metric/root:
+BENCHMARK_SHARDS := $(filter-out ./sdk/metric,$(OTEL_GO_MOD_DIRS)) ./sdk/metric/. ./sdk/metric/internal
+benchmark/./sdk/metric/.:
 	cd ./sdk/metric && $(GO) test -run='^$$' -bench=. $(ARGS) . ./exemplar/...
-benchmark/./sdk/metric/internal:
-	cd ./sdk/metric && $(GO) test -run='^$$' -bench=. $(ARGS) ./internal/...
 
 print-sharded-benchmarks:
 	@echo $(BENCHMARK_SHARDS) | jq -cR 'split(" ")'
+
+# Print the JSON list of benchmark shards whose code changed since
+# BASE_REF (default: main). Filters print-sharded-benchmarks
+# down to shards whose underlying module contains a changed *.go file.
+# Non-Go changes (docs, workflows, Makefile, go.mod/go.sum, tooling) emit [].
+# Override the diff base via BASE_REF, or pass ARGS=-all to emit the full list.
+BASE_REF ?= main
+.PHONY: print-affected-benchmarks
+print-affected-benchmarks:
+	@$(MAKE) -s print-sharded-benchmarks | $(GO) -C $(TOOLS_MOD_DIR) run ./affectedmods $(if $(strip $(BASE_REF)),-base=$(BASE_REF),) $(ARGS)
 
 .PHONY: golangci-lint golangci-lint-fix
 golangci-lint-fix: ARGS=--fix
@@ -227,10 +239,6 @@ go-mod-tidy/%: crosslink
 
 .PHONY: lint
 lint: misspell go-mod-tidy golangci-lint
-
-.PHONY: vanity-import-check
-vanity-import-check: $(PORTO)
-	@$(PORTO) --include-internal -l . || ( echo "(run: make vanity-import-fix)"; exit 1 )
 
 .PHONY: misspell
 misspell: $(MISSPELL)

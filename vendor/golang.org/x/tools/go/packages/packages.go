@@ -1508,7 +1508,7 @@ func (ld *loader) loadFromExportData(lpkg *loaderPackage) error {
 	}
 	defer f.Close()
 
-	// Read gc export data.
+	// Read gc or cmd/export export data.
 	//
 	// We don't currently support gccgo export data because all
 	// underlying workspaces use the gc toolchain. (Even build

@@ -29,7 +29,7 @@ package v1
 type SecretEnvSourceApplyConfiguration struct {
 	// The Secret to select from.
 	LocalObjectReferenceApplyConfiguration `json:""`
-	// Specify whether the Secret must be defined
+	// optional specifies whether the Secret must be defined
 	Optional *bool `json:"optional,omitempty"`
 }
 

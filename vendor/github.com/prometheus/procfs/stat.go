@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/prometheus/procfs/internal/fs"
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // CPUStat shows how much time the cpu spend in various stages.
@@ -167,7 +167,7 @@ func (fs FS) NewStat() (Stat, error) {
 // See: https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 func (fs FS) Stat() (Stat, error) {
 	fileName := fs.proc.Path("stat")
-	data, err := util.ReadFileNoStat(fileName)
+	data, err := parsers.ReadFileNoStat(fileName)
 	if err != nil {
 		return Stat{}, err
 	}

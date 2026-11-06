@@ -1,0 +1,18 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..b712f8c4310 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -587,10 +587,9 @@ func (s *store) GuaranteedUpdate(
+ 					return err
+ 				}
+ 				origStateIsCurrent = true
+-				if !bytes.Equal(data, origState.data) {
+-					// original data changed, restart loop
+-					continue
+-				}
++				// BUG REVERT (#54780): do not restart the update loop when the live
++				// stored data differs from the stale suggestion, returning the
++				// un-updated live object instead of applying the update.
+ 			}
+ 			// recheck that the data from etcd is not stale before short-circuiting a write
+ 			if !origState.stale {

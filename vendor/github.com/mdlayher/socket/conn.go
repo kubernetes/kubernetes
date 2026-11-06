@@ -605,6 +605,13 @@ func (c *Conn) Sendmsg(ctx context.Context, p, oob []byte, to unix.Sockaddr, fla
 	})
 }
 
+// SendmsgBuffers wraps sendmsg(2) with scatter-gather I/O support.
+func (c *Conn) SendmsgBuffers(ctx context.Context, buffers [][]byte, oob []byte, to unix.Sockaddr, flags int) (int, error) {
+	return writeT(ctx, c, "sendmsg", func(fd int) (int, error) {
+		return unix.SendmsgBuffers(fd, buffers, oob, to, flags)
+	})
+}
+
 // Sendto wraps sendto(2).
 func (c *Conn) Sendto(ctx context.Context, p []byte, flags int, to unix.Sockaddr) error {
 	return c.write(ctx, "sendto", func(fd int) error {
@@ -750,12 +757,6 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 		needDisarm atomic.Bool
 	)
 
-	// On cancel, clean up the watcher.
-	defer func() {
-		close(doneC)
-		wg.Wait()
-	}()
-
 	if d, ok := rw.Context.Deadline(); ok {
 		// The context has an explicit deadline. We will use it for cancelation
 		// but disarm it after poll for the next call.
@@ -764,15 +765,17 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 		}
 		setDeadline = true
 		needDisarm.Store(true)
-	} else {
-		// The context does not have an explicit deadline. We have to watch for
-		// cancelation so we can propagate that signal to immediately unblock
-		// the runtime network poller.
-		//
-		// TODO(mdlayher): is it possible to detect a background context vs a
-		// context with possible future cancel?
-		wg.Go(func() {
+	}
 
+	if rw.Context.Done() != nil {
+		// The context can be canceled, regardless of whether or not it also
+		// carries a deadline. We have to watch for cancelation so we can
+		// propagate that signal to immediately unblock the runtime network
+		// poller rather than waiting for a possibly distant deadline to expire.
+		//
+		// A nil Done channel means the context can never be canceled (such as
+		// context.Background), so no watcher is necessary.
+		wg.Go(func() {
 			select {
 			case <-rw.Context.Done():
 				// Cancel the operation. Make the caller disarm after poll
@@ -794,6 +797,13 @@ func rwT[T any](c *Conn, rw rwContext[T]) (T, error) {
 		t, err = rw.Do(int(fd))
 		return ready(err)
 	})
+
+	// Stop the watcher and wait for it to exit before checking whether we
+	// must disarm the deadline. Otherwise the watcher could observe
+	// cancelation and arm a deadline in the past after we have already
+	// disarmed, leaving the next call to fail immediately.
+	close(doneC)
+	wg.Wait()
 
 	if needDisarm.Load() {
 		_ = deadline(time.Time{})

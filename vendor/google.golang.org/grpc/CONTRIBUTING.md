@@ -23,6 +23,29 @@ wanted"](https://github.com/grpc/grpc-go/issues?q=sort%3Aupdated-desc%20is%3Aiss
 are especially nice for first-time contributors, as they should be well-defined
 problems that already have agreed-upon solutions.
 
+## Generative AI Policy
+
+AI tools have the ability to produce more code than is possible for the gRPC
+team to read, understand, review, and accept into the repository.  For this
+reason, we request that all contributions adhere to the following rules:
+
+1. **No AI-Generated Interactions:** All communication in the repo must be
+   authored by a human.  _Exception: AIs may be used for directed writing
+   assistance or translation._  Absolutely no automated agents are allowed to
+   directly publish to GitHub.
+
+2. **Author Ownership and Accountability:** Code contributions are expected to
+   be fully owned and understood by the human contributor.  If the code was
+   produced by generative AI, the author is expected to have reviewed and
+   understood it in its entirety before submitting it for review.  This includes
+   all content: production code, tests, examples, tools, etc.
+
+In addition to the above requirements, any AI-assisted contributions must also
+comply with the [Linux Foundation Generative AI
+Policy](https://www.linuxfoundation.org/legal/generative-ai).  This includes
+confirming that all contributions are legally allowed to be contributed to the
+gRPC project under the applicable license terms.
+
 ## Code Style
 
 We follow [Google's published Go style

@@ -23,12 +23,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutil "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestDefaultBinder tests the binding process in the scheduler.
@@ -46,7 +47,7 @@ func TestDefaultBinder(t *testing.T) {
 			}
 
 			// Add a node.
-			node, err := testutil.CreateNode(testCtx.ClientSet, st.MakeNode().Name("testnode").Obj())
+			node, err := schedulerutils.CreateNode(testCtx.ClientSet, st.MakeNode().Name("testnode").Obj())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -65,7 +66,7 @@ func TestDefaultBinder(t *testing.T) {
 			}
 			for name, tc := range tests {
 				t.Run(name, func(t *testing.T) {
-					pod, err := testutil.CreatePausePodWithResource(testCtx.ClientSet, "fixed-name", testCtx.NS.Name, nil)
+					pod, err := schedulerutils.CreatePausePodWithResource(testCtx.ClientSet, "fixed-name", testCtx.NS.Name, nil)
 					if err != nil {
 						t.Fatalf("Failed to create pod: %v", err)
 					}

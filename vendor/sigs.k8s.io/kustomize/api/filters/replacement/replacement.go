@@ -191,7 +191,7 @@ func copyValueToTarget(target *yaml.RNode, value *yaml.RNode, selector *types.Ta
 		}
 
 		// Check if this fieldPath contains structured data access
-		if err := setValueInStructuredData(target, value, fp, createKind); err == nil {
+		if err := setValueInStructuredData(target, value, fp, selector.Options); err == nil {
 			// Successfully handled as structured data
 			continue
 		}
@@ -258,7 +258,7 @@ func setFieldValue(options *types.FieldOptions, targetField *yaml.RNode, value *
 }
 
 // setValueInStructuredData handles setting values within structured data (JSON/YAML) in scalar fields
-func setValueInStructuredData(target *yaml.RNode, value *yaml.RNode, fieldPath string, createKind yaml.Kind) error {
+func setValueInStructuredData(target *yaml.RNode, value *yaml.RNode, fieldPath string, options *types.FieldOptions) error {
 	pathParts := kyaml_utils.SmarterPathSplitter(fieldPath, ".")
 	if len(pathParts) < 2 {
 		return fmt.Errorf("not a structured data path")
@@ -309,6 +309,11 @@ func setValueInStructuredData(target *yaml.RNode, value *yaml.RNode, fieldPath s
 
 	structuredData := yaml.NewRNode(&parsedNode)
 
+	createKind := yaml.Kind(0) // do not create
+	if options != nil && options.Create {
+		createKind = value.YNode().Kind
+	}
+
 	// Navigate to the target location within the structured data
 	targetInStructured, err := structuredData.Pipe(&yaml.PathMatcher{
 		Path:   structuredDataPath,
@@ -329,10 +334,9 @@ func setValueInStructuredData(target *yaml.RNode, value *yaml.RNode, fieldPath s
 
 	// Set the value in the structured data
 	for _, t := range targetFields {
-		if t.YNode().Kind == yaml.ScalarNode {
-			t.YNode().Value = value.YNode().Value
-		} else {
-			t.SetYNode(value.YNode())
+		err = setFieldValue(options, t, value)
+		if err != nil {
+			return err
 		}
 	}
 

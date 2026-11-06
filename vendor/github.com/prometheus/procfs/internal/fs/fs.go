@@ -31,6 +31,9 @@ const (
 
 	// DefaultSelinuxMountPoint is the common mount point of the selinuxfs.
 	DefaultSelinuxMountPoint = "/sys/fs/selinux"
+
+	// DefaultResctrlMountPoint is the common mount point of the resctrl filesystem.
+	DefaultResctrlMountPoint = "/sys/fs/resctrl"
 )
 
 // FS represents a pseudo-filesystem, normally /proc or /sys, which provides an

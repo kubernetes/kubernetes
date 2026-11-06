@@ -27,16 +27,16 @@ import (
 //
 // ResourcePoolStatusRequestStatus contains the calculated pool status information.
 type ResourcePoolStatusRequestStatusApplyConfiguration struct {
-	// PoolCount is the total number of pools that matched the filter criteria,
+	// poolCount is the total number of pools that matched the filter criteria,
 	// regardless of truncation. This helps users understand how many pools exist
 	// even when the response is truncated. A value of 0 means no pools matched
 	// the filter criteria.
 	PoolCount *int32 `json:"poolCount,omitempty"`
-	// Pools contains the first `spec.limit` matching pools, sorted by driver
+	// pools contains the first `spec.limit` matching pools, sorted by driver
 	// then pool name. If `len(pools) < poolCount`, the list was truncated.
 	// When omitted, no pools matched the request filters.
 	Pools []PoolStatusApplyConfiguration `json:"pools,omitempty"`
-	// Conditions provide information about the state of the request.
+	// conditions provide information about the state of the request.
 	// A condition with type=Complete or type=Failed will always be set
 	// when the status is populated.
 	//

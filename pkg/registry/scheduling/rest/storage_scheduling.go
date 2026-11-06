@@ -118,6 +118,19 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		}
 	}
 
+	if resource := "compositepodgroups"; apiResourceConfigSource.ResourceEnabled(schedulingapiv1beta1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			cpgStorage, cpgStatusStorage, err := compositepodgroupstore.NewREST(restOptionsGetter)
+			if err != nil {
+				return nil, err
+			}
+			storage[resource] = cpgStorage
+			storage[resource+"/status"] = cpgStatusStorage
+		} else {
+			klog.Warning("CompositePodGroup storage is disabled because the CompositePodGroup feature gate is disabled")
+		}
+	}
+
 	return storage, nil
 }
 

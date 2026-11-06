@@ -22,18 +22,15 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
+	authorizationv1alpha1client "k8s.io/client-go/kubernetes/typed/authorization/v1alpha1"
 )
 
 // DelegatingAuthorizerConfig is the minimal configuration needed to create an authorizer
 // built to delegate authorization to a kube API server
 type DelegatingAuthorizerConfig struct {
 	SubjectAccessReviewClient authorizationclient.AuthorizationV1Interface
-
-	// Compiler is the CEL compiler to use for evaluating policies. If nil, a default compiler will be used.
-	Compiler authorizationcel.Compiler
 
 	// AllowCacheTTL is the length of time that a successful authorization response will be cached
 	AllowCacheTTL time.Duration
@@ -46,17 +43,16 @@ type DelegatingAuthorizerConfig struct {
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
 	WebhookRetryBackoff *wait.Backoff
+
+	// AuthorizationConditionsReviewClient points to client interface for the authorization.k8s.io API version
+	// that supports AuthorizationConditionsReview.
+	AuthorizationConditionsReviewClient authorizationv1alpha1client.AuthorizationV1alpha1Interface
 }
 
 func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 	if c.WebhookRetryBackoff == nil {
 		return nil, errors.New("retry backoff parameters for delegating authorization webhook has not been specified")
 	}
-	compiler := c.Compiler
-	if compiler == nil {
-		compiler = authorizationcel.NewDefaultCompiler()
-	}
-
 	return webhook.NewFromInterface(
 		c.SubjectAccessReviewClient,
 		c.AllowCacheTTL,
@@ -64,6 +60,6 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		*c.WebhookRetryBackoff,
 		authorizer.DecisionNoOpinion,
 		NewDelegatingAuthorizerMetrics(),
-		compiler,
+		c.AuthorizationConditionsReviewClient,
 	)
 }

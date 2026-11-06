@@ -12,7 +12,6 @@
 // limitations under the License.
 
 //go:build !windows && !js && !wasip1 && !darwin
-// +build !windows,!js,!wasip1,!darwin
 
 package prometheus
 

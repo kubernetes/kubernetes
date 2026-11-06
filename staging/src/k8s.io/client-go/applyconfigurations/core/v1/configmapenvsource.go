@@ -30,7 +30,7 @@ package v1
 type ConfigMapEnvSourceApplyConfiguration struct {
 	// The ConfigMap to select from.
 	LocalObjectReferenceApplyConfiguration `json:""`
-	// Specify whether the ConfigMap must be defined
+	// optional specifies whether the ConfigMap must be defined
 	Optional *bool `json:"optional,omitempty"`
 }
 

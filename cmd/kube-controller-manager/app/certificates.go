@@ -331,7 +331,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 		certificatesv1beta1.SchemeGroupVersion,
 		certificatesv1alpha1.SchemeGroupVersion,
 	} {
-		ctbAvailable, err := clusterTrustBundlesAvailable(apiserverSignerClient, gv)
+		ctbAvailable, err := clusterTrustBundlesAvailable(ctx, apiserverSignerClient, gv)
 		if err != nil {
 			return nil, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)
 		}
@@ -353,15 +353,15 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 	}
 
 	if runner == nil {
-		klog.Info("no known scheme version was found for clustertrustbundles, cannot start kube-apiserver-serving-clustertrustbundle-publisher-controller")
+		klog.FromContext(ctx).Info("no known scheme version was found for clustertrustbundles, cannot start kube-apiserver-serving-clustertrustbundle-publisher-controller")
 		return nil, nil
 	}
 
 	return newControllerLoop(runner.Run, controllerName), nil
 }
 
-func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
-	resList, err := client.Discovery().ServerResourcesForGroupVersion(schemaVersion.String())
+func clusterTrustBundlesAvailable(ctx context.Context, client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
+	resList, err := client.Discovery().ServerResourcesForGroupVersionWithContext(ctx, schemaVersion.String())
 	if errors.IsNotFound(err) {
 		return false, nil
 	}
@@ -380,11 +380,7 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion sch
 
 func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
 	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
-		config, err := controllerContext.NewClientConfig("root-ca-cert-publisher")
-		if err != nil {
-			return nil, err
-		}
-		return config.CAData, nil
+		return controllerContext.KubeAPIServerCAData, nil
 	}
 
 	rootCA, err := readCA(controllerContext.ComponentConfig.SAController.RootCAFile)
@@ -392,5 +388,4 @@ func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte
 		return nil, fmt.Errorf("error parsing root-ca-file at %s: %w", controllerContext.ComponentConfig.SAController.RootCAFile, err)
 	}
 	return rootCA, nil
-
 }

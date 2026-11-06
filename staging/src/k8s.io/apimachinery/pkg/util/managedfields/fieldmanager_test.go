@@ -35,9 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
+	managedfieldstesting "k8s.io/apimachinery/pkg/util/managedfields/internal/testing"
 	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/structured-merge-diff/v7/typed"
 	"sigs.k8s.io/yaml"
 )
 
@@ -1135,5 +1137,69 @@ func TestLiveObjectManagedFieldsNotRemoved(t *testing.T) {
 	// Managed fields should not be stripped
 	if len(accessor.GetManagedFields()) == 0 {
 		t.Fatalf("empty managed fields of object which expected nonzero fields")
+	}
+}
+
+type recordingTypeConverter struct {
+	managedfields.TypeConverter
+	sawManagedFields []int
+}
+
+func (r *recordingTypeConverter) ObjectToTyped(obj runtime.Object, opts ...typed.ValidationOptions) (*typed.TypedValue, error) {
+	if accessor, err := meta.Accessor(obj); err == nil {
+		r.sawManagedFields = append(r.sawManagedFields, len(accessor.GetManagedFields()))
+	}
+	return r.TypeConverter.ObjectToTyped(obj, opts...)
+}
+
+func TestUpdateSkipsLiveManagedFieldsConversion(t *testing.T) {
+	gvk := schema.FromAPIVersionAndKind("apps/v1", "Deployment")
+	rec := &recordingTypeConverter{TypeConverter: fakeTypeConverter}
+	fm, err := managedfields.NewDefaultFieldManager(
+		rec,
+		&managedfieldstesting.FakeObjectConvertor{},
+		&managedfieldstesting.FakeObjectDefaulter{},
+		&managedfieldstesting.FakeObjectCreater{},
+		gvk,
+		gvk.GroupVersion(),
+		"",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("failed to create field manager: %v", err)
+	}
+
+	live := &metav1.PartialObjectMetadata{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "deployment",
+			Labels: map[string]string{"app": "nginx"},
+		},
+	}
+	liveObj, err := fm.Update(&metav1.PartialObjectMetadata{
+		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
+	}, live, "fieldmanager_a")
+	if err != nil {
+		t.Fatalf("failed initial update: %v", err)
+	}
+
+	rec.sawManagedFields = nil
+	next := liveObj.DeepCopyObject().(*metav1.PartialObjectMetadata)
+	next.Labels["env"] = "prod"
+	updated, err := fm.Update(liveObj, next, "fieldmanager_b")
+	if err != nil {
+		t.Fatalf("failed second update: %v", err)
+	}
+
+	// Both objects should have managedFields cleared before ObjectToTyped.
+	if got := rec.sawManagedFields; !reflect.DeepEqual(got, []int{0, 0}) {
+		t.Fatalf("expected ObjectToTyped to see 0 managedFields for both objects, got %v", got)
+	}
+	// liveObj should not be mutated in place.
+	if got := len(liveObj.(*metav1.PartialObjectMetadata).GetManagedFields()); got != 1 {
+		t.Fatalf("expected liveObj to retain 1 managedFields entry, got %d", got)
+	}
+	if got := len(updated.(*metav1.PartialObjectMetadata).GetManagedFields()); got != 2 {
+		t.Fatalf("expected 2 managedFields entries on updated object, got %d", got)
 	}
 }

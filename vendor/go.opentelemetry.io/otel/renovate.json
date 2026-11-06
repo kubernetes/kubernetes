@@ -16,6 +16,13 @@
       "enabled": true
     },
     {
+      "description": "Disable Go module major updates to v2+",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["major"],
+      "matchNewValue": "/^v?([2-9]|[1-9][0-9]+)\\./",
+      "enabled": false
+    },
+    {
       "matchPackageNames": ["go.opentelemetry.io/build-tools/**"],
       "groupName": "build-tools"
     },

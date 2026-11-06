@@ -25,7 +25,7 @@ package v1
 // The scheduler uses this information to apply workload-aware scheduling semantics.
 // Exactly one field must be specified.
 type PodSchedulingGroupApplyConfiguration struct {
-	// PodGroupName specifies the name of the standalone PodGroup object
+	// podGroupName specifies the name of the standalone PodGroup object
 	// that represents the runtime instance of this group.
 	// Must be a DNS subdomain.
 	PodGroupName *string `json:"podGroupName,omitempty"`

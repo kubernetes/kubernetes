@@ -225,12 +225,16 @@ func HandleError(err error) {
 // This variant should be used instead of HandleError because it supports
 // structured, contextual logging. Alternatively, [HandleErrorWithLogger] can
 // be used if a logger is available instead of a context.
+//
+//logcheck:wrapper
 func HandleErrorWithContext(ctx context.Context, err error, msg string, keysAndValues ...interface{}) {
 	handleError(ctx, err, msg, keysAndValues...)
 }
 
 // HandleErrorWithLogger is an alternative to [HandlerErrorWithContext] which accepts
 // a logger for contextual logging.
+//
+//logcheck:wrapper
 func HandleErrorWithLogger(logger klog.Logger, err error, msg string, keysAndValues ...interface{}) {
 	handleError(klog.NewContext(context.Background(), logger), err, msg, keysAndValues...)
 }

@@ -48,6 +48,8 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -214,7 +216,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	isSwapOn, err := swap.IsSwapOn()
+	isSwapOn, err := swap.IsSwapOn(logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine if swap is on: %w", err)
 	}
@@ -315,14 +317,12 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	cm.topologyManager.AddHintProvider(logger, cm.deviceManager)
 
 	// Initialize DRA manager
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		logger.Info("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManager(logger, kubeClient, nodeConfig.KubeletRootDir)
-		if err != nil {
-			return nil, err
-		}
-		metrics.RegisterCollectors(cm.draManager.NewMetricsCollector())
+	logger.Info("Creating Dynamic Resource Allocation (DRA) manager")
+	cm.draManager, err = dra.NewManager(logger, kubeClient, nodeConfig.KubeletRootDir)
+	if err != nil {
+		return nil, err
 	}
+	metrics.RegisterCollectors(cm.draManager.NewMetricsCollector())
 	cm.kubeClient = kubeClient
 
 	// Initialize CPU manager
@@ -365,14 +365,11 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	// Start goroutines to fan-in updates from the various sub-managers
 	// (e.g., device manager, DRA manager) into the single updates channel.
 	var wg sync.WaitGroup
-	sources := map[string]<-chan resourceupdates.Update{}
-	if cm.deviceManager != nil {
-		sources["deviceManager"] = cm.deviceManager.Updates()
+	sources := map[string]<-chan resourceupdates.Update{
+		"deviceManager": cm.deviceManager.Updates(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
-			sources["draManager"] = cm.draManager.Updates()
-		}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
+		sources["draManager"] = cm.draManager.Updates()
 	}
 
 	for name, ch := range sources {
@@ -420,8 +417,8 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 
 func (cm *containerManagerImpl) PodHasExclusiveCPUs(logger klog.Logger, pod *v1.Pod) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			if cm.cpuManager.GetResourceIsolationLevel(pod, &container) != cmqos.ResourceIsolationContainer {
+		for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+			if cm.cpuManager.GetResourceIsolationLevel(pod, container) != cmqos.ResourceIsolationContainer {
 				return false
 			}
 		}
@@ -643,11 +640,8 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 
 	// Initialize DRA manager
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		err := cm.draManager.Start(ctx, dra.ActivePodsFunc(activePods), dra.GetNodeFunc(getNode), sourcesReady)
-		if err != nil {
-			return fmt.Errorf("start dra manager error: %w", err)
-		}
+	if err := cm.draManager.Start(ctx, dra.ActivePodsFunc(activePods), dra.GetNodeFunc(getNode), sourcesReady); err != nil {
+		return fmt.Errorf("start dra manager error: %w", err)
 	}
 
 	// Initialize CPU manager
@@ -729,15 +723,10 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 }
 
 func (cm *containerManagerImpl) GetPluginRegistrationHandlers() map[string]cache.PluginHandler {
-	res := map[string]cache.PluginHandler{
+	return map[string]cache.PluginHandler{
 		pluginwatcherapi.DevicePlugin: cm.deviceManager.GetWatcherHandler(),
+		pluginwatcherapi.DRAPlugin:    cm.draManager.GetWatcherHandler(),
 	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		res[pluginwatcherapi.DRAPlugin] = cm.draManager.GetWatcherHandler()
-	}
-
-	return res
 }
 
 func (cm *containerManagerImpl) GetHealthCheckers() []healthz.HealthChecker {
@@ -748,14 +737,12 @@ func (cm *containerManagerImpl) GetHealthCheckers() []healthz.HealthChecker {
 func (cm *containerManagerImpl) GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	logger := klog.FromContext(ctx)
 	opts := &kubecontainer.RunContainerOptions{}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		resOpts, err := cm.draManager.GetResources(pod, container)
-		if err != nil {
-			return nil, err
-		}
-		logger.V(5).Info("Determined CDI devices for pod", "pod", klog.KObj(pod), "cdiDevices", resOpts.CDIDevices)
-		opts.CDIDevices = append(opts.CDIDevices, resOpts.CDIDevices...)
+	resOpts, err := cm.draManager.GetResources(pod, container)
+	if err != nil {
+		return nil, err
 	}
+	logger.V(5).Info("Determined CDI devices for pod", "pod", klog.KObj(pod), "cdiDevices", resOpts.CDIDevices)
+	opts.CDIDevices = append(opts.CDIDevices, resOpts.CDIDevices...)
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
 	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(ctx, pod, container)
@@ -1056,19 +1043,15 @@ func (cm *containerManagerImpl) GetAllocatableMemory(logger klog.Logger) []*podr
 	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory(logger))
 }
 
-func (cm *containerManagerImpl) GetPodMemory(_ klog.Logger, podUID string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetPodMemory(logger klog.Logger, podUID string) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
 	}
 
-	return containerMemoryFromBlock(cm.memoryManager.GetPodMemory(podUID))
+	return containerMemoryFromBlock(cm.memoryManager.GetPodMemory(logger, podUID))
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		return []*podresourcesapi.DynamicResource{}
-	}
-
 	var containerDynamicResources []*podresourcesapi.DynamicResource
 	containerClaimInfos, err := cm.draManager.GetContainerClaimInfos(pod, container)
 	if err != nil {
@@ -1147,17 +1130,26 @@ func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) 
 
 func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod, status *v1.PodStatus) {
 
-	// For now we only support Device Plugin
+	// Update Device Plugin resources
 	cm.deviceManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
-	// Update DRA resources if the feature is enabled and the manager exists
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
-			cm.draManager.UpdateAllocatedResourcesStatus(logger, pod, status)
-		}
+	// Update DRA resources if ResourceHealthStatus is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatus) {
+		cm.draManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 	}
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
 	return cm.resourceUpdates
+}
+
+func (cm *containerManagerImpl) AllocationMode(res v1.ResourceName) ResourceAllocationMode {
+	// run from the cheapest to the most expensive
+	if cm.cpuManager.CanAllocateExclusively(res) || cm.memoryManager.CanAllocateExclusively(res) || cm.deviceManager.CanAllocateExclusively(res) {
+		return ResourceAllocationModeExclusive
+	}
+	if res == v1.ResourceCPU || res == v1.ResourceMemory || v1helper.IsHugePageResourceName(res) {
+		return ResourceAllocationModeShared
+	}
+	return ResourceAllocationModeUnsupported
 }

@@ -1,0 +1,36 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..6021a7d84e2 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -850,9 +850,8 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
+ 					return err
+ 				}
+ 				withRev = *chunk.revision
+-			} else if *chunk.revision != withRev {
+-				return fmt.Errorf("etcd returned revision %d for a list read at revision %d", *chunk.revision, withRev)
+ 			}
++			withRev = *chunk.revision
+ 		}
+ 		if len(chunk.kvs) == 0 && chunk.hasMore {
+ 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
+@@ -908,15 +907,16 @@ func (s *store) pagedChunks(ctx context.Context, keyPrefix string, opts storage.
+ 				return
+ 			}
+ 			hasMore := int64(len(getResp.Kvs)) < getResp.Count
+-			// use the same resource version for subsequent requests
+-			if withRev == 0 {
+-				withRev = getResp.Revision
+-			}
++			// BUG REVERT (#94002): do not pin withRev across paginated etcd range
++			// calls when filtering with a selector.
+ 			// capture the next continue key before yielding, the consumer nils out kvs as it decodes them
+ 			if len(getResp.Kvs) > 0 {
+ 				continueKey = string(getResp.Kvs[len(getResp.Kvs)-1].Key) + "\x00"
+ 			}
+ 			revision := withRev
++			if revision == 0 {
++				revision = getResp.Revision
++			}
+ 			if !yield(listChunk{kvs: getResp.Kvs, revision: &revision, count: getResp.Count, hasMore: hasMore}, nil) {
+ 				return
+ 			}

@@ -41,6 +41,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
+	mounter "k8s.io/kubernetes/cluster/gce/gci/mounter/pkg"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -50,7 +51,6 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
-	"k8s.io/kubernetes/test/e2e_node/mounter"
 	gcpcredentialprovider "k8s.io/kubernetes/test/e2e_node/plugins/gcp-credential-provider/pkg"
 	"k8s.io/kubernetes/test/e2e_node/runner/node"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -61,11 +61,11 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/feature"
 
 	// reconfigure framework
+	"k8s.io/ktesting"
+	_ "k8s.io/ktesting/format"
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"

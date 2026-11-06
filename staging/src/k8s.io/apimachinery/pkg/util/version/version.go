@@ -456,6 +456,7 @@ func (v *Version) Compare(other string) (int, error) {
 }
 
 // WithInfo returns copy of the version object.
+//
 // Deprecated: The Info field has been removed from the Version struct. This method no longer modifies the Version object.
 func (v *Version) WithInfo(info apimachineryversion.Info) *Version {
 	result := *v
@@ -463,6 +464,7 @@ func (v *Version) WithInfo(info apimachineryversion.Info) *Version {
 }
 
 // Info returns the version information of a component.
+//
 // Deprecated: Use Info() from effective version instead.
 func (v *Version) Info() *apimachineryversion.Info {
 	if v == nil {

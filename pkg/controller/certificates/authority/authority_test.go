@@ -49,7 +49,7 @@ func TestCertificateAuthority(t *testing.T) {
 		},
 		NotBefore:             now.Add(-24 * time.Hour),
 		NotAfter:              now.Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}

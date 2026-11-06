@@ -142,7 +142,7 @@ func TestStreamTranslator_LoopbackStdinToStdout(t *testing.T) {
 	// Validate the streamtranslator metrics; should be one 200 success.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# HELP apiserver_stream_translator_requests_total [BETA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
@@ -242,7 +242,7 @@ func TestStreamTranslator_LoopbackStdinToStderr(t *testing.T) {
 	// Validate the streamtranslator metrics; should be one 200 success.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# HELP apiserver_stream_translator_requests_total [BETA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
@@ -357,7 +357,7 @@ func TestStreamTranslator_ErrorStream(t *testing.T) {
 	// Validate the streamtranslator metrics; an exit code error is considered 200 success.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# HELP apiserver_stream_translator_requests_total [BETA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
@@ -466,7 +466,7 @@ func TestStreamTranslator_MultipleReadChannels(t *testing.T) {
 	// Validate the streamtranslator metrics; should have one 200 success.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# HELP apiserver_stream_translator_requests_total [BETA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
@@ -695,7 +695,7 @@ func TestStreamTranslator_TTYResizeChannel(t *testing.T) {
 	// Validate the streamtranslator metrics; should have one 200 success.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# HELP apiserver_stream_translator_requests_total [BETA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="200"} 1
 `
@@ -760,7 +760,7 @@ func TestStreamTranslator_WebSocketServerErrors(t *testing.T) {
 	// Use polling to wait for the metric to be updated asynchronously.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# HELP apiserver_stream_translator_requests_total [BETA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="400"} 1
 `
@@ -840,7 +840,7 @@ func TestStreamTranslator_BlockRedirects(t *testing.T) {
 			// Validate the streamtranslator metrics; should have one 500 failure each loop.
 			metricNames := []string{"apiserver_stream_translator_requests_total"}
 			expected := `
-# HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
+# HELP apiserver_stream_translator_requests_total [BETA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="500"} 1
 `

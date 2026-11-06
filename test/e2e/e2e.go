@@ -88,7 +88,7 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // If a "report directory" is specified, one or more JUnit test reports will be
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
-func RunE2ETests(t *testing.T) {
+func RunE2ETests(t *testing.T) { //nolint:forbidigo // calls t.Run per Ginkgo suite, which requires *testing.T
 	// InitLogs disables contextual logging, without a way to enable it again
 	// in the E2E test suite because it has no feature gates. It used to have a
 	// misleading --feature-gates parameter but that didn't do what users

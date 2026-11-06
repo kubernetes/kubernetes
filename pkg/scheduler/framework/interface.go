@@ -162,30 +162,21 @@ type SortedScoredNodes interface {
 	UnorderedList() []fwk.NodePluginScores
 }
 
-// PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
-// It is used to determine if a pod group is schedulable, may become schedulable or will not become schedulable regardless of the scheduling result of the remaining pods in the pod group.
-type PlacementFeasiblePlugin interface {
-	fwk.Plugin
-
-	// PlacementFeasible is called after each pod in a pod group is evaluated.
-	// placementProgress contains information that plugins might additionally need when determining whether pod group scheduling placement is feasible.
-	// Return Wait status if the pod group cannot be scheduled in the current partially evaluated placement, but may become schedulable once more pods are evaluated.
-	// Return Unschedulable status if the pod group cannot be scheduled in the current placement.
-	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
-	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
-	// After returning Success, the plugin should keep returning Success for the remaining pods.
-	PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementProgress PlacementProgress) *fwk.Status
+// NodeWithRank associates a NodeInfo with a non-negative integer rank.
+// Lower rank values represent better nodes (rank 0 is best).
+type NodeWithRank struct {
+	NodeInfo fwk.NodeInfo
+	Rank     int
 }
 
-// PlacementProgress contains information that plugins implementing the PlacementFeasiblePlugin
-// interface might additionally need when determining whether pod group scheduling placement is feasible.
-type PlacementProgress struct {
-	// Remaining is the number of children that have not been evaluated yet in the current scheduling cycle. For pod groups, this is the number of unscheduled pods.
-	Remaining int
-	// Scheduled is the number of children scheduled so far in the current pod group scheduling cycle
-	// for a particular (composite) pod group and placement. For a pod group the field includes the pods that are assigned
-	// or assumed in the current PodGroup scheduling cycle.
-	Scheduled int
+// RankNodesPlugin is an interface for plugins that rank candidate nodes
+// before Filter during PodGroup scheduling cycles.
+type RankNodesPlugin interface {
+	fwk.Plugin
+	// RankNodes ranks the given nodes for the pod. Nodes should be returned
+	// ordered by non-decreasing Rank (0 is best). If the plugin does not wish
+	// to rank nodes for this cycle, it may return a Skip status.
+	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
@@ -208,6 +199,13 @@ type Framework interface {
 	// and gang scheduling optimizations.
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/5598-opportunistic-batching
 	SignPod(ctx context.Context, pod *v1.Pod) fwk.PodSignature
+
+	// RunRankNodesPlugins runs the set of configured RankNodes plugins.
+	// It returns the ranked nodes from the first plugin that returns a Success status,
+	// or a non-success Status if any plugin returns a status other than Success or Skip.
+	// If no plugin ranks the nodes (e.g., all return Skip or none are configured),
+	// it returns a nil slice and a nil Status.
+	RunRankNodesPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 
 	// RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 	// *fwk.Status and its code is set to non-success if any of the plugins returns
@@ -268,13 +266,12 @@ type Framework interface {
 	// This function itself will NOT create a waiting pod object and the caller should call AddWaitingPod method to do this.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (pluginsWaitTime map[string]time.Duration, status *fwk.Status)
 
-	// RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
-	// The result will be Success if all plugins return Success.
+	// RunPlacementFeasiblePlugins runs the set of configured PlacementFeasible plugins.
 	// The only other valid statuses are Wait and Unschedulable.
 	// If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
 	// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins won't be invoked and the result will be Unschedulable. The placement will remain eligible for preemption.
 	// Otherwise, if at least 1 plugin returns Wait, the remaining plugins will be invoked and the result will be Wait.
-	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementProgress PlacementProgress) *fwk.Status
+	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo, placementProgress fwk.PlacementProgress) *fwk.Status
 
 	// AddWaitingPod creates a waiting pod instance and adds it to the framework.
 	// It takes the pluginsWaitTime map returned by the RunPermitPlugins.
@@ -314,6 +311,9 @@ type Framework interface {
 	// HasScorePlugins returns true if at least one Score plugin is defined.
 	HasScorePlugins() bool
 
+	// HasPlacementScorePlugins returns true if at least one PlacementScore plugin is defined.
+	HasPlacementScorePlugins() bool
+
 	// PodGroupPostFilterPlugins returns registered PodGroupPostFilter plugins.
 	PodGroupPostFilterPlugins() []fwk.PodGroupPostFilterPlugin
 
@@ -322,6 +322,9 @@ type Framework interface {
 
 	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
 	PercentageOfNodesToScore() *int32
+
+	// PercentageOfPlacementsToScore returns percentageOfPlacementsToScore associated to a profile.
+	PercentageOfPlacementsToScore() *int32
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator fwk.PodNominator)

@@ -47,7 +47,7 @@ var formulaTable = map[string]func(n int) int{
 		return 0
 	},
 	fmtForms("nplurals=2; plural=(n != 1);"): func(n int) int {
-		if n <= 1 {
+		if n == 1 {
 			return 0
 		}
 		return 1

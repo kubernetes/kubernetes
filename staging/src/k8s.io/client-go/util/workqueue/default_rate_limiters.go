@@ -149,6 +149,7 @@ func (r *TypedItemExponentialFailureRateLimiter[T]) Forget(item T) {
 }
 
 // ItemFastSlowRateLimiter does a quick retry for a certain number of attempts, then a slow retry after that
+//
 // Deprecated: Use TypedItemFastSlowRateLimiter instead.
 type ItemFastSlowRateLimiter = TypedItemFastSlowRateLimiter[any]
 
@@ -259,6 +260,7 @@ func (r *TypedMaxOfRateLimiter[T]) Forget(item T) {
 }
 
 // WithMaxWaitRateLimiter have maxDelay which avoids waiting too long
+//
 // Deprecated: Use TypedWithMaxWaitRateLimiter instead.
 type WithMaxWaitRateLimiter = TypedWithMaxWaitRateLimiter[any]
 

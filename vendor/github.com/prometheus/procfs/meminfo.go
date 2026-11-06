@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Meminfo represents memory statistics.
@@ -210,7 +210,7 @@ type Meminfo struct {
 // Meminfo returns an information about current kernel/system memory statistics.
 // See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 func (fs FS) Meminfo() (Meminfo, error) {
-	b, err := util.ReadFileNoStat(fs.proc.Path("meminfo"))
+	b, err := parsers.ReadFileNoStat(fs.proc.Path("meminfo"))
 	if err != nil {
 		return Meminfo{}, err
 	}

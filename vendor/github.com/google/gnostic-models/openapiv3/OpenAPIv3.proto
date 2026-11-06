@@ -42,7 +42,7 @@ option java_package = "org.openapi_v3";
 option objc_class_prefix = "OAS";
 
 // The Go package name.
-option go_package = "./openapiv3;openapi_v3";
+option go_package = "github.com/google/gnostic-models/openapiv3;openapi_v3";
 
 message AdditionalPropertiesItem {
   oneof oneof {

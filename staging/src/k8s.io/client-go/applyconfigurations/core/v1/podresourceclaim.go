@@ -36,16 +36,16 @@ package v1
 // the PodGroup in ResourceClaimStatus.ReservedFor rather than for individual
 // Pods.
 type PodResourceClaimApplyConfiguration struct {
-	// Name uniquely identifies this resource claim inside the pod.
+	// name uniquely identifies this resource claim inside the pod.
 	// This must be a DNS_LABEL.
 	Name *string `json:"name,omitempty"`
-	// ResourceClaimName is the name of a ResourceClaim object in the same
+	// resourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
 	//
 	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
 	// be set.
 	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
-	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+	// resourceClaimTemplateName is the name of a ResourceClaimTemplate
 	// object in the same namespace as this pod.
 	//
 	// The template will be used to create a new ResourceClaim, which will

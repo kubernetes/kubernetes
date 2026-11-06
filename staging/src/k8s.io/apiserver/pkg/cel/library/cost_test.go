@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/ref"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/common"
-	"github.com/google/cel-go/common/ast"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/ext"
+	"cel.dev/cel-go/cel"
+	"cel.dev/cel-go/checker"
+	"cel.dev/cel-go/common"
+	"cel.dev/cel-go/common/ast"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/ext"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -1359,7 +1359,8 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		CIDR(),
 		Format(),
 		JSONPatch(),
-		cel.OptionalTypes(),
+		cel.OptionalTypes(cel.OptionalTypesVersion(2)),
+		cel.CostModelVersion(0),
 		// cel-go v0.17.7 introduced CostEstimatorOptions.
 		// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
 		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
@@ -1462,6 +1463,55 @@ func TestSize(t *testing.T) {
 			targetSize: exactSize(4),
 			argSizes:   []checker.SizeEstimate{{Min: 1, Max: 2}, {Min: 1, Max: 1}},
 			expectSize: checker.SizeEstimate{Min: 2, Max: 4},
+		},
+		{
+			name:       "getScheme result size",
+			function:   "getScheme",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getHostname result size",
+			function:   "getHostname",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getHost result size",
+			function:   "getHost",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getPort result size",
+			function:   "getPort",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getQuery result size",
+			function:   "getQuery",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: exactSize(100),
+		},
+		{
+			name:       "getEscapedPath result size with 3x expansion",
+			function:   "getEscapedPath",
+			targetSize: exactSize(100),
+			argSizes:   nil,
+			expectSize: checker.SizeEstimate{Min: 100, Max: 300},
+		},
+		{
+			name:       "getEscapedPath result size preserves range",
+			function:   "getEscapedPath",
+			targetSize: checker.SizeEstimate{Min: 10, Max: 100},
+			argSizes:   nil,
+			expectSize: checker.SizeEstimate{Min: 10, Max: 300},
 		},
 	}
 

@@ -21,7 +21,6 @@
 # with a claim template that uses the "firstAvailable" subrequests, aka DRAPrioritizedList.
 - name: FirstAvailable
   featureGates:
-    DynamicResourceAllocation: true
     DRAPrioritizedList: true
   workloadTemplate:
   - opcode: createNodes

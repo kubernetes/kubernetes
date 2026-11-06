@@ -3,14 +3,15 @@
 
 package sliceutil
 
+import "slices"
+
 // Contains return true if string e is present in slice s
+//
+// Deprecated: use slices.Contains instead.
+//
+//go:fix inline
 func Contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, e)
 }
 
 // Remove removes the first occurrence of r in slice s

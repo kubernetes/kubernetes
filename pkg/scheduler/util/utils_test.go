@@ -90,7 +90,8 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 				newPriorityPodWithStartTime("pod1", 1, currentTime.Add(-time.Second)),
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod2",
+						Name:              "pod2",
+						CreationTimestamp: metav1.NewTime(currentTime),
 					},
 					Spec: v1.PodSpec{
 						Priority: &priority,
@@ -163,6 +164,85 @@ func TestMoreImportantPod(t *testing.T) {
 				t.Errorf("expected %t but got %t", v.expected, got)
 			}
 		})
+	}
+}
+
+func TestMoreImportantPodWithoutStartTime(t *testing.T) {
+	var priority int32 = 1
+	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	newPod := func(name string, creationTimestamp time.Time, startTime *metav1.Time) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				CreationTimestamp: metav1.NewTime(creationTimestamp),
+			},
+			Spec: v1.PodSpec{
+				Priority: &priority,
+			},
+			Status: v1.PodStatus{StartTime: startTime},
+		}
+	}
+
+	startedAt := metav1.NewTime(baseTime.Add(time.Hour))
+	startedPod := newPod("started-pod", baseTime.Add(time.Hour), &startedAt)
+	unstartedOlderPod := newPod("unstarted-older-pod", baseTime, nil)
+	unstartedNewerPod := newPod("unstarted-newer-pod", baseTime.Add(2*time.Hour), nil)
+
+	tests := []struct {
+		name     string
+		pod1     *v1.Pod
+		pod2     *v1.Pod
+		expected bool
+	}{
+		{
+			name:     "started pod is more important than unstarted pod",
+			pod1:     startedPod,
+			pod2:     unstartedOlderPod,
+			expected: true,
+		},
+		{
+			name:     "unstarted pod is less important than started pod",
+			pod1:     unstartedOlderPod,
+			pod2:     startedPod,
+			expected: false,
+		},
+		{
+			name:     "creation timestamp does not order unstarted pods",
+			pod1:     unstartedOlderPod,
+			pod2:     unstartedNewerPod,
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := MoreImportantPod(test.pod1, test.pod2)
+			if got != test.expected {
+				t.Errorf("expected %t but got %t", test.expected, got)
+			}
+		})
+	}
+}
+
+func BenchmarkMoreImportantPodWithoutStartTime(b *testing.B) {
+	var priority int32 = 1
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		MoreImportantPod(pod1, pod2)
 	}
 }
 
@@ -364,7 +444,7 @@ func TestPatchPodStatus(t *testing.T) {
 }
 
 func TestPatchPodGroupStatus(t *testing.T) {
-	now := metav1.NewTime(time.Now().Truncate(time.Second))
+	now := metav1.Now().Rfc3339Copy()
 
 	tests := []struct {
 		name     string
@@ -614,6 +694,262 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			}
 			if diff := cmp.Diff(wantStatus, retrievedPG.Status); diff != "" {
 				t.Errorf("unexpected podgroup status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPatchCompositePodGroupStatus(t *testing.T) {
+	now := metav1.Now().Rfc3339Copy()
+
+	tests := []struct {
+		name              string
+		compositePodGroup schedulingv1beta1.CompositePodGroup
+		client            *clientsetfake.Clientset
+		// validateErr checks if error returned from PatchCompositePodGroupStatus is expected one or not.
+		// (true means error is expected one.)
+		validateErr    func(goterr error) bool
+		statusToUpdate *schedulingv1beta1.CompositePodGroupStatus
+		nilOldStatus   bool
+	}{
+		{
+			name:   "Should update composite podgroup conditions successfully",
+			client: clientsetfake.NewClientset(),
+			compositePodGroup: schedulingv1beta1.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "cpg1",
+				},
+			},
+			statusToUpdate: &schedulingv1beta1.CompositePodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name:   "no-op when status is unchanged",
+			client: clientsetfake.NewClientset(),
+			compositePodGroup: schedulingv1beta1.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "cpg1",
+				},
+				Status: schedulingv1beta1.CompositePodGroupStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+							Status:             metav1.ConditionFalse,
+							Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+							Message:            "not enough capacity",
+							LastTransitionTime: now,
+						},
+					},
+				},
+			},
+			statusToUpdate: &schedulingv1beta1.CompositePodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+						Message:            "not enough capacity",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name:   "nil newStatus returns nil",
+			client: clientsetfake.NewClientset(),
+			compositePodGroup: schedulingv1beta1.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "cpg1",
+				},
+			},
+			statusToUpdate: nil,
+		},
+		{
+			name: "retry patch request when a 'connection refused' error is returned",
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+
+				reqcount := 0
+				client.PrependReactor("patch", "compositepodgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					defer func() { reqcount++ }()
+					if reqcount == 0 {
+						return true, &schedulingv1beta1.CompositePodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+					}
+					if reqcount == 1 {
+						return false, &schedulingv1beta1.CompositePodGroup{}, nil
+					}
+					return true, nil, errors.New("requests comes in more than three times.")
+				})
+
+				return client
+			}(),
+			compositePodGroup: schedulingv1beta1.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "cpg1",
+				},
+			},
+			statusToUpdate: &schedulingv1beta1.CompositePodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name: "only 4 retries at most",
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+
+				reqcount := 0
+				client.PrependReactor("patch", "compositepodgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					defer func() { reqcount++ }()
+					if reqcount >= 4 {
+						return true, nil, errors.New("requests comes in more than four times.")
+					}
+					return true, &schedulingv1beta1.CompositePodGroup{}, fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+				})
+
+				return client
+			}(),
+			compositePodGroup: schedulingv1beta1.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "cpg1",
+				},
+			},
+			validateErr: net.IsConnectionRefused,
+			statusToUpdate: &schedulingv1beta1.CompositePodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name: "retry patch request when a conflict error is returned",
+			client: func() *clientsetfake.Clientset {
+				client := clientsetfake.NewClientset()
+
+				reqcount := 0
+				client.PrependReactor("patch", "compositepodgroups", func(action clienttesting.Action) (bool, runtime.Object, error) {
+					defer func() { reqcount++ }()
+					if reqcount == 0 {
+						return true, &schedulingv1beta1.CompositePodGroup{},
+							apierrors.NewConflict(schema.GroupResource{
+								Resource: "compositepodgroups"}, "cpg1",
+								errors.New("the object has been modified"))
+					}
+					if reqcount == 1 {
+						return false, &schedulingv1beta1.CompositePodGroup{}, nil
+					}
+					return true, nil, errors.New("requests comes in more than three times.")
+				})
+
+				return client
+			}(),
+			compositePodGroup: schedulingv1beta1.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "cpg1",
+				},
+			},
+			statusToUpdate: &schedulingv1beta1.CompositePodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+		},
+		{
+			name:   "nil oldStatus patches successfully",
+			client: clientsetfake.NewClientset(),
+			compositePodGroup: schedulingv1beta1.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "ns",
+					Name:      "cpg1",
+				},
+			},
+			statusToUpdate: &schedulingv1beta1.CompositePodGroupStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               schedulingapi.CompositePodGroupInitiallyScheduled,
+						Status:             metav1.ConditionFalse,
+						Reason:             schedulingapi.CompositePodGroupReasonUnschedulable,
+						Message:            "not enough capacity for the gang",
+						LastTransitionTime: now,
+					},
+				},
+			},
+			nilOldStatus: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := tc.client
+			_, err := client.SchedulingV1beta1().CompositePodGroups(tc.compositePodGroup.Namespace).Create(ctx, &tc.compositePodGroup, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			oldStatus := &tc.compositePodGroup.Status
+			if tc.nilOldStatus {
+				oldStatus = nil
+			}
+			err = PatchCompositePodGroupStatus(ctx, client, tc.compositePodGroup.Name, tc.compositePodGroup.Namespace, oldStatus, tc.statusToUpdate)
+			if err != nil && tc.validateErr == nil {
+				t.Fatal(err)
+			}
+			if tc.validateErr != nil {
+				if !tc.validateErr(err) {
+					t.Fatalf("Returned unexpected error: %v", err)
+				}
+				return
+			}
+
+			retrievedCPG, err := client.SchedulingV1beta1().CompositePodGroups(tc.compositePodGroup.Namespace).Get(ctx, tc.compositePodGroup.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			wantStatus := tc.compositePodGroup.Status
+			if tc.statusToUpdate != nil {
+				wantStatus = *tc.statusToUpdate
+			}
+			if diff := cmp.Diff(wantStatus, retrievedCPG.Status); diff != "" {
+				t.Errorf("unexpected composite podgroup status (-want,+got):\n%s", diff)
 			}
 		})
 	}

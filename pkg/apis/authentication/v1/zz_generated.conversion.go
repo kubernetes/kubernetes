@@ -25,7 +25,6 @@ import (
 	unsafe "unsafe"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
@@ -188,9 +187,7 @@ func Convert_authentication_SelfSubjectReview_To_v1_SelfSubjectReview(in *authen
 }
 
 func autoConvert_v1_SelfSubjectReviewStatus_To_authentication_SelfSubjectReviewStatus(in *authenticationv1.SelfSubjectReviewStatus, out *authentication.SelfSubjectReviewStatus, s conversion.Scope) error {
-	if err := Convert_v1_UserInfo_To_authentication_UserInfo(&in.UserInfo, &out.UserInfo, s); err != nil {
-		return err
-	}
+	*out = *(*authentication.SelfSubjectReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -200,9 +197,7 @@ func Convert_v1_SelfSubjectReviewStatus_To_authentication_SelfSubjectReviewStatu
 }
 
 func autoConvert_authentication_SelfSubjectReviewStatus_To_v1_SelfSubjectReviewStatus(in *authentication.SelfSubjectReviewStatus, out *authenticationv1.SelfSubjectReviewStatus, s conversion.Scope) error {
-	if err := Convert_authentication_UserInfo_To_v1_UserInfo(&in.UserInfo, &out.UserInfo, s); err != nil {
-		return err
-	}
+	*out = *(*authenticationv1.SelfSubjectReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -244,12 +239,7 @@ func Convert_authentication_TokenRequest_To_v1_TokenRequest(in *authentication.T
 }
 
 func autoConvert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec(in *authenticationv1.TokenRequestSpec, out *authentication.TokenRequestSpec, s conversion.Scope) error {
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	if err := metav1.Convert_Pointer_int64_To_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
-		return err
-	}
-	out.BoundObjectRef = (*authentication.BoundObjectReference)(unsafe.Pointer(in.BoundObjectRef))
-	out.Attestations = *(*map[string]authentication.AttestationValue)(unsafe.Pointer(&in.Attestations))
+	*out = *(*authentication.TokenRequestSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -259,12 +249,7 @@ func Convert_v1_TokenRequestSpec_To_authentication_TokenRequestSpec(in *authenti
 }
 
 func autoConvert_authentication_TokenRequestSpec_To_v1_TokenRequestSpec(in *authentication.TokenRequestSpec, out *authenticationv1.TokenRequestSpec, s conversion.Scope) error {
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	if err := metav1.Convert_int64_To_Pointer_int64(&in.ExpirationSeconds, &out.ExpirationSeconds, s); err != nil {
-		return err
-	}
-	out.BoundObjectRef = (*authenticationv1.BoundObjectReference)(unsafe.Pointer(in.BoundObjectRef))
-	out.Attestations = *(*map[string]authenticationv1.AttestationValue)(unsafe.Pointer(&in.Attestations))
+	*out = *(*authenticationv1.TokenRequestSpec)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -346,12 +331,7 @@ func Convert_authentication_TokenReviewSpec_To_v1_TokenReviewSpec(in *authentica
 }
 
 func autoConvert_v1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *authenticationv1.TokenReviewStatus, out *authentication.TokenReviewStatus, s conversion.Scope) error {
-	out.Authenticated = in.Authenticated
-	if err := Convert_v1_UserInfo_To_authentication_UserInfo(&in.User, &out.User, s); err != nil {
-		return err
-	}
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	out.Error = in.Error
+	*out = *(*authentication.TokenReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -361,12 +341,7 @@ func Convert_v1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *authen
 }
 
 func autoConvert_authentication_TokenReviewStatus_To_v1_TokenReviewStatus(in *authentication.TokenReviewStatus, out *authenticationv1.TokenReviewStatus, s conversion.Scope) error {
-	out.Authenticated = in.Authenticated
-	if err := Convert_authentication_UserInfo_To_v1_UserInfo(&in.User, &out.User, s); err != nil {
-		return err
-	}
-	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
-	out.Error = in.Error
+	*out = *(*authenticationv1.TokenReviewStatus)(unsafe.Pointer(in))
 	return nil
 }
 
@@ -376,17 +351,11 @@ func Convert_authentication_TokenReviewStatus_To_v1_TokenReviewStatus(in *authen
 }
 
 func autoConvert_v1_UserInfo_To_authentication_UserInfo(in *authenticationv1.UserInfo, out *authentication.UserInfo, s conversion.Scope) error {
-	out.Username = in.Username
-	out.UID = in.UID
-	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]authentication.ExtraValue)(unsafe.Pointer(&in.Extra))
+	*out = *(*authentication.UserInfo)(unsafe.Pointer(in))
 	return nil
 }
 
 func autoConvert_authentication_UserInfo_To_v1_UserInfo(in *authentication.UserInfo, out *authenticationv1.UserInfo, s conversion.Scope) error {
-	out.Username = in.Username
-	out.UID = in.UID
-	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]authenticationv1.ExtraValue)(unsafe.Pointer(&in.Extra))
+	*out = *(*authenticationv1.UserInfo)(unsafe.Pointer(in))
 	return nil
 }

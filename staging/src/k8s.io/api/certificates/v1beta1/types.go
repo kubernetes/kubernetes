@@ -45,6 +45,7 @@ type CertificateSigningRequest struct {
 	// Other fields are derived by Kubernetes and cannot be modified by users.
 	// +required
 	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status is the derived information about the request.
@@ -183,12 +184,12 @@ type CertificateSigningRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:listType=map
-	// +k8s:beta(since: "1.37")=+k8s:listMapKey=type
-	// +k8s:beta(since: "1.37")=+k8s:customUnique
-	// +k8s:beta(since: "1.37")=+k8s:optional
-	// +k8s:beta(since: "1.37")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
-	// +k8s:beta(since: "1.37")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
+	// +k8s:listType=map
+	// +k8s:listMapKey=type
+	// +k8s:customUnique
+	// +k8s:optional
+	// +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+	// +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
@@ -333,8 +334,8 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
-	// +k8s:alpha(since:"1.37")=+k8s:optional
-	// +k8s:alpha(since:"1.37")=+k8s:immutable
+	// +k8s:beta(since:"1.38")=+k8s:optional
+	// +k8s:beta(since:"1.38")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -553,9 +554,9 @@ type PodCertificateRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 
 	// certificateChain is populated with an issued certificate by the signer.

@@ -24,8 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/ktesting"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func testPodGroup(tCtx ktesting.TContext) {
@@ -208,7 +208,7 @@ func testPodGroup(tCtx ktesting.TContext) {
 		pod1.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "worker-1"}
 		pod1 = createPod(tCtx, namespace, "-1", pod1, claimObj)
 
-		expectPodUnschedulable(tCtx, pod0, "parent pod group is unschedulable: minCount (2) cannot be satisfied")
+		expectPodUnschedulable(tCtx, pod0, fmt.Sprintf("parent pod group %q is unschedulable", podGroupName))
 		expectPodUnschedulable(tCtx, pod1, "1 resourceclaim not available on the node")
 	})
 }

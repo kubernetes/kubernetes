@@ -354,7 +354,9 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				nodeInfoSnapshot: emptySnapshot,
 				logger:           logger,
 			}
-			sched.initAlgorithm()
+			if err := sched.initAlgorithm(); err != nil {
+				t.Fatalf("Failed to initialize scheduling algorithm: %v", err)
+			}
 			sched.applyDefaultHandlers()
 
 			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {

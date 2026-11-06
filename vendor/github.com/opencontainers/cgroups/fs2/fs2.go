@@ -89,7 +89,8 @@ func (m *Manager) Apply(pid int) error {
 // a cgroup under under the manager's cgroup.
 func (m *Manager) AddPid(subcgroup string, pid int) error {
 	path := filepath.Join(m.dirPath, subcgroup)
-	if !strings.HasPrefix(path, m.dirPath) {
+	// Make sure path is either m.dirPath itself or below it.
+	if path != m.dirPath && !strings.HasPrefix(path, m.dirPath+"/") {
 		return fmt.Errorf("bad sub cgroup path: %s", subcgroup)
 	}
 

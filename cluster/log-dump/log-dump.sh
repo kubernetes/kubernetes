@@ -44,7 +44,6 @@ readonly gcloud_supported_providers="gce gke"
 readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log cloud-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log konnectivity-server.log fluentd.log kubelet.cov"
 readonly node_logfiles="kube-proxy.log containers/konnectivity-agent-*.log fluentd.log kubelet.cov kube-network-policies.log"
 readonly node_systemd_services=""
-readonly hollow_node_logfiles="kubelet-hollow-node-*.log kubeproxy-hollow-node-*.log npd-hollow-node-*.log"
 readonly aws_logfiles="cloud-init-output.log"
 readonly gce_logfiles="startupscript.log"
 readonly kern_logfile="kern.log"
@@ -291,7 +290,7 @@ function save-windows-logs-via-diagnostics-tool() {
     logs_archive_in_gcs=$(gcloud alpha compute diagnose export-logs "${node}" "--zone=${ZONE}" "--project=${PROJECT}" | tail -n 1)
     local temp_local_path="${node}.zip"
     for retry in {1..20}; do
-      if gsutil mv "${logs_archive_in_gcs}" "${temp_local_path}"  > /dev/null 2>&1; then
+      if gcloud storage mv "${logs_archive_in_gcs}" "${temp_local_path}"  > /dev/null 2>&1; then
         echo "Downloaded diagnostics log from ${logs_archive_in_gcs}"
         break
       else
@@ -375,8 +374,6 @@ function dump_masters() {
   elif [[ ! "${master_ssh_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
-  elif [[ -n "${KUBEMARK_MASTER_NAME:-}" ]]; then
-    master_names=( "${KUBEMARK_MASTER_NAME}" )
   else
     if ! (detect-master); then
       echo 'Master not detected. Is the cluster up?'
@@ -444,9 +441,6 @@ function dump_nodes() {
   fi
 
   node_logfiles_all="${node_logfiles}"
-  if [[ "${ENABLE_HOLLOW_NODE_LOGS:-}" == "true" ]]; then
-    node_logfiles_all="${node_logfiles_all} ${hollow_node_logfiles}"
-  fi
 
   linux_nodes_selected_for_logs=()
   if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
@@ -513,7 +507,7 @@ function dump_nodes() {
 function find_non_logexported_nodes() {
   local file="${gcs_artifacts_dir}/logexported-nodes-registry"
   echo "Listing marker files ($file) for successful nodes..."
-  succeeded_nodes=$(gsutil ls "${file}") || return 1
+  succeeded_nodes=$(gcloud storage ls "${file}") || return 1
   echo 'Successfully listed marker files for successful nodes'
   NON_LOGEXPORTED_NODES=()
   for node in "${NODE_NAMES[@]}"; do
@@ -543,7 +537,6 @@ function dump_nodes_with_logexporter() {
   # Obtain parameters required by logexporter.
   local -r service_account_credentials="$(base64 "${GOOGLE_APPLICATION_CREDENTIALS}" | tr -d '\n')"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
-  local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
   local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 3 ))"
   if [[ -z "${ZONE_NODE_SELECTOR_DISABLED:-}" ]]; then
     local -r node_selector="${ZONE_NODE_SELECTOR_LABEL:-topology.kubernetes.io/zone}: ${ZONE}"
@@ -560,7 +553,6 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.ServiceAccountCredentials}}@${service_account_credentials}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${manifest_yaml}"
-  sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.DumpSystemdJournal}}@${dump_systemd_journal}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.ExtraLogFiles}}@${extra_log_files}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${manifest_yaml}"

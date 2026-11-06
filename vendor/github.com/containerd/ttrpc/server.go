@@ -283,7 +283,7 @@ func (cs connState) String() string {
 	}
 }
 
-func (s *Server) newConn(conn net.Conn, handshake interface{}) (*serverConn, error) {
+func (s *Server) newConn(conn net.Conn, handshake any) (*serverConn, error) {
 	c := &serverConn{
 		server:    s,
 		conn:      conn,
@@ -301,7 +301,7 @@ func (s *Server) newConn(conn net.Conn, handshake interface{}) (*serverConn, err
 type serverConn struct {
 	server    *Server
 	conn      net.Conn
-	handshake interface{} // data from handshake, not used for now
+	handshake any // data from handshake, not used for now
 	state     atomic.Value
 
 	shutdownOnce sync.Once
@@ -417,7 +417,7 @@ func (c *serverConn) run(sctx context.Context) {
 				}
 				sh := i.(*streamHandler)
 				if mh.Flags&flagNoData != flagNoData {
-					unmarshal := func(obj interface{}) error {
+					unmarshal := func(obj any) error {
 						err := protoUnmarshal(p, obj)
 						ch.putmbuf(p)
 						return err

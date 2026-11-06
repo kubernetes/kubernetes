@@ -16,6 +16,7 @@ limitations under the License.
 
 // +k8s:validation-gen=TypesWithField=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
+// +k8s:validation-gen-test-targets
 // +k8s:validation-gen-test-fixture=validateFalse
 
 // This is a test package.

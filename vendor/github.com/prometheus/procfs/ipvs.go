@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // IPVSStats holds IPVS statistics, as exposed by the kernel in `/proc/net/ip_vs_stats`.
@@ -66,7 +66,7 @@ type IPVSBackendStatus struct {
 
 // IPVSStats reads the IPVS statistics from the specified `proc` filesystem.
 func (fs FS) IPVSStats() (IPVSStats, error) {
-	data, err := util.ReadFileNoStat(fs.proc.Path("net/ip_vs_stats"))
+	data, err := parsers.ReadFileNoStat(fs.proc.Path("net/ip_vs_stats"))
 	if err != nil {
 		return IPVSStats{}, err
 	}

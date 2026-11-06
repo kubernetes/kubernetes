@@ -27,11 +27,11 @@ import (
 //
 // ContainerRestartRule describes how a container exit is handled.
 type ContainerRestartRuleApplyConfiguration struct {
-	// Specifies the action taken on a container exit if the requirements
+	// action specifies the action taken on a container exit if the requirements
 	// are satisfied. The only possible value is "Restart" to restart the
 	// container.
 	Action *corev1.ContainerRestartRuleAction `json:"action,omitempty"`
-	// Represents the exit codes to check on container exits.
+	// exitCodes represents the exit codes to check on container exits.
 	ExitCodes *ContainerRestartRuleOnExitCodesApplyConfiguration `json:"exitCodes,omitempty"`
 }
 

@@ -39,7 +39,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "stream_translator_requests_total",
 			Help:           "Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{statuscode},
 	)
@@ -50,7 +50,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "stream_tunnel_requests_total",
 			Help:           "Total number of requests that were handled by the StreamTunnelProxy, which processes streaming PortForward/V2",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{statuscode},
 	)
@@ -63,7 +63,7 @@ var (
 			Help: "Total number of WebSocket streaming requests (exec/attach/portforward) routed by the API server, " +
 				"labeled by subresource and proxy_type. proxy_type is proxied_to_kubelet when the kubelet " +
 				"handles the request directly; otherwise translated_at_apiserver.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"subresource", "proxy_type"},
 	)

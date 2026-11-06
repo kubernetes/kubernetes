@@ -23,7 +23,7 @@ package v1
 //
 // NodeConfigStatus describes the status of the config assigned by Node.Spec.ConfigSource.
 type NodeConfigStatusApplyConfiguration struct {
-	// Assigned reports the checkpointed config the node will try to use.
+	// assigned reports the checkpointed config the node will try to use.
 	// When Node.Spec.ConfigSource is updated, the node checkpoints the associated
 	// config payload to local disk, along with a record indicating intended
 	// config. The node refers to this record to choose its config checkpoint, and
@@ -32,12 +32,12 @@ type NodeConfigStatusApplyConfiguration struct {
 	// it tries to make the Assigned config the Active config by loading and
 	// validating the checkpointed payload identified by Assigned.
 	Assigned *NodeConfigSourceApplyConfiguration `json:"assigned,omitempty"`
-	// Active reports the checkpointed config the node is actively using.
+	// active reports the checkpointed config the node is actively using.
 	// Active will represent either the current version of the Assigned config,
 	// or the current LastKnownGood config, depending on whether attempting to use the
 	// Assigned config results in an error.
 	Active *NodeConfigSourceApplyConfiguration `json:"active,omitempty"`
-	// LastKnownGood reports the checkpointed config the node will fall back to
+	// lastKnownGood reports the checkpointed config the node will fall back to
 	// when it encounters an error attempting to use the Assigned config.
 	// The Assigned config becomes the LastKnownGood config when the node determines
 	// that the Assigned config is stable and correct.
@@ -49,7 +49,7 @@ type NodeConfigStatusApplyConfiguration struct {
 	// You should not make assumptions about the node's method of determining config stability
 	// and correctness, as this may change or become configurable in the future.
 	LastKnownGood *NodeConfigSourceApplyConfiguration `json:"lastKnownGood,omitempty"`
-	// Error describes any problems reconciling the Spec.ConfigSource to the Active config.
+	// error describes any problems reconciling the Spec.ConfigSource to the Active config.
 	// Errors may occur, for example, attempting to checkpoint Spec.ConfigSource to the local Assigned
 	// record, attempting to checkpoint the payload associated with Spec.ConfigSource, attempting
 	// to load or validate the Assigned config, etc.

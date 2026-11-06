@@ -1,0 +1,34 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..3a91c82041b 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -527,8 +527,10 @@ func (s *store) GuaranteedUpdate(
+ 	transformContext := authenticatedDataString(preparedKey)
+ 	for {
+ 		if err := preconditions.Check(preparedKey, origState.obj); err != nil {
++			// BUG REVERT (#35415): treat the cached suggestion as authoritative without
++			// refetching live state from etcd when preconditions or no-op checks run.
+ 			// If our data is already up to date, return the error
+-			if origStateIsCurrent {
++			if true || origStateIsCurrent {
+ 				return err
+ 			}
+ 
+@@ -544,7 +546,7 @@ func (s *store) GuaranteedUpdate(
+ 		ret, ttl, err := s.updateState(origState, tryUpdate)
+ 		if err != nil {
+ 			// If our data is already up to date, return the error
+-			if origStateIsCurrent {
++			if true || origStateIsCurrent {
+ 				return err
+ 			}
+ 
+@@ -580,7 +582,7 @@ func (s *store) GuaranteedUpdate(
+ 			// if we skipped the original Get in this loop, we must refresh from
+ 			// etcd in order to be sure the data in the store is equivalent to
+ 			// our desired serialization
+-			if !origStateIsCurrent {
++			if false && !origStateIsCurrent {
+ 				origState, err = getCurrentState()
+ 				if err != nil {
+ 					return err

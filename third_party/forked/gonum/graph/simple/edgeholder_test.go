@@ -18,7 +18,7 @@ func TestEdgeHolder(t *testing.T) {
 	if n, ok := holder.Get(2); ok || n != nil {
 		t.Errorf("expected nil,false")
 	}
-	holder.Visit(func(_ int, _ graph.Edge) { t.Errorf("unexpected call to visitor") })
+	holder.Visit(func(_ int, _ graph.Edge) (shouldContinue bool) { t.Errorf("unexpected call to visitor"); return true })
 	holder = holder.Delete(2)
 
 	// Insert an edge to ourselves
@@ -30,7 +30,10 @@ func TestEdgeHolder(t *testing.T) {
 		t.Errorf("expected edge to ourselves, got %#v", n)
 	}
 	neighbors := []int{}
-	holder.Visit(func(neighbor int, _ graph.Edge) { neighbors = append(neighbors, neighbor) })
+	holder.Visit(func(neighbor int, _ graph.Edge) (shouldContinue bool) {
+		neighbors = append(neighbors, neighbor)
+		return true
+	})
 	if !reflect.DeepEqual(neighbors, []int{1}) {
 		t.Errorf("expected a single visit to ourselves, got %v", neighbors)
 	}
@@ -46,7 +49,10 @@ func TestEdgeHolder(t *testing.T) {
 		t.Errorf("expected edge from us to another node, got %#v", n)
 	}
 	neighbors = []int{}
-	holder.Visit(func(neighbor int, _ graph.Edge) { neighbors = append(neighbors, neighbor) })
+	holder.Visit(func(neighbor int, _ graph.Edge) (shouldContinue bool) {
+		neighbors = append(neighbors, neighbor)
+		return true
+	})
 	if !reflect.DeepEqual(neighbors, []int{1, 2, 3, 4}) {
 		t.Errorf("expected a single visit to ourselves, got %v", neighbors)
 	}
@@ -62,7 +68,10 @@ func TestEdgeHolder(t *testing.T) {
 		t.Errorf("expected reversed edge, got %#v", n)
 	}
 	neighbors = []int{}
-	holder.Visit(func(neighbor int, _ graph.Edge) { neighbors = append(neighbors, neighbor) })
+	holder.Visit(func(neighbor int, _ graph.Edge) (shouldContinue bool) {
+		neighbors = append(neighbors, neighbor)
+		return true
+	})
 	if !reflect.DeepEqual(neighbors, []int{1, 2, 3, 4}) {
 		t.Errorf("expected a single visit to ourselves, got %v", neighbors)
 	}
@@ -87,7 +96,10 @@ func TestEdgeHolder(t *testing.T) {
 		t.Errorf("expected new edge, got %#v", n)
 	}
 	neighbors = []int{}
-	holder.Visit(func(neighbor int, _ graph.Edge) { neighbors = append(neighbors, neighbor) })
+	holder.Visit(func(neighbor int, _ graph.Edge) (shouldContinue bool) {
+		neighbors = append(neighbors, neighbor)
+		return true
+	})
 	sort.Ints(neighbors) // sort, map order is random
 	if !reflect.DeepEqual(neighbors, []int{1, 2, 3, 4, 5}) {
 		t.Errorf("expected 1,2,3,4,5, got %v", neighbors)
@@ -100,5 +112,24 @@ func TestEdgeHolder(t *testing.T) {
 	holder = holder.Delete(6)
 	if len := holder.Len(); len != 0 {
 		t.Errorf("expected 0")
+	}
+}
+
+func TestEdgeHolderVisitStopsEarly(t *testing.T) {
+	// 3 edges stays a sliceEdgeHolder; 6 edges promotes to a mapEdgeHolder.
+	for _, numEdges := range []int{3, 6} {
+		holder := edgeHolder(&sliceEdgeHolder{self: 1})
+		for i := 2; i < 2+numEdges; i++ {
+			holder = holder.Set(i, Edge{F: Node(1), T: Node(i)})
+		}
+
+		calls := 0
+		holder.Visit(func(_ int, _ graph.Edge) (shouldContinue bool) {
+			calls++
+			return false
+		})
+		if calls != 1 {
+			t.Errorf("%T with %d edges: expected visitor to be called once, got %d", holder, numEdges, calls)
+		}
 	}
 }

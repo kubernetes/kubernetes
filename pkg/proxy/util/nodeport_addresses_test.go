@@ -411,6 +411,18 @@ func TestContainsExplicitLoopback(t *testing.T) {
 		want        bool
 	}{
 		{
+			name:        "IPv4 explicit localhost /32",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"127.0.0.1/32"},
+			want:        true,
+		},
+		{
+			name:        "IPv4 other loopback address is not explicit localhost",
+			family:      v1.IPv4Protocol,
+			cidrStrings: []string{"127.0.0.2/32"},
+			want:        false,
+		},
+		{
 			name:        "IPv4 explicit loopback /8",
 			family:      v1.IPv4Protocol,
 			cidrStrings: []string{"127.0.0.0/8"},

@@ -114,6 +114,30 @@ const (
 	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
 )
 
+// CertificateKeyAlgorithmType defines the type of key algorithm used for certificate signing requests.
+type CertificateKeyAlgorithmType string
+
+const (
+	// CertificateKeyAlgorithmECDSAP256 defines the ECDSA key algorithm type with curve P256.
+	CertificateKeyAlgorithmECDSAP256 CertificateKeyAlgorithmType = "ECDSA-P256"
+	// CertificateKeyAlgorithmECDSAP384 defines the ECDSA key algorithm type with curve P384.
+	CertificateKeyAlgorithmECDSAP384 CertificateKeyAlgorithmType = "ECDSA-P384"
+	// CertificateKeyAlgorithmRSA2048 defines the RSA key algorithm type with key size 2048 bits.
+	CertificateKeyAlgorithmRSA2048 CertificateKeyAlgorithmType = "RSA-2048"
+	// CertificateKeyAlgorithmRSA3072 defines the RSA key algorithm type with key size 3072 bits.
+	CertificateKeyAlgorithmRSA3072 CertificateKeyAlgorithmType = "RSA-3072"
+	// CertificateKeyAlgorithmRSA4096 defines the RSA key algorithm type with key size 4096 bits.
+	CertificateKeyAlgorithmRSA4096 CertificateKeyAlgorithmType = "RSA-4096"
+	// CertificateKeyAlgorithmMLDSA44 defines the ML-DSA-44 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA44 CertificateKeyAlgorithmType = "ML-DSA-44"
+	// CertificateKeyAlgorithmMLDSA65 defines the ML-DSA-65 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA65 CertificateKeyAlgorithmType = "ML-DSA-65"
+	// CertificateKeyAlgorithmMLDSA87 defines the ML-DSA-87 key algorithm variant.
+	CertificateKeyAlgorithmMLDSA87 CertificateKeyAlgorithmType = "ML-DSA-87"
+	// CertificateKeyAlgorithmDefault is the default key algorithm (ECDSA P-256).
+	CertificateKeyAlgorithmDefault = CertificateKeyAlgorithmECDSAP256
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
@@ -221,21 +245,48 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	ServerTLSBootstrap bool `json:"serverTLSBootstrap,omitempty"`
+	// clientCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// client certificate signing requests during certificate rotation.
+	// This field only takes effect when rotateCertificates is true. It controls keys
+	// generated for initial and renewal CSRs; it does not alter supplied static
+	// credentials.
+	// Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected
+	// signature algorithm. Go rejects ML-DSA certificates under TLS 1.2.
+	// Valid values are: "ECDSA-P256", "ECDSA-P384", "RSA-2048", "RSA-3072", "RSA-4096",
+	// "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// When omitted, defaults to "ECDSA-P256".
+	// +optional
+	ClientCertificateKeyAlgorithm *CertificateKeyAlgorithmType `json:"clientCertificateKeyAlgorithm,omitempty"`
+	// serverCertificateKeyAlgorithm specifies the key algorithm to use when generating
+	// server certificate signing requests during certificate rotation.
+	// This field only takes effect when serverTLSBootstrap is true. It is not used
+	// for self-signed serving certificates.
+	// Changing this value does not immediately replace an existing certificate;
+	// the new algorithm takes effect at the next certificate renewal.
+	// Note: ML-DSA algorithms require TLS 1.3 and peers that support the selected
+	// signature algorithm. Go rejects ML-DSA certificates under TLS 1.2.
+	// Valid values are: "ECDSA-P256", "ECDSA-P384", "RSA-2048", "RSA-3072", "RSA-4096",
+	// "ML-DSA-44", "ML-DSA-65", "ML-DSA-87".
+	// When omitted, defaults to "ECDSA-P256".
+	// +optional
+	ServerCertificateKeyAlgorithm *CertificateKeyAlgorithmType `json:"serverCertificateKeyAlgorithm,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated.
-	// Defaults:
-	//   anonymous:
-	//     enabled: false
-	//   webhook:
-	//     enabled: true
-	//     cacheTTL: "2m"
+	//
+	//	Defaults:
+	//		anonymous:
+	//			enabled: false
+	//		webhook:
+	//			enabled: true
+	//			cacheTTL: "2m"
 	// +optional
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized.
-	// Defaults:
-	//   mode: Webhook
-	//   webhook:
-	//     cacheAuthorizedTTL: "5m"
-	//     cacheUnauthorizedTTL: "30s"
+	//
+	//	Defaults:
+	//		mode: Webhook
+	//		webhook:
+	//			cacheAuthorizedTTL: "5m"
+	//			cacheUnauthorizedTTL: "30s"
 	// +optional
 	Authorization KubeletAuthorization `json:"authorization"`
 	// registryPullQPS is the limit of registry pulls per second.
@@ -323,6 +374,7 @@ type KubeletConfiguration struct {
 	ClusterDNS []string `json:"clusterDNS,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
+	//
 	// Deprecated: no longer has any effect.
 	// Default: "4h"
 	// +optional
@@ -648,11 +700,13 @@ type KubeletConfiguration struct {
 	MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains,omitempty"`
 	// iptablesMasqueradeBit formerly controlled the creation of the KUBE-MARK-MASQ
 	// chain.
+	//
 	// Deprecated: no longer has any effect.
 	// Default: 14
 	// +optional
 	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit,omitempty"`
 	// iptablesDropBit formerly controlled the creation of the KUBE-MARK-DROP chain.
+	//
 	// Deprecated: no longer has any effect.
 	// Default: 15
 	// +optional
@@ -879,7 +933,7 @@ type KubeletConfiguration struct {
 	// 1. Duplicates, the same NUMA node, and memory type, but with a different value.
 	// 2. zero limits for any memory type.
 	// 3. NUMAs nodes IDs that do not exist under the machine.
-	// 4. memory types except for memory and hugepages-<size>
+	// 4. memory types except for memory and hugepages-SIZE
 	//
 	// Default: nil
 	// +optional
@@ -1117,9 +1171,9 @@ type CredentialProvider struct {
 	//
 	// Each entry in matchImages is a pattern which can optionally contain a port and a path.
 	// Globs can be used in the domain, but not in the port or the path. Globs are supported
-	// as subdomains like '*.k8s.io' or 'k8s.*.io', and top-level-domains such as 'k8s.*'.
-	// Matching partial subdomains like 'app*.k8s.io' is also supported. Each glob can only match
-	// a single subdomain segment, so *.io does not match *.k8s.io.
+	// as subdomains like `*.k8s.io` or `k8s.*.io`, and top-level-domains such as `k8s.*`.
+	// Matching partial subdomains like `app*.k8s.io` is also supported. Each glob can only match
+	// a single subdomain segment, so `*.io` does not match `*.k8s.io`.
 	//
 	// A match exists between an image and a matchImage when all of the below are true:
 	// - Both contain the same number of domain parts and each part matches.
@@ -1127,11 +1181,11 @@ type CredentialProvider struct {
 	// - If the imageMatch contains a port, then the port must match in the image as well.
 	//
 	// Example values of matchImages:
-	//   - 123456789.dkr.ecr.us-east-1.amazonaws.com
-	//   - *.azurecr.io
-	//   - gcr.io
-	//   - *.*.registry.io
-	//   - registry.io:8080/path
+	//   - `123456789.dkr.ecr.us-east-1.amazonaws.com`
+	//   - `*.azurecr.io`
+	//   - `gcr.io`
+	//   - `*.*.registry.io`
+	//   - `registry.io:8080/path`
 	MatchImages []string `json:"matchImages"`
 
 	// defaultCacheDuration is the default duration the plugin will cache credentials in-memory

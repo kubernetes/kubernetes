@@ -122,12 +122,20 @@ func (e errorNotServeServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream 
 }
 
 func TestGrpcProber_Probe(t *testing.T) {
-	t.Run("Should: failed but return nil error because cant find host", func(t *testing.T) {
+	t.Run("Should: fail fast when the connection is refused", func(t *testing.T) {
 		s := New()
-		p, o, err := s.Probe("", "", 32, time.Second, ProbeOptions{})
+		lis, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("failed to listen: %v", err)
+		}
+		port := lis.Addr().(*net.TCPAddr).Port
+		_ = lis.Close()
+		start := time.Now()
+		p, o, err := s.Probe("127.0.0.1", "", port, 10*time.Second, ProbeOptions{})
 		assert.Equal(t, probe.Failure, p)
 		assert.NoError(t, err)
-		assert.Equal(t, "timeout: failed to connect service \":32\" within 1s: context deadline exceeded", o)
+		assert.Contains(t, o, fmt.Sprintf("error: failed to connect service at \"127.0.0.1:%d\"", port))
+		assert.Less(t, time.Since(start), 5*time.Second)
 	})
 	t.Run("Should: return nil error because connection closed", func(t *testing.T) {
 		s := New()

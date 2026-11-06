@@ -3,7 +3,7 @@
 
 // Package tracetransform provides conversion functionality for the otlptrace
 // exporters.
-package tracetransform // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform"
+package tracetransform
 
 import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -95,6 +95,12 @@ func Value(v attribute.Value) *commonpb.AnyValue {
 		av.Value = &commonpb.AnyValue_ArrayValue{
 			ArrayValue: &commonpb.ArrayValue{
 				Values: values(v.AsSlice()),
+			},
+		}
+	case attribute.MAP:
+		av.Value = &commonpb.AnyValue_KvlistValue{
+			KvlistValue: &commonpb.KeyValueList{
+				Values: KeyValues(v.AsMap()),
 			},
 		}
 	case attribute.STRINGSLICE:

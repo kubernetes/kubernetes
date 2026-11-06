@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -500,6 +501,39 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"valid firstAvailable derived attributes, max allowed": {
 			input: mkValidResourceClaimTemplate(tweakFirstAvailableDerivedAttributesCount(32)),
 		},
+		"valid exactly capacity requests, max allowed": {
+			input: mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(mkCapacityRequests(32, "1"))),
+		},
+		"valid exactly capacity requests, zero": {
+			input: mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(mkCapacityRequests(1, "0"))),
+		},
+		"invalid exactly capacity requests, too many": {
+			input: mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(mkCapacityRequests(33, "1"))),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests"), 33, 32).WithOrigin("maxProperties"),
+			},
+		},
+		"invalid exactly capacity requests, negative": {
+			input: mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(mkCapacityRequests(1, "-1"))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "capacity", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+			},
+		},
+		"valid firstAvailable capacity requests, max allowed": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableCapacityRequests(mkCapacityRequests(32, "1"))),
+		},
+		"invalid firstAvailable capacity requests, too many": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableCapacityRequests(mkCapacityRequests(33, "1"))),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("capacity", "requests"), 33, 32).WithOrigin("maxProperties"),
+			},
+		},
+		"invalid firstAvailable capacity requests, negative": {
+			input: mkValidResourceClaimTemplate(tweakFirstAvailableCapacityRequests(mkCapacityRequests(1, "-1"))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("capacity", "requests").Key("dra.example.com/cap0"), "-1", "").WithOrigin("minimum"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 
@@ -541,6 +575,18 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		"valid update (no spec change)": {
 			old:    mkValidResourceClaimTemplate(),
 			update: mkValidResourceClaimTemplate(),
+		},
+		"valid update with unchanged negative capacity requests": {
+			old:    mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(mkCapacityRequests(1, "-1"))),
+			update: mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(mkCapacityRequests(1, "-1")), tweakLabels(map[string]string{"foo": "bar"})),
+		},
+		"valid update with unchanged invalid capacity request name": {
+			old:    mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(invalidCapacityRequestName)),
+			update: mkValidResourceClaimTemplate(tweakExactlyCapacityRequests(invalidCapacityRequestName), tweakLabels(map[string]string{"foo": "bar"})),
+		},
+		"valid update with unchanged invalid capacity request name in subrequest": {
+			old:    mkValidResourceClaimTemplate(tweakFirstAvailableCapacityRequests(invalidCapacityRequestName)),
+			update: mkValidResourceClaimTemplate(tweakFirstAvailableCapacityRequests(invalidCapacityRequestName), tweakLabels(map[string]string{"foo": "bar"})),
 		},
 		// TODO: Add more test cases
 	}
@@ -745,6 +791,38 @@ func tweakDuplicateConfigRequest(name string) func(*resource.ResourceClaimTempla
 			rct.Spec.Spec.Devices.Config = append(rct.Spec.Spec.Devices.Config, mkDeviceClaimConfiguration())
 		}
 		rct.Spec.Spec.Devices.Config[0].Requests = append(rct.Spec.Spec.Devices.Config[0].Requests, name)
+	}
+}
+
+// invalidCapacityRequestName could be stored before capacity request names were validated.
+var invalidCapacityRequestName = map[resource.QualifiedName]apiresource.Quantity{
+	"test-capacity": apiresource.MustParse("1"),
+}
+
+func mkCapacityRequests(count int, value string) map[resource.QualifiedName]apiresource.Quantity {
+	requests := make(map[resource.QualifiedName]apiresource.Quantity, count)
+	for i := range count {
+		requests[resource.QualifiedName(fmt.Sprintf("dra.example.com/cap%d", i))] = apiresource.MustParse(value)
+	}
+	return requests
+}
+
+func tweakExactlyCapacityRequests(requests map[resource.QualifiedName]apiresource.Quantity) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		rct.Spec.Spec.Devices.Requests[0].Exactly.Capacity = &resource.CapacityRequirements{Requests: requests}
+	}
+}
+
+func tweakFirstAvailableCapacityRequests(requests map[resource.QualifiedName]apiresource.Quantity) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		tweakFirstAvailable(1)(rct)
+		rct.Spec.Spec.Devices.Requests[0].FirstAvailable[0].Capacity = &resource.CapacityRequirements{Requests: requests}
+	}
+}
+
+func tweakLabels(labels map[string]string) func(*resource.ResourceClaimTemplate) {
+	return func(rct *resource.ResourceClaimTemplate) {
+		rct.Labels = labels
 	}
 }
 

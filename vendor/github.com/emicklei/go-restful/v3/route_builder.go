@@ -117,7 +117,7 @@ func (b *RouteBuilder) Reads(sample interface{}, optionalDescription ...string) 
 		description = optionalDescription[0]
 	}
 	b.readSample = sample
-	bodyParameter := &Parameter{&ParameterData{Name: "body", Description: description}}
+	bodyParameter := &Parameter{data: ParameterData{Name: "body", Description: description}}
 	bodyParameter.beBody()
 	bodyParameter.Required(true)
 	bodyParameter.DataType(typeAsName)

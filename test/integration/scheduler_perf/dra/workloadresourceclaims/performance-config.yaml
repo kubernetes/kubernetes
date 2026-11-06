@@ -21,7 +21,6 @@
 # the same ResourceClaim. Exactly one ResourceClaim exists for each PodGroup.
 - name: SharedPodGroupResourceClaim
   featureGates:
-    DynamicResourceAllocation: true
     DRAWorkloadResourceClaims: true
     GenericWorkload: true
   workloadTemplate:
@@ -79,7 +78,6 @@
 # the same ResourceClaim generated from a ResourceClaimTemplate.
 - name: SharedPodGroupResourceClaimTemplate
   featureGates:
-    DynamicResourceAllocation: true
     DRAWorkloadResourceClaims: true
     GenericWorkload: true
   workloadTemplate:

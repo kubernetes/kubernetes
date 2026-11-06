@@ -30,11 +30,9 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/apis/core"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -55,8 +53,7 @@ func Register(plugins *admission.Plugins) {
 // Plugin is an admission controller that validates pod resize requests against the node's capabilities.
 type Plugin struct {
 	*admission.Handler
-	nodeLister                       corev1listers.NodeLister
-	inPlacePodVerticalScalingEnabled bool
+	nodeLister corev1listers.NodeLister
 }
 
 var _ admission.ValidationInterface = &Plugin{}
@@ -76,11 +73,6 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 	p.SetReadyFunc(nodeInformer.Informer().HasSynced)
 }
 
-// InspectFeatureGates sets the feature gates for the plugin.
-func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.inPlacePodVerticalScalingEnabled = featureGates.Enabled(features.InPlacePodVerticalScaling)
-}
-
 // ValidateInitialization ensures that the plugin is properly initialized.
 func (p *Plugin) ValidateInitialization() error {
 	if p.nodeLister == nil {
@@ -92,11 +84,6 @@ func (p *Plugin) ValidateInitialization() error {
 
 // Validate is the core of the admission controller logic.
 func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	// Ignore if the feature gate is not enabled.
-	if !p.inPlacePodVerticalScalingEnabled {
-		return nil
-	}
-
 	if a.GetOperation() != admission.Update {
 		return nil
 	}

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/client-go/tools/cache"
 	singleapiv1 "k8s.io/code-generator/examples/single/api/v1"
 	"k8s.io/code-generator/examples/single/clientset/versioned"
@@ -102,10 +103,86 @@ func TestTransforms(t *testing.T) {
 
 type transformTrackingInformer struct {
 	cache.SharedIndexInformer
-	lastTransform cache.TransformFunc
+	lastTransform     cache.TransformFunc
+	lastShardSelector sharding.Selector
 }
 
 func (s *transformTrackingInformer) SetTransform(handler cache.TransformFunc) error {
 	s.lastTransform = handler
 	return s.SharedIndexInformer.SetTransform(handler)
+}
+
+func (s *transformTrackingInformer) SetShardSelector(selector sharding.Selector) error {
+	s.lastShardSelector = selector
+	return s.SharedIndexInformer.SetShardSelector(selector)
+}
+
+func TestShardSelector(t *testing.T) {
+	factorySel, err := sharding.NewShardRangeSelector("object.metadata.uid", 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	informerSel, err := sharding.NewShardRangeSelector("object.metadata.uid", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name                        string
+		factorySelector             sharding.Selector
+		perInformerSelector         sharding.Selector
+		wantEffectiveSelectorString string
+	}{
+		{
+			name:                        "no shard selector",
+			wantEffectiveSelectorString: "",
+		},
+		{
+			name:                        "no factory shard selector preserves per-informer shard selector",
+			perInformerSelector:         informerSel,
+			wantEffectiveSelectorString: informerSel.String(),
+		},
+		{
+			name:                        "factory shard selector applied when no per-informer shard selector",
+			factorySelector:             factorySel,
+			wantEffectiveSelectorString: factorySel.String(),
+		},
+		{
+			name:                        "factory shard selector overrides per-informer shard selector",
+			factorySelector:             factorySel,
+			perInformerSelector:         informerSel,
+			wantEffectiveSelectorString: factorySel.String(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var opts []SharedInformerOption
+			if tt.factorySelector != nil {
+				opts = append(opts, WithShardSelector(tt.factorySelector))
+			}
+			factory := NewSharedInformerFactoryWithOptions(nil, 0, opts...)
+
+			var wrapper *transformTrackingInformer
+			newFunc := func(_ versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+				inner := cache.NewSharedIndexInformer(nil, &singleapiv1.TestType{}, resyncPeriod, cache.Indexers{})
+				wrapper = &transformTrackingInformer{SharedIndexInformer: inner}
+				if tt.perInformerSelector != nil {
+					if err := wrapper.SetShardSelector(tt.perInformerSelector); err != nil {
+						t.Fatalf("failed to set shard selector: %v", err)
+					}
+				}
+				return wrapper
+			}
+			factory.InformerFor(&singleapiv1.TestType{}, newFunc)
+
+			got := ""
+			if wrapper.lastShardSelector != nil {
+				got = wrapper.lastShardSelector.String()
+			}
+			if got != tt.wantEffectiveSelectorString {
+				t.Errorf("shard selector: got %q, want %q", got, tt.wantEffectiveSelectorString)
+			}
+		})
+	}
 }

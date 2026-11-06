@@ -17,10 +17,12 @@ limitations under the License.
 package noderesources
 
 import (
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,11 +33,14 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	"k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -44,7 +49,6 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -593,16 +597,19 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 	tCtx = tCtx.WithCancel()
 	client := fake.NewClientset(objects...)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 	resourceSliceTrackerOpts := tracker.Options{
-		SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
+		SliceLister:   draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+		SliceInformer: sliceInformer,
 		KubeClient:    client,
 	}
 	resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	tCtx.ExpectNoError(err, "couldn't start resource slice tracker")
+	logger := tCtx.Logger()
 	draManager := dynamicresources.NewDRAManager(
 		tCtx,
 		assumecache.NewAssumeCache(
-			tCtx.Logger(),
+			logger,
 			informerFactory.Resource().V1().ResourceClaims().Informer(),
 			"resource claim",
 			"",
@@ -610,20 +617,20 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 		resourceSliceTracker,
 		informerFactory)
 
+	handlerOptions := cache.HandlerOptions{Logger: &logger}
 	cache := draManager.DeviceClassResolver().(*extendedresourcecache.ExtendedResourceCache)
-	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(cache)
+	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(cache, handlerOptions)
 	tCtx.ExpectNoError(err, "add device class informer event handler")
 	tCtx.Cleanup(func() {
 		_ = informerFactory.Resource().V1().DeviceClasses().Informer().RemoveEventHandler(handle)
 	})
 
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	tCtx.Cleanup(func() {
-		tCtx.Cancel("test has completed")
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 
 	// Wait for full initialization of manager, including
 	// processing of all informer events.
@@ -964,4 +971,50 @@ func BenchmarkNodeMatchCaching(b *testing.B) {
 			_, _ = scorer.getCachedNodeMatch(testNode.Name, "", false, nodeSelectorStr)
 		}
 	})
+}
+
+func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
+	// Adding the scored pod to a node total already at MaxInt64 must not wrap it
+	// negative, which would read as free capacity.
+	tCtx := ktesting.Init(t)
+
+	node := st.MakeNode().Name("saturated-node").Capacity(map[v1.ResourceName]string{
+		v1.ResourceCPU:    "8",
+		v1.ResourceMemory: "16Gi",
+	}).Obj()
+
+	// Both requests project to MaxInt64, so the node totals saturate.
+	hugePod := st.MakePod().Name("huge").Namespace("ns").UID("huge").
+		Req(map[v1.ResourceName]string{
+			v1.ResourceCPU:    "9223372036854775807",
+			v1.ResourceMemory: "9223372036854775807",
+		}).Obj()
+
+	nodeInfo := framework.NewNodeInfo(hugePod)
+	nodeInfo.SetNode(node)
+
+	if got := nodeInfo.GetNonZeroRequested().GetMilliCPU(); got != math.MaxInt64 {
+		t.Fatalf("precondition: node requested milliCPU = %d, want MaxInt64 (NodeInfo did not saturate)", got)
+	}
+	if got := nodeInfo.GetNonZeroRequested().GetMemory(); got != math.MaxInt64 {
+		t.Fatalf("precondition: node requested memory = %d, want MaxInt64 (NodeInfo did not saturate)", got)
+	}
+
+	scorer := &resourceAllocationScorer{
+		resources: []config.ResourceSpec{
+			{Name: string(v1.ResourceCPU)},
+			{Name: string(v1.ResourceMemory)},
+		},
+	}
+
+	requested, allocated, _ := scorer.calculateNodeAllocatableRequest(tCtx, nodeInfo, []int64{1, 1}, nil)
+
+	for i, name := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+		if allocated[i] != math.MaxInt64 {
+			t.Errorf("%s: allocated = %d, want MaxInt64", name, allocated[i])
+		}
+		if requested[i] != math.MaxInt64 {
+			t.Errorf("%s: requested = %d, want MaxInt64; a wrap to a negative reads as spare capacity", name, requested[i])
+		}
+	}
 }

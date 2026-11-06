@@ -36,9 +36,9 @@ import (
 // Cluster scoped.
 type DeviceClassApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:""`
-	// Standard object metadata
+	// metadata is the standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Spec defines what can be allocated and how to configure it.
+	// spec defines what can be allocated and how to configure it.
 	//
 	// This is mutable. Consumers have to be prepared for classes changing
 	// at any time, either because they get updated or replaced. Claim

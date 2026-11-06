@@ -26,8 +26,8 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // TestCreateResourceSlices uses the ResourceSlice controller to create slices.

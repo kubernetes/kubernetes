@@ -22,7 +22,6 @@ import (
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -180,14 +179,17 @@ func NewEmptySnapshot() *Snapshot {
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
+// Nodes are listed in the order of nodes, followed by the node names that only
+// appear in pods, in pod order.
 // It should be used only in the tests.
 func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
-	nodeInfoMap := createNodeInfoMap(pods, nodes)
+	nodeInfoMap, nodeNames := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithRequiredNonHostScopedAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
-	for _, v := range nodeInfoMap {
+	for _, nodeName := range nodeNames {
+		v := nodeInfoMap[nodeName]
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity) > 0 {
 			havePodsWithAffinityNodeInfoList = append(havePodsWithAffinityNodeInfoList, v)
@@ -217,58 +219,21 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	return s
 }
 
-// NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and returns it.
+// NewTestSnapshotWithPodGroups initializes a Snapshot struct with pod groups and composite pod groups and returns it.
 // It should be used only in the tests.
-func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup) *Snapshot {
+func NewTestSnapshotWithPodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1beta1.CompositePodGroup) *Snapshot {
 	s := NewSnapshot(pods, nodes)
-	for _, podGroup := range podGroups {
-		key := fwk.PodGroupKey(podGroup.Namespace, podGroup.Name)
-		pgs, ok := s.podGroupStates[key]
-		if !ok {
-			pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
-			s.podGroupStates[key] = pgs
-		}
-		pgs.podGroup = podGroup
-	}
-	return s
-}
-
-// NewTestSnapshotWithCompositePodGroups initializes a Snapshot struct with pod groups and composite pod groups and returns it.
-// It should be used only in the tests.
-func NewTestSnapshotWithCompositePodGroups(pods []*v1.Pod, nodes []*v1.Node, podGroups []*schedulingv1beta1.PodGroup, compositePodGroups []*schedulingv1alpha3.CompositePodGroup) *Snapshot {
-	s := NewTestSnapshotWithPodGroups(pods, nodes, podGroups)
+	genericPodGroups := make([]*fwk.GenericPodGroup, 0, len(compositePodGroups)+len(podGroups))
 	for _, cpg := range compositePodGroups {
-		key := fwk.CompositePodGroupKey(cpg.Namespace, cpg.Name)
-		cpgs, ok := s.compositePodGroupStates[key]
-		if !ok {
-			cpgs = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
-			s.compositePodGroupStates[key] = cpgs
-		}
-		cpgs.compositePodGroup = cpg
+		genericPodGroups = append(genericPodGroups, fwk.NewGenericCompositePodGroup(cpg))
 	}
-	for entityKey, cpgs := range s.compositePodGroupStates {
-		if cpgs.compositePodGroup == nil || cpgs.compositePodGroup.Spec.ParentCompositePodGroupName == nil {
-			continue
-		}
-		parentKey := fwk.CompositePodGroupKey(cpgs.compositePodGroup.Namespace, *cpgs.compositePodGroup.Spec.ParentCompositePodGroupName)
-		parentState, ok := s.compositePodGroupStates[parentKey]
-		if !ok {
-			parentState = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
-			s.compositePodGroupStates[parentKey] = parentState
-		}
-		parentState.addChild(entityKey)
+	for _, pg := range podGroups {
+		genericPodGroups = append(genericPodGroups, fwk.NewGenericPodGroup(pg))
 	}
-	for entityKey, pgs := range s.podGroupStates {
-		if pgs.podGroup == nil || pgs.podGroup.Spec.ParentCompositePodGroupName == nil {
-			continue
+	for _, genericPodGroup := range genericPodGroups {
+		if err := s.AddGenericPodGroup(genericPodGroup); err != nil {
+			return nil
 		}
-		parentKey := fwk.CompositePodGroupKey(pgs.podGroup.Namespace, *pgs.podGroup.Spec.ParentCompositePodGroupName)
-		parentState, ok := s.compositePodGroupStates[parentKey]
-		if !ok {
-			parentState = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
-			s.compositePodGroupStates[parentKey] = parentState
-		}
-		parentState.addChild(entityKey)
 	}
 	return s
 }
@@ -352,27 +317,33 @@ func (s *Snapshot) EndMutations() error {
 
 // createNodeInfoMap obtains a list of pods and pivots that list into a map
 // where the keys are node names and the values are the aggregated information
-// for that node.
-func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.NodeInfo {
+// for that node. It also returns the map's keys in the order of nodes, followed
+// by the node names that only appear in pods, in pod order.
+func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) (map[string]*framework.NodeInfo, []string) {
 	nodeNameToInfo := make(map[string]*framework.NodeInfo)
-	for _, pod := range pods {
-		nodeName := pod.Spec.NodeName
-		if _, ok := nodeNameToInfo[nodeName]; !ok {
-			nodeNameToInfo[nodeName] = framework.NewNodeInfo()
+	nodeNames := make([]string, 0, len(nodes))
+	// getOrCreate is the only place that adds to nodeNameToInfo, so nodeNames
+	// holds each of its keys exactly once.
+	getOrCreate := func(nodeName string) *framework.NodeInfo {
+		nodeInfo, ok := nodeNameToInfo[nodeName]
+		if !ok {
+			nodeInfo = framework.NewNodeInfo()
+			nodeNameToInfo[nodeName] = nodeInfo
+			nodeNames = append(nodeNames, nodeName)
 		}
-		nodeNameToInfo[nodeName].AddPod(pod)
+		return nodeInfo
 	}
-	imageExistenceMap := createImageExistenceMap(nodes)
 
+	imageExistenceMap := createImageExistenceMap(nodes)
 	for _, node := range nodes {
-		if _, ok := nodeNameToInfo[node.Name]; !ok {
-			nodeNameToInfo[node.Name] = framework.NewNodeInfo()
-		}
-		nodeInfo := nodeNameToInfo[node.Name]
+		nodeInfo := getOrCreate(node.Name)
 		nodeInfo.SetNode(node)
 		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
 	}
-	return nodeNameToInfo
+	for _, pod := range pods {
+		getOrCreate(pod.Spec.NodeName).AddPod(pod)
+	}
+	return nodeNameToInfo, nodeNames
 }
 
 func createUsedPVCRefCounts(nodeInfoMap map[string]*framework.NodeInfo) map[string]int {
@@ -473,7 +444,7 @@ type compositePodGroupSnapshotListerImpl struct {
 	snapshot *Snapshot
 }
 
-func (l *compositePodGroupSnapshotListerImpl) Get(namespace string, name string) (*schedulingv1alpha3.CompositePodGroup, error) {
+func (l *compositePodGroupSnapshotListerImpl) Get(namespace string, name string) (*schedulingv1beta1.CompositePodGroup, error) {
 	if !l.snapshot.compositePodGroupEnabled {
 		return nil, fmt.Errorf("composite pod group feature gate is disabled")
 	}
@@ -930,50 +901,96 @@ func removeNodeInfoFromList(logger klog.Logger, list []fwk.NodeInfo, nodeInfoToR
 	return list
 }
 
-// GetRootKeyForGroup returns the root key of the given EntityKey.
-// The key must be of PodGroupKey or CompositePodGroupKey type.
-func (s *Snapshot) GetRootKeyForGroup(key fwk.EntityKey) (fwk.EntityKey, bool, error) {
-	currentKey := key
-	visited := sets.New[fwk.EntityKey]()
-	for {
-		if visited.Has(currentKey) {
-			return fwk.EntityKey{}, false, fmt.Errorf("cycle detected in the hierarchy: %v", visited.UnsortedList())
-		}
-		visited.Insert(currentKey)
+// AddGenericPodGroup adds generic pod group object to the snapshot,
+// linking it to its parent composite pod group if CompositePodGroup is enabled.
+// NOTE: this function is meant to be use by tests and simulation library ONLY.
+func (s *Snapshot) AddGenericPodGroup(genericPodGroup *fwk.GenericPodGroup) error {
+	key := genericPodGroup.GetKey()
 
-		switch currentKey.Type {
-		case fwk.PodGroupKeyType:
-			pgs, ok := s.podGroupStates[currentKey]
-			if !ok {
-				return fwk.EntityKey{}, false, nil
-			}
-			pg := pgs.podGroup
-			if pg == nil {
-				return fwk.EntityKey{}, false, nil
-			}
-			if !s.compositePodGroupEnabled || pg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
-		case fwk.CompositePodGroupKeyType:
-			cpgs, ok := s.compositePodGroupStates[currentKey]
-			if !ok {
-				return fwk.EntityKey{}, false, nil
-			}
-			cpg := cpgs.compositePodGroup
-			if cpg == nil {
-				return fwk.EntityKey{}, false, nil
-			}
-			if cpg.Spec.ParentCompositePodGroupName == nil {
-				return currentKey, true, nil
-			}
-			currentKey = fwk.CompositePodGroupKey(cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
-		case fwk.PodKeyType:
-			return fwk.EntityKey{}, false, fmt.Errorf("pod key type not supported in snapshot GetRootKeyForGroup for %s", currentKey.String())
+	switch genericPodGroup.GetType() {
+	case fwk.PodGroupKeyType:
+		pgs := s.getOrCreatePodGroupState(key)
+		if pgs.podGroup != nil {
+			return fmt.Errorf("pod group %s already exists in snapshot", key)
+		}
+		pgs.setPodGroup(genericPodGroup.PodGroup)
+	case fwk.CompositePodGroupKeyType:
+		cpgs := s.getOrCreateCompositePodGroupState(key)
+		if cpgs.compositePodGroup != nil {
+			return fmt.Errorf("composite pod group %s already exists in snapshot", key)
+		}
+		cpgs.setCompositePodGroup(genericPodGroup.CompositePodGroup)
+	default:
+		return fmt.Errorf("unsupported generic pod group type %q for %s", genericPodGroup.GetType(), key)
+	}
+
+	if s.compositePodGroupEnabled {
+		if parentKey, hasParent := genericPodGroup.GetParentKey(); hasParent {
+			parent := s.getOrCreateCompositePodGroupState(parentKey)
+			parent.addChild(key)
 		}
 	}
+
+	return nil
 }
 
-func (s *Snapshot) BuildHierarchySnapshotFromPod(pod *v1.Pod) (fwk.PodGroupManager, error) {
-	return s, nil
+// RemoveGenericPodGroup removes a generic pod group object from the snapshot,
+// unlinking it from its parent composite pod group if CompositePodGroup is enabled.
+// NOTE: this function is meant to be use by simulation library ONLY.
+func (s *Snapshot) RemoveGenericPodGroup(gpg *fwk.GenericPodGroup) error {
+	key := gpg.GetKey()
+
+	switch gpg.GetType() {
+	case fwk.PodGroupKeyType:
+		pgs, exists := s.podGroupStates[key]
+		if !exists || pgs.podGroup == nil {
+			return fmt.Errorf("pod group %s not found in snapshot", key)
+		}
+		pgs.removePodGroup()
+		if pgs.empty() {
+			delete(s.podGroupStates, key)
+		}
+	case fwk.CompositePodGroupKeyType:
+		cpgs, exists := s.compositePodGroupStates[key]
+		if !exists || cpgs.compositePodGroup == nil {
+			return fmt.Errorf("composite pod group %s not found in snapshot", key)
+		}
+		cpgs.removeCompositePodGroup()
+		if cpgs.empty() {
+			delete(s.compositePodGroupStates, key)
+		}
+	default:
+		return fmt.Errorf("unsupported generic pod group type %q for %s", gpg.GetType(), key)
+	}
+
+	if s.compositePodGroupEnabled {
+		if parentKey, hasParent := gpg.GetParentKey(); hasParent {
+			if parent, exists := s.compositePodGroupStates[parentKey]; exists {
+				parent.removeChild(key)
+				if parent.empty() {
+					delete(s.compositePodGroupStates, parentKey)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Snapshot) getOrCreatePodGroupState(key fwk.EntityKey) *podGroupStateSnapshot {
+	pgs, exists := s.podGroupStates[key]
+	if !exists {
+		pgs = &podGroupStateSnapshot{podGroupStateData: newPodGroupStateData()}
+		s.podGroupStates[key] = pgs
+	}
+	return pgs
+}
+
+func (s *Snapshot) getOrCreateCompositePodGroupState(key fwk.EntityKey) *compositePodGroupStateSnapshot {
+	cpgs, exists := s.compositePodGroupStates[key]
+	if !exists {
+		cpgs = &compositePodGroupStateSnapshot{compositePodGroupStateData: newCompositePodGroupStateData()}
+		s.compositePodGroupStates[key] = cpgs
+	}
+	return cpgs
 }

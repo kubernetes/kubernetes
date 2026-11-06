@@ -395,3 +395,30 @@ func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string
 	h.withEnv = env
 	return nil
 }
+
+func TestGetLogVerbosity(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "no verbosity flag", args: []string{"kubectl", "get", "pods"}, want: "0"},
+		{name: "long flag with equals", args: []string{"kubectl", "get", "pods", "--v=8"}, want: "8"},
+		{name: "short flag with equals", args: []string{"kubectl", "get", "pods", "-v=8"}, want: "8"},
+		{name: "long flag with separate value", args: []string{"kubectl", "get", "pods", "--v", "8"}, want: "8"},
+		{name: "short flag with separate value", args: []string{"kubectl", "get", "pods", "-v", "8"}, want: "8"},
+		{name: "flag after double dash is ignored", args: []string{"kubectl", "exec", "foo", "--", "cmd", "-v=8"}, want: "0"},
+		{name: "label value containing -v=", args: []string{"kubectl", "label", "pod", "foo", "tier-v=8"}, want: "0"},
+		{name: "real flag after label value containing -v=", args: []string{"kubectl", "label", "pod", "foo", "tier-v=8", "-v=3"}, want: "3"},
+		{name: "real flag before label value containing -v=", args: []string{"kubectl", "label", "pod", "foo", "-v=3", "tier-v=8"}, want: "3"},
+		{name: "selector value containing -v=", args: []string{"kubectl", "get", "pods", "-l", "app-v=9"}, want: "0"},
+		{name: "flag value containing -v=", args: []string{"kubectl", "get", "pods", "--selector=app-v=9"}, want: "0"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := GetLogVerbosity(tc.args); got != tc.want {
+				t.Errorf("GetLogVerbosity(%q) = %q, want %q", tc.args, got, tc.want)
+			}
+		})
+	}
+}

@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
@@ -181,7 +182,7 @@ func NewRequestWithClient(base *url.URL, versionedAPIPath string, content Client
 	return NewRequest(&RESTClient{
 		base:             base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: content},
+		content:          requestClientContentConfigProvider{base: configureDropManagedFields(scrubCBORContentConfigIfDisabled(content))},
 		Client:           client,
 	})
 }
@@ -462,6 +463,9 @@ func (r *Request) setParam(paramName, value string) *Request {
 func (r *Request) SetHeader(key string, values ...string) *Request {
 	if r.headers == nil {
 		r.headers = http.Header{}
+	}
+	if r.contentConfig.DropManagedFields && strings.EqualFold(key, "Accept") && len(values) > 0 {
+		values = []string{acceptDroppingManagedFields(strings.Join(values, ","))}
 	}
 	r.headers.Del(key)
 	for _, value := range values {
@@ -848,11 +852,18 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
+		r.newWatchEventDecoder(watchEventDecoder, objectDecoder),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
 	), nil
+}
+
+func (r *Request) newWatchEventDecoder(streamDecoder streaming.Decoder, objectDecoder runtime.Decoder) watch.Decoder {
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClientConcurrentDecoding) && r.params.Get("sendInitialEvents") == "true" {
+		return restclientwatch.NewConcurrentWatchEventDecoder(streamDecoder, objectDecoder)
+	}
+	return restclientwatch.NewDecoder(streamDecoder, objectDecoder)
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,

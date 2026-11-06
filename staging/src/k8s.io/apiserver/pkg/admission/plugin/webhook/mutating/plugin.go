@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/source"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -83,6 +84,13 @@ func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
 func (a *Plugin) ValidateInitialization() error {
 	if err := a.Webhook.ValidateInitialization(); err != nil {
 		return err
+	}
+	// Logged so the effective order can be diffed across API servers: a staticOrder
+	// rolled out to only part of an HA control plane changes mutation order depending
+	// on which instance served the request. Without manifest-based webhooks there is
+	// nothing to merge, so the line would only be noise.
+	if staticManifestsDir := a.Webhook.GetStaticManifestsDir(); len(staticManifestsDir) > 0 {
+		klog.InfoS("Configured mutating webhook merge order", "plugin", PluginName, "staticManifestsDir", staticManifestsDir, "staticOrder", a.Webhook.GetStaticOrder())
 	}
 	return nil
 }

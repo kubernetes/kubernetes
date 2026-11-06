@@ -369,6 +369,41 @@ var objWithSkipNodeOperationsStatus = &resource.ResourceClaim{
 	},
 }
 
+var objWithAllocationTimestamp = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request: "req-0",
+						Driver:  "dra.example.com",
+						Pool:    "pool-0",
+						Device:  "device-0",
+					},
+				},
+			},
+			AllocationTimestamp: &metav1.Time{},
+		},
+	},
+}
+
 var objWithCapacityRequests = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
@@ -384,7 +419,7 @@ var objWithCapacityRequests = &resource.ResourceClaim{
 						AllocationMode:  resource.DeviceAllocationModeAll,
 						Capacity: &resource.CapacityRequirements{
 							Requests: map[resource.QualifiedName]apiresource.Quantity{
-								resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+								resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 							},
 						},
 					},
@@ -501,7 +536,7 @@ var (
 )
 
 var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
-	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+	resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 }
 
 func TestStrategy(t *testing.T) {
@@ -1655,6 +1690,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"drop-fields-binding-conditions": {
 			oldObj:    obj,
@@ -1666,6 +1702,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"drop-fields-binding-conditions-disable-feature-gate": {
 			oldObj:    obj,
@@ -1689,6 +1726,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"keep-fields-optional-node-operations": {
 			oldObj:    obj,
@@ -1722,6 +1760,41 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAOptionalNodeOperations: false},
+		},
+		"keep-fields-allocation-timestamp": {
+			oldObj:    obj,
+			newObj:    objWithAllocationTimestamp,
+			expectObj: objWithAllocationTimestamp,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: true},
+		},
+		"drop-fields-allocation-timestamp": {
+			oldObj:    obj,
+			newObj:    objWithAllocationTimestamp,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
+		},
+		"keep-exist-fields-allocation-timestamp-disable-feature-gate": {
+			oldObj:    objWithAllocationTimestamp,
+			newObj:    objWithAllocationTimestamp,
+			expectObj: objWithAllocationTimestamp,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAResourceClaimDeviceStatus: true, features.DRADeviceBindingConditions: false},
+			emulatedVersion:  "1.37",
 		},
 		"keep-fields-consumable-capacity-with-device-status": {
 			oldObj: func() *resource.ResourceClaim {

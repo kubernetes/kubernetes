@@ -26,10 +26,12 @@ const (
 //
 //   - if a type implements [JSONPointable], its [JSONPointable.JSONLookup] method is used to resolve [Pointer.Get]
 //   - if a type implements [JSONSetable], its [JSONSetable.JSONSet] method is used to resolve [Pointer.Set]
-//   - a go map[K]V is interpreted as an object, with type K assignable to a string
+//   - a go map[K]V is interpreted as an object, with K a string type. A named string type is
+//     converted; a map keyed by anything else (e.g. map[int]V) cannot be addressed by a pointer
 //   - a go slice []T is interpreted as an array
 //   - a go struct is interpreted as an object, with exported fields interpreted as keys
-//   - promoted fields from an embedded struct are traversed
+//   - promoted fields from an embedded struct are traversed, including through an embedded pointer
+//     to a struct. Resolving one on a value whose embedded pointer is nil reports an error
 //   - scalars (e.g. int, float64 ...), channels, functions and go arrays cannot be traversed
 //
 // For struct s resolved by reflection, key mappings honor the conventional struct tag `json`.
@@ -40,7 +42,9 @@ const (
 // # Limitations
 //
 //   - Unlike go standard marshaling, untagged fields do not default to the go field name and are ignored.
-//   - anonymous fields are not traversed if untagged
+//   - an anonymous field is walked for the fields it promotes, and its own `json` tag is ignored.
+//     An anonymous field that is not a struct (e.g. an embedded named slice) promotes nothing and
+//     is unreachable.
 type Pointer struct {
 	referenceTokens []string
 }
@@ -82,6 +86,17 @@ func (p *Pointer) Get(document any, opts ...Option) (any, reflect.Kind, error) {
 // Pass *[]T if you want in-place rebind for that case as well.
 //
 // See [ErrDashToken] for the semantics of the "-" token.
+//
+// # Setting a null value
+//
+// A nil value (what [encoding/json] decodes a JSON null into) is set as the zero value of the
+// target, provided the target can hold nil: an interface, pointer, map, slice, channel or func.
+//
+// Setting nil on a target that cannot represent it — a string or an int field, an element of a
+// []int — reports an error wrapping [ErrPointer] rather than substituting a zero value, which
+// would erase the difference between a null and a 0.
+//
+// Setting a map member to nil keeps the member with a nil value. It does not delete it.
 func (p *Pointer) Set(document any, value any, opts ...Option) (any, error) {
 	o := optionsWithDefaults(opts)
 
@@ -284,7 +299,7 @@ func (p *Pointer) set(node, data any, nameProvider NameProvider) (any, error) {
 // new child reference (e.g. a slice header returned by an "-" append) into its parent on the way
 // back up.
 //
-// Returning the (possibly new) node at each level is what makes append work at any depth without
+// Returning the (possibly new) node at each level makes append work at any depth without
 // requiring the caller to pass a pointer to the containing slice: the new slice header propagates
 // up and each parent rebinds it via the appropriate kind-specific setter.
 func (p *Pointer) setAt(node any, tokens []string, data any, nameProvider NameProvider) (any, error) {
@@ -330,7 +345,10 @@ func rebindChild(node any, decodedToken string, newChild any, nameProvider NameP
 		if !ok {
 			return node, fmt.Errorf("object has no field %q: %w", decodedToken, ErrPointer)
 		}
-		fld := rValue.FieldByName(nm)
+		fld, err := fieldByName(rValue, nm)
+		if err != nil {
+			return node, err
+		}
 		if !fld.CanSet() {
 			return node, nil
 		}
@@ -338,7 +356,16 @@ func rebindChild(node any, decodedToken string, newChild any, nameProvider NameP
 		return node, nil
 
 	case reflect.Map:
-		rValue.SetMapIndex(reflect.ValueOf(decodedToken), reflect.ValueOf(newChild))
+		kv, err := mapKeyValue(rValue.Type(), decodedToken)
+		if err != nil {
+			return node, err
+		}
+		nv := reflect.ValueOf(newChild)
+		if !nv.IsValid() || !nv.Type().AssignableTo(rValue.Type().Elem()) {
+			// the child was mutated in place: there is nothing to rebind.
+			return node, nil
+		}
+		rValue.SetMapIndex(kv, nv)
 		return node, nil
 
 	case reflect.Slice:
@@ -409,10 +436,18 @@ func (p *Pointer) resolveNodeForToken(node any, decodedToken string, nameProvide
 			return nil, fmt.Errorf("object has no field %q: %w", decodedToken, ErrPointer)
 		}
 
-		return typeFromValue(rValue.FieldByName(nm)), nil
+		fld, err := fieldByName(rValue, nm)
+		if err != nil {
+			return nil, err
+		}
+
+		return typeFromValue(fld), nil
 
 	case reflect.Map:
-		kv := reflect.ValueOf(decodedToken)
+		kv, err := mapKeyValue(rValue.Type(), decodedToken)
+		if err != nil {
+			return nil, err
+		}
 		mv := rValue.MapIndex(kv)
 
 		if !mv.IsValid() {
@@ -454,6 +489,80 @@ func isNil(input any) bool {
 	default:
 		return false
 	}
+}
+
+func isNilableKind(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
+		return true
+	default:
+		return false
+	}
+}
+
+// fieldByName resolves a (possibly promoted) struct field by its go name.
+//
+// Unlike [reflect.Value.FieldByName], it reports an error instead of panicking when the field is
+// promoted through a nil embedded pointer: the field exists on the type, but there is no value to
+// reach it through.
+func fieldByName(rValue reflect.Value, nm string) (reflect.Value, error) {
+	sf, ok := rValue.Type().FieldByName(nm)
+	if !ok {
+		return reflect.Value{}, errNoField(nm)
+	}
+
+	fld, err := rValue.FieldByIndexErr(sf.Index)
+	if err != nil {
+		return reflect.Value{}, errUnreachableField(nm, err)
+	}
+
+	return fld, nil
+}
+
+// mapKeyValue converts a reference token into a value usable as a key of mapType.
+//
+// JSON object member names are strings, so the map key type must accept one: named string types are
+// converted, and anything else (e.g. a map keyed by an integer) is an error rather than a panic in
+// [reflect.Value.MapIndex] or [reflect.Value.SetMapIndex].
+func mapKeyValue(mapType reflect.Type, decodedToken string) (reflect.Value, error) {
+	kv := reflect.ValueOf(decodedToken)
+	keyType := mapType.Key()
+
+	switch {
+	case kv.Type().AssignableTo(keyType):
+		return kv, nil
+	case keyType.Kind() == reflect.String && kv.Type().ConvertibleTo(keyType):
+		return kv.Convert(keyType), nil
+	default:
+		return reflect.Value{}, errMapKey(decodedToken, mapType)
+	}
+}
+
+// resolveSetValue converts data into a [reflect.Value] assignable to target.
+//
+// A nil data value (typically a JSON null) resolves to the zero value of target whenever target can
+// hold nil. Targets that cannot represent null (e.g. a string or an int field) yield an error: they
+// have no faithful representation of the value being set, and silently substituting a zero value
+// would lose that distinction.
+//
+// verb and what describe the destination for error reporting, e.g. "set" and `field Name with type
+// int`.
+func resolveSetValue(data any, target reflect.Type, verb, what string) (reflect.Value, error) {
+	value := reflect.ValueOf(data)
+
+	if !value.IsValid() {
+		if !isNilableKind(target.Kind()) {
+			return reflect.Value{}, fmt.Errorf("can't %s null value to %s: %w", verb, what, ErrPointer)
+		}
+
+		return reflect.Zero(target), nil
+	}
+
+	if !value.Type().AssignableTo(target) {
+		return reflect.Value{}, fmt.Errorf("can't %s value with type %T to %s: %w", verb, data, what, ErrPointer)
+	}
+
+	return value, nil
 }
 
 func typeFromValue(v reflect.Value) any {
@@ -506,12 +615,18 @@ func getSingleImpl(node any, decodedToken string, nameProvider NameProvider) (an
 			return nil, kind, fmt.Errorf("object has no field %q: %w", decodedToken, ErrPointer)
 		}
 
-		fld := rValue.FieldByName(nm)
+		fld, err := fieldByName(rValue, nm)
+		if err != nil {
+			return nil, kind, err
+		}
 
 		return fld.Interface(), kind, nil
 
 	case reflect.Map:
-		kv := reflect.ValueOf(decodedToken)
+		kv, err := mapKeyValue(rValue.Type(), decodedToken)
+		if err != nil {
+			return nil, kind, err
+		}
 		mv := rValue.MapIndex(kv)
 
 		if mv.IsValid() {
@@ -557,20 +672,21 @@ func setSingleImpl(node, data any, decodedToken string, nameProvider NameProvide
 	case reflect.Struct:
 		nm, ok := nameProvider.GetGoNameForType(rValue.Type(), decodedToken)
 		if !ok {
-			return node, fmt.Errorf("object has no field %q: %w", decodedToken, ErrPointer)
+			return node, errNoField(decodedToken)
 		}
 
-		fld := rValue.FieldByName(nm)
+		fld, err := fieldByName(rValue, nm)
+		if err != nil {
+			return node, err
+		}
 		if !fld.CanSet() {
 			return node, fmt.Errorf("can't set struct field %s to %v: %w", nm, data, ErrPointer)
 		}
 
-		value := reflect.ValueOf(data)
-		valueType := value.Type()
 		assignedType := fld.Type()
-
-		if !valueType.AssignableTo(assignedType) {
-			return node, fmt.Errorf("can't set value with type %T to field %s with type %v: %w", data, nm, assignedType, ErrPointer)
+		value, err := resolveSetValue(data, assignedType, "set", fmt.Sprintf("field %s with type %v", nm, assignedType))
+		if err != nil {
+			return node, err
 		}
 
 		fld.Set(value)
@@ -578,8 +694,20 @@ func setSingleImpl(node, data any, decodedToken string, nameProvider NameProvide
 		return node, nil
 
 	case reflect.Map:
-		kv := reflect.ValueOf(decodedToken)
-		rValue.SetMapIndex(kv, reflect.ValueOf(data))
+		kv, err := mapKeyValue(rValue.Type(), decodedToken)
+		if err != nil {
+			return node, err
+		}
+
+		// reflect.Value.SetMapIndex deletes the key when handed the zero Value, so a nil data value
+		// must be resolved to a typed zero first: setting a member to JSON null keeps the member.
+		elemType := rValue.Type().Elem()
+		value, err := resolveSetValue(data, elemType, "set", fmt.Sprintf("map value %q with type %v", decodedToken, elemType))
+		if err != nil {
+			return node, err
+		}
+
+		rValue.SetMapIndex(kv, value)
 
 		return node, nil
 
@@ -589,11 +717,12 @@ func setSingleImpl(node, data any, decodedToken string, nameProvider NameProvide
 			//
 			// We rebind in place when the slice is reachable via an addressable ancestor; otherwise we
 			// return the new slice header for the parent (or the public Set) to rebind.
-			value := reflect.ValueOf(data)
 			elemType := rValue.Type().Elem()
-			if !value.Type().AssignableTo(elemType) {
-				return node, fmt.Errorf("can't append value of type %T to slice of %v: %w", data, elemType, ErrPointer)
+			value, err := resolveSetValue(data, elemType, "append", fmt.Sprintf("slice of %v", elemType))
+			if err != nil {
+				return node, err
 			}
+
 			newSlice := reflect.Append(rValue, value)
 			if rValue.CanSet() {
 				rValue.Set(newSlice)
@@ -617,12 +746,10 @@ func setSingleImpl(node, data any, decodedToken string, nameProvider NameProvide
 			return node, fmt.Errorf("can't set slice index %s to %v: %w", decodedToken, data, ErrPointer)
 		}
 
-		value := reflect.ValueOf(data)
-		valueType := value.Type()
 		assignedType := elem.Type()
-
-		if !valueType.AssignableTo(assignedType) {
-			return node, fmt.Errorf("can't set value with type %T to slice element %d with type %v: %w", data, tokenIndex, assignedType, ErrPointer)
+		value, err := resolveSetValue(data, assignedType, "set", fmt.Sprintf("slice element %d with type %v", tokenIndex, assignedType))
+		if err != nil {
+			return node, err
 		}
 
 		elem.Set(value)

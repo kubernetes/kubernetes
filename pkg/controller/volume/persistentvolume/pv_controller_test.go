@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -854,4 +855,47 @@ func TestAssumeOwnWrites(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotContains(t, cached.Annotations, volume.AnnSelectedNode)
 	})
+}
+
+// The size check has to order capacities and requests that do not fit in int64,
+// where Value() wraps to a negative number or to zero and compares them wrongly.
+func TestCheckVolumeSatisfyClaim(t *testing.T) {
+	tests := []struct {
+		name         string
+		pvCapacity   string
+		claimRequest string
+		wantTooSmall bool
+	}{
+		{name: "capacity-past-int64-small-request", pvCapacity: "9223372036854775808", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "small-capacity-request-past-int64", pvCapacity: "1Gi", claimRequest: "9223372036854775808", wantTooSmall: true},
+		{name: "capacity-wraps-to-zero-small-request", pvCapacity: "18446744073709551616", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "small-capacity-request-wraps-to-zero", pvCapacity: "1Gi", claimRequest: "18446744073709551616", wantTooSmall: true},
+		{name: "capacity-at-int64-max-request-one-larger", pvCapacity: "9223372036854775807", claimRequest: "9223372036854775808", wantTooSmall: true},
+		{name: "both-past-int64-capacity-smaller", pvCapacity: "9223372036854775808", claimRequest: "18446744073709551616", wantTooSmall: true},
+		{name: "both-past-int64-equal", pvCapacity: "9223372036854775808", claimRequest: "9223372036854775808", wantTooSmall: false},
+		{name: "ordinary-capacity-larger-than-request", pvCapacity: "10Gi", claimRequest: "1Gi", wantTooSmall: false},
+		{name: "ordinary-capacity-smaller-than-request", pvCapacity: "1Gi", claimRequest: "10Gi", wantTooSmall: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			volume := &v1.PersistentVolume{
+				Spec: v1.PersistentVolumeSpec{
+					Capacity: v1.ResourceList{v1.ResourceStorage: resource.MustParse(tc.pvCapacity)},
+				},
+			}
+			claim := &v1.PersistentVolumeClaim{
+				Spec: v1.PersistentVolumeClaimSpec{
+					Resources: v1.VolumeResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse(tc.claimRequest)},
+					},
+				},
+			}
+			err := checkVolumeSatisfyClaim(volume, claim)
+			if tc.wantTooSmall {
+				require.EqualError(t, err, "requested PV is too small")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

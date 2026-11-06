@@ -25,12 +25,12 @@ package v1beta2
 // units requested to the corresponding quantity of the node allocatable resource.
 // At least one of Mapping or Overhead must be specified. Not specifying either is an invalid configuration.
 type NodeAllocatableResourceApplyConfiguration struct {
-	// Mapping is used when the device directly models a node allocatable resource like standard CPU or memory
+	// mapping is used when the device directly models a node allocatable resource like standard CPU or memory
 	// (e.g., with a CPU DRA driver). The calculated quantity is accounted for exactly once per claim instance
 	// on the node. To prevent node cgroup isolation friction, the scheduler explicitly
 	// blocks sharing mapped device claims across multiple pods.
 	Mapping *NodeAllocatableMappingApplyConfiguration `json:"mapping,omitempty"`
-	// Overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources
+	// overhead contains fields for modeling auxiliary overhead incurred on node allocatable resources
 	// when allocating devices that are not themselves modeling a node allocatable resource (e.g., host memory overhead for GPUs).
 	// Sharing overhead-mapped claims across multiple pods is allowed. The node allocatable overhead is accounted
 	// for individually for each pod referencing the claim.

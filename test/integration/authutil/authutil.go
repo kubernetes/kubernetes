@@ -19,7 +19,6 @@ package authutil
 import (
 	"context"
 	"strings"
-	"testing"
 	"time"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -32,11 +31,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/rest"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // WaitForNamedAuthorizationUpdate checks if the given user can perform the named verb and action on the named resource.
 // Copied from k8s.io/kubernetes/test/e2e/framework/auth.
-func WaitForNamedAuthorizationUpdate(t *testing.T, ctx context.Context, c authorizationv1client.SubjectAccessReviewsGetter, user, namespace, verb, resourceName string, resource schema.GroupResource, allowed bool) {
+func WaitForNamedAuthorizationUpdate(t testutils.TB, ctx context.Context, c authorizationv1client.SubjectAccessReviewsGetter, user, namespace, verb, resourceName string, resource schema.GroupResource, allowed bool) {
 	t.Helper()
 
 	review := &authorizationv1.SubjectAccessReview{
@@ -67,15 +67,15 @@ func WaitForNamedAuthorizationUpdate(t *testing.T, ctx context.Context, c author
 	}
 }
 
-func GrantUserAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, username string, rule rbacv1.PolicyRule) {
+func GrantUserAuthorization(t testutils.TB, ctx context.Context, adminClient clientset.Interface, username string, rule rbacv1.PolicyRule) {
 	grantAuthorization(t, ctx, adminClient, username, "", rbacv1.UserKind, rule)
 }
 
-func GrantServiceAccountAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, serviceAccountName, serviceAccountNamespace string, rule rbacv1.PolicyRule) {
+func GrantServiceAccountAuthorization(t testutils.TB, ctx context.Context, adminClient clientset.Interface, serviceAccountName, serviceAccountNamespace string, rule rbacv1.PolicyRule) {
 	grantAuthorization(t, ctx, adminClient, serviceAccountName, serviceAccountNamespace, rbacv1.ServiceAccountKind, rule)
 }
 
-func grantAuthorization(t *testing.T, ctx context.Context, adminClient clientset.Interface, name, namespace, accountKind string, rule rbacv1.PolicyRule) {
+func grantAuthorization(t testutils.TB, ctx context.Context, adminClient clientset.Interface, name, namespace, accountKind string, rule rbacv1.PolicyRule) {
 	t.Helper()
 
 	cr, err := adminClient.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
@@ -137,10 +137,10 @@ func grantAuthorization(t *testing.T, ctx context.Context, adminClient clientset
 	)
 }
 
-type clientFn func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
+type clientFn func(t testutils.TB, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
 
 func ServiceAccountClient(namespace, name string) clientFn {
-	return func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
+	return func(t testutils.TB, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
 		clientConfig = rest.CopyConfig(clientConfig)
 		sa, err := adminClient.CoreV1().ServiceAccounts(namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {

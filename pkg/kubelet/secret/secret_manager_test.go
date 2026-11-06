@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
@@ -48,9 +49,9 @@ func noObjectTTL() (time.Duration, bool) {
 	return time.Duration(0), false
 }
 
-func getSecret(fakeClient clientset.Interface) manager.GetObjectFunc {
+func getSecret(ctx context.Context, fakeClient clientset.Interface) manager.GetObjectFunc {
 	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, opts)
+		return fakeClient.CoreV1().Secrets(namespace).Get(ctx, name, opts)
 	}
 }
 
@@ -107,8 +108,9 @@ func podWithSecrets(ns, podName string, toAttach secretsToAttach) *v1.Pod {
 }
 
 func TestCacheBasedSecretManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
-	store := manager.NewObjectStore(getSecret(fakeClient), clock.RealClock{}, noObjectTTL, 0)
+	store := manager.NewObjectStore(getSecret(tCtx, fakeClient), clock.RealClock{}, noObjectTTL, 0)
 	manager := &secretManager{
 		manager: manager.NewCacheBasedManager(store, getSecretNames),
 	}

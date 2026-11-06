@@ -81,8 +81,9 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 			// making sure HPA is ready, doing its job and already has a recommendation recorded
 			// for stabilization logic before lowering the consumption
 			ginkgo.By("triggering scale up to record a recommendation")
-			rc.ConsumeCPU(usageForReplicas(3))
-			rc.WaitForReplicas(ctx, 3, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
+			// Keep demand above maxReplicas to maintain the high recommendation.
+			rc.ConsumeCPU(usageForReplicas(6))
+			rc.WaitForReplicas(ctx, 5, maxHPAReactionTime+maxResourceConsumerDelay+waitBuffer)
 
 			ginkgo.By("triggering scale down by lowering consumption")
 			rc.ConsumeCPU(usageForReplicas(2))
@@ -172,7 +173,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 
 			ginkgo.By("verifying number of replicas")
 			replicas, err := rc.GetReplicas(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get replica count of the autoscaling target")
 			gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 		})
 
@@ -209,7 +210,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 
 			ginkgo.By("verifying number of replicas")
 			replicas, err := rc.GetReplicas(ctx)
-			framework.ExpectNoError(err)
+			framework.ExpectNoError(err, "get replica count of the autoscaling target")
 			gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 		})
 
@@ -540,7 +541,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSlow(), framework.WithFeatureGate
 
 				ginkgo.By("verifying number of replicas")
 				replicas, err := rc.GetReplicas(ctx)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(err, "get replica count of the autoscaling target")
 				gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 			})
 		})

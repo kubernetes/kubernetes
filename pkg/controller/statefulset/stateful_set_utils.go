@@ -129,17 +129,17 @@ func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVol
 }
 
 // isMemberOf tests if pod is a member of set.
+// StatefulSet controller should not treat Pods like "sts-01" as its members, so we place the name check here.
 func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
-	parent, _ := getParentNameAndOrdinal(pod)
-	return parent == set.Name
+	parent, ordinal := getParentNameAndOrdinal(pod)
+	return ordinal >= 0 &&
+		parent == set.Name &&
+		pod.Name == getPodName(set, ordinal)
 }
 
 // identityMatches returns true if pod has a valid identity and network identity for a member of set.
 func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
-	parent, ordinal := getParentNameAndOrdinal(pod)
-	return ordinal >= 0 &&
-		set.Name == parent &&
-		pod.Name == getPodName(set, ordinal) &&
+	return isMemberOf(set, pod) &&
 		pod.Namespace == set.Namespace &&
 		pod.Labels[apps.StatefulSetPodNameLabel] == pod.Name
 }
@@ -597,8 +597,8 @@ func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (
 	return cr, nil
 }
 
-// ApplyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
-// is nil, the returned StatefulSet is valid.
+// ApplyRevision returns a new StatefulSet constructed by restoring only the .Spec from revision to set.
+// If the returned error is nil, the returned StatefulSet is valid.
 func ApplyRevision(set *apps.StatefulSet, revision *apps.ControllerRevision) (*apps.StatefulSet, error) {
 	clone := set.DeepCopy()
 	patched, err := strategicpatch.StrategicMergePatch([]byte(runtime.EncodeOrDie(patchCodec, clone)), revision.Data.Raw, clone)
@@ -610,7 +610,8 @@ func ApplyRevision(set *apps.StatefulSet, revision *apps.ControllerRevision) (*a
 	if err != nil {
 		return nil, err
 	}
-	return restoredSet, nil
+	clone.Spec = restoredSet.Spec
+	return clone, nil
 }
 
 // nextRevision finds the next valid revision number based on revisions. If the length of revisions
@@ -691,13 +692,15 @@ func (do descendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(do[i]) > getOrdinal(do[j])
 }
 
-// getStatefulSetMaxUnavailable calculates the real maxUnavailable number according to the replica count
-// and maxUnavailable from rollingUpdateStrategy. The number defaults to 1 if the maxUnavailable field is
-// not set, and it will be round down to at least 1 if the maxUnavailable value is a percentage.
+// getStatefulSetMaxUnavailable calculates the real maxUnavailable number from rollingUpdateStrategy.
+// updateRangeCount is the number of pods in the RollingUpdate range (Replicas - Partition). Absolute
+// MaxUnavailable values are used as-is; percentages are scaled from updateRangeCount. The number
+// defaults to 1 if the maxUnavailable field is not set, and it will be rounded down to at least 1 if
+// the maxUnavailable value is a percentage.
 // Note that API validation has already guaranteed the maxUnavailable field to be >1 if it is an integer
 // or 0% < value <= 100% if it is a percentage, so we don't have to consider other cases.
-func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCount int) (int, error) {
-	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt32(1)), replicaCount, false)
+func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, updateRangeCount int) (int, error) {
+	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt32(1)), updateRangeCount, false)
 	if err != nil {
 		return 0, err
 	}

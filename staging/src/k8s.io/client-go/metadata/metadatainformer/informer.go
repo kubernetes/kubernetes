@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -40,6 +41,14 @@ type SharedInformerOption func(*metadataSharedInformerFactory) *metadataSharedIn
 func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 	return func(factory *metadataSharedInformerFactory) *metadataSharedInformerFactory {
 		factory.transform = transform
+		return factory
+	}
+}
+
+// WithShardSelector sets a shard selector on all informers.
+func WithShardSelector(shardSelector sharding.Selector) SharedInformerOption {
+	return func(factory *metadataSharedInformerFactory) *metadataSharedInformerFactory {
+		factory.shardSelector = shardSelector
 		return factory
 	}
 }
@@ -85,6 +94,7 @@ type metadataSharedInformerFactory struct {
 	defaultResync time.Duration
 	namespace     string
 	transform     cache.TransformFunc
+	shardSelector sharding.Selector
 
 	lock      sync.Mutex
 	informers map[schema.GroupVersionResource]informers.GenericInformer
@@ -113,6 +123,9 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 
 	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	informer.Informer().SetTransform(f.transform)
+	if f.shardSelector != nil {
+		_ = informer.Informer().SetShardSelector(f.shardSelector)
+	}
 	f.informers[key] = informer
 
 	return informer
@@ -151,7 +164,15 @@ func (f *metadataSharedInformerFactory) StartWithContext(ctx context.Context) {
 }
 
 // WaitForCacheSync waits for all started informers' cache were synced.
+//
+//logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging.
 func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool {
+	return f.WaitForCacheSyncWithContext(wait.ContextForChannel(stopCh)).Synced
+}
+
+// WaitForCacheSyncWithContext waits for all started informers' caches to be
+// synced or the context to be canceled.
+func (f *metadataSharedInformerFactory) WaitForCacheSyncWithContext(ctx context.Context) cache.GVRSyncResult {
 	informers := func() map[schema.GroupVersionResource]cache.SharedIndexInformer {
 		f.lock.Lock()
 		defer f.lock.Unlock()
@@ -165,9 +186,27 @@ func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{})
 		return informers
 	}()
 
-	res := map[schema.GroupVersionResource]bool{}
+	// Wait for informers to sync, without polling.
+	cacheSyncs := make([]cache.DoneChecker, 0, len(informers))
+	for _, informer := range informers {
+		cacheSyncs = append(cacheSyncs, informer.HasSyncedChecker())
+	}
+	cache.WaitFor(ctx, "" /* no logging */, cacheSyncs...)
+
+	res := cache.GVRSyncResult{
+		Synced: make(map[schema.GroupVersionResource]bool, len(informers)),
+	}
+	failed := false
 	for informType, informer := range informers {
-		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
+		hasSynced := informer.HasSynced()
+		if !hasSynced {
+			failed = true
+		}
+		res.Synced[informType] = hasSynced
+	}
+	if failed {
+		// Non-nil, otherwise WaitFor wouldn't have stopped prematurely.
+		res.Err = context.Cause(ctx)
 	}
 	return res
 }

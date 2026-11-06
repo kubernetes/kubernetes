@@ -116,6 +116,16 @@ func TestV3SupportsQueryParamBatchV1(t *testing.T) {
 			queryParam:       QueryParamFieldValidation,
 			expectedSupports: false,
 		},
+		"Typed List GVK without PATCH operation returns ParamUnsupportedError": {
+			crds: []schema.GroupKind{},
+			gvk: schema.GroupVersionKind{
+				Group:   "",
+				Version: "v1",
+				Kind:    "ReplicationControllerList",
+			},
+			queryParam:       QueryParamFieldValidation,
+			expectedSupports: false,
+		},
 	}
 
 	root := openapi3.NewRoot(cached.NewClient(openapitest.NewEmbeddedFileClient()))
@@ -130,9 +140,9 @@ func TestV3SupportsQueryParamBatchV1(t *testing.T) {
 			}
 			err := verifier.HasSupport(tc.gvk)
 			if tc.expectedSupports && err != nil {
-				t.Errorf("Expected supports, but returned err for GVK (%s)", tc.gvk)
-			} else if !tc.expectedSupports && err == nil {
-				t.Errorf("Expected not supports, but returned no err for GVK (%s)", tc.gvk)
+				t.Errorf("Expected supports, but returned err for GVK (%s): %v", tc.gvk, err)
+			} else if !tc.expectedSupports && !IsParamUnsupportedError(err) {
+				t.Errorf("Expected ParamUnsupportedError, but returned (%v) for GVK (%s)", err, tc.gvk)
 			}
 		})
 	}
@@ -158,26 +168,26 @@ func TestInvalidOpenAPIV3Document(t *testing.T) {
 			},
 			err: "Invalid OpenAPI V3 document",
 		},
-		"empty Paths returns error": {
+		"empty Paths returns ParamUnsupportedError": {
 			spec: &spec3.OpenAPI{
 				Version: "openapi 3.0.0",
 				Paths:   &spec3.Paths{},
 			},
-			err: "Path not found for GVK",
+			err: "batch/v1, Kind=Job doesn't support fieldValidation",
 		},
-		"nil Path returns error": {
+		"nil Path returns ParamUnsupportedError": {
 			spec: &spec3.OpenAPI{
 				Version: "openapi 3.0.0",
 				Paths:   &spec3.Paths{Paths: map[string]*spec3.Path{"/version": nil}},
 			},
-			err: "Path not found for GVK",
+			err: "batch/v1, Kind=Job doesn't support fieldValidation",
 		},
-		"empty Path returns error": {
+		"empty Path returns ParamUnsupportedError": {
 			spec: &spec3.OpenAPI{
 				Version: "openapi 3.0.0",
 				Paths:   &spec3.Paths{Paths: map[string]*spec3.Path{"/version": {}}},
 			},
-			err: "Path not found for GVK",
+			err: "batch/v1, Kind=Job doesn't support fieldValidation",
 		},
 	}
 

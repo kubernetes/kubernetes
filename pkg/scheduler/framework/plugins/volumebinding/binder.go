@@ -1002,10 +1002,9 @@ func (b *volumeBinder) hasEnoughCapacity(logger klog.Logger, provisioner string,
 		return false, nil, err
 	}
 
-	sizeInBytes := quantity.Value()
 	for _, capacity := range capacities {
 		if capacity.StorageClassName == storageClass.Name &&
-			capacitySufficient(capacity, sizeInBytes) &&
+			capacitySufficient(capacity, quantity) &&
 			b.nodeHasAccess(logger, node, capacity) {
 			// Enough capacity found.
 			return true, capacity, nil
@@ -1015,13 +1014,15 @@ func (b *volumeBinder) hasEnoughCapacity(logger klog.Logger, provisioner string,
 	// TODO (?): this doesn't give any information about which pools where considered and why
 	// they had to be rejected. Log that above? But that might be a lot of log output...
 	logger.V(5).Info("Node has no accessible CSIStorageCapacity with enough capacity for PVC",
-		"node", klog.KObj(node), "PVC", klog.KObj(claim), "size", sizeInBytes, "storageClass", klog.KObj(storageClass))
+		"node", klog.KObj(node), "PVC", klog.KObj(claim), "size", quantity, "storageClass", klog.KObj(storageClass))
 	return false, nil, nil
 }
 
-func capacitySufficient(capacity *storagev1.CSIStorageCapacity, sizeInBytes int64) bool {
+func capacitySufficient(capacity *storagev1.CSIStorageCapacity, requestedQty resource.Quantity) bool {
 	limit := volumeLimit(capacity)
-	return limit != nil && limit.Value() >= sizeInBytes
+	// requestedQty is the receiver: Cmp may convert its receiver to the Dec
+	// backend in place, and limit points into an informer-cached object.
+	return limit != nil && requestedQty.Cmp(*limit) <= 0
 }
 
 func volumeLimit(capacity *storagev1.CSIStorageCapacity) *resource.Quantity {

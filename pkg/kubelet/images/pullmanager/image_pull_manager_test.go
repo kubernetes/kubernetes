@@ -30,10 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	ctesting "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func Test_pulledRecordMergeNewCreds(t *testing.T) {

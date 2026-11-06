@@ -115,7 +115,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		}
 
 		// if we don't have any unready or missing pods, we can calculate the new replica count now
-		return int32(math.Ceil(usageRatio * float64(readyPodCount))), utilization, rawUtilization, timestamp, nil
+		return ceilToInt32(usageRatio * float64(readyPodCount)), utilization, rawUtilization, timestamp, nil
 	}
 
 	if len(missingPods) > 0 {
@@ -153,7 +153,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		return currentReplicas, utilization, rawUtilization, timestamp, nil
 	}
 
-	newReplicas := int32(math.Ceil(newUsageRatio * float64(len(metrics))))
+	newReplicas := ceilToInt32(newUsageRatio * float64(len(metrics)))
 	if (newUsageRatio < 1.0 && newReplicas > currentReplicas) || (newUsageRatio > 1.0 && newReplicas < currentReplicas) {
 		// return the current replicas if the change of metrics length would cause a change in scale direction
 		return currentReplicas, utilization, rawUtilization, timestamp, nil
@@ -220,7 +220,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		}
 
 		// if we don't have any unready or missing pods, we can calculate the new replica count now
-		return int32(math.Ceil(usageRatio * float64(readyPodCount))), usage, nil
+		return ceilToInt32(usageRatio * float64(readyPodCount)), usage, nil
 	}
 
 	if len(missingPods) > 0 {
@@ -253,7 +253,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return currentReplicas, usage, nil
 	}
 
-	newReplicas := int32(math.Ceil(newUsageRatio * float64(len(metrics))))
+	newReplicas := ceilToInt32(newUsageRatio * float64(len(metrics)))
 	if (newUsageRatio < 1.0 && newReplicas > currentReplicas) || (newUsageRatio > 1.0 && newReplicas < currentReplicas) {
 		// return the current replicas if the change of metrics length would cause a change in scale direction
 		return currentReplicas, usage, nil
@@ -290,17 +290,10 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 		if err != nil {
 			return 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
 		}
-		// Calculate replicaCount as float64 first
-		replicaCountFloat := usageRatio * float64(readyPodCount)
-		// Check if replicaCount exceeds max int32
-		if replicaCountFloat > math.MaxInt32 {
-			replicaCount = math.MaxInt32
-		} else {
-			replicaCount = int32(math.Ceil(replicaCountFloat))
-		}
+		replicaCount = ceilToInt32(usageRatio * float64(readyPodCount))
 	} else {
 		// Scale to zero or n pods depending on usageRatio
-		replicaCount = int32(math.Ceil(usageRatio))
+		replicaCount = ceilToInt32(usageRatio)
 	}
 
 	return replicaCount, timestamp, err
@@ -314,12 +307,7 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s on %s %s/%s: %w", metricName, objectRef.Kind, namespace, objectRef.Name, err)
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
-		// update number of replicas if change is large enough
-		replicaCount = int32(math.Ceil(float64(usage) / float64(targetAverageUsage)))
-	}
+	replicaCount = getPerPodReplicas(usage, targetAverageUsage, statusReplicas, tolerances)
 	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
 }
@@ -398,20 +386,22 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 		}
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
-		// update number of replicas if the change is large enough
-		replicaCountResult := math.Ceil(float64(usage) / float64(targetUsagePerPod))
-		// Ensure that the result exceeds the bounds of an int32
-		if replicaCountResult > float64(math.MaxInt32) {
-			replicaCount = math.MaxInt32
-		} else {
-			replicaCount = int32(replicaCountResult)
-		}
-	}
+	replicaCount = getPerPodReplicas(usage, targetUsagePerPod, statusReplicas, tolerances)
 	usage = getPerPodUsage(usage, statusReplicas)
 	return replicaCount, usage, timestamp, nil
+}
+
+// getPerPodReplicas returns the current replica count if usage is within tolerance,
+// else the desired count (total usage / per-pod target, rounded up).
+// With zero running pods the ratio is undefined, so skip the tolerance check and use the desired count.
+func getPerPodReplicas(totalUsage int64, targetPerPod int64, statusReplicas int32, tolerances Tolerances) int32 {
+	if statusReplicas != 0 {
+		usageRatio := float64(totalUsage) / (float64(targetPerPod) * float64(statusReplicas))
+		if tolerances.isWithin(usageRatio) {
+			return statusReplicas
+		}
+	}
+	return ceilToInt32(float64(totalUsage) / float64(targetPerPod))
 }
 
 // getPerPodUsage calculates the per-pod usage based on total usage and replica count,
@@ -509,7 +499,9 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 // calculatePodLevelRequests computes the requests for the specific resource at
 // the pod level.
 func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
-	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{})
+	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
+		ExcludeOverhead: true,
+	})
 	podRequest, ok := podLevelRequests[resource]
 	if !ok {
 		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
@@ -521,15 +513,11 @@ func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, er
 // resource by summing requests from all containers in the pod.
 // If a container name is specified, it uses only that container.
 func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource v1.ResourceName) (int64, error) {
-	containers := append([]v1.Container{}, pod.Spec.Containers...)
-	for _, c := range pod.Spec.InitContainers {
-		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
-			containers = append(containers, c)
-		}
-	}
-
 	request := int64(0)
-	for _, c := range containers {
+	for c, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if containerType == podutil.InitContainers && !podutil.IsRestartableInitContainer(c) {
+			continue
+		}
 		if container == "" || container == c.Name {
 			containerRequest, ok := c.Resources.Requests[resource]
 			if !ok {
@@ -554,5 +542,17 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.Set[string]) {
 	for _, pod := range pods.UnsortedList() {
 		delete(metrics, pod)
+	}
+}
+
+func ceilToInt32(f float64) int32 {
+	c := math.Ceil(f)
+	switch {
+	case c > math.MaxInt32:
+		return math.MaxInt32
+	case c < math.MinInt32:
+		return math.MinInt32
+	default:
+		return int32(c)
 	}
 }

@@ -1,0 +1,28 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+index 0cb165fb4ec..89f11a2c331 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+@@ -527,20 +527,9 @@ func (s *store) GuaranteedUpdate(
+ 	transformContext := authenticatedDataString(preparedKey)
+ 	for {
+ 		if err := preconditions.Check(preparedKey, origState.obj); err != nil {
+-			// If our data is already up to date, return the error
+-			if origStateIsCurrent {
+-				return err
+-			}
+-
+-			// It's possible we were working with stale data
+-			// Actually fetch
+-			origState, err = getCurrentState()
+-			if err != nil {
+-				return err
+-			}
+-			origStateIsCurrent = true
+-			// Retry
+-			continue
++			// BUG REVERT (#82303): return precondition check failure on a stale
++			// cached suggestion without refetching live data from etcd.
++			return err
+ 		}
+ 
+ 		ret, ttl, err := s.updateState(origState, tryUpdate)

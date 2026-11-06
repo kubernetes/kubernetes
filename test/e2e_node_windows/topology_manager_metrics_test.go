@@ -72,7 +72,7 @@ var _ = SIGWindowsDescribe(feature.TopologyManager, feature.Windows, framework.W
 			newCfg := buildWindowsCPUManagerKubeletConfig(oldCfg, true)
 			newCfg.TopologyManagerPolicy = topologymanager.PolicySingleNumaNode
 			newCfg.TopologyManagerScope = topologymanager.PodTopologyScope
-			updateWindowsKubeletConfig(ctx, f, newCfg)
+			updateWindowsKubeletConfigClearState(ctx, f, newCfg)
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
@@ -80,7 +80,7 @@ var _ = SIGWindowsDescribe(feature.TopologyManager, feature.Windows, framework.W
 				e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 				testPod = nil
 			}
-			updateWindowsKubeletConfig(ctx, f, oldCfg)
+			updateWindowsKubeletConfigClearState(ctx, f, oldCfg)
 		})
 
 		ginkgo.It("should report zero admission counters after a fresh restart", func(ctx context.Context) {

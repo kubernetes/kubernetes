@@ -27,8 +27,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -79,10 +77,10 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 }
 
 func newEtcdTestStorageWithCodec(t testing.TB, prefix string, codec runtime.Codec) (*etcd3testing.EtcdTestServer, storage.Interface) {
-	return newEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer())
+	return newEtcdTestStorageWithOptions(t, prefix, codec, identity.NewEncryptCheckTransformer(), storagetesting.PodReverseKeyFunc("/pods/", true))
 }
 
-func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Codec, transformer value.Transformer) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Codec, transformer value.Transformer, reverseKeyFunc storage.ReverseKeyFunc) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	versioner := storage.APIObjectVersioner{}
 	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
@@ -93,6 +91,7 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		codec,
 		newPod,
 		newPodList,
+		reverseKeyFunc,
 		prefix,
 		"/pods/",
 		schema.GroupResource{Resource: "pods"},
@@ -107,50 +106,36 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 	return server, storage
 }
 
-func computePodKey(obj *example.Pod) string {
-	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+func computePodKey(obj metav1.Object) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
-func newCorev1EtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, storage.Interface) {
+func benchmarkEtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, storage.Interface) {
+	config := storagetesting.StoreConfigForBenchmarks()
 	server := &etcd3testing.EtcdTestServer{V3Client: testserver.RunEtcd(t, func(cfg *embed.Config) {
 		cfg.QuotaBackendBytes = 4 << 30 // 4 GiB (default 2 GiB is too small for 150k pods)
 	})}
-	versioner := storage.APIObjectVersioner{}
 	compactor := etcd3.NewCompactor(server.V3Client.Client, 0, clock.RealClock{}, nil)
 	t.Cleanup(compactor.Stop)
 	s, err := etcd3.New(
 		server.V3Client,
 		compactor,
-		corev1ProtoCodec,
-		func() runtime.Object { return &corev1.Pod{} },
-		func() runtime.Object { return &corev1.PodList{} },
+		config.Codec,
+		config.NewFunc,
+		config.NewListFunc,
+		storagetesting.PodReverseKeyFunc(config.ResourcePrefix, true),
 		etcd3testing.PathPrefix(),
-		"/pods/",
-		schema.GroupResource{Resource: "pods"},
+		config.ResourcePrefix,
+		config.GroupResource,
 		identity.NewEncryptCheckTransformer(),
 		etcd3.NewDefaultLeaseManagerConfig(),
-		etcd3.NewDefaultDecoder(corev1ProtoCodec, versioner),
-		versioner)
+		etcd3.NewDefaultDecoder(config.Codec, config.Versioner),
+		config.Versioner)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Close)
 	return server, s
-}
-
-func getCorev1PodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	pod, ok := obj.(*corev1.Pod)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a pod")
-	}
-	fs := fields.Set{
-		"metadata.name":      pod.Name,
-		"metadata.namespace": pod.Namespace,
-		"spec.nodeName":      pod.Spec.NodeName,
-		"spec.restartPolicy": string(pod.Spec.RestartPolicy),
-		"status.phase":       string(pod.Status.Phase),
-	}
-	return labels.Set(pod.Labels), fs, nil
 }
 
 func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
@@ -162,7 +147,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 		}
 
 		c.cacher.watchCache.RLock()
-		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), false, rv)
+		err = c.cacher.watchCache.waitUntilFreshLocked(context.TODO(), rv)
 		c.cacher.watchCache.RUnlock()
 		if err != nil {
 			t.Fatalf("WatchCache didn't caught up to RV: %v", rv)
@@ -176,13 +161,6 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 			t.Fatalf("Can't compact into a future version: %v", resourceVersion)
 		}
 
-		if len(c.cacher.watchers.allWatchers) > 0 || len(c.cacher.watchers.valueWatchers) > 0 {
-			// We could consider terminating those watchers, but given
-			// watchcache doesn't really support compaction and we don't
-			// exercise it in tests, we just throw an error here.
-			t.Error("Open watchers are not supported during compaction")
-		}
-
 		for c.cacher.watchCache.history.startIndex < c.cacher.watchCache.history.endIndex {
 			index := c.cacher.watchCache.history.startIndex % c.cacher.watchCache.history.capacity
 			if c.cacher.watchCache.history.cache[index].ResourceVersion > rv {
@@ -191,7 +169,7 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 
 			c.cacher.watchCache.history.startIndex++
 		}
-		c.cacher.watchCache.storage.UpdateListResourceVersion(rv)
+		c.cacher.watchCache.history.listResourceVersion = rv
 		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
 		}
@@ -199,31 +177,31 @@ func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Com
 }
 
 func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+	var currentVersion int64
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var currentVersion int64
-		currentVersion, _, _, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
-		if err != nil {
-			_, _, _, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
+		var compactRev int64
+		currentVersion, _, compactRev, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
+		if err == nil && compactRev != int64(rv) {
+			currentVersion, _, compactRev, err = etcd3.Compact(ctx, client, currentVersion, int64(rv))
 		}
 		if err != nil {
 			t.Fatal(err)
 		}
+		if compactRev != int64(rv) {
+			t.Fatalf("expected compact revision %d, got %d", rv, compactRev)
+		}
 		// Wait for compaction to be observed.
 		if c.cacher.compactor != nil {
-			for {
+			for c.storage.CompactRevision() != int64(rv) {
 				select {
 				case <-ctx.Done():
 					t.Fatal(ctx.Err())
-				case <-time.After(100 * time.Millisecond):
-				}
-				compactedRev := c.storage.CompactRevision()
-				if compactedRev == int64(rv) {
-					break
+				case <-time.After(5 * time.Millisecond):
 				}
 			}
 			c.cacher.compactor.compactIfNeeded()

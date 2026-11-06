@@ -23,6 +23,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -266,13 +267,20 @@ func (c *credStateWaitRefresh) metricsState(now time.Time) string {
 
 var _ Manager = (*IssuingManager)(nil)
 
-func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
+func NewIssuingManager(logger klog.Logger, kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
+	name := "podcertificate_projection"
 	m := &IssuingManager{
 		kc: kc,
 
-		podManager:      podManager,
-		recorder:        recorder,
-		projectionQueue: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[projectionKey]()),
+		podManager: podManager,
+		recorder:   recorder,
+		projectionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[projectionKey](),
+			workqueue.TypedRateLimitingQueueConfig[projectionKey]{
+				Logger: new(klog.LoggerWithName(logger, name)),
+				Name:   name,
+			},
+		),
 
 		pcrInformer:  pcrInformer.Informer(),
 		pcrLister:    pcrInformer.Lister(),
@@ -289,7 +297,7 @@ func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder 
 	// This is not needed for correctness, since volumeSourceQueue backoffs will
 	// eventually trigger the volume to be inspected.  However, it's a better UX
 	// for us to notice immediately once the certificate is issued.
-	m.pcrInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = m.pcrInformer.AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			pcr := obj.(*certificatesv1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
@@ -302,6 +310,8 @@ func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder 
 			pcr := obj.(*certificatesv1.PodCertificateRequest)
 			m.queueAllProjectionsForPod(pcr.Spec.PodUID)
 		},
+	}, cache.HandlerOptions{
+		Logger: &logger,
 	})
 
 	return m
@@ -909,6 +919,24 @@ func generateKeyAndProof(keyType string) (crypto.PrivateKey, []byte, error) {
 		_, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			return nil, nil, fmt.Errorf("while generating Ed25519 key: %w", err)
+		}
+		privKey = priv
+	case "MLDSA44":
+		priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+		if err != nil {
+			return nil, nil, fmt.Errorf("while generating MLDSA44 key: %w", err)
+		}
+		privKey = priv
+	case "MLDSA65":
+		priv, err := mldsa.GenerateKey(mldsa.MLDSA65())
+		if err != nil {
+			return nil, nil, fmt.Errorf("while generating MLDSA65 key: %w", err)
+		}
+		privKey = priv
+	case "MLDSA87":
+		priv, err := mldsa.GenerateKey(mldsa.MLDSA87())
+		if err != nil {
+			return nil, nil, fmt.Errorf("while generating MLDSA87 key: %w", err)
 		}
 		privKey = priv
 	default:

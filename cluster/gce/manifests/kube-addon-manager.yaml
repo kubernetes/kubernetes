@@ -21,8 +21,6 @@ spec:
       capabilities:
         drop:
         - all
-    # When updating version also bump it in:
-    # - test/kubemark/resources/manifests/kube-addon-manager.yaml
     image: registry.k8s.io/addon-manager/kube-addon-manager:v9.1.8
     command:
     - /bin/bash

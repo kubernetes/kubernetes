@@ -60,7 +60,7 @@ kube_master_image="${KUBE_GCE_MASTER_IMAGE:-}"
 if [[ -z "${kube_master_image}" ]]; then
   # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
   # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
-  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
+  kube_master_image=$(gcloud compute images list --project="${MASTER_IMAGE_PROJECT}" --no-standard-images --filter="family:${MASTER_IMAGE_FAMILY} architecture:X86_64 status=(READY)" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
 fi
 
 echo "Using image: ${kube_master_image} from project: ${MASTER_IMAGE_PROJECT} as master image" >&2
@@ -81,7 +81,7 @@ function set-linux-node-image() {
   if [[ -z "${kube_node_image}" ]]; then
     # remove architecture:X86_64 once we move on from ubuntu jammy as that image family has both X86_64 and ARM images
     # a family may briefly contain more than one non-deprecated image; take the newest (the family head)
-    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
+    kube_node_image=$(gcloud compute images list --project="${NODE_IMAGE_PROJECT}" --no-standard-images --filter="family:${NODE_IMAGE_FAMILY} architecture:X86_64 status=(READY)" --sort-by='~creationTimestamp' --limit=1 --format 'value(name)')
   fi
 
   echo "Using image: ${kube_node_image} from project: ${NODE_IMAGE_PROJECT} as node image" >&2
@@ -142,6 +142,8 @@ PREEXISTING_NETWORK_MODE=""
 KUBE_PROMPT_FOR_UPDATE=${KUBE_PROMPT_FOR_UPDATE:-"n"}
 # How long (in seconds) to wait for cluster initialization.
 KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
+# Regions to choose from when neither KUBE_GCE_ZONE nor KUBE_GCE_REGION is set.
+KUBE_GCE_DEFAULT_REGIONS=(us-central1 us-east1 us-east4 europe-west1)
 
 function join_csv() {
   local IFS=','; echo "$*";
@@ -170,14 +172,12 @@ function verify-prereqs() {
     exit 1
   fi
 
-  # we use gcloud to create the cluster, gsutil to stage binaries and data
-  for cmd in gcloud gsutil; do
-    if ! which "${cmd}" >/dev/null; then
-      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud " >&2
-      echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
-      exit 1
-    fi
-  done
+  # we use gcloud both to create the cluster and to stage binaries and data
+  if ! which gcloud >/dev/null; then
+    echo "Can't find gcloud in PATH, please fix and retry. The Google Cloud " >&2
+    echo "SDK can be downloaded from https://cloud.google.com/sdk/." >&2
+    exit 1
+  fi
   update-or-verify-gcloud
 }
 
@@ -200,6 +200,7 @@ function detect-project() {
     echo "'gcloud config set project <PROJECT>'" >&2
     exit 1
   fi
+  detect-zone-in-region
   if [[ -z "${PROJECT_REPORTED-}" ]]; then
     echo "Project: ${PROJECT}" >&2
     echo "Network Project: ${NETWORK_PROJECT}" >&2
@@ -208,15 +209,82 @@ function detect-project() {
   fi
 }
 
-# Use gsutil to get the md5 hash for a particular tar
-function gsutil_get_tar_md5() {
+# Prints the UP zones of the given regions, one per line.
+#
+# Assumed vars:
+#   PROJECT
+function list-region-zones() {
+  local regions_re
+  regions_re=$(IFS='|'; echo "$*")
+  gcloud compute zones list \
+    --project "${PROJECT}" \
+    --filter "name ~ '^(${regions_re})-[a-z]+$' AND status=UP" \
+    --format 'value(name)' \
+    --sort-by name
+}
+
+# When KUBE_GCE_ZONE is unset, sets REGION and ZONE to where the master instance
+# or disk already is. Otherwise uses REGION if set, or a region from
+# KUBE_GCE_DEFAULT_REGIONS, and the first zone in it.
+#
+# Assumed vars:
+#   PROJECT
+#   MASTER_NAME
+#   KUBE_GCE_DEFAULT_REGIONS
+# Vars set:
+#   REGION
+#   ZONE
+function detect-zone-in-region() {
+  if [[ -n "${ZONE:-}" ]]; then
+    return
+  fi
+
+  local -a regions=("${KUBE_GCE_DEFAULT_REGIONS[@]}")
+  if [[ -n "${REGION:-}" ]]; then
+    regions=("${REGION}")
+  fi
+
+  local zones
+  zones=$(list-region-zones "${regions[@]}")
+  if [[ -z "${zones}" ]]; then
+    echo -e "${color_red:-}Could not find any zones in regions ${regions[*]} for project ${PROJECT}${color_norm:-}" >&2
+    exit 1
+  fi
+  # Deliberately split on whitespace
+  # shellcheck disable=SC2086
+  local -r zones_csv=$(join_csv ${zones})
+
+  local zone
+  zone=$(gcloud compute instances list --project "${PROJECT}" --zones "${zones_csv}" \
+    --filter "name=${MASTER_NAME}" --format 'value(zone.basename())' --limit 1 2>/dev/null || true)
+  if [[ -z "${zone}" ]]; then
+    zone=$(gcloud compute disks list --project "${PROJECT}" --zones "${zones_csv}" \
+      --filter "name=${MASTER_NAME}-pd" --format 'value(zone.basename())' --limit 1 2>/dev/null || true)
+  fi
+
+  if [[ -z "${zone}" ]]; then
+    # Only regions with UP zones are candidates.
+    local -a available
+    read -r -a available <<< "$(echo "${zones}" | sed 's/-[a-z]*$//' | sort -u | tr '\n' ' ')"
+    # Hash MASTER_NAME so separate kube-up/kube-down/log-dump runs agree on the region.
+    local hash
+    hash=$(cksum <<< "${MASTER_NAME}" | cut -d' ' -f1)
+    local -r region="${available[hash % ${#available[@]}]}"
+    zone=$(echo "${zones}" | grep -m1 "^${region}-")
+  fi
+
+  ZONE="${zone}"
+  REGION="${zone%-*}"
+}
+
+# Use gcloud storage to get the md5 hash for a particular tar
+function get_tar_md5() {
   # location_tar could be local or in the cloud
   # local tar_location example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
   # cloud tar_location example gs://kubernetes-staging-PROJECT/kubernetes-devel/kubernetes-server-linux-amd64.tar.gz
   local -r tar_location=$1
-  #parse the output and return the md5 hash
-  #the sed command at the end removes whitespace
-  local -r tar_md5=$(gsutil hash -h -m "${tar_location}" 2>/dev/null | grep "Hash (md5):" | awk -F ':' '{print $2}' | sed 's/^[[:space:]]*//g')
+  #print an empty string if the tar does not exist, so the caller uploads it
+  local -r tar_md5=$(gcloud storage hash --hex --skip-crc32c --format='value(md5_hash)' "${tar_location}" 2>/dev/null)
   echo "${tar_md5}"
 }
 
@@ -234,11 +302,11 @@ function copy-to-staging() {
   #remote_tar_md5 checks the remote location for the existing tarball and its md5
   #staging_path example gs://kubernetes-staging-PROJECT/kubernetes-devel
   #basename_tar example kubernetes-server-linux-amd64.tar.gz
-  local -r remote_tar_md5=$(gsutil_get_tar_md5 "${staging_path}/${basename_tar}")
+  local -r remote_tar_md5=$(get_tar_md5 "${staging_path}/${basename_tar}")
   if [[ -n ${remote_tar_md5} ]]; then
     #local_tar_md5 checks the remote location for the existing tarball and its md5 hash
     #tar example ./_output/release-tars/kubernetes-server-linux-amd64.tar.gz
-    local -r local_tar_md5=$(gsutil_get_tar_md5 "${tar}")
+    local -r local_tar_md5=$(get_tar_md5 "${tar}")
     if [[ "${remote_tar_md5}" == "${local_tar_md5}" ]]; then
       echo "+++ ${basename_tar} uploaded earlier, cloud and local file md5 match (md5 = ${local_tar_md5})"
       return 0
@@ -246,8 +314,8 @@ function copy-to-staging() {
   fi
 
   echo "${hash}" > "${tar}.sha512"
-  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha512" "${staging_path}"
-  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
+  gcloud storage cp --no-user-output-enabled --cache-control="private, max-age=0" "${tar}" "${tar}.sha512" "${staging_path}"
+  gcloud storage objects update --add-acl-grant=entity=allUsers,role=READER "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
   echo "+++ ${basename_tar} uploaded (sha512 = ${hash})"
 }
 
@@ -338,9 +406,9 @@ function upload-tars() {
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
 
     # Ensure the buckets are created
-    if ! gsutil ls "${staging_bucket}" >/dev/null; then
+    if ! gcloud storage buckets describe "${staging_bucket}" >/dev/null; then
       echo "Creating ${staging_bucket}"
-      gsutil mb -l "${region}" -p "${PROJECT}" "${staging_bucket}"
+      gcloud storage buckets create --location="${region}" --project="${PROJECT}" "${staging_bucket}"
     fi
 
     local staging_path="${staging_bucket}/${INSTANCE_PREFIX}-devel"
@@ -892,7 +960,7 @@ function construct-windows-kubeproxy-flags {
   # port usage for services.
   # https://techcommunity.microsoft.com/t5/networking-blog/direct-server-return-dsr-in-a-nutshell/ba-p/693710
   if [[ "${WINDOWS_ENABLE_DSR:-}" == "true" ]]; then
-    flags+=" --feature-gates=WinDSR=true --enable-dsr=true "
+    flags+=" --enable-dsr=true "
   fi
 
   # Configure flags with explicit empty string values. We can't escape
@@ -2868,13 +2936,20 @@ function create-master() {
       --allow tcp:8132 &
   fi
 
+  local zone_fallback=false
+  if [[ -z "${KUBE_GCE_ZONE:-}" ]]; then
+    zone_fallback=true
+  fi
+
   # We have to make sure the disk is created before creating the master VM, so
-  # run this in the foreground.
-  gcloud compute disks create "${MASTER_NAME}-pd" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --type "${MASTER_DISK_TYPE}" \
-    --size "${MASTER_DISK_SIZE}"
+  # run this in the foreground. With zone fallback the disk is created per zone.
+  if [[ "${zone_fallback}" != "true" ]]; then
+    gcloud compute disks create "${MASTER_NAME}-pd" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --type "${MASTER_DISK_TYPE}" \
+      --size "${MASTER_DISK_SIZE}"
+  fi
 
   # Create rule for accessing and securing etcd servers.
   if ! gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${MASTER_NAME}-etcd" &>/dev/null; then
@@ -2918,7 +2993,10 @@ function create-master() {
   create-etcd-certs "${MASTER_NAME}"
   create-etcd-apiserver-certs "etcd-${MASTER_NAME}" "${MASTER_NAME}"
 
-  if [[ "$(get-num-nodes)" -ge "50" ]]; then
+  if [[ "${zone_fallback}" == "true" ]]; then
+    # Must run in the foreground so the chosen ZONE is visible to node creation.
+    create-master-in-region "${MASTER_RESERVED_IP}" "${MASTER_INTERNAL_IP}" || exit 1
+  elif [[ "$(get-num-nodes)" -ge "50" ]]; then
     # We block on master creation for large clusters to avoid doing too much
     # unnecessary work in case master start-up fails (like creation of nodes).
     create-master-instance "${MASTER_RESERVED_IP}" "${MASTER_INTERNAL_IP}"
@@ -2926,6 +3004,64 @@ function create-master() {
     create-master-instance "${MASTER_RESERVED_IP}" "${MASTER_INTERNAL_IP}" &
   fi
 
+}
+
+# Tries each zone of REGION in turn: creates the master disk, then makes two
+# attempts to create the master instance. Sets ZONE to the first zone that succeeds.
+#
+# Assumed vars:
+#   PROJECT
+#   REGION
+#   MASTER_NAME
+#   MASTER_DISK_TYPE
+#   MASTER_DISK_SIZE
+# Vars set:
+#   ZONE
+#
+# $1: master reserved IP
+# $2: master internal IP (may be empty)
+function create-master-in-region() {
+  local -r address="${1}"
+  local -r internal_address="${2:-}"
+
+  local zones
+  zones=$(list-region-zones "${REGION}")
+  if [[ -z "${zones}" ]]; then
+    echo -e "${color_red}Could not find any zones in region ${REGION}${color_norm}" >&2
+    return 1
+  fi
+
+  local zone
+  for zone in ${zones}; do
+    ZONE="${zone}"
+    echo "Attempting to create master in zone ${ZONE}" >&2
+    # Both embed ZONE, so regenerate them for the zone being tried.
+    write-cluster-location
+    create-autoscaler-config
+
+    if ! gcloud compute disks create "${MASTER_NAME}-pd" \
+        --project "${PROJECT}" \
+        --zone "${ZONE}" \
+        --type "${MASTER_DISK_TYPE}" \
+        --size "${MASTER_DISK_SIZE}"; then
+      echo -e "${color_yellow}Failed to create master disk in zone ${ZONE}, trying next zone.${color_norm}" >&2
+      continue
+    fi
+
+    if MASTER_CREATE_ATTEMPTS_PER_ZONE=2 create-master-instance "${address}" "${internal_address}"; then
+      echo "Created master in zone ${ZONE}" >&2
+      return 0
+    fi
+
+    echo -e "${color_yellow}Failed to create master in zone ${ZONE}, trying next zone.${color_norm}" >&2
+    gcloud compute disks delete "${MASTER_NAME}-pd" \
+      --project "${PROJECT}" \
+      --zone "${ZONE}" \
+      --quiet || true
+  done
+
+  echo -e "${color_red}Failed to create master in any zone of region ${REGION}.${color_norm}" >&2
+  return 1
 }
 
 # Adds master replica to etcd cluster.
@@ -3633,6 +3769,77 @@ function remove-replica-from-etcd() {
   return "${res}"
 }
 
+# Robustly try to delete a managed instance group.
+# Retry transient gcloud failures. A failed delete only counts as success once
+# list confirms the group is gone, which covers a group that never existed and
+# a delete that succeeded but whose response was lost.
+# $1: The name of the managed instance group.
+# $2: The zone of the managed instance group.
+function delete-managed-instance-group-with-retries() {
+  local -r group_name="${1}"
+  local -r zone="${2}"
+  local attempt=0
+  local found
+
+  while true; do
+    gcloud compute instance-groups managed delete \
+      --project "${PROJECT}" \
+      --quiet \
+      --zone "${zone}" \
+      "${group_name}" && break
+
+    if found=$(gcloud compute instance-groups managed list \
+        --project "${PROJECT}" \
+        --filter="name=${group_name} AND zone:(${zone})" \
+        --format="value(name)") && [[ -z "${found}" ]]; then
+      return 0
+    fi
+
+    if (( attempt >= 3 )); then
+      echo -e "${color_red}Failed to delete managed instance group ${group_name}.${color_norm}" >&2
+      return 1
+    fi
+
+    attempt=$((attempt + 1))
+    echo -e "${color_yellow}Attempt ${attempt} failed to delete managed instance group ${group_name}. Retrying.${color_norm}" >&2
+    sleep $((attempt * 15))
+  done
+}
+
+# Robustly try to delete an instance template.
+# Retry transient gcloud failures. A failed delete only counts as success once
+# list confirms the template is gone, which covers a template that never
+# existed and a delete that succeeded but whose response was lost.
+# $1: The name of the instance template.
+function delete-instance-template-with-retries() {
+  local -r template_name="${1}"
+  local attempt=0
+  local found
+
+  while true; do
+    gcloud compute instance-templates delete \
+      --project "${PROJECT}" \
+      --quiet \
+      "${template_name}" && break
+
+    if found=$(gcloud compute instance-templates list \
+        --project "${PROJECT}" \
+        --filter="name=${template_name}" \
+        --format="value(name)") && [[ -z "${found}" ]]; then
+      return 0
+    fi
+
+    if (( attempt >= 3 )); then
+      echo -e "${color_red}Failed to delete instance template ${template_name}.${color_norm}" >&2
+      return 1
+    fi
+
+    attempt=$((attempt + 1))
+    echo -e "${color_yellow}Attempt ${attempt} failed to delete instance template ${template_name}. Retrying.${color_norm}" >&2
+    sleep $((attempt * 15))
+  done
+}
+
 # Delete a kubernetes cluster. This is called from test-teardown.
 #
 # Assumed vars:
@@ -3665,15 +3872,7 @@ function kube-down() {
     # Deliberately do not quote, do not change unless a bug is found
     # shellcheck disable=SC2068
     for group in ${all_instance_groups[@]:-}; do
-      {
-        if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-          gcloud compute instance-groups managed delete \
-            --project "${PROJECT}" \
-            --quiet \
-            --zone "${ZONE}" \
-            "${group}"
-        fi
-      } &
+      delete-managed-instance-group-with-retries "${group}" "${ZONE}" &
     done
 
 
@@ -3735,14 +3934,7 @@ function kube-down() {
     # Deliberately do not quote, do not change unless a bug is found
     # shellcheck disable=SC2068
     for template in ${templates[@]:-}; do
-      {
-        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-          gcloud compute instance-templates delete \
-            --project "${PROJECT}" \
-            --quiet \
-            "${template}" &
-        fi
-      } &
+      delete-instance-template-with-retries "${template}" &
     done
   fi
 

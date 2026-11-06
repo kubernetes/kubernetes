@@ -1,0 +1,19 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 72e54937c39..21f87a903bc 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -560,10 +560,14 @@ func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, minResourceVersio
+ 		snap = w.storage.LatestSnapshot()
+ 		readResourceVersion = snap.ResourceVersion()
+ 	} else {
++		// BUG REVERT (#123674): do not request watch progress when waiting for
++		// freshness in WaitUntilFreshAndGet.
++		w.config.waitingUntilFresh.Remove()
+ 		var err error
+ 		snap, readResourceVersion, _, err = w.waitAndGetLatestSnapshot(ctx, minResourceVersion, nil)
++		w.config.waitingUntilFresh.Add()
+ 		if err != nil {
+ 			return nil, false, 0, err
+ 		}
+ 	}
+ 	value, exists, err := snap.GetByKey(key)

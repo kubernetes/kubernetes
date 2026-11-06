@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package attribute // import "go.opentelemetry.io/otel/attribute"
+package attribute
 
 import (
 	"cmp"
@@ -313,6 +313,9 @@ func filteredToFront(slice []KeyValue, keep Filter) int {
 // Filter returns a filtered copy of this Set. See the documentation for
 // NewSetWithSortableFiltered for more details.
 func (l *Set) Filter(re Filter) (Set, []KeyValue) {
+	if l == nil {
+		return emptySet, nil
+	}
 	if re == nil {
 		return *l, nil
 	}
@@ -404,6 +407,21 @@ func computeDataReflect(kvs []KeyValue) any {
 		*at.Index(i).Addr().Interface().(*KeyValue) = keyValue
 	}
 	return at.Interface()
+}
+
+// String returns a string representation of the Set using the
+// [OpenTelemetry Attribute Collection representation for non-OTLP protocols]
+// rules.
+//
+// The Set is encoded as a JSON object. A nil or empty Set is encoded as an
+// empty JSON object.
+//
+// [OpenTelemetry Attribute Collection representation for non-OTLP protocols]: https://opentelemetry.io/docs/specs/otel/common/#attribute-collection-representation-for-non-otlp
+func (l *Set) String() string {
+	if l == nil || l.hash == 0 {
+		return "{}"
+	}
+	return formatMapValue(l.data)
 }
 
 // MarshalJSON returns the JSON encoding of the Set.

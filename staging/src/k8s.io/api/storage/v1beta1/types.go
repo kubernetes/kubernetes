@@ -44,22 +44,22 @@ type StorageClass struct {
 
 	// provisioner indicates the type of the provisioner.
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
-	// +k8s:beta(since: "1.37")=+k8s:immutable
+	// +k8s:required
+	// +k8s:immutable
 	Provisioner string `json:"provisioner" protobuf:"bytes,2,opt,name=provisioner"`
 
 	// parameters holds the parameters for the provisioner that should
 	// create volumes of this storage class.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:immutable
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:immutable
+	// +k8s:optional
 	Parameters map[string]string `json:"parameters,omitempty" protobuf:"bytes,3,rep,name=parameters"`
 
 	// reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
 	// Defaults to Delete.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:immutable
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:immutable
+	// +k8s:optional
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
 
 	// mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
@@ -77,8 +77,8 @@ type StorageClass struct {
 	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
 	// This field is only honored by servers that enable the VolumeScheduling feature.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:immutable
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:immutable
+	// +k8s:optional
 	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
 
 	// allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
@@ -377,8 +377,8 @@ type CSIDriverSpec struct {
 	//
 	// +optional
 	// +listType=atomic
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:immutable
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:immutable
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
 
 	// storageCapacity indicates that the CSI volume driver wants pod scheduling to consider the storage
@@ -692,6 +692,7 @@ type VolumeNodeResources struct {
 
 // StorageHealthStatusType describes the health status category of a storage backend.
 // +enum
+// +k8s:alpha(since: "1.38")=+k8s:enum
 type StorageHealthStatusType string
 
 const (
@@ -707,14 +708,20 @@ type StorageHealthCondition struct {
 	// status is the health status category.
 	// One of "StorageUnreachable", "StorageDegraded".
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Status StorageHealthStatusType `json:"status" protobuf:"bytes,1,opt,name=status,casttype=StorageHealthStatusType"`
 	// reason is a brief CamelCase machine-parseable reason.
+	// Maximum permitted length of a reason is 256 bytes.
 	// +required
-	// Maximum permitted length of a reason is 256 characters.
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=256
+	// +k8s:alpha(since: "1.38")=+k8s:format=k8s-condition-reason
 	Reason string `json:"reason" protobuf:"bytes,2,opt,name=reason"`
 	// message is a human-readable description.
+	// Maximum permitted length of a message is 1024 bytes.
 	// +optional
-	// Maximum permitted length of a message is 1024 characters.
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
 	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
 	// accessMode is the access mode affected. Nil means all access modes are affected.
 	// +optional
@@ -731,11 +738,14 @@ type StorageHealthCondition struct {
 type StorageHealth struct {
 	// name is the CSI driver name, matching CSINodeDriver.name.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// healthConditions are the adverse storage backend conditions reported by the CSI driver.
 	// At most 16 conditions may be reported.
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxItems=16
 	HealthConditions []StorageHealthCondition `json:"healthConditions,omitempty" protobuf:"bytes,2,rep,name=healthConditions"`
 }
 
@@ -743,6 +753,7 @@ type StorageHealth struct {
 type CSINodeStatus struct {
 	// storageHealth contains backend health reports for CSI drivers registered on the node.
 	// +optional
+	// +k8s:optional
 	// +listType=map
 	// +listMapKey=name
 	// +patchMergeKey=name
@@ -831,6 +842,8 @@ type CSIStorageCapacity struct {
 	// creator.
 	// This field is immutable.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	StorageClassName string `json:"storageClassName" protobuf:"bytes,3,name=storageClassName"`
 
 	// capacity is the value reported by the CSI driver in its GetCapacityResponse

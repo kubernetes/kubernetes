@@ -18,12 +18,14 @@ package workload
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -64,6 +66,7 @@ var (
 	forbiddenError          = "Forbidden"
 	fieldCannotBeUnsetError = "field cannot be cleared once set"
 	supportedPoliciesError  = `supported values: "Never", "PreemptLowerPriority"`
+	multiplePriorityError   = "all priority, priorityClassName, and preemptionPolicy values must be identical, detected multiple values"
 )
 
 func TestWorkloadStrategy(t *testing.T) {
@@ -88,12 +91,11 @@ func TestStrategyCreate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 
 	testCases := map[string]struct {
-		obj                            *scheduling.Workload
-		expectObj                      *scheduling.Workload
-		enableTopologyAwareScheduling  bool
-		enableCompositePodGroup        bool
-		enablePodGroupPreemptionPolicy bool
-		expectValidationError          string
+		obj                           *scheduling.Workload
+		expectObj                     *scheduling.Workload
+		enableTopologyAwareScheduling bool
+		enableCompositePodGroup       bool
+		expectValidationErrors        []string
 	}{
 		"simple": {
 			obj:       workload,
@@ -105,7 +107,7 @@ func TestStrategyCreate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = -1
 				return w
 			}(),
-			expectValidationError: minCountError,
+			expectValidationErrors: []string{minCountError},
 		},
 		"drops field with SchedulingConstraints set and TAS disabled": {
 			obj: func() *scheduling.Workload {
@@ -146,7 +148,7 @@ func TestStrategyCreate(t *testing.T) {
 				return workload
 			}(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         tooManyItemsError,
+			expectValidationErrors:        []string{tooManyItemsError},
 		},
 		"invalid with invalid topology key": {
 			obj: func() *scheduling.Workload {
@@ -159,7 +161,7 @@ func TestStrategyCreate(t *testing.T) {
 				return workload
 			}(),
 			enableTopologyAwareScheduling: true,
-			expectValidationError:         requiredError,
+			expectValidationErrors:        []string{requiredError},
 		},
 		"disruption mode single": {
 			obj: func() *scheduling.Workload {
@@ -194,7 +196,7 @@ func TestStrategyCreate(t *testing.T) {
 				}
 				return w
 			}(),
-			expectValidationError: "must specify exactly one of",
+			expectValidationErrors: []string{"must specify exactly one of"},
 		},
 		"priorityClassName set": {
 			obj: func() *scheduling.Workload {
@@ -214,27 +216,21 @@ func TestStrategyCreate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].PriorityClassName = "invalid/priority/class/name"
 				return w
 			}(),
-			expectValidationError: subdomainNameError,
+			expectValidationErrors: []string{subdomainNameError},
 		},
-		"drop preemptionPolicy with PodGroupPreemptionPolicy disabled": {
+		"system-node-critical priority": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				policy := scheduling.PreemptNever
-				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
 				return w
 			}(),
-			expectObj: workload,
-		},
-		"drop invalid preemptionPolicy with PodGroupPreemptionPolicy disabled": {
-			obj: func() *scheduling.Workload {
+			expectObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				policy := scheduling.PreemptionPolicy("Invalid")
-				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
+				w.Spec.PodGroupTemplates[0].Priority = new(int32(scheduling.SystemCriticalPriority + 1000))
 				return w
 			}(),
-			expectObj: workload,
 		},
-		"preemptionPolicy set (Never) with PodGroupPreemptionPolicy enabled": {
+		"preemptionPolicy set (Never)": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				policy := scheduling.PreemptNever
@@ -247,9 +243,8 @@ func TestStrategyCreate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
 				return w
 			}(),
-			enablePodGroupPreemptionPolicy: true,
 		},
-		"preemptionPolicy set (PreemptLowerPriority) with PodGroupPreemptionPolicy enabled": {
+		"preemptionPolicy set (PreemptLowerPriority)": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				policy := scheduling.PreemptLowerPriority
@@ -262,19 +257,17 @@ func TestStrategyCreate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
 				return w
 			}(),
-			enablePodGroupPreemptionPolicy: true,
 		},
-		"invalid preemptionPolicy with PodGroupPreemptionPolicy enabled": {
+		"invalid preemptionPolicy": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				policy := scheduling.PreemptionPolicy("Invalid")
 				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
 				return w
 			}(),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationError:          supportedPoliciesError,
+			expectValidationErrors: []string{supportedPoliciesError},
 		},
-		"drop cpg preemptionPolicy with PodGroupPreemptionPolicy disabled": {
+		"cpg preemptionPolicy set (Never)": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates = nil
@@ -296,6 +289,7 @@ func TestStrategyCreate(t *testing.T) {
 										MinCount: 5,
 									},
 								},
+								PreemptionPolicy: &policy,
 							},
 						},
 					},
@@ -305,6 +299,7 @@ func TestStrategyCreate(t *testing.T) {
 			expectObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptNever
 				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
 					{
 						Name: "cpg-template",
@@ -313,6 +308,39 @@ func TestStrategyCreate(t *testing.T) {
 								MinGroupCount: 5,
 							},
 						},
+						PreemptionPolicy: &policy,
+						PodGroupTemplates: []scheduling.PodGroupTemplate{
+							{
+								Name: "pg-template",
+								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+									Gang: &scheduling.GangSchedulingPolicy{
+										MinCount: 5,
+									},
+								},
+								PreemptionPolicy: &policy,
+							},
+						},
+					},
+				}
+				return w
+			}(),
+			enableCompositePodGroup:       true,
+			enableTopologyAwareScheduling: true,
+		},
+		"invalid cpg preemptionPolicy": {
+			obj: func() *scheduling.Workload {
+				w := workload.DeepCopy()
+				w.Spec.PodGroupTemplates = nil
+				policy := scheduling.PreemptionPolicy("Invalid")
+				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
+					{
+						Name: "cpg-template",
+						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+							Gang: &scheduling.CompositeGangSchedulingPolicy{
+								MinGroupCount: 5,
+							},
+						},
+						PreemptionPolicy: &policy,
 						PodGroupTemplates: []scheduling.PodGroupTemplate{
 							{
 								Name: "pg-template",
@@ -329,154 +357,7 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
-		},
-		"drop invalid cpg preemptionPolicy with PodGroupPreemptionPolicy disabled": {
-			obj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				policy := scheduling.PreemptionPolicy("Invalid")
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: &policy,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			expectObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			enableCompositePodGroup:       true,
-			enableTopologyAwareScheduling: true,
-		},
-		"cpg preemptionPolicy set (Never) with PodGroupPreemptionPolicy enabled": {
-			obj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				policy := scheduling.PreemptNever
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: &policy,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			expectObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				policy := scheduling.PreemptNever
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: &policy,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			enableCompositePodGroup:        true,
-			enableTopologyAwareScheduling:  true,
-			enablePodGroupPreemptionPolicy: true,
-		},
-		"invalid cpg preemptionPolicy with PodGroupPreemptionPolicy enabled": {
-			obj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				policy := scheduling.PreemptionPolicy("Invalid")
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: &policy,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			enableCompositePodGroup:        true,
-			enableTopologyAwareScheduling:  true,
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationError:          supportedPoliciesError,
+			expectValidationErrors:        []string{multiplePriorityError, supportedPoliciesError},
 		},
 	}
 
@@ -487,7 +368,6 @@ func TestStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 
@@ -495,15 +375,21 @@ func TestStrategyCreate(t *testing.T) {
 			errs := Strategy.Validate(ctx, workload)
 			errs = Strategy.ValidateDeclaratively(ctx, workload, nil, errs, operation.Create, Strategy.DeclarativeValidationConfig(ctx, workload, nil))
 			if len(errs) != 0 {
-				if tc.expectValidationError == "" {
+				if len(tc.expectValidationErrors) == 0 {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
-				if len(errs) != 1 {
-					t.Fatalf("exactly one error expected")
+				if len(errs) != len(tc.expectValidationErrors) {
+					t.Fatalf("%d errors expected, got %d: %v", len(tc.expectValidationErrors), len(errs), errs)
 				}
-				if errMsg := errs[0].Error(); !strings.Contains(errMsg, tc.expectValidationError) {
-					t.Fatalf("error %#v does not contain the expected message %q", errMsg, tc.expectValidationError)
+				for _, expectedErr := range tc.expectValidationErrors {
+					if !slices.ContainsFunc(errs, func(err *field.Error) bool {
+						return strings.Contains(err.Error(), expectedErr)
+					}) {
+						t.Fatalf("errors %v do not contain the expected message %q", errs, expectedErr)
+					}
 				}
+			} else if len(tc.expectValidationErrors) != 0 {
+				t.Fatalf("expected errors %q, got none", tc.expectValidationErrors)
 			}
 			if tc.expectObj != nil {
 				if diff := cmp.Diff(tc.expectObj, workload); diff != "" {
@@ -518,13 +404,12 @@ func TestStrategyUpdate(t *testing.T) {
 	ctx := ctxWithRequestInfo()
 
 	testCases := map[string]struct {
-		oldObj                         *scheduling.Workload
-		newObj                         *scheduling.Workload
-		enableTopologyAwareScheduling  bool
-		enableCompositePodGroup        bool
-		enablePodGroupPreemptionPolicy bool
-		expectValidationErrors         []string
-		expectWorkload                 *scheduling.Workload
+		oldObj                        *scheduling.Workload
+		newObj                        *scheduling.Workload
+		enableTopologyAwareScheduling bool
+		enableCompositePodGroup       bool
+		expectValidationErrors        []string
+		expectWorkload                *scheduling.Workload
 	}{
 		"no changes": {
 			oldObj:         workload,
@@ -753,7 +638,7 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+		"changing preemptionPolicy not allowed": {
 			oldObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				policy := scheduling.PreemptNever
@@ -766,40 +651,9 @@ func TestStrategyUpdate(t *testing.T) {
 				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
 				return w
 			}(),
-			expectValidationErrors: []string{forbiddenError, fieldImmutableError},
+			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
-			oldObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				policy := scheduling.PreemptNever
-				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
-				return w
-			}(),
-			newObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				policy := scheduling.PreemptLowerPriority
-				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
-				return w
-			}(),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationErrors:         []string{fieldImmutableError},
-		},
-		"clearing preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
-			oldObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				policy := scheduling.PreemptNever
-				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &policy
-				return w
-			}(),
-			newObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].PreemptionPolicy = nil
-				return w
-			}(),
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationErrors:         []string{fieldImmutableError},
-		},
-		"clearing preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+		"clearing preemptionPolicy not allowed": {
 			oldObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				policy := scheduling.PreemptNever
@@ -813,7 +667,7 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			expectValidationErrors: []string{fieldImmutableError},
 		},
-		"changing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+		"changing cpg preemptionPolicy not allowed": {
 			oldObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates = nil
@@ -870,128 +724,9 @@ func TestStrategyUpdate(t *testing.T) {
 			}(),
 			enableCompositePodGroup:       true,
 			enableTopologyAwareScheduling: true,
-			expectValidationErrors:        []string{forbiddenError, fieldImmutableError},
+			expectValidationErrors:        []string{fieldImmutableError},
 		},
-		"changing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
-			oldObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				policy := scheduling.PreemptNever
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: &policy,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			newObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				policy := scheduling.PreemptLowerPriority
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: &policy,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			enableCompositePodGroup:        true,
-			enableTopologyAwareScheduling:  true,
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationErrors:         []string{fieldImmutableError},
-		},
-		"clearing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy enabled": {
-			oldObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				policy := scheduling.PreemptNever
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: &policy,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			newObj: func() *scheduling.Workload {
-				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates = nil
-				w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
-					{
-						Name: "cpg-template",
-						SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
-							Gang: &scheduling.CompositeGangSchedulingPolicy{
-								MinGroupCount: 5,
-							},
-						},
-						PreemptionPolicy: nil,
-						PodGroupTemplates: []scheduling.PodGroupTemplate{
-							{
-								Name: "pg-template",
-								SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
-									Gang: &scheduling.GangSchedulingPolicy{
-										MinCount: 5,
-									},
-								},
-							},
-						},
-					},
-				}
-				return w
-			}(),
-			enableCompositePodGroup:        true,
-			enableTopologyAwareScheduling:  true,
-			enablePodGroupPreemptionPolicy: true,
-			expectValidationErrors:         []string{fieldImmutableError},
-		},
-		"clearing cpg preemptionPolicy not allowed with PodGroupPreemptionPolicy disabled": {
+		"clearing cpg preemptionPolicy not allowed": {
 			oldObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
 				w.Spec.PodGroupTemplates = nil
@@ -1056,7 +791,6 @@ func TestStrategyUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: tc.enableTopologyAwareScheduling,
-				features.PodGroupPreemptionPolicy:        tc.enablePodGroupPreemptionPolicy,
 				features.CompositePodGroup:               tc.enableCompositePodGroup,
 			})
 			oldWorkload := tc.oldObj.DeepCopy()
@@ -1076,9 +810,11 @@ func TestStrategyUpdate(t *testing.T) {
 				if len(errs) != len(tc.expectValidationErrors) {
 					t.Fatalf("%d errors expected", len(tc.expectValidationErrors))
 				}
-				for i, err := range errs {
-					if !strings.Contains(err.Error(), tc.expectValidationErrors[i]) {
-						t.Fatalf("error %#v does not contain the expected message %q", err.Error(), tc.expectValidationErrors[i])
+				for _, expectedErr := range tc.expectValidationErrors {
+					if !slices.ContainsFunc(errs, func(err *field.Error) bool {
+						return strings.Contains(err.Error(), expectedErr)
+					}) {
+						t.Fatalf("errors %v do not contain the expected message %q", errs, expectedErr)
 					}
 				}
 				return
@@ -1335,28 +1071,47 @@ func TestDropCompositePodGroupTemplates(t *testing.T) {
 			if tc.oldWorkload != nil {
 				oldSpec = &tc.oldWorkload.Spec
 			}
-			dropDisabledWorkloadSpecFields(&tc.newWorkload.Spec, oldSpec)
-			if diff := cmp.Diff(tc.wantWorkload, tc.newWorkload); diff != "" {
+			newWorkload := tc.newWorkload.DeepCopy()
+			dropDisabledWorkloadSpecFields(&newWorkload.Spec, oldSpec)
+			if diff := cmp.Diff(tc.wantWorkload, newWorkload); diff != "" {
 				t.Errorf("new Workload changed (- want, + got): %s", diff)
 			}
 		})
 	}
 }
 
-func TestDropCompositePodGroupTemplatePreemptionPolicy(t *testing.T) {
-	var noWorkload *scheduling.Workload
-	workloadWithoutPreemptionPolicy := &scheduling.Workload{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: scheduling.WorkloadSpec{
-			CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+func TestCompositePodGroupTemplatesEnablement(t *testing.T) {
+	var (
+		ctx = ctxWithRequestInfo()
+		w   = func() *scheduling.Workload {
+			w := workload.DeepCopy()
+			w.Spec.PodGroupTemplates = nil
+			w.Spec.CompositePodGroupTemplates = []scheduling.CompositePodGroupTemplate{
 				{
 					Name: "cpg-template",
 					SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
 						Gang: &scheduling.CompositeGangSchedulingPolicy{
 							MinGroupCount: 5,
+						},
+					},
+					CompositePodGroupTemplates: []scheduling.CompositePodGroupTemplate{
+						{
+							Name: "child-cpg-template",
+							SchedulingPolicy: scheduling.CompositePodGroupSchedulingPolicy{
+								Gang: &scheduling.CompositeGangSchedulingPolicy{
+									MinGroupCount: 2,
+								},
+							},
+							PodGroupTemplates: []scheduling.PodGroupTemplate{
+								{
+									Name: "child-pg-template",
+									SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+										Gang: &scheduling.GangSchedulingPolicy{
+											MinCount: 3,
+										},
+									},
+								},
+							},
 						},
 					},
 					PodGroupTemplates: []scheduling.PodGroupTemplate{
@@ -1370,119 +1125,64 @@ func TestDropCompositePodGroupTemplatePreemptionPolicy(t *testing.T) {
 						},
 					},
 				},
-			},
-		},
-	}
-	workloadWithPreemptionPolicy := func() *scheduling.Workload {
-		w := workloadWithoutPreemptionPolicy.DeepCopy()
-		policy := scheduling.PreemptNever
-		w.Spec.CompositePodGroupTemplates[0].PreemptionPolicy = &policy
-		return w
-	}()
+			}
+			return w
+		}()
+	)
 
-	tests := []struct {
-		description  string
-		enabled      bool
-		oldWorkload  *scheduling.Workload
-		newWorkload  *scheduling.Workload
-		wantWorkload *scheduling.Workload
-	}{
-		{
-			description:  "old with preemption / new with preemption / disabled",
-			oldWorkload:  workloadWithPreemptionPolicy,
-			newWorkload:  workloadWithPreemptionPolicy,
-			wantWorkload: workloadWithPreemptionPolicy,
-		},
-		{
-			description:  "old without preemption / new with preemption / disabled",
-			oldWorkload:  workloadWithoutPreemptionPolicy,
-			newWorkload:  workloadWithPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
-		{
-			description:  "no old workload / new with preemption / disabled",
-			oldWorkload:  noWorkload,
-			newWorkload:  workloadWithPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
-		{
-			description:  "old with preemption / new without preemption / disabled",
-			oldWorkload:  workloadWithPreemptionPolicy,
-			newWorkload:  workloadWithoutPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
-		{
-			description:  "old without preemption / new without preemption / disabled",
-			oldWorkload:  workloadWithoutPreemptionPolicy,
-			newWorkload:  workloadWithoutPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
-		{
-			description:  "no old workload / new without preemption / disabled",
-			oldWorkload:  noWorkload,
-			newWorkload:  workloadWithoutPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
-		{
-			description:  "old with preemption / new with preemption / enabled",
-			enabled:      true,
-			oldWorkload:  workloadWithPreemptionPolicy,
-			newWorkload:  workloadWithPreemptionPolicy,
-			wantWorkload: workloadWithPreemptionPolicy,
-		},
-		{
-			description:  "old without preemption / new with preemption / enabled",
-			enabled:      true,
-			oldWorkload:  workloadWithoutPreemptionPolicy,
-			newWorkload:  workloadWithPreemptionPolicy,
-			wantWorkload: workloadWithPreemptionPolicy,
-		},
-		{
-			description:  "no old workload / new with preemption / enabled",
-			enabled:      true,
-			oldWorkload:  noWorkload,
-			newWorkload:  workloadWithPreemptionPolicy,
-			wantWorkload: workloadWithPreemptionPolicy,
-		},
-		{
-			description:  "old with preemption / new without preemption / enabled",
-			enabled:      true,
-			oldWorkload:  workloadWithPreemptionPolicy,
-			newWorkload:  workloadWithoutPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
-		{
-			description:  "old without preemption / new without preemption / enabled",
-			enabled:      true,
-			oldWorkload:  workloadWithoutPreemptionPolicy,
-			newWorkload:  workloadWithoutPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
-		{
-			description:  "no old workload / new without preemption / enabled",
-			enabled:      true,
-			oldWorkload:  noWorkload,
-			newWorkload:  workloadWithoutPreemptionPolicy,
-			wantWorkload: workloadWithoutPreemptionPolicy,
-		},
+	// Enable the CompositePodGroup feature gate during Workload creation.
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+
+	createdWorkload := w.DeepCopy()
+	Strategy.PrepareForCreate(ctx, createdWorkload)
+
+	errs := Strategy.Validate(ctx, createdWorkload)
+	errs = Strategy.ValidateDeclaratively(ctx, createdWorkload, nil, errs, operation.Create, Strategy.DeclarativeValidationConfig(ctx, createdWorkload, nil))
+	if len(errs) != 0 {
+		t.Fatalf("create with CompositePodGroup enabled: unexpected validation errors: %v", errs.ToAggregate())
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.description, func(t *testing.T) {
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.PodGroupPreemptionPolicy:        tc.enabled,
-				features.GenericWorkload:                 true,
-				features.CompositePodGroup:               true,
-				features.TopologyAwareWorkloadScheduling: true,
-			})
-			var oldSpec *scheduling.WorkloadSpec
-			if tc.oldWorkload != nil {
-				oldSpec = &tc.oldWorkload.Spec
-			}
-			dropDisabledWorkloadSpecFields(&tc.newWorkload.Spec, oldSpec)
-			if diff := cmp.Diff(tc.wantWorkload, tc.newWorkload); diff != "" {
-				t.Errorf("new Workload changed (- want, + got): %s", diff)
-			}
-		})
+	if diff := cmp.Diff(w.Spec.CompositePodGroupTemplates, createdWorkload.Spec.CompositePodGroupTemplates); diff != "" {
+		t.Fatalf("create with CompositePodGroup enabled: spec.compositePodGroupTemplates mismatch (-want +got):\n%s", diff)
+	}
+
+	// Disable the CompositePodGroup feature gate and check that the CompositePodGroupTemplates field still exists after the update.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, false)
+
+	updatedWorkload := createdWorkload.DeepCopy()
+	updatedWorkload.Labels = map[string]string{"foo": "bar"}
+	updatedWorkload.ResourceVersion = "2"
+	Strategy.PrepareForUpdate(ctx, updatedWorkload, createdWorkload)
+
+	errs = Strategy.ValidateUpdate(ctx, updatedWorkload, createdWorkload)
+	errs = Strategy.ValidateDeclaratively(ctx, updatedWorkload, createdWorkload, errs, operation.Update, Strategy.DeclarativeValidationConfig(ctx, updatedWorkload, createdWorkload))
+	if len(errs) != 0 {
+		t.Fatalf("update with CompositePodGroup disabled: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(w.Spec.CompositePodGroupTemplates, updatedWorkload.Spec.CompositePodGroupTemplates); diff != "" {
+		t.Fatalf("update with CompositePodGroup disabled: spec.compositePodGroupTemplates mismatch (-want +got):\n%s", diff)
+	}
+
+	// Re-enable the CompositePodGroup feature gate to verify that the CompositePodGroupTemplates field still exists after the update.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	updatedWorkload2 := updatedWorkload.DeepCopy()
+	updatedWorkload2.Labels = map[string]string{"foo": "baz"}
+	updatedWorkload2.ResourceVersion = "3"
+	Strategy.PrepareForUpdate(ctx, updatedWorkload2, updatedWorkload)
+
+	errs = Strategy.ValidateUpdate(ctx, updatedWorkload2, updatedWorkload)
+	errs = Strategy.ValidateDeclaratively(ctx, updatedWorkload2, updatedWorkload, errs, operation.Update, Strategy.DeclarativeValidationConfig(ctx, updatedWorkload2, updatedWorkload))
+	if len(errs) != 0 {
+		t.Fatalf("update after re-enabling CompositePodGroup: unexpected validation errors: %v", errs.ToAggregate())
+	}
+
+	if diff := cmp.Diff(w.Spec.CompositePodGroupTemplates, updatedWorkload2.Spec.CompositePodGroupTemplates); diff != "" {
+		t.Fatalf("update after re-enabling CompositePodGroup: spec.compositePodGroupTemplates mismatch (-want +got):\n%s", diff)
 	}
 }

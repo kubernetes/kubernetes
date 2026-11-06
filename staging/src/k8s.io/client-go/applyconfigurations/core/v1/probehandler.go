@@ -24,13 +24,13 @@ package v1
 // ProbeHandler defines a specific action that should be taken in a probe.
 // One and only one of the fields must be specified.
 type ProbeHandlerApplyConfiguration struct {
-	// Exec specifies a command to execute in the container.
+	// exec specifies a command to execute in the container.
 	Exec *ExecActionApplyConfiguration `json:"exec,omitempty"`
-	// HTTPGet specifies an HTTP GET request to perform.
+	// httpGet specifies an HTTP GET request to perform.
 	HTTPGet *HTTPGetActionApplyConfiguration `json:"httpGet,omitempty"`
-	// TCPSocket specifies a connection to a TCP port.
+	// tcpSocket specifies a connection to a TCP port.
 	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
-	// GRPC specifies a GRPC HealthCheckRequest.
+	// grpc specifies a GRPC HealthCheckRequest.
 	GRPC *GRPCActionApplyConfiguration `json:"grpc,omitempty"`
 }
 

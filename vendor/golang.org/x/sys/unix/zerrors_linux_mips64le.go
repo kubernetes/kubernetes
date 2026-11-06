@@ -481,7 +481,6 @@ const (
 	TIOCSERGWILD                     = 0x5489
 	TIOCSERSETMULTI                  = 0x5490
 	TIOCSERSWILD                     = 0x548a
-	TIOCSER_TEMT                     = 0x1
 	TIOCSETD                         = 0x7401
 	TIOCSETN                         = 0x740a
 	TIOCSETP                         = 0x7409
@@ -602,6 +601,7 @@ const (
 	EDQUOT          = syscall.Errno(0x46d)
 	EFSBADCRC       = syscall.Errno(0x4d)
 	EFSCORRUPTED    = syscall.Errno(0x87)
+	EFTYPE          = syscall.Errno(0xa9)
 	EHOSTDOWN       = syscall.Errno(0x93)
 	EHOSTUNREACH    = syscall.Errno(0x94)
 	EHWPOISON       = syscall.Errno(0xa8)
@@ -846,6 +846,7 @@ var errorList = [...]struct {
 	{166, "ENOTRECOVERABLE", "state not recoverable"},
 	{167, "ERFKILL", "operation not possible due to RF-kill"},
 	{168, "EHWPOISON", "memory page has hardware error"},
+	{169, "EFTYPE", "unknown error 169"},
 	{1133, "EDQUOT", "disk quota exceeded"},
 }
 

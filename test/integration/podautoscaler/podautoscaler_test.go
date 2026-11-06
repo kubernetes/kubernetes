@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/ktesting"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -37,16 +38,14 @@ import (
 // is reconciled, by bringing the replicas of the Deployment within the HPA's min and max range.
 // Given that the metrics aren't mocked, it should go up to min only.
 func TestHPAScaleUpToMin(t *testing.T) {
-	ctx := t.Context()
-
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
-	clients, _ := createClients(t, server.ClientConfig)
-	startHPAControllerAndWaitForCaches(t, clients)
+	tCtx := ktesting.Init(t).WithRESTConfig(server.ClientConfig)
+	clients, _ := createClients(tCtx)
+	startHPAControllerAndWaitForCaches(tCtx, clients)
 
-	cs := clients.apiServer
-	ns := createTestNamespace(t, cs)
-	deployment := createDeployment(t, cs, ns.Name, 1)
+	ns := createTestNamespace(tCtx)
+	deployment := createDeployment(tCtx, ns.Name, 1)
 
 	metricSpec := autoscalingv2.MetricSpec{
 		Type: autoscalingv2.ResourceMetricSourceType,
@@ -59,9 +58,9 @@ func TestHPAScaleUpToMin(t *testing.T) {
 		},
 	}
 
-	createHPA(t, cs, deployment, metricSpec, withHPAMinMaxReplicas(2, 10))
+	createHPA(tCtx, deployment, metricSpec, withHPAMinMaxReplicas(2, 10))
 
-	err := waitForDeploymentCondition(ctx, cs, deployment, atLeastReplicas(2))
+	err := waitForDeploymentCondition(tCtx, deployment, atLeastReplicas(2))
 	if err != nil {
 		t.Fatalf("HPA did not reconcile: %v", err)
 	}
@@ -69,17 +68,17 @@ func TestHPAScaleUpToMin(t *testing.T) {
 
 // TestHPAScaleToZero verifies that HPA can scale up to five, then down to zero and back again, using an external metric.
 func TestHPAScaleToZero(t *testing.T) {
-	ctx := t.Context()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, true)
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
-	clients, metricValue := createClients(t, server.ClientConfig)
-	startHPAControllerAndWaitForCaches(t, clients)
+	tCtx := ktesting.Init(t).WithRESTConfig(server.ClientConfig)
 
-	cs := clients.apiServer
-	ns := createTestNamespace(t, cs)
-	deployment := createDeployment(t, cs, ns.Name, 1)
+	clients, metricValue := createClients(tCtx)
+	startHPAControllerAndWaitForCaches(tCtx, clients)
+
+	ns := createTestNamespace(tCtx)
+	deployment := createDeployment(tCtx, ns.Name, 1)
 
 	// Create HPA using an external metric.
 	metricSpec := autoscalingv2.MetricSpec{
@@ -94,17 +93,17 @@ func TestHPAScaleToZero(t *testing.T) {
 			},
 		},
 	}
-	createHPA(t, cs, deployment, metricSpec, withHPAMinMaxReplicas(0, 10))
+	createHPA(tCtx, deployment, metricSpec, withHPAMinMaxReplicas(0, 10))
 
 	// Phase 1: metric=500, expect scale up to 5 pods.
 	metricValue.Store(resource.MustParse("500"))
-	err := waitForDeploymentCondition(ctx, cs, deployment, atLeastReplicas(5))
+	err := waitForDeploymentCondition(tCtx, deployment, atLeastReplicas(5))
 	if err != nil {
 		t.Fatalf("Phase 1: HPA did not scale up: %v", err)
 	}
 
 	// Verify the ScaledToZero condition is set to false on the HPA.
-	gotHPA, err := cs.AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Get(ctx, hpaName, metav1.GetOptions{})
+	gotHPA, err := tCtx.Client().AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Get(tCtx, hpaName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Phase 3: failed to get HPA: %v", err)
 	}
@@ -124,13 +123,13 @@ func TestHPAScaleToZero(t *testing.T) {
 
 	// Phase 2: metric=0, expect scale down to 0 and ScaledToZero condition.
 	metricValue.Store(resource.MustParse("0"))
-	err = waitForDeploymentCondition(ctx, cs, deployment, equalReplicas(0))
+	err = waitForDeploymentCondition(tCtx, deployment, equalReplicas(0))
 	if err != nil {
 		t.Fatalf("Phase 2: HPA did not scale to zero: %v", err)
 	}
 
 	// Verify the ScaledToZero condition is set on the HPA.
-	gotHPA, err = cs.AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Get(ctx, hpaName, metav1.GetOptions{})
+	gotHPA, err = tCtx.Client().AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Get(tCtx, hpaName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Phase 2: failed to get HPA: %v", err)
 	}
@@ -150,13 +149,13 @@ func TestHPAScaleToZero(t *testing.T) {
 
 	// Phase 3: metric=400, expect scale up again (replicas >= 4).
 	metricValue.Store(resource.MustParse("400"))
-	err = waitForDeploymentCondition(ctx, cs, deployment, atLeastReplicas(4))
+	err = waitForDeploymentCondition(tCtx, deployment, atLeastReplicas(4))
 	if err != nil {
 		t.Fatalf("Phase 3: HPA did not scale back up: %v", err)
 	}
 
 	// Verify the ScaledToZero condition is set to false on the HPA.
-	gotHPA, err = cs.AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Get(ctx, hpaName, metav1.GetOptions{})
+	gotHPA, err = tCtx.Client().AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Get(tCtx, hpaName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Phase 3: failed to get HPA: %v", err)
 	}
@@ -232,14 +231,13 @@ func TestHPAScaleToZeroRejected(t *testing.T) {
 
 			server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 			t.Cleanup(server.TearDownFn)
-			clients, _ := createClients(t, server.ClientConfig)
+			tCtx := ktesting.Init(t).WithRESTConfig(server.ClientConfig)
 
-			cs := clients.apiServer
-			ns := createTestNamespace(t, cs)
-			deployment := createDeployment(t, cs, ns.Name, 1)
+			ns := createTestNamespace(tCtx)
+			deployment := createDeployment(tCtx, ns.Name, 1)
 
 			hpa := newHPA(deployment, tc.metricSpec, withHPAMinMaxReplicas(0, 10))
-			_, err := cs.AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Create(t.Context(), hpa, metav1.CreateOptions{})
+			_, err := tCtx.Client().AutoscalingV2().HorizontalPodAutoscalers(ns.Name).Create(tCtx, hpa, metav1.CreateOptions{})
 			if err == nil {
 				t.Fatal("expected creating an HPA with minReplicas: 0 to be rejected, but it succeeded")
 			}

@@ -1745,6 +1745,52 @@ func TestVolumeHealthSurvivesPodStatusUpdate(t *testing.T) {
 	}
 }
 
+func TestNormalizeStatusVolumeHealth(t *testing.T) {
+	now := metav1.Now()
+	expectedTime := now.DeepCopy().Rfc3339Copy()
+
+	tests := []struct {
+		name         string
+		featureGate  bool
+		expectedTime metav1.Time
+	}{
+		{
+			name:         "feature gate enabled normalizes timestamp",
+			featureGate:  true,
+			expectedTime: expectedTime,
+		},
+		{
+			name:         "feature gate disabled leaves timestamp unchanged",
+			featureGate:  false,
+			expectedTime: now,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, tc.featureGate)
+
+			pod := getTestPod()
+			status := v1.PodStatus{
+				VolumeHealth: []v1.PodVolumeHealth{
+					{
+						Name:               "vol1",
+						LastTransitionTime: now,
+					},
+				},
+			}
+
+			normalized := normalizeStatus(pod, &status)
+			if len(normalized.VolumeHealth) != 1 {
+				t.Fatalf("expected 1 VolumeHealth, got %d", len(normalized.VolumeHealth))
+			}
+			if normalized.VolumeHealth[0].LastTransitionTime != tc.expectedTime {
+				t.Errorf("expected LastTransitionTime %v, got %v", tc.expectedTime, normalized.VolumeHealth[0].LastTransitionTime)
+			}
+		})
+	}
+}
+
 func TestSetContainerStartup(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
@@ -3503,4 +3549,56 @@ func TestPodDeferredResizeDurationSeconds(t *testing.T) {
 			require.Equal(t, uint64(tc.expectedCount), count)
 		})
 	}
+}
+
+// The eviction status set while the containers may still be running is not
+// published as terminal; once the containers have stopped, the terminal
+// status (as generateAPIPodStatus regenerates it from the stopped containers)
+// is published with the Failed phase, the eviction reason and the original
+// message, even though the container exited 0.
+func TestSyncBatch_EvictionPublishedAfterCleanExit(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	pod := getTestPod()
+	pod.Status = v1.PodStatus{Phase: v1.PodRunning}
+	client := fake.NewSimpleClientset(pod)
+	podManager := kubepod.NewBasicPodManager()
+	podManager.(mutablePodManager).AddPod(pod)
+	deletionSafety := &statustest.FakePodDeletionSafetyProvider{HasRunning: true}
+	syncer := NewManager(client, podManager, deletionSafety, util.NewPodStartupLatencyTracker()).(*manager)
+
+	apiPod := func() *v1.Pod {
+		got, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		require.NoError(t, err)
+		return got
+	}
+	const message = "Pod ephemeral local storage usage exceeds the total limit of containers 1Gi."
+	evicting := v1.PodStatus{
+		Phase:             v1.PodFailed,
+		Reason:            "Evicted",
+		Message:           message,
+		ContainerStatuses: []v1.ContainerStatus{{Name: "bar", State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}}},
+	}
+	syncer.SetPodStatus(logger, pod, evicting)
+	syncer.syncBatch(ctx, true)
+	published := apiPod()
+	assert.Equal(t, v1.PodRunning, published.Status.Phase, "the terminal phase must be withheld while containers may run")
+	assert.Empty(t, published.Status.Reason)
+	assert.Empty(t, published.Status.Message)
+
+	deletionSafety.HasRunning = false
+	terminal := v1.PodStatus{
+		Phase:             v1.PodFailed,
+		Reason:            "Evicted",
+		Message:           message,
+		ContainerStatuses: []v1.ContainerStatus{{Name: "bar", State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}}},
+	}
+	syncer.SetPodStatus(logger, pod, terminal)
+	syncer.syncBatch(ctx, true)
+	published = apiPod()
+	assert.Equal(t, v1.PodFailed, published.Status.Phase)
+	assert.Equal(t, "Evicted", published.Status.Reason)
+	assert.Equal(t, message, published.Status.Message)
+	require.Len(t, published.Status.ContainerStatuses, 1)
+	require.NotNil(t, published.Status.ContainerStatuses[0].State.Terminated)
+	assert.Equal(t, int32(0), published.Status.ContainerStatuses[0].State.Terminated.ExitCode)
 }

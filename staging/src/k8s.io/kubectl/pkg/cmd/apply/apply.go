@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
-	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
@@ -105,7 +104,6 @@ type ApplyOptions struct {
 	Builder             *resource.Builder
 	Mapper              meta.RESTMapper
 	DynamicClient       dynamic.Interface
-	OpenAPIGetter       openapi.OpenAPIResourcesGetter
 	OpenAPIV3Root       openapi3.Root
 
 	Namespace        string
@@ -288,7 +286,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 	if err == nil {
 		openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
 	} else {
-		klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
+		klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded")
 	}
 
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)
@@ -367,7 +365,6 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		Builder:             builder,
 		Mapper:              mapper,
 		DynamicClient:       dynamicClient,
-		OpenAPIGetter:       f,
 		OpenAPIV3Root:       openAPIV3Root,
 
 		IOStreams: flags.IOStreams,

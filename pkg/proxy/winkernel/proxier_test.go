@@ -34,11 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -113,9 +110,6 @@ func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType st
 	if family == v1.IPv6Protocol {
 		sourceVip = "192::1:2"
 	}
-
-	// enable `WinDSR` feature gate
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WinDSR, true)
 
 	config := kubeproxyconfig.KubeProxyWinkernelConfiguration{
 		SourceVip:             sourceVip,
@@ -1691,7 +1685,7 @@ func TestFindRemoteSubnetProviderAddress(t *testing.T) {
 	}
 }
 
-func TestWinDSRWithOverlayEnabled(t *testing.T) {
+func TestDSRWithOverlayEnabled(t *testing.T) {
 	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error("Failed to create proxier")

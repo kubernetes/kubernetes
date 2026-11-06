@@ -67,10 +67,11 @@ func TestDeclarativeValidate(t *testing.T) {
 			APIGroup:   "apps",
 			APIVersion: apiVersion,
 		})
-		testCases := map[string]struct {
+		type testCase struct {
 			input        *apps.DaemonSet
 			expectedErrs field.ErrorList
-		}{
+		}
+		testCases := map[string]testCase{
 			"valid": {
 				input: mkDaemonSet(),
 			},
@@ -83,10 +84,44 @@ func TestDeclarativeValidate(t *testing.T) {
 			"invalid toleration key format": {
 				input: mkDaemonSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}))),
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
+				},
+			},
+			"activeDeadlineSeconds minimum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(0)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+				},
+			},
+			"activeDeadlineSeconds maximum boundary violation": {
+				input: mkDaemonSet(func(ds *apps.DaemonSet) {
+					deadline := int64(2147483648)
+					ds.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+				}),
+				expectedErrs: field.ErrorList{
+					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+				},
+			},
+			"restartPolicy not Always": {
+				input: mkDaemonSet(tweakPodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever))),
+				expectedErrs: field.ErrorList{
+					field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), api.RestartPolicyNever, []api.RestartPolicy{api.RestartPolicyAlways}).MarkAlpha(),
 				},
 			},
 		}
+
+		for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+			testCases["podspec:"+tc.ID] = testCase{
+				input:        mkDaemonSet(tweakPodSpec(tc.Tweaks...)),
+				expectedErrs: tc.ExpectedErrs,
+			}
+		}
+
 		for k, tc := range testCases {
 			t.Run(k, func(t *testing.T) {
 				apitesting.VerifyValidationEquivalence(t, ctx, tc.input, registry.Strategy, tc.expectedErrs)

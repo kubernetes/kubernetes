@@ -27,7 +27,7 @@ import (
 
 // use stderr as fallback
 func getJournalWriteSyncer() (zapcore.WriteSyncer, error) {
-	jw, err := logutil.NewJournalWriter(os.Stderr)
+	jw, err := logutil.NewJournalWriter(os.Stderr) //nolint:staticcheck // SA1019: the server keeps using this writer until v3.8 moves it into server/embed.
 	if err != nil {
 		return nil, fmt.Errorf("can't find journal (%w)", err)
 	}

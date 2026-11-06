@@ -36,7 +36,6 @@ import (
 	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	certificatesapiv1 "k8s.io/api/certificates/v1"
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
@@ -67,7 +66,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
@@ -82,7 +80,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/pkg/controlplane/controller/kubernetesservice"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 
@@ -375,19 +372,17 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil
 	})
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			controller := defaultservicecidr.NewController(
-				c.Extra.ServiceIPRange,
-				c.Extra.SecondaryServiceIPRange,
-				client,
-			)
-			// The default serviceCIDR must exist before the apiserver is healthy
-			// otherwise the allocators for Services will not work.
-			controller.Start(hookContext)
-			return nil
-		})
-	}
+	s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("start-kubernetes-service-cidr-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		controller := defaultservicecidr.NewController(
+			c.Extra.ServiceIPRange,
+			c.Extra.SecondaryServiceIPRange,
+			client,
+		)
+		// The default serviceCIDR must exist before the apiserver is healthy
+		// otherwise the allocators for Services will not work.
+		controller.Start(hookContext)
+		return nil
+	})
 
 	return s, nil
 
@@ -513,7 +508,6 @@ var (
 		authenticationv1alpha1.SchemeGroupVersion,
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		coordinationv1alpha2.SchemeGroupVersion,
-		certificatesv1alpha1.SchemeGroupVersion,
 	}
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have for additional API groups only provided in kube-apiserver. They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{

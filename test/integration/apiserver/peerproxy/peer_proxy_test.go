@@ -45,9 +45,9 @@ import (
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestPeerProxiedRequest(t *testing.T) {

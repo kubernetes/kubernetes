@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
@@ -48,9 +49,9 @@ func noObjectTTL() (time.Duration, bool) {
 	return time.Duration(0), false
 }
 
-func getConfigMap(fakeClient clientset.Interface) manager.GetObjectFunc {
+func getConfigMap(ctx context.Context, fakeClient clientset.Interface) manager.GetObjectFunc {
 	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, opts)
+		return fakeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, opts)
 	}
 }
 
@@ -114,8 +115,9 @@ func podWithConfigMaps(ns, podName string, toAttach configMapsToAttach) *v1.Pod 
 }
 
 func TestCacheBasedConfigMapManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeClient := &fake.Clientset{}
-	store := manager.NewObjectStore(getConfigMap(fakeClient), clock.RealClock{}, noObjectTTL, 0)
+	store := manager.NewObjectStore(getConfigMap(tCtx, fakeClient), clock.RealClock{}, noObjectTTL, 0)
 	manager := &configMapManager{
 		manager: manager.NewCacheBasedManager(store, getConfigMapNames),
 	}

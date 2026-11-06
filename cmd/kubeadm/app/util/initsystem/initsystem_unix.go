@@ -21,6 +21,7 @@ package initsystem
 import (
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -60,8 +61,28 @@ func (openrc OpenRCInitSystem) ServiceExists(service string) bool {
 // ServiceIsEnabled ensures the service is enabled to start on each boot.
 func (openrc OpenRCInitSystem) ServiceIsEnabled(service string) bool {
 	args := []string{"show", "default"}
-	outBytes, _ := exec.Command("rc-update", args...).Output()
-	return strings.Contains(string(outBytes), service)
+	outBytes, err := exec.Command("rc-update", args...).Output()
+	if err != nil {
+		return false
+	}
+	return openrcServiceIsEnabled(string(outBytes), service)
+}
+
+// openrcServiceIsEnabled reports whether the listing printed by "rc-update show default"
+// has the service in the default runlevel.
+func openrcServiceIsEnabled(listing, service string) bool {
+	// rc-update prints one "<service> | <runlevels>" line per listed service, and with
+	// verbose output on it lists services in no runlevel. Hence, we compare both columns.
+	for line := range strings.SplitSeq(listing, "\n") {
+		name, runlevels, found := strings.CutLast(line, "|")
+		if !found || strings.TrimSpace(name) != service {
+			continue
+		}
+		if slices.Contains(strings.Fields(runlevels), "default") {
+			return true
+		}
+	}
+	return false
 }
 
 // ServiceIsActive ensures the service is running, or attempting to run. (crash looping in the case of kubelet)

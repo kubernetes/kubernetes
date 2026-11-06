@@ -25,12 +25,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestConfigurationChannels(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestConfigurationChannels completed")
 
 	mux := newMux(nil)
 	channelOne := mux.ChannelWithContext(tCtx, "one")
@@ -45,7 +44,6 @@ func TestConfigurationChannels(t *testing.T) {
 
 func TestMergeInvoked(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestMergeInvoked completed")
 
 	const expectedSource = "one"
 	done := make(chan interface{})
@@ -83,7 +81,6 @@ func (f mergeFunc) Merge(ctx context.Context, source string, update sourceUpdate
 
 func TestSimultaneousMerge(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestSimultaneousMerge completed")
 
 	ch := make(chan bool, 2)
 	mux := newMux(mergeFunc(func(ctx context.Context, source string, update sourceUpdate) error {

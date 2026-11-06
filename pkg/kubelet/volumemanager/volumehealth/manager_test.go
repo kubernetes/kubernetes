@@ -30,7 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
@@ -127,7 +127,7 @@ func newTestManager(t *testing.T, statusUpdater StatusUpdater, client csi.Health
 	logger, _ := ktesting.NewTestContext(t)
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, util.NewFakeSELinuxLabelTranslator())
-	asw := cache.NewActualStateOfWorld("node1", volumePluginMgr)
+	asw := cache.NewActualStateOfWorld("node1", volumePluginMgr, nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod-uid-1", Namespace: "ns"},
@@ -175,6 +175,7 @@ func newTestManager(t *testing.T, statusUpdater StatusUpdater, client csi.Health
 }
 
 func TestProbeVolumeHealth(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 
 	degraded := []v1.VolumeHealthCondition{{
@@ -243,7 +244,7 @@ func TestProbeVolumeHealth(t *testing.T) {
 			for i, s := range tc.steps {
 				client.volumeConditions = s.volumeConditions
 				client.volumeErr = s.volumeErr
-				m.probeVolumeHealth(context.Background())
+				m.probeVolumeHealth(tCtx)
 
 				got := status.callCount()
 				if got != s.wantCallCount {
@@ -271,6 +272,7 @@ func TestProbeVolumeHealth(t *testing.T) {
 }
 
 func TestProbeStorageHealth(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 	registerHealthMetrics()
 
@@ -341,7 +343,7 @@ func TestProbeStorageHealth(t *testing.T) {
 			for i, s := range tc.steps {
 				client.storageConditions = s.storageConditions
 				client.storageErr = s.storageErr
-				m.probeStorageHealth(context.Background())
+				m.probeStorageHealth(tCtx)
 
 				updater.mu.Lock()
 				got := len(updater.calls)

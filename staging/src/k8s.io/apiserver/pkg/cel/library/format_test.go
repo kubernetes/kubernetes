@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
 
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/library"

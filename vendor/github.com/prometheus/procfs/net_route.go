@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 const (
@@ -50,7 +50,7 @@ func (fs FS) NetRoute() ([]NetRouteLine, error) {
 }
 
 func readNetRoute(path string) ([]NetRouteLine, error) {
-	b, err := util.ReadFileNoStat(path)
+	b, err := parsers.ReadFileNoStat(path)
 	if err != nil {
 		return nil, err
 	}

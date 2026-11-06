@@ -147,7 +147,7 @@ func TestDeclarativeValidate(t *testing.T) {
 						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2+1)},
 					})),
 					expectedErrs: field.ErrorList{
-						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkAlpha(),
+						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkBeta(),
 					},
 				},
 				"valid: device attribute list of versions": {
@@ -320,6 +320,16 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
 					},
 				},
+				"invalid: partitionTypeAttribute with more than one slash": {
+					input: mkResourceSliceWithDevices(
+						tweakDeviceCounter(counters("valid-key")),
+						tweakPartitionTypeAttribute("gpu.example.com/profile/full"),
+					),
+					enablePartitionTypeAttr: true,
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "partitionTypeAttribute"), nil, "").WithOrigin("format=k8s-resource-fully-qualified-name"),
+					},
+				},
 				"invalid: partitionTypeAttribute with feature disabled": {
 					input: mkResourceSliceWithDevices(
 						tweakDeviceCounter(counters("valid-key")),
@@ -424,7 +434,7 @@ func TestDeclarativeValidate(t *testing.T) {
 					expectedErrs: field.ErrorList{
 						field.NotFound(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "capacity_1").MarkFromImperative(),
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
-						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityMultiplier"), "must be set when capacityKey is set").WithOrigin("dependentRequired").MarkAlpha(),
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityMultiplier"), "must be set when capacityKey is set").WithOrigin("dependentRequired").MarkBeta(),
 					},
 				},
 				"invalid: node allocatable mapping capacityMultiplier set when capacityKey is not set": {
@@ -437,7 +447,7 @@ func TestDeclarativeValidate(t *testing.T) {
 					})),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping"), "", "").WithOrigin("union"),
-						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "must be set when capacityMultiplier is set").WithOrigin("dependentRequired").MarkAlpha(),
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("nodeAllocatableResources").Key("cpu").Child("mapping", "capacityKey"), "must be set when capacityMultiplier is set").WithOrigin("dependentRequired").MarkBeta(),
 					},
 				},
 				"invalid: node allocatable mapping both capacityMultiplier and deviceMultiplier set": {
@@ -687,7 +697,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2+1)},
 					})),
 					expectedErrs: field.ErrorList{
-						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkAlpha(),
+						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkBeta(),
 					},
 				},
 				// spec.sharedCounters
@@ -861,6 +871,20 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("compatibilityGroups").Index(0), "InvalidKey", "").WithOrigin("format=k8s-short-name"),
 					},
 				},
+				"valid update: device attribute no value, devices unchanged": {
+					old:    mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{})),
+					update: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{})),
+				},
+				// Only the handwritten node selection check depends on
+				// perDeviceNodeSelection, so changing it must not revalidate
+				// the rest of the unchanged devices on either side.
+				"invalid update: device attribute no value, devices unchanged, perDeviceNodeSelection changed": {
+					old:    mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{}), tweakNodeName(nil), tweakAllNodes(new(true))),
+					update: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/multiple", resource.DeviceAttribute{}), tweakNodeName(nil), tweakAllNodes(nil), tweakPerDeviceNodeSelection(new(true))),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "devices").Index(0), "").MarkFromImperative(),
+					},
+				},
 			}
 			for k, tc := range testCases {
 
@@ -935,6 +959,24 @@ func mkResourceSliceWithSharedCounters(mutators ...func(*resource.ResourceSlice)
 		mutate(&rs)
 	}
 	return rs
+}
+
+func tweakPerDeviceNodeSelection(enabled *bool) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.PerDeviceNodeSelection = enabled
+	}
+}
+
+func tweakNodeName(name *string) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.NodeName = name
+	}
+}
+
+func tweakAllNodes(enabled *bool) func(*resource.ResourceSlice) {
+	return func(rs *resource.ResourceSlice) {
+		rs.Spec.AllNodes = enabled
+	}
 }
 
 func tweakBindingFailureConditions(count int) func(*resource.ResourceSlice) {

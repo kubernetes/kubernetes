@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -53,11 +53,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		Verb:              "create",
 	})
 
-	testCases := map[string]struct {
+	type testCase struct {
 		input                 batch.Job
 		enableWorkloadWithJob bool
 		expectedErrs          field.ErrorList
-	}{
+	}
+
+	testCases := map[string]testCase{
 		"valid": {
 			input: mkJob(),
 		},
@@ -70,7 +72,49 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"maxFailedIndexes set without backoffLimitPerIndex": {
 			input: mkJob(tweakMaxFailedIndexes(ptr.To[int32](5))),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkAlpha(),
+				field.Required(field.NewPath("spec", "backoffLimitPerIndex"), "").WithOrigin("dependentRequired").MarkBeta(),
+			},
+		},
+		"negative parallelism": {
+			input: mkJob(tweakParallelism(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "parallelism"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative completions": {
+			input: mkJob(tweakCompletions(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "completions"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative activeDeadlineSeconds": {
+			input: mkJob(tweakActiveDeadlineSeconds(ptr.To[int64](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "activeDeadlineSeconds"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative backoffLimit": {
+			input: mkJob(tweakBackoffLimit(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "backoffLimit"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative backoffLimitPerIndex": {
+			input: mkJob(tweakBackoffLimitPerIndex(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "backoffLimitPerIndex"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative maxFailedIndexes": {
+			input: mkJob(tweakBackoffLimitPerIndex(ptr.To[int32](1)), tweakMaxFailedIndexes(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "maxFailedIndexes"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"negative ttlSecondsAfterFinished": {
+			input: mkJob(tweakTTLSecondsAfterFinished(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "ttlSecondsAfterFinished"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 		"valid with basic scheduling policy": {
@@ -152,18 +196,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			},
 		},
 		"valid resource claim with name reference": {
-			input: mkJob(setGangPolicy(4), addResourceClaims(schedulingv1alpha3.WorkloadPodGroupResourceClaim{
+			input: mkJob(setGangPolicy(4), addResourceClaims(schedulingv1.WorkloadPodGroupResourceClaim{
 				Name: "claim", ResourceClaimName: new("resource-claim"),
 			})),
 			enableWorkloadWithJob: true,
 		},
 		"too many resource claims": {
 			input: mkJob(setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c1", ResourceClaimName: new("rc1")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c2", ResourceClaimName: new("rc2")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c3", ResourceClaimName: new("rc3")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c4", ResourceClaimName: new("rc4")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "c5", ResourceClaimName: new("rc5")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c1", ResourceClaimName: new("rc1")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c2", ResourceClaimName: new("rc2")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c3", ResourceClaimName: new("rc3")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c4", ResourceClaimName: new("rc4")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "c5", ResourceClaimName: new("rc5")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -172,8 +216,8 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with duplicate entries": {
 			input: mkJob(setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-1")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-2")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-1")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new("rc-2")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -182,7 +226,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with neither name nor template": {
 			input: mkJob(setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim"},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim"},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -191,7 +235,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with invalid short name": {
 			input: mkJob(setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "../my-claim", ResourceClaimName: new("rc")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "../my-claim", ResourceClaimName: new("rc")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -200,7 +244,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with empty name": {
 			input: mkJob(setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "", ResourceClaimName: new("rc")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "", ResourceClaimName: new("rc")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -209,7 +253,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with invalid resourceClaimName": {
 			input: mkJob(setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new(".foo_bar")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimName: new(".foo_bar")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -218,7 +262,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		},
 		"resource claim with invalid resourceClaimTemplateName": {
 			input: mkJob(setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimTemplateName: new(".foo_bar")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim", ResourceClaimTemplateName: new(".foo_bar")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -234,10 +278,36 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"invalid toleration key format": {
 			input: mkJob(tweakTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists})),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+				field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
+			},
+		},
+		"activeDeadlineSeconds minimum boundary violation": {
+			input: mkJob(func(job *batch.Job) {
+				deadline := int64(0)
+				job.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(0), "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"activeDeadlineSeconds maximum boundary violation": {
+			input: mkJob(func(job *batch.Job) {
+				deadline := int64(2147483648)
+				job.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
 			},
 		},
 	}
+
+	for _, tc := range poddeclarativevalidation.InvalidPodSpecTestcases(field.NewPath("spec", "template", "spec")) {
+		testCases["podspec:"+tc.ID] = testCase{
+			input:        mkJob(tweakPodSpec(tc.Tweaks...)),
+			expectedErrs: tc.ExpectedErrs,
+		}
+	}
+
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -294,6 +364,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "scheduling", "schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"updating parallelism to negative": {
+			old:    mkJob(setResourceVersion("1"), tweakParallelism(ptr.To[int32](5))),
+			update: mkJob(setResourceVersion("1"), tweakParallelism(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "parallelism"), nil, "").WithOrigin("minimum").MarkAlpha(),
+			},
+		},
+		"updating backoffLimit to negative": {
+			old:    mkJob(setResourceVersion("1"), tweakBackoffLimit(ptr.To[int32](3))),
+			update: mkJob(setResourceVersion("1"), tweakBackoffLimit(ptr.To[int32](-1))),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "backoffLimit"), nil, "").WithOrigin("minimum").MarkAlpha(),
 			},
 		},
 		"adding scheduling after creation is immutable": {
@@ -364,11 +448,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"adding a resource claim is immutable": {
 			old: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
 			)),
 			update: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -377,11 +461,11 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"removing a resource claim is immutable": {
 			old: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-b", ResourceClaimName: new("rc-b")},
 			)),
 			update: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -390,10 +474,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"changing a resource claim name is immutable": {
 			old: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-a")},
 			)),
 			update: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimName: new("rc-b")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -402,10 +486,10 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		},
 		"changing a resource claim template name is immutable": {
 			old: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-a")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-a")},
 			)),
 			update: mkJob(setResourceVersion("1"), setGangPolicy(4), addResourceClaims(
-				schedulingv1alpha3.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-b")},
+				schedulingv1.WorkloadPodGroupResourceClaim{Name: "claim-a", ResourceClaimTemplateName: new("rct-b")},
 			)),
 			enableWorkloadWithJob: true,
 			expectedErrs: field.ErrorList{
@@ -452,8 +536,8 @@ func setResourceVersion(rv string) func(*batch.Job) {
 func setBasicPolicy() func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 			},
 		}
 	}
@@ -462,8 +546,8 @@ func setBasicPolicy() func(*batch.Job) {
 func setGangPolicy(minCount int32) func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(minCount)},
 			},
 		}
 	}
@@ -472,7 +556,7 @@ func setGangPolicy(minCount int32) func(*batch.Job) {
 func setEmptyPolicy() func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{},
 		}
 	}
 }
@@ -486,9 +570,9 @@ func setSchedulingNoPolicy() func(*batch.Job) {
 func setBothPolicies() func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.Scheduling = &batch.JobSchedulingConfiguration{
-			SchedulingPolicy: &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
-				Gang:  &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
+			SchedulingPolicy: &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+				Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
+				Gang:  &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: new(int32(1))},
 			},
 		}
 	}
@@ -500,11 +584,11 @@ func addTopologyConstraint(key string) func(*batch.Job) {
 			setGangPolicy(4)(job)
 		}
 		if job.Spec.Scheduling.SchedulingConstraints == nil {
-			job.Spec.Scheduling.SchedulingConstraints = &schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints{}
+			job.Spec.Scheduling.SchedulingConstraints = &schedulingv1.WorkloadPodGroupSchedulingConstraints{}
 		}
 		job.Spec.Scheduling.SchedulingConstraints.Topology = append(
 			job.Spec.Scheduling.SchedulingConstraints.Topology,
-			schedulingv1alpha3.TopologyConstraint{Key: key},
+			schedulingv1.WorkloadTopologyConstraint{Key: key},
 		)
 	}
 }
@@ -514,8 +598,8 @@ func setDisruptionModeSingle() func(*batch.Job) {
 		if job.Spec.Scheduling == nil {
 			setGangPolicy(4)(job)
 		}
-		job.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-			Single: &schedulingv1alpha3.WorkloadPodGroupSingleDisruptionMode{},
+		job.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{
+			Single: &schedulingv1.WorkloadPodGroupSingleDisruptionMode{},
 		}
 	}
 }
@@ -525,8 +609,8 @@ func setDisruptionModeAll() func(*batch.Job) {
 		if job.Spec.Scheduling == nil {
 			setGangPolicy(4)(job)
 		}
-		job.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{
-			All: &schedulingv1alpha3.WorkloadPodGroupAllDisruptionMode{},
+		job.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{
+			All: &schedulingv1.WorkloadPodGroupAllDisruptionMode{},
 		}
 	}
 }
@@ -536,16 +620,46 @@ func setDisruptionModeNeither() func(*batch.Job) {
 		if job.Spec.Scheduling == nil {
 			setGangPolicy(4)(job)
 		}
-		job.Spec.Scheduling.DisruptionMode = &schedulingv1alpha3.WorkloadPodGroupDisruptionMode{}
+		job.Spec.Scheduling.DisruptionMode = &schedulingv1.WorkloadPodGroupDisruptionMode{}
 	}
 }
 
-func addResourceClaims(claims ...schedulingv1alpha3.WorkloadPodGroupResourceClaim) func(*batch.Job) {
+func addResourceClaims(claims ...schedulingv1.WorkloadPodGroupResourceClaim) func(*batch.Job) {
 	return func(job *batch.Job) {
 		if job.Spec.Scheduling == nil {
 			setGangPolicy(4)(job)
 		}
 		job.Spec.Scheduling.ResourceClaims = append(job.Spec.Scheduling.ResourceClaims, claims...)
+	}
+}
+
+func tweakParallelism(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.Parallelism = v
+	}
+}
+
+func tweakCompletions(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.Completions = v
+	}
+}
+
+func tweakActiveDeadlineSeconds(v *int64) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.ActiveDeadlineSeconds = v
+	}
+}
+
+func tweakBackoffLimit(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.BackoffLimit = v
+	}
+}
+
+func tweakTTLSecondsAfterFinished(v *int32) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.TTLSecondsAfterFinished = v
 	}
 }
 
@@ -564,6 +678,18 @@ func tweakBackoffLimitPerIndex(v *int32) func(*batch.Job) {
 func tweakTolerations(tolerations ...api.Toleration) func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+}
+
+func tweakPodSpec(podTweaks ...podtest.Tweak) func(*batch.Job) {
+	return func(j *batch.Job) {
+		pod := &api.Pod{
+			Spec: j.Spec.Template.Spec,
+		}
+		for _, tweak := range podTweaks {
+			tweak(pod)
+		}
+		j.Spec.Template.Spec = pod.Spec
 	}
 }
 

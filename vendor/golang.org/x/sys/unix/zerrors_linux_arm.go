@@ -489,7 +489,6 @@ const (
 	TIOCSERGWILD                     = 0x5454
 	TIOCSERSETMULTI                  = 0x545b
 	TIOCSERSWILD                     = 0x5455
-	TIOCSER_TEMT                     = 0x1
 	TIOCSETD                         = 0x5423
 	TIOCSIG                          = 0x40045436
 	TIOCSISO7816                     = 0xc0285443
@@ -606,6 +605,7 @@ const (
 	EDQUOT          = syscall.Errno(0x7a)
 	EFSBADCRC       = syscall.Errno(0x4a)
 	EFSCORRUPTED    = syscall.Errno(0x75)
+	EFTYPE          = syscall.Errno(0x86)
 	EHOSTDOWN       = syscall.Errno(0x70)
 	EHOSTUNREACH    = syscall.Errno(0x71)
 	EHWPOISON       = syscall.Errno(0x85)
@@ -846,6 +846,7 @@ var errorList = [...]struct {
 	{131, "ENOTRECOVERABLE", "state not recoverable"},
 	{132, "ERFKILL", "operation not possible due to RF-kill"},
 	{133, "EHWPOISON", "memory page has hardware error"},
+	{134, "EFTYPE", "unknown error 134"},
 }
 
 // Signal table

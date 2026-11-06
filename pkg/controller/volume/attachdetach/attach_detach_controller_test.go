@@ -33,13 +33,13 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	kcache "k8s.io/client-go/tools/cache"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -298,8 +298,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 
 	// Create the controller
 	var wg sync.WaitGroup
-	defer wg.Wait()
-	defer tCtx.Cancel("test case terminating")
+	tCtx.Cleanup(wg.Wait)
 
 	adcObj, err := NewAttachDetachController(
 		tCtx,
@@ -569,8 +568,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 
 	// Create the controller
 	var wg sync.WaitGroup
-	defer wg.Wait()
-	defer tCtx.Cancel("test case terminating")
+	tCtx.Cleanup(wg.Wait)
 
 	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 

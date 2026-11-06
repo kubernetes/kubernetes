@@ -1959,8 +1959,8 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				// we do not expose a stable type for the self variable, even when it is an object that CEL
 				// considers a named type. The only operation developers should be able to perform on the type is
 				// equality checking.
-				"type(self) == type(self)":                                     uint64(1844674407370955268),
-				"type(self.nestedInMap['k1']) == type(self.nestedInMap['k2'])": uint64(1844674407370955272),
+				"type(self) == type(self)":                                     5,
+				"type(self.nestedInMap['k1']) == type(self.nestedInMap['k2'])": 9,
 			},
 		},
 		{name: "listMaps with unsupported identity characters in property names",
@@ -2085,6 +2085,18 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				`quantity("50k").sub(20) == quantity("49980")`:                                                                           uint64(4),
 				`quantity("50").isInteger()`:                                                                                             2,
 				`quantity(self.val1).isInteger()`:                                                                                        314576,
+			},
+		},
+		// Verifies that URL accessor ResultSize propagation keeps downstream
+		// string operations bounded. Without the fix, matches() on an accessor
+		// result treats the input as unbounded (~943721 for an unbound string).
+		// getEscapedPath is higher due to 3x percent-encoding expansion (%XX).
+		{name: "url accessors with bounded string",
+			schema: schemas(withMaxLength(stringType, ptr.To[int64](300))),
+			expectCost: map[string]uint64{
+				`url(self.val1).getScheme().matches('^[a-z]+$')`:       365,
+				`url(self.val1).getHostname().matches('^[a-z]+$')`:     365,
+				`url(self.val1).getEscapedPath().matches('^/[a-z]+$')`: 1206,
 			},
 		},
 	}

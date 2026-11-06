@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -28,8 +29,8 @@ import (
 	"fmt"
 	"strings"
 
-	jose "gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
@@ -37,6 +38,8 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
@@ -75,6 +78,14 @@ func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, erro
 		if err != nil {
 			return nil, fmt.Errorf("could not generate signer for ECDSA keypair: %v", err)
 		}
+	case *mldsa.PrivateKey:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenMLDSA) {
+			return nil, fmt.Errorf("*mldsa.PrivateKey support is not enabled, must be *rsa.PrivateKey, *ecdsa.PrivateKey, or jose.OpaqueSigner")
+		}
+		signer, err = signerFromMLDSAPrivateKey(pk)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate signer for ML-DSA keypair: %w", err)
+		}
 	case jose.OpaqueSigner:
 		signer, err = signerFromOpaqueSigner(pk)
 		if err != nil {
@@ -88,6 +99,52 @@ func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, erro
 		iss:    iss,
 		signer: signer,
 	}, nil
+}
+
+func signerFromMLDSAPrivateKey(pk *mldsa.PrivateKey) (jose.Signer, error) {
+	keyID, err := keyIDFromPublicKey(pk.PublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("getting key ID from public key: %w", err)
+	}
+
+	alg := ""
+	var joseAlg jose.SignatureAlgorithm
+
+	switch pk.PublicKey().Parameters() {
+	case mldsa.MLDSA44():
+		alg = string(jose.MLDSA44)
+		joseAlg = jose.MLDSA44
+	case mldsa.MLDSA65():
+		alg = string(jose.MLDSA65)
+		joseAlg = jose.MLDSA65
+	case mldsa.MLDSA87():
+		alg = string(jose.MLDSA87)
+		joseAlg = jose.MLDSA87
+	default:
+		return nil, fmt.Errorf("unknown ML-DSA key parameter: %v", pk.PublicKey().Parameters().String())
+	}
+
+	privateJWK := &jose.JSONWebKey{
+		Algorithm: alg,
+		Key:       pk,
+		KeyID:     keyID,
+		Use:       "sig",
+	}
+
+	signer, err := jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: joseAlg,
+			Key:       privateJWK,
+		},
+		nil,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %w", err)
+	}
+
+	return signer, nil
+
 }
 
 // keyIDFromPublicKey derives a key ID non-reversibly from a public key.
@@ -124,6 +181,7 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	// Wrap the RSA keypair in a JOSE JWK with the designated key ID.
@@ -156,6 +214,7 @@ func signerFromECDSAPrivateKey(keyPair *ecdsa.PrivateKey) (jose.Signer, error) {
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	switch keyPair.Curve {
@@ -337,12 +396,29 @@ type Validator[PrivateClaims any] interface {
 	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private *PrivateClaims) (*apiserverserviceaccount.ServiceAccountInfo, error)
 }
 
+// IMPORTANT: The algorithms listed below must be kept in sync with:
+// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
+// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
+// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
+// - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
+// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
+var AcceptableServiceAccountSignatureAlgorithms = []jose.SignatureAlgorithm{
+	jose.ES256,
+	jose.ES384,
+	jose.ES512,
+	jose.RS256,
+	jose.MLDSA44,
+	jose.MLDSA65,
+	jose.MLDSA87,
+}
+
 func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
 
-	tok, err := jwt.ParseSigned(tokenData)
+	tok, err := jwt.ParseSigned(tokenData, AcceptableServiceAccountSignatureAlgorithms)
 	if err != nil {
 		return nil, false, nil
 	}
@@ -445,8 +521,31 @@ func (j *jwtTokenAuthenticator[PrivateClaims]) hasCorrectIssuer(tokenData string
 	return j.issuers[claims.Issuer]
 }
 
+// audienceOverrider is a utility struct used to
+// ensure that the audience claim always serializes
+// as a list of string values.
+// This prevents the go-jose change in https://github.com/go-jose/go-jose/blob/25b55feb059b8b08e16a73c601c8b80571fa5208/jwt/claims.go#L129-L135
+// from causing the 'aud' claim in serviceaccount tokens
+// to suddenly be plain strings.
+// Use of this utility struct is intended to allow
+// updating to the latest version of go-jose while maintaining
+// backwards compatibility for serviceaccount token payloads.
+type audienceOverrider struct {
+	Aud []string `json:"aud,omitempty"`
+}
+
 // GenerateToken is shared between internal and external signer code to ensure that claim merging logic remains consistent between them.
 func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateClaims interface{}) (string, error) {
+	audOverride := &audienceOverrider{
+		Aud: []string{},
+	}
+
+	if claims != nil {
+		for _, aud := range claims.Audience {
+			audOverride.Aud = append(audOverride.Aud, aud)
+		}
+	}
+
 	// claims are applied in reverse precedence
 	return jwt.Signed(signer).
 		Claims(privateClaims).
@@ -454,5 +553,6 @@ func GenerateToken(signer jose.Signer, iss string, claims *jwt.Claims, privateCl
 		Claims(&jwt.Claims{
 			Issuer: iss,
 		}).
-		CompactSerialize()
+		Claims(audOverride).
+		Serialize()
 }

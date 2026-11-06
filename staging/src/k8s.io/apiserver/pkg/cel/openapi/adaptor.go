@@ -17,7 +17,7 @@ limitations under the License.
 package openapi
 
 import (
-	"github.com/google/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/ref"
 
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
@@ -80,6 +80,17 @@ func (s *Schema) Properties() map[string]common.Schema {
 		res[n] = &Schema{Schema: &s}
 	}
 	return res
+}
+
+func (s *Schema) HasProperties() bool {
+	return s.Schema.Properties != nil
+}
+
+func (s *Schema) Property(key string) (common.Schema, bool) {
+	if prop, ok := s.Schema.Properties[key]; ok {
+		return &Schema{Schema: &prop}, true
+	}
+	return nil, false
 }
 
 func (s *Schema) AdditionalProperties() common.SchemaOrBool {

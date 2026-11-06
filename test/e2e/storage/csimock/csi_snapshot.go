@@ -155,7 +155,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				// Refer https://github.com/kubernetes/kubernetes/pull/99167#issuecomment-781670012
 				if claim != nil && claim.Spec.VolumeName != "" {
 					ginkgo.By(fmt.Sprintf("Wait for PV %s to be deleted", claim.Spec.VolumeName))
-					err = e2epv.WaitForPersistentVolumeDeleted(ctx, m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
+					err = e2epv.WaitForPersistentVolumeDeleted(ctx, m.cs, claim.Spec.VolumeName, framework.Poll, f.Timeouts.PVDelete)
 					framework.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
 				}
 
@@ -310,7 +310,7 @@ var _ = utils.SIGDescribe("CSI Mock volume snapshot", func() {
 				}
 				ginkgo.DeferCleanup(m.cleanup)
 
-				metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, m.config.Framework.ClientSet, nil, f.ClientConfig(), false, false, false, false, false, true)
+				metricsGrabber, err := e2emetrics.NewMetricsGrabber(ctx, m.config.Framework.ClientSet, f.ClientConfig(), false, false, false, false, false, true)
 				if err != nil {
 					framework.Failf("Error creating metrics grabber : %v", err)
 				}

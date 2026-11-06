@@ -1,0 +1,24 @@
+# An example of the validations a project adds to the built-in ones, read by
+# the stock validation-gen via --validation-extensions-file. See README.md.
+formats:
+  # Patterns are single-quoted: YAML takes a single-quoted scalar literally,
+  # while a double-quoted one would read \s as an escape and fail.
+  - name: example-uri
+    docs: This field holds an absolute URI, with a scheme.
+    pattern: '^[a-z][a-z0-9+.-]*://[^\s]+$'
+    message: must be an absolute URI with a scheme (e.g. 'https://example.com/path')
+
+  - name: example-hex-digest
+    docs: This field holds a lower-case hexadecimal digest.
+    pattern: '^[0-9a-f]{8,}$'
+    message: must be a lower-case hexadecimal digest of at least 8 characters
+
+  - name: example-semver
+    docs: This field holds a semantic version, with a leading "v".
+    pattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+    message: must be a semantic version with a leading "v" (e.g. 'v1.2.3')
+
+  - name: example-base64
+    docs: This field holds standard base64-encoded data.
+    pattern: '^[A-Za-z0-9+/]*={0,2}$'
+    message: must be standard base64-encoded data

@@ -85,6 +85,12 @@ func TestRequiredValue(t *testing.T) {
 			return RequiredValue(context.Background(), op, fp, &value, nil)
 		},
 		err: "fldpath: Required value",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			value := "" // zero-value
+			return RequiredValue(context.Background(), op, fp, &value, nil, "custom msg")
+		},
+		err: "fldpath: Required value: custom msg",
 	}}
 
 	for i, tc := range cases {
@@ -168,6 +174,12 @@ func TestRequiredPointer(t *testing.T) {
 			return RequiredPointer(context.Background(), op, fp, pointer, nil)
 		},
 		err: "fldpath: Required value",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			pointer := (*string)(nil)
+			return RequiredPointer(context.Background(), op, fp, pointer, nil, "custom msg")
+		},
+		err: "fldpath: Required value: custom msg",
 	}}
 
 	for i, tc := range cases {
@@ -240,6 +252,12 @@ func TestRequiredSlice(t *testing.T) {
 			return RequiredSlice(context.Background(), op, fp, value, nil)
 		},
 		err: "fldpath: Required value",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			value := []string{}
+			return RequiredSlice(context.Background(), op, fp, value, nil, "custom msg")
+		},
+		err: "fldpath: Required value: custom msg",
 	}}
 
 	for i, tc := range cases {
@@ -301,6 +319,12 @@ func TestRequiredMap(t *testing.T) {
 			return RequiredMap(context.Background(), op, fp, value, nil)
 		},
 		err: "fldpath: Required value",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			value := map[string]string{}
+			return RequiredMap(context.Background(), op, fp, value, nil, "custom msg")
+		},
+		err: "fldpath: Required value: custom msg",
 	}}
 
 	for i, tc := range cases {
@@ -683,6 +707,12 @@ func TestForbiddenValue(t *testing.T) {
 			return ForbiddenValue(context.Background(), op, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			value := "value"
+			return ForbiddenValue(context.Background(), op, fp, &value, nil, "custom msg")
+		},
+		err: "fldpath: Forbidden: custom msg",
 	}}
 
 	for i, tc := range cases {
@@ -766,6 +796,12 @@ func TestForbiddenPointer(t *testing.T) {
 			return ForbiddenPointer(context.Background(), op, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			value := ""
+			return ForbiddenPointer(context.Background(), op, fp, &value, nil, "custom msg")
+		},
+		err: "fldpath: Forbidden: custom msg",
 	}}
 
 	for i, tc := range cases {
@@ -838,6 +874,12 @@ func TestForbiddenSlice(t *testing.T) {
 			return ForbiddenSlice(context.Background(), op, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			value := []string{""}
+			return ForbiddenSlice(context.Background(), op, fp, value, nil, "custom msg")
+		},
+		err: "fldpath: Forbidden: custom msg",
 	}}
 
 	for i, tc := range cases {
@@ -899,6 +941,12 @@ func TestForbiddenMap(t *testing.T) {
 			return ForbiddenMap(context.Background(), op, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
+	}, {
+		fn: func(op operation.Operation, fp *field.Path) field.ErrorList {
+			value := map[string]string{"": ""}
+			return ForbiddenMap(context.Background(), op, fp, value, nil, "custom msg")
+		},
+		err: "fldpath: Forbidden: custom msg",
 	}}
 
 	for i, tc := range cases {

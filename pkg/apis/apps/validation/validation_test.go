@@ -612,19 +612,19 @@ func TestValidateStatefulSet(t *testing.T) {
 		name: "invalid restart policy 1",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyOnFailure)),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "invalid restart policy 2",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyNever)),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "empty restart policy",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 			field.Required(field.NewPath("spec", "template", "spec", "restartPolicy"), ""),
 		},
 	}, {
@@ -684,7 +684,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		set:  mkStatefulSet(&invalidPodTemplate2, tweakReplicas(3)),
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
-			field.Required(field.NewPath("spec", "template", "spec", "containers"), ""),
+			field.Required(field.NewPath("spec", "template", "spec", "containers"), "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "empty PersistentVolumeClaimRetentionPolicy",
@@ -1340,7 +1340,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		old:    mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault)),
 		update: mkStatefulSet(&validPodTemplate, tweakNamespace(metav1.NamespaceDefault+"1")),
 		errs: field.ErrorList{
-			field.Invalid(field.NewPath("metadata", "namespace"), nil, ""),
+			field.Invalid(field.NewPath("metadata", "namespace"), nil, "").WithOrigin("immutable").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "update selector",
@@ -1411,7 +1411,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				"map[string]string{\\\"NoUppercaseOrSpecialCharsLike=Equals\\\":\\\"b\\\"}", ""),
 			field.Invalid(field.NewPath("spec", "template", "metadata", "labels"),
 				"map[string]string{\\\"NoUppercaseOrSpecialCharsLike=Equals\\\":\\\"b\\\"}", ""),
-			field.Required(field.NewPath("spec", "template", "spec", "containers"), ""),
+			field.Required(field.NewPath("spec", "template", "spec", "containers"), "").MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "switch from RollingUpdate to Recreate, RecreateFG off",

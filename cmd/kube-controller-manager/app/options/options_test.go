@@ -61,7 +61,9 @@ import (
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
 	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
+	evictionrequestconfig "k8s.io/kubernetes/pkg/controller/evictionrequest/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
+	imperativeevictionresponderconfig "k8s.io/kubernetes/pkg/controller/imperativeevictionresponder/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
@@ -109,9 +111,11 @@ var args = []string{
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
+	"--concurrent-eviction-request-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
+	"--concurrent-imperative-eviction-responder-syncs=17",
 	"--concurrent-job-syncs=10",
 	"--concurrent-cron-job-syncs=10",
 	"--concurrent-replicaset-syncs=10",
@@ -317,6 +321,11 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentEphemeralVolumeSyncs: 10,
 			},
 		},
+		EvictionRequestController: &EvictionRequestControllerOptions{
+			&evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
+			},
+		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
@@ -335,6 +344,11 @@ func TestAddFlags(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
+			},
+		},
+		ImperativeEvictionResponderController: &ImperativeEvictionResponderControllerOptions{
+			&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+				ConcurrentImperativeEvictionResponderSyncs: 17,
 			},
 		},
 		JobController: &JobControllerOptions{
@@ -539,6 +553,13 @@ func TestValidateFlags(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "concurrent eviction request syncs set to 0",
+			flags: []string{
+				"--concurrent-eviction-request-syncs=0",
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -663,6 +684,9 @@ func TestApplyTo(t *testing.T) {
 			EphemeralVolumeController: ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
 				ConcurrentEphemeralVolumeSyncs: 10,
 			},
+			EvictionRequestController: evictionrequestconfig.EvictionRequestControllerConfiguration{
+				ConcurrentEvictionRequestSyncs: 10,
+			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
@@ -678,6 +702,9 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
+			},
+			ImperativeEvictionResponderController: imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+				ConcurrentImperativeEvictionResponderSyncs: 17,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 10,
@@ -1256,6 +1283,26 @@ func TestValidateControllersOptions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                   "EvictionRequestControllerOptions ConcurrentEvictionRequestSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must not be less than 1",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
+		{
+			name:                   "EvictionRequestControllerOptions ConcurrentEvictionRequestSyncs equal 0",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must not be more than 50",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 51,
+				},
+			},
+		},
 		/* empty errs */
 		{
 			name:         "CronJobControllerOptions",
@@ -1303,6 +1350,15 @@ func TestValidateControllersOptions(t *testing.T) {
 			},
 		},
 		{
+			name:         "EvictionRequestControllerOptions",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 10,
+				},
+			},
+		},
+		{
 			name:         "ResourceClaimControllerOptions",
 			expectErrors: false,
 			options: &ResourceClaimControllerOptions{
@@ -1338,6 +1394,35 @@ func TestValidateControllersOptions(t *testing.T) {
 						{Group: eventv1.GroupName, Resource: "events"},
 					},
 					EnableGarbageCollector: false,
+				},
+			},
+		},
+		{
+			name:         "ImperativeEvictionResponderControllerConfiguration",
+			expectErrors: false,
+			options: &ImperativeEvictionResponderControllerOptions{
+				&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+					ConcurrentImperativeEvictionResponderSyncs: 17,
+				},
+			},
+		},
+		{
+			name:                   "ImperativeEvictionResponderControllerConfiguration lower than minConcurrentImperativeEvictionResponderSyncs (1)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-imperative-eviction-responder-syncs must not be less than 1",
+			options: &ImperativeEvictionResponderControllerOptions{
+				&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+					ConcurrentImperativeEvictionResponderSyncs: 0,
+				},
+			},
+		},
+		{
+			name:                   "ImperativeEvictionResponderControllerConfiguration greater than maxConcurrentImperativeEvictionResponderSyncs (50)",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-imperative-eviction-responder-syncs must not be more than 50",
+			options: &ImperativeEvictionResponderControllerOptions{
+				&imperativeevictionresponderconfig.ImperativeEvictionResponderControllerConfiguration{
+					ConcurrentImperativeEvictionResponderSyncs: 51,
 				},
 			},
 		},
@@ -1438,6 +1523,30 @@ func TestValidateControllersOptions(t *testing.T) {
 					ConcurrentTTLSyncs: 8,
 				},
 			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions valid",
+			expectErrors: false,
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 5,
+				},
+			},
+		},
+		{
+			name:                   "EvictionRequestControllerOptions zero syncs",
+			expectErrors:           true,
+			expectedErrorSubString: "concurrent-eviction-request-syncs must not be less than 1",
+			options: &EvictionRequestControllerOptions{
+				&evictionrequestconfig.EvictionRequestControllerConfiguration{
+					ConcurrentEvictionRequestSyncs: 0,
+				},
+			},
+		},
+		{
+			name:         "EvictionRequestControllerOptions nil",
+			expectErrors: false,
+			options:      (*EvictionRequestControllerOptions)(nil),
 		},
 	}
 

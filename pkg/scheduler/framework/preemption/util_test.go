@@ -17,6 +17,7 @@ limitations under the License.
 package preemption
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -24,8 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -41,6 +40,7 @@ func TestFilterVictimsWithPDBViolation(t *testing.T) {
 	viNoPDBMatch := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Label("app", "foo").Obj())}, keyType: fwk.PodKeyType}
 	viMatchPDB := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj())}, keyType: fwk.PodKeyType}
 	viMatchPDB2 := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p2").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj())}, keyType: fwk.PodKeyType}
+	viNoLabels := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Obj())}, keyType: fwk.PodKeyType}
 	viPodGroup := &victim{
 		pods: []fwk.PodInfo{
 			newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj()),
@@ -205,7 +205,29 @@ func TestFilterVictimsWithPDBViolation(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
 					Spec: policy.PodDisruptionBudgetSpec{
-						Selector: &metav1.LabelSelector{}, // matches nothing
+						Selector: &metav1.LabelSelector{},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating: []ViolatingVictim[*victim]{
+				{
+					Victim:       viMatchPDB,
+					ViolateCount: 1,
+				},
+			},
+			expectedNonViolating: nil,
+		},
+		{
+			name:    "PDB with nil selector",
+			victims: []*victim{viMatchPDB},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: nil,
 					},
 					Status: policy.PodDisruptionBudgetStatus{
 						DisruptionsAllowed: 0,
@@ -214,6 +236,74 @@ func TestFilterVictimsWithPDBViolation(t *testing.T) {
 			},
 			expectedViolating:    nil,
 			expectedNonViolating: []*victim{viMatchPDB},
+		},
+		{
+			name:    "unlabeled victim with empty PDB selector",
+			victims: []*victim{viNoLabels},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating: []ViolatingVictim[*victim]{
+				{
+					Victim:       viNoLabels,
+					ViolateCount: 1,
+				},
+			},
+			expectedNonViolating: nil,
+		},
+		{
+			name:    "unlabeled victim with nil PDB selector",
+			victims: []*victim{viNoLabels},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: nil,
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating:    nil,
+			expectedNonViolating: []*victim{viNoLabels},
+		},
+		{
+			name:    "unlabeled victim matching PDB",
+			victims: []*victim{viNoLabels},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "app",
+									Operator: metav1.LabelSelectorOpDoesNotExist,
+								},
+							},
+						},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating: []ViolatingVictim[*victim]{
+				{
+					Victim:       viNoLabels,
+					ViolateCount: 1,
+				},
+			},
+			expectedNonViolating: nil,
 		},
 		{
 			name:    "Multiple PDBs",
@@ -764,364 +854,129 @@ func TestPodTerminatingByPreemption(t *testing.T) {
 	}
 }
 
-func TestGetPodPriority(t *testing.T) {
+func TestCompareVictimSets(t *testing.T) {
+	now := time.Now()
+	makeVictim := func(name string, priority int32, keyType fwk.EntityKeyType, podCount int, startOffset time.Duration, pdbViolations int) fwk.PreemptionVictim {
+		var pods []fwk.PodInfo
+		for i := range podCount {
+			podName := fmt.Sprintf("%s-%d", name, i)
+			pod := st.MakePod().Name(podName).UID(podName).Priority(priority).StartTime(metav1.NewTime(now.Add(startOffset))).Node("node1").Obj()
+			pi, _ := framework.NewPodInfo(pod)
+			pods = append(pods, pi)
+		}
+		v, err := NewVictim(pods, priority, keyType)
+		if err != nil {
+			t.Fatalf("NewVictim failed: %v", err)
+		}
+		return &victimWithPDBViolations{
+			Victim:           v,
+			numPDBViolations: pdbViolations,
+		}
+	}
+
+	veryLowPrioPod := makeVictim("very-low-pod", 1, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	veryLowPrioPodGroupSize3 := makeVictim("very-low-pg-3", 1, fwk.PodGroupKeyType, 3, -10*time.Minute, 0)
+	lowPrioPod := makeVictim("low-pod", 10, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	lowPrioPDBViolatingPod := makeVictim("low-pod-pdb", 10, fwk.PodKeyType, 1, -10*time.Minute, 1)
+	midLowPrioPod := makeVictim("mid-low-pod", 9, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	midHighPrioPod := makeVictim("mid-high-pod", 19, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	highPrioPod := makeVictim("high-pod", 20, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	highPrioPodGroupSize2 := makeVictim("high-pg-2", 20, fwk.PodGroupKeyType, 2, -10*time.Minute, 0)
+	podGroupSize1 := makeVictim("pg-1", 10, fwk.PodGroupKeyType, 1, -10*time.Minute, 0)
+	podGroupSize2 := makeVictim("pg-2", 10, fwk.PodGroupKeyType, 2, -10*time.Minute, 0)
+	podGroupSize3 := makeVictim("pg-3", 10, fwk.PodGroupKeyType, 3, -10*time.Minute, 0)
+	podGroupSize4 := makeVictim("pg-4", 10, fwk.PodGroupKeyType, 4, -10*time.Minute, 0)
+	youngerLowPrioPod := makeVictim("young-low-pod", 10, fwk.PodKeyType, 1, -1*time.Minute, 0)
+
 	tests := []struct {
-		name                    string
-		pod                     *v1.Pod
-		podGroupLister          fwk.PodGroupLister
-		compositePodGroupLister fwk.CompositePodGroupLister
-		expectedPriority        int32
+		name      string
+		set1      []fwk.PreemptionVictim
+		set2      []fwk.PreemptionVictim
+		wantOrder int // -1 if set1 is strictly better to preempt than set2, 1 if worse, 0 if equal
 	}{
 		{
-			name:                    "pod without PodGroup returns pod priority",
-			pod:                     st.MakePod().Name("p1").Priority(10).Obj(),
-			podGroupLister:          nil,
-			compositePodGroupLister: nil,
-			expectedPriority:        10,
+			name:      "empty set strictly preferred over non-empty set",
+			set1:      nil,
+			set2:      []fwk.PreemptionVictim{lowPrioPod},
+			wantOrder: -1,
 		},
 		{
-			name: "pod with PodGroup returns PodGroup priority instead of pod priority",
-			pod:  st.MakePod().Name("p2").Priority(10).PodGroupName("pg1").Obj(),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Name("pg1").Priority(50).Obj(),
-				},
-			},
-			compositePodGroupLister: nil,
-			expectedPriority:        50,
+			name:      "fewer PDB violations strictly preferred",
+			set1:      []fwk.PreemptionVictim{highPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPDBViolatingPod},
+			wantOrder: -1,
 		},
 		{
-			name:                    "pod with PodGroup but nil PodGroupLister falls back to pod priority",
-			pod:                     st.MakePod().Name("p4").Priority(20).PodGroupName("pg1").Obj(),
-			podGroupLister:          nil,
-			compositePodGroupLister: nil,
-			expectedPriority:        20,
+			name:      "lower priority victim preferred over higher priority victim",
+			set1:      []fwk.PreemptionVictim{lowPrioPod},
+			set2:      []fwk.PreemptionVictim{highPrioPod},
+			wantOrder: -1,
 		},
 		{
-			name:                    "pod with PodGroup but PodGroup not found in lister falls back to pod priority",
-			pod:                     st.MakePod().Name("p5").Priority(30).PodGroupName("missing-pg").Obj(),
-			podGroupLister:          &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
-			compositePodGroupLister: nil,
-			expectedPriority:        30,
+			name:      "priorities across the set compared before total pod count",
+			set1:      []fwk.PreemptionVictim{highPrioPod, veryLowPrioPodGroupSize3},
+			set2:      []fwk.PreemptionVictim{highPrioPod, midHighPrioPod},
+			wantOrder: -1,
 		},
 		{
-			name:                    "pod with nil priority and without PodGroup returns zero priority",
-			pod:                     st.MakePod().Name("p6").Obj(),
-			podGroupLister:          nil,
-			compositePodGroupLister: nil,
-			expectedPriority:        0,
+			name:      "fewer evicted pods at highest priority preferred even with higher secondary priority",
+			set1:      []fwk.PreemptionVictim{lowPrioPod, midLowPrioPod},
+			set2:      []fwk.PreemptionVictim{podGroupSize3, veryLowPrioPod},
+			wantOrder: -1,
 		},
 		{
-			name: "pod with PodGroup and parent CPG, returns CPG priority",
-			pod:  st.MakePod().Name("p7").Priority(10).PodGroupName("pg1").Obj(),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "pg1"},
-						Spec: schedulingv1beta1.PodGroupSpec{
-							ParentCompositePodGroupName: new("cpg1"),
-						},
-					},
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							Priority: new(int32(150)),
-						},
-					},
-				},
-			},
-			expectedPriority: 150,
+			name:      "fewer evicted pods at highest priority preferred over multi-pod group at same priority",
+			set1:      []fwk.PreemptionVictim{highPrioPod, midHighPrioPod},
+			set2:      []fwk.PreemptionVictim{highPrioPodGroupSize2, veryLowPrioPod},
+			wantOrder: -1,
 		},
 		{
-			name: "pod with PodGroup and grandparent CPG, returns grandparent CPG priority",
-			pod:  st.MakePod().Name("p8").Priority(10).PodGroupName("pg1").Obj(),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "pg1"},
-						Spec: schedulingv1beta1.PodGroupSpec{
-							ParentCompositePodGroupName: new("cpg1"),
-						},
-					},
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg2"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							Priority: new(int32(250)),
-						},
-					},
-				},
-			},
-			expectedPriority: 250,
+			name:      "fewer total evicted pods preferred when priorities match",
+			set1:      []fwk.PreemptionVictim{podGroupSize2},
+			set2:      []fwk.PreemptionVictim{lowPrioPod, lowPrioPod, lowPrioPod},
+			wantOrder: -1,
 		},
 		{
-			name: "pod with PodGroup and parent CPG, but nil compositePodGroupLister, falls back to PodGroup priority",
-			pod:  st.MakePod().Name("p9").Priority(10).PodGroupName("pg1").Obj(),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Name("pg1").Priority(50).ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: nil,
-			expectedPriority:        50,
+			name:      "one 4-pod PodGroup preferred over three 3-pod PodGroups of same priority",
+			set1:      []fwk.PreemptionVictim{podGroupSize4},
+			set2:      []fwk.PreemptionVictim{podGroupSize3, podGroupSize3, podGroupSize3},
+			wantOrder: -1,
 		},
 		{
-			name: "pod with PodGroup and parent CPG, but parent CPG not found in lister, falls back to PodGroup priority",
-			pod:  st.MakePod().Name("p10").Priority(10).PodGroupName("pg1").Obj(),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Name("pg1").Priority(50).ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{},
-			},
-			expectedPriority: 50,
+			name:      "standalone pod preferred over PodGroup of same priority and total pod count",
+			set1:      []fwk.PreemptionVictim{lowPrioPod},
+			set2:      []fwk.PreemptionVictim{podGroupSize1},
+			wantOrder: -1,
 		},
 		{
-			name: "pod with PodGroup, parent CPG and grandparent CPG, but grandparent CPG not found in lister, falls back to parent CPG priority",
-			pod:  st.MakePod().Name("p11").Priority(10).PodGroupName("pg1").Obj(),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Name("pg1").Priority(50).ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							Priority:                    new(int32(150)),
-							ParentCompositePodGroupName: new("missing-cpg2"),
-						},
-					},
-				},
-			},
-			expectedPriority: 150,
+			name:      "smaller PodGroup preferred over larger PodGroup of same priority",
+			set1:      []fwk.PreemptionVictim{podGroupSize2},
+			set2:      []fwk.PreemptionVictim{podGroupSize4},
+			wantOrder: -1,
 		},
 		{
-			name: "pod with PodGroup, but PodGroup not found in lister and non-nil compositePodGroupLister, falls back to pod priority",
-			pod:  st.MakePod().Name("p12").Priority(50).PodGroupName("missing-pg").Obj(),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{},
-			},
-			expectedPriority: 50,
+			name:      "fewer victim units preferred when structural importance ties",
+			set1:      []fwk.PreemptionVictim{lowPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPod, youngerLowPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "equal cost when structural importance and counts tie",
+			set1:      []fwk.PreemptionVictim{youngerLowPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPod},
+			wantOrder: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetPodPriority(tt.pod, tt.podGroupLister, tt.compositePodGroupLister)
-			if got != tt.expectedPriority {
-				t.Errorf("GetPodPriority() = %v, want %v", got, tt.expectedPriority)
+			got := CompareVictimSets(tt.set1, tt.set2)
+			if got != tt.wantOrder {
+				t.Errorf("CompareVictimSets(set1, set2) = %d, want %d", got, tt.wantOrder)
 			}
-		})
-	}
-}
-
-func TestTraverseHierarchyUp(t *testing.T) {
-	namespace := metav1.NamespaceDefault
-
-	tests := []struct {
-		name                    string
-		startKey                fwk.EntityKey
-		podGroupLister          fwk.PodGroupLister
-		compositePodGroupLister fwk.CompositePodGroupLister
-		stopAt                  string
-		expectedVisitedKeys     []fwk.EntityKey
-	}{
-		{
-			name:                    "nil podGroupLister",
-			startKey:                fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister:          nil,
-			compositePodGroupLister: nil,
-			expectedVisitedKeys:     nil,
-		},
-		{
-			name:     "nil compositePodGroupLister",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Name("pg1").Obj(),
-				},
-			},
-			compositePodGroupLister: nil,
-			expectedVisitedKeys:     nil,
-		},
-		{
-			name:                    "unsupported key type",
-			startKey:                fwk.PodKey(namespace, "p1"),
-			podGroupLister:          &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys:     nil,
-		},
-		{
-			name:     "single PG without parent CPG",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-			},
-		},
-		{
-			name:     "PG -> parent CPG -> grandparent CPG",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
-				},
-			},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg2"),
-			},
-		},
-		{
-			name:           "start directly from CPG",
-			startKey:       fwk.CompositePodGroupKey(namespace, "cpg1"),
-			podGroupLister: &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
-				},
-			},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg2"),
-			},
-		},
-		{
-			name:     "early stop via visitFn",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-					},
-				},
-			},
-			stopAt: "cpg1",
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-			},
-		},
-		{
-			name:     "cycle detection between CPGs",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("cpg1").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{
-				compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{
-					"cpg1": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg1"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg2"),
-						},
-					},
-					"cpg2": {
-						ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: "cpg2"},
-						Spec: schedulingv1alpha3.CompositePodGroupSpec{
-							ParentCompositePodGroupName: new("cpg1"),
-						},
-					},
-				},
-			},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg1"),
-				fwk.CompositePodGroupKey(namespace, "cpg2"),
-			},
-		},
-		{
-			name:                    "missing PG in lister",
-			startKey:                fwk.PodGroupKey(namespace, "missing-pg"),
-			podGroupLister:          &mockPodGroupLister{podGroups: map[string]*schedulingv1beta1.PodGroup{}},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys:     nil,
-		},
-		{
-			name:     "missing parent CPG in lister stops gracefully",
-			startKey: fwk.PodGroupKey(namespace, "pg1"),
-			podGroupLister: &mockPodGroupLister{
-				podGroups: map[string]*schedulingv1beta1.PodGroup{
-					"pg1": st.MakePodGroup().Namespace(namespace).Name("pg1").ParentCompositePodGroup("missing-cpg").Obj(),
-				},
-			},
-			compositePodGroupLister: &mockCompositePodGroupLister{compositePodGroups: map[string]*schedulingv1alpha3.CompositePodGroup{}},
-			expectedVisitedKeys: []fwk.EntityKey{
-				fwk.PodGroupKey(namespace, "pg1"),
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var visitedKeys []fwk.EntityKey
-			traverseFn := func(key fwk.EntityKey, pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup) bool {
-				visitedKeys = append(visitedKeys, key)
-				return key.Name == tt.stopAt
-			}
-			TraverseHierarchyUp(namespace, tt.startKey, tt.podGroupLister, tt.compositePodGroupLister, traverseFn)
-			if diff := cmp.Diff(tt.expectedVisitedKeys, visitedKeys); diff != "" {
-				t.Errorf("TraverseHierarchyUp() mismatch (-want, +got):\n%s", diff)
+			gotRev := CompareVictimSets(tt.set2, tt.set1)
+			if gotRev != -tt.wantOrder {
+				t.Errorf("CompareVictimSets(set2, set1) = %d, want %d", gotRev, -tt.wantOrder)
 			}
 		})
 	}

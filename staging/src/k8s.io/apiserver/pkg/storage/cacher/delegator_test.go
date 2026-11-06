@@ -31,10 +31,16 @@ func TestConsistencyCheckerDigestMatches(t *testing.T) {
 	ctx, store, terminate := testSetup(t)
 	t.Cleanup(terminate)
 
+	originalPageSize := consistency.CheckerListPageSize
+	consistency.CheckerListPageSize = 10
+	t.Cleanup(func() {
+		consistency.CheckerListPageSize = originalPageSize
+	})
+
 	var out example.Pod
 	resourceVersion := ""
-	t.Logf("Create %d pods to ensure pagination", storageWatchListPageSize+1)
-	for i := 0; i < int(storageWatchListPageSize)+1; i++ {
+	t.Logf("Create %d pods to ensure pagination", consistency.CheckerListPageSize+1)
+	for i := 0; i <= int(consistency.CheckerListPageSize); i++ {
 		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: fmt.Sprintf("%d", i)}}
 		err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
 		if err != nil {
@@ -49,8 +55,8 @@ func TestConsistencyCheckerDigestMatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(outList.Items) != int(storageWatchListPageSize)+1 {
-		t.Errorf("Expect to get %d pods, got %d", storageWatchListPageSize+1, len(outList.Items))
+	if len(outList.Items) != int(consistency.CheckerListPageSize)+1 {
+		t.Errorf("Expect to get %d pods, got %d", consistency.CheckerListPageSize+1, len(outList.Items))
 	}
 
 	checker := consistency.NewChecker("/pods/", schema.GroupResource{}, store.cacher.newListFunc, store.cacher, store.storage)

@@ -427,6 +427,25 @@ function kube::util::test_openssl_installed {
     OPENSSL_BIN=$(command -v openssl)
 }
 
+# OpenSSL 3.5.0 introduced native ML-DSA support:
+# https://openssl-library.org/news/openssl-3.5-notes/
+function kube::util::test_curl_mldsa_support {
+  local version
+  if ! version=$(curl --version 2>&1); then
+    kube::log::error "Failed to run curl --version: ${version}. ENABLE_MLDSA=true requires curl using OpenSSL 3.5.0 or newer; install a compatible curl build."
+    return 1
+  fi
+  version="${version%%$'\n'*}"
+  # Inactive TLS backends in MultiSSL builds are parenthesized.
+  if [[ "${version}" =~ (^|[[:space:]])OpenSSL/([0-9]+)\.([0-9]+)\.[0-9]+ ]]; then
+    if (( BASH_REMATCH[2] > 3 || (BASH_REMATCH[2] == 3 && BASH_REMATCH[3] >= 5) )); then
+      return 0
+    fi
+  fi
+  kube::log::error "ENABLE_MLDSA=true requires curl using OpenSSL 3.5.0 or newer; detected: ${version}. Upgrade or install curl built with a compatible OpenSSL backend."
+  return 1
+}
+
 # Query the API server for client certificate authentication capabilities
 function kube::util::test_client_certificate_authentication_enabled {
   local output
@@ -436,10 +455,20 @@ function kube::util::test_client_certificate_authentication_enabled {
     | "${OPENSSL_BIN}" s_client -connect "127.0.0.1:${SECURE_API_PORT}" 2> /dev/null \
     | grep -A3 'Acceptable client certificate CA names')
 
-  if [[ "${output}" != *"/CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
+  if [[ "${output}" != *"CN=127.0.0.1"* ]] && [[ "${output}" != *"CN = 127.0.0.1"* ]]; then
     echo "API server not configured for client certificate authentication"
     echo "Output of from acceptable client certificate check: ${output}"
     exit 1
+  fi
+}
+
+function kube::util::cfssl_keyspec {
+  local key_algo="${KUBE_CERT_KEY_ALGO:-rsa}"
+  local key_size="${KUBE_CERT_KEY_SIZE:-2048}"
+  if [[ "${key_algo}" == mldsa* ]]; then
+    echo -n "{\"algo\":\"${key_algo}\"}"
+  else
+    echo -n "{\"algo\":\"${key_algo}\",\"size\":${key_size}}"
   fi
 }
 
@@ -453,15 +482,21 @@ function kube::util::create_signing_certkey {
     local dest_dir=$2
     local id=$3
     local purpose=$4
-    # Create client ca
+    local keyspec
+    keyspec=$(kube::util::cfssl_keyspec)
     ${sudo} /usr/bin/env bash -e <<EOF
     rm -f "${dest_dir}/${id}-ca.crt" "${dest_dir}/${id}-ca.key"
-    ${OPENSSL_BIN} req -x509 -sha256 -new -nodes -days 365 -newkey rsa:2048 -keyout "${dest_dir}/${id}-ca.key" -out "${dest_dir}/${id}-ca.crt" -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=ca/emailAddress=x/"
-    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment",${purpose}]}}}' > "${dest_dir}/${id}-ca-config.json"
+    cd "${dest_dir}"
+    echo '{"CN":"${id}-ca","key":${keyspec}}' | ${CFSSL_BIN} gencert -initca - | ${CFSSLJSON_BIN} -bare ${id}-ca
+    mv "${id}-ca.pem" "${id}-ca.crt"
+    mv "${id}-ca-key.pem" "${id}-ca.key"
+    rm -f "${id}-ca.csr"
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","digital signature",${purpose}]}}}' > "${dest_dir}/${id}-ca-config.json"
 EOF
 }
 
 # signs a client certificate: args are sudo, dest-dir, CA, filename (roughly), username, groups...
+# When KUBE_CERT_KEY_ALGO is set (e.g. mldsa65), uses that algorithm instead of RSA-2048.
 function kube::util::create_client_certkey {
     local sudo=$1
     local dest_dir=$2
@@ -476,9 +511,11 @@ function kube::util::create_client_certkey {
         SEP=","
         shift 1
     done
+    local keyspec
+    keyspec=$(kube::util::cfssl_keyspec)
     ${sudo} /usr/bin/env bash -e <<EOF
     cd ${dest_dir}
-    echo '{"CN":"${cn}","names":[${groups}],"hosts":[],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
+    echo '{"CN":"${cn}","names":[${groups}],"hosts":[],"key":${keyspec}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare client-${id}
     mv "client-${id}-key.pem" "client-${id}.key"
     mv "client-${id}.pem" "client-${id}.crt"
     rm -f "client-${id}.csr"
@@ -486,6 +523,7 @@ EOF
 }
 
 # signs a serving certificate: args are sudo, dest-dir, ca, filename (roughly), subject, hosts...
+# When KUBE_CERT_KEY_ALGO is set (e.g. mldsa65), uses that algorithm instead of RSA-2048.
 function kube::util::create_serving_certkey {
     local sudo=$1
     local dest_dir=$2
@@ -500,9 +538,11 @@ function kube::util::create_serving_certkey {
         SEP=","
         shift 1
     done
+    local keyspec
+    keyspec=$(kube::util::cfssl_keyspec)
     ${sudo} /usr/bin/env bash -e <<EOF
     cd ${dest_dir}
-    echo '{"CN":"${cn}","hosts":[${hosts}],"key":{"algo":"rsa","size":2048}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare serving-${id}
+    echo '{"CN":"${cn}","hosts":[${hosts}],"key":${keyspec}}' | ${CFSSL_BIN} gencert -ca=${ca}.crt -ca-key=${ca}.key -config=${ca}-config.json - | ${CFSSLJSON_BIN} -bare serving-${id}
     mv "serving-${id}-key.pem" "serving-${id}.key"
     mv "serving-${id}.pem" "serving-${id}.crt"
     rm -f "serving-${id}.csr"
@@ -623,15 +663,6 @@ function kube::util::ensure-cfssl {
     return 0
   fi
 
-  host_arch=$(kube::util::host_arch)
-
-  if [[ "${host_arch}" != "amd64" ]]; then
-    echo "Cannot download cfssl on non-amd64 hosts and cfssl does not appear to be installed."
-    echo "Please install cfssl and cfssljson and verify they are in \$PATH."
-    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
-    exit 1
-  fi
-
   # Create a temp dir for cfssl if no directory was given
   local cfssldir=${1:-}
   if [[ -z "${cfssldir}" ]]; then
@@ -643,21 +674,17 @@ function kube::util::ensure-cfssl {
   pushd "${cfssldir}" > /dev/null || return 1
 
     echo "Unable to successfully run 'cfssl' from ${PATH}; downloading instead..."
-    kernel=$(uname -s)
-    case "${kernel}" in
-      Linux)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_linux_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_linux_amd64
-        ;;
-      Darwin)
-        curl --retry 10 -L -o cfssl https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssl_1.5.0_darwin_amd64
-        curl --retry 10 -L -o cfssljson https://github.com/cloudflare/cfssl/releases/download/v1.5.0/cfssljson_1.5.0_darwin_amd64
-        ;;
-      *)
-        echo "Unknown, unsupported platform: ${kernel}." >&2
-        echo "Supported platforms: Linux, Darwin." >&2
-        exit 2
-    esac
+    local host_os; host_os=$(kube::util::host_os)
+    local host_arch; host_arch=$(kube::util::host_arch)
+    local cfssl_response; cfssl_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssl "https://github.com/cloudflare/cfssl/releases/download/v1.7.1/cfssl_1.7.1_${host_os}_${host_arch}")
+    local cfssljson_response; cfssljson_response=$(curl --retry 10 --write-out "%{response_code}" -fL -o cfssljson "https://github.com/cloudflare/cfssl/releases/download/v1.7.1/cfssljson_1.7.1_${host_os}_${host_arch}")
+
+    if [[ "$cfssl_response" == "404" || "$cfssljson_response" == "404" ]]; then
+      echo "cfssl download unavailable for $host_os/$host_arch and cfssl does not appear to be installed."
+      echo "Please install cfssl and cfssljson and verify they are in \$PATH."
+      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
+      exit 1
+    fi
 
     chmod +x cfssl || true
     chmod +x cfssljson || true

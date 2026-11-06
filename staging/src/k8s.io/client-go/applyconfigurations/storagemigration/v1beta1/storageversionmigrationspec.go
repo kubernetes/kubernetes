@@ -27,7 +27,7 @@ import (
 //
 // Spec of the storage version migration.
 type StorageVersionMigrationSpecApplyConfiguration struct {
-	// The resource that is being migrated. The migrator sends requests to
+	// resource is the resource that is being migrated. The migrator sends requests to
 	// the endpoint serving the resource.
 	// Immutable.
 	Resource *v1.GroupResourceApplyConfiguration `json:"resource,omitempty"`

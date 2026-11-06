@@ -23,7 +23,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sync"
+	"slices"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -66,7 +66,7 @@ func GetSigner(provider string) (ssh.Signer, error) {
 	// support.
 	keyfile := ""
 	switch provider {
-	case "gce", "kubemark":
+	case "gce":
 		keyfile = os.Getenv("GCE_SSH_KEY")
 		if keyfile == "" {
 			keyfile = os.Getenv("GCE_SSH_PRIVATE_KEY_FILE")
@@ -142,43 +142,12 @@ func NodeSSHHosts(ctx context.Context, c clientset.Interface) ([]string, error) 
 			len(hosts), len(nodelist.Items), nodelist)
 	}
 
-	lenHosts := len(hosts)
-	wg := &sync.WaitGroup{}
-	wg.Add(lenHosts)
-	sshHosts := make([]string, 0, lenHosts)
-	var sshHostsLock sync.Mutex
-
+	sshHosts := make([]string, 0, len(hosts))
 	for _, host := range hosts {
-		go func(host string) {
-			defer wg.Done()
-			if canConnect(host) {
-				framework.Logf("Assuming SSH on host %s", host)
-				sshHostsLock.Lock()
-				sshHosts = append(sshHosts, net.JoinHostPort(host, SSHPort))
-				sshHostsLock.Unlock()
-			} else {
-				framework.Logf("Skipping host %s because it does not run anything on port %s", host, SSHPort)
-			}
-		}(host)
+		sshHosts = append(sshHosts, net.JoinHostPort(host, SSHPort))
 	}
-	wg.Wait()
 
 	return sshHosts, nil
-}
-
-// canConnect returns true if a network connection is possible to the SSHPort.
-func canConnect(host string) bool {
-	if _, ok := os.LookupEnv(sshBastionEnvKey); ok {
-		return true
-	}
-	hostPort := net.JoinHostPort(host, SSHPort)
-	conn, err := net.DialTimeout("tcp", hostPort, 3*time.Second)
-	if err != nil {
-		framework.Logf("cannot dial %s: %v", hostPort, err)
-		return false
-	}
-	conn.Close()
-	return true
 }
 
 // Result holds the execution result of SSH command
@@ -217,15 +186,33 @@ func SSH(ctx context.Context, cmd, host, provider string) (Result, error) {
 		result.User = os.Getenv("USER")
 	}
 
-	if bastion := os.Getenv(sshBastionEnvKey); len(bastion) > 0 {
-		stdout, stderr, code, err := runSSHCommandViaBastion(ctx, cmd, result.User, bastion, host, signer)
-		result.Stdout = stdout
-		result.Stderr = stderr
-		result.Code = code
-		return result, err
+	client, err := framework.LoadClientset()
+	if err != nil {
+		return result, fmt.Errorf("error creating client to resolve SSH addresses: %w", err)
+	}
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return result, fmt.Errorf("error listing nodes to resolve SSH addresses: %w", err)
 	}
 
-	stdout, stderr, code, err := runSSHCommand(ctx, cmd, result.User, host, signer)
+	bastion := os.Getenv(sshBastionEnvKey)
+	if bastion == "" {
+		bastion, err = controlPlaneBastion(nodes)
+		if err != nil {
+			return result, err
+		}
+	}
+
+	// The bastion is inside the cluster network, where a node's external IP
+	// is not necessarily reachable: on AWS the connection leaves through the
+	// internet gateway and the node's security group rejects it. Dial the
+	// node's internal IP from the bastion instead.
+	target := internalHost(nodes, host)
+	if target != host {
+		framework.Logf("SSH to %s via bastion %s: using internal address %s", host, bastion, target)
+	}
+
+	stdout, stderr, code, err := runSSHCommandViaBastion(ctx, cmd, result.User, bastion, target, signer)
 	result.Stdout = stdout
 	result.Stderr = stderr
 	result.Code = code
@@ -233,54 +220,45 @@ func SSH(ctx context.Context, cmd, host, provider string) (Result, error) {
 	return result, err
 }
 
-// runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
-// host as specific user, along with any SSH-level error.
-func runSSHCommand(ctx context.Context, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
-	if user == "" {
-		user = os.Getenv("USER")
-	}
-	// Setup the config, dial the server, and open a session.
-	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-	var client *ssh.Client
-	err := framework.Gomega().Eventually(ctx, func() error {
-		c, err := ssh.Dial("tcp", host, config)
-		client = c
-		return err
-	}).WithPolling(5 * time.Second).WithTimeout(20 * time.Second).Should(gomega.Succeed())
-	if err != nil {
-		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: %w", user, host, err)
-	}
-	defer client.Close()
-	session, err := client.NewSession()
-	if err != nil {
-		return "", "", 0, fmt.Errorf("error creating session to %s@%s: %w", user, host, err)
-	}
-	defer session.Close()
-
-	// Run the command.
-	code := 0
-	var bout, berr bytes.Buffer
-	session.Stdout, session.Stderr = &bout, &berr
-	if err = session.Run(cmd); err != nil {
-		// Check whether the command failed to run or didn't complete.
-		if exiterr, ok := err.(*ssh.ExitError); ok {
-			// If we got an ExitError and the exit code is nonzero, we'll
-			// consider the SSH itself successful (just that the command run
-			// errored on the host).
-			if code = exiterr.ExitStatus(); code != 0 {
-				err = nil
+// controlPlaneBastion returns the SSH address of the first control-plane node
+// that has an external IP.
+func controlPlaneBastion(nodes *v1.NodeList) (string, error) {
+	for _, node := range nodes.Items {
+		_, isControlPlane := node.Labels[framework.ControlPlaneLabel]
+		for _, taint := range node.Spec.Taints {
+			if taint.Key == framework.ControlPlaneLabel && taint.Effect == v1.TaintEffectNoSchedule {
+				isControlPlane = true
+				break
 			}
-		} else {
-			// Some other kind of error happened (e.g. an IOError); consider the
-			// SSH unsuccessful.
-			err = fmt.Errorf("failed running `%s` on %s@%s: %w", cmd, user, host, err)
+		}
+		if isControlPlane {
+			if ips := framework.GetNodeExternalIPs(&node); len(ips) > 0 {
+				return net.JoinHostPort(ips[0], SSHPort), nil
+			}
 		}
 	}
-	return bout.String(), berr.String(), code, err
+	return "", fmt.Errorf("no control-plane node with an external IP found; set %s to an SSH bastion address (host:port)", sshBastionEnvKey)
+}
+
+// internalHost returns the "<internal IP>:<port>" address of the node whose
+// external IP is the host part of host. Any other host is returned unchanged.
+func internalHost(nodes *v1.NodeList, host string) string {
+	ip, port, err := net.SplitHostPort(host)
+	if err != nil {
+		return host
+	}
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if !slices.Contains(framework.GetNodeExternalIPs(node), ip) {
+			continue
+		}
+		for _, addr := range node.Status.Addresses {
+			if addr.Type == v1.NodeInternalIP && addr.Address != "" {
+				return net.JoinHostPort(addr.Address, port)
+			}
+		}
+	}
+	return host
 }
 
 // runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on

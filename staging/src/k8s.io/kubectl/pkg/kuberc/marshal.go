@@ -32,6 +32,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 	"k8s.io/kubectl/pkg/config/scheme"
+	v1 "k8s.io/kubectl/pkg/config/v1"
+	"k8s.io/kubectl/pkg/config/v1alpha1"
 	"k8s.io/kubectl/pkg/config/v1beta1"
 )
 
@@ -90,6 +92,10 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 			continue
 		}
 
+		if gvk.GroupVersion() == v1alpha1.SchemeGroupVersion || gvk.GroupVersion() == v1beta1.SchemeGroupVersion {
+			klog.V(5).Infof("kuberc: %s is deprecated, use %s instead", gvk.GroupVersion(), v1.SchemeGroupVersion)
+		}
+
 		// we have a usable preferences to return
 		klog.V(5).Infof("kuberc: using entry %d (%s) in %s", attemptedItems, gvk.GroupVersion(), kubercFile)
 		return preferences, strictDecodeErr
@@ -104,21 +110,21 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 	return nil, nil
 }
 
-// LoadPreference loads the kuberc file, and returns v1beta1.Preference object
-func LoadPreference(kubercFile string) (*v1beta1.Preference, error) {
+// LoadPreference loads the kuberc file, and returns v1.Preference object
+func LoadPreference(kubercFile string) (*v1.Preference, error) {
 	internal, err := decodePreference(kubercFile)
 	if err != nil {
 		return nil, err
 	}
-	prefs, err := scheme.Scheme.ConvertToVersion(internal, v1beta1.SchemeGroupVersion)
+	prefs, err := scheme.Scheme.ConvertToVersion(internal, v1.SchemeGroupVersion)
 	if err != nil {
-		return nil, fmt.Errorf("error converting Preferences to v1beta1.Preferences: %w", err)
+		return nil, fmt.Errorf("error converting Preferences to v1.Preferences: %w", err)
 	}
-	return prefs.(*v1beta1.Preference), nil
+	return prefs.(*v1.Preference), nil
 }
 
 // SavePreference saves the preference to the kuberc file
-func SavePreference(pref *v1beta1.Preference, kubercFile string, out io.Writer) error {
+func SavePreference(pref *v1.Preference, kubercFile string, out io.Writer) error {
 	dir := filepath.Dir(kubercFile)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -127,12 +133,16 @@ func SavePreference(pref *v1beta1.Preference, kubercFile string, out io.Writer) 
 	if err != nil {
 		return fmt.Errorf("failed to write kuberc file: %w", err)
 	}
+	defer file.Close() // nolint:errcheck
 
 	const mediaType = runtime.ContentTypeYAML
 	yamlInfo, _ := runtime.SerializerInfoForMediaType(scheme.StrictCodecs.SupportedMediaTypes(), mediaType)
-	encoder := scheme.StrictCodecs.EncoderForVersion(yamlInfo.Serializer, v1beta1.SchemeGroupVersion)
+	encoder := scheme.StrictCodecs.EncoderForVersion(yamlInfo.Serializer, v1.SchemeGroupVersion)
 	if err := encoder.Encode(pref, file); err != nil {
 		return fmt.Errorf("failed to marshal preferences: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close kuberc file %s: %w", kubercFile, err)
 	}
 
 	fmt.Fprintf(out, "Updated %s\n", kubercFile) // nolint:errcheck
@@ -141,16 +151,16 @@ func SavePreference(pref *v1beta1.Preference, kubercFile string, out io.Writer) 
 
 // CreateDefaultPreference returns Preference object with
 // some default configurations.
-func CreateDefaultPreference() *v1beta1.Preference {
-	return &v1beta1.Preference{
+func CreateDefaultPreference() *v1.Preference {
+	return &v1.Preference{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "kubectl.config.k8s.io/v1beta1",
+			APIVersion: "kubectl.config.k8s.io/v1",
 			Kind:       "Preference",
 		},
-		Defaults: []v1beta1.CommandDefaults{
+		Defaults: []v1.CommandDefaults{
 			{
 				Command: "apply",
-				Options: []v1beta1.CommandOptionDefault{
+				Options: []v1.CommandOptionDefault{
 					{
 						Name:    "server-side",
 						Default: "true",
@@ -159,7 +169,7 @@ func CreateDefaultPreference() *v1beta1.Preference {
 			},
 			{
 				Command: "delete",
-				Options: []v1beta1.CommandOptionDefault{
+				Options: []v1.CommandOptionDefault{
 					{
 						Name:    "interactive",
 						Default: "true",

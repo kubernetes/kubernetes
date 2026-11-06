@@ -32,6 +32,7 @@ type ServerHandler struct {
 
 	numSuiteDidBegins int
 	numSuiteDidEnds   int
+	procDidEnd        []bool
 	aggregatedReport  types.Report
 	reportHoldingArea []types.SpecReport
 }
@@ -42,6 +43,7 @@ func newServerHandler(parallelTotal int, reporter reporters.Reporter) *ServerHan
 		lock:             &sync.Mutex{},
 		counterLock:      &sync.Mutex{},
 		alives:           make([]func() bool, parallelTotal),
+		procDidEnd:       make([]bool, parallelTotal),
 		beforeSuiteState: BeforeSuiteState{Data: nil, State: types.SpecStateInvalid},
 
 		parallelTotal:     parallelTotal,
@@ -90,6 +92,9 @@ func (handler *ServerHandler) SpecSuiteDidEnd(report types.Report, _ *Void) erro
 	defer handler.lock.Unlock()
 
 	handler.numSuiteDidEnds += 1
+	if proc := report.SuiteConfig.ParallelProcess; proc >= 1 && proc <= handler.parallelTotal {
+		handler.procDidEnd[proc-1] = true
+	}
 	if handler.numSuiteDidEnds == 1 {
 		handler.aggregatedReport = report
 	} else {
@@ -133,9 +138,17 @@ func (handler *ServerHandler) procIsAlive(proc int) bool {
 	return alive()
 }
 
+func (handler *ServerHandler) procHasFinished(proc int) bool {
+	handler.lock.Lock()
+	didEnd := handler.procDidEnd[proc-1]
+	handler.lock.Unlock()
+
+	return didEnd || !handler.procIsAlive(proc)
+}
+
 func (handler *ServerHandler) haveNonprimaryProcsFinished() bool {
 	for i := 2; i <= handler.parallelTotal; i++ {
-		if handler.procIsAlive(i) {
+		if !handler.procHasFinished(i) {
 			return false
 		}
 	}

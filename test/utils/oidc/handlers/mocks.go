@@ -21,8 +21,8 @@ limitations under the License.
 package handlers
 
 import (
+	"github.com/go-jose/go-jose/v4"
 	mock "github.com/stretchr/testify/mock"
-	"gopkg.in/go-jose/go-jose.v2"
 )
 
 // NewMockTokenHandler creates a new instance of MockTokenHandler. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

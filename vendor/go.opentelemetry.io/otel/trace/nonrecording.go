@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trace // import "go.opentelemetry.io/otel/trace"
+package trace
 
 // nonRecordingSpan is a minimal implementation of a Span that wraps a
 // SpanContext. It performs no operations other than to return the wrapped

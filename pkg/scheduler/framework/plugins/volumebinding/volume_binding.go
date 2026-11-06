@@ -262,9 +262,12 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 		"volumeLimit(old)", oldLimit,
 	)
 
-	if newLimit != nil && (oldLimit == nil || newLimit.Value() > oldLimit.Value()) {
-		logger.V(5).Info("VolumeLimit was increased, which could make a Pod schedulable")
-		return fwk.Queue, nil
+	if newLimit != nil {
+		newLimitCopy := *newLimit
+		if oldLimit == nil || newLimitCopy.Cmp(*oldLimit) > 0 {
+			logger.V(5).Info("VolumeLimit was increased, which could make a Pod schedulable")
+			return fwk.Queue, nil
+		}
 	}
 
 	logger.V(5).Info("CSIStorageCapacity was updated, but it doesn't make this pod schedulable")

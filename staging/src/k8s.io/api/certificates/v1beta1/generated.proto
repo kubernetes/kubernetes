@@ -42,6 +42,7 @@ message CertificateSigningRequest {
   // Other fields are derived by Kubernetes and cannot be modified by users.
   // +required
   // +k8s:alpha(since: "1.38")=+k8s:required
+  // +k8s:alpha(since: "1.38")=+k8s:immutable
   optional CertificateSigningRequestSpec spec = 2;
 
   // status is the derived information about the request.
@@ -189,12 +190,12 @@ message CertificateSigningRequestStatus {
   // +listType=map
   // +listMapKey=type
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:listType=map
-  // +k8s:beta(since: "1.37")=+k8s:listMapKey=type
-  // +k8s:beta(since: "1.37")=+k8s:customUnique
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
-  // +k8s:beta(since: "1.37")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
+  // +k8s:listType=map
+  // +k8s:listMapKey=type
+  // +k8s:customUnique
+  // +k8s:optional
+  // +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+  // +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
   repeated CertificateSigningRequestCondition conditions = 1;
 
   // If request was approved, the controller will place the issued certificate here.
@@ -259,8 +260,8 @@ message ClusterTrustBundleSpec {
   // using a `spec.signerName=NAME` field selector.
   //
   // +optional
-  // +k8s:alpha(since:"1.37")=+k8s:optional
-  // +k8s:alpha(since:"1.37")=+k8s:immutable
+  // +k8s:beta(since:"1.38")=+k8s:optional
+  // +k8s:beta(since:"1.38")=+k8s:immutable
   optional string signerName = 1;
 
   // trustBundle contains the individual X.509 trust anchors for this
@@ -476,9 +477,9 @@ message PodCertificateRequestStatus {
   // +listType=map
   // +listMapKey=type
   // +optional
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 
   // certificateChain is populated with an issued certificate by the signer.

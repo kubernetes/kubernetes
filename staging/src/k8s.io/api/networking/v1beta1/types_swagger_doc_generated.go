@@ -123,7 +123,7 @@ var map_IngressClassParametersReference = map[string]string{
 	"apiGroup":  "apiGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
 	"kind":      "kind is the type of resource being referenced.",
 	"name":      "name is the name of resource being referenced.",
-	"scope":     "scope represents if this refers to a cluster or namespace scoped resource. This may be set to \"Cluster\" (default) or \"Namespace\".",
+	"scope":     "scope represents if this refers to a cluster or namespace scoped resource. This may be set to \"Cluster\" (default) or \"Namespace\". Note: unlike networking.k8s.io/v1, this API version has no defaulting for this field, so it must be set explicitly.",
 	"namespace": "namespace is the namespace of the resource being referenced. This field is required when scope is set to \"Namespace\" and must be unset when scope is set to \"Cluster\".",
 }
 

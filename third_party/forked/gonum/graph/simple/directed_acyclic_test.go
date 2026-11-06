@@ -5,6 +5,7 @@
 package simple
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -59,4 +60,73 @@ func TestAcyclicIssue123DirectedGraph(t *testing.T) {
 
 	n2 := Node(g.NewNodeID())
 	g.AddNode(n2)
+}
+
+func TestAcyclicVisitStopsEarly(t *testing.T) {
+	// 6 edges on the hub promotes its edgeHolder to a map.
+	g := NewDirectedAcyclicGraph(0, math.Inf(1))
+	for i := 1; i <= 3; i++ {
+		g.SetEdge(Edge{F: Node(0), T: Node(i), W: 1})
+	}
+	for i := 4; i <= 6; i++ {
+		g.SetEdge(Edge{F: Node(i), T: Node(0), W: 1})
+	}
+
+	fromCalls := 0
+	g.VisitFrom(Node(0), func(n graph.Node) bool {
+		fromCalls++
+		if n.ID() < 1 || n.ID() > 3 {
+			t.Errorf("VisitFrom visited unexpected node %d", n.ID())
+		}
+		return false
+	})
+	if fromCalls != 1 {
+		t.Errorf("expected VisitFrom visitor to be called once, got %d", fromCalls)
+	}
+
+	toCalls := 0
+	g.VisitTo(Node(0), func(n graph.Node) bool {
+		toCalls++
+		if n.ID() < 4 || n.ID() > 6 {
+			t.Errorf("VisitTo visited unexpected node %d", n.ID())
+		}
+		return false
+	})
+	if toCalls != 1 {
+		t.Errorf("expected VisitTo visitor to be called once, got %d", toCalls)
+	}
+
+	// Returning true must still visit every neighbor in the right direction.
+	fromAll, toAll := 0, 0
+	g.VisitFrom(Node(0), func(graph.Node) bool { fromAll++; return true })
+	g.VisitTo(Node(0), func(graph.Node) bool { toAll++; return true })
+	if fromAll != 3 || toAll != 3 {
+		t.Errorf("expected 3 from and 3 to neighbors, got %d and %d", fromAll, toAll)
+	}
+}
+
+// BenchmarkAcyclicVisitStopsEarly measures a visitor that stops after the
+// first neighbor, which is what VisitingDepthFirst.Walk does once it finds
+// its target. Cost should not scale with the hub's degree.
+func BenchmarkAcyclicVisitStopsEarly(b *testing.B) {
+	for _, degree := range []int{2, 100, 10000} {
+		// Hub 0 has degree outgoing edges and degree incoming edges.
+		g := NewDirectedAcyclicGraph(0, math.Inf(1))
+		for i := 1; i <= degree; i++ {
+			g.SetEdge(Edge{F: Node(0), T: Node(i), W: 1})
+			g.SetEdge(Edge{F: Node(degree + i), T: Node(0), W: 1})
+		}
+		stop := func(graph.Node) bool { return false }
+
+		b.Run(fmt.Sprintf("VisitFrom/degree=%d", degree), func(b *testing.B) {
+			for b.Loop() {
+				g.VisitFrom(Node(0), stop)
+			}
+		})
+		b.Run(fmt.Sprintf("VisitTo/degree=%d", degree), func(b *testing.B) {
+			for b.Loop() {
+				g.VisitTo(Node(0), stop)
+			}
+		})
+	}
 }

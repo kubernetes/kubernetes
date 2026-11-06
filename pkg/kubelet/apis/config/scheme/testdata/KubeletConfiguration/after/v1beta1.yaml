@@ -14,6 +14,7 @@ authorization:
     cacheUnauthorizedTTL: 30s
 cgroupDriver: cgroupfs
 cgroupsPerQOS: true
+clientCertificateKeyAlgorithm: ECDSA-P256
 configMapAndSecretChangeDetectionStrategy: Watch
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
@@ -88,6 +89,7 @@ resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: 2m0s
 seccompDefault: false
 serializeImagePulls: true
+serverCertificateKeyAlgorithm: ECDSA-P256
 shutdownGracePeriod: 0s
 shutdownGracePeriodCriticalPods: 0s
 streamingConnectionIdleTimeout: 4h0m0s

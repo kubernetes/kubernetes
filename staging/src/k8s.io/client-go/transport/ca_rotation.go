@@ -19,6 +19,8 @@ package transport
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 	"os"
 	"sync"
@@ -42,7 +44,7 @@ type atomicTransportHolder struct {
 	caRefreshDuration time.Duration
 	// mu covers transport and transportLastChecked
 	mu                   sync.RWMutex
-	transport            *http.Transport
+	transport            rotatableCARoundTripper
 	transportLastChecked time.Time
 }
 
@@ -57,7 +59,7 @@ func (h *atomicTransportHolder) WrappedRoundTripper() http.RoundTripper {
 	return h.transport
 }
 
-func (h *atomicTransportHolder) getTransport(ctx context.Context) *http.Transport {
+func (h *atomicTransportHolder) getTransport(ctx context.Context) rotatableCARoundTripper {
 	if rt := h.getTransportIfFresh(); rt != nil {
 		return rt
 	}
@@ -69,7 +71,7 @@ func (h *atomicTransportHolder) getTransport(ctx context.Context) *http.Transpor
 	return h.transport
 }
 
-func (h *atomicTransportHolder) getTransportIfFresh() *http.Transport {
+func (h *atomicTransportHolder) getTransportIfFresh() rotatableCARoundTripper {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
@@ -124,7 +126,7 @@ func (h *atomicTransportHolder) tryRefreshTransportLocked(ctx context.Context) {
 		return
 	}
 	newTransport := h.transport.Clone()
-	newTransport.TLSClientConfig.RootCAs = newCAs
+	newTransport.SetRootCAs(newCAs)
 	oldTransport := h.transport
 	h.transport = newTransport
 	// Update our tracking of current CA data
@@ -137,11 +139,48 @@ func (h *atomicTransportHolder) tryRefreshTransportLocked(ctx context.Context) {
 	metrics.TransportCAReloads.Increment("success", "updated")
 }
 
+type rotatableCARoundTripper interface {
+	http.RoundTripper
+	Clone() rotatableCARoundTripper
+	GetRootCAs() *x509.CertPool
+	SetRootCAs(*x509.CertPool)
+	CloseIdleConnections()
+}
+
+// rotatableCAHTTPTransport adapts an *http.Transport to rotatableCARoundTripper.
+type rotatableCAHTTPTransport struct {
+	*http.Transport
+}
+
+var _ utilnet.RoundTripperWrapper = &rotatableCAHTTPTransport{}
+
+// WrappedRoundTripper returns the underlying transport, so that helpers like
+// utilnet.TLSClientConfig and utilnet.DialerFor can inspect it.
+func (h *rotatableCAHTTPTransport) WrappedRoundTripper() http.RoundTripper {
+	return h.Transport
+}
+
+func (h *rotatableCAHTTPTransport) Clone() rotatableCARoundTripper {
+	return &rotatableCAHTTPTransport{h.Transport.Clone()}
+}
+func (h *rotatableCAHTTPTransport) GetRootCAs() *x509.CertPool {
+	if h.Transport.TLSClientConfig == nil {
+		return nil
+	}
+	return h.Transport.TLSClientConfig.RootCAs
+}
+func (h *rotatableCAHTTPTransport) SetRootCAs(pool *x509.CertPool) {
+	if h.Transport.TLSClientConfig == nil {
+		h.Transport.TLSClientConfig = &tls.Config{}
+	}
+	h.Transport.TLSClientConfig.RootCAs = pool
+}
+
 // newAtomicTransportHolder creates a new holder for CA file reloading scenarios.
 // The caFile must be specified.
 // caData may be empty but should correspond to the contents of caFile.
 // transport must have a TLS config and its root CAs should match caData.
-func newAtomicTransportHolder(caFile string, caData []byte, transport *http.Transport) *atomicTransportHolder {
+func newAtomicTransportHolder(caFile string, caData []byte, transport rotatableCARoundTripper) *atomicTransportHolder {
 	c := clock.RealClock{}
 	return &atomicTransportHolder{
 		caFile:               caFile,

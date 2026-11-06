@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // Softirqs represents the softirq statistics.
@@ -40,7 +40,7 @@ type Softirqs struct {
 
 func (fs FS) Softirqs() (Softirqs, error) {
 	fileName := fs.proc.Path("softirqs")
-	data, err := util.ReadFileNoStat(fileName)
+	data, err := parsers.ReadFileNoStat(fileName)
 	if err != nil {
 		return Softirqs{}, err
 	}

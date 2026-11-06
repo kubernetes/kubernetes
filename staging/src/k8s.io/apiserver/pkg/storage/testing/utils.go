@@ -23,6 +23,7 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -81,8 +82,31 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
-func computePodKey(obj *example.Pod) string {
-	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+func PodReverseKeyFunc(prefix string, namespaced bool) storage.ReverseKeyFunc {
+	prefix = strings.TrimSuffix(prefix, "/") + "/"
+	return func(key string) (name string, namespace string, err error) {
+		relativeKey, ok := strings.CutPrefix(key, prefix)
+		if !ok {
+			return "", "", fmt.Errorf("invalid key %q, expected prefix %q", key, prefix)
+		}
+		if namespaced {
+			namespace, name, ok = strings.Cut(relativeKey, "/")
+			// Storage tests bypass API validation and use empty namespaces, which
+			// storage.NamespaceKeyFunc preserves as an empty path segment.
+			if !ok || name == "" || strings.Contains(name, "/") {
+				return "", "", fmt.Errorf("invalid namespaced key %q", key)
+			}
+			return name, namespace, nil
+		}
+		if relativeKey == "" || strings.Contains(relativeKey, "/") {
+			return "", "", fmt.Errorf("invalid cluster-scoped key %q", key)
+		}
+		return relativeKey, "", nil
+	}
+}
+
+func computePodKey(obj v1.Object) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.GetNamespace(), obj.GetName())
 }
 
 // testPropagateStore helps propagates store with objects, automates key generation, and returns
@@ -153,9 +177,17 @@ func testCheckEventType(t *testing.T, w watch.Interface, expectEventType watch.E
 	}
 }
 
-func testCheckResult(t *testing.T, w watch.Interface, expectEvent watch.Event) {
+func testCheckResult(t *testing.T, w watch.Interface, expectEvent *watch.Event) {
+	if expectEvent == nil {
+		select {
+		case res := <-w.ResultChan():
+			t.Errorf("Unexpected: %#v event received, expected no events", res)
+		case <-time.After(100 * time.Millisecond):
+		}
+		return
+	}
 	testCheckResultFunc(t, w, func(actualEvent watch.Event) {
-		expectNoDiff(t, "incorrect event", expectEvent, actualEvent)
+		expectNoDiff(t, "incorrect event", *expectEvent, actualEvent)
 	})
 }
 
@@ -228,8 +260,34 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 
 func TestCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
 	for _, expectedEvent := range expectedEvents {
-		testCheckResult(t, w, expectedEvent)
+		testCheckResult(t, w, &expectedEvent)
+		if expectedEvent.Type == watch.Error {
+			testCheckStop(t, w)
+		}
 	}
+}
+
+func MatchWatchEventsPrefix(t *testing.T, w watch.Interface, expectedEvents []watch.Event) (matched int) {
+	for i, expectedEvent := range expectedEvents {
+		select {
+		case res, ok := <-w.ResultChan():
+			if !ok {
+				return i
+			}
+			if co, ok := res.Object.(runtime.CacheableObject); ok {
+				res.Object = co.GetObject()
+			}
+			if withRecordTime, ok := res.Object.(storage.WatchEventWithRecordTime); ok {
+				res.Object = withRecordTime.Unwrap()
+			}
+			expectNoDiff(t, "incorrect event", expectedEvent, res)
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
+			return i
+		}
+	}
+	testCheckStop(t, w)
+	return len(expectedEvents)
 }
 
 func TestCheckNoMoreResultsWithIgnoreFunc(t *testing.T, w watch.Interface, ignore func(watch.Event) bool) {
@@ -423,7 +481,7 @@ func determinePodGetAttrFunc(namespaceScoped bool, indexField []string) storage.
 
 func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod := obj.(*example.Pod)
-	return nil, fields.Set{
+	return labels.Set(pod.Labels), fields.Set{
 		"spec.nodeName":      pod.Spec.NodeName,
 		"metadata.name":      pod.ObjectMeta.Name,
 		"metadata.namespace": pod.ObjectMeta.Namespace,
@@ -432,7 +490,7 @@ func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Se
 
 func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod := obj.(*example.Pod)
-	return nil, fields.Set{
+	return labels.Set(pod.Labels), fields.Set{
 		"spec.nodeName": pod.Spec.NodeName,
 		"metadata.name": pod.ObjectMeta.Name,
 	}, nil

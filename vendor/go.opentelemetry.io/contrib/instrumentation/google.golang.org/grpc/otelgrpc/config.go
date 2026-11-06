@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otelgrpc // import "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+package otelgrpc
 
 import (
 	"context"
@@ -47,7 +47,6 @@ type config struct {
 	TracerProvider     trace.TracerProvider
 	MeterProvider      metric.MeterProvider
 	SpanKind           trace.SpanKind
-	SpanStartOptions   []trace.SpanStartOption
 	SpanAttributes     []attribute.KeyValue
 	MetricAttributes   []attribute.KeyValue
 	MetricAttributesFn func(ctx context.Context) []attribute.KeyValue
@@ -201,16 +200,6 @@ func WithMessageEvents(events ...Event) Option {
 				c.SentEvent = true
 			}
 		}
-	})
-}
-
-// WithSpanOptions configures an additional set of
-// trace.SpanOptions, which are applied to each new span.
-//
-// Deprecated: It is only used by the deprecated interceptor, and is unused by [NewClientHandler] and [NewServerHandler].
-func WithSpanOptions(opts ...trace.SpanStartOption) Option {
-	return optionFunc(func(c *config) {
-		c.SpanStartOptions = append(c.SpanStartOptions, opts...)
 	})
 }
 

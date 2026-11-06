@@ -472,7 +472,6 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 		newPod      *v1.Pod
 		oldPod      *v1.Pod
 		isTargetPod bool
-		draDisabled bool
 		want        []fwk.ClusterEvent
 	}{
 		{
@@ -536,15 +535,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodToleration}},
 		},
 		{
-			name:        "pod claim statuses change, feature disabled",
-			draDisabled: true,
-			newPod:      st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
-			oldPod:      st.MakePod().Obj(),
-			isTargetPod: true,
-			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.Update}},
-		},
-		{
-			name:        "pod claim statuses change, feature enabled",
+			name:        "pod claim statuses change",
 			newPod:      st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
 			oldPod:      st.MakePod().Obj(),
 			isTargetPod: true,
@@ -558,15 +549,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 		{
-			name:        "pod extended resource claim status change, feature disabled",
-			draDisabled: true,
-			newPod:      st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
-			oldPod:      st.MakePod().Obj(),
-			isTargetPod: true,
-			want:        []fwk.ClusterEvent{{Resource: fwk.TargetPod, ActionType: fwk.Update}},
-		},
-		{
-			name:        "pod extended resource claim status change, feature enabled",
+			name:        "pod extended resource claim status change",
 			newPod:      st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
 			oldPod:      st.MakePod().Obj(),
 			isTargetPod: true,
@@ -589,13 +572,136 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.draDisabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, !tt.draDisabled)
 			got := PodSchedulingPropertiesChange(tt.newPod, tt.oldPod, tt.isTargetPod)
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateComparable(fwk.ClusterEvent{})); diff != "" {
 				t.Errorf("unexpected event is returned from podSchedulingPropertiesChange (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func makePodWithRequests(reqs map[v1.ResourceName]string) *v1.Pod {
+	container := st.MakeContainer().Name("c").ResourceRequests(reqs).Obj()
+	return st.MakePod().Name("pod").Containers([]v1.Container{container}).Obj()
+}
+
+func TestExtractPodScaleDown(t *testing.T) {
+	tests := []struct {
+		name   string
+		newPod *v1.Pod
+		oldPod *v1.Pod
+		want   fwk.ActionType
+	}{
+		{
+			name: "resource request scaled down",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "500m",
+				v1.ResourceMemory: "1Gi",
+			}),
+			want: fwk.UpdatePodScaleDown,
+		},
+		{
+			name: "resource request scaled up",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "500m",
+				v1.ResourceMemory: "1Gi",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			}),
+			want: fwk.None,
+		},
+		{
+			name: "huge request scaled down beyond int64 milli range",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "9e21",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "1e21",
+			}),
+			want: fwk.UpdatePodScaleDown,
+		},
+		{
+			name: "equal requests beyond int64 milli range",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "9e21",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "9e21",
+			}),
+			want: fwk.None,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := extractPodScaleDown(tt.newPod, tt.oldPod); got != tt.want {
+				t.Errorf("extractPodScaleDown() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestExtractPodScaleUp(t *testing.T) {
+	tests := []struct {
+		name   string
+		newPod *v1.Pod
+		oldPod *v1.Pod
+		want   fwk.ActionType
+	}{
+		{
+			name: "resource request scaled up",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "500m",
+				v1.ResourceMemory: "1Gi",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			}),
+			want: fwk.UpdatePodScaleUp,
+		},
+		{
+			name: "resource request scaled down",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "1Gi",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "500m",
+				v1.ResourceMemory: "1Gi",
+			}),
+			want: fwk.None,
+		},
+		{
+			name: "huge request scaled up beyond int64 milli range",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "1e21",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "9e21",
+			}),
+			want: fwk.UpdatePodScaleUp,
+		},
+		{
+			name: "equal requests beyond int64 milli range",
+			oldPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "9e21",
+			}),
+			newPod: makePodWithRequests(map[v1.ResourceName]string{
+				v1.ResourceCPU: "9e21",
+			}),
+			want: fwk.None,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := extractPodScaleUp(tt.newPod, tt.oldPod); got != tt.want {
+				t.Errorf("extractPodScaleUp() = %v, want %v", got, tt.want)
 			}
 		})
 	}

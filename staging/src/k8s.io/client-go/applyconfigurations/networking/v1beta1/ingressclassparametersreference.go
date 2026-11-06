@@ -34,6 +34,8 @@ type IngressClassParametersReferenceApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 	// scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
+	// Note: unlike networking.k8s.io/v1, this API version has no defaulting
+	// for this field, so it must be set explicitly.
 	Scope *string `json:"scope,omitempty"`
 	// namespace is the namespace of the resource being referenced. This field is
 	// required when scope is set to "Namespace" and must be unset when scope is set to

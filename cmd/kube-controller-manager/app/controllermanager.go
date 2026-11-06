@@ -33,6 +33,7 @@ import (
 	"github.com/spf13/cobra"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	apiextensionsclientset "k8s.io/apiextensions-api/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,17 +42,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/apiserver/pkg/server/signals"
 	"k8s.io/apiserver/pkg/server/statusz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
@@ -68,6 +70,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -88,7 +91,11 @@ import (
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	configv1alpha1conversion "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	"k8s.io/metrics/pkg/client/custom_metrics"
+	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
 func init() {
@@ -141,7 +148,7 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			// We use context.Background() here still because using server.SetupSignalContext() would cause
+			// We use context.Background() here still because using signals.SetupSignalContext() would cause
 			// components like the event broadcaster to terminate on signal immediately, which is not what we want.
 			// Termination for that case is being handled explicitly in Run() later on.
 			ctx := context.Background()
@@ -152,12 +159,12 @@ controller, and serviceaccounts controller.`,
 
 			// add feature enablement metrics
 			fg := s.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
-			fg.(featuregate.MutableFeatureGate).AddMetrics()
+			fg.(featuregate.MutableFeatureGate).AddMetrics(featuremetrics.RecordFeatureInfo)
 			// add component version metrics
 			s.ComponentGlobalsRegistry.AddMetrics()
 
 			if utilfeature.DefaultFeatureGate.Enabled(cmfeatures.ControllerManagerReleaseLeaderElectionLockOnExit) {
-				ctx = server.SetupSignalContext()
+				ctx = signals.SetupSignalContext()
 			}
 			return Run(ctx, c.Complete())
 		},
@@ -198,7 +205,6 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 // Run runs the KubeControllerManagerOptions.
 func Run(ctx context.Context, c *config.CompletedConfig) error {
 	logger := klog.FromContext(ctx)
-	stopCh := ctx.Done()
 
 	// To help debugging, immediately log version
 	logger.Info("Starting", "version", utilversion.Get())
@@ -255,8 +261,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
+		// ctx.Done() is nil for context.Background(), so derive a channel that is closed when Run returns.
+		servingCtx, cancelServingCtx := context.WithCancel(ctx)
+		defer cancelServingCtx()
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
-		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		if _, _, err := c.SecureServing.Serve(handler, 0, servingCtx.Done()); err != nil {
 			return err
 		}
 	}
@@ -281,7 +290,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 		// Start the informers.
 		stopCh := ctx.Done()
-		controllerContext.InformerFactory.Start(stopCh)
+		controllerContext.InformerFactory.StartWithContext(ctx)
 		defer controllerContext.InformerFactory.Shutdown()
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
@@ -368,7 +377,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(waitForSync))
 
-		go leaseCandidate.Run(ctx)
+		go func() {
+			defer utilruntime.HandleCrashWithContext(ctx)
+			leaseCandidate.Run(ctx)
+		}()
 	}
 
 	// Start the main lock.
@@ -463,7 +475,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 // ControllerContext defines the context object for controller
 type ControllerContext struct {
 	// ClientBuilder will provide a client for this controller to use
-	ClientBuilder clientbuilder.ControllerClientBuilder
+	ClientBuilder clientbuilder.TypedClientBuilder
 
 	// InformerFactory gives access to informers for the controller.
 	InformerFactory informers.SharedInformerFactory
@@ -496,6 +508,11 @@ type ControllerContext struct {
 
 	// GraphBuilder gives an access to dependencyGraphBuilder which keeps tracks of resources in the cluster
 	GraphBuilder *garbagecollector.GraphBuilder
+
+	// KubeAPIServerCAData holds the PEM-encoded CA bundle from the controller
+	// manager's kubeconfig. It is empty when the kubeconfig refers to the CA
+	// by file (certificate-authority) rather than inline data.
+	KubeAPIServerCAData []byte
 }
 
 // IsControllerEnabled checks if the context's controllers enabled or not
@@ -507,9 +524,11 @@ func (c ControllerContext) IsControllerEnabled(controllerDescriptor *ControllerD
 	return genericcontrollermanager.IsControllerEnabled(controllerDescriptor.Name(), controllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
 
-// NewClientConfig is a shortcut for ClientBuilder.Config. It wraps the error with an additional message.
-func (c ControllerContext) NewClientConfig(name string) (*restclient.Config, error) {
-	config, err := c.ClientBuilder.Config(name)
+// clientConfig returns the client config builder would use for name, for the
+// client types the builder cannot construct itself (HPA metrics,
+// apiextensions). The config is only ever used to construct a client.
+func clientConfig(builder clientbuilder.TypedClientBuilder, name string) (*restclient.Config, error) {
+	config, err := builder.Config(name) //nolint:forbidigo,staticcheck // deprecated on purpose, see above
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Kubernetes client config for %q: %w", name, err)
 	}
@@ -525,21 +544,58 @@ func (c ControllerContext) NewClient(name string) (kubernetes.Interface, error) 
 	return client, nil
 }
 
+// NewApiextensionsClient creates an apiextensions clientset for the named
+// controller from builder.
+func NewApiextensionsClient(builder clientbuilder.TypedClientBuilder, name string) (apiextensionsclientset.Interface, error) {
+	config, err := clientConfig(builder, name)
+	if err != nil {
+		return nil, err
+	}
+	return apiextensionsclientset.NewForConfig(config)
+}
+
+// NewMetricsClient creates a RESTMetricsClient for the named controller.
+func (c ControllerContext) NewMetricsClient(name string, apiVersionsGetter custom_metrics.AvailableAPIsGetter) (metrics.MetricsClient, error) {
+	clientConfig, err := clientConfig(c.ClientBuilder, name)
+	if err != nil {
+		return nil, err
+	}
+	resourceClient, err := resourceclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init the resource client for %s: %w", name, err)
+	}
+	externalMetricsClient, err := external_metrics.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init the external metrics client for %s: %w", name, err)
+	}
+	return metrics.NewRESTMetricsClient(
+		resourceClient,
+		custom_metrics.NewForConfig(clientConfig, c.RESTMapper, apiVersionsGetter),
+		externalMetricsClient,
+	), nil
+}
+
 // CreateControllerContext creates a context struct containing references to resources needed by the
 // controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
 // the shared-informers client and token controller.
-func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.ControllerClientBuilder) (ControllerContext, error) {
-	// Informer transform to trim ManagedFields for memory efficiency.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
+func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, rootClientBuilder, clientBuilder clientbuilder.TypedClientBuilder) (ControllerContext, error) {
+	// Informer transform to trim ManagedFields for memory efficiency. With
+	// ManagedFieldsOptOutClient, the informer clients drop them instead.
+	var trim cache.TransformFunc
+	if !clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.ManagedFieldsOptOutClient) {
+		trim = func(obj interface{}) (interface{}, error) {
+			if accessor, err := meta.Accessor(obj); err == nil {
+				if accessor.GetManagedFields() != nil {
+					accessor.SetManagedFields(nil)
+				}
 			}
+			return obj, nil
 		}
-		return obj, nil
 	}
 
-	versionedClient, err := rootClientBuilder.Client("shared-informers")
+	// Informer clients ask the server to omit managedFields, see trim above.
+	informerClientBuilder := rootClientBuilder.WithDropManagedFields()
+	versionedClient, err := informerClientBuilder.Client("shared-informers")
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
 	}
@@ -551,12 +607,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 
 	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim), informers.WithInformerName(informerName))
 
-	metadataConfig, err := rootClientBuilder.Config("metadata-informers")
-	if err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to create metadata client config: %w", err)
-	}
-
-	metadataClient, err := metadata.NewForConfig(metadataConfig)
+	metadataClient, err := informerClientBuilder.MetadataClient("metadata-informers")
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("failed to create metadata client: %w", err)
 	}
@@ -575,11 +626,16 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		return ControllerContext{}, fmt.Errorf("failed to create discovery client: %w", err)
 	}
 
-	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient)
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
+	cachedClient := cacheddiscovery.NewMemCacheClientWithContext(discovery.ToDiscoveryInterfaceWithContext(discoveryClient))
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapperWithContext(cachedClient)
 	go wait.Until(func() {
 		restMapper.Reset()
 	}, 30*time.Second, ctx.Done())
+
+	var kubeAPIServerCAData []byte
+	if s.Kubeconfig != nil {
+		kubeAPIServerCAData = s.Kubeconfig.CAData
+	}
 
 	controllerContext := ControllerContext{
 		ClientBuilder:                   clientBuilder,
@@ -590,6 +646,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics(kubeControllerManager),
+		KubeAPIServerCAData:             kubeAPIServerCAData,
 	}
 
 	if controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector &&
@@ -720,6 +777,8 @@ func RunControllers(ctx context.Context, controllerCtx ControllerContext, contro
 	loggingCtx, cancelLoggingCtx := context.WithCancel(context.Background())
 	defer cancelLoggingCtx()
 	go func() {
+		defer utilruntime.HandleCrashWithContext(ctx)
+
 		// Only start logging when terminating.
 		select {
 		case <-ctx.Done():
@@ -751,11 +810,13 @@ func RunControllers(ctx context.Context, controllerCtx ControllerContext, contro
 
 	terminatedCh := make(chan struct{})
 	go func() {
+		defer utilruntime.HandleCrashWithContext(ctx)
 		defer close(terminatedCh)
 		var wg sync.WaitGroup
 		wg.Add(len(controllers))
 		for _, controller := range controllers {
 			go func() {
+				defer utilruntime.HandleCrashWithContext(ctx)
 				defer wg.Done()
 
 				// It would be better to unblock and return on context cancelled here,
@@ -819,7 +880,7 @@ func readCA(file string) ([]byte, error) {
 }
 
 // createClientBuilders creates clientBuilder and rootClientBuilder from the given configuration
-func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilder.ControllerClientBuilder, rootClientBuilder clientbuilder.ControllerClientBuilder) {
+func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilder.TypedClientBuilder, rootClientBuilder clientbuilder.TypedClientBuilder) {
 
 	rootClientBuilder = clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,

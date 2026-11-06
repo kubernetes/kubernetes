@@ -86,7 +86,7 @@ var _ = SIGWindowsDescribe(feature.CPUManager, feature.Windows, ginkgo.Ordered, 
 	})
 
 	ginkgo.AfterAll(func(ctx context.Context) {
-		updateWindowsKubeletConfig(ctx, f, oldCfg)
+		updateWindowsKubeletConfigClearState(ctx, f, oldCfg)
 	})
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
@@ -795,6 +795,7 @@ func buildWindowsContainers(attrs []windowsCtnAttribute) []v1.Container {
 // WindowsCPUAndMemoryAffinity feature gate is also enabled.
 func buildWindowsCPUManagerKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration, featureGateOn bool) *kubeletconfig.KubeletConfiguration {
 	newCfg := oldCfg.DeepCopy()
+	newCfg.CPUManagerPolicyOptions = nil
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
 	}
@@ -818,21 +819,15 @@ func buildWindowsStrictCPUReservationConfig(oldCfg *kubeletconfig.KubeletConfigu
 	return newCfg
 }
 
-// updateWindowsKubeletConfig stops the kubelet Windows service, writes the new
-// configuration file, and restarts the service.
-func updateWindowsKubeletConfig(ctx context.Context, f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
-	ginkgo.GinkgoHelper()
-	kubeletStart := mustStopKubelet(ctx, f)
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg), "failed to write kubelet config file")
-	kubeletStart(ctx)
-}
-
-// updateWindowsKubeletConfigClearState is like updateWindowsKubeletConfig but
-// also removes the CPU/memory manager state files while the kubelet is stopped.
-// This is required when the new configuration invalidates the persisted
-// checkpoint (e.g. toggling strict-cpu-reservation, which changes whether the
+// updateWindowsKubeletConfigClearState stops the kubelet Windows service,
+// removes the CPU/memory manager state files, writes the new configuration
+// file, and restarts the service.
+// Clearing state is required whenever the new configuration invalidates the
+// persisted checkpoint (e.g. switching CPUManagerPolicy between "none" and
+// "static", or toggling strict-cpu-reservation, which changes whether the
 // reserved CPU belongs to the default pool) — otherwise the kubelet refuses to
-// start with "invalid state, please drain node and remove policy state file".
+// start with "configured policy differs from state checkpoint policy" or
+// "invalid state, please drain node and remove policy state file".
 // It mirrors the Linux updateKubeletConfig(..., deleteStateFiles=true).
 func updateWindowsKubeletConfigClearState(ctx context.Context, f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
 	ginkgo.GinkgoHelper()
@@ -843,9 +838,13 @@ func updateWindowsKubeletConfigClearState(ctx context.Context, f *framework.Fram
 	kubeletStart(ctx)
 }
 
-// updateWindowsKubeletConfigIfNeeded calls updateWindowsKubeletConfig only when
-// the desired configuration differs from what is currently running, avoiding
+// updateWindowsKubeletConfigIfNeeded restarts the kubelet with the desired
+// configuration only when it differs from what is currently running, avoiding
 // unnecessary kubelet restarts between tests in the same When block.
+// State files are always cleared on restart: with WindowsCPUAndMemoryAffinity
+// enabled by default, the kubelet persists a CPU manager checkpoint even under
+// the "none" policy, and switching to "static" against that checkpoint makes
+// the kubelet refuse to start. It mirrors the Linux updateKubeletConfigIfNeeded.
 func updateWindowsKubeletConfigIfNeeded(ctx context.Context, f *framework.Framework, desired *kubeletconfig.KubeletConfiguration) {
 	ginkgo.GinkgoHelper()
 	current, err := getCurrentKubeletConfig(ctx)
@@ -854,7 +853,7 @@ func updateWindowsKubeletConfigIfNeeded(ctx context.Context, f *framework.Framew
 		framework.Logf("kubelet configuration already matches desired state, skipping restart")
 		return
 	}
-	updateWindowsKubeletConfig(ctx, f, desired)
+	updateWindowsKubeletConfigClearState(ctx, f, desired)
 }
 
 // equalKubeletConfiguration returns true when the two configurations are

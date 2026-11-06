@@ -31,11 +31,14 @@ import (
 
 type MockStorage struct {
 	sync.RWMutex
-	GetListErr error
-	WatchErr   error
-	GetListFn  func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
-	GetRVFn    func(_ context.Context) (uint64, error)
-	WatchFn    func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+	GetListErr         error
+	WatchErr           error
+	GetFn              func(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error
+	GetListFn          func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
+	GetRVFn            func(_ context.Context) (uint64, error)
+	WatchFn            func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+	DeleteFn           func(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object, _ storage.DeleteOptions) error
+	GuaranteedUpdateFn func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error
 
 	// use GetRequestWatchProgressCounter when reading
 	// the value of the counter
@@ -85,7 +88,13 @@ func (d *MockStorage) Versioner() storage.Versioner { return nil }
 func (d *MockStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *MockStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object, _ storage.DeleteOptions) error {
+func (d *MockStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+	if d.DeleteFn != nil {
+		return d.DeleteFn(ctx, key, out, preconditions, validateDeletion, cachedExistingObject, opts)
+	}
+	return fmt.Errorf("unimplemented")
+}
+func (d *MockStorage) DeleteOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
 func (d *MockStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
@@ -97,7 +106,10 @@ func (d *MockStorage) Watch(ctx context.Context, key string, opts storage.ListOp
 
 	return NewMockWatch(), d.WatchErr
 }
-func (d *MockStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
+func (d *MockStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if d.GetFn != nil {
+		return d.GetFn(ctx, key, opts, objPtr)
+	}
 	d.RLock()
 	defer d.RUnlock()
 	return d.GetListErr
@@ -112,8 +124,14 @@ func (d *MockStorage) GetList(ctx context.Context, resPrefix string, opts storag
 	podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
 	return d.GetListErr
 }
-func (d *MockStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
+func (d *MockStorage) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+	if d.GuaranteedUpdateFn != nil {
+		return d.GuaranteedUpdateFn(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
+	}
 	return fmt.Errorf("unimplemented")
+}
+func (d *MockStorage) UpdateOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object, _ uint64, _ runtime.Object, _ bool) (*storage.ObjState, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 func (d *MockStorage) Stats(_ context.Context) (storage.Stats, error) {
 	return storage.Stats{}, fmt.Errorf("unimplemented")

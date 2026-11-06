@@ -98,11 +98,11 @@ func parseMountInfoString(mountString string) (*MountInfo, error) {
 
 	mount.MountID, err = strconv.Atoi(mountInfo[0])
 	if err != nil {
-		return nil, fmt.Errorf("%w: mount ID: %q", ErrFileParse, mount.MountID)
+		return nil, fmt.Errorf("%w: mount ID: %q", ErrFileParse, mountInfo[0])
 	}
 	mount.ParentID, err = strconv.Atoi(mountInfo[1])
 	if err != nil {
-		return nil, fmt.Errorf("%w: parent ID: %q", ErrFileParse, mount.ParentID)
+		return nil, fmt.Errorf("%w: parent ID: %q", ErrFileParse, mountInfo[1])
 	}
 	// Has optional fields, which is a space separated list of values.
 	// Example: shared:2 master:7
@@ -160,7 +160,7 @@ func mountOptionsParser(mountOptions string) map[string]string {
 	return opts
 }
 
-// readMountInfo reads a full mountinfo file (no 1 MiB cap, unlike util.ReadFileNoStat).
+// readMountInfo reads a full mountinfo file (no 1 MiB cap, unlike parsers.ReadFileNoStat).
 func readMountInfo(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {

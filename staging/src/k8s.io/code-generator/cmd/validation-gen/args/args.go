@@ -64,6 +64,10 @@ type Args struct {
 	// validation-gen set this to claim their own tag namespace.
 	TagPrefix string
 
+	// ExtensionsFiles are paths to YAML files declaring the validations this
+	// project adds to the built-in ones. Empty means the built-in ones only.
+	ExtensionsFiles []string
+
 	apidefinitions.LintArgs
 }
 
@@ -92,6 +96,8 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"path to a YAML config file of rule-level filters to exclude from coverage fixture generation; only meaningful with --test-output-root")
 	fs.StringVar(&args.TagPrefix, "tag-prefix", args.TagPrefix,
 		"the prefix of every tag this generator recognizes, e.g. \"k8s:\" for +k8s:validation-gen and +k8s:required; empty or one or more ':'-terminated segments")
+	fs.StringSliceVar(&args.ExtensionsFiles, "validation-extensions-file", nil,
+		"path to a YAML file declaring validations this project adds to the built-in ones, such as its own \"format\" values; may be repeated")
 	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 

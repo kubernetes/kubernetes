@@ -27,7 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -35,6 +35,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/flagz"
+	"k8s.io/apiserver/pkg/server/signals"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -70,7 +72,7 @@ func init() {
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
 	s := options.NewServerRunOptions()
-	ctx := genericapiserver.SetupSignalContext()
+	ctx := signals.SetupSignalContext()
 	featureGate := s.GenericServerRunOptions.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
 
 	cmd := &cobra.Command{
@@ -112,7 +114,7 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 			// add feature enablement metrics
-			featureGate.(featuregate.MutableFeatureGate).AddMetrics()
+			featureGate.(featuregate.MutableFeatureGate).AddMetrics(featuremetrics.RecordFeatureInfo)
 			// add component version metrics
 			s.GenericServerRunOptions.ComponentGlobalsRegistry.AddMetrics()
 			return Run(ctx, completedOptions)
@@ -147,10 +149,11 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(ctx context.Context, opts options.CompletedOptions) error {
+	logger := klog.FromContext(ctx)
 	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", utilversion.Get())
+	logger.Info("Build information", "version", utilversion.Get())
 
-	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	if opts.InformerName == nil {
 		informerName, err := cache.NewInformerName("kube-apiserver")

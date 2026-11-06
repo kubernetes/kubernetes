@@ -144,10 +144,21 @@ func WithExponentialBackoff(ctx context.Context, retryBackoff wait.Backoff, webh
 	}
 }
 
+// LoadKubeconfig loads a kubeconfig file using the current context.
 func LoadKubeconfig(kubeConfigFile string, customDial utilnet.DialFunc) (*rest.Config, error) {
+	return LoadKubeconfigWithContext(kubeConfigFile, "", customDial)
+}
+
+// LoadKubeconfigWithContext loads a kubeconfig file using the specified context name.
+// If contextName is empty, the current-context from the kubeconfig is used.
+func LoadKubeconfigWithContext(kubeConfigFile string, contextName string, customDial utilnet.DialFunc) (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	loadingRules.ExplicitPath = kubeConfigFile
-	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+	overrides := &clientcmd.ConfigOverrides{}
+	if contextName != "" {
+		overrides.CurrentContext = contextName
+	}
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 
 	clientConfig, err := loader.ClientConfig()
 	if err != nil {

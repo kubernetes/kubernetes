@@ -198,48 +198,39 @@ func TestInFlightEventAsync(t *testing.T) {
 	}
 }
 
-func TestEntityToLabel(t *testing.T) {
+func TestEntityTypeToLabel(t *testing.T) {
 	tests := []struct {
-		name      string
-		entity    Entity
-		wantLabel string
-		wantOK    bool
+		name       string
+		entityType fwk.EntityKeyType
+		wantLabel  string
 	}{
 		{
-			name:   "nil entity",
-			entity: nil,
-			wantOK: false,
+			name:       "pod entity",
+			entityType: fwk.PodKeyType,
+			wantLabel:  Pod,
 		},
 		{
-			name:      "pod entity",
-			entity:    &testEntity{t: "pod"},
-			wantLabel: Pod,
-			wantOK:    true,
+			name:       "podgroup entity",
+			entityType: fwk.PodGroupKeyType,
+			wantLabel:  PodGroup,
 		},
 		{
-			name:      "podgroup entity",
-			entity:    &testEntity{t: "podgroup"},
-			wantLabel: PodGroup,
-			wantOK:    true,
+			name:       "compositepodgroup entity",
+			entityType: fwk.CompositePodGroupKeyType,
+			wantLabel:  CompositePodGroup,
 		},
 		{
-			name:      "compositepodgroup entity",
-			entity:    &testEntity{t: "compositepodgroup"},
-			wantLabel: CompositePodGroup,
-			wantOK:    true,
-		},
-		{
-			name:   "unknown entity type",
-			entity: &testEntity{t: "unknown"},
-			wantOK: false,
+			name:       "unknown entity type",
+			entityType: "unknown",
+			wantLabel:  "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLabel, gotOK := EntityToLabel(tt.entity)
-			if gotLabel != tt.wantLabel || gotOK != tt.wantOK {
-				t.Errorf("EntityToLabel() = (%v, %v), want (%v, %v)", gotLabel, gotOK, tt.wantLabel, tt.wantOK)
+			gotLabel := EntityTypeToLabel(tt.entityType)
+			if gotLabel != tt.wantLabel {
+				t.Errorf("Unexpected EntityToLabel, want: %v, got: %v", tt.wantLabel, gotLabel)
 			}
 		})
 	}
@@ -277,9 +268,9 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 				scheduler_pending_pods{queue="active"} 17
 				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
-				scheduler_queued_entities{queue="active",type="pod"} 2
-				scheduler_queued_entities{queue="active",type="podgroup"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 1
+				scheduler_queued_entities{entity="pod",queue="active"} 2
+				scheduler_queued_entities{entity="podgroup",queue="active"} 1
 			`,
 		},
 		{
@@ -294,9 +285,9 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 				scheduler_pending_pods{queue="active"} 6
 				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
-				scheduler_queued_entities{queue="active",type="pod"} 1
-				scheduler_queued_entities{queue="active",type="podgroup"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
+				scheduler_queued_entities{entity="pod",queue="active"} 1
+				scheduler_queued_entities{entity="podgroup",queue="active"} 1
 			`,
 		},
 		{
@@ -312,9 +303,9 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 				scheduler_pending_pods{queue="active"} 21
 				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 1
-				scheduler_queued_entities{queue="active",type="pod"} 1
-				scheduler_queued_entities{queue="active",type="podgroup"} 1
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 1
+				scheduler_queued_entities{entity="pod",queue="active"} 1
+				scheduler_queued_entities{entity="podgroup",queue="active"} 1
 			`,
 		},
 		{
@@ -328,9 +319,9 @@ func TestQueuedEntitiesRecorder(t *testing.T) {
 				scheduler_pending_pods{queue="active"} 0
 				# HELP scheduler_queued_entities [ALPHA] Number of queued scheduling entities ('pod', 'podgroup', or 'compositepodgroup'; 'pod' stands for individual pods that are not members of any podgroup) by the queue type. 'active' means number of entities in activeQ; 'backoff' means number of entities in backoffQ; 'unschedulable' means number of entities in unschedulableEntities that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable entities that the scheduler never attempted to schedule because they are gated.
 				# TYPE scheduler_queued_entities gauge
-				scheduler_queued_entities{queue="active",type="compositepodgroup"} 0
-				scheduler_queued_entities{queue="active",type="pod"} 0
-				scheduler_queued_entities{queue="active",type="podgroup"} 0
+				scheduler_queued_entities{entity="compositepodgroup",queue="active"} 0
+				scheduler_queued_entities{entity="pod",queue="active"} 0
+				scheduler_queued_entities{entity="podgroup",queue="active"} 0
 			`,
 		},
 	}

@@ -47,6 +47,12 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.VolumeZone},
 				{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 				{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+				// DynamicResources should come before DefaultPreemption because if
+				// there is a problem with a Pod and PostFilter gets called to
+				// resolve the problem, it is better to first deallocate an
+				// idle ResourceClaim than it is to evict some Pod that might
+				// be doing useful work.
+				{Name: names.DynamicResources, Weight: ptr.To[int32](2)},
 				{Name: names.DefaultPreemption},
 				{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 				{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
@@ -66,32 +72,15 @@ func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
 		applyDeferredPodScheduling(config)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		applyDynamicResources(config)
-	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		applyGangScheduling(config)
+	} else {
+		// DefaultPreemption is listed in MultiPoint.Enabled and implements ReservePlugin
+		// only for PodGroup preemption, so disable its Reserve extension when GenericWorkload is off.
+		config.Reserve.Disabled = append(config.Reserve.Disabled, v1.Plugin{Name: names.DefaultPreemption})
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		applyTopologyAwareWorkloadScheduling(config)
-	}
-}
-
-func applyDynamicResources(config *v1.Plugins) {
-	// This plugin should come before DefaultPreemption because if
-	// there is a problem with a Pod and PostFilter gets called to
-	// resolve the problem, it is better to first deallocate an
-	// idle ResourceClaim than it is to evict some Pod that might
-	// be doing useful work.
-	for i := range config.MultiPoint.Enabled {
-		if config.MultiPoint.Enabled[i].Name == names.DefaultPreemption {
-			extended := make([]v1.Plugin, 0, len(config.MultiPoint.Enabled)+1)
-			extended = append(extended, config.MultiPoint.Enabled[:i]...)
-			extended = append(extended, v1.Plugin{Name: names.DynamicResources, Weight: ptr.To[int32](2)})
-			extended = append(extended, config.MultiPoint.Enabled[i:]...)
-			config.MultiPoint.Enabled = extended
-			break
-		}
 	}
 }
 
@@ -125,6 +114,7 @@ func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins)
 	defaultPlugins.PostBind = mergePluginSet(logger, defaultPlugins.PostBind, customPlugins.PostBind)
 	defaultPlugins.PlacementGenerate = mergePluginSet(logger, defaultPlugins.PlacementGenerate, customPlugins.PlacementGenerate)
 	defaultPlugins.PlacementScore = mergePluginSet(logger, defaultPlugins.PlacementScore, customPlugins.PlacementScore)
+	defaultPlugins.PlacementFeasible = mergePluginSet(logger, defaultPlugins.PlacementFeasible, customPlugins.PlacementFeasible)
 	defaultPlugins.PodGroupPostFilter = mergePluginSet(logger, defaultPlugins.PodGroupPostFilter, customPlugins.PodGroupPostFilter)
 	return defaultPlugins
 }

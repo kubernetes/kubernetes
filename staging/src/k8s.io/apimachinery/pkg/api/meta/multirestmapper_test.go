@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/ktesting"
 )
 
 func TestMultiRESTMapperResourceFor(t *testing.T) {
@@ -56,8 +57,9 @@ func TestMultiRESTMapperResourceFor(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, tc := range tcs {
-		actualResult, actualErr := tc.mapper.ResourceFor(tc.input)
+		actualResult, actualErr := ToMultiRESTMapperWithContext(tc.mapper).ResourceForWithContext(tCtx, tc.input)
 		if e, a := tc.result, actualResult; e != a {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
@@ -123,8 +125,9 @@ func TestMultiRESTMapperResourcesFor(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, tc := range tcs {
-		actualResult, actualErr := tc.mapper.ResourcesFor(tc.input)
+		actualResult, actualErr := ToMultiRESTMapperWithContext(tc.mapper).ResourcesForWithContext(tCtx, tc.input)
 		if e, a := tc.result, actualResult; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
@@ -190,8 +193,9 @@ func TestMultiRESTMapperKindsFor(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, tc := range tcs {
-		actualResult, actualErr := tc.mapper.KindsFor(tc.input)
+		actualResult, actualErr := ToMultiRESTMapperWithContext(tc.mapper).KindsForWithContext(tCtx, tc.input)
 		if e, a := tc.result, actualResult; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
@@ -239,8 +243,9 @@ func TestMultiRESTMapperKindFor(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, tc := range tcs {
-		actualResult, actualErr := tc.mapper.KindFor(tc.input)
+		actualResult, actualErr := ToMultiRESTMapperWithContext(tc.mapper).KindForWithContext(tCtx, tc.input)
 		if e, a := tc.result, actualResult; e != a {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}
@@ -331,8 +336,9 @@ func TestMultiRESTMapperRESTMappings(t *testing.T) {
 		},
 	}
 
+	tCtx := ktesting.Init(t)
 	for _, tc := range tcs {
-		actualResult, actualErr := tc.mapper.RESTMappings(tc.groupKind, tc.versions...)
+		actualResult, actualErr := ToMultiRESTMapperWithContext(tc.mapper).RESTMappingsWithContext(tCtx, tc.groupKind, tc.versions...)
 		if e, a := tc.result, actualResult; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
 		}

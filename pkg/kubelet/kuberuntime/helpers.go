@@ -280,25 +280,33 @@ func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallba
 			ProfileType: runtimeapi.SecurityProfile_Unconfined,
 		}, nil
 	}
-	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
+	switch scmp.Type {
+	case v1.SeccompProfileTypeUnconfined:
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}, nil
+	case v1.SeccompProfileTypeRuntimeDefault:
 		return &runtimeapi.SecurityProfile{
 			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
 		}, nil
-	}
-	if scmp.Type == v1.SeccompProfileTypeLocalhost {
+	case v1.SeccompProfileTypeLocalhost:
 		if scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
 			fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
 			return &runtimeapi.SecurityProfile{
 				ProfileType:  runtimeapi.SecurityProfile_Localhost,
 				LocalhostRef: fname,
 			}, nil
-		} else {
-			return nil, fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost.")
 		}
+		return nil, fmt.Errorf("localhostProfile must be set if seccompProfile type is Localhost")
+	default:
+		return nil, fmt.Errorf(
+			"unsupported seccompProfile type %q (supported: %s, %s, %s)",
+			scmp.Type,
+			v1.SeccompProfileTypeUnconfined,
+			v1.SeccompProfileTypeRuntimeDefault,
+			v1.SeccompProfileTypeLocalhost,
+		)
 	}
-	return &runtimeapi.SecurityProfile{
-		ProfileType: runtimeapi.SecurityProfile_Unconfined,
-	}, nil
 }
 
 func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,

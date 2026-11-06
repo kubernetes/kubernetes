@@ -91,7 +91,7 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
-			func() { // cohort = "{"key1": "b"}"
+			func() { // cohort = "{"key1": "b"}.stringField"
 				earlyReturn := false
 				if e := validate.ValSliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual,

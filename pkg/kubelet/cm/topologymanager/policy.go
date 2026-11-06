@@ -38,10 +38,37 @@ func IsAlignmentGuaranteed(p Policy) bool {
 	return p.Name() == PolicySingleNumaNode
 }
 
+// aggregateHintScores returns the equal-weight average of the Score values in the
+// permutation, and whether any contributor supplied one.
+//
+// Only hints with an affinity and a non-zero Score are counted: Score 0 means "no
+// signal", not "zero utilization", so averaging it in would drag the result towards
+// zero for every provider that simply has nothing to say. The current implementation
+// means that a lone contributor scoring 1 sets the merged score to 1 however many
+// unscored or affinity-less contributors sit beside it.
+//
+// Score is a coarse packing signal and does not drive hint selection. Because of this,
+// we use integer division that truncates towards zero. For example, scores of 40 and 81
+// aggregate to 60.
+func aggregateHintScores(permutation []TopologyHint) (int64, bool) {
+	var sum int64
+	var count int64
+	for _, hint := range permutation {
+		if hint.NUMANodeAffinity != nil && hint.Score > 0 {
+			sum += hint.Score
+			count++
+		}
+	}
+	if count == 0 {
+		return 0, false
+	}
+	return sum / count, true
+}
+
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
-func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
+func mergePermutation(logger klog.Logger, defaultAffinity bitmask.BitMask, permutation []TopologyHint) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
 	preferred := true
@@ -63,9 +90,15 @@ func mergePermutation(defaultAffinity bitmask.BitMask, permutation []TopologyHin
 
 	// Merge the affinities using a bitwise-and operation.
 	mergedAffinity := bitmask.And(defaultAffinity, numaAffinities...)
+
+	score, hasScores := aggregateHintScores(permutation)
+	if hasScores {
+		logger.V(4).Info("Merged hint includes aggregated score", "score", score)
+	}
+
 	// Build a mergedHint from the merged affinity mask, setting preferred as
 	// appropriate based on the logic above.
-	return TopologyHint{mergedAffinity, preferred}
+	return TopologyHint{NUMANodeAffinity: mergedAffinity, Preferred: preferred, Score: score}
 }
 
 func filterProvidersHints(logger klog.Logger, providersHints []map[string][]TopologyHint) [][]TopologyHint {
@@ -77,7 +110,7 @@ func filterProvidersHints(logger klog.Logger, providersHints []map[string][]Topo
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			logger.Info("Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+			allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
 			continue
 		}
 
@@ -85,13 +118,13 @@ func filterProvidersHints(logger klog.Logger, providersHints []map[string][]Topo
 		for resource := range hints {
 			if hints[resource] == nil {
 				logger.Info("Hint Provider has no preference for NUMA affinity with resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: true}})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				logger.Info("Hint Provider has no possible NUMA affinities for resource", "resource", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{NUMANodeAffinity: nil, Preferred: false}})
 				continue
 			}
 
@@ -300,14 +333,14 @@ func (m HintMerger) compare(current *TopologyHint, candidate *TopologyHint) *Top
 
 }
 
-func (m HintMerger) Merge() TopologyHint {
+func (m HintMerger) Merge(logger klog.Logger) TopologyHint {
 	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
 
 	var bestHint *TopologyHint
 	iterateAllProviderTopologyHints(m.Hints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
-		mergedHint := mergePermutation(defaultAffinity, permutation)
+		mergedHint := mergePermutation(logger, defaultAffinity, permutation)
 
 		// Compare the current bestHint with the candidate mergedHint and
 		// update bestHint if appropriate.
@@ -315,10 +348,77 @@ func (m HintMerger) Merge() TopologyHint {
 	})
 
 	if bestHint == nil {
-		bestHint = &TopologyHint{defaultAffinity, false}
+		bestHint = &TopologyHint{NUMANodeAffinity: defaultAffinity, Preferred: false}
 	}
 
 	return *bestHint
+}
+
+// mergePreferred searches for the best preferred merged hint.
+// It is intended as an optimization for policies where any preferred merged hint
+// will always beat any non-preferred merged hint according to compare().
+//
+// Returning ok=false means: no preferred merged hint exists (or no preferred merged
+// hint with non-empty affinity exists), and the caller should fall back to the
+// full Merge() search to preserve existing behavior.
+func (m HintMerger) mergePreferred(logger klog.Logger) (TopologyHint, bool) {
+	preferredHints := make([][]TopologyHint, len(m.Hints))
+	for dim, hints := range m.Hints {
+		// Collect preferred hints per dimension; empty means no preferred permutation exists.
+		for _, hint := range hints {
+			if hint.Preferred {
+				preferredHints[dim] = append(preferredHints[dim], hint)
+			}
+		}
+		if len(preferredHints[dim]) == 0 {
+			return TopologyHint{}, false
+		}
+	}
+
+	// defaultAffinity represents all NUMA nodes on the machine.
+	defaultAffinity := m.NUMAInfo.DefaultAffinityMask()
+
+	// bestHint tracks the best preferred merged hint found so far.
+	var bestHint *TopologyHint
+	permutation := make([]TopologyHint, len(preferredHints))
+	// dim: current dimension index; baseAffinity: first non-nil preferred affinity chosen so far.
+	var iterate func(dim int, baseAffinity bitmask.BitMask)
+	iterate = func(dim int, baseAffinity bitmask.BitMask) {
+		if dim == len(preferredHints) {
+			// The candidate tuple is complete; evaluate it against the current best.
+			mergedHint := mergePermutation(logger, defaultAffinity, permutation)
+			bestHint = m.compare(bestHint, &mergedHint)
+			return
+		}
+
+		for _, candidate := range preferredHints[dim] {
+			nextBaseAffinity := baseAffinity
+			if candidate.NUMANodeAffinity != nil {
+				if nextBaseAffinity == nil {
+					// mergePermutation marks a merged hint preferred only if all non-nil
+					// affinities match exactly. Track the first non-nil affinity as the base.
+					nextBaseAffinity = candidate.NUMANodeAffinity
+					// Prune permutations that would produce an empty affinity mask.
+					if bitmask.And(defaultAffinity, nextBaseAffinity).Count() == 0 {
+						continue
+					}
+				} else if !candidate.NUMANodeAffinity.IsEqual(nextBaseAffinity) {
+					// Once two non-nil affinities differ, this permutation cannot yield a
+					// preferred merged hint.
+					continue
+				}
+			}
+
+			permutation[dim] = candidate
+			iterate(dim+1, nextBaseAffinity)
+		}
+	}
+
+	iterate(0, nil)
+	if bestHint == nil {
+		return TopologyHint{}, false
+	}
+	return *bestHint, true
 }
 
 // Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.

@@ -30,8 +30,8 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/consistency"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
 func TestStatefulSetStatusUpdater(t *testing.T) {

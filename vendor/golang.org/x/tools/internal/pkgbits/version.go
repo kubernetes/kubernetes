@@ -4,6 +4,8 @@
 
 package pkgbits
 
+// This package is dependency-restricted; see x/tools/go/gcexportdata.TestDeps.
+
 // Version indicates a version of a unified IR bitstream.
 // Each Version indicates the addition, removal, or change of
 // new data in the bitstream.
@@ -36,6 +38,10 @@ const (
 
 	// V4: encodes generic methods as standalone function objects
 	V4
+
+	// V5: encodes the index of methods to preserve relative order
+	// of nongeneric and generic methods (go.dev/issue/81188).
+	V5
 
 	numVersions = iota
 )
@@ -76,6 +82,10 @@ const (
 	// Generic methods may appear as standalone function objects.
 	GenericMethods
 
+	// Method index is encoded to preserve relative order of
+	// nongeneric and generic methods.
+	PreserveMethodOrder
+
 	numFields = iota
 )
 
@@ -85,6 +95,7 @@ var introduced = [numFields]Version{
 	AliasTypeParamNames: V2,
 	CompactCompLiterals: V3,
 	GenericMethods:      V4,
+	PreserveMethodOrder: V5,
 }
 
 // removed is the version a field was removed in or 0 for fields

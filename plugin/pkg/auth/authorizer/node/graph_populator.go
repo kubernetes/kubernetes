@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -85,16 +86,18 @@ func AddGraphEventHandlers(
 		podQueue:         newRateLimitingQueue("node_authorizer_pods"),
 		pvQueue:          newRateLimitingQueue("node_authorizer_persistentvolumes"),
 		attachmentQueue:  newRateLimitingQueue("node_authorizer_volumeattachments"),
+		sliceQueue:       newRateLimitingQueue("node_authorizer_resourceslices"),
 		podLister:        pods.Lister(),
 		pvLister:         pvs.Lister(),
 		attachmentLister: attachments.Lister(),
+		sliceLister:      slices.Lister(),
 	}
 
 	queues := []workqueue.TypedRateLimitingInterface[types.NamespacedName]{
-		g.podQueue, g.pvQueue, g.attachmentQueue,
+		g.podQueue, g.pvQueue, g.attachmentQueue, g.sliceQueue,
 	}
 	workers := []func(){
-		g.runPodWorker, g.runPVWorker, g.runAttachmentWorker,
+		g.runPodWorker, g.runPVWorker, g.runAttachmentWorker, g.runSliceWorker,
 	}
 
 	podHandler, _ := pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -115,21 +118,14 @@ func AddGraphEventHandlers(
 		DeleteFunc: g.deleteVolumeAttachment,
 	})
 
-	synced := []cache.InformerSynced{
-		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced,
-	}
+	sliceHandler, _ := slices.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    g.addResourceSlice,
+		UpdateFunc: nil, // Not needed, NodeName is immutable.
+		DeleteFunc: g.deleteResourceSlice,
+	})
 
-	if slices != nil {
-		g.sliceQueue = newRateLimitingQueue("node_authorizer_resourceslices")
-		g.sliceLister = slices.Lister()
-		queues = append(queues, g.sliceQueue)
-		workers = append(workers, g.runSliceWorker)
-		sliceHandler, _ := slices.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc:    g.addResourceSlice,
-			UpdateFunc: nil, // Not needed, NodeName is immutable.
-			DeleteFunc: g.deleteResourceSlice,
-		})
-		synced = append(synced, sliceHandler.HasSynced)
+	synced := []cache.InformerSynced{
+		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced, sliceHandler.HasSynced,
 	}
 
 	if pcrs != nil {
@@ -175,19 +171,33 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 		return
 	}
 	if oldPod, ok := oldObj.(*corev1.Pod); ok && oldPod != nil {
-		// Ephemeral containers can add new secret or config map references to the pod.
-		hasNewEphemeralContainers := len(pod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers)
 		if (pod.Spec.NodeName == oldPod.Spec.NodeName) && (pod.UID == oldPod.UID) &&
-			!hasNewEphemeralContainers &&
+			!podSpecChanged(oldPod, pod) &&
 			resourceclaim.PodStatusEqual(oldPod.Status.ResourceClaimStatuses, pod.Status.ResourceClaimStatuses) &&
 			resourceclaim.PodExtendedStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, pod.Status.ExtendedResourceClaimStatus) {
-			// Node and uid are unchanged, all object references in the pod spec are immutable respectively unmodified (claim statuses).
+			// Node and uid are unchanged, and all object references in the pod spec and status are unmodified.
 			klog.V(5).Infof("updatePod %s/%s, node unchanged", pod.Namespace, pod.Name)
 			return
 		}
 	}
 
 	g.podQueue.Add(types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name})
+}
+
+// podSpecChanged returns true if the pod spec changed in a way that can affect
+// object references in the authorization graph.
+func podSpecChanged(oldPod, newPod *corev1.Pod) bool {
+	if newPod.Generation == oldPod.Generation {
+		return false
+	}
+	// Ephemeral containers can add new secret or config map references to the pod.
+	if len(newPod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers) {
+		return true
+	}
+	if !apiequality.Semantic.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes) {
+		return true
+	}
+	return false
 }
 
 func (g *graphPopulator) deletePod(obj interface{}) {
@@ -385,9 +395,6 @@ func (g *graphPopulator) runSliceWorker() {
 }
 
 func (g *graphPopulator) processSliceKey(key types.NamespacedName) error {
-	if g.sliceLister == nil {
-		return nil
-	}
 	slice, err := g.sliceLister.Get(key.Name)
 	if err != nil {
 		if errors.IsNotFound(err) {

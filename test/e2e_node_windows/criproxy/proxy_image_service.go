@@ -23,11 +23,14 @@ import (
 )
 
 const (
-	ListImages  = "ListImages"
-	ImageStatus = "ImageStatus"
-	PullImage   = "PullImage"
-	RemoveImage = "RemoveImage"
-	ImageFsInfo = "ImageFsInfo"
+	ListImages            = "ListImages"
+	ImageStatus           = "ImageStatus"
+	PullImage             = "PullImage"
+	RemoveImage           = "RemoveImage"
+	ImageFsInfo           = "ImageFsInfo"
+	PullSecurityProfile   = "PullSecurityProfile"
+	ListSecurityProfiles  = "ListSecurityProfiles"
+	RemoveSecurityProfile = "RemoveSecurityProfile"
 	// Streaming APIs
 	StreamImages = "StreamImages"
 	// Per-send injection point for streaming APIs, called before each stream.Send().
@@ -77,6 +80,44 @@ func (p *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageReq
 	return &kubeapi.PullImageResponse{
 		ImageRef: image,
 	}, nil
+}
+
+// PullSecurityProfile pulls a security profile with authentication config.
+func (p *RemoteRuntime) PullSecurityProfile(ctx context.Context, req *kubeapi.PullSecurityProfileRequest) (*kubeapi.PullSecurityProfileResponse, error) {
+	if err := p.runInjectors(PullSecurityProfile); err != nil {
+		return nil, err
+	}
+
+	return p.imageService.PullSecurityProfile(ctx, req.Image, req.Auth, req.SandboxConfig, req.ProfileKind)
+}
+
+// ListSecurityProfiles lists the pulled security profiles.
+func (p *RemoteRuntime) ListSecurityProfiles(ctx context.Context, req *kubeapi.ListSecurityProfilesRequest) (*kubeapi.ListSecurityProfilesResponse, error) {
+	if err := p.runInjectors(ListSecurityProfiles); err != nil {
+		return nil, err
+	}
+
+	profiles, err := p.imageService.ListSecurityProfiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ListSecurityProfilesResponse{
+		Profiles: profiles,
+	}, nil
+}
+
+// RemoveSecurityProfile removes a pulled security profile.
+func (p *RemoteRuntime) RemoveSecurityProfile(ctx context.Context, req *kubeapi.RemoveSecurityProfileRequest) (*kubeapi.RemoveSecurityProfileResponse, error) {
+	if err := p.runInjectors(RemoveSecurityProfile); err != nil {
+		return nil, err
+	}
+
+	if err := p.imageService.RemoveSecurityProfile(ctx, req.Digest); err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.RemoveSecurityProfileResponse{}, nil
 }
 
 // RemoveImage removes the image.

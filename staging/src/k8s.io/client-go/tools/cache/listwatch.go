@@ -18,13 +18,19 @@ package cache
 
 import (
 	"context"
+	"fmt"
+	"sync"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/sharding"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // Lister is any object that knows how to perform an initial list.
@@ -309,4 +315,121 @@ func (lw *ListWatch) WatchWithContext(ctx context.Context, options metav1.ListOp
 		return lw.WatchFuncWithContext(ctx, options)
 	}
 	return lw.WatchFunc(options)
+}
+
+type shardedListWatch struct {
+	rawLW        ListerWatcher
+	lw           ListerWatcherWithContext
+	selector     sharding.Selector
+	fallbackOnce sync.Once
+}
+
+var (
+	_ ListerWatcher            = &shardedListWatch{}
+	_ ListerWatcherWithContext = &shardedListWatch{}
+)
+
+// NewShardedListWatch wraps a ListerWatcher to attach selector to outgoing
+// LIST and WATCH requests and transparently fall back to client-side filtering
+// via selector.Matches when the server omits ListMeta.ShardInfo (e.g. when the
+// ShardedListAndWatch feature gate is disabled on kube-apiserver).
+func NewShardedListWatch(lw ListerWatcher, selector sharding.Selector) ListerWatcher {
+	if selector == nil || selector.Empty() {
+		return lw
+	}
+	return &shardedListWatch{
+		rawLW:    lw,
+		lw:       ToListerWatcherWithContext(lw),
+		selector: selector,
+	}
+}
+
+func (s *shardedListWatch) logClientFallback(ctx context.Context) {
+	s.fallbackOnce.Do(func() {
+		klog.FromContext(ctx).V(2).Info("Server did not apply shard selector; falling back to client-side filtering", "selector", s.selector.String())
+	})
+}
+
+func (s *shardedListWatch) List(options metav1.ListOptions) (runtime.Object, error) {
+	return s.ListWithContext(context.Background(), options)
+}
+
+func (s *shardedListWatch) ListWithContext(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+	expected := s.selector.String()
+	if options.ShardSelector != "" && options.ShardSelector != expected {
+		return nil, fmt.Errorf("conflicting shard selector %q, expected %q", options.ShardSelector, expected)
+	}
+	options.ShardSelector = expected
+	list, err := s.lw.ListWithContext(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	metaObj, err := meta.ListAccessor(list)
+	if err != nil {
+		return nil, err
+	}
+	shardedList, ok := metaObj.(metav1.ShardedListInterface)
+	if !ok {
+		return nil, fmt.Errorf("object %T does not implement metav1.ShardedListInterface", list)
+	}
+	if info := shardedList.GetShardInfo(); info != nil {
+		if info.Selector != options.ShardSelector {
+			return nil, fmt.Errorf("server applied shard selector %q, expected %q", info.Selector, options.ShardSelector)
+		}
+		return list, nil
+	}
+	s.logClientFallback(ctx)
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]runtime.Object, 0, len(items))
+	for _, item := range items {
+		matched, err := s.selector.Matches(item)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			filtered = append(filtered, item)
+		}
+	}
+	metaObj.SetRemainingItemCount(nil)
+	if err := meta.SetList(list, filtered); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (s *shardedListWatch) Watch(options metav1.ListOptions) (watch.Interface, error) {
+	return s.WatchWithContext(context.Background(), options)
+}
+
+func (s *shardedListWatch) WatchWithContext(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+	expected := s.selector.String()
+	if options.ShardSelector != "" && options.ShardSelector != expected {
+		return nil, fmt.Errorf("conflicting shard selector %q, expected %q", options.ShardSelector, expected)
+	}
+	options.ShardSelector = expected
+	w, err := s.lw.WatchWithContext(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+	return watch.Filter(w, func(in watch.Event) (watch.Event, bool) {
+		if in.Type == watch.Bookmark || in.Type == watch.Error {
+			return in, true
+		}
+		matched, err := s.selector.Matches(in.Object)
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Unable to match watch event against shard selector")
+			return in, false
+		}
+		if !matched {
+			s.logClientFallback(ctx)
+		}
+		return in, matched
+	}), nil
+}
+
+func (s *shardedListWatch) IsWatchListSemanticsUnSupported() bool {
+	return watchlist.DoesClientNotSupportWatchListSemantics(s.rawLW)
 }

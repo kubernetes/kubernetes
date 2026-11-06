@@ -22,11 +22,10 @@ import (
 	"context"
 	"os/exec"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	utilipset "k8s.io/kubernetes/pkg/proxy/ipvs/ipset"
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 // CleanupIptablesLeftovers removes all iptables rules and chains created by the Proxier
@@ -39,7 +38,7 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 			"-m", "comment", "--comment", jc.comment,
 			"-j", string(jc.to),
 		}
-		if err := ipt.DeleteRule(jc.table, jc.from, args...); err != nil {
+		if err := ipt.DeleteRule(ctx, jc.table, jc.from, args...); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				logger.Error(err, "Error removing iptables rules in ipvs proxier")
 				encounteredError = true
@@ -49,7 +48,7 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 
 	// Flush and remove all of our chains. Flushing all chains before removing them also removes all links between chains first.
 	for _, ch := range iptablesCleanupChains {
-		if err := ipt.FlushChain(ch.table, ch.chain); err != nil {
+		if err := ipt.FlushChain(ctx, ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				logger.Error(err, "Error removing iptables rules in ipvs proxier")
 				encounteredError = true
@@ -59,7 +58,7 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 
 	// Remove all of our chains.
 	for _, ch := range iptablesCleanupChains {
-		if err := ipt.DeleteChain(ch.table, ch.chain); err != nil {
+		if err := ipt.DeleteChain(ctx, ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				logger.Error(err, "Error removing iptables rules in ipvs proxier")
 				encounteredError = true
@@ -81,14 +80,14 @@ func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
 		return false
 	}
 
-	ipts := utiliptables.NewBestEffort()
+	ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 	ipsetInterface := utilipset.New()
 	ipvsInterface := utilipvs.New()
 
 	return cleanupLeftovers(ctx, ipvsInterface, ipts, ipsetInterface)
 }
 
-func cleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipts map[v1.IPFamily]utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
+func cleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipts map[utiliptables.Protocol]utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
 	logger := klog.FromContext(ctx)
 	// Clear all ipvs rules
 	if ipvs != nil {

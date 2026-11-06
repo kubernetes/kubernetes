@@ -22,4 +22,4 @@ To read more about logs, see go.opentelemetry.io/otel/log.
 To read more about propagation, see go.opentelemetry.io/otel/propagation and
 go.opentelemetry.io/otel/baggage.
 */
-package otel // import "go.opentelemetry.io/otel"
+package otel

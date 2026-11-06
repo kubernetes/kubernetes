@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 
@@ -26,9 +27,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -103,6 +107,10 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 	statusStore := *store
 	statusStore.UpdateStrategy = registrypod.StatusStrategy
 	statusStore.ResetFieldsStrategy = registrypod.StatusStrategy
+	evictionStore := *store
+	evictionStore.UpdateStrategy = registrypod.StatusStrategy
+	evictionStore.ResetFieldsStrategy = registrypod.StatusStrategy
+	evictionStore.ReturnDeletedObject = false
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 	resizeStore := *store
@@ -113,7 +121,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Pod:                 &REST{store, proxyTransport},
 		Binding:             &BindingREST{store: store},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
-		Eviction:            newEvictionStorage(&statusStore, podDisruptionBudgetClient),
+		Eviction:            newEvictionStorage(&evictionStore, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
 		Resize:              &ResizeREST{store: &resizeStore},
@@ -195,8 +203,16 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 		}
 	}
 
-	err = r.assignPod(ctx, binding.UID, binding.ResourceVersion, binding.Name, binding.Target.Name, binding.Annotations, binding.Labels, dryrun.IsDryRun(options.DryRun))
-	out = &metav1.Status{Status: metav1.StatusSuccess}
+	finalPod, err := r.assignPod(ctx, binding.UID, binding.ResourceVersion, binding.Name, binding.Target.Name, binding.Annotations, binding.Labels, dryrun.IsDryRun(options.DryRun))
+	if err != nil {
+		return nil, err
+	}
+	out = &metav1.Status{
+		Status: metav1.StatusSuccess,
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: finalPod.ResourceVersion,
+		},
+	}
 	return
 }
 
@@ -227,7 +243,8 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 		}
 	}
 
-	err = r.store.Storage.GuaranteedUpdate(ctx, podKey, &api.Pod{}, false, preconditions, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+	finalPod = &api.Pod{}
+	err = r.store.Storage.GuaranteedUpdate(ctx, podKey, finalPod, false, preconditions, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, fmt.Errorf("unexpected object: %#v", obj)
@@ -250,6 +267,10 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
+		var oldAnnotations map[string]string
+		if len(annotations) > 0 {
+			oldAnnotations = maps.Clone(pod.Annotations)
+		}
 		for k, v := range annotations {
 			pod.Annotations[k] = v
 		}
@@ -266,7 +287,18 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			Status: api.ConditionTrue,
 		})
 
-		finalPod = pod
+		if len(annotations) > 0 {
+			// validate updated annotations
+			fldPath := field.NewPath("metadata", "annotations")
+			allErrs := validation.ValidatePodSpecificAnnotationUpdates(pod, oldAnnotations, fldPath, validation.PodValidationOptions{})
+			if err := apimachineryvalidation.ValidateAnnotationsSize(pod.Annotations); err != nil {
+				allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, apimachineryvalidation.TotalAnnotationSizeLimitB))
+			}
+			if len(allErrs) > 0 {
+				return nil, errors.NewInvalid(schema.GroupKind{Group: "", Kind: "Binding"}, "", allErrs)
+			}
+		}
+
 		return pod, nil
 	}), dryRun, nil)
 	return finalPod, err
@@ -287,8 +319,8 @@ func copyLabelsWithOverwriting(pod *api.Pod, labels map[string]string) {
 }
 
 // assignPod assigns the given pod to the given machine.
-func (r *BindingREST) assignPod(ctx context.Context, podUID types.UID, podResourceVersion, podID string, machine string, annotations, labels map[string]string, dryRun bool) (err error) {
-	if _, err = r.setPodNodeAndMetadata(ctx, podUID, podResourceVersion, podID, machine, annotations, labels, dryRun); err != nil {
+func (r *BindingREST) assignPod(ctx context.Context, podUID types.UID, podResourceVersion, podID string, machine string, annotations, labels map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
+	if finalPod, err = r.setPodNodeAndMetadata(ctx, podUID, podResourceVersion, podID, machine, annotations, labels, dryRun); err != nil {
 		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
 		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {

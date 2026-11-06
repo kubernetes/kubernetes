@@ -23,15 +23,17 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
+	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
@@ -305,25 +307,13 @@ func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
 }
 
 // rejectPodAdmissionBasedOnSupplementalGroupsPolicy rejects pod only if
-// - the feature is beta or above, and SupplementalPolicy=Strict is set in the pod
+// - SupplementalGroupsPolicy=Strict is set in the pod
 // - but, the node does not support the feature
-//
-// Note: During the feature is alpha or before(not yet released) in emulated version,
-// it should admit for backward compatibility
 func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Node) bool {
 	admit, reject := false, true // just for readability
 
 	inUse := (pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroupsPolicy != nil)
 	if !inUse {
-		return admit
-	}
-
-	isBetaOrAbove := false
-	if featureSpec, ok := utilfeature.DefaultMutableFeatureGate.GetAll()[features.SupplementalGroupsPolicy]; ok {
-		isBetaOrAbove = (featureSpec.PreRelease == featuregate.Beta) || (featureSpec.PreRelease == featuregate.GA)
-	}
-
-	if !isBetaOrAbove {
 		return admit
 	}
 
@@ -430,19 +420,27 @@ func (e *PredicateFailureError) GetReason() string {
 
 // generalFilter checks a group of filterings that the kubelet cares about.
 func generalFilter(logger klog.Logger, pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
-	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
 	var reasons []PredicateFailureReason
-	for _, r := range admissionResults {
-		if r.InsufficientResource != nil {
-			reasons = append(reasons, &InsufficientResourceError{
-				ResourceName: r.InsufficientResource.ResourceName,
-				Requested:    r.InsufficientResource.Requested,
-				Used:         r.InsufficientResource.Used,
-				Capacity:     r.InsufficientResource.Capacity,
-			})
-		} else {
-			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
-		}
+	for _, r := range helper.Fits(pod, nodeInfo, nil, helper.ResourceRequestsOptions{
+		EnablePodLevelResources:           utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		EnableDRAExtendedResource:         utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
+		EnableDRANodeAllocatableResources: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+	}) {
+		reasons = append(reasons, &InsufficientResourceError{
+			ResourceName: r.ResourceName,
+			Requested:    r.Requested,
+			Used:         r.Used,
+			Capacity:     r.Capacity,
+		})
+	}
+	if matches, _ := corev1nodeaffinity.GetRequiredNodeAffinity(pod).Match(nodeInfo.Node()); !matches {
+		reasons = append(reasons, &PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod})
+	}
+	if !nodename.Fits(pod, nodeInfo) {
+		reasons = append(reasons, &PredicateFailureError{nodename.Name, nodename.ErrReason})
+	}
+	if !nodeports.Fits(pod, nodeInfo) {
+		reasons = append(reasons, &PredicateFailureError{nodeports.Name, nodeports.ErrReason})
 	}
 
 	// Check taint/toleration except for static pods

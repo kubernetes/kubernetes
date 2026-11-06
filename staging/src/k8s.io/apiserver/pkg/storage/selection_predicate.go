@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/sharding"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -91,13 +90,12 @@ type SelectionPredicate struct {
 }
 
 // Matches returns true if the given object's labels and fields (as
-// returned by s.GetAttrs) match s.Label and s.Field. An error is
-// returned if s.GetAttrs fails.
+// returned by s.GetAttrs) match s.Label and s.Field, and the object matches
+// s.ShardSelector when sharding is enabled. An error is returned if
+// s.GetAttrs or shard matching fails.
 func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-		if matched, err := s.MatchesSharding(obj); err != nil || !matched {
-			return matched, err
-		}
+	if matched, err := s.MatchesSharding(obj); err != nil || !matched {
+		return matched, err
 	}
 	if s.labelFieldEmpty() {
 		return true, nil
@@ -106,22 +104,18 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	matched := s.Label.Matches(labels)
-	if matched && s.Field != nil {
-		matched = matched && s.Field.Matches(fields)
-	}
-	return matched, nil
+	return s.MatchesObjectAttributes(labels, fields), nil
 }
 
 // MatchesObjectAttributes returns true if the given labels and fields
 // match s.Label and s.Field.
 func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set) bool {
-	if s.Label.Empty() && s.Field.Empty() {
+	if s.labelFieldEmpty() {
 		return true
 	}
-	matched := s.Label.Matches(l)
+	matched := s.Label == nil || s.Label.Matches(l)
 	if matched && s.Field != nil {
-		matched = (matched && s.Field.Matches(f))
+		matched = s.Field.Matches(f)
 	}
 	return matched
 }
@@ -153,17 +147,18 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 
 // Empty returns true if the predicate performs no filtering.
 func (s *SelectionPredicate) Empty() bool {
-	// Check the selector before the feature gate: Empty is called per event on
-	// watch paths, and the nil check is free while the gate lookup is not.
-	if s.ShardSelector != nil && !s.ShardSelector.Empty() &&
-		utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-		return false
-	}
-	return s.labelFieldEmpty()
+	return !s.ShardingEnabled() && s.labelFieldEmpty()
 }
 
 func (s *SelectionPredicate) labelFieldEmpty() bool {
 	return (s.Label == nil || s.Label.Empty()) && (s.Field == nil || s.Field.Empty())
+}
+
+// ShardingEnabled returns true if a non-empty ShardSelector is configured and
+// the ShardedListAndWatch feature gate is enabled.
+func (s *SelectionPredicate) ShardingEnabled() bool {
+	return s.ShardSelector != nil && !s.ShardSelector.Empty() &&
+		utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch)
 }
 
 // For any index defined by IndexFields, if a matcher can match only (a subset)
@@ -174,11 +169,6 @@ func (s *SelectionPredicate) MatcherIndex(ctx context.Context) []MatchValue {
 	for _, field := range s.IndexFields {
 		if value, ok := s.Field.RequiresExactMatch(field); ok {
 			result = append(result, MatchValue{IndexName: FieldIndex(field), Value: value})
-		} else if field == "metadata.namespace" {
-			// list pods in the namespace. i.e. /api/v1/namespaces/default/pods
-			if namespace, isNamespaceScope := isNamespaceScopedRequest(ctx); isNamespaceScope {
-				result = append(result, MatchValue{IndexName: FieldIndex(field), Value: namespace})
-			}
 		}
 	}
 	for _, label := range s.IndexLabels {
@@ -192,33 +182,20 @@ func (s *SelectionPredicate) MatcherIndex(ctx context.Context) []MatchValue {
 // MatchesSharding returns true if the given object matches the sharding configuration.
 // If ShardSelector is set and non-empty, it delegates to ShardSelector.Matches().
 func (s *SelectionPredicate) MatchesSharding(obj runtime.Object) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+	if !s.ShardingEnabled() {
 		return true, nil
 	}
-	if s.ShardSelector != nil && !s.ShardSelector.Empty() {
-		return s.ShardSelector.Matches(obj)
-	}
-	return true, nil
+	return s.ShardSelector.Matches(obj)
 }
 
 // SetShardInfoOnList sets shard metadata on the list response if sharding is active.
 func (s *SelectionPredicate) SetShardInfoOnList(listObj runtime.Object) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+	if !s.ShardingEnabled() {
 		return
 	}
-	if s.ShardSelector != nil && !s.ShardSelector.Empty() {
-		if setter, ok := listObj.(metav1.ShardedListInterface); ok {
-			setter.SetShardInfo(&metav1.ShardInfo{Selector: s.ShardSelector.String()})
-		}
+	if setter, ok := listObj.(metav1.ShardedListInterface); ok {
+		setter.SetShardInfo(&metav1.ShardInfo{Selector: s.ShardSelector.String()})
 	}
-}
-
-func isNamespaceScopedRequest(ctx context.Context) (string, bool) {
-	re, _ := request.RequestInfoFrom(ctx)
-	if re == nil || len(re.Namespace) == 0 {
-		return "", false
-	}
-	return re.Namespace, true
 }
 
 // LabelIndex add prefix for label index.

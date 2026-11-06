@@ -32,11 +32,11 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestMigrateServiceCIDR validates the steps necessary to migrate a cluster default ServiceCIDR
@@ -197,7 +197,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 			"--disable-admission-plugins=ServiceAccount",
 		},
 		etcdOptions)
-	defer s2.TearDownFn()
+	t.Cleanup(s2.TearDownFn)
 
 	client2, err := clientset.NewForConfig(s2.ClientConfig)
 	if err != nil {
@@ -211,7 +211,6 @@ func TestMigrateServiceCIDR(t *testing.T) {
 
 	// ServiceCIDR controller
 	tCtx2 := ktesting.Init(t)
-	defer tCtx2.Cancel("tearing down ServiceCIDR controller 2")
 	informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
 	go servicecidrs.NewController(
 		tCtx2,

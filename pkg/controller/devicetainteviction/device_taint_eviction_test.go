@@ -45,6 +45,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/ktesting"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -57,7 +58,6 @@ import (
 	controllertestutil "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func init() {
@@ -616,6 +616,17 @@ var (
 				// its claim generated for it. Not used in practice.
 				ResourceClaimName: nil,
 			},
+		}
+		return pod
+	}()
+	podWithoutClaimsScheduled = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID).
+					Node(nodeName).
+					Obj()
+	podWithExtendedResourceClaimInStatus = func() *v1.Pod {
+		pod := podWithoutClaimsScheduled.DeepCopy()
+		pod.Status.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+			ResourceClaimName: claimName,
 		}
 		return pod
 	}()
@@ -1319,6 +1330,50 @@ func testController(tCtx ktesting.TContext) {
 			},
 			wantEvents: l(deletePodEvent),
 		},
+		"evict-pod-extended-resourceclaim": {
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(inUseClaim),
+				add(podWithExtendedResourceClaimInStatus),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithExtendedResourceClaimInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithExtendedResourceClaimInStatus)},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"evict-pod-extended-resourceclaim-status-update": {
+			initialState: state{
+				pods:            l(podWithoutClaimsScheduled),
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+			},
+			events: []any{
+				update(podWithoutClaimsScheduled, podWithExtendedResourceClaimInStatus),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaim, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+				deletePodAt:     evictMap{newObject(podWithExtendedResourceClaimInStatus): *newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0)},
+				queued:          MockState[workItem]{Ready: newWorkItems(podWithExtendedResourceClaimInStatus)},
+			},
+			wantEvents: l(deletePodEvent),
+		},
+		"no-evict-extended-resourceclaim-wrong-owner": {
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(inUseClaimOld), // pod not the owner
+				add(podWithExtendedResourceClaimInStatus),
+			},
+			finalState: state{
+				slices:          l(sliceTainted, slice2),
+				allocatedClaims: l(ac(inUseClaimOld, newEvictionTime(taintTime, sliceTainted, sliceTainted.Spec.Devices[0].Name, 0))),
+			},
+		},
 		"evict-pod-later": {
 			events: []any{
 				add(sliceTainted),
@@ -1471,6 +1526,32 @@ func testController(tCtx ktesting.TContext) {
 					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 						Operator: resourceapi.DeviceTolerationOpExists,
 						Effect:   resourceapi.DeviceTaintEffectNoExecute,
+					}}
+					return claim
+				}())),
+			},
+			process: []step{{pods: l(podWithClaimName)}},
+		},
+		"no-evict-pod-toleration-forever-any-effect": {
+			events: []any{
+				add(sliceTainted),
+				add(slice2),
+				add(func() *resourceapi.ResourceClaim {
+					claim := inUseClaim.DeepCopy()
+					// An empty effect matches all taint effects, same as for node taints.
+					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
+						Operator: resourceapi.DeviceTolerationOpExists,
+					}}
+					return claim
+				}()),
+				add(podWithClaimName),
+			},
+			finalState: state{
+				slices: l(sliceTainted, slice2),
+				allocatedClaims: l(ac(func() *resourceapi.ResourceClaim {
+					claim := inUseClaim.DeepCopy()
+					claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
+						Operator: resourceapi.DeviceTolerationOpExists,
 					}}
 					return claim
 				}())),
@@ -2354,7 +2435,7 @@ func testEviction(tCtx ktesting.TContext) {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			start := time.Now()
 			fakeClientset := fake.NewClientset(tt.initialObjects...)
-			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+			tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 			var podGets int
 			var podUpdates int
@@ -2385,11 +2466,10 @@ func testEviction(tCtx ktesting.TContext) {
 			controller := newTestController(tCtx)
 
 			var wg sync.WaitGroup
-			defer func() {
+			tCtx.Cleanup(func() {
 				tCtx.Log("Waiting for goroutine termination...")
-				tCtx.Cancel("time to stop")
 				wg.Wait()
-			}()
+			})
 			wg.Go(func() {
 				tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 			})
@@ -2479,15 +2559,14 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool
 			tCtx.Logf("Proceeding with pod deletion")
 		}}
 	}
-	tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, client, nil)
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		// Run with 1 worker to ensure sequential execution. Concurrent workers cause
 		// non-deterministic ordering of status updates, leading to flakes in Status assertions.
@@ -2672,7 +2751,7 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 		return false, nil, nil
 	})
 
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 	controller := newTestController(tCtx)
 
 	podEvicting := false
@@ -2687,11 +2766,10 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
@@ -2741,13 +2819,14 @@ func doCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 }
 
 // TestParallelPodDeletion covers the scenario that a pod gets deleted right before
-// trying to evict it.
+// trying to evict it, either completely or with deletion still in progress.
 func TestParallelPodDeletion(t *testing.T) { testParallelPodDeletion(ktesting.Init(t)) }
 func testParallelPodDeletion(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	tCtx.SyncTest("", synctestParallelPodDeletion)
+	tCtx.SyncTest("deleted", func(tCtx ktesting.TContext) { synctestParallelPodDeletion(tCtx, false) })
+	tCtx.SyncTest("terminating", func(tCtx ktesting.TContext) { synctestParallelPodDeletion(tCtx, true) })
 }
-func synctestParallelPodDeletion(tCtx ktesting.TContext) {
+func synctestParallelPodDeletion(tCtx ktesting.TContext, terminating bool) {
 	// This scenario is the same as "evict-pod-resourceclaim" above.
 	pod := podWithClaimName.DeepCopy()
 	fakeClientset := fake.NewClientset(
@@ -2756,7 +2835,7 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
@@ -2769,6 +2848,15 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 		podGets++
 		podName := action.(core.GetAction).GetName()
 		tCtx.Assert(podName).Should(gomega.Equal(podWithClaimName.Name), "name of patched pod")
+
+		if terminating {
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/143789.
+			// Someone else already started deleting the pod, for example with a grace period
+			// or a finalizer. The controller must leave it alone and not count it as evicted.
+			terminatingPod := pod.DeepCopy()
+			terminatingPod.DeletionTimestamp = metav1Time(time.Now())
+			return true, terminatingPod, nil
+		}
 
 		// This gets called directly before eviction. Pretend that it is deleted.
 		err = fakeClientset.Tracker().Delete(v1.SchemeGroupVersion.WithResource("pods"), pod.Namespace, pod.Name)
@@ -2784,11 +2872,10 @@ func synctestParallelPodDeletion(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
@@ -2817,7 +2904,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 		inUseClaim,
 		pod,
 	)
-	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
+	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil)
 
 	pod, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get pod before eviction")
@@ -2851,11 +2938,10 @@ func synctestRetry(tCtx ktesting.TContext) {
 	controller := newTestController(tCtx)
 
 	var wg sync.WaitGroup
-	defer func() {
+	tCtx.Cleanup(func() {
 		tCtx.Log("Waiting for goroutine termination...")
-		tCtx.Cancel("time to stop")
 		wg.Wait()
-	}()
+	})
 	wg.Go(func() {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})

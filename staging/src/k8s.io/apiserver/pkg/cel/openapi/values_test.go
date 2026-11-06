@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -673,6 +673,27 @@ func BenchmarkUnstructuredToValWithEscape(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		if val := UnstructuredToVal(u, mapListSchema); val == nil {
 			b.Fatal(val)
+		}
+	}
+}
+
+func BenchmarkUnstructuredMapFind(b *testing.B) {
+	obj := map[string]interface{}{
+		"field1": "a",
+		"field2": "b",
+	}
+	mapper := UnstructuredToVal(obj, objectSchema).(traits.Mapper)
+	k1 := types.String("field1")
+	k2 := types.String("field2")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		if _, ok := mapper.Find(k1); !ok {
+			b.Fatal("expected field1")
+		}
+		if _, ok := mapper.Find(k2); !ok {
+			b.Fatal("expected field2")
 		}
 	}
 }

@@ -248,7 +248,7 @@ var objWithDerivedAttributesInPrioritizedList = &resource.ResourceClaimTemplate{
 }
 
 var testCapacity = map[resource.QualifiedName]apiresource.Quantity{
-	resource.QualifiedName("test-capacity"): apiresource.MustParse("1"),
+	resource.QualifiedName("test_capacity"): apiresource.MustParse("1"),
 }
 
 var objWithCapacityRequests = func() *resource.ResourceClaimTemplate {
@@ -256,6 +256,17 @@ var objWithCapacityRequests = func() *resource.ResourceClaimTemplate {
 	addSpecDeviceRequestWithCapacityRequests(obj, testCapacity, false)
 	return obj
 }()
+
+// objWithStoredInvalidCapacityName has a capacity request name which was
+// accepted before capacity request names were validated.
+func objWithStoredInvalidCapacityName(prioritizedList bool, finalizers ...string) *resource.ResourceClaimTemplate {
+	obj := obj.DeepCopy()
+	obj.Finalizers = finalizers
+	addSpecDeviceRequestWithCapacityRequests(obj, map[resource.QualifiedName]apiresource.Quantity{
+		"test-capacity": apiresource.MustParse("1"),
+	}, prioritizedList)
+	return obj
+}
 
 func addSpecDeviceRequestWithCapacityRequests(resourceClaimTemplate *resource.ResourceClaimTemplate,
 	capacity map[resource.QualifiedName]apiresource.Quantity, prioritizedListFeature bool) {
@@ -410,6 +421,7 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		"drop-fields-device-taints": {
 			obj:              objWithDeviceTaints,
 			featureOverrides: featuregatetesting.FeatureOverrides{features.DRADeviceTaints: false},
+			emulatedVersion:  "1.37",
 			expectObj:        obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
@@ -433,7 +445,8 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -828,7 +841,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: obj,
+			emulatedVersion: "1.37",
+			expectObj:       obj,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -870,7 +884,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithDeviceTaints,
+			emulatedVersion: "1.37",
+			expectObj:       objWithDeviceTaints,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -884,7 +899,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -926,7 +942,8 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRADeviceTaints:    false,
 				features.DRAPrioritizedList: true,
 			},
-			expectObj: objWithDeviceTaintsInPrioritizedList,
+			emulatedVersion: "1.37",
+			expectObj:       objWithDeviceTaintsInPrioritizedList,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")
@@ -966,6 +983,32 @@ func TestStrategyUpdate(t *testing.T) {
 				features.DRAConsumableCapacity: false,
 			},
 			expectValidationErrors: []string{fieldImmutableError}, // Spec is immutable.
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"remove-finalizer-with-stored-invalid-capacity-name": {
+			oldObj: objWithStoredInvalidCapacityName(false, "example.com/finalizer"),
+			newObj: objWithStoredInvalidCapacityName(false),
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: true,
+			},
+			expectObj: objWithStoredInvalidCapacityName(false),
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"remove-finalizer-with-stored-invalid-capacity-name-in-subrequest": {
+			oldObj: objWithStoredInvalidCapacityName(true, "example.com/finalizer"),
+			newObj: objWithStoredInvalidCapacityName(true),
+			featureOverrides: featuregatetesting.FeatureOverrides{
+				features.DRAConsumableCapacity: true,
+			},
+			expectObj: objWithStoredInvalidCapacityName(true),
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
 					t.Errorf("expected no action to be taken")

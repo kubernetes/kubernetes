@@ -287,8 +287,10 @@ func main() {
 			return ri.version < rj.version
 		})
 		for _, referencer := range unwantedToReferencers[unwanted] {
-			// make sure any reference at all shows up as a non-nil status
-			if config.Status.UnwantedReferences == nil {
+			// make sure any reference at all shows up as a non-nil status,
+			// even when every referencer is a main module that only lists the
+			// unwanted module as an indirect dependency
+			if _, ok := config.Status.UnwantedReferences[unwanted]; !ok {
 				config.Status.UnwantedReferences[unwanted] = []string{}
 			}
 			// record specific names of versioned referents

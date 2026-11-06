@@ -28,8 +28,8 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestRecordOperation(t *testing.T) {

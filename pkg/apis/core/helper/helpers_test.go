@@ -181,6 +181,52 @@ func TestIsHugePageResourceName(t *testing.T) {
 	}
 }
 
+func TestIsHugePageResourceValueDivisibleOverflow(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		name     core.ResourceName
+		quantity string
+		result   bool
+	}{
+		{"request at the int64 limit, page size 1", "hugepages-1", "9223372036854775807", true},
+		{"request at the int64 limit, not a multiple", "hugepages-2Mi", "9223372036854775807", false},
+		{"request past int64", "hugepages-2Mi", "9223372036854775808", false},
+		{"request well past int64", "hugepages-2Mi", "1e30", false},
+		{"request past int64, page size dividing MaxInt64", "hugepages-7", "9223372036854775808", false},
+		{"negative request past int64", "hugepages-2Mi", "-1e30", false},
+		{"page size whose milli value exceeds int64", "hugepages-16Pi", "16Pi", false},
+		{"page size past int64", "hugepages-1e19", "1", false},
+		{"page size well past int64", "hugepages-1e30", "1", false},
+		{"page size below one byte", "hugepages-0.5", "1", false},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, resource.MustParse(testCase.quantity)) {
+			t.Errorf("%s: resource: %v quantity: %v expected result: %v", testCase.desc, testCase.name, testCase.quantity, testCase.result)
+		}
+	}
+}
+
+func TestIsHugePageResourceValueDivisibleRounding(t *testing.T) {
+	// Both operands are rounded to whole bytes before the comparison.
+	testCases := []struct {
+		desc     string
+		name     core.ResourceName
+		quantity string
+		result   bool
+	}{
+		{"2Mi written in milli", "hugepages-2Mi", "2097152000m", true},
+		{"half a byte below 2Mi rounds up to it", "hugepages-2Mi", "2097151500m", true},
+		{"half a byte above 2Mi rounds away from it", "hugepages-2Mi", "2097152500m", false},
+		{"page size with trailing zeros", "hugepages-17179869184.000000000", "34359738368", true},
+		{"page size half a milli below 2 bytes", "hugepages-1.9995", "2", true},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, resource.MustParse(testCase.quantity)) {
+			t.Errorf("%s: resource: %v quantity: %v expected result: %v", testCase.desc, testCase.name, testCase.quantity, testCase.result)
+		}
+	}
+}
+
 func TestIsHugePageResourceValueDivisible(t *testing.T) {
 	testCases := []struct {
 		name     core.ResourceName

@@ -18,12 +18,12 @@ package framework
 
 import (
 	"runtime"
-	"testing"
 	"time"
 
 	"go.uber.org/goleak"
 
 	"k8s.io/apiserver/pkg/server/healthz"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 // IgnoreBackgroundGoroutines returns options for goleak.Find
@@ -43,7 +43,7 @@ func IgnoreBackgroundGoroutines() []goleak.Option {
 // GoleakCheck sets up leak checking for a test or benchmark.
 // The check runs as cleanup operation and records an
 // error when goroutines were leaked.
-func GoleakCheck(tb testing.TB, opts ...goleak.Option) {
+func GoleakCheck(tb testutils.TB, opts ...goleak.Option) {
 	// Must be called *before* creating new goroutines.
 	opts = append(opts, IgnoreBackgroundGoroutines()...)
 

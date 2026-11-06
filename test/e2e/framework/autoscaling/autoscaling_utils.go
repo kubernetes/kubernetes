@@ -30,14 +30,15 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsv1 "k8s.io/apiextensions-api/pkg/apis/apiextensions/v1"
+	crdclientset "k8s.io/apiextensions-api/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -724,22 +725,17 @@ func (rc *ResourceConsumer) GetReplicas(ctx context.Context) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		deploymentReplicas := int64(deployment.Status.ReadyReplicas)
-
 		scale, err := rc.scaleClient.Scales(rc.nsName).Get(ctx, schema.GroupResource{Group: crdGroup, Resource: crdNamePlural}, rc.name, metav1.GetOptions{})
 		if err != nil {
 			return 0, err
 		}
-		crdInstance, err := rc.resourceClient.Get(ctx, rc.name, metav1.GetOptions{})
-		if err != nil {
-			return 0, err
-		}
-		// Update custom resource's status.replicas with child Deployment's current number of ready replicas.
-		err = unstructured.SetNestedField(crdInstance.Object, deploymentReplicas, "status", "replicas")
-		if err != nil {
-			return 0, err
-		}
-		_, err = rc.resourceClient.Update(ctx, crdInstance, metav1.UpdateOptions{})
+		// Stand in for the controller a real CRD would have by mirroring the child
+		// Deployment's ready replicas into status.replicas. A merge patch carries no
+		// resourceVersion, so it can't collide with the HPA writing spec.replicas
+		// through the scale subresource at the same moment; a read-modify-write
+		// Update did, and HandleRetry treats the resulting 409 as fatal.
+		patch := fmt.Sprintf(`{"status":{"replicas":%d}}`, deployment.Status.ReadyReplicas)
+		_, err = rc.resourceClient.Patch(ctx, rc.name, types.MergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
 			return 0, err
 		}

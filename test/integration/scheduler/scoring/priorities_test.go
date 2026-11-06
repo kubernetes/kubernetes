@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
@@ -50,15 +50,15 @@ import (
 
 // imported from testutils
 var (
-	runPausePod                  = testutils.RunPausePod
-	createAndWaitForNodesInCache = testutils.CreateAndWaitForNodesInCache
-	createNode                   = testutils.CreateNode
-	createNamespacesWithLabels   = testutils.CreateNamespacesWithLabels
-	runPodWithContainers         = testutils.RunPodWithContainers
+	runPausePod                  = schedulerutils.RunPausePod
+	createAndWaitForNodesInCache = schedulerutils.CreateAndWaitForNodesInCache
+	createNode                   = schedulerutils.CreateNode
+	createNamespacesWithLabels   = schedulerutils.CreateNamespacesWithLabels
+	runPodWithContainers         = schedulerutils.RunPodWithContainers
 	initPausePod                 = testutils.InitPausePod
-	initPodWithContainers        = testutils.InitPodWithContainers
-	podScheduledIn               = testutils.PodScheduledIn
-	podUnschedulable             = testutils.PodUnschedulable
+	initPodWithContainers        = schedulerutils.InitPodWithContainers
+	podScheduledIn               = schedulerutils.PodScheduledIn
+	podUnschedulable             = schedulerutils.PodUnschedulable
 )
 
 var (
@@ -270,7 +270,7 @@ func TestNodeResourcesScoring(t *testing.T) {
 				}
 			}
 
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 				t.Fatalf("failed to wait for nodes in cache: %v", err)
 			}
 
@@ -311,7 +311,7 @@ func TestNodeAffinityScoring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot create labeled node: %v", err)
 	}
-	if err = testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 5); err != nil {
+	if err = schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 5); err != nil {
 		t.Fatalf("failed to wait for nodes in cache: %v", err)
 	}
 
@@ -365,8 +365,7 @@ func TestPodAffinityScoring(t *testing.T) {
 		existingPods []*testutils.PausePodConfig
 		nodes        []*v1.Node
 		// expectedNodeName is the list of node names. The pod should be scheduled on either of them.
-		expectedNodeName               []string
-		enableMatchLabelKeysInAffinity bool
+		expectedNodeName []string
 	}{
 		{
 			name: "pod affinity",
@@ -472,7 +471,7 @@ func TestPodAffinityScoring(t *testing.T) {
 			expectedNodeName: []string{"node1", "node6"},
 		},
 		{
-			name: "anti affinity: matchLabelKeys is merged into LabelSelector with In operator (feature flag: enabled)",
+			name: "anti affinity: matchLabelKeys is merged into LabelSelector with In operator",
 			pod: &testutils.PausePodConfig{
 				Name:      "incoming",
 				Namespace: "ns1",
@@ -520,11 +519,10 @@ func TestPodAffinityScoring(t *testing.T) {
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
 			},
-			expectedNodeName:               []string{"node1"},
-			enableMatchLabelKeysInAffinity: true,
+			expectedNodeName: []string{"node1"},
 		},
 		{
-			name: "anti affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator  (feature flag: enabled)",
+			name: "anti affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator",
 			pod: &testutils.PausePodConfig{
 				Name:      "incoming",
 				Namespace: "ns1",
@@ -572,11 +570,10 @@ func TestPodAffinityScoring(t *testing.T) {
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
 			},
-			expectedNodeName:               []string{"node2"},
-			enableMatchLabelKeysInAffinity: true,
+			expectedNodeName: []string{"node2"},
 		},
 		{
-			name: "affinity: matchLabelKeys is merged into LabelSelector with In operator (feature flag: enabled)",
+			name: "affinity: matchLabelKeys is merged into LabelSelector with In operator",
 			pod: &testutils.PausePodConfig{
 				Affinity: &v1.Affinity{
 					PodAffinity: &v1.PodAffinity{
@@ -642,7 +639,6 @@ func TestPodAffinityScoring(t *testing.T) {
 					Labels:    map[string]string{"foo": "", "bar": "a"},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
@@ -654,7 +650,7 @@ func TestPodAffinityScoring(t *testing.T) {
 			expectedNodeName: []string{"node3", "node6"},
 		},
 		{
-			name: "affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator (feature flag: enabled)",
+			name: "affinity: mismatchLabelKeys is merged into LabelSelector with NotIn operator",
 			pod: &testutils.PausePodConfig{
 				Affinity: &v1.Affinity{
 					PodAffinity: &v1.PodAffinity{
@@ -720,7 +716,6 @@ func TestPodAffinityScoring(t *testing.T) {
 					Labels:    map[string]string{"foo": "", "bar": "hoge"},
 				},
 			},
-			enableMatchLabelKeysInAffinity: true,
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Label(topologyKey, topologyValues[0]).Obj(),
 				st.MakeNode().Name("node2").Label(topologyKey, topologyValues[1]).Obj(),
@@ -735,18 +730,8 @@ func TestPodAffinityScoring(t *testing.T) {
 
 	for _, interPodAffinityHostnameFastPathEnabled := range []bool{true, false} {
 		for _, tt := range tests {
-			if !tt.enableMatchLabelKeysInAffinity && interPodAffinityHostnameFastPathEnabled {
-				// Avoid running the v1.32 emulation twice (once for interPodAffinityHostnameFastPathEnabled=true and once for false).
-				// Since fastPath is not available in v1.32, it will run with fastPath disabled when interPodAffinityHostnameFastPathEnabled=false.
-				continue
-			}
 			t.Run(fmt.Sprintf("%s/fastPathEnabled=%v", tt.name, interPodAffinityHostnameFastPathEnabled), func(t *testing.T) {
-				if !tt.enableMatchLabelKeysInAffinity {
-					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
-				} else {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
-				}
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InterPodAffinityHostnameFastPath, interPodAffinityHostnameFastPathEnabled)
 
 				testCtx := initTestSchedulerForScoringTests(t, interpodaffinity.Name, interpodaffinity.Name)
 				if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
@@ -758,7 +743,7 @@ func TestPodAffinityScoring(t *testing.T) {
 						t.Fatalf("failed to create node: %v", err)
 					}
 				}
-				if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 					t.Fatalf("failed to wait for nodes in cache: %v", err)
 				}
 
@@ -876,7 +861,7 @@ func TestTaintTolerationScoring(t *testing.T) {
 					t.Fatalf("Failed to create node: %v", err)
 				}
 			}
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 			pod, err := runPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{
@@ -920,7 +905,7 @@ func TestImageLocalityScoring(t *testing.T) {
 
 	// Create a pod with containers each having the specified image.
 	podName := "pod-using-large-image"
-	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &testutils.PodWithContainersConfig{
+	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &schedulerutils.PodWithContainersConfig{
 		Name:       podName,
 		Namespace:  testCtx.NS.Name,
 		Containers: makeContainersWithImages([]string{imageName}),
@@ -971,14 +956,13 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                      string
-		incomingPod               *v1.Pod
-		existingPods              []*v1.Pod
-		fits                      bool
-		nodes                     []*v1.Node
-		want                      []string // nodes expected to schedule onto
-		enableNodeInclusionPolicy bool
-		enableMatchLabelKeys      bool
+		name                 string
+		incomingPod          *v1.Pod
+		existingPods         []*v1.Pod
+		fits                 bool
+		nodes                []*v1.Node
+		want                 []string // nodes expected to schedule onto
+		enableMatchLabelKeys bool
 	}{
 		// note: naming starts at index 0
 		// the symbol ~X~ means that node is infeasible
@@ -1041,8 +1025,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                      []string{"node-3"},
-			enableNodeInclusionPolicy: true,
+			want: []string{"node-3"},
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as ~3~/~1~
@@ -1067,8 +1050,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Obj(),
 			},
-			want:                      []string{"node-3"},
-			enableNodeInclusionPolicy: true,
+			want: []string{"node-3"},
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled, node-1 is the preferred fit",
@@ -1127,11 +1109,6 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.enableNodeInclusionPolicy {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
-			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTestSchedulerForScoringTests(t, podtopologyspread.Name, podtopologyspread.Name)
@@ -1143,7 +1120,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 					t.Fatalf("Cannot create node: %v", err)
 				}
 			}
-			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
 				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 
@@ -1161,7 +1138,7 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 					t.Fatalf("Test Failed: error while creating pod during test: %v", err)
 				}
 				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
+					schedulerutils.PodScheduled(cs, createdPod.Namespace, createdPod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: error while waiting for pod during test: %v", err)
 				}
@@ -1205,7 +1182,7 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 			t.Fatalf("Cannot create node: %v", err)
 		}
 	}
-	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, nodeNum); err != nil {
+	if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, nodeNum); err != nil {
 		t.Fatalf("Failed to wait for nodes in cache: %v", err)
 	}
 

@@ -18,12 +18,16 @@ package reconciler
 
 import (
 	"context"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // readyToUnmount returns true when reconciler can start unmounting volumes.
@@ -93,6 +97,33 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 
 		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
+	}
+	if (utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) ||
+		utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes)) &&
+		rc.actuatedState != nil {
+		for _, uid := range rc.actuatedState.GetPodUIDs() {
+			vols, _ := rc.actuatedState.GetPodVolumes(uid)
+			for _, vol := range vols {
+				if !VolumeRequiresUnmount(vol) {
+					continue
+				}
+				if slices.ContainsFunc(podVolumes, func(pv podVolume) bool {
+					return pv.podName == volumetypes.UniquePodName(uid) && pv.volumeSpecName == vol.Name
+				}) {
+					continue
+				}
+				if slices.ContainsFunc(rc.volumesFailedReconstruction, func(pv podVolume) bool {
+					return pv.podName == volumetypes.UniquePodName(uid) && pv.volumeSpecName == vol.Name
+				}) {
+					continue
+				}
+				if !rc.actualStateOfWorld.VolumeExistsWithSpecName(volumetypes.UniquePodName(uid), vol.Name) {
+					if err := rc.actuatedState.RemovePodVolume(logger, uid, vol.Name); err != nil {
+						logger.Error(err, "Failed to remove unmounted volume from actuated state", "podUID", uid, "volumeName", vol.Name)
+					}
+				}
+			}
+		}
 	}
 	logger.V(2).Info("Volume reconstruction finished")
 }
@@ -204,4 +235,13 @@ func (rc *reconciler) updateReconstructedFromNodeStatus(ctx context.Context) {
 
 	logger.V(2).Info("DevicePaths of reconstructed volumes updated")
 	rc.volumesNeedUpdateFromNodeStatus = nil
+}
+
+// VolumeRequiresUnmount returns true if the volume creates a per-pod directory
+// under the kubelet pods directory that must be torn down by VolumeManager
+// during unmount and is discoverable on disk during volume reconstruction.
+// HostPath and Image volumes do not create per-pod volume directories on disk
+// and their Unmounter.TearDown is a no-op.
+func VolumeRequiresUnmount(v v1.Volume) bool {
+	return v.HostPath == nil && v.Image == nil
 }

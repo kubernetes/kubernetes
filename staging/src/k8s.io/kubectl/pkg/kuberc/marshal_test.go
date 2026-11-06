@@ -38,10 +38,23 @@ func TestDecodePreference(t *testing.T) {
 			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "v1beta1.kuberc"),
 			expectedDefaults: []string{"v1beta1-apply", "v1beta1-delete"},
 		},
+		"v1": {
+			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "v1.kuberc"),
+			expectedDefaults: []string{"v1-apply", "v1-delete"},
+		},
+		"first known version (v1) with all known versions": {
+			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "allversions-v1.kuberc"),
+			expectedAliases:  []string{"getn", "runx"},
+			expectedDefaults: []string{"v1-apply", "v1-delete"},
+		},
 		"first known version (v1beta1) with all versions": {
 			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "allversions.kuberc"),
 			expectedAliases:  []string{"getn", "runx"},
 			expectedDefaults: []string{"v1beta1-apply", "v1beta1-delete"},
+		},
+		"first known (v1) with multiple versions (unknown, v1, v1beta1)": {
+			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "multiple5.kuberc"),
+			expectedDefaults: []string{"v1-apply", "v1-delete"},
 		},
 		"first known (v1beta1) with multiple versions (unknown, v1beta1, v1alpha1)": {
 			kuberc:           filepath.Join("..", "..", "testdata", "kuberc", "multiple1.kuberc"),

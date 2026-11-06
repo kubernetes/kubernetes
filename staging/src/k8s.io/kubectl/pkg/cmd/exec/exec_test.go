@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/term"
 )
@@ -428,7 +427,7 @@ func TestCreateExecutor(t *testing.T) {
 		t.Fatalf("unable to parse test url: %v", err)
 	}
 	config := cmdtesting.DefaultClientConfig()
-	// First, ensure that no environment variable creates the fallback executor.
+	// WebSockets with SPDY fallback is always used.
 	executor, err := createExecutor(url, config)
 	if err != nil {
 		t.Fatalf("unable to create executor: %v", err)
@@ -436,22 +435,5 @@ func TestCreateExecutor(t *testing.T) {
 	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
 		t.Errorf("expected fallback executor, got %#v", executor)
 	}
-	// Next, check turning on feature flag explicitly also creates fallback executor.
-	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "true")
-	executor, err = createExecutor(url, config)
-	if err != nil {
-		t.Fatalf("unable to create executor: %v", err)
-	}
-	if _, isFallback := executor.(*remotecommand.FallbackExecutor); !isFallback {
-		t.Errorf("expected fallback executor, got %#v", executor)
-	}
-	// Finally, check explicit disabling does NOT create the fallback executor.
-	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
-	executor, err = createExecutor(url, config)
-	if err != nil {
-		t.Fatalf("unable to create executor: %v", err)
-	}
-	if _, isFallback := executor.(*remotecommand.FallbackExecutor); isFallback {
-		t.Errorf("expected fallback executor, got %#v", executor)
-	}
+
 }

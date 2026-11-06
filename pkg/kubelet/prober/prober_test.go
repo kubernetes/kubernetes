@@ -18,7 +18,6 @@ package prober
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -33,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetURLParts(t *testing.T) {
@@ -367,6 +366,7 @@ func TestNewProber(t *testing.T) {
 }
 
 func TestRunProbeHTTPGetHTTP2ProtocolFeatureGateDisabled(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, false)
 
 	runner := &containertest.FakeContainerCommandRunner{}
@@ -392,7 +392,7 @@ func TestRunProbeHTTPGetHTTP2ProtocolFeatureGateDisabled(t *testing.T) {
 	// Gate off: kubelet silently falls back to HTTP/1.1 rather than
 	// failing with a gate error. The probe will fail with a connection
 	// error (no server), but must NOT fail due to the feature gate.
-	res, _, err := pb.runProbe(context.Background(), readiness, p, pod, status, container, containerID)
+	res, _, err := pb.runProbe(tCtx, readiness, p, pod, status, container, containerID)
 	if res == probe.Unknown {
 		t.Errorf("gate-off probe should fall back to HTTP/1.1, not return Unknown")
 	}

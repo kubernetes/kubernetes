@@ -18,6 +18,7 @@ package server
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
@@ -48,6 +49,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		certsubjectrestriction.PluginName,    // CertificateSubjectRestriction
 		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
 		mutatingadmissionpolicy.PluginName,   // MutatingAdmissionPolicy
+		conditionsenforcer.PluginName,        // AuthorizationConditionsEnforcer
 	)
 
 	return sets.New(options.AllOrderedPlugins...).Difference(defaultOnPlugins)

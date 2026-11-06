@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	metadata "k8s.io/dynamic-resource-allocation/api/metadata"
@@ -67,7 +68,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	dratest "k8s.io/kubernetes/test/integration/dra"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -3133,8 +3133,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 
 		ginkgo.By("Creating the pod with extended resource")
 		b.Create(tCtx, class, pod)
-		err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-		framework.ExpectNoError(err, "start pod")
 
 		ginkgo.By("Verifying extended resource claim exists")
 		var extendedResourceClaim *resourceapi.ResourceClaim
@@ -3152,7 +3150,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("extended resource claim should be created"))
 
 		ginkgo.By("Waiting for the pod to reach terminal state")
-		err = waitFn(ctx, pod)
+		err := waitFn(ctx, pod)
 		framework.ExpectNoError(err, "waiting for pod to reach terminal state")
 
 		ginkgo.By("Verifying extended resource claim is cleaned up")

@@ -59,4 +59,10 @@ func Test(t *testing.T) {
 			{Key1: "c", StringField: "changed"},
 		},
 	}).OldValue(old).ExpectValid()
+
+	st.Value(&Struct{
+		ListField: []Item{{Key1: "c"}, {Key1: "c"}},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("listField").Index(1), nil),
+	})
 }

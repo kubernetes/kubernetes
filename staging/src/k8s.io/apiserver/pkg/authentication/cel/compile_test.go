@@ -117,7 +117,7 @@ func TestCompileClaimsExpressionError(t *testing.T) {
 					Expression: "user.username == 'foo'",
 				},
 			},
-			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'user' (in container '')`,
+			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'user'`,
 		},
 		{
 			name: "invalid ClaimMappingCondition",
@@ -167,7 +167,7 @@ func TestCompileUserExpressionError(t *testing.T) {
 					Expression: "claims.foo",
 				},
 			},
-			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'claims' (in container '')`,
+			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'claims'`,
 		},
 		{
 			name: "ExtraMappingCondition with wrong env",
@@ -176,7 +176,7 @@ func TestCompileUserExpressionError(t *testing.T) {
 					Expression: "claims.foo",
 				},
 			},
-			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'claims' (in container '')`,
+			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'claims'`,
 		},
 		{
 			name: "ClaimValidationCondition with wrong env",
@@ -185,7 +185,7 @@ func TestCompileUserExpressionError(t *testing.T) {
 					Expression: "claims.foo == 'bar'",
 				},
 			},
-			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'claims' (in container '')`,
+			wantErr: `compilation failed: ERROR: <input>:1:1: undeclared reference to 'claims'`,
 		},
 		{
 			name: "UserValidationCondition expression with unknown field",

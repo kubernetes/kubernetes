@@ -24,36 +24,35 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"k8s.io/klog/v2/ktesting"
+	g "github.com/onsi/gomega"
+	"k8s.io/ktesting"
 )
 
-func TestEndpointLifecycle(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	tempDir := t.TempDir()
+func TestEndpointLifecycle(t *testing.T) { testEndpointLifecycle(ktesting.Init(t)) }
+func testEndpointLifecycle(tCtx ktesting.TContext) {
+	tempDir := tCtx.TempDir()
 	socketname := "test.sock"
 	e := endpoint{dir: tempDir, file: socketname}
-	listener, err := e.listen(ctx)
-	require.NoError(t, err, "listen")
-	assert.FileExists(t, path.Join(tempDir, socketname))
-	require.NoError(t, listener.Close(), "close")
-	assert.NoFileExists(t, path.Join(tempDir, socketname))
+	listener, err := e.listen(tCtx)
+	tCtx.ExpectNoError(err, "listen")
+	tCtx.Assert(path.Join(tempDir, socketname)).To(g.BeAnExistingFile())
+	tCtx.ExpectNoError(listener.Close(), "close")
+	tCtx.Assert(path.Join(tempDir, socketname)).ToNot(g.BeAnExistingFile())
 }
 
-func TestEndpointListener(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	tempDir := t.TempDir()
+func TestEndpointListener(t *testing.T) { testEndpointListener(ktesting.Init(t)) }
+func testEndpointListener(tCtx ktesting.TContext) {
+	tempDir := tCtx.TempDir()
 	socketname := "test.sock"
 	listen := func(ctx2 context.Context, socketpath string) (net.Listener, error) {
-		assert.Equal(t, path.Join(tempDir, socketname), socketpath)
+		tCtx.Assert(socketpath).To(g.Equal(path.Join(tempDir, socketname)))
 		return nil, nil
 	}
 	e := endpoint{dir: tempDir, file: socketname, listenFunc: listen}
-	listener, err := e.listen(ctx)
-	require.NoError(t, err, "listen")
-	assert.NoFileExists(t, path.Join(tempDir, socketname))
-	assert.Nil(t, listener)
+	listener, err := e.listen(tCtx)
+	tCtx.ExpectNoError(err, "listen")
+	tCtx.Assert(path.Join(tempDir, socketname)).ToNot(g.BeAnExistingFile())
+	tCtx.Assert(listener).To(g.BeNil())
 }
 
 // closeErrorListener is a net.Listener whose Close returns a fixed error. Only
@@ -68,16 +67,19 @@ func (l closeErrorListener) Close() error { return l.closeErr }
 // unremovableSocket puts something at the socket path that os.Remove refuses to
 // delete. A directory that is not empty fails without depending on file
 // permissions or on which user runs the test.
-func unremovableSocket(t *testing.T, dir, file string) {
-	t.Helper()
-	require.NoError(t, os.Mkdir(path.Join(dir, file), 0700))
-	require.NoError(t, os.WriteFile(path.Join(dir, file, "occupied"), nil, 0600))
+func unremovableSocket(tCtx ktesting.TContext, dir, file string) {
+	tCtx.Helper()
+	tCtx.ExpectNoError(os.Mkdir(path.Join(dir, file), 0700))
+	tCtx.ExpectNoError(os.WriteFile(path.Join(dir, file, "occupied"), nil, 0600))
 }
 
 func TestEndpointCloseReportsFailedSocketRemoval(t *testing.T) {
-	tempDir := t.TempDir()
+	testEndpointCloseReportsFailedSocketRemoval(ktesting.Init(t))
+}
+func testEndpointCloseReportsFailedSocketRemoval(tCtx ktesting.TContext) {
+	tempDir := tCtx.TempDir()
 	socketname := "test.sock"
-	unremovableSocket(t, tempDir, socketname)
+	unremovableSocket(tCtx, tempDir, socketname)
 	listener := &unixListener{
 		Listener: closeErrorListener{},
 		endpoint: endpoint{dir: tempDir, file: socketname},
@@ -85,14 +87,16 @@ func TestEndpointCloseReportsFailedSocketRemoval(t *testing.T) {
 
 	err := listener.Close()
 
-	require.Error(t, err, "closing must report the socket that was left behind")
-	assert.Contains(t, err.Error(), "remove Unix domain socket")
+	tCtx.Require(err).To(g.MatchError(g.ContainSubstring("remove Unix domain socket")), "closing must report the socket that was left behind")
 }
 
 func TestEndpointCloseKeepsBothErrors(t *testing.T) {
-	tempDir := t.TempDir()
+	testEndpointCloseKeepsBothErrors(ktesting.Init(t))
+}
+func testEndpointCloseKeepsBothErrors(tCtx ktesting.TContext) {
+	tempDir := tCtx.TempDir()
 	socketname := "test.sock"
-	unremovableSocket(t, tempDir, socketname)
+	unremovableSocket(tCtx, tempDir, socketname)
 	closeErr := errors.New("close failed")
 	listener := &unixListener{
 		Listener: closeErrorListener{closeErr: closeErr},
@@ -101,7 +105,6 @@ func TestEndpointCloseKeepsBothErrors(t *testing.T) {
 
 	err := listener.Close()
 
-	require.Error(t, err)
-	require.ErrorIs(t, err, closeErr, "the listener's own error")
-	assert.Contains(t, err.Error(), "remove Unix domain socket", "the removal error")
+	tCtx.Require(err).To(g.MatchError(closeErr), "the listener's own error")
+	tCtx.Assert(err.Error()).To(g.ContainSubstring("remove Unix domain socket"), "the removal error")
 }

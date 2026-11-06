@@ -1,0 +1,24 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+index 9df8cdd9e34..f03812ab911 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+@@ -1294,7 +1294,9 @@ func (c *Cacher) getBookmarkAfterResourceVersionLockedFunc(parsedResourceVersion
+ 
+ 	switch {
+ 	case len(opts.ResourceVersion) == 0:
+-		return func() uint64 { return requiredResourceVersion }, nil
++		// BUG REVERT (#122805): when ResourceVersion is unset on a WatchList request,
++		// do not schedule an initial-events-end bookmark.
++		return func() uint64 { return 0 }, nil
+ 	case parsedResourceVersion == 0:
+ 		// here we assume that watchCache locked is already held
+ 		return func() uint64 { return c.watchCache.resourceVersion }, nil
+@@ -1366,7 +1368,7 @@ func (c *Cacher) Wait(ctx context.Context) error {
+ 
+ // setInitialEventsEndBookmarkIfRequested sets initialEventsEndBookmark field in watchCacheInterval for watchlist request
+ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCacheInterval, opts storage.ListOptions, currentResourceVersion uint64) {
+-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks {
++	if len(opts.ResourceVersion) > 0 && opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks {
+ 		// We don't need to set the InitialEventsAnnotation for this bookmark event,
+ 		// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
+ 		initialEventsEndBookmark := &watchCacheEvent{

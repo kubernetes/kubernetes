@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/ktesting"
 )
 
 func TestIsSwapEnabled(t *testing.T) {

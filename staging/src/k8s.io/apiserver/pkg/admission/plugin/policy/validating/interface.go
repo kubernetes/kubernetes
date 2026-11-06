@@ -19,7 +19,7 @@ package validating
 import (
 	"context"
 
-	celgo "github.com/google/cel-go/cel"
+	celgo "cel.dev/cel-go/cel"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

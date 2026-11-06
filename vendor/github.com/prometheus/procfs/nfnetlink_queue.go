@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 const nfNetLinkQueueFormat = "%d %d %d %d %d %d %d %d %d"
@@ -48,7 +48,7 @@ type NFNetLinkQueue struct {
 
 // NFNetLinkQueue returns information about current state of netfilter queues.
 func (fs FS) NFNetLinkQueue() ([]NFNetLinkQueue, error) {
-	data, err := util.ReadFileNoStat(fs.proc.Path("net/netfilter/nfnetlink_queue"))
+	data, err := parsers.ReadFileNoStat(fs.proc.Path("net/netfilter/nfnetlink_queue"))
 	if err != nil {
 		return nil, err
 	}

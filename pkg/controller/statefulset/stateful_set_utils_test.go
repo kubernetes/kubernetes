@@ -17,6 +17,8 @@ limitations under the License.
 package statefulset
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -27,8 +29,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -194,6 +198,15 @@ func TestIsMemberOf(t *testing.T) {
 	}
 	if isMemberOf(set2, pod) {
 		t.Error("isMemberOf returned false positive")
+	}
+	for _, suffix := range []string{"-00", "-01", "-001"} {
+		t.Run(suffix, func(t *testing.T) {
+			pod := newStatefulSetPod(set, 1)
+			pod.Name = set.Name + suffix
+			if isMemberOf(set, pod) {
+				t.Errorf("isMemberOf returned true for non-canonical Pod name %q", pod.Name)
+			}
+		})
 	}
 }
 
@@ -1510,6 +1523,156 @@ func TestNewPodControllerRef(t *testing.T) {
 	}
 }
 
+func TestApplyRevision(t *testing.T) {
+	set := newStatefulSet(1)
+
+	testCases := []struct {
+		name       string
+		sts        *apps.StatefulSet
+		revisionFn func() *apps.ControllerRevision
+		expectSts  *apps.StatefulSet
+		expectErr  bool
+	}{
+		{
+			name: "clean revision",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				revision, err := newRevision(set, 1, new(int32))
+				if err != nil {
+					panic(err)
+				}
+				return revision
+			},
+			expectSts: set,
+		},
+		{
+			name: "empty revision",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				return &apps.ControllerRevision{}
+			},
+			expectSts: set,
+		},
+		{
+			name: "malformed revision data",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: []byte(`[]`)},
+				}
+			},
+			expectErr: true,
+		},
+		{
+			name: "spec change is applied",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				changed := newStatefulSet(1)
+				changed.Spec.Template.Spec.Containers[0].Image = "nginx:latest"
+				changed.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
+				revision, err := newRevision(changed, 1, new(int32))
+				if err != nil {
+					panic(err)
+				}
+				return revision
+			},
+			expectSts: func() *apps.StatefulSet {
+				changed := newStatefulSet(1)
+				changed.Spec.Template.Spec.Containers[0].Image = "nginx:latest"
+				changed.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
+				return changed
+			}(),
+		},
+		{
+			name: "metadata changes are ignored",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				copy := set.DeepCopy()
+				copy.ObjectMeta.Namespace = "non-default-namespace"
+				copy.ObjectMeta.UID = "non-default-uid"
+				copy.Annotations = map[string]string{"injected": "true"}
+				buf := new(bytes.Buffer)
+				enc := json.NewEncoder(buf)
+				if err := enc.Encode(copy); err != nil {
+					panic(err)
+				}
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: buf.Bytes()},
+				}
+			},
+			expectSts: set,
+		},
+		{
+			name: "status changes are ignored",
+			sts: func() *apps.StatefulSet {
+				s := newStatefulSet(1)
+				cc := int32(1)
+				s.Status.CollisionCount = &cc
+				s.Status.ObservedGeneration = 5
+				return s
+			}(),
+			revisionFn: func() *apps.ControllerRevision {
+				copy := set.DeepCopy()
+				cc := int32(99)
+				copy.Status.CollisionCount = &cc
+				copy.Status.ObservedGeneration = 100
+				buf := new(bytes.Buffer)
+				enc := json.NewEncoder(buf)
+				if err := enc.Encode(copy); err != nil {
+					panic(err)
+				}
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: buf.Bytes()},
+				}
+			},
+			expectSts: func() *apps.StatefulSet {
+				s := newStatefulSet(1)
+				cc := int32(1)
+				s.Status.CollisionCount = &cc
+				s.Status.ObservedGeneration = 5
+				return s
+			}(),
+		},
+		{
+			name: "typemeta changes are ignored",
+			sts:  set,
+			revisionFn: func() *apps.ControllerRevision {
+				copy := set.DeepCopy()
+				copy.TypeMeta.Kind = "NotAStatefulSet"
+				copy.TypeMeta.APIVersion = "v0fake"
+				buf := new(bytes.Buffer)
+				enc := json.NewEncoder(buf)
+				if err := enc.Encode(copy); err != nil {
+					panic(err)
+				}
+				return &apps.ControllerRevision{
+					Data: runtime.RawExtension{Raw: buf.Bytes()},
+				}
+			},
+			expectSts: set,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			revision := tc.revisionFn()
+			restoredSet, err := ApplyRevision(tc.sts, revision)
+			if tc.expectErr && err == nil {
+				t.Errorf("expected error but got nil")
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected error %s", err)
+			}
+			if tc.expectErr {
+				return
+			}
+			if !apiequality.Semantic.DeepEqual(tc.expectSts, restoredSet) {
+				t.Errorf("unexpected diff between expected and restored: %s", cmp.Diff(tc.expectSts, restoredSet))
+			}
+		})
+	}
+}
+
 func TestCreateApplyRevision(t *testing.T) {
 	set := newStatefulSet(1)
 	set.Status.CollisionCount = new(int32)
@@ -1541,39 +1704,6 @@ func TestCreateApplyRevision(t *testing.T) {
 	}
 	if value != expectedValue {
 		t.Errorf("for annotation %s wanted %s got %s", key, expectedValue, value)
-	}
-}
-
-func TestRollingUpdateApplyRevision(t *testing.T) {
-	set := newStatefulSet(1)
-	set.Status.CollisionCount = new(int32)
-	currentSet := set.DeepCopy()
-	currentRevision, err := newRevision(set, 1, set.Status.CollisionCount)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	set.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{{Name: "foo", Value: "bar"}}
-	updateSet := set.DeepCopy()
-	updateRevision, err := newRevision(set, 2, set.Status.CollisionCount)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	restoredCurrentSet, err := ApplyRevision(set, currentRevision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(currentSet.Spec.Template, restoredCurrentSet.Spec.Template) {
-		t.Errorf("want %v got %v", currentSet.Spec.Template, restoredCurrentSet.Spec.Template)
-	}
-
-	restoredUpdateSet, err := ApplyRevision(set, updateRevision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(updateSet.Spec.Template, restoredUpdateSet.Spec.Template) {
-		t.Errorf("want %v got %v", updateSet.Spec.Template, restoredUpdateSet.Spec.Template)
 	}
 }
 
@@ -1805,26 +1935,31 @@ func newStatefulSetWithLabels(replicas int32, name string, uid types.UID, labels
 
 func TestGetStatefulSetMaxUnavailable(t *testing.T) {
 	testCases := []struct {
+		name                   string
 		maxUnavailable         *intstr.IntOrString
-		replicaCount           int
+		updateRangeCount       int
 		expectedMaxUnavailable int
 	}{
 		// it wouldn't hurt to also test 0 and 0%, even if they should have been forbidden by API validation.
-		{maxUnavailable: nil, replicaCount: 10, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromInt32(3)), replicaCount: 10, expectedMaxUnavailable: 3},
-		{maxUnavailable: ptr.To(intstr.FromInt32(3)), replicaCount: 0, expectedMaxUnavailable: 3},
-		{maxUnavailable: ptr.To(intstr.FromInt32(0)), replicaCount: 0, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromString("10%")), replicaCount: 25, expectedMaxUnavailable: 2},
-		{maxUnavailable: ptr.To(intstr.FromString("100%")), replicaCount: 5, expectedMaxUnavailable: 5},
-		{maxUnavailable: ptr.To(intstr.FromString("50%")), replicaCount: 5, expectedMaxUnavailable: 2},
-		{maxUnavailable: ptr.To(intstr.FromString("10%")), replicaCount: 5, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromString("1%")), replicaCount: 0, expectedMaxUnavailable: 1},
-		{maxUnavailable: ptr.To(intstr.FromString("0%")), replicaCount: 0, expectedMaxUnavailable: 1},
+		{name: "nil defaults to 1", maxUnavailable: nil, updateRangeCount: 10, expectedMaxUnavailable: 1},
+		{name: "absolute 3", maxUnavailable: new(intstr.FromInt32(3)), updateRangeCount: 10, expectedMaxUnavailable: 3},
+		{name: "absolute 3 with empty range", maxUnavailable: new(intstr.FromInt32(3)), updateRangeCount: 0, expectedMaxUnavailable: 3},
+		{name: "absolute 0 clamped to 1", maxUnavailable: new(intstr.FromInt32(0)), updateRangeCount: 0, expectedMaxUnavailable: 1},
+		{name: "10% of 25", maxUnavailable: new(intstr.FromString("10%")), updateRangeCount: 25, expectedMaxUnavailable: 2},
+		{name: "100% of 5", maxUnavailable: new(intstr.FromString("100%")), updateRangeCount: 5, expectedMaxUnavailable: 5},
+		{name: "50% of 5", maxUnavailable: new(intstr.FromString("50%")), updateRangeCount: 5, expectedMaxUnavailable: 2},
+		{name: "10% of 5 rounds down to 0 then clamp 1", maxUnavailable: new(intstr.FromString("10%")), updateRangeCount: 5, expectedMaxUnavailable: 1},
+		{name: "1% of empty range", maxUnavailable: new(intstr.FromString("1%")), updateRangeCount: 0, expectedMaxUnavailable: 1},
+		{name: "0% of empty range", maxUnavailable: new(intstr.FromString("0%")), updateRangeCount: 0, expectedMaxUnavailable: 1},
+		// Partition-scoped range: e.g. Replicas=10, Partition=8 → update range size 2.
+		{name: "50% of partition range size 2", maxUnavailable: new(intstr.FromString("50%")), updateRangeCount: 2, expectedMaxUnavailable: 1},
+		{name: "100% of partition range size 2", maxUnavailable: new(intstr.FromString("100%")), updateRangeCount: 2, expectedMaxUnavailable: 2},
+		{name: "absolute ignores range size", maxUnavailable: new(intstr.FromInt32(3)), updateRangeCount: 2, expectedMaxUnavailable: 3},
 	}
 
-	for i, tc := range testCases {
-		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			gotMaxUnavailable, err := getStatefulSetMaxUnavailable(tc.maxUnavailable, tc.replicaCount)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotMaxUnavailable, err := getStatefulSetMaxUnavailable(tc.maxUnavailable, tc.updateRangeCount)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -28,8 +28,8 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func newTokenCleaner(t *testing.T) (*TokenCleaner, *fake.Clientset, coreinformers.SecretInformer, error) {

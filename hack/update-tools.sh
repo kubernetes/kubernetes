@@ -35,7 +35,7 @@ if ! git -C "${KUBE_ROOT}" diff --quiet hack/tools; then
     exit 1
 fi
 
-for tool in $(go -C "${KUBE_ROOT}/hack/tools" tool | grep /); do
+for tool in $(go -C "${KUBE_ROOT}/hack/tools" tool | awk -F'[()]' '/\// { print $2 }'); do
     echo Checking "${tool}"...
     go -C "${KUBE_ROOT}/hack/tools" get "${tool}"
     go -C "${KUBE_ROOT}/hack/tools" mod tidy

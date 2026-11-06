@@ -28,20 +28,20 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
-	return st.MakePodGroup().Name(podGroupName).WorkloadRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Priority(100).Obj()
+	return st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "t1").TopologyKey(topologyKey).MinCount(minCount).Priority(100).Obj()
 }
 
 func makeGangPodGroupWithPriority(podGroupName, topologyKey string, minCount int32, priority int32) *schedulingapi.PodGroup {
-	return st.MakePodGroup().Name(podGroupName).WorkloadRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Priority(priority).Obj()
+	return st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "t1").TopologyKey(topologyKey).MinCount(minCount).Priority(priority).Obj()
 }
 
 func makeBasicPodGroup(podGroupName, topologyKey string) *schedulingapi.PodGroup {
-	return st.MakePodGroup().Name(podGroupName).WorkloadRef("t1", "workload").BasicPolicy().TopologyKey(topologyKey).Priority(100).Obj()
+	return st.MakePodGroup().Name(podGroupName).WorkloadRef("workload", "t1").BasicPolicy().TopologyKey(topologyKey).Priority(100).Obj()
 }
 
 func makeNode(nodeName, rackLabel, zoneLabel string) *v1.Node {
@@ -240,8 +240,11 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:               "Verify that low prio pods are removed",
-					WaitForPodsRemoved: []string{"existing1", "existing2"},
+					Name: "Verify that one low prio pod is removed",
+					WaitForAnyPodsRemoved: &stepsframework.WaitForAnyPodsRemoved{
+						Pods:       []string{"existing1", "existing2"},
+						NumRemoved: 1,
+					},
 				},
 			},
 		},
@@ -1580,6 +1583,153 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 	}
 }
 
+func TestTopologyAwareSchedulingNominatedNode(t *testing.T) {
+	tests := []scenario{
+		{
+			name: "gang prefers the rack matching the pods' nominated node",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create one node per rack. rack-1's node is smaller so MostAllocated scores it higher; rack-2 (nominated) fits the gang but scores lower, so without the NNN fix the gang deterministically lands on rack-1",
+					CreateNodes: []*v1.Node{
+						makeNode("node-rack1", "rack-1", "zone-1"),
+						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+					},
+				},
+				{
+					Name: "Create the gang pods before the PodGroup, so they wait gated in the queue",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+					},
+				},
+				{
+					Name: "Nominate rack-2 for p1 via its status",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p1",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name: "Nominate rack-2 for p2 via its status",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p2",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack2" },
+					},
+				},
+				{
+					Name: "Wait until the queued pods carry the nominated node before opening the gate",
+					WaitForPodsNominated: map[string]string{
+						"p1": "node-rack2",
+						"p2": "node-rack2",
+					},
+				},
+				{
+					Name:           "Create the PodGroup (gang, minCount=2), opening the gate",
+					CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+				},
+				{
+					Name:                 "Verify the gang is scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name: "Verify the gang landed on rack-2, the nominated rack",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2"},
+						Nodes: sets.New("node-rack2"),
+					},
+				},
+			},
+		},
+		{
+			name: "NNN outside the selected TAS domain does not prevent scheduling",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create a one-CPU node in rack-1 and a four-CPU node in rack-2",
+					CreateNodes: []*v1.Node{
+						st.MakeNode().Name("node-rack1").Label("rack", "rack-1").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+						st.MakeNode().Name("node-rack2").Label("rack", "rack-2").Label("zone", "zone-1").
+							Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
+					},
+				},
+				{
+					Name:       "Fill rack-1 with an unrelated assigned pod",
+					CreatePods: []*v1.Pod{makeAssignedPod("existing", "node-rack1", "1")},
+				},
+				{
+					Name:           "Create the gang with minCount=2",
+					CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+				},
+				{
+					Name: "Create the first two pods",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+					},
+				},
+				{
+					Name:                 "Wait for minCount to be satisfied",
+					WaitForPodsScheduled: []string{"p1", "p2"},
+				},
+				{
+					Name: "Verify the first two pods satisfied minCount on rack-2",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2"},
+						Nodes: sets.New("node-rack2"),
+					},
+				},
+				{
+					Name:           "Delete the PodGroup so a new pod remains gated",
+					DeletePodGroup: "pg1",
+				},
+				{
+					Name:       "Create a third pod while the PodGroup is absent",
+					CreatePods: []*v1.Pod{makePod("p3", "pg1")},
+				},
+				{
+					Name:                                "Wait for the third pod to be gated on the missing PodGroup",
+					WaitForPodsInIncompletePodGroupPods: []string{"p3"},
+				},
+				{
+					Name: "Nominate the full node in rack-1 for the third pod",
+					UpdatePodStatus: &stepsframework.UpdatePod{
+						PodName:  "p3",
+						ModifyFn: func(p *v1.Pod) { p.Status.NominatedNodeName = "node-rack1" },
+					},
+				},
+				{
+					Name: "Wait until the gated pod carries the nominated node",
+					WaitForPodsNominated: map[string]string{
+						"p3": "node-rack1",
+					},
+				},
+				{
+					Name:           "Re-create the PodGroup to move the third pod to the active queue",
+					CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
+				},
+				{
+					Name:                 "Verify the third pod schedules in the selected TAS domain",
+					WaitForPodsScheduled: []string{"p3"},
+				},
+				{
+					Name: "Verify the third pod landed on rack-2; its rack-1 NNN was outside the generated placement",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p3"},
+						Nodes: sets.New("node-rack2"),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runTestScenario(t, tt, false)
+		})
+	}
+}
+
 func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.CompositePodGroup:               cpgEnabled,
@@ -1587,7 +1737,7 @@ func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	testCtx := testutils.InitTestSchedulerWithNS(t, "tas",
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "tas",
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0))
 	ns := testCtx.NS.Name
@@ -1603,5 +1753,127 @@ func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 	}
 	if err := stepsframework.RunSteps(testCtx, t, ns, append(workloadStep, tt.steps...)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
+	tests := []struct {
+		name  string
+		steps []stepsframework.Step
+	}{
+		{
+			name: "basic podgroup co-locates on a single rack despite a restrictive placement limit",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple racks, each rack able to fit the whole group",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack2", "rack-2", "zone-1"),
+						makeNode("node4-rack2", "rack-2", "zone-1"),
+						makeNode("node5-rack3", "rack-3", "zone-2"),
+						makeNode("node6-rack3", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name:           "Create the PodGroup constrained to a single rack",
+					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
+				},
+				{
+					Name: "Create all pods belonging to the podgroup",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg1"),
+					},
+				},
+				{
+					Name:                 "Verify the entire podgroup is scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name: "Verify all pods landed on a single rack despite the limit",
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
+						Pods:        []string{"p1", "p2", "p3"},
+						TopologyKey: "rack",
+					},
+				},
+			},
+		},
+		{
+			name: "restrictive placement limit still finds the only feasible rack for a gang",
+			steps: []stepsframework.Step{
+				{
+					Name: "Create nodes in multiple racks; only rack-1 can fit the whole gang",
+					CreateNodes: []*v1.Node{
+						makeNode("node1-rack1", "rack-1", "zone-1"),
+						makeNode("node2-rack1", "rack-1", "zone-1"),
+						makeNode("node3-rack1", "rack-1", "zone-1"),
+						makeNode("node4-rack2", "rack-2", "zone-1"),
+						makeNode("node5-rack2", "rack-2", "zone-1"),
+						makeNode("node6-zone2", "rack-3", "zone-2"),
+					},
+				},
+				{
+					Name: "Block rack-2 so it can no longer fit the whole gang",
+					CreatePods: []*v1.Pod{
+						makeAssignedPod("existing1", "node4-rack2", "2"),
+					},
+				},
+				{
+					Name:           "Create the PodGroup object (Gang with minCount=3) constrained to a single rack",
+					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
+				},
+				{
+					Name: "Create all pods belonging to the gang",
+					CreatePods: []*v1.Pod{
+						makePod("p1", "pg1"),
+						makePod("p2", "pg1"),
+						makePod("p3", "pg1"),
+					},
+				},
+				{
+					Name:                 "Verify the entire gang is scheduled",
+					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+				},
+				{
+					Name: "Verify all pods landed on the only feasible rack",
+					VerifyAssignments: &stepsframework.VerifyAssignments{
+						Pods:  []string{"p1", "p2", "p3"},
+						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack1"),
+					},
+				},
+			},
+		},
+	}
+
+	// A low percentage forces the scheduler to score only a subset of the generated placements.
+	percentageLimit := int32(1)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: true,
+			})
+
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "tas-placement-limit",
+				scheduler.WithPodMaxBackoffSeconds(0),
+				scheduler.WithPodInitialBackoffSeconds(0),
+				scheduler.WithPercentageOfPlacementsToScore(new(percentageLimit)))
+			ns := testCtx.NS.Name
+
+			workload := st.MakeWorkload().Name("workload").Namespace(ns).
+				PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).
+				Obj()
+			workloadStep := []stepsframework.Step{
+				{
+					Name:            "Creating workload",
+					CreateWorkloads: []*schedulingapi.Workload{workload},
+				},
+			}
+			if err := stepsframework.RunSteps(testCtx, t, ns, append(workloadStep, tt.steps...)); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

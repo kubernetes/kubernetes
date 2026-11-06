@@ -24,10 +24,10 @@ package v1
 // A topology selector requirement is a selector that matches given label.
 // This is an alpha feature and may change in the future.
 type TopologySelectorLabelRequirementApplyConfiguration struct {
-	// The label key that the selector applies to.
+	// key is the label key that the selector applies to.
 	Key *string `json:"key,omitempty"`
-	// An array of string values. One value must match the label to be selected.
-	// Each entry in Values is ORed.
+	// values is an array of string values. One value must match the label to be selected.
+	// Each entry in values is ORed.
 	Values []string `json:"values,omitempty"`
 }
 

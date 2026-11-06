@@ -18,12 +18,37 @@ package connrotation
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestNilDialFuncUsesDefaultDialer(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		newDialer func() *Dialer
+	}{
+		{"default tracker", func() *Dialer { return NewDialer(nil) }},
+		{"provided tracker", func() *Dialer { return NewDialerWithTracker(nil, NewConnectionTracker()) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conn, err := tc.newDialer().DialContext(context.Background(), "invalid-network", "unused")
+			if conn != nil {
+				conn.Close()
+			}
+			if err == nil {
+				t.Fatal("expected an unknown network error from the default dialer")
+			}
+			var networkError net.UnknownNetworkError
+			if !errors.As(err, &networkError) {
+				t.Fatalf("expected an unknown network error, got %v", err)
+			}
+		})
+	}
+}
 
 func TestCloseAll(t *testing.T) {
 	closed := make(chan struct{}, 50)

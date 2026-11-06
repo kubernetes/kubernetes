@@ -2373,6 +2373,9 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	}, core.PersistentVolumeClaimStatus{
 		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+		},
 	})
 
 	validClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast", core.PersistentVolumeClaimSpec{
@@ -2826,7 +2829,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		isExpectedFailure           bool
 		oldClaim                    *core.PersistentVolumeClaim
 		newClaim                    *core.PersistentVolumeClaim
-		enableRecoverFromExpansion  bool
 		enableVolumeAttributesClass bool
 	}{
 		"valid-update-volumeName-only": {
@@ -2999,33 +3001,23 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          validClaimRWOPAccessModeAddAnnotation,
 		},
 		"valid-expand-shrink-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   validClaimShrink,
-			enableRecoverFromExpansion: true,
+			oldClaim: validClaimShrinkInitial,
+			newClaim: validClaimShrink,
 		},
 		"invalid-expand-shrink-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   invalidClaimShrink,
-			enableRecoverFromExpansion: true,
-			isExpectedFailure:          true,
+			oldClaim:          validClaimShrinkInitial,
+			newClaim:          invalidClaimShrink,
+			isExpectedFailure: true,
 		},
 		"invalid-expand-shrink-to-status-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   invalidShrinkToStatus,
-			enableRecoverFromExpansion: true,
-			isExpectedFailure:          true,
-		},
-		"invalid-expand-shrink-recover-disabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   validClaimShrink,
-			enableRecoverFromExpansion: false,
-			isExpectedFailure:          true,
+			oldClaim:          validClaimShrinkInitial,
+			newClaim:          invalidShrinkToStatus,
+			isExpectedFailure: true,
 		},
 		"unbound-size-shrink-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   unboundShrink,
-			enableRecoverFromExpansion: true,
-			isExpectedFailure:          true,
+			oldClaim:          validClaimShrinkInitial,
+			newClaim:          unboundShrink,
+			isExpectedFailure: true,
 		},
 		"allow-update-pvc-when-data-source-used": {
 			oldClaim:          invalidClaimDataSourceAPIGroup,
@@ -3128,8 +3120,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.RecoverVolumeExpansionFailure: scenario.enableRecoverFromExpansion,
-				features.VolumeAttributesClass:         scenario.enableVolumeAttributesClass,
+				features.VolumeAttributesClass: scenario.enableVolumeAttributesClass,
 			})
 
 			scenario.oldClaim.ResourceVersion = "1"
@@ -3157,21 +3148,18 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 		"nil pv": {
 			oldPvc: nil,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: true,
-				EnableVolumeAttributesClass:       false,
+				EnableVolumeAttributesClass: false,
 			},
 		},
 		"invalid apiGroup in dataSource allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
 		"invalid apiGroup in dataSourceRef allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
@@ -3179,16 +3167,14 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: true,
-				EnableVolumeAttributesClass:       true,
+				EnableVolumeAttributesClass: true,
 			},
 		},
 		"volume attributes class validated because used and feature disabled": {
 			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: true,
-				EnableVolumeAttributesClass:       true,
+				EnableVolumeAttributesClass: true,
 			},
 		},
 	}
@@ -8752,7 +8738,6 @@ func TestValidatePullPolicy(t *testing.T) {
 }
 
 func TestValidateResizePolicy(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
 	type T struct {
@@ -10367,7 +10352,7 @@ func TestValidateInitContainers(t *testing.T) {
 	}}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowExistingRestartContainerForNonSidecarInitContainer: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -10743,19 +10728,6 @@ func TestValidateInitContainers(t *testing.T) {
 		}},
 		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
 	}, {
-		"Not supported ResizePolicy: invalid",
-		line(),
-		[]core.Container{{
-			Name:                     "init",
-			Image:                    "image",
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-			ResizePolicy: []core.ContainerResizePolicy{
-				{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-			},
-		}},
-		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].resizePolicy", BadValue: []core.ContainerResizePolicy{{ResourceName: "cpu", RestartPolicy: "NotRequired"}}}},
-	}, {
 		"RestartContainer policy forbidden for non-sidecar init container",
 		line(),
 		[]core.Container{{
@@ -10768,10 +10740,6 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 		}},
 		field.ErrorList{{
-			Type:     field.ErrorTypeInvalid,
-			Field:    "initContainers[0].resizePolicy",
-			BadValue: []core.ContainerResizePolicy{{ResourceName: core.ResourceCPU, RestartPolicy: core.RestartContainer}},
-		}, {
 			Type:     field.ErrorTypeInvalid,
 			Field:    "initContainers[0].resizePolicy[0].restartPolicy",
 			BadValue: core.RestartContainer,
@@ -11075,7 +11043,10 @@ func TestValidatePodDNSConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
+			if tc.legacyIPs {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
+			}
 
 			if tc.dnsPolicy == nil {
 				tc.dnsPolicy = &testDNSClusterFirst
@@ -11330,7 +11301,6 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			opts := PodValidationOptions{
 				ResourceIsPod:            true,
 				PodLevelResourcesEnabled: true,
@@ -11357,6 +11327,7 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range legacyValidationCases {
 		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			opts := PodValidationOptions{
 				ResourceIsPod:            true,
@@ -11497,7 +11468,6 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, tc := range failureCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			opts := PodValidationOptions{
 				ResourceIsPod:            true,
 				PodLevelResourcesEnabled: true,
@@ -14272,6 +14242,38 @@ func TestValidatePodUpdate(t *testing.T) {
 			err:  "Forbidden: pod updates may not change fields other than",
 			test: "storage request change",
 		}, {
+			// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+					}))),
+			),
+			err:  "must be an integer",
+			test: "unchanged fractional extended resource limit",
+		}, {
+			// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+			new: *podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+					}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+					}))),
+			),
+			err:  "must be an integer",
+			test: "unchanged fractional extended resource limit in init container",
+		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
@@ -14631,7 +14633,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "spec.initContainers[0].resizePolicy[0].restartPolicy: Invalid value: \"RestartContainer\": must not be set to 'RestartContainer' for non-sidecar initContainers",
 			test: "adding RestartContainer resize policy to non-sidecar init container should fail",
-			opts: PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: false},
+			opts: PodValidationOptions{AllowExistingRestartContainerForNonSidecarInitContainer: false},
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetInitContainers(core.Container{
@@ -14647,7 +14649,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "",
 			test: "existing RestartContainer resize policy on non-sidecar init container should be allowed on update",
-			opts: PodValidationOptions{AllowSidecarResizePolicy: true, AllowExistingRestartContainerForNonSidecarInitContainer: true},
+			opts: PodValidationOptions{AllowExistingRestartContainerForNonSidecarInitContainer: true},
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetOS(core.Windows),
@@ -15603,6 +15605,68 @@ func TestValidatePodUpdate(t *testing.T) {
 				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
 			}
 		}
+	}
+}
+
+func TestValidatePodTemplateUpdate(t *testing.T) {
+	makeTemplate := func(labels map[string]string, tweaks ...podtest.Tweak) core.PodTemplate {
+		return core.PodTemplate{
+			ObjectMeta: metav1.ObjectMeta{Name: "template", Namespace: "ns", ResourceVersion: "1", Labels: labels},
+			Template:   core.PodTemplateSpec{Spec: podtest.MakePodSpec(tweaks...)},
+		}
+	}
+	fractionalGPULimit := podtest.SetContainerResources(core.ResourceRequirements{
+		Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+	})
+
+	tests := []struct {
+		test string
+		old  core.PodTemplate
+		new  core.PodTemplate
+		err  string
+	}{{
+		test: "nothing",
+		old:  makeTemplate(nil),
+		new:  makeTemplate(nil),
+	}, {
+		test: "labels",
+		old:  makeTemplate(map[string]string{"foo": "bar"}),
+		new:  makeTemplate(map[string]string{"bar": "foo"}),
+	}, {
+		test: "image change",
+		old:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("image:v1")))),
+		new:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerImage("image:v2")))),
+	}, {
+		test: "duplicate container names",
+		old:  makeTemplate(nil),
+		new:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr"), podtest.MakeContainer("ctr"))),
+		err:  "template.spec.containers[1].name",
+	}, {
+		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+		test: "unchanged fractional extended resource limit",
+		old:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr", fractionalGPULimit))),
+		new:  makeTemplate(nil, podtest.SetContainers(podtest.MakeContainer("ctr", fractionalGPULimit))),
+		err:  "must be an integer",
+	}, {
+		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+		test: "unchanged fractional extended resource limit in init container",
+		old:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit))),
+		new:  makeTemplate(nil, podtest.SetInitContainers(podtest.MakeContainer("init", fractionalGPULimit))),
+		err:  "must be an integer",
+	}}
+	for _, tc := range tests {
+		t.Run(tc.test, func(t *testing.T) {
+			errs := ValidatePodTemplateUpdate(&tc.new, &tc.old, PodValidationOptions{})
+			if tc.err == "" {
+				if len(errs) != 0 {
+					t.Errorf("unexpected invalid: %v", errs)
+				}
+			} else if len(errs) == 0 {
+				t.Errorf("unexpected valid")
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, tc.err) {
+				t.Errorf("unexpected error message:\nExpected error: %s\nActual error: %s", tc.err, actualErr)
+			}
+		})
 	}
 }
 
@@ -18020,6 +18084,80 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			return p
 		}(),
 		"Forbidden: static pods do not support ephemeral containers",
+	}, {
+		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+		"Add an Ephemeral Container next to an unchanged fractional extended resource limit",
+		func() *core.Pod {
+			p := makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}})
+			p.Spec.Containers = []core.Container{{
+				Name:                     "ctr",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+				},
+			}}
+			return p
+		}(),
+		func() *core.Pod {
+			p := makePod(nil)
+			p.Spec.Containers = []core.Container{{
+				Name:                     "ctr",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+				},
+			}}
+			return p
+		}(),
+		"must be an integer",
+	}, {
+		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+		"Add an Ephemeral Container next to an unchanged fractional extended resource limit in an init container",
+		func() *core.Pod {
+			p := makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}})
+			p.Spec.InitContainers = []core.Container{{
+				Name:                     "init",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+				},
+			}}
+			return p
+		}(),
+		func() *core.Pod {
+			p := makePod(nil)
+			p.Spec.InitContainers = []core.Container{{
+				Name:                     "init",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+				},
+			}}
+			return p
+		}(),
+		"must be an integer",
 	},
 	}
 
@@ -19340,16 +19478,14 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.disableRelaxedServiceNames {
+			if tc.disableRelaxedServiceNames || tc.legacyIPs {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.RelaxedServiceNameValidation: false,
+					features.RelaxedServiceNameValidation: !tc.disableRelaxedServiceNames,
+					features.StrictIPCIDRValidation:       !tc.legacyIPs,
 				})
 			}
 
-			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.StrictIPCIDRValidation: !tc.legacyIPs,
-			})
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -20024,7 +20160,6 @@ func TestValidateNode(t *testing.T) {
 	}
 	for _, successCase := range successCases {
 		t.Run("", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			if errs := ValidateNode(&successCase); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
@@ -20052,6 +20187,7 @@ func TestValidateNode(t *testing.T) {
 	}
 	for name, legacyCase := range legacyValidationCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			if errs := ValidateNode(&legacyCase); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
@@ -20278,8 +20414,6 @@ func TestValidateNode(t *testing.T) {
 	}
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
-
 			errs := ValidateNode(&v)
 			if len(errs) == 0 {
 				t.Errorf("expected failure")
@@ -20638,6 +20772,40 @@ func TestValidateNodeUpdate(t *testing.T) {
 					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
 					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
 					core.ResourceName("example.com/a"):     resource.MustParse("4.5"),
+				},
+			},
+		}, false},
+		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unchanged-fractional-extended-capacity-and-allocatable",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+					core.ResourceName("example.com/a"):     resource.MustParse("18446744073709551616m"),
+				},
+				Allocatable: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+					core.ResourceName("example.com/a"):     resource.MustParse("18446744073709551616m"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "unchanged-fractional-extended-capacity-and-allocatable",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+					core.ResourceName("example.com/a"):     resource.MustParse("18446744073709551616m"),
+				},
+				Allocatable: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("10G"),
+					core.ResourceName("example.com/a"):     resource.MustParse("18446744073709551616m"),
 				},
 			},
 		}, false},
@@ -22031,7 +22199,6 @@ func TestValidateServiceUpdate(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.StrictIPCIDRValidation:       true,
 				features.RelaxedServiceNameValidation: !tc.disableRelaxedServiceNames,
 			})
 
@@ -22736,6 +22903,29 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"ratio 10 is greater than max/min = 4.000000",
 		},
+		// TODO(#141166): The true max/min is 2, so this must be accepted.
+		"maxLimitRequestRatio equal to max/min past int64": {
+			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:                 core.LimitTypeContainer,
+					Max:                  getResources("", "18446744073709551616", "", ""),
+					Min:                  getResources("", "9223372036854775808", "", ""),
+					MaxLimitRequestRatio: getResources("", "2", "", ""),
+				}},
+			}},
+			"ratio 2 is greater than max/min = 1.000000",
+		},
+		"invalid spec maxLimitRequestRatio greater than max/min past int64": {
+			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:                 core.LimitTypeContainer,
+					Max:                  getResources("", "18446744073709551616", "", ""),
+					Min:                  getResources("", "9223372036854775808", "", ""),
+					MaxLimitRequestRatio: getResources("", "3", "", ""),
+				}},
+			}},
+			"ratio 3 is greater than max/min",
+		},
 		"invalid non standard limit type": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
 				Limits: []core.LimitRangeItem{{
@@ -22785,7 +22975,6 @@ func TestValidateLimitRange(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -22850,6 +23039,80 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 		AllocatedResources: core.ResourceList{
 			core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
+		},
+	})
+
+	negativeCapacity := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-9.5Gi"),
+		},
+	})
+
+	negativeCapacityConditionUpdate := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-9.5Gi"),
+		},
+	})
+
+	hugeNegativeCapacity := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-1e30"),
+		},
+	})
+
+	hugeNegativeCapacityConditionUpdate := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.VolumeResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Conditions: []core.PersistentVolumeClaimCondition{
+			{Type: core.PersistentVolumeClaimResizing, Status: core.ConditionTrue},
+		},
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("-1e30"),
 		},
 	})
 
@@ -23010,10 +23273,9 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	})
 
 	scenarios := map[string]struct {
-		isExpectedFailure          bool
-		oldClaim                   *core.PersistentVolumeClaim
-		newClaim                   *core.PersistentVolumeClaim
-		enableRecoverFromExpansion bool
+		isExpectedFailure bool
+		oldClaim          *core.PersistentVolumeClaim
+		newClaim          *core.PersistentVolumeClaim
 	}{
 		"condition-update-with-enabled-feature-gate": {
 			isExpectedFailure: false,
@@ -23021,107 +23283,111 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			newClaim:          validConditionUpdate,
 		},
 		"status-update-with-valid-allocatedResources-feature-enabled": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validAllocatedResources,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validAllocatedResources,
 		},
 		"status-update-with-invalid-allocatedResources-native-key-feature-enabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidNativeResourceAllocatedKey,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidNativeResourceAllocatedKey,
 		},
 		"status-update-with-valid-allocatedResources-external-key-feature-enabled": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validExternalAllocatedResource,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validExternalAllocatedResource,
 		},
 
 		"status-update-with-invalid-allocatedResources-feature-enabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidAllocatedResources,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidAllocatedResources,
+		},
+		"status-update-with-negative-capacity": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          negativeCapacity,
+		},
+		// TODO(#141166): An unchanged stored capacity must pass a status update that does not change it. Expect no errors.
+		"condition-update-with-unchanged-negative-capacity": {
+			isExpectedFailure: true,
+			oldClaim:          negativeCapacity,
+			newClaim:          negativeCapacityConditionUpdate,
+		},
+		"status-update-with-negative-capacity-past-int64": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          hugeNegativeCapacity,
+		},
+		// TODO(#141166): An unchanged stored capacity must pass a status update that does not change it. Expect no errors.
+		"condition-update-with-unchanged-negative-capacity-past-int64": {
+			isExpectedFailure: true,
+			oldClaim:          hugeNegativeCapacity,
+			newClaim:          hugeNegativeCapacityConditionUpdate,
 		},
 		"status-update-with-no-storage-update": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   noStoraegeClaimStatus,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          noStoraegeClaimStatus,
 		},
 		"staus-update-with-controller-resize-failed": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validResizeStatusControllerResizeFailed,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validResizeStatusControllerResizeFailed,
 		},
 		"staus-update-with-node-resize-pending": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validNodeResizePending,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validNodeResizePending,
 		},
 		"staus-update-with-node-resize-inprogress": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validNodeResizeInProgress,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validNodeResizeInProgress,
 		},
 		"staus-update-with-node-resize-failed": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validNodeResizeFailed,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validNodeResizeFailed,
 		},
 		"staus-update-with-invalid-native-resource-status-key": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidNativeResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidNativeResizeStatusPVC,
 		},
 		"staus-update-with-valid-external-resource-status-key": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validExternalResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validExternalResizeStatusPVC,
 		},
 		"status-update-with-multiple-resources-key": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   multipleResourceStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          multipleResourceStatusPVC,
 		},
 		"status-update-with-valid-pvc-resize-status": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validResizeStatusPVC,
 		},
 		"status-update-with-invalid-pvc-resize-status": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidResizeStatusPVC,
 		},
-		"status-update-with-old-pvc-valid-resourcestatus-newpvc-invalid-recovery-disabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validResizeStatusPVC,
-			newClaim:                   invalidResizeStatusPVC,
-			enableRecoverFromExpansion: false,
+		"status-update-with-old-pvc-valid-resourcestatus-newpvc-invalid": {
+			isExpectedFailure: true,
+			oldClaim:          validResizeStatusPVC,
+			newClaim:          invalidResizeStatusPVC,
 		},
-		"status-update-with-old-pvc-valid-allocatedResource-newpvc-invalid-recovery-disabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validExternalAllocatedResource,
-			newClaim:                   invalidNativeResourceAllocatedKey,
-			enableRecoverFromExpansion: false,
+		"status-update-with-old-pvc-valid-allocatedResource-newpvc-invalid": {
+			isExpectedFailure: true,
+			oldClaim:          validExternalAllocatedResource,
+			newClaim:          invalidNativeResourceAllocatedKey,
 		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)
-
 			validateOpts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
 
 			// ensure we have a resource version specified for updates
@@ -24125,7 +24391,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
@@ -24152,6 +24417,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 	for name, tc := range legacyValidationCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
@@ -24348,7 +24614,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointsCreate(&v.endpoints)
 			// TODO: set .RequireOriginWhenInvalid() once metadata is done
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
@@ -24922,7 +25187,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		"sys admin without privilege escalation": {sysAdminPriv, false, true},
 	}
 	for k, v := range successCases {
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers, v.allowSysAdmin); len(errs) != 0 {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers, v.allowSysAdmin, false); len(errs) != 0 {
 			t.Errorf("[%s] Expected success, got %v", k, errs)
 		}
 	}
@@ -24982,7 +25247,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		})
 		// note the unconditional `true` here for hostUsers. The failure case to test for ProcMount only includes it being true,
 		// and the field is ignored if ProcMount isn't set. Thus, we can unconditionally set to `true` and simplify the test matrix setup.
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true, false); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true, false, false); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
 	}
@@ -26757,7 +27022,10 @@ func TestPodIPsValidation(t *testing.T) {
 
 	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
+			if testCase.legacyIPs {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
+			}
 			for j, oldTestCase := range testCases {
 				if oldTestCase.legacyIPs && !testCase.legacyIPs {
 					continue
@@ -26890,7 +27158,10 @@ func TestHostIPsValidation(t *testing.T) {
 
 	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
+			if testCase.legacyIPs {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
+			}
 			for j, oldTestCase := range testCases {
 				if oldTestCase.legacyIPs && !testCase.legacyIPs {
 					continue
@@ -27296,6 +27567,12 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 		description:     "localhost/test.json annotation and SeccompProfileTypeRuntimeDefault with different profile should error",
 		annotationValue: "localhost/test.json",
 		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault},
+		fldPath:         rootFld,
+		expectedErr:     field.Forbidden(rootFld.Child("type"), "seccomp type in annotation and field must match"),
+	}, {
+		description:     "runtime/default annotation and SeccompProfileTypeOCI should error",
+		annotationValue: "runtime/default",
+		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}},
 		fldPath:         rootFld,
 		expectedErr:     field.Forbidden(rootFld.Child("type"), "seccomp type in annotation and field must match"),
 	},
@@ -28834,7 +29111,10 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
+			if tc.legacyIPs {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
+			}
 			oldStatus := core.LoadBalancerStatus{}
 			if tc.tweakOldLBStatus != nil {
 				tc.tweakOldLBStatus(&oldStatus)
@@ -30209,75 +30489,6 @@ func TestValidatePodResize(t *testing.T) {
 				))),
 			disableInitCtrResize: true,
 			err:                  "Forbidden: resources for non-sidecar init containers are immutable",
-		},
-
-		{
-			test: "Pod with nil Resource field in Status",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{{
-					ContainerID: "docker://numbers",
-					Image:       "nginx:alpine",
-					Name:        "main",
-					Ready:       true,
-					Started:     proto.Bool(true),
-					Resources:   nil,
-					State: core.ContainerState{
-						Running: &core.ContainerStateRunning{
-							StartedAt: metav1.NewTime(time.Now()),
-						},
-					},
-				}},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "Forbidden: Pod running on node without support for resize",
-		},
-		{
-			test: "Pod with non-nil Resources field in Status",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{{
-					ContainerID: "docker://numbers",
-					Image:       "nginx:alpine",
-					Name:        "main",
-					Ready:       true,
-					Started:     proto.Bool(true),
-					Resources:   &core.ResourceRequirements{},
-					State: core.ContainerState{
-						Running: &core.ContainerStateRunning{
-							StartedAt: metav1.NewTime(time.Now()),
-						},
-					},
-				}},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "",
-		},
-		{
-			test: "Pod without running containers",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "",
-		},
-		{
-			test: "Pod with containers which are not running yet",
-			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
-				ContainerStatuses: []core.ContainerStatus{{
-					ContainerID: "docker://numbers",
-					Image:       "nginx:alpine",
-					Name:        "main",
-					Ready:       true,
-					Started:     proto.Bool(true),
-					Resources:   &core.ResourceRequirements{},
-					State: core.ContainerState{
-						Waiting: &core.ContainerStateWaiting{
-							Reason: "PodInitializing",
-						},
-					},
-				}},
-			})),
-			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
-			err: "",
 		}, {
 			test: "cpu limit change for sidecar containers",
 			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), core.ContainerRestartPolicyAlways),
@@ -31010,6 +31221,19 @@ func TestValidatePodResize(t *testing.T) {
 				return p
 			}(),
 		},
+		// TODO(#141166): An unchanged stored value must pass on update. Expect no error.
+		{
+			test: "cpu resize next to an unchanged fractional extended resource",
+			old: mkPod(
+				core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+				core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+			),
+			new: mkPod(
+				core.ResourceList{core.ResourceCPU: resource.MustParse("200m"), core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+				core.ResourceList{core.ResourceCPU: resource.MustParse("200m"), core.ResourceName("example.com/gpu"): resource.MustParse("18446744073709551616m")},
+			),
+			err: "must be an integer",
+		},
 	}
 
 	for _, test := range tests {
@@ -31051,7 +31275,6 @@ func TestValidatePodResize(t *testing.T) {
 			}
 
 			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{
-				AllowSidecarResizePolicy:                            true,
 				InPlacePodLevelResourcesVerticalScalingEnabled:      true,
 				PodLevelResourcesEnabled:                            true,
 				InPlacePodVerticalScalingMemoryBackedVolumesEnabled: test.enableMemoryBackedVolumesResize,
@@ -32986,4 +33209,171 @@ func TestValidateBasicResource(t *testing.T) {
 			}
 		})
 	}
+}
+
+const validOCIProfileReference = "registry.example.com/profiles/seccomp@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+// TestValidateSeccompProfileFieldOCI covers the handwritten part; the oci
+// field is validated declaratively (test/declarative_validation/core/pod).
+func TestValidateSeccompProfileFieldOCI(t *testing.T) {
+	fldPath := field.NewPath("seccompProfile")
+	oci := &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}}
+	tests := []struct {
+		name         string
+		profile      *core.SeccompProfile
+		disallowOCI  bool
+		expectedErrs field.ErrorList
+	}{{
+		name:    "type OCI",
+		profile: oci,
+	}, {
+		name: "type OCI with a Localhost base profile",
+		profile: &core.SeccompProfile{
+			Type: core.SeccompProfileTypeOCI,
+			OCI: &core.SecurityProfileOCI{
+				Ref:         validOCIProfileReference,
+				BaseProfile: &core.SecurityProfileOCIBase{Type: core.SecurityProfileOCIBaseTypeLocalhost, LocalhostProfile: new("profiles/base.json")},
+			},
+		},
+	}, {
+		name:         "type OCI with the feature disabled",
+		profile:      oci,
+		disallowOCI:  true,
+		expectedErrs: field.ErrorList{field.NotSupported(fldPath.Child("type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType{core.SeccompProfileTypeLocalhost, core.SeccompProfileTypeRuntimeDefault, core.SeccompProfileTypeUnconfined})},
+	}, {
+		name: "type OCI with localhostProfile",
+		profile: &core.SeccompProfile{
+			Type:             core.SeccompProfileTypeOCI,
+			LocalhostProfile: new("profile.json"),
+			OCI:              &core.SecurityProfileOCI{Ref: validOCIProfileReference},
+		},
+		expectedErrs: field.ErrorList{field.Invalid(fldPath.Child("localhostProfile"), nil, "")},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateSeccompProfileField(tc.profile, fldPath, !tc.disallowOCI)
+			matcher := field.ErrorMatcher{}.ByType().ByField()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+func TestValidatePrivilegedContainersSeccompOCI(t *testing.T) {
+	specPath := field.NewPath("spec")
+	oci := &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}}
+	runtimeDefault := &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}
+	container := func(name string, privileged bool, profile *core.SeccompProfile) core.Container {
+		return core.Container{Name: name, SecurityContext: &core.SecurityContext{Privileged: new(privileged), SeccompProfile: profile}}
+	}
+	tests := []struct {
+		name         string
+		spec         *core.PodSpec
+		expectedErrs field.ErrorList
+	}{{
+		name: "unprivileged container with OCI profile",
+		spec: &core.PodSpec{Containers: []core.Container{container("c", false, oci)}},
+	}, {
+		name: "privileged container with RuntimeDefault profile and pod-level OCI profile",
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{SeccompProfile: oci},
+			Containers:      []core.Container{container("c", true, runtimeDefault)},
+		},
+	}, {
+		name:         "privileged container with OCI profile",
+		spec:         &core.PodSpec{Containers: []core.Container{container("c", true, oci)}},
+		expectedErrs: field.ErrorList{field.Forbidden(specPath.Child("containers").Index(0).Child("securityContext", "privileged"), "")},
+	}, {
+		name: "privileged containers inheriting a pod-level OCI profile",
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{SeccompProfile: oci},
+			InitContainers:  []core.Container{container("init", true, nil)},
+			Containers:      []core.Container{container("c", false, nil)},
+			EphemeralContainers: []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", SecurityContext: &core.SecurityContext{Privileged: new(true)}},
+			}},
+		},
+		expectedErrs: field.ErrorList{
+			field.Forbidden(specPath.Child("initContainers").Index(0).Child("securityContext", "privileged"), ""),
+			field.Forbidden(specPath.Child("ephemeralContainers").Index(0).Child("securityContext", "privileged"), ""),
+		},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validatePrivilegedContainersSeccompOCI(tc.spec, specPath)
+			matcher := field.ErrorMatcher{}.ByType().ByField()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+// TestValidatePodSecurityProfileOCI runs pods with OCI seccomp profiles through
+// the pod validation entry points, so that the feature gate option and the
+// privileged container rule are covered where they are wired in.
+func TestValidatePodSecurityProfileOCI(t *testing.T) {
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{AllowPrivileged: true})
+	t.Cleanup(capabilities.ResetForTest)
+
+	oci := &core.SeccompProfile{Type: core.SeccompProfileTypeOCI, OCI: &core.SecurityProfileOCI{Ref: validOCIProfileReference}}
+	specPath := field.NewPath("spec")
+
+	createTests := []struct {
+		name         string
+		pod          *core.Pod
+		allowOCI     bool
+		expectedErrs field.ErrorList
+	}{{
+		name:     "container-level OCI profile",
+		pod:      podtest.MakePod("pod", podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{SeccompProfile: oci})))),
+		allowOCI: true,
+	}, {
+		name:         "container-level OCI profile with the feature disabled",
+		pod:          podtest.MakePod("pod", podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{SeccompProfile: oci})))),
+		expectedErrs: field.ErrorList{field.NotSupported(specPath.Child("containers").Index(0).Child("securityContext", "seccompProfile", "type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType(nil))},
+	}, {
+		name:         "pod-level OCI profile with the feature disabled",
+		pod:          podtest.MakePod("pod", podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci})),
+		expectedErrs: field.ErrorList{field.NotSupported(specPath.Child("securityContext", "seccompProfile", "type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType(nil))},
+	}, {
+		name: "privileged container with a pod-level OCI profile and the feature disabled",
+		pod: podtest.MakePod("pod",
+			podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci}),
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(true)})))),
+		expectedErrs: field.ErrorList{field.NotSupported(specPath.Child("securityContext", "seccompProfile", "type"), core.SeccompProfileTypeOCI, []core.SeccompProfileType(nil))},
+	}, {
+		name: "privileged container inheriting a pod-level OCI profile",
+		pod: podtest.MakePod("pod",
+			podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci}),
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(true)})))),
+		allowOCI:     true,
+		expectedErrs: field.ErrorList{field.Forbidden(specPath.Child("containers").Index(0).Child("securityContext", "privileged"), "")},
+	}}
+	for _, tc := range createTests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidatePodCreate(tc.pod, PodValidationOptions{AllowSecurityProfileOCI: tc.allowOCI})
+			field.ErrorMatcher{}.ByType().ByField().Test(t, tc.expectedErrs, errs)
+		})
+	}
+
+	t.Run("privileged ephemeral container inheriting a pod-level OCI profile", func(t *testing.T) {
+		oldPod := podtest.MakePod("pod",
+			podtest.SetObjectMeta(metav1.ObjectMeta{Name: "pod", Namespace: "ns", ResourceVersion: "1"}),
+			podtest.SetSecurityContext(&core.PodSecurityContext{SeccompProfile: oci}))
+		newPod := oldPod.DeepCopy()
+		newPod.Spec.EphemeralContainers = []core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "debugger",
+				Image:                    "busybox",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				SecurityContext:          &core.SecurityContext{Privileged: new(true)},
+			},
+		}}
+		errs := ValidatePodEphemeralContainersUpdate(newPod, oldPod, PodValidationOptions{AllowSecurityProfileOCI: true})
+		field.ErrorMatcher{}.ByType().ByField().Test(t, field.ErrorList{
+			field.Forbidden(specPath.Child("ephemeralContainers").Index(0).Child("securityContext", "privileged"), ""),
+		}, errs)
+	})
 }

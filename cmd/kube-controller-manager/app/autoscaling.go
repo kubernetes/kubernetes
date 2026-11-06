@@ -26,10 +26,7 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
-	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
-	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
 func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
@@ -41,11 +38,6 @@ func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
 }
 
 func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	clientConfig, err := controllerContext.NewClientConfig("horizontal-pod-autoscaler")
-	if err != nil {
-		return nil, err
-	}
-
 	hpaClient, err := controllerContext.NewClient("horizontal-pod-autoscaler")
 	if err != nil {
 		return nil, err
@@ -54,28 +46,17 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
 	// so we want to re-fetch every time when we actually ask for it
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
-	scaleClient, err := scale.NewForConfig(clientConfig, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := controllerContext.ClientBuilder.ScaleClient("horizontal-pod-autoscaler", controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init HPA scale client: %w", err)
 	}
 
 	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
 
-	resourceClient, err := resourceclient.NewForConfig(clientConfig)
+	metricsClient, err := controllerContext.NewMetricsClient("horizontal-pod-autoscaler", apiVersionsGetter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the resource client for %s: %w", controllerName, err)
+		return nil, err
 	}
-
-	externalMetricsClient, err := external_metrics.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init the external metrics client for %s: %w", controllerName, err)
-	}
-
-	metricsClient := metrics.NewRESTMetricsClient(
-		resourceClient,
-		custom_metrics.NewForConfig(clientConfig, controllerContext.RESTMapper, apiVersionsGetter),
-		externalMetricsClient,
-	)
 
 	pas := podautoscaler.NewHorizontalController(
 		ctx,

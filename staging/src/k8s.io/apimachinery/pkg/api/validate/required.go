@@ -18,6 +18,7 @@ package validate
 
 import (
 	"context"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -25,70 +26,70 @@ import (
 
 // RequiredValue verifies that the specified value is not the zero-value for
 // its type.
-func RequiredValue[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+func RequiredValue[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, msgs ...string) field.ErrorList {
 	var zero T
 	if *value != zero {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "")}
+	return field.ErrorList{field.Required(fldPath, strings.Join(msgs, ", "))}
 }
 
 // RequiredPointer verifies that the specified pointer is not nil.
-func RequiredPointer[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+func RequiredPointer[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, msgs ...string) field.ErrorList {
 	if value != nil {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "")}
+	return field.ErrorList{field.Required(fldPath, strings.Join(msgs, ", "))}
 }
 
 // RequiredSlice verifies that the specified slice is not empty.
-func RequiredSlice[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T) field.ErrorList {
+func RequiredSlice[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, msgs ...string) field.ErrorList {
 	if len(value) > 0 {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "")}
+	return field.ErrorList{field.Required(fldPath, strings.Join(msgs, ", "))}
 }
 
 // RequiredMap verifies that the specified map is not empty.
-func RequiredMap[K comparable, T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
+func RequiredMap[K comparable, T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]T, msgs ...string) field.ErrorList {
 	if len(value) > 0 {
 		return nil
 	}
-	return field.ErrorList{field.Required(fldPath, "")}
+	return field.ErrorList{field.Required(fldPath, strings.Join(msgs, ", "))}
 }
 
 // ForbiddenValue verifies that the specified value is the zero-value for its
 // type.
-func ForbiddenValue[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+func ForbiddenValue[T comparable](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, msgs ...string) field.ErrorList {
 	var zero T
 	if *value == zero {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "")}
+	return field.ErrorList{field.Forbidden(fldPath, strings.Join(msgs, ", "))}
 }
 
 // ForbiddenPointer verifies that the specified pointer is nil.
-func ForbiddenPointer[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+func ForbiddenPointer[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, msgs ...string) field.ErrorList {
 	if value == nil {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "")}
+	return field.ErrorList{field.Forbidden(fldPath, strings.Join(msgs, ", "))}
 }
 
 // ForbiddenSlice verifies that the specified slice is empty.
-func ForbiddenSlice[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T) field.ErrorList {
+func ForbiddenSlice[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, msgs ...string) field.ErrorList {
 	if len(value) == 0 {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "")}
+	return field.ErrorList{field.Forbidden(fldPath, strings.Join(msgs, ", "))}
 }
 
 // ForbiddenMap verifies that the specified map is empty.
-func ForbiddenMap[K comparable, T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
+func ForbiddenMap[K comparable, T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]T, msgs ...string) field.ErrorList {
 	if len(value) == 0 {
 		return nil
 	}
-	return field.ErrorList{field.Forbidden(fldPath, "")}
+	return field.ErrorList{field.Forbidden(fldPath, strings.Join(msgs, ", "))}
 }
 
 // OptionalValue verifies that the specified value is not the zero-value for

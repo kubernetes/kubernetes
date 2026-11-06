@@ -39,7 +39,7 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "sigs.k8s.io/iptables-wrappers/pkg/iptables"
 )
 
 var defaultedMode bool
@@ -86,8 +86,8 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	if isIPTablesBased(s.Config.Mode) {
 		// Check for the iptables and ip6tables binaries.
-		errv4 := utiliptables.New(utiliptables.ProtocolIPv4).Present()
-		errv6 := utiliptables.New(utiliptables.ProtocolIPv6).Present()
+		_, errv4 := utiliptables.New(ctx, utiliptables.ProtocolIPv4, utiliptables.DetectHostMode)
+		_, errv6 := utiliptables.New(ctx, utiliptables.ProtocolIPv6, utiliptables.DetectHostMode)
 
 		ipv4Supported = errv4 == nil
 		ipv6Supported = errv6 == nil
@@ -133,7 +133,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 	var proxier proxy.Provider
 	var err error
 
-	localDetectors := getLocalDetectors(logger, s.PrimaryIPFamily, config, s.podCIDRs)
+	localDetectors := proxyutil.GetLocalTrafficDetectors(ctx, config, s.NodeManager)
 
 	if config.Mode == kubeproxyconfig.ProxyModeIPTables {
 		if defaultedMode {
@@ -142,7 +142,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 			s.Recorder.Eventf(s.NodeRef, nil, v1.EventTypeWarning, "KubeProxyDefaultMode", "StartKubeProxy", message)
 		}
 		logger.Info("Using iptables Proxier")
-		ipts := utiliptables.NewBestEffort()
+		ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 
 		if dualStack {
 			// TODO this has side effects that should only happen when Run() is invoked.
@@ -166,7 +166,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 				ctx,
 				config,
 				s.PrimaryIPFamily,
-				ipts[s.PrimaryIPFamily],
+				ipts[utiliptables.Protocol(s.PrimaryIPFamily)],
 				utilsysctl.New(),
 				localDetectors[s.PrimaryIPFamily],
 				s.NodeName,
@@ -186,7 +186,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipts := utiliptables.NewBestEffort()
+		ipts := utiliptables.NewBestEffort(ctx, utiliptables.DetectHostMode)
 
 		logger.Info("Using ipvs Proxier")
 		message := "The ipvs proxier has been deprecated and will be disabled by default in Kubernetes 1.40 and removed in Kubernetes 1.43. Migrate to the 'nftables' proxier instead."
@@ -212,7 +212,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 				ctx,
 				config,
 				s.PrimaryIPFamily,
-				ipts[s.PrimaryIPFamily],
+				ipts[utiliptables.Protocol(s.PrimaryIPFamily)],
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
@@ -264,46 +264,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 	}
 
 	return proxier, nil
-}
-
-func getLocalDetectors(logger klog.Logger, primaryIPFamily v1.IPFamily, config *kubeproxyconfig.KubeProxyConfiguration, nodePodCIDRs []string) map[v1.IPFamily]proxyutil.LocalTrafficDetector {
-	localDetectors := map[v1.IPFamily]proxyutil.LocalTrafficDetector{
-		v1.IPv4Protocol: proxyutil.NewNoOpLocalDetector(),
-		v1.IPv6Protocol: proxyutil.NewNoOpLocalDetector(),
-	}
-
-	switch config.DetectLocalMode {
-	case kubeproxyconfig.LocalModeClusterCIDR:
-		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(config.DetectLocal.ClusterCIDRs) {
-			localDetectors[family] = proxyutil.NewDetectLocalByCIDR(cidrs[0].String())
-		}
-		if !localDetectors[primaryIPFamily].IsImplemented() {
-			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR specified for primary IP family", "ipFamily", primaryIPFamily, "clusterCIDRs", config.DetectLocal.ClusterCIDRs)
-		}
-
-	case kubeproxyconfig.LocalModeNodeCIDR:
-		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(nodePodCIDRs) {
-			localDetectors[family] = proxyutil.NewDetectLocalByCIDR(cidrs[0].String())
-		}
-		if !localDetectors[primaryIPFamily].IsImplemented() {
-			logger.Info("Detect-local-mode set to NodeCIDR, but no PodCIDR defined at node for primary IP family", "ipFamily", primaryIPFamily, "podCIDRs", nodePodCIDRs)
-		}
-
-	case kubeproxyconfig.LocalModeBridgeInterface:
-		localDetector := proxyutil.NewDetectLocalByBridgeInterface(config.DetectLocal.BridgeInterface)
-		localDetectors[v1.IPv4Protocol] = localDetector
-		localDetectors[v1.IPv6Protocol] = localDetector
-
-	case kubeproxyconfig.LocalModeInterfaceNamePrefix:
-		localDetector := proxyutil.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
-		localDetectors[v1.IPv4Protocol] = localDetector
-		localDetectors[v1.IPv6Protocol] = localDetector
-
-	default:
-		logger.Info("Defaulting to no-op detect-local")
-	}
-
-	return localDetectors
 }
 
 // platformCleanup removes stale kube-proxy rules that can be safely removed. If

@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,7 +32,6 @@ import (
 	"github.com/cespare/xxhash/v2"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -296,6 +296,7 @@ func (r *Registry) Register(c Collector) error {
 	defer func() {
 		// Drain channel in case of premature return to not leak a goroutine.
 		for range descChan {
+			continue
 		}
 		r.mtx.Unlock()
 	}()
@@ -369,9 +370,7 @@ func (r *Registry) Register(c Collector) error {
 	for hash := range newDescIDs {
 		r.descIDs[hash] = struct{}{}
 	}
-	for name, dimHash := range newDimHashesByName {
-		r.dimHashesByName[name] = dimHash
-	}
+	maps.Copy(r.dimHashesByName, newDimHashesByName)
 	return nil
 }
 
@@ -476,7 +475,7 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 		for {
 			select {
 			case collector := <-checkedCollectors:
-				safeErrs.Append((safeCollect(collector, checkedMetricChan)))
+				safeErrs.Append(safeCollect(collector, checkedMetricChan))
 			case collector := <-uncheckedCollectors:
 				safeErrs.Append(safeCollect(collector, uncheckedMetricChan))
 			default:
@@ -502,10 +501,12 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 	defer func() {
 		if checkedMetricChan != nil {
 			for range checkedMetricChan {
+				continue
 			}
 		}
 		if uncheckedMetricChan != nil {
 			for range uncheckedMetricChan {
+				continue
 			}
 		}
 	}()
@@ -727,10 +728,10 @@ func processMetric(
 		}
 	} else { // New name.
 		metricFamily = &dto.MetricFamily{}
-		metricFamily.Name = proto.String(desc.fqName)
-		metricFamily.Help = proto.String(desc.help)
+		metricFamily.Name = new(desc.fqName)
+		metricFamily.Help = new(desc.help)
 		if desc.unit != "" {
-			metricFamily.Unit = proto.String(desc.unit)
+			metricFamily.Unit = new(desc.unit)
 		}
 		// TODO(beorn7): Simplify switch once Desc has type.
 		switch {
@@ -956,7 +957,8 @@ func checkMetricConsistency(
 		if !utf8.ValidString(labelPair.GetValue()) {
 			return fmt.Errorf(
 				"collected metric %q { %s} has a label named %q whose value is not utf8: %#v",
-				name, dtoMetric, labelName, labelPair.GetValue())
+				name, dtoMetric, labelName, labelPair.GetValue(),
+			)
 		}
 		previousLabelName = labelName
 	}
@@ -981,7 +983,7 @@ func checkMetricConsistency(
 		h.Write(separatorByteSlice)
 	}
 	if dtoMetric.TimestampMs != nil {
-		h.WriteString(strconv.FormatInt(*(dtoMetric.TimestampMs), 10))
+		h.WriteString(strconv.FormatInt(*dtoMetric.TimestampMs, 10))
 		h.Write(separatorByteSlice)
 	}
 	hSum := h.Sum64()
@@ -1013,7 +1015,7 @@ func checkDescConsistency(
 	copy(lpsFromDesc, desc.constLabelPairs)
 	for _, l := range desc.variableLabels.names {
 		lpsFromDesc = append(lpsFromDesc, &dto.LabelPair{
-			Name: proto.String(l),
+			Name: new(l),
 		})
 	}
 	if len(lpsFromDesc) != len(dtoMetric.Label) {

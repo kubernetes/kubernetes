@@ -19,6 +19,7 @@ package csi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -858,6 +859,21 @@ func TestNodeExpandVolume(t *testing.T) {
 			newSize:    resource.MustParse("-9.5Gi"),
 			mustFail:   true,
 		},
+		{
+			name:       "with quantity of exactly MaxInt64 bytes",
+			volID:      "vol-1234",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("9223372036854775807"),
+			mustFail:   false,
+		},
+		{
+			// TODO(#141166): A size past int64 must be rejected before the CSI call.
+			name:       "with quantity past int64",
+			volID:      "vol-1234",
+			volumePath: "/foo/bar",
+			newSize:    resource.MustParse("100E"),
+			mustFail:   false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1383,5 +1399,85 @@ func TestMapStorageBackendHealthLimit(t *testing.T) {
 
 	if _, err := mapStorageBackendHealth(entries); err == nil {
 		t.Fatalf("mapStorageBackendHealth() expected an error for %d conditions", len(entries))
+	}
+}
+
+func TestMapVolumeHealthConditions(t *testing.T) {
+	tests := []struct {
+		name string
+		vh   *csipbv1.VolumeHealth
+		want []api.VolumeHealthCondition
+	}{
+		{
+			name: "nil VolumeHealth returns nil",
+			vh:   nil,
+			want: nil,
+		},
+		{
+			name: "empty health statuses returns nil",
+			vh:   &csipbv1.VolumeHealth{},
+			want: nil,
+		},
+		{
+			name: "unique statuses preserved",
+			vh: &csipbv1.VolumeHealth{
+				HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "R1", Message: "M1"},
+					{Status: csipbv1.VolumeHealthErrorType_INACCESSIBLE, Reason: "R2", Message: "M2"},
+				},
+			},
+			want: []api.VolumeHealthCondition{
+				{Status: api.VolumeHealthDegraded, Reason: "R1", Message: "M1"},
+				{Status: api.VolumeHealthInaccessible, Reason: "R2", Message: "M2"},
+			},
+		},
+		{
+			name: "duplicate (status, reason) entries are deduplicated keeping first occurrence",
+			vh: &csipbv1.VolumeHealth{
+				HealthStatuses: []*csipbv1.VolumeHealth_VolumeHealthEntry{
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "missing_controller", Message: "missing controller for storage"},
+					{Status: csipbv1.VolumeHealthErrorType_DEGRADED, Reason: "missing_controller", Message: "missing controller for k8s"},
+				},
+			},
+			want: []api.VolumeHealthCondition{
+				{Status: api.VolumeHealthDegraded, Reason: "missing_controller", Message: "missing controller for storage"},
+			},
+		},
+		{
+			name: "capped at maxVolumeHealthConditions (16)",
+			vh: &csipbv1.VolumeHealth{
+				HealthStatuses: func() []*csipbv1.VolumeHealth_VolumeHealthEntry {
+					entries := make([]*csipbv1.VolumeHealth_VolumeHealthEntry, 20)
+					for i := range 20 {
+						entries[i] = &csipbv1.VolumeHealth_VolumeHealthEntry{
+							Status:  csipbv1.VolumeHealthErrorType_DEGRADED,
+							Reason:  fmt.Sprintf("Reason%d", i),
+							Message: fmt.Sprintf("Message%d", i),
+						}
+					}
+					return entries
+				}(),
+			},
+			want: func() []api.VolumeHealthCondition {
+				conds := make([]api.VolumeHealthCondition, 16)
+				for i := range 16 {
+					conds[i] = api.VolumeHealthCondition{
+						Status:  api.VolumeHealthDegraded,
+						Reason:  fmt.Sprintf("Reason%d", i),
+						Message: fmt.Sprintf("Message%d", i),
+					}
+				}
+				return conds
+			}(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := mapVolumeHealthConditions(tc.vh)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("mapVolumeHealthConditions() = %+v, want %+v", got, tc.want)
+			}
+		})
 	}
 }

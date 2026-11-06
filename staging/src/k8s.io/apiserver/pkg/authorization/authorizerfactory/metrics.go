@@ -20,7 +20,7 @@ import (
 	"context"
 	"sync"
 
-	celmetrics "k8s.io/apiserver/pkg/authorization/cel"
+	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -63,7 +63,7 @@ type delegatingAuthorizerMetrics struct {
 	// no-op for webhook metrics for now, delegating authorization reports original total/latency metrics
 	webhookmetrics.NoopWebhookMetrics
 	// no-op for matchCondition metrics for now, delegating authorization doesn't configure match conditions
-	celmetrics.NoopMatcherMetrics
+	authorizationmetrics.NoopMatcherMetrics
 }
 
 func NewDelegatingAuthorizerMetrics() delegatingAuthorizerMetrics {

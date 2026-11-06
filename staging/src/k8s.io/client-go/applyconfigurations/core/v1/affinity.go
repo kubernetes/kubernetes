@@ -23,11 +23,11 @@ package v1
 //
 // Affinity is a group of affinity scheduling rules.
 type AffinityApplyConfiguration struct {
-	// Describes node affinity scheduling rules for the pod.
+	// nodeAffinity describes node affinity scheduling rules for the pod.
 	NodeAffinity *NodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
-	// Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)).
+	// podAffinity describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)).
 	PodAffinity *PodAffinityApplyConfiguration `json:"podAffinity,omitempty"`
-	// Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).
+	// podAntiAffinity describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).
 	PodAntiAffinity *PodAntiAffinityApplyConfiguration `json:"podAntiAffinity,omitempty"`
 }
 

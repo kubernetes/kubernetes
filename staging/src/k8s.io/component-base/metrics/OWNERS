@@ -7,6 +7,7 @@ emeritus_approvers:
   - logicalhan
 reviewers:
   - sig-instrumentation-reviewers
+  - tico88612
   - YoyinZyc
 labels:
   - sig/instrumentation

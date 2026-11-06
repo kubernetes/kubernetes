@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/procfs/internal/util"
+	"github.com/prometheus/procfs/internal/parsers"
 )
 
 // CPUInfo contains general information about a system CPU found in /proc/cpuinfo.
@@ -65,7 +65,7 @@ var (
 // CPUInfo returns information about current system CPUs.
 // See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 func (fs FS) CPUInfo() ([]CPUInfo, error) {
-	data, err := util.ReadFileNoStat(fs.proc.Path("cpuinfo"))
+	data, err := parsers.ReadFileNoStat(fs.proc.Path("cpuinfo"))
 	if err != nil {
 		return nil, err
 	}

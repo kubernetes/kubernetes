@@ -41,12 +41,11 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-var (
-	defaultNamespace      = ""
-	preFilterStateCmpOpts = []cmp.Option{
-		cmp.AllowUnexported(preFilterState{}, framework.PodInfo{}),
-	}
-)
+const defaultNamespace = ""
+
+var preFilterStateCmpOpts = []cmp.Option{
+	cmp.AllowUnexported(preFilterState{}, framework.PodInfo{}),
+}
 
 func init() {
 	metrics.Register()
@@ -72,16 +71,24 @@ func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]st
 	}
 }
 
+func makeNodeWithLabels(name string, labels map[string]string) *v1.Node {
+	return st.MakeNode().Name(name).Labels(labels).Obj()
+}
+
+func makeScheduledPodWithLabels(namespace, node string, labels map[string]string) *v1.Pod {
+	return st.MakePod().Namespace(namespace).Labels(labels).Node(node).Obj()
+}
+
 func TestRequiredAffinitySingleNode(t *testing.T) {
 	podLabel := map[string]string{"service": "securityscan"}
-	pod := st.MakePod().Labels(podLabel).Node("node1").Obj()
+	pod := makeScheduledPodWithLabels(defaultNamespace, "node1", podLabel)
 
 	labels1 := map[string]string{
 		"region": "r1",
 		"zone":   "z11",
 	}
 	podLabel2 := map[string]string{"security": "S1"}
-	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labels1}}
+	node1 := *makeNodeWithLabels("node1", labels1)
 
 	tests := []struct {
 		pod                 *v1.Pod
@@ -126,7 +133,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 						Namespaces: []string{"DiffNameSpace"},
 					},
 				}, nil),
-			pods: []*v1.Pod{st.MakePod().Namespace("ns").Label("service", "securityscan").Node("node1").Obj()},
+			pods: []*v1.Pod{makeScheduledPodWithLabels("ns", "node1", map[string]string{"service": "securityscan"})},
 			node: &node1,
 			wantFilterStatus: fwk.NewStatus(
 				fwk.UnschedulableAndUnresolvable,
@@ -270,7 +277,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			name: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
 			pod: st.MakePod().Namespace(defaultNamespace).Labels(podLabel).
 				PodAffinityNotIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			pods: []*v1.Pod{st.MakePod().Label("service", "securityscan").Node("node2").Obj()},
+			pods: []*v1.Pod{makeScheduledPodWithLabels(defaultNamespace, "node2", map[string]string{"service": "securityscan"})},
 			node: &node1,
 			wantFilterStatus: fwk.NewStatus(
 				fwk.UnschedulableAndUnresolvable,
@@ -425,7 +432,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 						TopologyKey: "region",
 					},
 				}, nil),
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team1", Labels: podLabel}}},
+			pods: []*v1.Pod{makeScheduledPodWithLabels("subteam1.team1", "node1", podLabel)},
 			node: &node1,
 		},
 		{
@@ -454,7 +461,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 						TopologyKey: "region",
 					},
 				}, nil),
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team2", Labels: podLabel}}},
+			pods: []*v1.Pod{makeScheduledPodWithLabels("subteam1.team2", "node1", podLabel)},
 			node: &node1,
 			wantFilterStatus: fwk.NewStatus(
 				fwk.UnschedulableAndUnresolvable,
@@ -487,7 +494,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 						TopologyKey: "zone",
 					},
 				}),
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam2.team1", Labels: podLabel}}},
+			pods: []*v1.Pod{makeScheduledPodWithLabels("subteam2.team1", "node1", podLabel)},
 			node: &node1,
 			wantFilterStatus: fwk.NewStatus(
 				fwk.Unschedulable,
@@ -512,7 +519,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 						TopologyKey:       "zone",
 					},
 				}),
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam2.team1", Labels: podLabel}}},
+			pods: []*v1.Pod{makeScheduledPodWithLabels("subteam2.team1", "node1", podLabel)},
 			node: &node1,
 			wantFilterStatus: fwk.NewStatus(
 				fwk.Unschedulable,
@@ -545,7 +552,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 						TopologyKey: "zone",
 					},
 				}),
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team2", Labels: podLabel}}},
+			pods: []*v1.Pod{makeScheduledPodWithLabels("subteam1.team2", "node1", podLabel)},
 			node: &node1,
 		},
 	}
@@ -609,12 +616,12 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		{
 			pod: st.MakePod().Namespace(defaultNamespace).PodAffinityIn("foo", "region", []string{"bar"}, st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Node("node1").Labels(podLabelA).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "node1", podLabelA),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelRgIndia}},
+				makeNodeWithLabels("node1", labelRgChina),
+				makeNodeWithLabels("node2", labelRgChinaAzAz1),
+				makeNodeWithLabels("node3", labelRgIndia),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				nil,
@@ -631,11 +638,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				PodAffinityIn("foo", "zone", []string{"bar"}, st.PodAffinityWithRequiredReq).
 				PodAffinityIn("service", "zone", []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Node("nodeA").Labels(map[string]string{"foo": "bar"}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "bar"}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"zone": "az1", "hostname": "h1"}),
+				makeNodeWithLabels("nodeB", map[string]string{"zone": "az2", "hostname": "h2"}),
 			},
 			wantFilterStatuses: []*fwk.Status{nil, nil},
 			name: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
@@ -646,11 +653,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				PodAffinityIn("foo", "zone", []string{"bar"}, st.PodAffinityWithRequiredReq).
 				PodAffinityIn("service", "zone", []string{"securityscan"}, st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Node("nodeA").Labels(map[string]string{"foo": "bar"}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "bar"}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zoneLabel": "az1", "hostname": "h1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zoneLabel": "az2", "hostname": "h2"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"zoneLabel": "az1", "hostname": "h1"}),
+				makeNodeWithLabels("nodeB", map[string]string{"zoneLabel": "az2", "hostname": "h2"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -667,11 +674,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		{
 			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityIn("foo", "region", []string{"abc"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Labels(map[string]string{"foo": "abc"}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "abc"}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -689,11 +696,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityIn("foo", "region", []string{"abc"}, st.PodAntiAffinityWithRequiredReq).
 				PodAntiAffinityIn("service", "zone", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Labels(map[string]string{"foo": "abc", "service": "securityscan"}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "abc", "service": "securityscan"}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -710,12 +717,12 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		{
 			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityIn("foo", "region", []string{"abc"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Labels(map[string]string{"foo": "abc"}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "abc"}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+				makeNodeWithLabels("nodeA", labelRgChina),
+				makeNodeWithLabels("nodeB", labelRgChinaAzAz1),
+				makeNodeWithLabels("nodeC", labelRgIndia),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -733,13 +740,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		{
 			pod: st.MakePod().Namespace("NS1").Labels(map[string]string{"foo": "123"}).PodAntiAffinityIn("foo", "region", []string{"bar"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Namespace("NS1").Labels(map[string]string{"foo": "bar"}).Obj(),
+				makeScheduledPodWithLabels("NS1", "nodeA", map[string]string{"foo": "bar"}),
 				st.MakePod().Node("nodeC").Namespace("NS2").PodAntiAffinityIn("foo", "region", []string{"123"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
+				makeNodeWithLabels("nodeA", labelRgChina),
+				makeNodeWithLabels("nodeB", labelRgChinaAzAz1),
+				makeNodeWithLabels("nodeC", labelRgIndia),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -760,8 +767,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				st.MakePod().Node("nodeA").Namespace(defaultNamespace).PodAntiAffinityExists("foo", "invalid-node-label", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}),
 			},
 			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 			wantFilterStatuses:  []*fwk.Status{nil, nil},
@@ -770,11 +777,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		{
 			pod: st.MakePod().Node("nodeA").Namespace(defaultNamespace).PodAntiAffinityExists("foo", "invalid-node-label", st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Labels(map[string]string{"foo": ""}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{nil, nil},
 			name:               "Test incoming pod's anti-affinity: even if labelSelector matches, we still check if topologyKey matches",
@@ -786,8 +793,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				st.MakePod().Node("nodeA").Namespace(defaultNamespace).PodAntiAffinityExists("bar", "region", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -805,12 +812,12 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityExists("foo", "zone", st.PodAntiAffinityWithRequiredReq).
 				PodAntiAffinityExists("bar", "region", st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Labels(map[string]string{"foo": ""}).Obj(),
-				st.MakePod().Node("nodeB").Labels(map[string]string{"bar": ""}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": ""}),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeB", map[string]string{"bar": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -831,8 +838,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 					PodAntiAffinityExists("bar", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -847,11 +854,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityExists("foo", "invalid-node-label", st.PodAntiAffinityWithRequiredReq).
 				PodAntiAffinityExists("bar", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("podA").Node("nodeA").Labels(map[string]string{"foo": "", "bar": ""}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "", "bar": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -869,8 +876,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 					PodAntiAffinityExists("bar", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -888,11 +895,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityExists("foo", "region", st.PodAntiAffinityWithRequiredReq).
 				PodAntiAffinityExists("bar", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Labels(map[string]string{"foo": "", "bar": ""}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "", "bar": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -915,9 +922,9 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 					PodAntiAffinityExists("labelB", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: map[string]string{"region": "r1", "zone": "z3", "hostname": "nodeC"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
+				makeNodeWithLabels("nodeC", map[string]string{"region": "r1", "zone": "z3", "hostname": "nodeC"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -936,11 +943,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: st.MakePod().Namespace(defaultNamespace).PodAffinityExists("foo", "region", st.PodAffinityWithRequiredReq).
 				PodAffinityExists("bar", "zone", st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("pod1").Labels(map[string]string{"foo": "", "bar": ""}).Node("nodeA").Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "", "bar": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{nil, nil},
 			name:               "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match",
@@ -949,12 +956,12 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			pod: st.MakePod().Namespace(defaultNamespace).PodAffinityExists("foo", "region", st.PodAffinityWithRequiredReq).
 				PodAffinityExists("bar", "zone", st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Node("nodeA").Name("pod1").Namespace(defaultNamespace).Labels(map[string]string{"foo": ""}).Obj(),
-				st.MakePod().Node("nodeB").Name("pod2").Namespace(defaultNamespace).Labels(map[string]string{"bar": ""}).Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": ""}),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeB", map[string]string{"bar": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				fwk.NewStatus(
@@ -971,11 +978,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		{
 			pod: st.MakePod().Namespace(defaultNamespace).PodAffinityExists("foo", v1.LabelHostname, st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("pod1").Labels(map[string]string{"foo": ""}).Node("nodeA").Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{v1.LabelHostname: "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{v1.LabelHostname: "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				// Result for nodeA: Schedulable
@@ -991,11 +998,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		{
 			pod: st.MakePod().Namespace(defaultNamespace).PodAntiAffinityExists("foo", v1.LabelHostname, st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("pod1").Labels(map[string]string{"foo": ""}).Node("nodeA").Obj(),
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": ""}),
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{v1.LabelHostname: "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{v1.LabelHostname: "nodeB"}),
 			},
 			wantFilterStatuses: []*fwk.Status{
 				// Result for nodeA: Unschedulable
@@ -1171,9 +1178,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
-				},
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", selector1),
 				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
@@ -1193,9 +1198,9 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+				makeNodeWithLabels("nodeA", label1),
+				makeNodeWithLabels("nodeB", label2),
+				makeNodeWithLabels("nodeC", label3),
 			},
 			expectedAntiAffinity: topologyToMatchedTermCount{
 				{key: "region", value: "r1"}: 2,
@@ -1213,9 +1218,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
-				},
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", selector1),
 				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
@@ -1235,9 +1238,9 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+				makeNodeWithLabels("nodeA", label1),
+				makeNodeWithLabels("nodeB", label2),
+				makeNodeWithLabels("nodeC", label3),
 			},
 			expectedAntiAffinity: topologyToMatchedTermCount{
 				{key: "region", value: "r1"}: 2,
@@ -1257,9 +1260,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
-				},
+				makeScheduledPodWithLabels(defaultNamespace, "nodeA", selector1),
 				{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
 					Spec: v1.PodSpec{
 						NodeName: "nodeC",
@@ -1280,9 +1281,9 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: label3}},
+				makeNodeWithLabels("nodeA", label1),
+				makeNodeWithLabels("nodeB", label2),
+				makeNodeWithLabels("nodeC", label3),
 			},
 			expectedAntiAffinity: topologyToMatchedTermCount{},
 			expectedAffinity: topologyToMatchedTermCount{
@@ -1300,11 +1301,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 					},
 				},
 			},
-			existingPods: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-					Spec: v1.PodSpec{NodeName: "nodeA"},
-				},
-			},
+			existingPods: []*v1.Pod{makeScheduledPodWithLabels(defaultNamespace, "nodeA", selector1)},
 			addedPod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "addedPod", Labels: selector1},
 				Spec: v1.PodSpec{
@@ -1342,8 +1339,8 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z11", v1.LabelHostname: "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z12", v1.LabelHostname: "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{"region": "r1", "zone": "z11", v1.LabelHostname: "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{"region": "r1", "zone": "z12", v1.LabelHostname: "nodeB"}),
 			},
 			expectedAntiAffinity: topologyToMatchedTermCount{
 				{key: "region", value: "r1"}: 2,
@@ -1474,7 +1471,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	normalPodA := newPod("aaa")
 	normalPodB := newPod("bbb")
 	normalPodAB := newPod("aaa", "bbb")
-	nodeA := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}}
+	nodeA := makeNodeWithLabels("nodeA", map[string]string{v1.LabelHostname: "nodeA"})
 
 	tests := []struct {
 		name                    string
@@ -1642,11 +1639,11 @@ func TestRemovePodHostScopedAffinityCount(t *testing.T) {
 				PodAffinityIn("foo", v1.LabelHostname, []string{"bar"}, st.PodAffinityWithRequiredReq).Obj()
 
 			// Existing pod on nodeA that satisfies the affinity
-			existingPod := st.MakePod().Name("existing").Node("nodeA").Labels(map[string]string{"foo": "bar"}).Obj()
+			existingPod := makeScheduledPodWithLabels(defaultNamespace, "nodeA", map[string]string{"foo": "bar"})
 
 			nodes := []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{v1.LabelHostname: "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{v1.LabelHostname: "nodeB"}}},
+				makeNodeWithLabels("nodeA", map[string]string{v1.LabelHostname: "nodeA"}),
+				makeNodeWithLabels("nodeB", map[string]string{v1.LabelHostname: "nodeB"}),
 			}
 
 			snapshot := cache.NewSnapshot([]*v1.Pod{existingPod}, nodes)
@@ -1712,17 +1709,17 @@ func TestMultipleAffinityTermsRequireSingleMatchingPod(t *testing.T) {
 
 	// 2. Setup existing pods to test different combinations of label matches
 	// podA only matches the first term ("foo=bar")
-	podA := st.MakePod().Name("podA").Namespace("default").Label("foo", "bar").Node("node-1").Obj()
+	podA := makeScheduledPodWithLabels("default", "node-1", map[string]string{"foo": "bar"})
 	// podB only matches the second term ("baz=qux")
-	podB := st.MakePod().Name("podB").Namespace("default").Label("baz", "qux").Node("node-1").Obj()
+	podB := makeScheduledPodWithLabels("default", "node-1", map[string]string{"baz": "qux"})
 	// podC matches BOTH terms simultaneously
-	podC := st.MakePod().Name("podC").Namespace("default").Label("foo", "bar").Label("baz", "qux").Node("node-3").Obj()
+	podC := makeScheduledPodWithLabels("default", "node-3", map[string]string{"foo": "bar", "baz": "qux"})
 
 	// 3. Create nodes to house the existing pods: node-1 (podA, podB), node-2 (empty), node-3 (podC)
 	nodes := []*v1.Node{
-		st.MakeNode().Name("node-1").Label(v1.LabelHostname, "node-1").Obj(),
-		st.MakeNode().Name("node-2").Label(v1.LabelHostname, "node-2").Obj(),
-		st.MakeNode().Name("node-3").Label(v1.LabelHostname, "node-3").Obj(),
+		makeNodeWithLabels("node-1", map[string]string{v1.LabelHostname: "node-1"}),
+		makeNodeWithLabels("node-2", map[string]string{v1.LabelHostname: "node-2"}),
+		makeNodeWithLabels("node-3", map[string]string{v1.LabelHostname: "node-3"}),
 	}
 
 	namespaces := []runtime.Object{
@@ -1828,14 +1825,14 @@ func TestFastTrackInterPodAffinity(t *testing.T) {
 
 			// Background cluster pods:
 			// "node-1" (zone-a) will host 'foo' and 'blocked' (in a ns with team=blue)
-			podWithNoRulesFoo := st.MakePod().Name("pod-no-rules-foo").Namespace("default").Label("app", "foo").Node("node-1").Obj()
-			podInNsWithTeamLabel := st.MakePod().Name("pod-in-ns-with-team-label").Namespace("blue-ns").Label("app", "blocked").Label("team", "blue").Node("node-1").Obj()
+			podWithNoRulesFoo := makeScheduledPodWithLabels("default", "node-1", map[string]string{"app": "foo"})
+			podInNsWithTeamLabel := makeScheduledPodWithLabels("blue-ns", "node-1", map[string]string{"app": "blocked", "team": "blue"})
 			// "node-2" (zone-b) will host 'bar'
-			podWithNoRulesBar := st.MakePod().Name("pod-no-rules-bar").Namespace("default").Label("app", "bar").Node("node-2").Obj()
+			podWithNoRulesBar := makeScheduledPodWithLabels("default", "node-2", map[string]string{"app": "bar"})
 
 			nodes := []*v1.Node{
-				st.MakeNode().Name("node-1").Label(v1.LabelHostname, "node-1").Label("topology.kubernetes.io/zone", "zone-a").Obj(),
-				st.MakeNode().Name("node-2").Label(v1.LabelHostname, "node-2").Label("topology.kubernetes.io/zone", "zone-b").Obj(),
+				makeNodeWithLabels("node-1", map[string]string{v1.LabelHostname: "node-1", "topology.kubernetes.io/zone": "zone-a"}),
+				makeNodeWithLabels("node-2", map[string]string{v1.LabelHostname: "node-2", "topology.kubernetes.io/zone": "zone-b"}),
 			}
 
 			namespaces := []runtime.Object{

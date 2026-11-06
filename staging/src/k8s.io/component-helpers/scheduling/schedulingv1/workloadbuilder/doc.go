@@ -52,8 +52,10 @@ limitations under the License.
 //     PathElements.
 //
 //   - Complex validation: the controller allow-lists (AllowedPolicies,
-//     AllowedDisruptionModes) and cross-field rules DV cannot express, such as
-//     the Basic policy not being combinable with All disruption.
+//     AllowedDisruptionModes) and cross-field or hierarchy rules DV cannot
+//     express, such as the Basic policy not being combinable with All
+//     disruption, parent-child policy and disruption mode compatibility, and
+//     uniform PriorityClassName across the tree.
 //
 // Out-of-tree controllers leave DV enabled so one Builder.Validate call covers
 // both layers. They record each building block with the field path where it

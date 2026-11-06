@@ -124,19 +124,31 @@ func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
 	return uint32(num1), uint32(num2), nil
 }
 
+// defaultKubeletMappings returns the range of IDs to use for user namespaces when there is no
+// specific configuration for the kubelet user. It is the entire ID range except the IDs below
+// idsPerPod and the last idsPerPod IDs.
+func defaultKubeletMappings(idsPerPod uint32) (uint32, uint32) {
+	firstID := idsPerPod
+	// The last idsPerPod IDs are left unmapped since the kernel considers user
+	// 2^32-1 an invalid user (see man 7 user_namespaces)
+	//
+	// We cast firstID to 64 bits, as otherwise any operation (including subtraction)
+	// fires the overflow detection (go is not smart enough to realize that if we subtract a
+	// non-negative number, it fits in 32 bits).
+	// Then we cast it back to 32 bits, as this what the function returns.
+	length := uint32((1 << 32) - uint64(firstID) - uint64(idsPerPod))
+	return firstID, length
+}
+
 // getKubeletMappings returns the range of IDs that can be used to configure user namespaces.
 // If subordinate user or group ID ranges are specified for the kubelet user and the getsubids tool
 // is installed, then the single mapping specified both for user and group IDs will be used.
 // If the tool is not installed, or there are no IDs configured, the default mapping is returned.
-// The default mapping includes the entire IDs range except IDs below idsPerPod.
+// The default mapping includes the entire IDs range except IDs below idsPerPod and the
+// last idsPerPod IDs (since the last user in the range is invalid from the kernel's POV).
 func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error) {
 	// default mappings to return if there is no specific configuration
-	defaultFirstID := idsPerPod
-	// We cast defaultFirstID to 64 bits, as otherwise any operation (including subtraction)
-	// fires the overflow detection (go is not smart enough to realize that if we subtract a
-	// non-negative number, it fits in 32 bits).
-	// Then we cast it back to 32 bits, as this what the function returns.
-	defaultLen := uint32((1 << 32) - uint64(defaultFirstID))
+	defaultFirstID, defaultLen := defaultKubeletMappings(idsPerPod)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
@@ -161,7 +173,7 @@ func (kl *Kubelet) getKubeletMappings(logger klog.Logger, idsPerPod uint32) (uin
 	execName := "getsubids"
 	cmd, err := exec.LookPath(execName)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if goerrors.Is(err, exec.ErrNotFound) {
 			logger.V(2).Info("user namespaces: executable not found, using default mappings", "executable", execName, "err", err)
 			return defaultFirstID, defaultLen, nil
 		}
@@ -233,10 +245,6 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 // allocated state.
 func (kl *Kubelet) getAllocatedPods() []*v1.Pod {
 	activePods := kl.GetActivePods()
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return activePods
-	}
-
 	allocatedPods := make([]*v1.Pod, len(activePods))
 	for i, pod := range activePods {
 		allocatedPods[i], _ = kl.allocationManager.UpdatePodFromAllocation(pod)
@@ -821,7 +829,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
-				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+				configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -915,7 +923,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+					configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -983,14 +991,20 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, err
 				}
 
-				runtimeVal, err = envutil.ParseEnv(envFilePath, key)
+				var found bool
+				runtimeVal, found, err = envutil.ParseEnv(envFilePath, key)
 				if err != nil {
+					// A missing file is equivalent to a missing key: the env var is
+					// simply not published when the reference is optional.
+					if optional && goerrors.Is(err, os.ErrNotExist) {
+						continue
+					}
 					logger.Error(err, "Failed to parse env file", "pod", klog.KObj(pod))
 					return result, fmt.Errorf("couldn't parse env file")
 				}
 
 				// If the key was not found, and it's not optional, return an error
-				if runtimeVal == "" {
+				if !found {
 					if optional {
 						// If the key doesn't exist, and it's optional, skip this environment variable
 						continue
@@ -1142,10 +1156,8 @@ func (kl *Kubelet) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
 	// status manager and its tests.
 	// TODO: extend PodDeletionSafetyProvider interface and implement it
 	// in a separate Kubelet method.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
-			return true
-		}
+	if kl.containerManager.PodMightNeedToUnprepareResources(pod.UID) {
+		return true
 	}
 	return false
 }
@@ -1187,6 +1199,15 @@ func (kl *Kubelet) isPodInactive(p *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// IsPodTerminatingOrTerminal returns true if the pod is currently terminating
+// or has already reached a terminal state.
+func (kl *Kubelet) IsPodTerminatingOrTerminal(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil ||
+		kl.podWorkers.IsPodTerminationRequested(pod.UID) ||
+		kl.podWorkers.IsPodKnownTerminated(pod.UID) ||
+		kl.isAdmittedPodTerminal(pod)
 }
 
 // isAdmittedPodTerminal returns true if the provided config source pod is in
@@ -1671,16 +1692,6 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 		return err
 	}
 
-	// Since v1.32, stdout may be nil if the stream is not requested.
-	if stdout != nil {
-		// Do a zero-byte write to stdout before handing off to the container runtime.
-		// This ensures at least one Write call is made to the writer when copying starts,
-		// even if we then block waiting for log output from the container.
-		if _, err := stdout.Write([]byte{}); err != nil {
-			return err
-		}
-	}
-
 	return kl.containerRuntime.GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr)
 }
 
@@ -1909,12 +1920,16 @@ func getPhase(logger klog.Logger, pod *v1.Pod, info []v1.ContainerStatus, podIsT
 	}
 }
 
-func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal bool) []*v1.PodCondition {
-	// If pod is terminal, clear the resize status.
-	if podIsTerminal {
+func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podState PodWorkerState) []*v1.PodCondition {
+	switch podState {
+	case TerminatedPod:
+		// If pod is terminal, clear the resize status.
 		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
 		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 		return nil
+	case TerminatingPod:
+		// PodResizeInProgress is cleared once the pod reaches TerminatedPod.
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 	}
 
 	resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
@@ -1923,9 +1938,10 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal 
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status. This method should only be called from within sync*Pod methods.
-func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodStatus {
+func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podState PodWorkerState) v1.PodStatus {
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Generating pod status", "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
+	podIsTerminal := podState == TerminatedPod
+	logger.V(3).Info("Generating pod status", "podState", podState, "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
 	// use the previous pod status, or the api status, as the basis for this pod
 	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
@@ -1939,14 +1955,22 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// Perform a three-way merge between the statuses from the status manager,
 	// runtime, and generated status to ensure terminal status is correctly set.
-	if s.Phase != v1.PodFailed && s.Phase != v1.PodSucceeded {
+	// A phase already recorded as Failed is kept even when the container exit
+	// codes alone would compute Succeeded: the kubelet may have failed the pod
+	// for a reason the containers cannot see, such as an eviction whose
+	// SIGTERM the container handled by exiting 0.
+	if s.Phase != v1.PodFailed {
 		switch {
 		case oldPodStatus.Phase == v1.PodFailed || oldPodStatus.Phase == v1.PodSucceeded:
-			logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
-			s.Phase = oldPodStatus.Phase
+			if s.Phase != oldPodStatus.Phase {
+				logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
+				s.Phase = oldPodStatus.Phase
+			}
 		case pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded:
-			logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
-			s.Phase = pod.Status.Phase
+			if s.Phase != pod.Status.Phase {
+				logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
+				s.Phase = pod.Status.Phase
+			}
 		}
 	}
 
@@ -1996,18 +2020,16 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 			s.Conditions = append(s.Conditions, c)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		resizeStatus := kl.determinePodResizeStatus(pod, podIsTerminal)
-		for _, c := range resizeStatus {
-			// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
-			// observed generation is not already set. We avoid overwriting the condition's observedGeneration
-			// in other cases, because the condition may be reflecting an older podspec.
-			gen := podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
-			if gen == 0 {
-				c.ObservedGeneration = 0
-			}
-			s.Conditions = append(s.Conditions, *c)
+	resizeStatus := kl.determinePodResizeStatus(pod, podState)
+	for _, c := range resizeStatus {
+		// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
+		// observed generation is not already set. We avoid overwriting the condition's observedGeneration
+		// in other cases, because the condition may be reflecting an older podspec.
+		gen := podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
+		if gen == 0 {
+			c.ObservedGeneration = 0
 		}
+		s.Conditions = append(s.Conditions, *c)
 	}
 
 	// copy over the pod disruption conditions from state which is already
@@ -2021,7 +2043,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// set all Kubelet-owned conditions
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
-		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(pod, &oldPodStatus, podStatus))
+		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(logger, pod, &oldPodStatus, podStatus))
 	}
 	allContainerStatuses := append(s.InitContainerStatuses, s.ContainerStatuses...)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(pod, &oldPodStatus, allContainerStatuses, s.Phase))
@@ -2724,24 +2746,20 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
-			if allocatedContainer != nil {
-				// status.Resources reflects cgroup-actuated resources. If the container is running,
-				// it is populated from CRI status.
-				status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
-				// status.AllocatedResources represents the desired cgroup resource state for resize,
-				// and is strictly based on the uninflated standard cgroup resources requested in the spec.
-				// DRA based allocations are not included in AllocatedResources at the container level.
-				// This is because the claims can be shared across containers in the pod and can be
-				// shared unevenly (enforced by the DRA driver).
-				status.AllocatedResources = allocatedContainer.Resources.Requests
-			}
+		allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
+		if allocatedContainer != nil {
+			// status.Resources reflects cgroup-actuated resources. If the container is running,
+			// it is populated from CRI status.
+			status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
+			// status.AllocatedResources represents the desired cgroup resource state for resize,
+			// and is strictly based on the uninflated standard cgroup resources requested in the spec.
+			// DRA based allocations are not included in AllocatedResources at the container level.
+			// This is because the claims can be shared across containers in the pod and can be
+			// shared unevenly (enforced by the DRA driver).
+			status.AllocatedResources = allocatedContainer.Resources.Requests
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			status.User = convertContainerStatusUser(cStatus)
-		}
+		status.User = convertContainerStatusUser(cStatus)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 			status.StopSignal = cStatus.StopSignal
 		}

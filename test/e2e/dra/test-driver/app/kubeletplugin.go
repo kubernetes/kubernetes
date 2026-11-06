@@ -86,7 +86,7 @@ type ExamplePlugin struct {
 	// race with reading.
 	mutex     sync.Mutex
 	prepared  map[ClaimID][]kubeletplugin.Device // prepared claims -> result of nodePrepareResource
-	gRPCCalls []GRPCCall
+	gRPCCalls []*GRPCCall
 
 	healthMutex       sync.Mutex
 	deviceHealth      map[string]deviceHealthInfo
@@ -556,42 +556,39 @@ func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
 }
 
 func (ex *ExamplePlugin) recordGRPCCall(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-	call := GRPCCall{
+	call := &GRPCCall{
 		FullMethod: info.FullMethod,
 		Request:    req,
 	}
 	ex.mutex.Lock()
 	ex.gRPCCalls = append(ex.gRPCCalls, call)
-	index := len(ex.gRPCCalls) - 1
 	ex.mutex.Unlock()
 
 	// We don't hold the mutex here to allow concurrent calls.
-	call.Response, call.Err = handler(ctx, req)
+	resp, err = handler(ctx, req)
 
 	ex.mutex.Lock()
-	ex.gRPCCalls[index] = call
+	call.Response, call.Err = resp, err
 	ex.mutex.Unlock()
 
-	return call.Response, call.Err
+	return resp, err
 }
 
-func (ex *ExamplePlugin) recordGRPCStream(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+func (ex *ExamplePlugin) recordGRPCStream(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	call := &GRPCCall{
+		FullMethod: info.FullMethod,
+	}
 	ex.mutex.Lock()
-	// Append a new empty GRPCCall struct to get its index.
-	ex.gRPCCalls = append(ex.gRPCCalls, GRPCCall{})
-
-	pCall := &ex.gRPCCalls[len(ex.gRPCCalls)-1]
-
-	pCall.FullMethod = info.FullMethod
+	ex.gRPCCalls = append(ex.gRPCCalls, call)
 	ex.mutex.Unlock()
 
-	defer func() {
-		ex.mutex.Lock()
-		defer ex.mutex.Unlock()
-		pCall.Err = err
-	}()
+	// We don't hold the mutex here to allow concurrent calls.
+	err := handler(srv, stream)
 
-	err = handler(srv, stream)
+	ex.mutex.Lock()
+	call.Err = err
+	ex.mutex.Unlock()
+
 	return err
 }
 
@@ -601,15 +598,18 @@ func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
 
 	// We must return a new slice, otherwise adding new calls would become
 	// visible to the caller. We also need to copy the entries because
-	// they get mutated by recordGRPCCall.
+	// they get mutated by the interceptors.
 	calls := make([]GRPCCall, 0, len(ex.gRPCCalls))
-	calls = append(calls, ex.gRPCCalls...)
+	for _, call := range ex.gRPCCalls {
+		calls = append(calls, *call)
+	}
 	return calls
 }
 
 // ResetGRPCCalls clears the internal tracking of GRPC calls made to the plugin.
 // This is useful in tests to start with a clean slate when verifying plugin
 // registration behavior, particularly when testing registration retry scenarios.
+// A call still in flight is dropped as well; its completion does not bring it back.
 func (ex *ExamplePlugin) ResetGRPCCalls() {
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()

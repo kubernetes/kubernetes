@@ -85,7 +85,7 @@ func runTestReflectorDataConsistencyDetector(t *testing.T, transformer Transform
 			}, nil
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			w := watch.NewFake()
+			w := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 			go func() {
 				w.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-1", ResourceVersion: "1"}})
 				w.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{
@@ -98,7 +98,7 @@ func runTestReflectorDataConsistencyDetector(t *testing.T, transformer Transform
 		},
 	}
 
-	r := NewReflector(lw, &v1.Pod{}, fifo, 0)
+	r := NewReflector(lw, &v1.Pod{}, fifo, 0) //nolint:logcheck // Intentionally testing old API here.
 
 	go func() {
 		_ = wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {

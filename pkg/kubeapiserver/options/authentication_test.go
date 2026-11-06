@@ -595,7 +595,7 @@ kind: AuthenticationConfiguration
 anonymous:
   enabled: false
 `,
-				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
+				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
 		{
@@ -620,7 +620,7 @@ kind: AuthenticationConfiguration
 anonymous:
   enabled: true
 `,
-				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
+				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
 		{
@@ -690,7 +690,7 @@ anonymous:
   conditions:
   - path: "/livez"
 `,
-				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
+				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
 		{
@@ -752,7 +752,7 @@ jwt:
       claim: sub
       prefix: ""
 `,
-				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
+				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
 	}
@@ -1034,7 +1034,7 @@ jwt:
       claim: sub
       prefix: ""
 `,
-				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
+				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
 		{

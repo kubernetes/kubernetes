@@ -6,7 +6,7 @@ package types
 // Restrictions on what things can be referred to
 // in a kustomization file.
 //
-//go:generate stringer -type=LoadRestrictions
+//go:generate go tool stringer -type=LoadRestrictions
 type LoadRestrictions int
 
 const (

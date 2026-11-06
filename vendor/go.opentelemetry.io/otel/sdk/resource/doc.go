@@ -17,4 +17,4 @@
 //
 // While this package provides a stable API,
 // the attributes added by resource detectors may change.
-package resource // import "go.opentelemetry.io/otel/sdk/resource"
+package resource

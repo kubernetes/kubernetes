@@ -489,17 +489,12 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
 			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a *UpdateItem, b *UpdateItem) bool { return a.Name == b.Name }, validate.DirectEqual,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UpdateItem) field.ErrorList {
 					return validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify)
-				}).MarkShortCircuit(); len(e) != 0 {
+				}); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
 			}
 			// lists with map semantics require unique keys
 			if e := validate.ValSliceUnique(ctx, op, fldPath, obj, oldObj,

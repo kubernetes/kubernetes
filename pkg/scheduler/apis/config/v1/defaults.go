@@ -59,6 +59,8 @@ func pluginsNames(p *configv1.Plugins) []string {
 		p.QueueSort,
 		p.PlacementGenerate,
 		p.PlacementScore,
+		p.PlacementFeasible,
+		p.PodGroupPostFilter,
 	}
 	n := sets.New[string]()
 	for _, e := range extensions {
@@ -128,6 +130,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 
 	if obj.PercentageOfNodesToScore == nil {
 		obj.PercentageOfNodesToScore = ptr.To[int32](config.DefaultPercentageOfNodesToScore)
+	}
+
+	if obj.PercentageOfPlacementsToScore == nil && feature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
+		obj.PercentageOfPlacementsToScore = ptr.To[int32](config.DefaultPercentageOfPlacementsToScore)
 	}
 
 	if len(obj.LeaderElection.ResourceLock) == 0 {

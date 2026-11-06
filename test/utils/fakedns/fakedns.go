@@ -21,13 +21,13 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"testing"
 	"time"
 
 	netutils "k8s.io/utils/net"
 
 	"golang.org/x/net/dns/dnsmessage"
 
+	testutils "k8s.io/kubernetes/test/utils"
 	nettesting "k8s.io/kubernetes/third_party/forked/golang/net/testing"
 )
 
@@ -110,7 +110,7 @@ func NewServer(hosts map[string]string) (*Server, error) {
 //
 //	dnsServer, _ := fakedns.NewServer(hosts)
 //	dnsServer.Hijack(t)
-func (s *Server) Hijack(t *testing.T) {
+func (s *Server) Hijack(t testutils.TB) {
 	t.Helper()
 
 	dnsHijackLock.Lock()

@@ -124,7 +124,7 @@ var _ = utils.SIGDescribe("Volume metrics", func() {
 			VolumeMode:       ptr.To(v1.PersistentVolumeBlock),
 		}, ns)
 
-		metricsGrabber, err = e2emetrics.NewMetricsGrabber(ctx, c, nil, f.ClientConfig(), true, false, true, false, false, false)
+		metricsGrabber, err = e2emetrics.NewMetricsGrabber(ctx, c, f.ClientConfig(), true, false, true, false, false, false)
 
 		if err != nil {
 			framework.Failf("Error creating metrics grabber : %v", err)

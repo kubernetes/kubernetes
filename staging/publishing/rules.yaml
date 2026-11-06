@@ -1,4 +1,12 @@
 rules:
+- destination: ktesting
+  branches:
+  - name: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/ktesting
+  library: true
 - destination: streaming
   branches:
   - name: master
@@ -21,6 +29,8 @@ rules:
   branches:
   - name: master
     dependencies:
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     source:
@@ -59,6 +69,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master
@@ -112,6 +124,8 @@ rules:
     - repository: streaming
       branch: master
     - repository: api
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -188,6 +202,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     source:
@@ -241,6 +257,8 @@ rules:
     - repository: api
       branch: master
     - repository: client-go
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -310,6 +328,8 @@ rules:
     - repository: api
       branch: master
     - repository: client-go
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -427,6 +447,8 @@ rules:
       branch: master
     - repository: kms
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -519,6 +541,8 @@ rules:
     - repository: kms
       branch: master
     - repository: code-generator
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -627,6 +651,8 @@ rules:
     - repository: kms
       branch: master
     - repository: component-base
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -755,6 +781,8 @@ rules:
       branch: master
     - repository: code-generator
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -844,6 +872,25 @@ rules:
     smoke-test: |
       # assumes GO111MODULE=on
       go build -mod=mod .
+- destination: apiextensions-api
+  branches:
+  - name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: streaming
+      branch: master
+    - repository: api
+      branch: master
+    - repository: ktesting
+      branch: master
+    - repository: client-go
+      branch: master
+    source:
+      branch: master
+      dirs:
+      - staging/src/k8s.io/apiextensions-api
+  library: true
 - destination: apiextensions-apiserver
   branches:
   - name: master
@@ -863,6 +910,10 @@ rules:
     - repository: component-base
       branch: master
     - repository: kms
+      branch: master
+    - repository: ktesting
+      branch: master
+    - repository: apiextensions-api
       branch: master
     source:
       branch: master
@@ -976,6 +1027,8 @@ rules:
       branch: master
     - repository: code-generator
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -1053,6 +1106,8 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -1124,6 +1179,8 @@ rules:
       branch: master
     - repository: client-go
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -1193,6 +1250,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master
@@ -1417,6 +1476,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     - repository: api
@@ -1519,6 +1580,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: kms
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -1623,6 +1686,8 @@ rules:
       branch: master
     - repository: kms
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -1725,6 +1790,8 @@ rules:
   - name: master
     dependencies:
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master
@@ -1855,6 +1922,8 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: ktesting
+      branch: master
     - repository: streaming
       branch: master
     - repository: api
@@ -1915,6 +1984,8 @@ rules:
     - repository: api
       branch: master
     - repository: apimachinery
+      branch: master
+    - repository: ktesting
       branch: master
     - repository: streaming
       branch: master
@@ -2016,6 +2087,8 @@ rules:
     - repository: component-helpers
       branch: master
     - repository: metrics
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -2132,6 +2205,8 @@ rules:
       branch: master
     - repository: kms
       branch: master
+    - repository: ktesting
+      branch: master
     source:
       branch: master
       dirs:
@@ -2234,6 +2309,8 @@ rules:
     - repository: kms
       branch: master
     - repository: kubelet
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -2355,9 +2432,9 @@ rules:
       branch: master
     - repository: dynamic-resource-allocation
       branch: master
-    - repository: kms
-      branch: master
     - repository: kubelet
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master
@@ -2467,6 +2544,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: ktesting
       branch: master
     source:
       branch: master

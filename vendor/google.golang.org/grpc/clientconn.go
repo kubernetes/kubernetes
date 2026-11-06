@@ -24,12 +24,10 @@ import (
 	"fmt"
 	"math"
 	"net/url"
-	"os"
 	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"google.golang.org/grpc/balancer"
@@ -1213,6 +1211,12 @@ func (cc *ClientConn) Close() error {
 	cc.mu.Unlock()
 
 	cc.resolverWrapper.close()
+	// Swap in a default ConfigSelector so the resolver-provided one (which may
+	// transitively retain resolver-owned state such as parsed service configs
+	// and cluster maps) is released once in-flight RPCs finish selecting on
+	// it. Done after the resolver has closed so no further UpdateState calls
+	// race with this swap.
+	cc.safeConfigSelector.UpdateConfigSelector(&defaultConfigSelector{nil})
 	// The order of closing matters here since the balancer wrapper assumes the
 	// picker is closed before it is closed.
 	cc.pickerWrapper.close()
@@ -1573,26 +1577,13 @@ func (ac *addrConn) createTransport(ctx context.Context, addr resolver.Address, 
 // to the provided transport.GoAwayInfo, as specified by gRFC A94:
 // https://github.com/grpc/proposal/blob/master/A94-grpc-subchannel-disconnections-metrics.md
 func disconnectErrorString(info transport.GoAwayInfo) string {
-	err := info.Err
-	var sysErr syscall.Errno
-	switch {
-	case info.Reason != transport.GoAwayInvalid:
+	if info.Reason != transport.GoAwayInvalid {
 		return fmt.Sprintf("GOAWAY %s", info.GoAwayCode.String())
-	case err == nil:
-		return "unknown"
-	case errors.Is(err, context.Canceled):
-		return "subchannel shutdown"
-	case errors.Is(err, syscall.ECONNRESET):
-		return "connection reset"
-	case errors.Is(err, syscall.ETIMEDOUT), errors.Is(err, context.DeadlineExceeded), errors.Is(err, os.ErrDeadlineExceeded):
-		return "connection timed out"
-	case errors.Is(err, syscall.ECONNABORTED):
-		return "connection aborted"
-	case errors.As(err, &sysErr):
-		return "socket error"
-	default:
+	}
+	if info.Err == nil {
 		return "unknown"
 	}
+	return disconnectErrorLabel(info.Err)
 }
 
 // startHealthCheck starts the health checking stream (RPC) to watch the health

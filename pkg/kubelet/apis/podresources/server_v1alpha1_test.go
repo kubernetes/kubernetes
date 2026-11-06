@@ -22,10 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/ktesting"
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestListPodResourcesV1alpha1(t *testing.T) {

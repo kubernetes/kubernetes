@@ -19,8 +19,8 @@ package admission
 import (
 	"reflect"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -57,6 +57,14 @@ func (v *VersionedAttributes) GetObject() runtime.Object {
 		return v.VersionedObject.object
 	}
 	return v.Attributes.GetObject()
+}
+
+// GetOldObject overrides the Attributes.GetOldObject()
+func (v *VersionedAttributes) GetOldObject() runtime.Object {
+	if v.VersionedOldObject.object != nil {
+		return v.VersionedOldObject.object
+	}
+	return v.Attributes.GetOldObject()
 }
 
 // ConvertToGVK converts object to the desired gvk.

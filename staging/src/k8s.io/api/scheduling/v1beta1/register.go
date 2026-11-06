@@ -50,6 +50,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&WorkloadList{},
 		&PodGroup{},
 		&PodGroupList{},
+		&CompositePodGroup{},
+		&CompositePodGroupList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

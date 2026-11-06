@@ -50,6 +50,11 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeDeclaredFeatures},
 		},
 	},
+	Reserve: config.PluginSet{
+		Disabled: []config.Plugin{
+			{Name: names.DefaultPreemption},
+		},
+	},
 }
 
 // ExpandedPluginsV1 default set of v1 plugins after MultiPoint expansion

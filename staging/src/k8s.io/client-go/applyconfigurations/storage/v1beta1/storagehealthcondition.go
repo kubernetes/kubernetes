@@ -34,10 +34,10 @@ type StorageHealthConditionApplyConfiguration struct {
 	// One of "StorageUnreachable", "StorageDegraded".
 	Status *storagev1beta1.StorageHealthStatusType `json:"status,omitempty"`
 	// reason is a brief CamelCase machine-parseable reason.
-	// Maximum permitted length of a reason is 256 characters.
+	// Maximum permitted length of a reason is 256 bytes.
 	Reason *string `json:"reason,omitempty"`
 	// message is a human-readable description.
-	// Maximum permitted length of a message is 1024 characters.
+	// Maximum permitted length of a message is 1024 bytes.
 	Message *string `json:"message,omitempty"`
 	// accessMode is the access mode affected. Nil means all access modes are affected.
 	AccessMode *v1.PersistentVolumeAccessMode `json:"accessMode,omitempty"`

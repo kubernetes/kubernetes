@@ -33,6 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
@@ -107,7 +108,7 @@ type resourceSliceLister struct {
 	tracker *resourceslicetracker.Tracker
 }
 
-func (l *resourceSliceLister) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
+func (l *resourceSliceLister) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
 	return l.tracker.ListPatchedResourceSlices()
 }
 
@@ -326,7 +327,7 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
-	allocated, revision := c.allocatedDevices.Get()
+	allocated, revision := c.allocatedDevices.get()
 
 	// Whatever is in flight also has to be checked.
 	for _, inFlight := range c.allInFlightAllocationsRLocked() {
@@ -337,7 +338,7 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 		}, false, func(structured.SharedDeviceID) {}, func(structured.DeviceConsumedCapacity) {})
 	}
 
-	if revision == c.allocatedDevices.Revision() {
+	if revision == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return allocated, nil
 	}
@@ -348,7 +349,7 @@ func (c *claimTracker) ListAllAllocatedDevices() (a sets.Set[structured.DeviceID
 // GatherAllocatedState collects and returns the current allocation state of all devices
 // across the cluster. This includes:
 // - AllocatedDevices: Set of device IDs that are fully allocated (dedicated mode)
-// - AllocatedSharedDeviceIDs: Set of shared device IDs when consumable capacity is enabled
+// - AllocatedSharedDeviceIDs: Set of device IDs with shared allocations when consumable capacity is enabled
 // - AggregatedCapacity: Consumed capacity across all devices when consumable capacity is enabled
 //
 // The function handles two allocation models:
@@ -378,9 +379,12 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 	// world according to the informers.
 	enabledConsumableCapacity := utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)
 
-	allocated, revision1 := c.allocatedDevices.Get()
-	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.GetSharedDeviceIDs()
-	aggregatedCapacity, revision3 := c.allocatedDevices.Capacities()
+	allocated, revision1 := c.allocatedDevices.get()
+	allocatedSharedDeviceIDs, revision2 := c.allocatedDevices.getSharedDeviceIDs()
+	aggregatedCapacity, revision3, err := c.allocatedDevices.getCapacities()
+	if err != nil {
+		return nil, err
+	}
 
 	if revision1 != revision2 || revision2 != revision3 {
 		// Already not consistent. Try again.
@@ -392,17 +396,22 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 		// dedicated device allocation model.
 		// This ensures backward compatibility with the original DRA behavior where devices
 		// could only be allocated exclusively to a single claim.
-		for sharedDeviceID := range allocatedSharedDeviceIDs {
-			allocated.Insert(sharedDeviceID.GetDeviceID())
+		for deviceID := range allocatedSharedDeviceIDs {
+			allocated.Insert(deviceID)
 		}
 		// Reset allocatedSharedDeviceIDs and aggregatedCapacity
-		allocatedSharedDeviceIDs = sets.New[structured.SharedDeviceID]()
+		allocatedSharedDeviceIDs = sets.New[structured.DeviceID]()
 		aggregatedCapacity = make(schedulerapi.ConsumedCapacityCollection)
 	}
 
 	// Whatever is in flight also has to be checked.
 	for _, inFlight := range c.allInFlightAllocationsRLocked() {
 		claim := inFlight.claim
+		if enabledConsumableCapacity {
+			if err = consumedCapacityError(claim); err != nil {
+				return nil, err
+			}
+		}
 		foreachAllocatedDevice(claim,
 			func(deviceID structured.DeviceID) { // dedicatedDeviceCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
@@ -411,14 +420,14 @@ func (c *claimTracker) GatherAllocatedState() (s *structured.AllocatedState, err
 			enabledConsumableCapacity,
 			func(sharedDeviceID structured.SharedDeviceID) { // sharedDeviceCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
-				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				allocatedSharedDeviceIDs.Insert(sharedDeviceID.GetDeviceID())
 			},
 			func(capacity structured.DeviceConsumedCapacity) { // consumedCapacityCallback
 				c.logger.V(6).Info("Device is in flight for allocation", "consumed capacity", capacity, "claim", klog.KObj(claim))
 				aggregatedCapacity.Insert(capacity)
 			})
 	}
-	if revision1 == c.allocatedDevices.Revision() {
+	if revision1 == c.allocatedDevices.getRevision() {
 		// Our current result is valid, nothing changed in the meantime.
 		return &structured.AllocatedState{
 			AllocatedDevices:         allocated,

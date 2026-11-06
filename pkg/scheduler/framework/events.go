@@ -84,9 +84,7 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod, isTargetPod b
 		extractPodScaleUp,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
+		extractPodGeneratedResourceClaimChange,
 	}
 
 	for _, fn := range podChangeExtractors {
@@ -109,7 +107,7 @@ type podChangeExtractor func(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType
 // extractPodScaleDown interprets the update of a pod and returns PodRequestScaledDown event if any pod's resource request(s) is scaled down.
 func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
-		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
@@ -122,7 +120,7 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 			return fwk.UpdatePodScaleDown
 		}
 
-		if oldReq.MilliValue() > newReq.MilliValue() {
+		if oldReq.Cmp(newReq) > 0 {
 			// The resource request of rName is scaled down.
 			return fwk.UpdatePodScaleDown
 		}
@@ -134,7 +132,7 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 // extractPodScaleUp interprets the update of a pod and returns PodRequestScaledUp event if any pod's resource request(s) is scaled up.
 func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
-		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		UseStatusResources: true,
 		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
 	}
 	newPodRequests := resource.PodRequests(newPod, opt)
@@ -147,7 +145,7 @@ func extractPodScaleUp(newPod, oldPod *v1.Pod) fwk.ActionType {
 			return fwk.UpdatePodScaleUp
 		}
 
-		if newReq.MilliValue() > oldReq.MilliValue() {
+		if newReq.Cmp(oldReq) > 0 {
 			// The resource request of rName is scaled up.
 			return fwk.UpdatePodScaleUp
 		}

@@ -1,0 +1,15 @@
+diff --git a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+index 06ae150447c..b1109e8d201 100644
+--- a/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
++++ b/staging/src/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go
+@@ -458,7 +458,9 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
+ 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+ 			return w.waitAndListExactRV(ctx, key, "", listRV)
+ 		}
+-		if opts.ResourceVersion == "" {
++		// BUG REVERT (#123676): check listRV == 0 instead of opts.ResourceVersion == "",
++		// treating resourceVersion="0" as a consistent list rather than NotOlderThan 0.
++		if listRV == 0 {
+ 			return w.waitAndListConsistent(ctx, key, "", opts.Predicate.MatcherIndex(ctx))
+ 		}
+ 	}

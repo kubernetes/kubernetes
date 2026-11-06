@@ -200,7 +200,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 	podsToActivate *framework.PodsToActivate,
 	scheduleResult ScheduleResult,
 ) (*framework.QueuedPodInfo, *fwk.Status) {
-	assumedPodInfo, status := sched.algorithm.assumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
+	assumedPodInfo, status := sched.algorithm.AssumeAndReserveInCache(ctx, state, schedFramework, podInfo, scheduleResult)
 	if !status.IsSuccess() {
 		return assumedPodInfo, status
 	}
@@ -212,7 +212,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 		schedFramework.AddWaitingPod(assumedPod, pluginsWaitTime)
 	} else if !runPermitStatus.IsSuccess() {
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
-		err := sched.algorithm.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
+		err := sched.algorithm.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
@@ -271,14 +271,6 @@ func (sched *Scheduler) schedulingAlgorithm(
 		if !ok {
 			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
-		}
-
-		// We do not want to run PostFilters for single pods in PodGroup cycle.
-		// Instead we will run PodGroupPostFilter at the end of PodGroup cycle.
-		if state.IsPodGroupSchedulingCycle() {
-			// Return nil as NominatingInfo. It can be overridden by the PodGroupPostFilter later
-			// and the final decision whether to clear NominatingInfo will be done in submitPodGroupAlgorithmResult.
-			return ScheduleResult{nominatingInfo: nil}, fwk.NewStatus(fwk.Unschedulable).WithError(err)
 		}
 
 		// SchedulePod() may have failed because the pod would not fit on any host, so we try to
@@ -431,7 +423,7 @@ func (sched *Scheduler) handleBindingCycleError(
 
 	assumedPod := podInfo.Pod
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
-	if forgetErr := sched.algorithm.unreserveAndForget(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
+	if forgetErr := sched.algorithm.UnreserveAndForgetFromCache(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
 		utilruntime.HandleErrorWithContext(ctx, forgetErr, "ForgetPod failed")
 	} else {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
@@ -511,7 +503,7 @@ func hasExtenderFilters(fwk framework.Framework) bool {
 	return false
 }
 
-func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, pod *v1.Pod, feasibleNodes []fwk.NodeInfo, statuses *framework.NodeToStatus) ([]fwk.NodeInfo, error) {
+func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, pod *v1.Pod, feasibleNodes []framework.NodeWithRank, statuses *framework.NodeToStatus) ([]framework.NodeWithRank, error) {
 	logger := klog.FromContext(ctx)
 
 	// Extenders are called sequentially.
@@ -525,12 +517,19 @@ func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, p
 			continue
 		}
 
+		nodeInfos := make([]fwk.NodeInfo, len(feasibleNodes))
+		nodeRanks := make(map[string]int, len(feasibleNodes))
+		for i, n := range feasibleNodes {
+			nodeInfos[i] = n.NodeInfo
+			nodeRanks[n.NodeInfo.Node().Name] = n.Rank
+		}
+
 		// Status of failed nodes in failedAndUnresolvableMap will be added to <statuses>,
 		// so that the scheduler framework can respect the UnschedulableAndUnresolvable status for
 		// particular nodes, and this may eventually improve preemption efficiency.
 		// Note: users are recommended to configure the extenders that may return UnschedulableAndUnresolvable
 		// status ahead of others.
-		feasibleList, failedMap, failedAndUnresolvableMap, err := extender.Filter(pod, feasibleNodes)
+		feasibleList, failedMap, failedAndUnresolvableMap, err := extender.Filter(pod, nodeInfos)
 		if err != nil {
 			if extender.IsIgnorable() {
 				logger.Info("Skipping extender as it returned error and has ignorable flag set", "extender", extender, "err", err)
@@ -552,7 +551,13 @@ func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, p
 			statuses.Set(failedNodeName, fwk.NewStatus(fwk.Unschedulable, failedMsg))
 		}
 
-		feasibleNodes = feasibleList
+		feasibleNodes = make([]framework.NodeWithRank, len(feasibleList))
+		for i, nodeInfo := range feasibleList {
+			feasibleNodes[i] = framework.NodeWithRank{
+				NodeInfo: nodeInfo,
+				Rank:     nodeRanks[nodeInfo.Node().Name],
+			}
+		}
 	}
 	return feasibleNodes, nil
 }
@@ -567,10 +572,27 @@ func prioritizeNodes(
 	schedFramework framework.Framework,
 	state fwk.CycleState,
 	pod *v1.Pod,
-	nodes []fwk.NodeInfo,
+	rankedNodes []framework.NodeWithRank,
 ) ([]fwk.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
 	extenders := schedFramework.Extenders()
+
+	var nodes []fwk.NodeInfo
+	if len(rankedNodes) > 0 {
+		minRank := rankedNodes[0].Rank
+		for _, n := range rankedNodes[1:] {
+			if n.Rank < minRank {
+				minRank = n.Rank
+			}
+		}
+		nodes = make([]fwk.NodeInfo, 0, len(rankedNodes))
+		for _, n := range rankedNodes {
+			if n.Rank == minRank {
+				nodes = append(nodes, n.NodeInfo)
+			}
+		}
+	}
+
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(extenders) == 0 && !schedFramework.HasScorePlugins() {
@@ -778,7 +800,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		// won't modify them afterwards.
 		podInfo.UnschedulablePlugins = fitError.unschedulablePlugins.Clone()
 		podInfo.PendingPlugins = fitError.pendingPlugins.Clone()
-		errMsg = fmt.Sprintf("parent pod group is unschedulable: %s", errMsg)
+		errMsg = fmt.Sprintf("parent pod group %q is unschedulable", *pod.Spec.SchedulingGroup.PodGroupName)
 		logger.V(2).Info("Unable to schedule pod belonging to a pod group; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else {
 		utilruntime.HandleErrorWithContext(ctx, err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
@@ -808,7 +830,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
 			nominatedPodInfo = podInfo.PodInfo
-			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
+			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
 			calledDone = true

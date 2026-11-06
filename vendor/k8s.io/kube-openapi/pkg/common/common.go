@@ -20,8 +20,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/emicklei/go-restful/v3"
-
 	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -97,12 +95,6 @@ type Config struct {
 	// This takes precedent over the GetDefinitions function
 	Definitions map[string]OpenAPIDefinition
 
-	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
-	//
-	// Deprecated: GetOperationIDAndTagsFromRoute should be used instead. This cannot be specified if using the new Route
-	// interface set of funcs.
-	GetOperationIDAndTags func(r *restful.Route) (string, []string, error)
-
 	// GetOperationIDAndTagsFromRoute returns operation id and tags for a Route. It is an optional function to customize operation IDs.
 	GetOperationIDAndTagsFromRoute func(r Route) (string, []string, error)
 
@@ -150,12 +142,6 @@ type OpenAPIV3Config struct {
 	// Provides the definition for all models used by routes. One of GetDefinitions or Definitions must be defined to generate a spec.
 	// This takes precedent over the GetDefinitions function
 	Definitions map[string]OpenAPIDefinition
-
-	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
-	//
-	// Deprecated: GetOperationIDAndTagsFromRoute should be used instead. This cannot be specified if using the new Route
-	// interface set of funcs.
-	GetOperationIDAndTags func(r *restful.Route) (string, []string, error)
 
 	// GetOperationIDAndTagsFromRoute returns operation id and tags for a Route. It is an optional function to customize operation IDs.
 	GetOperationIDAndTagsFromRoute func(r Route) (string, []string, error)

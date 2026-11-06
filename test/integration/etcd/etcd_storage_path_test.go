@@ -106,7 +106,6 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 		}
 	})
 
-	defer apiServer.Cleanup()
 	defer dumpEtcdKVOnFailure(t, apiServer.KV)
 
 	client := &allClient{dynamicClient: apiServer.Dynamic}

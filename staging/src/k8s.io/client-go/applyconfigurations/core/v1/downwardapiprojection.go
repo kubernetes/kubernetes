@@ -25,7 +25,7 @@ package v1
 // Note that this is identical to a downwardAPI volume source without the default
 // mode.
 type DownwardAPIProjectionApplyConfiguration struct {
-	// Items is a list of DownwardAPIVolume file
+	// items is a list of DownwardAPIVolume file
 	Items []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
 }
 

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/mldsa"
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
@@ -37,7 +38,7 @@ import (
 	"text/template"
 	"time"
 
-	"gopkg.in/go-jose/go-jose.v2"
+	"github.com/go-jose/go-jose/v4"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -88,6 +89,38 @@ func loadECDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm
 	})
 }
 
+func loadMLDSAKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		key, err := x509.ParsePKCS8PrivateKey(b)
+		if err != nil {
+			return nil, err
+		}
+
+		mldsaKey, ok := key.(*mldsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("loaded key is not an ML-DSA private key, got %T", key)
+		}
+
+		return mldsaKey.PublicKey(), nil
+	})
+}
+
+func loadMLDSAPrivKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm) *jose.JSONWebKey {
+	return loadKey(t, filepath, alg, func(b []byte) (interface{}, error) {
+		key, err := x509.ParsePKCS8PrivateKey(b)
+		if err != nil {
+			return nil, err
+		}
+
+		mldsaKey, ok := key.(*mldsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("loaded key is not an ML-DSA private key, got %T", key)
+		}
+
+		return mldsaKey, nil
+	})
+}
+
 func loadKey(t *testing.T, filepath string, alg jose.SignatureAlgorithm, unmarshal func([]byte) (interface{}, error)) *jose.JSONWebKey {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
@@ -116,7 +149,12 @@ type staticKeySet struct {
 }
 
 func (s *staticKeySet) VerifySignature(ctx context.Context, jwt string) (payload []byte, err error) {
-	jws, err := jose.ParseSigned(jwt)
+	allowedSignatureAlgorithms := []jose.SignatureAlgorithm{}
+	for _, key := range s.keys {
+		allowedSignatureAlgorithms = append(allowedSignatureAlgorithms, jose.SignatureAlgorithm(key.Algorithm))
+	}
+
+	jws, err := jose.ParseSigned(jwt, allowedSignatureAlgorithms)
 	if err != nil {
 		return nil, err
 	}
@@ -1946,7 +1984,7 @@ func TestToken(t *testing.T) {
 				"username": "jane",
 				"exp": %d
 			}`, valid.Unix()),
-			wantErr: `oidc: verify token: oidc: id token signed with unsupported algorithm, expected ["RS256"] got "PS256"`,
+			wantErr: `oidc: verify token: oidc: malformed jwt: unexpected signature algorithm "PS256"; expected ["RS256"]`,
 		},
 		{
 			name: "ps256",
@@ -2002,6 +2040,39 @@ func TestToken(t *testing.T) {
 			pubKeys: []*jose.JSONWebKey{
 				loadECDSAKey(t, "testdata/ecdsa_1.pem", jose.ES512),
 				loadECDSAKey(t, "testdata/ecdsa_2.pem", jose.ES512),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
+			name: "mldsa-44",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: new(""),
+						},
+					},
+				},
+				SupportedSigningAlgs: []string{"ML-DSA-44"},
+				now:                  func() time.Time { return now },
+			},
+			signingKey: loadMLDSAPrivKey(t, "testdata/mldsa_2.pem", jose.MLDSA44),
+			pubKeys: []*jose.JSONWebKey{
+				loadMLDSAKey(t, "testdata/mldsa_1.pem", jose.MLDSA44),
+				loadMLDSAKey(t, "testdata/mldsa_2.pem", jose.MLDSA44),
 			},
 			claims: fmt.Sprintf(`{
 				"iss": "https://auth.example.com",

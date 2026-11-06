@@ -22,13 +22,13 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alphav3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -58,7 +57,7 @@ func TestGeneratePlacements(t *testing.T) {
 		wantStatus            fwk.Code
 	}{
 		"without constraint returns placement matching all nodes": {
-			podGroupInfo: makePodGroupInfoFromPG(&schedulingapi.PodGroup{}),
+			podGroupInfo: makePodGroupInfoFromPG(&schedulingv1beta1.PodGroup{}),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Label("foo", "bar").Obj(),
@@ -152,6 +151,30 @@ func TestGeneratePlacements(t *testing.T) {
 			},
 			wantStatus: fwk.Error,
 		},
+		"with pods already scheduled in the empty string domain, returns error": {
+			podGroupInfo: makePodGroup("topology"),
+			scheduledPodGroupPods: []scheduledPod{
+				{assignedNode: "node2"},
+			},
+			placementNodes: []*v1.Node{
+				st.MakeNode().Name("node0").Label("topology", "d1").Obj(),
+			},
+			otherNodes: []*v1.Node{
+				st.MakeNode().Name("node2").Label("topology", "").Obj(),
+			},
+			wantStatus: fwk.Error,
+		},
+		"with nodes labeled with the empty string, skips those nodes": {
+			podGroupInfo: makePodGroup("topology"),
+			placementNodes: []*v1.Node{
+				st.MakeNode().Name("node0").Label("topology", "d1").Obj(),
+				st.MakeNode().Name("node1").Label("topology", "").Obj(),
+			},
+			wantPlacementNodes: map[string][]string{
+				"d1": {"node0"},
+			},
+			wantStatus: fwk.Success,
+		},
 		"with already scheduled pod on node outside of snapshot, returns error": {
 			podGroupInfo: makePodGroup("topology"),
 			scheduledPodGroupPods: []scheduledPod{
@@ -182,7 +205,7 @@ func TestGeneratePlacements(t *testing.T) {
 			wantStatus: fwk.Error,
 		},
 		"for cpg without constraint returns placement matching all nodes": {
-			podGroupInfo: makePodGroupInfoFromCPG(&schedulingv1alphav3.CompositePodGroup{}),
+			podGroupInfo: makePodGroupInfoFromCPG(&schedulingv1beta1.CompositePodGroup{}),
 			placementNodes: []*v1.Node{
 				st.MakeNode().Name("node1").Obj(),
 				st.MakeNode().Name("node2").Label("foo", "bar").Obj(),
@@ -374,8 +397,8 @@ func TestGeneratePlacements(t *testing.T) {
 					nodes = append(nodes, *node)
 				}
 
-				pgs := []schedulingapi.PodGroup{}
-				cpgs := []schedulingv1alphav3.CompositePodGroup{}
+				pgs := []schedulingv1beta1.PodGroup{}
+				cpgs := []schedulingv1beta1.CompositePodGroup{}
 				pods := []*v1.Pod{}
 				alreadyAdded := sets.New[string]()
 				namespace := tt.podGroupInfo.GetNamespace()
@@ -404,19 +427,19 @@ func TestGeneratePlacements(t *testing.T) {
 				}
 
 				cs := clientsetfake.NewClientset(
-					&schedulingapi.PodGroupList{Items: pgs},
-					&schedulingv1alphav3.CompositePodGroupList{Items: cpgs},
+					&schedulingv1beta1.PodGroupList{Items: pgs},
+					&schedulingv1beta1.CompositePodGroupList{Items: cpgs},
 					&v1.NodeList{Items: nodes},
 				)
 				informerFactory := informers.NewSharedInformerFactory(cs, 0)
 				_ = informerFactory.Scheduling().V1beta1().PodGroups().Informer()
-				_ = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+				_ = informerFactory.Scheduling().V1beta1().CompositePodGroups().Informer()
 				_ = informerFactory.Core().V1().Nodes().Informer()
 				informerFactory.StartWithContext(tCtx)
 				informerFactory.WaitForCacheSyncWithContext(tCtx)
 
-				pgPtrs := make([]*schedulingapi.PodGroup, len(pgs))
-				cpgPtrs := make([]*schedulingv1alphav3.CompositePodGroup, len(cpgs))
+				pgPtrs := make([]*schedulingv1beta1.PodGroup, len(pgs))
+				cpgPtrs := make([]*schedulingv1beta1.CompositePodGroup, len(cpgs))
 				nodePtrs := make([]*v1.Node, len(nodes))
 				for i := range pgs {
 					pgPtrs[i] = &pgs[i]
@@ -428,7 +451,7 @@ func TestGeneratePlacements(t *testing.T) {
 					nodePtrs[i] = &nodes[i]
 				}
 
-				snapshot := cache.NewTestSnapshotWithCompositePodGroups(pods, nodePtrs, pgPtrs, cpgPtrs)
+				snapshot := cache.NewTestSnapshotWithPodGroups(pods, nodePtrs, pgPtrs, cpgPtrs)
 
 				fh, _ := runtime.NewFramework(tCtx, nil, nil,
 					runtime.WithInformerFactory(informerFactory),
@@ -474,13 +497,58 @@ func TestGeneratePlacements(t *testing.T) {
 	}
 }
 
-func makePodGroupInfoFromPG(pg *schedulingapi.PodGroup) fwk.PodGroupInfo {
+func TestGetScheduledPodsTopologyDomainEmptyValue(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("empty-domain-node").Label("topology", "").Obj(),
+		st.MakeNode().Name("non-empty-domain-node").Label("topology", "d1").Obj(),
+	}
+	snapshot := cache.NewSnapshot(nil, nodes)
+	fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+	pl, err := New(tCtx, nil, fh, feature.Features{})
+	if err != nil {
+		t.Fatalf("failed when creating plugin: %v", err)
+	}
+
+	tests := map[string]struct {
+		pods []*v1.Pod
+	}{
+		"single empty domain is rejected": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("empty-domain-node").Obj(),
+			},
+		},
+		"empty domain followed by non-empty domain is rejected": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("empty-domain-node").Obj(),
+				st.MakePod().Name("pod2").UID("pod2").Node("non-empty-domain-node").Obj(),
+			},
+		},
+		"non-empty domain followed by empty domain is rejected": {
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").UID("pod1").Node("non-empty-domain-node").Obj(),
+				st.MakePod().Name("pod2").UID("pod2").Node("empty-domain-node").Obj(),
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got, err := pl.getScheduledPodsTopologyDomain("topology", tt.pods); err == nil {
+				t.Fatalf("expected error, got domain %q", got)
+			}
+		})
+	}
+}
+
+func makePodGroupInfoFromPG(pg *schedulingv1beta1.PodGroup) fwk.PodGroupInfo {
 	return &framework.PodGroupInfo{
 		GenericPodGroup: fwk.NewGenericPodGroup(pg),
 	}
 }
 
-func makePodGroupInfoFromCPG(cpg *schedulingv1alphav3.CompositePodGroup) fwk.PodGroupInfo {
+func makePodGroupInfoFromCPG(cpg *schedulingv1beta1.CompositePodGroup) fwk.PodGroupInfo {
 	return &framework.PodGroupInfo{
 		GenericPodGroup: fwk.NewGenericCompositePodGroup(cpg),
 	}

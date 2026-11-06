@@ -72,11 +72,13 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", framework.Wi
 
 		driver := "attachable-with-long-mount"
 		driverInstallAs := driver + "-" + suffix
+		hostExec := utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(ctx, cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
-		installFlex(ctx, cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(ctx, cs, hostExec, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		volumeSource := v1.VolumeSource{
 			FlexVolume: &v1.FlexVolumeSource{
 				Driver: "k8s/" + driverInstallAs,
@@ -121,9 +123,9 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Detaching volumes", framework.Wi
 		framework.ExpectNoError(err, "while waiting for volume to be removed from in-use")
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(ctx, cs, node, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, node, "k8s", driverInstallAs)
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
-		uninstallFlex(ctx, cs, nil, "k8s", driverInstallAs)
+		uninstallFlex(ctx, cs, hostExec, nil, "k8s", driverInstallAs)
 	})
 })
 

@@ -21,10 +21,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
@@ -76,7 +76,6 @@ const (
 	// UpdatePodSchedulingGatesEliminated is an update for pod's scheduling gates, which eliminates all scheduling gates in the Pod.
 	UpdatePodSchedulingGatesEliminated
 	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
-	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
 
 	All ActionType = 1<<iota - 1
@@ -179,7 +178,7 @@ const (
 	CSIStorageCapacity    EventResource = "storage.k8s.io/CSIStorageCapacity"
 	StorageClass          EventResource = "storage.k8s.io/StorageClass"
 	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
-	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
+	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice" // Hints use the ResourceSlice type from k8s.io/dynamic-resource-allocation/api.
 	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
 	PodGroup              EventResource = "scheduling.k8s.io/PodGroup"
 	CompositePodGroup     EventResource = "scheduling.k8s.io/CompositePodGroup"
@@ -202,8 +201,8 @@ type ClusterEventWithHint struct {
 	// the scheduling of Pods will be always retried with backoff when this Event happens.
 	// (the same as Queue)
 	QueueingHintFn QueueingHintFn
-	// PreQueueingHintFn is called once per event to narrow the set of pods to evaluate with QueueingHint.
-	// If set, only pods identified in the returned PreQueueingHintResult are checked.
+	// PreQueueingHintFn, if set, can narrow the unschedulable pods this plugin's
+	// QueueingHintFn is evaluated for when Event happens.
 	PreQueueingHintFn PreQueueingHintFn
 }
 
@@ -221,18 +220,22 @@ type ClusterEventWithHint struct {
 type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
 
 // PreQueueingHintResult is the return value of PreQueueingHintFn.
-// When AllPods is true, all unschedulable pods are evaluated (existing behavior).
-// When AllPods is false, only pods listed in Pods are evaluated.
+// If AllPods is true, the plugin is not narrowed for the event. Otherwise, of the
+// unschedulable pods the plugin rejected, its QueueingHintFn is evaluated only for
+// those listed in Pods.
 type PreQueueingHintResult struct {
 	AllPods bool
 	Pods    []types.NamespacedName
 }
 
-// PreQueueingHintFn is called once per event before iterating unschedulable pods.
-// PreQueueingHintFn will not be called when the deleted object is unknown (both oldObj and newObj are nil).
-// It returns a PreQueueingHintResult indicating which pods should be evaluated
-// by QueueingHintFn for this event. If it returns an error, the error is logged
-// and the result is treated as AllPods (all unschedulable pods are evaluated).
+// PreQueueingHintFn returns the pods for which the plugin's QueueingHintFn should
+// be evaluated when an event occurs. It is called before QueueingHintFn for each
+// matching registration, unless both oldObj and newObj are nil.
+//
+// Results are merged by plugin name across registrations and profiles. If any
+// matching registration of a plugin returns AllPods, returns an error, or omits
+// PreQueueingHintFn, that plugin evaluates all pods it rejected while other
+// plugins keep their narrowing.
 //
 // - oldObj is the old object in update events, or the deleted object in delete events.
 // - newObj is the new/added object. It is nil for delete events.
@@ -687,10 +690,10 @@ const (
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of unscheduled pods that belong to the pod group.
 // Typically used as an input to pod group scheduling cycle plugins.
 type PodGroupInfo interface {
-	// GetUnscheduledPods returns pods that are currently being considered for scheduling.
+	// GetAllUnscheduledPods returns pods that are currently being considered for scheduling.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	// This structure only contains the pods considered for scheduling in the pod group scheduling cycle.
-	GetUnscheduledPods() []*v1.Pod
+	GetAllUnscheduledPods() []*v1.Pod
 
 	// GetName returns the PodGroup name that is used to identify the pod group.
 	GetName() string
@@ -700,14 +703,26 @@ type PodGroupInfo interface {
 	GetType() EntityKeyType
 	// GetKey returns the EntityKey that uniquely identifies the pod group.
 	GetKey() EntityKey
+	// GetUID returns UID of the pod group.
+	GetUID() types.UID
+	// GetObject returns a raw runtime.Object representing the pod group.
+	GetObject() runtime.Object
 	// GetPodGroup returns the PodGroup API object or nil if the group is a composite pod group.
 	GetPodGroup() *schedulingv1beta1.PodGroup
 	// GetCompositePodGroup returns the associated composite pod group or nil if the group is not a composite pod group.
 	// It should only be used when the CompositePodGroup feature gate is enabled.
-	GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup
+	GetCompositePodGroup() *schedulingv1beta1.CompositePodGroup
 	// GetChildren returns the child pod groups of this pod group.
 	// Only composite pod groups have children.
 	GetChildren() []PodGroupInfo
+	// GetPriority returns the priority of the inner pod group or composite pod group.
+	GetPriority() int32
+	// GetPreemptionPolicy returns the PreemptionPolicy of the inner pod group or composite pod group,
+	// or an empty string if not set.
+	GetPreemptionPolicy() v1.PreemptionPolicy
+	// GetMinCount returns the minimum number of pods or child groups required
+	// to satisfy the group's scheduling policy requirements.
+	GetMinCount() int
 }
 
 // Placement determines the resources to be considered when scheduling a pod group.
@@ -717,6 +732,8 @@ type Placement struct {
 	// Name uniquely identifies the placement.
 	// This is used for diagnostics and debugability.
 	// The choice of the name is up to the PlacementGeneratePlugin.
+	// Names returned by one plugin must be unique and must not contain "/",
+	// which the framework uses to join names when merging placements.
 	Name string
 	// Nodes specifies the nodes that are valid for this placement.
 	// Scheduler will try to schedule the pod group using only those nodes.
@@ -798,7 +815,7 @@ type GenericPodGroup struct {
 	PodGroup *schedulingv1beta1.PodGroup
 	// CompositePodGroup is a CompositePodGroup API object.
 	// It can be set only when CompositePodGroup feature is enabled.
-	CompositePodGroup *schedulingv1alpha3.CompositePodGroup
+	CompositePodGroup *schedulingv1beta1.CompositePodGroup
 }
 
 // NewGenericPodGroup returns a GenericPodGroup for a PodGroup.
@@ -807,7 +824,7 @@ func NewGenericPodGroup(pg *schedulingv1beta1.PodGroup) *GenericPodGroup {
 }
 
 // NewGenericCompositePodGroup returns a GenericPodGroup for a CompositePodGroup.
-func NewGenericCompositePodGroup(cpg *schedulingv1alpha3.CompositePodGroup) *GenericPodGroup {
+func NewGenericCompositePodGroup(cpg *schedulingv1beta1.CompositePodGroup) *GenericPodGroup {
 	return &GenericPodGroup{CompositePodGroup: cpg}
 }
 
@@ -817,8 +834,24 @@ func (gpg *GenericPodGroup) GetPodGroup() *schedulingv1beta1.PodGroup {
 }
 
 // GetCompositePodGroup unwraps the underlying CompositePodGroup object. Returns nil if this wraps a PodGroup.
-func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1alpha3.CompositePodGroup {
+func (gpg *GenericPodGroup) GetCompositePodGroup() *schedulingv1beta1.CompositePodGroup {
 	return gpg.CompositePodGroup
+}
+
+// GetObject returns a raw runtime.Object representing the wrapped object.
+func (gpg *GenericPodGroup) GetObject() runtime.Object {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup
+	}
+	return gpg.CompositePodGroup
+}
+
+// GetUID returns UID of the wrapped object.
+func (gpg *GenericPodGroup) GetUID() types.UID {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.UID
+	}
+	return gpg.CompositePodGroup.UID
 }
 
 // GetName returns a name of the wrapped object.
@@ -878,6 +911,33 @@ func (gpg *GenericPodGroup) GetParentKey() (EntityKey, bool) {
 	return CompositePodGroupKey(gpg.GetNamespace(), *parentName), true
 }
 
+// GetWorkloadName returns the workload name referenced by the wrapped object.
+func (gpg *GenericPodGroup) GetWorkloadName() string {
+	if gpg.PodGroup != nil {
+		if ref := gpg.PodGroup.Spec.WorkloadRef; ref != nil {
+			return ref.WorkloadName
+		}
+		return ""
+	}
+	return gpg.CompositePodGroup.Spec.WorkloadRef.WorkloadName
+}
+
+// IsGang returns true if the wrapped object has a Gang scheduling policy.
+func (gpg *GenericPodGroup) IsGang() bool {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.SchedulingPolicy.Gang != nil
+	}
+	return gpg.CompositePodGroup.Spec.SchedulingPolicy.Gang != nil
+}
+
+// IsBasic returns true if the wrapped object has a Basic scheduling policy.
+func (gpg *GenericPodGroup) IsBasic() bool {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.SchedulingPolicy.Basic != nil
+	}
+	return gpg.CompositePodGroup.Spec.SchedulingPolicy.Basic != nil
+}
+
 // GetPriority returns the priority of the wrapped object.
 func (gpg *GenericPodGroup) GetPriority() int32 {
 	if gpg.PodGroup != nil {
@@ -892,4 +952,47 @@ func (gpg *GenericPodGroup) GetCreationTimestamp() time.Time {
 		return gpg.PodGroup.CreationTimestamp.Time
 	}
 	return gpg.CompositePodGroup.CreationTimestamp.Time
+}
+
+// GetPreemptionPolicy returns the PreemptionPolicy of the inner PodGroup or CompositePodGroup,
+// or an empty string if not set.
+func (gpg *GenericPodGroup) GetPreemptionPolicy() v1.PreemptionPolicy {
+	if pg := gpg.PodGroup; pg != nil && pg.Spec.PreemptionPolicy != nil {
+		return v1.PreemptionPolicy(*pg.Spec.PreemptionPolicy)
+	}
+	if cpg := gpg.CompositePodGroup; cpg != nil && cpg.Spec.PreemptionPolicy != nil {
+		return v1.PreemptionPolicy(*cpg.Spec.PreemptionPolicy)
+	}
+	return ""
+}
+
+// HasDisruptionModeAll returns true if the wrapped object has disruption mode All.
+func (gpg *GenericPodGroup) HasDisruptionModeAll() bool {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.DisruptionMode != nil && gpg.PodGroup.Spec.DisruptionMode.All != nil
+	}
+	return gpg.CompositePodGroup.Spec.DisruptionMode != nil && gpg.CompositePodGroup.Spec.DisruptionMode.All != nil
+}
+
+// HasDisruptionModeSingle returns true if the wrapped object has disruption mode Single.
+func (gpg *GenericPodGroup) HasDisruptionModeSingle() bool {
+	if gpg.PodGroup != nil {
+		return gpg.PodGroup.Spec.DisruptionMode != nil && gpg.PodGroup.Spec.DisruptionMode.Single != nil
+	}
+	return gpg.CompositePodGroup.Spec.DisruptionMode != nil && gpg.CompositePodGroup.Spec.DisruptionMode.Single != nil
+}
+
+// GetMinCount returns the minimum number of pods or child groups required
+// to satisfy the group's scheduling policy requirements.
+func (gpg *GenericPodGroup) GetMinCount() int {
+	if cpg := gpg.CompositePodGroup; cpg != nil {
+		if cpg.Spec.SchedulingPolicy.Gang != nil {
+			return int(cpg.Spec.SchedulingPolicy.Gang.MinGroupCount)
+		}
+		return 1
+	}
+	if gpg.PodGroup.Spec.SchedulingPolicy.Gang != nil {
+		return int(gpg.PodGroup.Spec.SchedulingPolicy.Gang.MinCount)
+	}
+	return 1
 }

@@ -38,8 +38,8 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -56,14 +56,14 @@ func TestPodGroupScheduling(t *testing.T) {
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(3).Obj()).
 		Obj()
 
-	gangPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("t1", "workload").
+	gangPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("workload", "t1").
 		Priority(100).MinCount(3).Obj()
 
-	otherGangPodGroup := st.MakePodGroup().Name("pg2").WorkloadRef("t", "other-workload").
+	otherGangPodGroup := st.MakePodGroup().Name("pg2").WorkloadRef("other-workload", "t").
 		Priority(100).MinCount(3).Obj()
 
-	basicPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("t2", "workload").Priority(100).BasicPolicy().Obj()
-	podGroupWithMinCount5 := st.MakePodGroup().Name("pg-mutable").WorkloadRef("t-mutable", "workload").Priority(100).MinCount(5).Obj()
+	basicPodGroup := st.MakePodGroup().Name("pg1").WorkloadRef("workload", "t2").Priority(100).BasicPolicy().Obj()
+	podGroupWithMinCount5 := st.MakePodGroup().Name("pg-mutable").WorkloadRef("workload", "t-mutable").Priority(100).MinCount(5).Obj()
 
 	mutP1 := st.MakePod().Name("mut-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
 	mutP2 := st.MakePod().Name("mut-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg-mutable").Priority(100).Obj()
@@ -105,9 +105,9 @@ func TestPodGroupScheduling(t *testing.T) {
 	midP2 := st.MakePod().Name("mid-p2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("mid-pg").Priority(50).Obj()
 
-	midPodGroup := st.MakePodGroup().Name("mid-pg").WorkloadRef("t-mid", "workload").
+	midPodGroup := st.MakePodGroup().Name("mid-pg").WorkloadRef("workload", "t-mid").
 		Priority(50).MinCount(2).Obj()
-	midPodGroupWithConstraint := st.MakePodGroup().Name("mid-pg").WorkloadRef("t-mid", "workload").
+	midPodGroupWithConstraint := st.MakePodGroup().Name("mid-pg").WorkloadRef("workload", "t-mid").
 		Priority(50).MinCount(2).TopologyKey("topology.kubernetes.io/zone").Obj()
 
 	otherP1 := st.MakePod().Name("other-p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
@@ -139,10 +139,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Scheduled",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 			},
@@ -226,10 +224,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionFalse,
-						Reason:          schedulingapi.PodGroupReasonUnschedulable,
+					WaitForGroupsUnschedulable: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 				{
@@ -242,10 +238,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition transitions to Scheduled",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 			},
@@ -479,10 +473,8 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Scheduled after preemption completes",
-					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
-						PodGroupName:    "pg1",
-						ConditionStatus: metav1.ConditionTrue,
-						Reason:          "Scheduled",
+					WaitForGroupsScheduled: &stepsframework.Groups{
+						PodGroups: []string{"pg1"},
 					},
 				},
 				{
@@ -661,7 +653,7 @@ func TestPodGroupScheduling(t *testing.T) {
 						features.CompositePodGroup:               cpgEnabled,
 					})
 
-					testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
+					testCtx := schedulerutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
 						// disable backoff
 						scheduler.WithPodMaxBackoffSeconds(0),
 						scheduler.WithPodInitialBackoffSeconds(0))
@@ -700,7 +692,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 			node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 			workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
-			pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("t1", "workload").
+			pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("workload", "t1").
 				DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 			// Low priority pods taking up all resources
@@ -718,7 +710,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 				st.MakePod().Namespace("default").Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
 			}
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "wap-inv",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "wap-inv",
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0))
 			cs, ns := testCtx.ClientSet, testCtx.NS.Name
@@ -739,7 +731,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 			// Wait for low priority pods to be scheduled
 			for _, p := range lowPods {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
@@ -824,7 +816,7 @@ func TestPostFilterNotCalled(t *testing.T) {
 			node := st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
 
 			workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
-			pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("t1", "workload").
+			pg := st.MakePodGroup().Namespace("default").Name("pg1").WorkloadRef("workload", "t1").
 				DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 			// Low priority pods taking up all resources
@@ -863,7 +855,7 @@ func TestPostFilterNotCalled(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "post-filter-count",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "post-filter-count",
 				// Set high backoff times so that the scheduler does not retry scheduling before checking the count.
 				scheduler.WithPodMaxBackoffSeconds(100),
 				scheduler.WithPodInitialBackoffSeconds(100),
@@ -888,7 +880,7 @@ func TestPostFilterNotCalled(t *testing.T) {
 			// Wait for low priority pods to be scheduled
 			for _, p := range lowPods {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
@@ -915,7 +907,7 @@ func TestPostFilterNotCalled(t *testing.T) {
 			// 5. Wait for high priority pod to be marked as unschedulable
 			for _, p := range highPods {
 				err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-					testutils.PodUnschedulable(cs, ns, p.Name))
+					schedulerutils.PodUnschedulable(cs, ns, p.Name))
 				if err != nil {
 					t.Fatalf("failed to wait for pod %s to be unschedulable: %v", p.Name, err)
 				}
@@ -1004,7 +996,7 @@ func TestPodGroupPostFilterIteration(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "pg-post-filter-iter",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pg-post-filter-iter",
 				scheduler.WithPodMaxBackoffSeconds(100),
 				scheduler.WithPodInitialBackoffSeconds(100),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),

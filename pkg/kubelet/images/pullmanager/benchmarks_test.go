@@ -24,8 +24,8 @@ import (
 
 	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/ktesting"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type namedAccessor struct {

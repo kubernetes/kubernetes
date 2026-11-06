@@ -115,7 +115,7 @@ func NewVolumeAttributesClassInformerWithOptions(client kubernetes.Interface, op
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewTypedVolumeAttributesClassInformerWithOptions(client kubernetes.Interface, options internalinterfaces.InformerOptions) VolumeAttributesClassIndexInformer {
-	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1", Resource: "volumeattributesclasss"}
+	gvr := schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1", Resource: "volumeattributesclasses"}
 	identifier := options.InformerName.WithResource(gvr)
 	tweakListOptions := options.TweakListOptions
 	return cache.NewTypedSharedIndexInformer[*apistoragev1.VolumeAttributesClass](cache.NewSharedIndexInformerWithOptions(

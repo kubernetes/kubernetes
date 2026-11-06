@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,6 +32,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +44,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
+	"k8s.io/ktesting"
+	"k8s.io/ktesting/initoption"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -57,10 +60,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 const (
@@ -372,6 +374,63 @@ func cleanup(logger klog.Logger, m Manager, p *plugin.Stub) error {
 		return err
 	}
 	return m.Stop(logger)
+}
+
+func TestGetCapacityDevicePluginDevicesMetric(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
+	})
+	testManager, err := newManagerImpl(logger, socketName, nil, topologymanager.NewFakeManager(logger))
+	require.NoError(t, err)
+	require.NotNil(t, testManager)
+
+	metrics.Register()
+	metrics.DevicePluginDevices.Reset()
+	t.Cleanup(metrics.DevicePluginDevices.Reset)
+
+	const metricName = metrics.KubeletSubsystem + "_" + metrics.DevicePluginDevicesKey
+	const header = `# HELP kubelet_device_plugin_devices [ALPHA] Number of devices currently known to the device manager. Broken down by resource name and health state.
+# TYPE kubelet_device_plugin_devices gauge
+`
+
+	resourceName := "domain1.com/resource1"
+	e := &endpointImpl{}
+	testManager.endpoints[resourceName] = endpointInfo{e: e, opts: nil}
+
+	// Two healthy devices and one unhealthy one are reported as two series.
+	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
+		{ID: "Device1", Health: pluginapi.Healthy},
+		{ID: "Device2", Health: pluginapi.Healthy},
+		{ID: "Device3", Health: pluginapi.Unhealthy},
+	})
+	testManager.GetCapacity(logger)
+	require.NoError(t, testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(header+
+		`kubelet_device_plugin_devices{health_state="healthy",resource_name="domain1.com/resource1"} 2
+kubelet_device_plugin_devices{health_state="unhealthy",resource_name="domain1.com/resource1"} 1
+`), metricName))
+
+	// A healthy device turning unhealthy moves between the two series without
+	// changing the node's capacity, which is what makes this metric worth having.
+	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
+		{ID: "Device1", Health: pluginapi.Healthy},
+		{ID: "Device2", Health: pluginapi.Unhealthy},
+		{ID: "Device3", Health: pluginapi.Unhealthy},
+	})
+	testManager.GetCapacity(logger)
+	require.NoError(t, testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(header+
+		`kubelet_device_plugin_devices{health_state="healthy",resource_name="domain1.com/resource1"} 1
+kubelet_device_plugin_devices{health_state="unhealthy",resource_name="domain1.com/resource1"} 2
+`), metricName))
+
+	// Once the endpoint's grace period expires the resource is garbage collected,
+	// and its series must go with it rather than reporting the last counts forever.
+	e.setStopTime(time.Now().Add(-1*endpointStopGracePeriod - 10*time.Second))
+	_, _, removed := testManager.GetCapacity(logger)
+	require.Equal(t, []string{resourceName}, removed)
+	require.NoError(t, testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(""), metricName))
 }
 
 func TestUpdateCapacityAllocatable(t *testing.T) {
@@ -1311,6 +1370,205 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 	assert.Equal(t, sets.New[string](deviceID), set)
 }
 
+func TestDevicesToAllocateRollsBackPartialReservation(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	const (
+		podUID            = "pod"
+		containerName     = "container"
+		initContainerName = "init-container"
+		resourceName      = "domain1.com/resource"
+		deviceID          = "dev0"
+	)
+
+	testManager := &ManagerImpl{
+		healthyDevices:        map[string]sets.Set[string]{resourceName: sets.New[string](deviceID)},
+		allocatedDevices:      map[string]sets.Set[string]{resourceName: sets.New[string](deviceID)},
+		podDevices:            newPodDevices(),
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+	}
+	testManager.podDevices.insert(podUID, initContainerName, resourceName, constructDevices([]string{deviceID}), newContainerAllocateResponse())
+
+	_, err := testManager.devicesToAllocate(tCtx, podUID, containerName, resourceName, 2, sets.New[string](deviceID))
+	require.ErrorContains(t, err, "requested number of devices unavailable")
+	assert.Equal(t, sets.New[string](deviceID), testManager.allocatedDevices[resourceName], "the committed reusable device must remain allocated")
+	assert.NotContains(t, testManager.podDevices.devs[podUID], containerName, "the partial reservation must be removed")
+}
+
+func TestDevicesToAllocateRevalidatesPreferredDevices(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+	const (
+		resourceName = "domain1.com/resource"
+		device0      = "dev0"
+		device1      = "dev1"
+	)
+
+	firstPreferredAllocationEntered := make(chan struct{})
+	releaseFirstPreferredAllocation := make(chan struct{})
+	var preferredAllocationCalls atomic.Int32
+	endpoint := &MockEndpoint{
+		getPreferredAllocationFunc: func(_, _ []string, _ int) (*pluginapi.PreferredAllocationResponse, error) {
+			if preferredAllocationCalls.Add(1) == 1 {
+				close(firstPreferredAllocationEntered)
+				<-releaseFirstPreferredAllocation
+			}
+			return &pluginapi.PreferredAllocationResponse{
+				ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{{DeviceIDs: []string{device0}}},
+			}, nil
+		},
+	}
+	testManager := &ManagerImpl{
+		endpoints: map[string]endpointInfo{
+			resourceName: {
+				e:    endpoint,
+				opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
+			},
+		},
+		healthyDevices:        map[string]sets.Set[string]{resourceName: sets.New[string](device0, device1)},
+		allocatedDevices:      map[string]sets.Set[string]{resourceName: sets.New[string]()},
+		podDevices:            newPodDevices(),
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+		allDevices:            NewResourceDeviceInstances(),
+	}
+
+	type allocationResult struct {
+		devices sets.Set[string]
+		err     error
+	}
+	firstResult := make(chan allocationResult, 1)
+	go func() {
+		devices, err := testManager.devicesToAllocate(tCtx, "pod1", "container", resourceName, 1, nil)
+		firstResult <- allocationResult{devices: devices, err: err}
+	}()
+
+	select {
+	case <-firstPreferredAllocationEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the first GetPreferredAllocation call")
+	}
+
+	secondDevices, err := testManager.devicesToAllocate(tCtx, "pod2", "container", resourceName, 1, nil)
+	require.NoError(t, err)
+	close(releaseFirstPreferredAllocation)
+	result := <-firstResult
+	require.NoError(t, result.err)
+	assert.Equal(t, sets.New[string](device0), secondDevices)
+	assert.Equal(t, sets.New[string](device1), result.devices)
+	assert.Empty(t, secondDevices.Intersection(result.devices), "concurrent allocations must not reserve the same preferred device")
+}
+
+func TestReservationLossWindowDoesNotDuplicateDeviceAcrossPods(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	// With one allocatable device, once pod1 has reserved it, pod2 must fail
+	// allocation until pod1 either commits or releases it.
+	//
+	// This test orchestrates the reservation-loss window:
+	// 1) pod1 reserves a device in allocatedDevices;
+	// 2) pod1 blocks in plugin Allocate (outside m.mutex);
+	// 3) an external caller invokes UpdateAllocatedDevices while pod1 is in-flight;
+	// 4) pod2 attempts allocation.
+	//
+	// Correct behavior: pod2 allocation fails (no available devices) and pod2
+	// gets no device assignment.
+
+	resourceName := "domain1.com/resource"
+	deviceID := "dev0"
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Errorf("failed to remove temp dir %q: %v", tmpDir, err)
+		}
+	})
+	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	require.NoError(t, err)
+
+	var allocateCalls atomic.Int32
+	firstAllocateEntered := make(chan struct{}, 1)
+	releaseFirstAllocate := make(chan struct{})
+
+	endpoint := &MockEndpoint{
+		allocateFunc: func(devs []string) (*pluginapi.AllocateResponse, error) {
+			if allocateCalls.Add(1) == 1 {
+				firstAllocateEntered <- struct{}{}
+				<-releaseFirstAllocate
+			}
+			return &pluginapi.AllocateResponse{
+				ContainerResponses: []*pluginapi.ContainerAllocateResponse{
+					{},
+				},
+			}, nil
+		},
+	}
+
+	testManager := &ManagerImpl{
+		endpoints:             make(map[string]endpointInfo),
+		healthyDevices:        make(map[string]sets.Set[string]),
+		unhealthyDevices:      make(map[string]sets.Set[string]),
+		allocatedDevices:      make(map[string]sets.Set[string]),
+		podDevices:            newPodDevices(),
+		activePods:            func() []*v1.Pod { return []*v1.Pod{} },
+		sourcesReady:          &sourcesReadyStub{},
+		topologyAffinityStore: topologymanager.NewFakeManager(logger),
+		allDevices:            NewResourceDeviceInstances(),
+		devicesToReuse:        make(PodReusableDevices),
+		checkpointManager:     ckm,
+	}
+	testManager.endpoints[resourceName] = endpointInfo{e: endpoint}
+	testManager.healthyDevices[resourceName] = sets.New[string](deviceID)
+	testManager.allocatedDevices[resourceName] = sets.New[string]()
+	testManager.allDevices[resourceName] = map[string]*pluginapi.Device{
+		deviceID: {ID: deviceID},
+	}
+
+	pod1 := makePod(v1.ResourceList{
+		v1.ResourceName(resourceName): *resource.NewQuantity(1, resource.DecimalSI),
+	})
+	pod1.Spec.Containers[0].Name = "pod1-container"
+	pod2 := makePod(v1.ResourceList{
+		v1.ResourceName(resourceName): *resource.NewQuantity(1, resource.DecimalSI),
+	})
+	pod2.Spec.Containers[0].Name = "pod2-container"
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- testManager.allocateContainerResources(tCtx, pod1, &pod1.Spec.Containers[0], map[string]sets.Set[string]{})
+	}()
+
+	select {
+	case <-firstAllocateEntered:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for pod1 Allocate to reach plugin RPC")
+	}
+
+	// Ensure this call takes the path that rewrites allocatedDevices from podDevices.
+	testManager.podDevices.insert("stale-pod", "stale-container", resourceName, nil, nil)
+	testManager.UpdateAllocatedDevices(logger)
+
+	err = testManager.allocateContainerResources(tCtx, pod2, &pod2.Spec.Containers[0], map[string]sets.Set[string]{})
+	if err == nil {
+		close(releaseFirstAllocate)
+		require.NoError(t, <-errCh)
+		pod1Devices := testManager.podDevices.containerDevices(string(pod1.UID), pod1.Spec.Containers[0].Name, resourceName)
+		pod2Devices := testManager.podDevices.containerDevices(string(pod2.UID), pod2.Spec.Containers[0].Name, resourceName)
+		t.Fatalf("pod2 unexpectedly allocated devices; pod1=%v pod2=%v", sets.List(pod1Devices), sets.List(pod2Devices))
+	}
+	assert.Contains(t, err.Error(), "requested number of devices unavailable")
+
+	close(releaseFirstAllocate)
+	require.NoError(t, <-errCh)
+
+	pod1Devices := testManager.podDevices.containerDevices(string(pod1.UID), pod1.Spec.Containers[0].Name, resourceName)
+	pod2Devices := testManager.podDevices.containerDevices(string(pod2.UID), pod2.Spec.Containers[0].Name, resourceName)
+	assert.Equal(t, sets.New[string](deviceID), pod1Devices)
+	if pod2Devices != nil {
+		assert.Equal(t, 0, pod2Devices.Len())
+	}
+}
+
 func TestGetDeviceRunContainerOptions(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	res1 := TestResource{
@@ -1641,7 +1899,10 @@ func TestUpdatePluginResources(t *testing.T) {
 		ManagerImpl: m,
 		callback:    monitorCallback,
 	}
-	testManager.podDevices.devs[string(pod.UID)] = make(containerDevices)
+	testManager.podDevices.insert(
+		string(pod.UID), "container", resourceName1,
+		constructDevices([]string{devID1}), newContainerAllocateResponse(),
+	)
 
 	// require one of resource1 and one of resource2
 	testManager.allocatedDevices[resourceName1] = sets.New[string]()
@@ -1944,7 +2205,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	podUID := "test-pod-uid"
 	containerName := "test-container"
-	resourceName := "test-resource"
+	resourceNames := []string{"test-resource-a", "test-resource-b"}
 
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	if err != nil {
@@ -1972,75 +2233,71 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 		checkpointManager: ckm,
 	}
 
-	testManager.podDevices.insert(podUID, containerName, resourceName,
-		constructDevices([]string{"dev1", "dev2"}),
-		newContainerAllocateResponse(
-			withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
-			withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
-		),
-	)
+	for _, resourceName := range resourceNames {
+		testManager.podDevices.insert(podUID, containerName, resourceName,
+			constructDevices([]string{"dev1", "dev2"}),
+			newContainerAllocateResponse(
+				withDevices(map[string]string{"/dev/r1dev1": "/dev/r1dev1", "/dev/r1dev2": "/dev/r1dev2"}),
+				withMounts(map[string]string{"/home/r1lib1": "/usr/r1lib1"}),
+			),
+		)
 
-	testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
-		{ID: "dev1", Health: pluginapi.Healthy},
-		{ID: "dev2", Health: pluginapi.Unhealthy},
-	})
+		testManager.genericDeviceUpdateCallback(logger, resourceName, []*pluginapi.Device{
+			{ID: "dev1", Health: pluginapi.Healthy},
+			{ID: "dev2", Health: pluginapi.Unhealthy},
+		})
+	}
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: types.UID(podUID),
 		},
 	}
-	status := &v1.PodStatus{
-		ContainerStatuses: []v1.ContainerStatus{
-			{
-				Name: containerName,
+	expectedContainerStatuses := []v1.ContainerStatus{
+		{
+			Name: containerName,
+			AllocatedResourcesStatus: []v1.ResourceStatus{
+				{
+					Name: v1.ResourceName(resourceNames[0]),
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev1", Health: pluginapi.Healthy},
+						{ResourceID: "dev2", Health: pluginapi.Unhealthy},
+					},
+				},
+				{
+					Name: v1.ResourceName(resourceNames[1]),
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev1", Health: pluginapi.Healthy},
+						{ResourceID: "dev2", Health: pluginapi.Unhealthy},
+					},
+				},
+				{
+					Name: "test-resource-c",
+					Resources: []v1.ResourceHealth{
+						{ResourceID: "dev1", Health: pluginapi.Healthy},
+						{ResourceID: "dev2", Health: pluginapi.Unhealthy},
+					},
+				},
 			},
 		},
+	}
+
+	status := &v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{{
+			Name: containerName,
+			AllocatedResourcesStatus: []v1.ResourceStatus{{
+				Name: "test-resource-c",
+				Resources: []v1.ResourceHealth{
+					{ResourceID: "dev2", Health: pluginapi.Unhealthy},
+					{ResourceID: "dev1", Health: pluginapi.Healthy},
+				},
+			}},
+		}},
 	}
 	testManager.UpdateAllocatedResourcesStatus(logger, pod, status)
 
-	expectedStatus := v1.ResourceStatus{
-		Name: v1.ResourceName(resourceName),
-		Resources: []v1.ResourceHealth{
-			{
-				ResourceID: "dev1",
-				Health:     pluginapi.Healthy,
-			},
-			{
-				ResourceID: "dev2",
-				Health:     pluginapi.Unhealthy,
-			},
-		},
-	}
-	expectedContainerStatuses := []v1.ContainerStatus{
-		{
-			Name:                     containerName,
-			AllocatedResourcesStatus: []v1.ResourceStatus{expectedStatus},
-		},
-	}
-
-	// Sort the resources for the expected status and actual status
-	sortContainerStatuses(status.ContainerStatuses)
-	sortContainerStatuses(expectedContainerStatuses)
-
 	if !reflect.DeepEqual(status.ContainerStatuses, expectedContainerStatuses) {
-		t.Errorf("UpdateAllocatedResourcesStatus failed, expected: %v, got: %v", expectedContainerStatuses, status.ContainerStatuses)
-	}
-}
-
-// Helper function to sort ResourceHealth slices
-func sortResourceHealth(resources []v1.ResourceHealth) {
-	sort.SliceStable(resources, func(i, j int) bool {
-		return resources[i].ResourceID < resources[j].ResourceID
-	})
-}
-
-// Helper function to sort ContainerStatus slices
-func sortContainerStatuses(statuses []v1.ContainerStatus) {
-	for i := range statuses {
-		for j := range statuses[i].AllocatedResourcesStatus {
-			sortResourceHealth(statuses[i].AllocatedResourcesStatus[j].Resources)
-		}
+		t.Fatalf("UpdateAllocatedResourcesStatus failed, expected: %v, got: %v", expectedContainerStatuses, status.ContainerStatuses)
 	}
 }
 
@@ -2255,6 +2512,132 @@ func TestAdmitPodWithDRAResources(t *testing.T) {
 			}
 
 			err := testManager.Allocate(tCtx, pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
+			test.checkError(t, err)
+		})
+	}
+}
+
+func TestIsDRAExtendedResource(t *testing.T) {
+	containerName := "container1"
+	resourceName := "domain1.com/resource1"
+	podWithMapping := &v1.Pod{
+		Status: v1.PodStatus{
+			ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+				RequestMappings: []v1.ContainerExtendedResourceRequest{
+					{
+						ContainerName: containerName,
+						ResourceName:  resourceName,
+					},
+				},
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		pod           *v1.Pod
+		containerName string
+		resourceName  string
+		expected      bool
+	}{
+		"resource mapped to the container": {
+			pod:           podWithMapping,
+			containerName: containerName,
+			resourceName:  resourceName,
+			expected:      true,
+		},
+		"resource mapped to a different container": {
+			pod:           podWithMapping,
+			containerName: "container2",
+			resourceName:  resourceName,
+			expected:      false,
+		},
+		"resource not mapped": {
+			pod:           podWithMapping,
+			containerName: containerName,
+			resourceName:  "domain1.com/resource2",
+			expected:      false,
+		},
+		"pod without extended resource claim status": {
+			pod:           &v1.Pod{},
+			containerName: containerName,
+			resourceName:  resourceName,
+			expected:      false,
+		},
+	}
+
+	for description, test := range testCases {
+		t.Run(description, func(t *testing.T) {
+			require.Equal(t, test.expected, isDRAExtendedResource(test.pod, test.containerName, test.resourceName))
+		})
+	}
+}
+
+// TestGetDeviceRunContainerOptionsWithDRAResourceAndStaleDevicePluginState verifies
+// that a DRA-backed extended resource is not mistaken for a device plugin resource
+// when the device manager still holds allocated devices under the same name.
+func TestGetDeviceRunContainerOptionsWithDRAResourceAndStaleDevicePluginState(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testCases := map[string]struct {
+		enableFeatureGate bool
+		checkError        func(t require.TestingT, err error, msgAndArgs ...interface{})
+	}{
+		"DRAExtendedResource enabled": {
+			enableFeatureGate: true,
+			checkError:        require.NoError,
+		},
+		"DRAExtendedResource disabled": {
+			enableFeatureGate: false,
+			checkError:        require.Error,
+		},
+	}
+
+	containerName := "container1"
+	resourceName := "domain1.com/resource1"
+
+	for description, test := range testCases {
+		t.Run(description, func(t *testing.T) {
+			if !test.enableFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.enableFeatureGate)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: uuid.NewUUID(),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: containerName,
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(resourceName): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+						RequestMappings: []v1.ContainerExtendedResourceRequest{
+							{
+								ContainerName: containerName,
+								ResourceName:  resourceName,
+							},
+						},
+					},
+				},
+			}
+
+			testManager := &ManagerImpl{
+				endpoints:  make(map[string]endpointInfo),
+				podDevices: newPodDevices(),
+				allocatedDevices: map[string]sets.Set[string]{
+					resourceName: sets.New("Dev"),
+				},
+			}
+
+			_, err := testManager.GetDeviceRunContainerOptions(tCtx, pod, &pod.Spec.Containers[0])
 			test.checkError(t, err)
 		})
 	}
@@ -2478,4 +2861,499 @@ func TestLifecycleAllocatePod(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- Socket-level endpoint lifecycle tests ---
+//
+// The tests below exercise PluginConnected / PluginDisconnected at the
+// socket-path level, bypassing real gRPC connections. They use
+// fakeDevicePluginAPI (a minimal pluginapi.DevicePluginClient) and operate
+// directly on the manager's endpointStore to verify connect/disconnect
+// semantics, race conditions, and endpoint identity.
+
+// fakeDevicePluginAPI satisfies pluginapi.DevicePluginClient enough for
+// ManagerImpl.PluginConnected to capture device-plugin options without a
+// real gRPC connection. PluginConnected only calls GetDevicePluginOptions
+// before storing the endpoint; the other methods are not exercised by the
+// manager's connect/disconnect paths and so are left to the embedded nil
+// interface to panic if a future change starts calling them — that panic
+// is intentional, a signal that the test needs updating.
+type fakeDevicePluginAPI struct {
+	pluginapi.DevicePluginClient
+	opts           *pluginapi.DevicePluginOptions
+	allocateCalled int
+}
+
+func (f *fakeDevicePluginAPI) GetDevicePluginOptions(_ context.Context, _ *pluginapi.Empty, _ ...grpc.CallOption) (*pluginapi.DevicePluginOptions, error) {
+	return f.opts, nil
+}
+
+func (f *fakeDevicePluginAPI) Allocate(_ context.Context, _ *pluginapi.AllocateRequest, _ ...grpc.CallOption) (*pluginapi.AllocateResponse, error) {
+	f.allocateCalled++
+	return &pluginapi.AllocateResponse{
+		ContainerResponses: []*pluginapi.ContainerAllocateResponse{{}},
+	}, nil
+}
+
+// fakeDevicePlugin is a minimal plugin.DevicePlugin that the manager treats
+// as a device-plugin handle. Each test owns its own fakes so identity
+// comparisons (api pointer equality) are meaningful.
+type fakeDevicePlugin struct {
+	api      pluginapi.DevicePluginClient
+	resource string
+	socket   string
+}
+
+func (f *fakeDevicePlugin) API() pluginapi.DevicePluginClient { return f.api }
+func (f *fakeDevicePlugin) Resource() string                  { return f.resource }
+func (f *fakeDevicePlugin) SocketPath() string                { return f.socket }
+
+func newFakeDevicePlugin(resource, socket string) *fakeDevicePlugin {
+	return &fakeDevicePlugin{
+		api:      &fakeDevicePluginAPI{opts: &pluginapi.DevicePluginOptions{}},
+		resource: resource,
+		socket:   socket,
+	}
+}
+
+// newSameSocketTestManager builds a ManagerImpl in the same way the existing
+// TestEndpointSyncOnDisconnect does (real mutex / endpointStore behavior),
+// but parameterised so each same-socket test gets a fresh scratch directory.
+func newSameSocketTestManager(t *testing.T) (*ManagerImpl, func()) {
+	t.Helper()
+	logger, _ := ktesting.NewTestContext(t)
+	socketDir, socketName, _, err := tmpSocketDir()
+	require.NoError(t, err)
+	manager, err := newManagerImpl(logger, socketName, nil, nil)
+	require.NoError(t, err)
+	cleanup := func() {
+		if err := os.RemoveAll(socketDir); err != nil {
+			logger.Error(err, "unable to remove socket directory", "dir", socketDir)
+		}
+	}
+	return manager, cleanup
+}
+
+// makeEndpointAt is the hand-rolled endpointImpl helper that the plan calls
+// for — mirrors the construction inside TestEndpointSyncOnDisconnect so the
+// PluginDisconnected path operates on a real endpointImpl whose socketPath()
+// returns the expected value.
+func makeEndpointAt(resourceName, socketPath string) *endpointImpl {
+	return &endpointImpl{
+		resourceName: resourceName,
+		socket:       socketPath,
+	}
+}
+
+// installEndpoint atomically populates both the primary endpoints map and
+// the per-endpoint store for one (resource, socket) pair, matching what
+// PluginConnected would do without exercising the connect path.
+func installEndpoint(m *ManagerImpl, resourceName string, ep *endpointImpl) {
+	info := endpointInfo{e: ep, opts: &pluginapi.DevicePluginOptions{}}
+	m.endpoints[resourceName] = info
+	if m.endpointStore[resourceName] == nil {
+		m.endpointStore[resourceName] = map[string]*endpointInfo{}
+	}
+	m.endpointStore[resourceName][ep.socketPath()] = &endpointInfo{e: ep, opts: info.opts}
+}
+
+// TestPluginConnected_SameResourceSameSocketRejected verifies that a second
+// PluginConnected for the same (resource, socket) is rejected without mutating
+// the existing endpoint state.
+func TestPluginConnectedSameResourceSameSocketRejected(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1),
+		"first PluginConnected for (resource, socketA) must succeed")
+
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "second PluginConnected at the same socket must be rejected")
+	require.Contains(t, err.Error(), "device plugin already connected",
+		"rejection error must use the documented prefix from manager.go")
+	require.Contains(t, err.Error(), socketA,
+		"rejection error must include the offending socket path")
+
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"endpointStore must still contain exactly one entry after rejection")
+	stored, ok := manager.endpointStore[resourceName][socketA]
+	require.True(t, ok, "stored entry must be at socketA")
+	storedImpl, ok := stored.e.(*endpointImpl)
+	require.True(t, ok, "stored endpoint must be *endpointImpl")
+	require.Same(t, p1.api, storedImpl.api,
+		"first endpoint's api pointer must survive the rejected second register")
+	primaryImpl, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Same(t, p1.api, primaryImpl.api,
+		"primary m.endpoints slot must also still reference the first endpoint")
+}
+
+// TestPluginConnected_SameResourceDifferentSocketsCoexist verifies that two
+// endpoints for the same resource at different socket paths can coexist.
+func TestPluginConnectedSameResourceDifferentSocketsCoexist(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	const socketB = "/var/lib/kubelet/plugins/socketB.sock"
+	pA := newFakeDevicePlugin(resourceName, socketA)
+	pB := newFakeDevicePlugin(resourceName, socketB)
+
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, pA))
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, pB),
+		"two endpoints at different socket paths for the same resource must coexist")
+
+	require.Len(t, manager.endpointStore[resourceName], 2,
+		"endpointStore must record both endpoints")
+	require.Contains(t, manager.endpointStore[resourceName], socketA)
+	require.Contains(t, manager.endpointStore[resourceName], socketB)
+
+	// The manager does not promise which sibling is the primary when more
+	// than one is registered — Go map iteration order is unspecified
+	// (manager.go's promote-survivor branch in PluginDisconnected), and
+	// PluginConnected's last-write-wins is an implementation detail that
+	// callers must not depend on. Assert only that the primary is one of
+	// the two registered plugins.
+	primaryImpl, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.True(t, primaryImpl.api == pA.api || primaryImpl.api == pB.api,
+		"primary endpoint must be one of the two registered plugins")
+}
+
+// TestPluginDisconnected_WrongSocketIsNoop verifies that PluginDisconnected
+// for a non-matching or unknown socket path does not mutate any state.
+func TestPluginDisconnectedWrongSocketIsNoop(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	const socketB = "/var/lib/kubelet/plugins/socketB.sock"
+	ep := makeEndpointAt(resourceName, socketA)
+	installEndpoint(manager, resourceName, ep)
+	manager.healthyDevices[resourceName] = sets.New("dev1", "dev2")
+
+	manager.PluginDisconnected(logger, resourceName, socketB)
+
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"PluginDisconnected for a non-matching socket must not remove the existing entry")
+	require.Contains(t, manager.endpointStore[resourceName], socketA,
+		"existing socketA entry must survive")
+	require.True(t, manager.endpoints[resourceName].e.(*endpointImpl).stopTime.IsZero(),
+		"a no-op disconnect must not call setStopTime on the surviving endpoint")
+	require.Equal(t, 2, manager.healthyDevices[resourceName].Len(),
+		"healthy devices must remain healthy when no endpoint actually disconnected")
+
+	// Also exercise the resourceName-unknown branch.
+	manager.PluginDisconnected(logger, "unknown.com/resource", socketA)
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"PluginDisconnected for an unknown resource must not touch unrelated state")
+}
+
+// TestPluginDisconnected_PromotesSurvivor verifies that when one of multiple
+// endpoints for a resource disconnects, an arbitrary survivor is promoted to
+// the primary slot and healthy devices remain healthy. Three endpoints are
+// registered so the promote loop genuinely chooses among more than one
+// candidate; epA and epC are then disconnected, leaving epB as the sole
+// deterministic survivor that must end up in m.endpoints.
+func TestPluginDisconnectedPromotesSurvivor(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	const socketB = "/var/lib/kubelet/plugins/socketB.sock"
+	const socketC = "/var/lib/kubelet/plugins/socketC.sock"
+	epA := makeEndpointAt(resourceName, socketA)
+	epB := makeEndpointAt(resourceName, socketB)
+	epC := makeEndpointAt(resourceName, socketC)
+	installEndpoint(manager, resourceName, epA)
+	installEndpoint(manager, resourceName, epB)
+	installEndpoint(manager, resourceName, epC)
+	// installEndpoint sets the primary to whichever was inserted last; pin
+	// the primary to epA so the test specifically removes the primary and
+	// observes a survivor being promoted into m.endpoints.
+	manager.endpoints[resourceName] = endpointInfo{e: epA, opts: &pluginapi.DevicePluginOptions{}}
+	manager.healthyDevices[resourceName] = sets.New("dev1")
+
+	// Disconnect the primary epA. With epB and epC still registered the
+	// promoted survivor is arbitrary (map iteration order is unspecified),
+	// so only assert it is one of the two remaining siblings.
+	manager.PluginDisconnected(logger, resourceName, socketA)
+
+	require.Len(t, manager.endpointStore[resourceName], 2,
+		"only the disconnected endpoint must be removed from endpointStore")
+	require.NotContains(t, manager.endpointStore[resourceName], socketA,
+		"socketA must be gone")
+	require.Contains(t, manager.endpointStore[resourceName], socketB,
+		"the surviving sibling at socketB must remain in endpointStore")
+	require.Contains(t, manager.endpointStore[resourceName], socketC,
+		"the surviving sibling at socketC must remain in endpointStore")
+	primaryAfterFirst, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Contains(t, []string{socketB, socketC}, primaryAfterFirst.socketPath(),
+		"the promoted primary must be one of the two remaining siblings")
+	require.False(t, epA.stopTime.IsZero(),
+		"the removed endpoint must have setStopTime called")
+
+	// Now disconnect epC as well, leaving epB as the only remaining endpoint.
+	// The promote loop has a single candidate, so epB is deterministically
+	// the survivor chosen for m.endpoints.
+	manager.PluginDisconnected(logger, resourceName, socketC)
+
+	require.Len(t, manager.endpointStore[resourceName], 1,
+		"epB must be the only endpoint left in endpointStore")
+	require.Contains(t, manager.endpointStore[resourceName], socketB,
+		"epB at socketB must remain in endpointStore")
+	primary, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Equal(t, socketB, primary.socketPath(),
+		"epB must be the survivor promoted into m.endpoints")
+	require.Equal(t, 1, manager.healthyDevices[resourceName].Len(),
+		"healthy devices must stay healthy when this was NOT the last endpoint")
+	require.False(t, epC.stopTime.IsZero(),
+		"the removed endpoint must have setStopTime called")
+}
+
+// TestPluginDisconnected_LastEndpointMarksUnhealthy verifies that when the
+// last endpoint for a resource disconnects, all its devices are marked
+// unhealthy and the resource is removed from endpointStore.
+func TestPluginDisconnectedLastEndpointMarksUnhealthy(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+	ep := makeEndpointAt(resourceName, socketA)
+	installEndpoint(manager, resourceName, ep)
+	manager.healthyDevices[resourceName] = sets.New("dev1", "dev2")
+
+	manager.PluginDisconnected(logger, resourceName, socketA)
+
+	require.NotContains(t, manager.endpointStore, resourceName,
+		"the resource entry must be fully removed from endpointStore on last disconnect")
+	require.Equal(t, 0, manager.healthyDevices[resourceName].Len(),
+		"markResourceUnhealthy must zero healthyDevices on last disconnect")
+	require.Equal(t, 2, manager.unhealthyDevices[resourceName].Len(),
+		"markResourceUnhealthy must migrate the previously healthy IDs into unhealthyDevices")
+	require.False(t, ep.stopTime.IsZero(),
+		"setStopTime must have been called on the removed endpoint")
+}
+
+// TestSameSocketRace_LateDisconnectAfterReconnect verifies that a stale
+// PluginDisconnected callback for an old endpoint evicts a fresh endpoint
+// that reused the same socket path. This is current behavior, but it is not
+// the best practice to reuse socket paths. It is also a recoverable
+// state as ListAndWatch will fail and the plugin will be reconnecting.
+func TestSameSocketRaceLateDisconnectAfterReconnect(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	// Step 1: register e1 at socketA via the real connect path.
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+	manager.healthyDevices[resourceName] = sets.New("dev1")
+
+	// Step 2: disconnect e1 — this is the last endpoint so the resource
+	// transitions to unhealthy and the resource key is removed from
+	// endpointStore.
+	manager.PluginDisconnected(logger, resourceName, socketA)
+	require.NotContains(t, manager.endpointStore, resourceName,
+		"after disconnecting the only endpoint, the resource key must be gone")
+
+	// Step 3: register e2 at the same socketA — the store is empty for
+	// this socket so the connect succeeds.
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p2),
+		"reconnecting at the same socket after a clean disconnect must succeed")
+
+	// e2's connect doesn't repopulate healthyDevices on its own (that
+	// would normally come from the device plugin's ListAndWatch stream).
+	// Repopulate it so the assertion below ("devices remain healthy")
+	// has something to observe.
+	manager.healthyDevices[resourceName] = sets.New("dev1")
+
+	// Step 4: a *second*, late PluginDisconnected for socketA arrives —
+	// this is the stale callback for e1 from the kubelet plugin server.
+	// Snapshot state, fire the callback, and assert what happens.
+	primaryBefore, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Same(t, p2.api, primaryBefore.api,
+		"sanity: e2 must be the primary endpoint before the late callback")
+
+	manager.PluginDisconnected(logger, resourceName, socketA)
+
+	// this is mostly for documentation purposes. Plugin will be rediscovered if
+	// socket stays open. And it is also not the best practice to reuse socket path.
+	require.NotContains(t, manager.endpointStore, resourceName,
+		"current behavior: late disconnect callback keyed on socket path evicts the fresh endpoint (I4 regression risk)")
+	require.Equal(t, 0, manager.healthyDevices[resourceName].Len(),
+		"current behavior: late callback also drives the resource unhealthy because it counts as the last-endpoint disconnect")
+}
+
+// TestSameSocketRace_DisconnectBeforeReconnectAttempt verifies that a connect
+// attempt at an occupied socket is rejected, but succeeds after the old
+// endpoint disconnects — the expected recovery path.
+func TestSameSocketRaceDisconnectBeforeReconnectAttempt(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+
+	// Attempt to reconnect WITHOUT first disconnecting — must be rejected.
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "second connect without an intervening disconnect must be rejected")
+	require.Contains(t, err.Error(), "device plugin already connected",
+		"rejection error must match the documented prefix")
+
+	// Sanity: the rejected register must not corrupt state.
+	stored, ok := manager.endpointStore[resourceName][socketA]
+	require.True(t, ok)
+	require.Same(t, p1.api, stored.e.(*endpointImpl).api,
+		"rejected register must leave the original endpoint untouched")
+
+	// Now disconnect the original endpoint and try again — must succeed.
+	manager.PluginDisconnected(logger, resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p2),
+		"after disconnect, reconnect at the same socket must succeed")
+
+	primary, ok := manager.endpoints[resourceName].e.(*endpointImpl)
+	require.True(t, ok)
+	require.Same(t, p2.api, primary.api,
+		"the fresh p2 endpoint must be installed as the primary after a clean reconnect")
+}
+
+// TestSameSocketRace_FastTakeoverMayResultInInfiniteRetries emulates a fast
+// socket takeover: plugin1 triggers registration, but by the time its
+// Connect() dials the socket, plugin2 is already listening there. Plugin1's
+// PluginConnected succeeds first (it connected to plugin2's server). When
+// plugin2 then tries to register itself at the same (resourceName,
+// socketPath), it is rejected — the duplicate check in PluginConnected
+// prevents two endpoints from coexisting at the same socket path.
+//
+// This is not ideal behaviour: plugin2 is the rightful owner of the socket,
+// yet it cannot register. Plugin1 holds the endpointStore slot and runs
+// ListAndWatch against plugin2's gRPC server — which is alive and serving —
+// so plugin1's stream never breaks and PluginDisconnected is never called to
+// clear the slot. Plugin2's retries will be rejected indefinitely. Recovery
+// requires plugin2 to restart its gRPC server (which severs plugin1's stream,
+// triggering disconnect and clearing the slot) or external intervention
+// (e.g. kubelet restart).
+//
+// This corrupted state is otherwise silent. PluginConnected logs every
+// rejection with the incumbent's stopped flag so it is detectable from kubelet
+// logs — see TestPluginConnectedDuplicateRejectionIsDetectable.
+func TestSameSocketRaceFastTakeoverMayResultInInfiniteRetries(t *testing.T) {
+	_, tCtx := ktesting.NewTestContext(t)
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	// p1 represents plugin1 whose dial connected to plugin2's server
+	// (fast takeover — plugin2 took over the socket before plugin1 dialed).
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+
+	// p2 represents plugin2 — the rightful owner of the socket — trying to
+	// register. It is rejected because p1 already occupies that slot.
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "plugin2 is rejected even though it owns the socket")
+	require.Contains(t, err.Error(), "device plugin already connected")
+
+	// Simulate plugin2 retrying registration — it keeps failing because
+	// plugin1's entry is never cleared (its ListAndWatch stream is alive).
+	for retry := range 3 {
+		p2Retry := newFakeDevicePlugin(resourceName, socketA)
+		err = manager.PluginConnected(tCtx, resourceName, p2Retry)
+		require.Error(t, err, "retry %d: plugin2 still cannot register", retry)
+		require.Contains(t, err.Error(), "device plugin already connected")
+	}
+
+	// Plugin1's stale registration remains — this is the problematic state.
+	require.Len(t, manager.endpointStore[resourceName], 1)
+	stored := manager.endpointStore[resourceName][socketA]
+	require.Same(t, p1.api, stored.e.(*endpointImpl).api,
+		"plugin1's stale endpoint persists; plugin2 cannot take over")
+
+	// Verify that Allocate calls go to plugin1's API — which in the real
+	// scenario is plugin2's gRPC server (since plugin1's dial connected
+	// to plugin2's listener). The kubelet thinks it's talking to plugin1,
+	// but the RPC actually reaches plugin2.
+	p1API := p1.api.(*fakeDevicePluginAPI)
+	p2API := p2.api.(*fakeDevicePluginAPI)
+	ep := stored.e.(*endpointImpl)
+	resp, err := ep.allocate(tCtx, []string{"dev1"})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, 1, p1API.allocateCalled,
+		"Allocate must reach plugin1's API (which is really plugin2's server in the real race)")
+	require.Equal(t, 0, p2API.allocateCalled,
+		"plugin2's own API is never called — it was never registered")
+}
+
+// TestPluginConnectedDuplicateRejectionIsDetectable verifies that the manager
+// makes the otherwise-silent same-socket corrupted state observable: when a
+// registration is rejected because the (resourceName, socketPath) slot is
+// already occupied, PluginConnected logs the rejection along with whether the
+// incumbent endpoint is already stopped. This is the detection signal that
+// answers the review question — without it the stuck fast-takeover state
+// (plugin retrying registration forever against a live incumbent) leaves no
+// trace in kubelet logs.
+func TestPluginConnectedDuplicateRejectionIsDetectable(t *testing.T) {
+	// A buffering logger lets the test read back what the manager logged and
+	// assert the corrupted state is observable. The manager retrieves this
+	// logger via klog.FromContext(tCtx).
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+	logger := tCtx.Logger()
+	underlier, ok := logger.GetSink().(ktesting.Underlier)
+	require.True(t, ok, "expected a ktesting LogSink to capture emitted logs, got %T", logger.GetSink())
+
+	manager, cleanup := newSameSocketTestManager(t)
+	defer cleanup()
+
+	const resourceName = "domain1.com/resource1"
+	const socketA = "/var/lib/kubelet/plugins/socketA.sock"
+
+	// The incumbent is live (never disconnected) — this is the stuck-takeover
+	// shape where the rejection would otherwise be invisible.
+	p1 := newFakeDevicePlugin(resourceName, socketA)
+	require.NoError(t, manager.PluginConnected(tCtx, resourceName, p1))
+
+	p2 := newFakeDevicePlugin(resourceName, socketA)
+	err := manager.PluginConnected(tCtx, resourceName, p2)
+	require.Error(t, err, "second connect at the occupied socket must be rejected")
+
+	logs := underlier.GetBuffer().String()
+	require.Contains(t, logs, "possible same-socket race",
+		"the rejection must be logged so the corrupted state is detectable from kubelet logs")
+	require.Contains(t, logs, socketA,
+		"the detection log must name the contended socket path")
+	require.Contains(t, logs, "incumbentStopped",
+		"the detection log must report whether the incumbent endpoint is already draining")
+	require.Contains(t, logs, "incumbentStopped=false",
+		"a live incumbent (the stuck-takeover shape) must be reported as not stopped")
 }

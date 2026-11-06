@@ -656,7 +656,6 @@ message MutatingWebhook {
 }
 
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
-// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 MutatingWebhookConfiguration instead.
 message MutatingWebhookConfiguration {
   // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional
@@ -876,7 +875,7 @@ message ValidatingAdmissionPolicyBindingSpec {
   // If the referenced resource does not exist, this binding is considered invalid and will be ignored
   // Required.
   // +required
-  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:required
   optional string policyName = 1;
 
   // paramRef specifies the parameter resource used to configure the admission control policy.
@@ -935,7 +934,7 @@ message ValidatingAdmissionPolicyBindingSpec {
   // Required.
   // +listType=set
   // +required
-  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:required
   repeated string validationActions = 4;
 }
 
@@ -1051,9 +1050,9 @@ message ValidatingAdmissionPolicyStatus {
   // +optional
   // +listType=map
   // +listMapKey=type
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 3;
 }
 
@@ -1212,7 +1211,6 @@ message ValidatingWebhook {
 }
 
 // ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
-// Deprecated in v1.16, planned for removal in v1.19. Use admissionregistration.k8s.io/v1 ValidatingWebhookConfiguration instead.
 message ValidatingWebhookConfiguration {
   // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional

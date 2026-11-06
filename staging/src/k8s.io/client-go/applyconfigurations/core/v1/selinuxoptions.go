@@ -23,13 +23,13 @@ package v1
 //
 // SELinuxOptions are the labels to be applied to the container
 type SELinuxOptionsApplyConfiguration struct {
-	// User is a SELinux user label that applies to the container.
+	// user is a SELinux user label that applies to the container.
 	User *string `json:"user,omitempty"`
-	// Role is a SELinux role label that applies to the container.
+	// role is a SELinux role label that applies to the container.
 	Role *string `json:"role,omitempty"`
-	// Type is a SELinux type label that applies to the container.
+	// type is a SELinux type label that applies to the container.
 	Type *string `json:"type,omitempty"`
-	// Level is SELinux level label that applies to the container.
+	// level is SELinux level label that applies to the container.
 	Level *string `json:"level,omitempty"`
 }
 

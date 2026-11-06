@@ -803,8 +803,8 @@ func (h *histogram) Write(out *dto.Metric) error {
 
 	his := &dto.Histogram{
 		Bucket:           make([]*dto.Bucket, len(h.upperBounds)),
-		SampleCount:      proto.Uint64(count),
-		SampleSum:        proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
+		SampleCount:      new(count),
+		SampleSum:        new(math.Float64frombits(atomic.LoadUint64(&coldCounts.sumBits))),
 		CreatedTimestamp: timestamppb.New(h.lastResetTime),
 	}
 	out.Histogram = his
@@ -814,8 +814,8 @@ func (h *histogram) Write(out *dto.Metric) error {
 	for i, upperBound := range h.upperBounds {
 		cumCount += atomic.LoadUint64(&coldCounts.buckets[i])
 		his.Bucket[i] = &dto.Bucket{
-			CumulativeCount: proto.Uint64(cumCount),
-			UpperBound:      proto.Float64(upperBound),
+			CumulativeCount: new(cumCount),
+			UpperBound:      new(upperBound),
 		}
 		if e := h.exemplars[i].Load(); e != nil {
 			his.Bucket[i].Exemplar = e.(*dto.Exemplar)
@@ -824,15 +824,15 @@ func (h *histogram) Write(out *dto.Metric) error {
 	// If there is an exemplar for the +Inf bucket, we have to add that bucket explicitly.
 	if e := h.exemplars[len(h.upperBounds)].Load(); e != nil {
 		b := &dto.Bucket{
-			CumulativeCount: proto.Uint64(count),
-			UpperBound:      proto.Float64(math.Inf(1)),
+			CumulativeCount: new(count),
+			UpperBound:      new(math.Inf(1)),
 			Exemplar:        e.(*dto.Exemplar),
 		}
 		his.Bucket = append(his.Bucket, b)
 	}
 	if h.nativeHistogramSchema > math.MinInt32 {
-		his.ZeroThreshold = proto.Float64(math.Float64frombits(atomic.LoadUint64(&coldCounts.nativeHistogramZeroThresholdBits)))
-		his.Schema = proto.Int32(atomic.LoadInt32(&coldCounts.nativeHistogramSchema))
+		his.ZeroThreshold = new(math.Float64frombits(atomic.LoadUint64(&coldCounts.nativeHistogramZeroThresholdBits)))
+		his.Schema = new(atomic.LoadInt32(&coldCounts.nativeHistogramSchema))
 		zeroBucket := atomic.LoadUint64(&coldCounts.nativeHistogramZeroBucket)
 
 		defer func() {
@@ -840,7 +840,7 @@ func (h *histogram) Write(out *dto.Metric) error {
 			coldCounts.nativeHistogramBucketsNegative.Range(addAndReset(&hotCounts.nativeHistogramBucketsNegative, &hotCounts.nativeHistogramBucketsNumber))
 		}()
 
-		his.ZeroCount = proto.Uint64(zeroBucket)
+		his.ZeroCount = new(zeroBucket)
 		his.NegativeSpan, his.NegativeDelta = makeBuckets(&coldCounts.nativeHistogramBucketsNegative)
 		his.PositiveSpan, his.PositiveDelta = makeBuckets(&coldCounts.nativeHistogramBucketsPositive)
 
@@ -1331,12 +1331,12 @@ func (h *constHistogram) Write(out *dto.Metric) error {
 
 	buckets := make([]*dto.Bucket, 0, len(h.buckets))
 
-	his.SampleCount = proto.Uint64(h.count)
-	his.SampleSum = proto.Float64(h.sum)
+	his.SampleCount = new(h.count)
+	his.SampleSum = new(h.sum)
 	for upperBound, count := range h.buckets {
 		buckets = append(buckets, &dto.Bucket{
-			CumulativeCount: proto.Uint64(count),
-			UpperBound:      proto.Float64(upperBound),
+			CumulativeCount: new(count),
+			UpperBound:      new(upperBound),
 		})
 	}
 
@@ -1481,7 +1481,7 @@ func pickSchema(bucketFactor float64) int32 {
 
 func makeBuckets(buckets *sync.Map) ([]*dto.BucketSpan, []int64) {
 	var ii []int
-	buckets.Range(func(k, v any) bool {
+	buckets.Range(func(k, _ any) bool {
 		ii = append(ii, k.(int))
 		return true
 	})
@@ -1518,13 +1518,13 @@ func makeBuckets(buckets *sync.Map) ([]*dto.BucketSpan, []int64) {
 			// at the very beginning, or because we have found a gap
 			// of more than two buckets.
 			spans = append(spans, &dto.BucketSpan{
-				Offset: proto.Int32(iDelta),
+				Offset: new(iDelta),
 				Length: proto.Uint32(0),
 			})
 		} else {
 			// We have found a small gap (or no gap at all).
 			// Insert empty buckets as needed.
-			for j := int32(0); j < iDelta; j++ {
+			for range iDelta {
 				appendDelta(0)
 			}
 		}
@@ -1570,7 +1570,7 @@ func addAndReset(hotBuckets *sync.Map, bucketNumber *uint32) func(k, v any) bool
 }
 
 func deleteSyncMap(m *sync.Map) {
-	m.Range(func(k, v any) bool {
+	m.Range(func(k, _ any) bool {
 		m.Delete(k)
 		return true
 	})
@@ -1578,7 +1578,7 @@ func deleteSyncMap(m *sync.Map) {
 
 func findSmallestKey(m *sync.Map) int {
 	result := math.MaxInt32
-	m.Range(func(k, v any) bool {
+	m.Range(func(k, _ any) bool {
 		key := k.(int)
 		if key < result {
 			result = key
@@ -1956,7 +1956,7 @@ func NewConstNativeHistogram(
 			PositiveSpan:  PositiveSpan,
 			PositiveDelta: PositiveDelta,
 
-			ZeroCount: proto.Uint64(zeroBucket),
+			ZeroCount: new(zeroBucket),
 		},
 		labelPairs: MakeLabelPairs(desc, labelValues),
 	}
@@ -2044,13 +2044,13 @@ func makeBucketsFromMap(buckets map[int]int64) ([]*dto.BucketSpan, []int64) {
 			// at the very beginning, or because we have found a gap
 			// of more than two buckets.
 			spans = append(spans, &dto.BucketSpan{
-				Offset: proto.Int32(iDelta),
+				Offset: new(iDelta),
 				Length: proto.Uint32(0),
 			})
 		} else {
 			// We have found a small gap (or no gap at all).
 			// Insert empty buckets as needed.
-			for j := int32(0); j < iDelta; j++ {
+			for range iDelta {
 				appendDelta(0)
 			}
 		}

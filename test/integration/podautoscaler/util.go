@@ -21,13 +21,11 @@ import (
 	"fmt"
 	"math"
 	"sync/atomic"
-	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,9 +33,7 @@ import (
 	memory "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/ktesting"
 	"k8s.io/client-go/scale"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
@@ -61,10 +57,8 @@ const (
 )
 
 type testClients struct {
-	apiServer       *clientset.Clientset
 	metrics         *metricsclientset.Clientset
 	externalMetrics *emfake.FakeExternalMetricsClient
-	restMapper      meta.RESTMapper
 	scale           scale.ScalesGetter
 }
 
@@ -72,33 +66,29 @@ type testClients struct {
 //
 // Creates an external metrics server to connect to, and returns a pointer to the
 // metric value it's serving.
-func createClients(t *testing.T, config *restclient.Config) (testClients, *atomic.Value) {
-	apiServer := clientset.NewForConfigOrDie(config)
-	metrics := metricsclientset.NewForConfigOrDie(config)
+func createClients(tCtx ktesting.TContext) (testClients, *atomic.Value) {
+	metrics := metricsclientset.NewForConfigOrDie(tCtx.RESTConfig())
 	externalMetrics, externalMetricValue := setupFakeExternalMetrics()
 
-	discoveryClient := memory.NewMemCacheClient(apiServer.Discovery())
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	discoveryClient := memory.NewMemCacheClient(tCtx.Client().Discovery())
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(discoveryClient)
 
-	scale, err := scale.NewForConfig(config, restMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(tCtx.RESTConfig(), tCtx.RESTMapper(), dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
-		t.Fatalf("Error creating scale client: %v", err)
+		tCtx.Fatalf("Error creating scale client: %v", err)
 	}
 
 	return testClients{
-		apiServer,
 		metrics,
 		externalMetrics,
-		restMapper,
-		scale,
+		scaleClient,
 	}, externalMetricValue
 }
 
-func createTestNamespace(t *testing.T, c *clientset.Clientset) *corev1.Namespace {
-	ns := framework.CreateNamespaceOrDie(c, "podautoscaler", t)
-	t.Cleanup(func() {
-		framework.DeleteNamespaceOrDie(c, ns, t)
+func createTestNamespace(tCtx ktesting.TContext) *corev1.Namespace {
+	ns := framework.CreateNamespaceOrDie(tCtx.Client(), "podautoscaler", tCtx)
+	tCtx.Cleanup(func() {
+		framework.DeleteNamespaceOrDie(tCtx.Client(), ns, tCtx)
 	})
 	return ns
 }
@@ -164,27 +154,26 @@ func newHPA(deployment *appsv1.Deployment, metricSpec autoscalingv2.MetricSpec, 
 	return hpa
 }
 
-func createHPA(t *testing.T, cs *clientset.Clientset, deployment *appsv1.Deployment, metricSpec autoscalingv2.MetricSpec, opts ...createHPAOption) *autoscalingv2.HorizontalPodAutoscaler {
-	hpa, err := cs.AutoscalingV2().HorizontalPodAutoscalers(deployment.Namespace).Create(t.Context(), newHPA(deployment, metricSpec, opts...), metav1.CreateOptions{})
+func createHPA(tCtx ktesting.TContext, deployment *appsv1.Deployment, metricSpec autoscalingv2.MetricSpec, opts ...createHPAOption) *autoscalingv2.HorizontalPodAutoscaler {
+	hpa, err := tCtx.Client().AutoscalingV2().HorizontalPodAutoscalers(deployment.Namespace).Create(tCtx, newHPA(deployment, metricSpec, opts...), metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Failed to create HPA: %v", err)
+		tCtx.Fatalf("Failed to create HPA: %v", err)
 	}
 	return hpa
 }
 
-func startHPAControllerAndWaitForCaches(t *testing.T, clients testClients) {
-	t.Helper()
+func startHPAControllerAndWaitForCaches(tCtx ktesting.TContext, clients testClients) {
+	tCtx.Helper()
 
-	ctx := t.Context()
 	metricsClient := metricsclient.NewRESTMetricsClient(clients.metrics.MetricsV1beta1(), nil, clients.externalMetrics)
 
-	informerSet := informers.NewSharedInformerFactory(clients.apiServer, 0)
+	informerSet := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	controller := podautoscaler.NewHorizontalController(
-		ctx,
-		clients.apiServer.CoreV1(),
+		tCtx,
+		tCtx.Client().CoreV1(),
 		clients.scale,
-		clients.apiServer.AutoscalingV2(),
-		clients.restMapper,
+		tCtx.Client().AutoscalingV2(),
+		tCtx.RESTMapper(),
 		metricsClient,
 		informerSet.Autoscaling().V2().HorizontalPodAutoscalers(),
 		informerSet.Core().V1().Pods(),
@@ -194,17 +183,17 @@ func startHPAControllerAndWaitForCaches(t *testing.T, clients testClients) {
 		cpuInitializationPeriod,
 		delayOfInitialReadinessStatus,
 	)
-	informerSet.Start(ctx.Done())
-	go controller.Run(ctx, 1)
+	informerSet.Start(tCtx.Done())
+	go controller.Run(tCtx, 1)
 
 	// Since this method starts the controller in a separate goroutine
 	// and the tests don't check /readyz there is no way
 	// the tests can tell it is safe to call the server and requests won't be rejected
 	// thus we wait until caches have synced
-	informerSet.WaitForCacheSync(ctx.Done())
+	informerSet.WaitForCacheSync(tCtx.Done())
 }
 
-func createDeployment(t *testing.T, cs *clientset.Clientset, namespace string, replicas int32) *appsv1.Deployment {
+func createDeployment(tCtx ktesting.TContext, namespace string, replicas int32) *appsv1.Deployment {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "dummy-deployment",
@@ -229,9 +218,9 @@ func createDeployment(t *testing.T, cs *clientset.Clientset, namespace string, r
 			},
 		},
 	}
-	d, err := cs.AppsV1().Deployments(namespace).Create(t.Context(), deployment, metav1.CreateOptions{})
+	d, err := tCtx.Client().AppsV1().Deployments(namespace).Create(tCtx, deployment, metav1.CreateOptions{})
 	if err != nil {
-		t.Fatalf("Failed to create deployment: %v", err)
+		tCtx.Fatalf("Failed to create deployment: %v", err)
 	}
 	return d
 }
@@ -269,7 +258,7 @@ func noMoreThanReplicas(maxReplicas int32) deploymentCondition {
 }
 
 // waitForDeploymentCondition waits until a deployment matches a given condition cond.
-func waitForDeploymentCondition(ctx context.Context, cs *clientset.Clientset, d *appsv1.Deployment,
+func waitForDeploymentCondition(tCtx ktesting.TContext, d *appsv1.Deployment,
 	cond deploymentCondition) error {
 
 	// Updates shouldn't take more than 1 HPA resync period. Bump to a few more
@@ -277,9 +266,9 @@ func waitForDeploymentCondition(ctx context.Context, cs *clientset.Clientset, d 
 	timeout := 10 * hpaControllerResyncPeriod
 
 	var condErr error
-	err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, false,
+	err := wait.PollUntilContextTimeout(tCtx, time.Second, timeout, false,
 		func(_ context.Context) (bool, error) {
-			got, err := cs.AppsV1().Deployments(d.Namespace).Get(ctx, d.Name, metav1.GetOptions{})
+			got, err := tCtx.Client().AppsV1().Deployments(d.Namespace).Get(tCtx, d.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}

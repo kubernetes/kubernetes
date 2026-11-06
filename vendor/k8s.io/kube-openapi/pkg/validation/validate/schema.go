@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/go-openapi/swag"
+	"github.com/go-openapi/swag/jsonutils"
 	"k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
@@ -140,14 +140,18 @@ func (s *SchemaValidator) Validate(data interface{}) *Result {
 		tpe = tpe.Elem()
 		kind = tpe.Kind()
 	}
-	d := data
-
+	var d interface{}
 	if kind == reflect.Struct {
 		// NOTE: since reflect retrieves the true nature of types
 		// this means that all strfmt types passed here (e.g. strfmt.Datetime, etc..)
 		// are converted here to strings, and structs are systematically converted
 		// to map[string]interface{}.
-		d = swag.ToDynamicJSON(data)
+		if err := jsonutils.FromDynamicJSON(data, &d); err != nil {
+			result.AddErrors(err)
+			return result
+		}
+	} else {
+		d = data
 	}
 
 	// TODO: this part should be handed over to type validator

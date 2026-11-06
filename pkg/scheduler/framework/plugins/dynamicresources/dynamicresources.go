@@ -177,22 +177,20 @@ type nodeAllocation struct {
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type DynamicResources struct {
-	enabled               bool
-	fts                   feature.Features
-	filterTimeout         time.Duration
-	bindingTimeout        time.Duration
-	fh                    fwk.Handle
-	clientset             kubernetes.Interface
-	celCache              *cel.Cache
-	draManager            fwk.SharedDRAManager
-	podIndexer            cache.Indexer
-	podResourceClaimIndex string
+	fts            feature.Features
+	filterTimeout  time.Duration
+	bindingTimeout time.Duration
+	fh             fwk.Handle
+	clientset      kubernetes.Interface
+	celCache       *cel.Cache
+	draManager     fwk.SharedDRAManager
+	podIndexer     cache.Indexer
 }
 
 const (
-	// podResourceClaimIndexPrefix is the prefix for the index function which indexes pods by
+	// podResourceClaimIndex is the name of the index function which indexes pods by
 	// the ResourceClaims that they reference. The key for looking up pods is "<namespace>/<name>".
-	podResourceClaimIndexPrefix = "schedulerPodResourceClaim"
+	podResourceClaimIndex = "schedulerPodResourceClaim"
 )
 
 var (
@@ -202,11 +200,6 @@ var (
 
 // New initializes a new plugin and returns it.
 func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
-	if !fts.EnableDynamicResourceAllocation {
-		// Disabled, won't do anything.
-		return &DynamicResources{}, nil
-	}
-
 	args, ok := plArgs.(*config.DynamicResourcesArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DynamicResourcesArgs", plArgs)
@@ -216,7 +209,6 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 	}
 
 	pl := &DynamicResources{
-		enabled:       true,
 		fts:           fts,
 		filterTimeout: ptr.Deref(args.FilterTimeout, metav1.Duration{}).Duration,
 		bindingTimeout: ptr.Deref(
@@ -235,14 +227,18 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		draManager: fh.SharedDRAManager(),
 	}
 
-	// Set up pod indexer for PreQueueingHint to look up pods by claim.
-	podInformer := fh.SharedInformerFactory().Core().V1().Pods()
-	podResourceClaimIndex := podResourceClaimIndexPrefix + "-" + fh.ProfileName()
-	if err := podInformer.Informer().AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
-		return nil, fmt.Errorf("failed to add pod resource claim indexer: %w", err)
+	if fts.EnableSchedulerPreQueueingHints {
+		// Set up pod indexer for PreQueueingHint to look up pods by claim.
+		// Profiles share the pod informer, so they also share one index:
+		// AddIndexers fails for the later profiles because it already exists.
+		podInformer := fh.SharedInformerFactory().Core().V1().Pods().Informer()
+		if err := podInformer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
+			if _, exists := podInformer.GetIndexer().GetIndexers()[podResourceClaimIndex]; !exists {
+				return nil, fmt.Errorf("failed to add pod resource claim indexer: %w", err)
+			}
+		}
+		pl.podIndexer = podInformer.GetIndexer()
 	}
-	pl.podIndexer = podInformer.Informer().GetIndexer()
-	pl.podResourceClaimIndex = podResourceClaimIndex
 
 	return pl, nil
 }
@@ -276,16 +272,17 @@ func (pl *DynamicResources) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Sig
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	if !pl.enabled {
-		return nil, nil
+	// preQueueingHint needs the pod index, which only exists with SchedulerPreQueueingHints.
+	var claimPreQueueingHint fwk.PreQueueingHintFn
+	if pl.fts.EnableSchedulerPreQueueingHints {
+		claimPreQueueingHint = pl.preQueueingHint
 	}
-
 	events := []fwk.ClusterEventWithHint{
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: pl.preQueueingHint},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: claimPreQueueingHint},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -301,10 +298,6 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 // scheduled. When this fails, one of the registered events can trigger another
 // attempt.
 func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *fwk.Status) {
-	if !pl.enabled {
-		return nil
-	}
-
 	if err := pl.foreachPodResourceClaim(pod, nil); err != nil {
 		return statusUnschedulable(klog.FromContext(ctx), err.Error())
 	}
@@ -313,20 +306,29 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys
 // (namespace/name) for any ResourceClaim referenced by a pod.
+// Extended resource claims in pod.Status.ExtendedResourceClaimStatus are
+// intentionally not indexed because the scheduler creates them during PreBind
+// and never waits for their creation.
 func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
-	if !ok {
+	if !ok || len(pod.Spec.ResourceClaims) == 0 {
+		// An index function that returns an error panics the informer, so we
+		// tolerate an unexpected object type by indexing it under no keys.
+		//
+		// Return early without allocating the slice when there are no
+		// resource claims.
 		return nil, nil
 	}
-	keySet := sets.New[string]()
+	keys := make([]string, 0, len(pod.Spec.ResourceClaims))
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &podClaim)
 		if err != nil || claimName == nil {
 			continue
 		}
-		keySet.Insert(pod.Namespace + "/" + *claimName)
+		// Duplicates are fine for the indexer.
+		keys = append(keys, pod.Namespace+"/"+*claimName)
 	}
-	return keySet.UnsortedList(), nil
+	return keys, nil
 }
 
 // preQueueingHint returns the pods affected by a ResourceClaim event.
@@ -357,14 +359,18 @@ func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj i
 	}
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
+		// Unexpected object type: we can't identify the affected pods, so
+		// conservatively evaluate all of them rather than returning an error.
 		return fwk.PreQueueingHintResult{AllPods: true}, nil
 	}
-	objs, err := pl.podIndexer.ByIndex(pl.podResourceClaimIndex, claim.Namespace+"/"+claim.Name)
+	objs, err := pl.podIndexer.ByIndex(podResourceClaimIndex, claim.Namespace+"/"+claim.Name)
 	if err != nil {
 		return fwk.PreQueueingHintResult{}, fmt.Errorf("failed to look up pods by claim %s/%s: %w", claim.Namespace, claim.Name, err)
 	}
 	pods := make([]types.NamespacedName, 0, len(objs))
 	for _, obj := range objs {
+		// The indexer only ever stores *v1.Pod, so the cast always succeeds;
+		// the check is defensive.
 		if pod, ok := obj.(*v1.Pod); ok {
 			pods = append(pods, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace})
 		}
@@ -571,9 +577,6 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 // the pod cannot be scheduled at the moment on any node.
 func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
-	if !pl.enabled {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	logger := klog.FromContext(ctx)
@@ -804,7 +807,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 				}
 				allocatedState = &structured.AllocatedState{
 					AllocatedDevices:         allocatedDevices,
-					AllocatedSharedDeviceIDs: sets.New[structured.SharedDeviceID](),
+					AllocatedSharedDeviceIDs: sets.New[structured.DeviceID](),
 					AggregatedCapacity:       structured.NewConsumedCapacityCollection(),
 				}
 				// Done.
@@ -897,17 +900,17 @@ func getPodGroupStateDataFromPodGroupCycleState(pgState fwk.PodGroupCycleState) 
 func getPodGroupStateData(cs fwk.CycleState) (*podGroupStateData, error) {
 	// This is nil if the GenericWorkload feature is disabled, the Pod does not
 	// belong to a PodGroup, or the PodGroup is in the asynchronous binding phase.
-	podGroupCycleState := cs.GetPodGroupSchedulingCycle()
+	podGroupCycleState := cs.GetPodGroupCycleState()
 	return getPodGroupStateDataFromPodGroupCycleState(podGroupCycleState)
 }
 
 func getOrCreatePodGroupStateData(cs fwk.CycleState) (*podGroupStateData, error) {
 	podGroupState, err := getPodGroupStateData(cs)
 	if errors.Is(err, fwk.ErrNotFound) {
-		podGroupCycleState := cs.GetPodGroupSchedulingCycle()
+		podGroupCycleState := cs.GetPodGroupCycleState()
 		if podGroupCycleState == nil {
 			// This should never happen since [getPodGroupStateData] only returns
-			// [fwk.ErrNotFound] after [fwk.CycleState.GetPodGroupSchedulingCycle]
+			// [fwk.ErrNotFound] after [fwk.CycleState.GetPodGroupCycleState]
 			// already returns non-nil.
 			return nil, err
 		}
@@ -932,9 +935,6 @@ func getOrCreatePodGroupStateData(cs fwk.CycleState) (*podGroupStateData, error)
 // for the node.
 func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil
-	}
-	if !pl.enabled {
 		return nil
 	}
 	state, err := getStateData(cs)
@@ -1149,10 +1149,6 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 // suitable node.
 func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, _ fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	if !pl.enabled {
-		logger.V(5).Info("Nothing to do in PostFilter, plugin disabled", "pod", klog.KObj(pod))
-		return nil, fwk.NewStatus(fwk.Unschedulable)
-	}
 	if pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
 		return nil, fwk.NewStatus(fwk.Unschedulable)
 	}
@@ -1224,10 +1220,6 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	_ fwk.PodGroupSchedulingFunc,
 ) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	if !pl.enabled {
-		logger.V(5).Info("Nothing to do in PodGroupPostFilter, plugin disabled", "podGroup", pgInfo.GetName())
-		return nil, fwk.NewStatus(fwk.Unschedulable)
-	}
 
 	if pgInfo.GetType() == fwk.CompositePodGroupKeyType {
 		logger.V(5).Info("DRA PodGroupPostFilter is not supporting CompositePodGroups", "podGroup", pgInfo.GetName())
@@ -1248,7 +1240,7 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	// 1. Process pod-level claims deallocations/deletions.
 	// This mimics running PostFilter for each of the pods in pod group.
 	if podGroupState != nil && len(podGroupState.podsStateData) > 0 {
-		for _, pod := range pgInfo.GetUnscheduledPods() {
+		for _, pod := range pgInfo.GetAllUnscheduledPods() {
 			podState := podGroupState.podsStateData[types.NamespacedName{Namespace: pod.GetNamespace(), Name: pod.GetName()}]
 			if podState == nil {
 				continue
@@ -1265,14 +1257,14 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	}
 
 	// 2. If at least one pod with claims did not deallocate/delete, try to unreserve PodGroup claims.
-	if unreservePodGroup && pl.fts.EnableDRAWorkloadResourceClaims && len(pgInfo.GetUnscheduledPods()) > 0 {
+	if unreservePodGroup && pl.fts.EnableDRAWorkloadResourceClaims && len(pgInfo.GetAllUnscheduledPods()) > 0 {
 		// To let the scheduler try to find new devices in case binding the current allocation
 		// failed in some previous cycle, deallocate any PodGroup-scoped claims
 		// unavailable on all nodes and remove the PodGroup from all its claims' status.reservedFor.
 		// Note that more Pods may exist than a PodGroup's minCount, but performing
 		// a cleanup after a previous cycle is safe as long as there are no assumed
 		// nor assigned pods yet.
-		status := pl.deallocatePodGroupClaims(ctx, podGroupState, pgInfo.GetUnscheduledPods()[0])
+		status := pl.deallocatePodGroupClaims(ctx, podGroupState, pgInfo.GetAllUnscheduledPods()[0])
 		if status != nil {
 			return nil, status
 		}
@@ -1381,7 +1373,7 @@ func (pl *DynamicResources) deallocatePodGroupClaims(ctx context.Context, state 
 }
 
 func (pl *DynamicResources) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
-	if !pl.enabled || !pl.fts.EnableDRAPrioritizedList {
+	if !pl.fts.EnableDRAPrioritizedList {
 		return 0, nil
 	}
 	logger := klog.FromContext(ctx)
@@ -1460,17 +1452,11 @@ func (pl *DynamicResources) ScoreExtensions() fwk.ScoreExtensions {
 }
 
 func (pl *DynamicResources) NormalizeScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
-	if !pl.enabled {
-		return nil
-	}
 	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, false, scores)
 }
 
 // Reserve reserves claims for the pod.
 func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
-	if !pl.enabled {
-		return nil
-	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
@@ -1580,9 +1566,6 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 // Unreserve clears the ReservedFor field for all claims.
 // It's idempotent, and does nothing if no state found for the given pod.
 func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
-	if !pl.enabled {
-		return
-	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return
@@ -1600,13 +1583,17 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	// we process user claims here first, extendedResourceClaim if any is handled below.
 	for _, claim := range state.claims.allUserClaims() {
 		// If allocation was in-flight, then it might not be anymore if no pods
-		// still need the pending allocation. If the allocation was removed from
-		// in-flight, we need to revert the claim object in the assume cache to
-		// what it was before. The allocation is not removed until the last Pod
-		// sharing it is Bound or Unreserved.
+		// still need the pending allocation. The allocation is not removed
+		// until the last Pod sharing it is Bound or Unreserved.
+		//
+		// The assume cache is not restored. Reserve does not modify it and
+		// PreBind only assumes claims returned by the API server. The informer
+		// copy can be older than such a claim because the assume cache ignores
+		// informer events whose ResourceVersion is not newer than the assumed
+		// claim, so restoring could drop an allocation stored by PreBind of
+		// this or another Pod sharing the claim and make its devices look free.
 		if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, false); deleted {
 			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(claim.Status.Allocation))
-			pl.draManager.ResourceClaims().AssumedClaimRestore(claim.Namespace, claim.Name)
 
 			// If we are currently asynchronously Binding Pods in a PodGroup,
 			// then the pendingAllocations set does not need to be updated. New
@@ -1659,9 +1646,6 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 // the pod will have to go into the backoff queue. The scheduler will call
 // Unreserve as part of the error handling.
 func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) (retStatus *fwk.Status) {
-	if !pl.enabled {
-		return nil
-	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
@@ -1672,14 +1656,9 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 
 	logger := klog.FromContext(ctx)
 
-	podGroupState, err := getPodGroupStateData(cs)
-	if err != nil {
-		return statusError(logger, err)
-	}
-
 	for index, claim := range state.claims.all() {
 		if !resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
-			claim, successCleanup, err := pl.bindClaim(ctx, state, podGroupState, index, pod, nodeName)
+			claim, successCleanup, err := pl.bindClaim(ctx, state, index, pod, nodeName)
 			if err != nil {
 				return statusError(logger, err)
 			}
@@ -1784,9 +1763,6 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 // It just checks state.claims to determine whether there are any claims and hence the plugin has to handle them at PreBind.
 func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
 	result := &fwk.PreBindPreFlightResult{AllowParallel: true}
-	if !pl.enabled {
-		return result, fwk.NewStatus(fwk.Skip)
-	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return result, statusError(klog.FromContext(ctx), err)
@@ -1802,7 +1778,7 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 // and reservation are recorded. This finishes the work started in Reserve.
 // Returns the updated claim, a function which (if not nil) should run when the
 // pod has been successfully bound, and an error if one occurred.
-func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, podGroupState *podGroupStateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, func(), error) {
+func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (*resourceapi.ResourceClaim, func(), error) {
 	logger := klog.FromContext(ctx)
 	claim := state.claims.get(index)
 	binding := state.claims.getBinding(index, pod)
@@ -1851,16 +1827,13 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, pod
 		if allocation != nil {
 			for _, claimUID := range claimUIDs {
 				if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claimUID, true); deleted {
-					// If we are currently asynchronously Binding Pods in a
-					// PodGroup, then the pendingAllocations set does not need
-					// to be updated. New PodGroup scheduling cycles will start
+					// Since PodGroup cycle state is not set during asynchronous
+					// binding, pendingAllocations does not need to be updated.
+					// New PodGroup scheduling cycles will start
 					// with an empty set and not share pending allocations
 					// started in *this* cycle until Unreserve completes for all
 					// the Pods sharing that pending allocation and they can be
 					// Reserved again in another cycle.
-					if podGroupState != nil {
-						delete(podGroupState.pendingAllocations, claim.UID)
-					}
 					logger.V(5).Info("Removed claim from in-flight claims", "claim", klog.KObj(claim), "uid", claimUID, "resourceVersion", resourceVersion, "allocation", klog.Format(allocation))
 				}
 			}
@@ -1888,8 +1861,11 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, pod
 	// We may run into a ResourceVersion conflict because there may be some
 	// benign concurrent changes. In that case we get the latest claim and
 	// try again.
+	//
+	// claim is never modified in place and only gets replaced by objects
+	// returned by the API server, so the deferred assume only stores what
+	// was actually written.
 	refreshClaim := false
-	claim = claim.DeepCopy()
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if refreshClaim {
 			updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
@@ -1916,33 +1892,37 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, pod
 			// The finalizer needs to be added in a normal update.
 			// If we were interrupted in the past, it might already be set and we simply continue.
 			if !slices.Contains(claim.Finalizers, resourceapi.Finalizer) {
-				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
-				updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+				withFinalizer := claim.DeepCopy()
+				withFinalizer.Finalizers = append(withFinalizer.Finalizers, resourceapi.Finalizer)
+				updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, withFinalizer, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("add finalizer to claim %s: %w", klog.KObj(claim), err)
 				}
 				claim = updatedClaim
 			}
-			claim.Status.Allocation = allocation
 		}
 
+		update := claim.DeepCopy()
+		if allocation != nil {
+			update.Status.Allocation = allocation
+		}
 		// We can simply try to add the pod here without checking
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
-		claim.Status.ReservedFor = append(claim.Status.ReservedFor, binding)
+		update.Status.ReservedFor = append(update.Status.ReservedFor, binding)
 		if pl.fts.EnableDRADeviceBindingConditions &&
 			pl.fts.EnableDRAResourceClaimDeviceStatus {
 			// Once the feature gate checks get removed, this code can be moved into an else branch
 			// for `if allocation != nil` above. For now it is kept here to avoid changing normal
 			// behavior.
-			if claim.Status.Allocation == nil {
+			if update.Status.Allocation == nil {
 				return fmt.Errorf("claim %s got deallocated elsewhere in the meantime", klog.KObj(claim))
 			}
-			if claim.Status.Allocation.AllocationTimestamp == nil {
-				claim.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
+			if update.Status.Allocation.AllocationTimestamp == nil {
+				update.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
 			}
 		}
-		updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, update, metav1.UpdateOptions{})
 		if err != nil {
 			if allocation != nil {
 				return fmt.Errorf("add allocation and reservation to claim %s: %w", klog.KObj(claim), err)

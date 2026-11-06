@@ -970,6 +970,7 @@ func TestPodResourceLimits(t *testing.T) {
 		description           string
 		options               PodResourcesOptions
 		overhead              v1.ResourceList
+		podLevelResources     *v1.ResourceRequirements
 		initContainers        []v1.Container
 		initContainerStatuses []v1.ContainerStatus
 		containers            []v1.Container
@@ -1115,11 +1116,8 @@ func TestPodResourceLimits(t *testing.T) {
 			},
 		},
 		{
-			description: "one limited and one unlimited container should result in the limited container's limits for the pod",
-			expectedLimits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
+			description:    "aggregate does not contain cpu and memory limits when they are omitted in one container",
+			expectedLimits: v1.ResourceList{},
 			initContainers: []v1.Container{},
 			containers: []v1.Container{
 				{
@@ -1136,11 +1134,8 @@ func TestPodResourceLimits(t *testing.T) {
 			},
 		},
 		{
-			description: "one limited and one unlimited init container should result in the limited init container's limits for the pod",
-			expectedLimits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("2"),
-				v1.ResourceMemory: resource.MustParse("2Gi"),
-			},
+			description:    "aggregate does not contain cpu and memory limits when they are omitted in one init container",
+			expectedLimits: v1.ResourceList{},
 			initContainers: []v1.Container{
 				{
 					Resources: v1.ResourceRequirements{
@@ -1546,6 +1541,69 @@ func TestPodResourceLimits(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "aggregate contains ephemeral-storage limit when limit is omitted in one container",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+		},
+		{
+			description: "aggregate contains hugepages limit when limit is omitted in one container, which contributes zero",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"hugepages-2Mi": resource.MustParse("2Mi")},
+		},
+		{
+			description: "aggregate contains extended resource limit when limit is omitted in one container, which contributes zero",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{"example.com/gpu": resource.MustParse("1")},
+		},
+		{
+			description:       "aggregate contains pod-level cpu limit when limit is omitted in one container",
+			podLevelResources: &v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")}},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+		},
+		{
+			description: "aggregate does not contain cpu limit or its overhead when limit is omitted in one container",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("64Mi"),
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+			},
+			expectedLimits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2112Mi")},
+		},
+		{
+			description: "aggregate does not contain cpu limit when limit is omitted in a restartable init container",
+			initContainers: []v1.Container{
+				{
+					RestartPolicy: &restartAlways,
+					Resources:     v1.ResourceRequirements{Limits: v1.ResourceList{}},
+				},
+			},
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}},
+			},
+			expectedLimits: v1.ResourceList{},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
@@ -1554,6 +1612,7 @@ func TestPodResourceLimits(t *testing.T) {
 					Containers:     tc.containers,
 					InitContainers: tc.initContainers,
 					Overhead:       tc.overhead,
+					Resources:      tc.podLevelResources,
 				},
 				Status: v1.PodStatus{
 					ContainerStatuses:     tc.containerStatuses,
@@ -3494,6 +3553,642 @@ func TestPodRequestsAndLimitsWithDRA(t *testing.T) {
 				hugePageResource1Gi: resource.MustParse("1"), // hugepages are added even without declared limits
 			},
 		},
+		{
+			description: "Mapping claim referenced only by init container is always accounted toward pod resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceCPU, Quantity: new(resource.MustParse("25m"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// Claim resource quantity is fully accounted.
+				// Total quantity: max(100m, 200m) + 25m.
+				v1.ResourceCPU: resource.MustParse("225m"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced only by init container counts only towards max, main container dominates",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// PerContainer overhead is part of its peak calculation: max(512Mi + 500Mi, 2Gi) = 2Gi.
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced only by init container counts only towards max, init container dominates",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2548Mi"), // max(2Gi + 500Mi, 1Gi) = 2548Mi
+			},
+		},
+		{
+			description: "Mapping and Overhead claim shared by init and main container, each perContainer share counts with its referencing container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1", "c1"},
+							Mapping: []v1.NodeAllocatableMappedResources{
+								{Name: v1.ResourceMemory, Quantity: new(resource.MustParse("512Mi"))},
+							},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{
+									Name:         v1.ResourceMemory,
+									PerPod:       new(resource.MustParse("1Gi")),
+									PerContainer: new(resource.MustParse("500Mi")),
+								},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// Mapping (512Mi) and PerPod (1Gi) are pod-lifetime; each container's
+				// PerContainer share belongs to its own peak:
+				// max(200Mi + 500Mi, 1Gi + 500Mi) + 512Mi + 1Gi = 3060Mi.
+				v1.ResourceMemory: resource.MustParse("3060Mi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced by two init containers counts once per init container towards max",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name: "ic2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("600Mi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1", "ic2"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// Init containers run sequentially: max(1Gi + 500Mi, 600Mi + 500Mi, 300Mi) = 1524Mi.
+				v1.ResourceMemory: resource.MustParse("1524Mi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer reference does not count towards init container max",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							},
+						},
+						{
+							Name: "ic2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// The overhead is part of ic1's peak only, not ic2's:
+				// max(100Mi + 500Mi, 1Gi, 300Mi) = 1Gi.
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			description: "Overhead claims with perContainer referenced by the same init container are summed towards max",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("500Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim-1",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("300Mi"))},
+							},
+						},
+						{
+							ResourceClaimName: "node-allocatable-claim-2",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("200Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// Both claims are in use concurrently while ic1 runs:
+				// max(100Mi + 300Mi + 200Mi, 500Mi) = 600Mi.
+				v1.ResourceMemory: resource.MustParse("600Mi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced by restartable init container is always accounted toward pod resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name:          "ic1",
+							RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// A restartable init container runs for the pod's lifetime:
+				// 1Gi (c1) + 512Mi (ic1 sidecar) + 500Mi (PerContainer) = 2036Mi.
+				v1.ResourceMemory: resource.MustParse("2036Mi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced by main container does not count towards init container peak",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// The main container is not running while ic1 runs:
+				// max(2Gi, 300Mi + 500Mi) = 2Gi.
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced by restartable init container does not count towards earlier init container's peak",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+							},
+						},
+						{
+							Name:          "ic2",
+							RestartPolicy: ptr.To(v1.ContainerRestartPolicyAlways),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic2"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				// The ic2 sidecar starts after ic1 completes:
+				// max(1Gi, 200Mi + 500Mi, 300Mi + 200Mi + 500Mi) = 1Gi.
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced only by init container is dropped from limits when a container leaves the limit undeclared",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceCPU, PerContainer: new(resource.MustParse("500m"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("600m"), // max(100m + 500m, 200m)
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			// cpu is not declared by ic1, so it is omitted along with its folded overhead.
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("1Gi"), // max(1Gi, 256Mi)
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced only by init container counts towards the limits peak when every container declares the limit",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("256Mi"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceCPU, PerContainer: new(resource.MustParse("500m"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("600m"), // max(100m + 500m, 200m)
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("600m"), // max(100m + 500m, 200m)
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			description: "Overhead claim with perContainer referenced only by init container counts towards the peak on the container status resize path",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               "ic1",
+							AllocatedResources: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+							},
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               "c1",
+							AllocatedResources: v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("200Mi")},
+							},
+						},
+					},
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("500Mi"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseStatusResources: true, UseDRANodeAllocatableResourceClaimStatus: true},
+			// actuated carries no DRA, so spec and allocated win: max(200Mi, 100Mi + 500Mi).
+			expectedRequests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("600Mi"),
+			},
+		},
+		{
+			description: "Hugepages overhead claim with perContainer referenced only by init container counts towards limits even when limits are not declared",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "ic1",
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits:   v1.ResourceList{hugePageResource1Gi: resource.MustParse("2")},
+								Requests: v1.ResourceList{hugePageResource1Gi: resource.MustParse("2")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"ic1"},
+							Overhead: []v1.NodeAllocatableOverheadResources{
+								{Name: hugePageResource1Gi, PerContainer: new(resource.MustParse("3"))},
+							},
+						},
+					},
+				},
+			},
+			options: PodResourcesOptions{UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: v1.ResourceList{
+				hugePageResource1Gi: resource.MustParse("3"), // max(0 + 3, 2)
+			},
+			// Hugepages are not overcommittable, so the folded overhead is kept.
+			expectedLimits: v1.ResourceList{
+				hugePageResource1Gi: resource.MustParse("3"), // max(0 + 3, 2)
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -3540,6 +4235,37 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 			expectedLimits: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU): resource.MustParse("9"),
 			},
+		},
+		{
+			name: "aggregate contains memory limit but not cpu limit when cpu limit is omitted in one container",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("2"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+			},
+			expectedRequests: v1.ResourceList{},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+		},
+		{
+			name: "aggregate does not contain both cpu and memory limits when they are zero in one container",
+			containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+				}}},
+				{Resources: v1.ResourceRequirements{Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("0"),
+					v1.ResourceMemory: resource.MustParse("0"),
+				}}},
+			},
+			expectedRequests: v1.ResourceList{},
+			expectedLimits:   v1.ResourceList{},
 		},
 		{
 			name: "two containers with limits",

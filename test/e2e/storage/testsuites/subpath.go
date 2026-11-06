@@ -1114,45 +1114,12 @@ func testSubpathStaleBindMountRemount(ctx context.Context, f *framework.Framewor
 	framework.ExpectNoError(err, "lazy-unmounting subPath bind mounts: %s", result)
 	framework.Logf("umount result: %s", result)
 
-	// stop the container via crictl so kubelet restarts it and calls
+	// stop the container so kubelet restarts it and calls
 	// prepareSubpathTarget on the stale bind mount.
-	ginkgo.By("Stopping app container via crictl to trigger restart through stale bind-mount path")
-	containerName := pod.Spec.Containers[0].Name
-	stopCmd := fmt.Sprintf(
-		`cid=$(crictl ps --label io.kubernetes.pod.uid=%s --name %s -q 2>/dev/null | head -1); `+
-			`[ -z "$cid" ] && { echo "container not found"; exit 1; }; `+
-			`crictl stop "$cid" && echo "stopped $cid"`,
-		pod.UID, containerName,
-	)
-	// crictl stop occasionally fails at the containerd gRPC client with
-	// RST_STREAM / DEADLINE_EXCEEDED. crictl stop is idempotent, so retry.
-	// If kubelet already restarted the container (RestartCount >= 1), the stop
-	// took effect even though our RPC reply was lost — treat as success and
-	// stop retrying instead of looping until timeout.
-	var stopResult string
-	stopErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, 60*time.Second, true,
-		func(ctx context.Context) (bool, error) {
-			out, err := hostExec.IssueCommandWithResult(ctx, stopCmd, podNode)
-			stopResult = out
-			if err == nil {
-				return true, nil
-			}
-			if p, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{}); getErr == nil {
-				for _, cs := range p.Status.ContainerStatuses {
-					if cs.Name == containerName && cs.RestartCount >= 1 {
-						framework.Logf("crictl stop returned %v, but container already restarted (count=%d); treating as success", err, cs.RestartCount)
-						stopResult = "container already restarted"
-						return true, nil
-					}
-				}
-			} else {
-				framework.Logf("crictl stop failed (will retry): %v — failed to get pod: %v", err, getErr)
-			}
-			framework.Logf("crictl stop failed (will retry): %v — %s", err, out)
-			return false, nil
-		})
-	framework.ExpectNoError(stopErr, "stopping container via crictl for pod %s: %s", pod.UID, stopResult)
-	framework.Logf("crictl stop result: %s", stopResult)
+	ginkgo.By("Stopping app container to trigger restart through stale bind-mount path")
+	// PID 1 is the sh that traps TERM and exits.
+	stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "kill", "1")
+	framework.ExpectNoError(err, "sending TERM to PID 1 in pod %s: stdout=%q stderr=%q", pod.Name, stdout, stderr)
 
 	// wait for the container to restart and reach Running with restarts >= 1.
 	ginkgo.By("Waiting for container to restart with a fresh bind mount")

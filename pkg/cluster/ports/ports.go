@@ -16,10 +16,6 @@ limitations under the License.
 
 package ports
 
-import (
-	cpoptions "k8s.io/cloud-provider/options"
-)
-
 // In this file, we can see all default port of cluster.
 // It's also an important documentation for us. So don't remove them easily.
 const (
@@ -49,6 +45,9 @@ const (
 	CloudControllerManagerPort = 10258
 	// CloudControllerManagerWebhookPort is the default port for the cloud
 	// controller manager webhook server.  May be overridden by a flag at
-	// startup.
-	CloudControllerManagerWebhookPort = cpoptions.CloudControllerManagerWebhookPort
+	// startup. It is a literal, not an alias of the k8s.io/cloud-provider
+	// constant, because importing cloud-provider/options pulls the generic
+	// apiserver (and CEL) into every binary that uses this package.
+	// ports_test.go checks that the two values stay equal.
+	CloudControllerManagerWebhookPort = 10260
 )

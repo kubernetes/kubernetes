@@ -19,7 +19,8 @@ package apimachinery
 import (
 	"crypto/x509"
 	"os"
-	"testing"
+
+	"github.com/onsi/ginkgo/v2"
 
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/test/utils"
@@ -55,7 +56,7 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err != nil {
 		framework.Failf("Failed to create a temp file for ca cert generation %v", err)
 	}
-	defer utiltesting.CloseAndRemove(&testing.T{}, caCertFile)
+	defer utiltesting.CloseAndRemove(ginkgo.GinkgoTB(), caCertFile)
 	if err := os.WriteFile(caCertFile.Name(), utils.EncodeCertPEM(signingCert), 0644); err != nil {
 		framework.Failf("Failed to write CA cert %v", err)
 	}
@@ -78,7 +79,7 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err != nil {
 		framework.Failf("Failed to create a temp file for cert generation %v", err)
 	}
-	defer utiltesting.CloseAndRemove(&testing.T{}, certFile)
+	defer utiltesting.CloseAndRemove(ginkgo.GinkgoTB(), certFile)
 	keyFile, err := os.CreateTemp(certDir, "server.key")
 	if err != nil {
 		framework.Failf("Failed to create a temp file for key generation %v", err)
@@ -93,7 +94,7 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err = os.WriteFile(keyFile.Name(), privateKeyPEM, 0644); err != nil {
 		framework.Failf("Failed to write key file %v", err)
 	}
-	defer utiltesting.CloseAndRemove(&testing.T{}, keyFile)
+	defer utiltesting.CloseAndRemove(ginkgo.GinkgoTB(), keyFile)
 	return &certContext{
 		cert:        utils.EncodeCertPEM(signedCert),
 		key:         privateKeyPEM,

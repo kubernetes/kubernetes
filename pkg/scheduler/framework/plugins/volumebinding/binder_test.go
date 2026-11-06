@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,7 +44,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
-	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
@@ -151,6 +151,12 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	client := &fake.Clientset{}
 	logger := klog.FromContext(ctx)
 	reactor := pvtesting.NewVolumeReactor(ctx, client, nil, nil, nil)
+
+	pvWatchStarted, pvcWatchStarted := make(chan struct{}), make(chan struct{})
+	watchStarted := map[string]func(){
+		"persistentvolumes":      sync.OnceFunc(func() { close(pvWatchStarted) }),
+		"persistentvolumeclaims": sync.OnceFunc(func() { close(pvcWatchStarted) }),
+	}
 	// TODO refactor all tests to use real watch mechanism, see #72327
 	client.AddWatchReactor("*", func(action k8stesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -159,9 +165,12 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 		if err != nil {
 			return false, nil, err
 		}
+		if started, ok := watchStarted[gvr.Resource]; ok {
+			started()
+		}
 		return true, watch, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
@@ -192,11 +201,21 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	}
 
 	// Wait for informers cache sync
-	informerFactory.Start(ctx.Done())
-	for v, synced := range informerFactory.WaitForCacheSync(ctx.Done()) {
+	informerFactory.StartWithContext(ctx)
+	for v, synced := range informerFactory.WaitForCacheSyncWithContext(ctx).Synced {
 		if !synced {
 			logger.Error(nil, "Error syncing informer", "informer", v)
 			os.Exit(1)
+		}
+	}
+	// Wait for the PV and PVC watches to start. The above WaitForCacheSync can return
+	// before the informers call Watch. Unlike a real apiserver, VolumeReactor does not
+	// send events for changes made before a watch started.
+	for _, started := range []chan struct{}{pvWatchStarted, pvcWatchStarted} {
+		select {
+		case <-started:
+		case <-ctx.Done():
+			t.Fatalf("PV and PVC informers did not start watching: %v", context.Cause(ctx))
 		}
 	}
 
@@ -2280,6 +2299,27 @@ func TestCapacity(t *testing.T) {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
 			capacities: []*storagev1.CSIStorageCapacity{
 				makeCapacity("net", waitClassWithProvisioner, node1, "", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
+		"capacity-exceeds-int64": {
+			// 800E saturates Value() to MaxInt64 and is still ordered above the 1Gi request.
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "800E", ""),
+			},
+			expectedProvisions: []*DynamicProvision{{
+				PVC:          provisionedPVC,
+				NodeCapacity: makeCapacity("net", waitClassWithProvisioner, node1, "800E", ""),
+			}},
+		},
+		"insufficient-storage-exceeds-int64": {
+			// Both sizes saturate Value() to MaxInt64 and are compared as sufficient before Cmp.
+			pvcs: []*v1.PersistentVolumeClaim{
+				makeTestPVC("provisioned-pvc", "20E", "", pvcUnbound, "", "1", &waitClassWithProvisioner),
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "10E", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},

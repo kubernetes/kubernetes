@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNodeResourcesBalancedAllocation(t *testing.T) {
@@ -324,10 +324,9 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 			p, _ := NewBalancedAllocation(tCtx, &test.args, fh, feature.Features{
 				EnableDRAExtendedResource: test.draObjects != nil,
 			})
@@ -445,12 +444,10 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 			} else {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
 			}
-
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
-			defer func() {
-				tCtx.Cancel("test has completed")
+			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
-			}()
+			})
 
 			p, err := NewBalancedAllocation(tCtx, &config.NodeResourcesBalancedAllocationArgs{}, fh, feature.Features{
 				EnableDRAExtendedResource: !test.disableDRAExtendedResource,

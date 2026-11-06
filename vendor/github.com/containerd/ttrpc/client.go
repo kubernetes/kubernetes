@@ -142,7 +142,7 @@ func (c *Client) send(sid uint32, mt messageType, flags uint8, b []byte) error {
 }
 
 // Call makes a unary request and returns with response
-func (c *Client) Call(ctx context.Context, service, method string, req, resp interface{}) error {
+func (c *Client) Call(ctx context.Context, service, method string, req, resp any) error {
 	payload, err := c.codec.Marshal(req)
 	if err != nil {
 		return err
@@ -194,8 +194,8 @@ type StreamDesc struct {
 // ClientStream is used to send or recv messages on the underlying stream
 type ClientStream interface {
 	CloseSend() error
-	SendMsg(m interface{}) error
-	RecvMsg(m interface{}) error
+	SendMsg(m any) error
+	RecvMsg(m any) error
 }
 
 type clientStream struct {
@@ -222,7 +222,7 @@ func (cs *clientStream) CloseSend() error {
 	return nil
 }
 
-func (cs *clientStream) SendMsg(m interface{}) error {
+func (cs *clientStream) SendMsg(m any) error {
 	if !cs.desc.StreamingClient {
 		return fmt.Errorf("%w: cannot send data from non-streaming client", ErrProtocol)
 	}
@@ -249,7 +249,7 @@ func (cs *clientStream) SendMsg(m interface{}) error {
 	return nil
 }
 
-func (cs *clientStream) RecvMsg(m interface{}) error {
+func (cs *clientStream) RecvMsg(m any) error {
 	if cs.remoteClosed {
 		return io.EOF
 	}
@@ -490,7 +490,7 @@ func filterCloseErr(err error) error {
 // NewStream creates a new stream with the given stream descriptor to the
 // specified service and method. If not a streaming client, the request object
 // may be provided.
-func (c *Client) NewStream(ctx context.Context, desc *StreamDesc, service, method string, req interface{}) (ClientStream, error) {
+func (c *Client) NewStream(ctx context.Context, desc *StreamDesc, service, method string, req any) (ClientStream, error) {
 	var payload []byte
 	if req != nil {
 		var err error

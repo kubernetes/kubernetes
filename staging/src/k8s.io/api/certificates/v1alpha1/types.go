@@ -24,6 +24,8 @@ import (
 // +genclient:nonNamespaced
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
 // +k8s:prerelease-lifecycle-gen:deprecated=1.34
+// +k8s:prerelease-lifecycle-gen:removed=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,ClusterTrustBundle
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
@@ -74,8 +76,8 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
-	// +k8s:alpha(since:"1.37")=+k8s:optional
-	// +k8s:alpha(since:"1.37")=+k8s:immutable
+	// +k8s:beta(since:"1.38")=+k8s:optional
+	// +k8s:beta(since:"1.38")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -94,6 +96,8 @@ type ClusterTrustBundleSpec struct {
 
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
 // +k8s:prerelease-lifecycle-gen:deprecated=1.34
+// +k8s:prerelease-lifecycle-gen:removed=1.37
+// +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,ClusterTrustBundleList
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects

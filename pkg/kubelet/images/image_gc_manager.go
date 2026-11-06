@@ -80,7 +80,7 @@ type ImageGCManager interface {
 	// Start async garbage collection of images.
 	Start(ctx context.Context)
 
-	GetImageList() ([]container.Image, error)
+	GetImageList(ctx context.Context) ([]container.Image, error)
 
 	// Delete all unused images.
 	DeleteUnusedImages(ctx context.Context) error
@@ -237,7 +237,7 @@ func (im *realImageGCManager) Start(ctx context.Context) {
 }
 
 // Get a list of images on this node
-func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
+func (im *realImageGCManager) GetImageList(_ context.Context) ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 

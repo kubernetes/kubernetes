@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 )
 
 // mockSource implements Source for testing.
@@ -57,6 +58,7 @@ func TestCompositeWebhookSource_Webhooks(t *testing.T) {
 		name         string
 		staticSource Source
 		apiSource    Source
+		order        webhookadmission.StaticOrder
 		wantUIDs     []string
 	}{
 		{
@@ -83,11 +85,94 @@ func TestCompositeWebhookSource_Webhooks(t *testing.T) {
 			apiSource:    &mockSource{webhooks: []webhook.WebhookAccessor{apiWebhook}, hasSynced: true},
 			wantUIDs:     []string{"api-1"},
 		},
+		{
+			name:         "explicit StaticFirst matches the empty default",
+			staticSource: &mockSource{webhooks: []webhook.WebhookAccessor{staticWebhook}, hasSynced: true},
+			apiSource:    &mockSource{webhooks: []webhook.WebhookAccessor{apiWebhook}, hasSynced: true},
+			order:        webhookadmission.StaticFirst,
+			wantUIDs:     []string{"static-1", "api-1"},
+		},
+		{
+			name:         "StaticLast puts static webhooks after api webhooks",
+			staticSource: &mockSource{webhooks: []webhook.WebhookAccessor{staticWebhook}, hasSynced: true},
+			apiSource:    &mockSource{webhooks: []webhook.WebhookAccessor{apiWebhook}, hasSynced: true},
+			order:        webhookadmission.StaticLast,
+			wantUIDs:     []string{"api-1", "static-1"},
+		},
+		{
+			name: "ByName interleaves both sources by configuration name",
+			staticSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("static-b", "b-config.static.k8s.io"),
+				createTestValidatingWebhook("static-d", "d-config.static.k8s.io"),
+			}},
+			apiSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("api-a", "a-config"),
+				createTestValidatingWebhook("api-c", "c-config"),
+			}},
+			order:    webhookadmission.ByName,
+			wantUIDs: []string{"api-a", "static-b", "api-c", "static-d"},
+		},
+		{
+			name: "ByName keeps the position of a replaced api configuration",
+			// b-config.static.k8s.io replaces the api configuration named b-config, and
+			// must still sort between a-config and c-config.
+			staticSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("static-b", "b-config.static.k8s.io"),
+			}},
+			apiSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("api-a", "a-config"),
+				createTestValidatingWebhook("api-c", "c-config"),
+			}},
+			order:    webhookadmission.ByName,
+			wantUIDs: []string{"api-a", "static-b", "api-c"},
+		},
+		{
+			name: "ByName preserves webhook order within a configuration",
+			staticSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("static-b-1", "b-config.static.k8s.io"),
+				createTestValidatingWebhook("static-b-2", "b-config.static.k8s.io"),
+			}},
+			apiSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("api-a-1", "a-config"),
+				createTestValidatingWebhook("api-a-2", "a-config"),
+			}},
+			order:    webhookadmission.ByName,
+			wantUIDs: []string{"api-a-1", "api-a-2", "static-b-1", "static-b-2"},
+		},
+		{
+			name: "ByName does not preserve position against a hyphenated sibling",
+			// "-" (0x2D) sorts before "." (0x2E), so migrating foo to
+			// foo.static.k8s.io moves it after foo-bar even though foo sorted before
+			// foo-bar. This is a documented limitation of ByName, pinned here so a
+			// refactor cannot silently change it.
+			staticSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("static-foo", "foo.static.k8s.io"),
+			}},
+			apiSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("api-foo-bar", "foo-bar"),
+			}},
+			order:    webhookadmission.ByName,
+			wantUIDs: []string{"api-foo-bar", "static-foo"},
+		},
+		{
+			name: "ByName does not preserve position against an earlier dot sibling",
+			// foo.bar.io sorts between foo and foo.static.k8s.io, so migrating foo
+			// moves it after foo.bar.io. This is a documented limitation of ByName,
+			// pinned here so a refactor cannot silently change it.
+			staticSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("static-foo", "foo.static.k8s.io"),
+			}},
+			apiSource: &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+				createTestValidatingWebhook("api-foo-bar-io", "foo.bar.io"),
+			}},
+			order:    webhookadmission.ByName,
+			wantUIDs: []string{"api-foo-bar-io", "static-foo"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := NewCompositeWebhookSource(tt.staticSource, tt.apiSource)
+			source := newCompositeWebhookSource(tt.staticSource, tt.apiSource, tt.order)
 			webhooks := source.Webhooks()
 
 			if len(webhooks) != len(tt.wantUIDs) {
@@ -111,7 +196,7 @@ func TestCompositeWebhookSource_Caching(t *testing.T) {
 	staticSource := &mockSource{webhooks: []webhook.WebhookAccessor{staticWebhook}, hasSynced: true}
 	apiSource := &mockSource{webhooks: []webhook.WebhookAccessor{apiWebhook}, hasSynced: true}
 
-	source := NewCompositeWebhookSource(staticSource, apiSource)
+	source := newCompositeWebhookSource(staticSource, apiSource, webhookadmission.StaticFirst)
 
 	// First call should create the combined slice.
 	webhooks1 := source.Webhooks()
@@ -135,6 +220,58 @@ func TestCompositeWebhookSource_Caching(t *testing.T) {
 	if &webhooks2[0] == &webhooks3[0] {
 		t.Error("Expected new slice after underlying source changed")
 	}
+
+	// Changing the api source should also invalidate the cache.
+	newAPIWebhook := createTestValidatingWebhook("api-2", "api-config-2")
+	apiSource.webhooks = []webhook.WebhookAccessor{newAPIWebhook}
+	webhooks4 := source.Webhooks()
+	if webhooks4[1].GetUID() != "api-2" {
+		t.Errorf("Expected second webhook UID to be api-2 after update, got %s", webhooks4[1].GetUID())
+	}
+	if &webhooks3[0] == &webhooks4[0] {
+		t.Error("Expected new slice after api source changed")
+	}
+}
+
+// TestCompositeWebhookSource_ByNameRecomputedOnReload verifies that the interleave is
+// recomputed, not just re-concatenated, when the static source swaps in a new accessor
+// slice on reload.
+func TestCompositeWebhookSource_ByNameRecomputedOnReload(t *testing.T) {
+	staticSource := &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+		createTestValidatingWebhook("static-b", "b-config.static.k8s.io"),
+	}}
+	apiSource := &mockSource{hasSynced: true, webhooks: []webhook.WebhookAccessor{
+		createTestValidatingWebhook("api-a", "a-config"),
+		createTestValidatingWebhook("api-c", "c-config"),
+	}}
+
+	source := newCompositeWebhookSource(staticSource, apiSource, webhookadmission.ByName)
+
+	assertUIDs := func(t *testing.T, got []webhook.WebhookAccessor, want []string) {
+		t.Helper()
+		if len(got) != len(want) {
+			t.Fatalf("Webhooks() returned %d webhooks, want %d", len(got), len(want))
+		}
+		for i, w := range got {
+			if w.GetUID() != want[i] {
+				t.Errorf("Webhooks()[%d].GetUID() = %s, want %s", i, w.GetUID(), want[i])
+			}
+		}
+	}
+
+	assertUIDs(t, source.Webhooks(), []string{"api-a", "static-b", "api-c"})
+
+	// Reload replaces the static accessors with a configuration that sorts last.
+	staticSource.webhooks = []webhook.WebhookAccessor{
+		createTestValidatingWebhook("static-d", "d-config.static.k8s.io"),
+	}
+	assertUIDs(t, source.Webhooks(), []string{"api-a", "api-c", "static-d"})
+
+	// Reload again with a configuration that sorts first.
+	staticSource.webhooks = []webhook.WebhookAccessor{
+		createTestValidatingWebhook("static-0", "0-config.static.k8s.io"),
+	}
+	assertUIDs(t, source.Webhooks(), []string{"static-0", "api-a", "api-c"})
 }
 
 func TestCompositeWebhookSource_HasSynced(t *testing.T) {
@@ -178,7 +315,7 @@ func TestCompositeWebhookSource_HasSynced(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			source := NewCompositeWebhookSource(tt.staticSource, tt.apiSource)
+			source := newCompositeWebhookSource(tt.staticSource, tt.apiSource, webhookadmission.StaticFirst)
 			if got := source.HasSynced(); got != tt.want {
 				t.Errorf("HasSynced() = %v, want %v", got, tt.want)
 			}

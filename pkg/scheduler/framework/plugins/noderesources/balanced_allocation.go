@@ -22,13 +22,14 @@ import (
 	"math"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -56,7 +57,7 @@ type draPreScoreState struct {
 	// allocatedState holds the DRA allocated state for DRA extended resources scoring.
 	allocatedState *structured.AllocatedState
 	// resourceSlices holds the list of resource slices for DRA extended resource scoring.
-	resourceSlices []*resourceapi.ResourceSlice
+	resourceSlices []*draapi.ResourceSlice
 }
 
 // balancedAllocationPreScoreState computed at PreScore and used at Score.
@@ -131,7 +132,7 @@ func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.S
 				continue
 			}
 
-			if shouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+			if helper.ShouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
 				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
 			}
 		}
@@ -188,13 +189,12 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:                            BalancedAllocationName,
-			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-			enablePodLevelResources:         fts.EnablePodLevelResources,
-			enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
-			scorer:                          balancedResourceScorer,
-			useRequested:                    true,
-			resources:                       args.Resources,
+			Name:                      BalancedAllocationName,
+			enablePodLevelResources:   fts.EnablePodLevelResources,
+			enableDRAExtendedResource: fts.EnableDRAExtendedResource,
+			scorer:                    balancedResourceScorer,
+			useRequested:              true,
+			resources:                 args.Resources,
 			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 			draManager: h.SharedDRAManager(),
 		},

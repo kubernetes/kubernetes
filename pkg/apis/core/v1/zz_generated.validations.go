@@ -306,6 +306,70 @@ func Validate_ConfigMap(
 	return errs
 }
 
+// Validate_Container validates an instance of Container according
+// to declarative validation rules in the API schema.
+func Validate_Container(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.Container) (errs field.ErrorList) {
+
+	// field corev1.Container.Name has no validation
+	// field corev1.Container.Image has no validation
+	// field corev1.Container.Command has no validation
+	// field corev1.Container.Args has no validation
+	// field corev1.Container.WorkingDir has no validation
+	// field corev1.Container.Ports has no validation
+	// field corev1.Container.EnvFrom has no validation
+	// field corev1.Container.Env has no validation
+	// field corev1.Container.Resources has no validation
+	// field corev1.Container.ResizePolicy has no validation
+	// field corev1.Container.RestartPolicy has no validation
+	// field corev1.Container.RestartPolicyRules has no validation
+	// field corev1.Container.VolumeMounts has no validation
+	// field corev1.Container.VolumeDevices has no validation
+	// field corev1.Container.LivenessProbe has no validation
+	// field corev1.Container.ReadinessProbe has no validation
+	// field corev1.Container.StartupProbe has no validation
+	// field corev1.Container.Lifecycle has no validation
+	// field corev1.Container.TerminationMessagePath has no validation
+	// field corev1.Container.TerminationMessagePolicy has no validation
+	// field corev1.Container.ImagePullPolicy has no validation
+
+	{ // field corev1.Container.SecurityContext
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SecurityContext,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SecurityContext(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Container) *corev1.SecurityContext {
+				return oldObj.SecurityContext
+			})
+		errs = append(errs, fn(fldPath.Child("securityContext"), obj.SecurityContext, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.Container.Stdin has no validation
+	// field corev1.Container.StdinOnce has no validation
+	// field corev1.Container.TTY has no validation
+	return errs
+}
+
 // Validate_Endpoints validates an instance of Endpoints according
 // to declarative validation rules in the API schema.
 func Validate_Endpoints(
@@ -337,6 +401,102 @@ func Validate_Endpoints(
 	}
 
 	// field corev1.Endpoints.Subsets has no validation
+	return errs
+}
+
+// Validate_EphemeralContainer validates an instance of EphemeralContainer according
+// to declarative validation rules in the API schema.
+func Validate_EphemeralContainer(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.EphemeralContainer) (errs field.ErrorList) {
+
+	{ // field corev1.EphemeralContainer.EphemeralContainerCommon
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.EphemeralContainerCommon,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EphemeralContainerCommon(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.EphemeralContainer) *corev1.EphemeralContainerCommon {
+				return &oldObj.EphemeralContainerCommon
+			})
+		errs = append(errs, fn(safe.Value(fldPath, func() *field.Path { return fldPath.Child("corev1.EphemeralContainerCommon") }), &obj.EphemeralContainerCommon, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.EphemeralContainer.TargetContainerName has no validation
+	return errs
+}
+
+// Validate_EphemeralContainerCommon validates an instance of EphemeralContainerCommon according
+// to declarative validation rules in the API schema.
+func Validate_EphemeralContainerCommon(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.EphemeralContainerCommon) (errs field.ErrorList) {
+
+	// field corev1.EphemeralContainerCommon.Name has no validation
+	// field corev1.EphemeralContainerCommon.Image has no validation
+	// field corev1.EphemeralContainerCommon.Command has no validation
+	// field corev1.EphemeralContainerCommon.Args has no validation
+	// field corev1.EphemeralContainerCommon.WorkingDir has no validation
+	// field corev1.EphemeralContainerCommon.Ports has no validation
+	// field corev1.EphemeralContainerCommon.EnvFrom has no validation
+	// field corev1.EphemeralContainerCommon.Env has no validation
+	// field corev1.EphemeralContainerCommon.Resources has no validation
+	// field corev1.EphemeralContainerCommon.ResizePolicy has no validation
+	// field corev1.EphemeralContainerCommon.RestartPolicy has no validation
+	// field corev1.EphemeralContainerCommon.RestartPolicyRules has no validation
+	// field corev1.EphemeralContainerCommon.VolumeMounts has no validation
+	// field corev1.EphemeralContainerCommon.VolumeDevices has no validation
+	// field corev1.EphemeralContainerCommon.LivenessProbe has no validation
+	// field corev1.EphemeralContainerCommon.ReadinessProbe has no validation
+	// field corev1.EphemeralContainerCommon.StartupProbe has no validation
+	// field corev1.EphemeralContainerCommon.Lifecycle has no validation
+	// field corev1.EphemeralContainerCommon.TerminationMessagePath has no validation
+	// field corev1.EphemeralContainerCommon.TerminationMessagePolicy has no validation
+	// field corev1.EphemeralContainerCommon.ImagePullPolicy has no validation
+
+	{ // field corev1.EphemeralContainerCommon.SecurityContext
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SecurityContext,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SecurityContext(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.EphemeralContainerCommon) *corev1.SecurityContext {
+				return oldObj.SecurityContext
+			})
+		errs = append(errs, fn(fldPath.Child("securityContext"), obj.SecurityContext, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.EphemeralContainerCommon.Stdin has no validation
+	// field corev1.EphemeralContainerCommon.StdinOnce has no validation
+	// field corev1.EphemeralContainerCommon.TTY has no validation
 	return errs
 }
 
@@ -1012,11 +1172,11 @@ func Validate_NodeSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if e := validate.UpdateValue(ctx, op, fldPath, obj, oldObj,
-				func(a string, b string) bool { return a == b }, validate.NoUnset, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				func(a string, b string) bool { return a == b }, validate.NoUnset, validate.NoModify).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1050,7 +1210,10 @@ func Validate_NodeSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "InPlacePodVerticalScalingSchedulerPreemption", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "InPlacePodVerticalScalingSchedulerPreemption", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.NodePodPreemptionPolicy) field.ErrorList {
+					return validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1294,6 +1457,58 @@ func Validate_Pod(
 	return errs
 }
 
+// Validate_PodSecurityContext validates an instance of PodSecurityContext according
+// to declarative validation rules in the API schema.
+func Validate_PodSecurityContext(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PodSecurityContext) (errs field.ErrorList) {
+
+	// field corev1.PodSecurityContext.SELinuxOptions has no validation
+	// field corev1.PodSecurityContext.WindowsOptions has no validation
+	// field corev1.PodSecurityContext.RunAsUser has no validation
+	// field corev1.PodSecurityContext.RunAsGroup has no validation
+	// field corev1.PodSecurityContext.RunAsNonRoot has no validation
+	// field corev1.PodSecurityContext.SupplementalGroups has no validation
+	// field corev1.PodSecurityContext.SupplementalGroupsPolicy has no validation
+	// field corev1.PodSecurityContext.FSGroup has no validation
+	// field corev1.PodSecurityContext.Sysctls has no validation
+	// field corev1.PodSecurityContext.FSGroupChangePolicy has no validation
+
+	{ // field corev1.PodSecurityContext.SeccompProfile
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SeccompProfile,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SeccompProfile(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSecurityContext) *corev1.SeccompProfile {
+				return oldObj.SeccompProfile
+			})
+		errs = append(errs, fn(fldPath.Child("seccompProfile"), obj.SeccompProfile, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.PodSecurityContext.AppArmorProfile has no validation
+	// field corev1.PodSecurityContext.SELinuxChangePolicy has no validation
+	return errs
+}
+
 // Validate_PodSpec validates an instance of PodSpec according
 // to declarative validation rules in the API schema.
 func Validate_PodSpec(
@@ -1312,17 +1527,146 @@ func Validate_PodSpec(
 				return false
 			}
 			return obj.SchedulingGroup != nil
-		}).MarkAlpha(); len(e) != 0 {
+		}).MarkBeta(); len(e) != 0 {
 		errs = append(errs, e...)
 	}
 
 	// field corev1.PodSpec.Volumes has no validation
-	// field corev1.PodSpec.InitContainers has no validation
-	// field corev1.PodSpec.Containers has no validation
-	// field corev1.PodSpec.EphemeralContainers has no validation
+
+	{ // field corev1.PodSpec.InitContainers
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.Container,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Container); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) []corev1.Container {
+				return oldObj.InitContainers
+			})
+		errs = append(errs, fn(fldPath.Child("initContainers"), obj.InitContainers, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.PodSpec.Containers
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.Container,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Container); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) []corev1.Container {
+				return oldObj.Containers
+			})
+		errs = append(errs, fn(fldPath.Child("containers"), obj.Containers, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.PodSpec.EphemeralContainers
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []corev1.EphemeralContainer,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachValSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_EphemeralContainer); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) []corev1.EphemeralContainer {
+				return oldObj.EphemeralContainers
+			})
+		errs = append(errs, fn(fldPath.Child("ephemeralContainers"), obj.EphemeralContainers, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.PodSpec.RestartPolicy has no validation
 	// field corev1.PodSpec.TerminationGracePeriodSeconds has no validation
-	// field corev1.PodSpec.ActiveDeadlineSeconds has no validation
+
+	{ // field corev1.PodSpec.ActiveDeadlineSeconds
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.Maximum(ctx, op, fldPath, obj, oldObj, 2147483647).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) *int64 {
+				return oldObj.ActiveDeadlineSeconds
+			})
+		errs = append(errs, fn(fldPath.Child("activeDeadlineSeconds"), obj.ActiveDeadlineSeconds, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.PodSpec.DNSPolicy has no validation
 	// field corev1.PodSpec.NodeSelector has no validation
 	// field corev1.PodSpec.ServiceAccountName has no validation
@@ -1333,7 +1677,37 @@ func Validate_PodSpec(
 	// field corev1.PodSpec.HostPID has no validation
 	// field corev1.PodSpec.HostIPC has no validation
 	// field corev1.PodSpec.ShareProcessNamespace has no validation
-	// field corev1.PodSpec.SecurityContext has no validation
+
+	{ // field corev1.PodSpec.SecurityContext
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodSecurityContext,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_PodSecurityContext(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PodSpec) *corev1.PodSecurityContext {
+				return oldObj.SecurityContext
+			})
+		errs = append(errs, fn(fldPath.Child("securityContext"), obj.SecurityContext, oldVal, oldObj != nil)...)
+	}
+
 	// field corev1.PodSpec.ImagePullSecrets has no validation
 	// field corev1.PodSpec.Hostname has no validation
 	// field corev1.PodSpec.Subdomain has no validation
@@ -1353,7 +1727,7 @@ func Validate_PodSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1869,12 +2243,25 @@ func Validate_ReplicationControllerSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
+			func() { // cohort = "spec.restartPolicy"
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "spec",
+					func(o *corev1.PodTemplateSpec) *corev1.PodSpec { return &o.Spec }, validate.SemanticDeepEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.PodSpec) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "restartPolicy",
+							func(o *corev1.PodSpec) *corev1.RestartPolicy { return &o.RestartPolicy }, validate.DirectEqual,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.RestartPolicy) field.ErrorList {
+								return validate.EQ(ctx, op, fldPath, obj, oldObj, "Always")
+							})
+					}).MarkAlpha(); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+			}()
 			// call the type's validation function
 			errs = append(errs, Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -1921,6 +2308,94 @@ func Validate_ResourceQuota(
 
 	// field corev1.ResourceQuota.Spec has no validation
 	// field corev1.ResourceQuota.Status has no validation
+	return errs
+}
+
+var unionMembershipFor_k8s_io_api_core_v1_SeccompProfile_ = validate.NewDiscriminatedUnionMembership("type", validate.NewDiscriminatedUnionMember("oci", "OCI"))
+
+// Validate_SeccompProfile validates an instance of SeccompProfile according
+// to declarative validation rules in the API schema.
+func Validate_SeccompProfile(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.SeccompProfile) (errs field.ErrorList) {
+
+	if e := validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_core_v1_SeccompProfile_,
+		func(obj *corev1.SeccompProfile) string {
+			if obj == nil {
+				return ""
+			}
+			return string(obj.Type)
+		},
+		func(obj *corev1.SeccompProfile) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.OCI != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field corev1.SeccompProfile.Type
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SeccompProfileType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SeccompProfile) *corev1.SeccompProfileType {
+				return &oldObj.Type
+			})
+		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.SeccompProfile.LocalhostProfile has no validation
+
+	{ // field corev1.SeccompProfile.OCI
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SecurityProfileOCI,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SecurityProfileOCI(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SeccompProfile) *corev1.SecurityProfileOCI {
+				return oldObj.OCI
+			})
+		errs = append(errs, fn(fldPath.Child("oci"), obj.OCI, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -1971,7 +2446,7 @@ func Validate_Secret(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -1988,6 +2463,240 @@ func Validate_Secret(
 				return &oldObj.Type
 			})
 		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_SecurityContext validates an instance of SecurityContext according
+// to declarative validation rules in the API schema.
+func Validate_SecurityContext(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.SecurityContext) (errs field.ErrorList) {
+
+	// field corev1.SecurityContext.Capabilities has no validation
+	// field corev1.SecurityContext.Privileged has no validation
+	// field corev1.SecurityContext.SELinuxOptions has no validation
+	// field corev1.SecurityContext.WindowsOptions has no validation
+	// field corev1.SecurityContext.RunAsUser has no validation
+	// field corev1.SecurityContext.RunAsGroup has no validation
+	// field corev1.SecurityContext.RunAsNonRoot has no validation
+	// field corev1.SecurityContext.ReadOnlyRootFilesystem has no validation
+	// field corev1.SecurityContext.AllowPrivilegeEscalation has no validation
+	// field corev1.SecurityContext.ProcMount has no validation
+
+	{ // field corev1.SecurityContext.SeccompProfile
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SeccompProfile,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SeccompProfile(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SecurityContext) *corev1.SeccompProfile {
+				return oldObj.SeccompProfile
+			})
+		errs = append(errs, fn(fldPath.Child("seccompProfile"), obj.SeccompProfile, oldVal, oldObj != nil)...)
+	}
+
+	// field corev1.SecurityContext.AppArmorProfile has no validation
+	return errs
+}
+
+// Validate_SecurityProfileOCI validates an instance of SecurityProfileOCI according
+// to declarative validation rules in the API schema.
+func Validate_SecurityProfileOCI(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.SecurityProfileOCI) (errs field.ErrorList) {
+
+	{ // field corev1.SecurityProfileOCI.Ref
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// custom validation
+			if e := ValidateCustom_SecurityProfileOCI_Ref(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 1024); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SecurityProfileOCI) *string {
+				return &oldObj.Ref
+			})
+		errs = append(errs, fn(fldPath.Child("ref"), &obj.Ref, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.SecurityProfileOCI.BaseProfile
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SecurityProfileOCIBase,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if validate.SemanticDeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SecurityProfileOCIBase(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SecurityProfileOCI) *corev1.SecurityProfileOCIBase {
+				return oldObj.BaseProfile
+			})
+		errs = append(errs, fn(fldPath.Child("baseProfile"), obj.BaseProfile, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var unionMembershipFor_k8s_io_api_core_v1_SecurityProfileOCIBase_ = validate.NewDiscriminatedUnionMembership("type", validate.NewDiscriminatedUnionMember("localhostProfile", "Localhost"))
+
+// Validate_SecurityProfileOCIBase validates an instance of SecurityProfileOCIBase according
+// to declarative validation rules in the API schema.
+func Validate_SecurityProfileOCIBase(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.SecurityProfileOCIBase) (errs field.ErrorList) {
+
+	if e := validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_core_v1_SecurityProfileOCIBase_,
+		func(obj *corev1.SecurityProfileOCIBase) string {
+			if obj == nil {
+				return ""
+			}
+			return string(obj.Type)
+		},
+		func(obj *corev1.SecurityProfileOCIBase) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.LocalhostProfile != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field corev1.SecurityProfileOCIBase.Type
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SecurityProfileOCIBaseType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_SecurityProfileOCIBaseType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SecurityProfileOCIBase) *corev1.SecurityProfileOCIBaseType {
+				return &oldObj.Type
+			})
+		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
+	}
+
+	{ // field corev1.SecurityProfileOCIBase.LocalhostProfile
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// custom validation
+			if e := ValidateCustom_SecurityProfileOCIBase_LocalhostProfile(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 4096); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.SecurityProfileOCIBase) *string {
+				return oldObj.LocalhostProfile
+			})
+		errs = append(errs, fn(fldPath.Child("localhostProfile"), obj.LocalhostProfile, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var symbolsForSecurityProfileOCIBaseType = sets.New(corev1.SecurityProfileOCIBaseTypeLocalhost, corev1.SecurityProfileOCIBaseTypeRuntimeDefault)
+
+// Validate_SecurityProfileOCIBaseType validates an instance of SecurityProfileOCIBaseType according
+// to declarative validation rules in the API schema.
+func Validate_SecurityProfileOCIBaseType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.SecurityProfileOCIBaseType) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForSecurityProfileOCIBaseType, nil); len(e) != 0 {
+		errs = append(errs, e...)
 	}
 
 	return errs
@@ -2083,13 +2792,13 @@ func Validate_Toleration(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
 			return

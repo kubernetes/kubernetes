@@ -231,6 +231,28 @@ func TestBootstrapControllerRoles(t *testing.T) {
 	testObjects(t, list, "controller-roles.yaml")
 }
 
+func TestBootstrapControllerRolesWithFeatureGatesEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		"AllAlpha": true,
+		"AllBeta":  true,
+	})
+
+	roles := bootstrappolicy.ControllerRoles()
+	featureGateList := &api.List{}
+	featureGateNames := sets.NewString()
+	featureGateRoles := map[string]runtime.Object{}
+	for i := range roles {
+		role := roles[i]
+		featureGateNames.Insert(role.Name)
+		featureGateRoles[role.Name] = &role
+	}
+	for _, featureGateName := range featureGateNames.List() {
+		featureGateList.Items = append(featureGateList.Items, featureGateRoles[featureGateName])
+	}
+
+	testObjects(t, featureGateList, "controller-roles-featuregates.yaml")
+}
+
 func TestBootstrapControllerRoleBindings(t *testing.T) {
 	list := &api.List{}
 	names := sets.NewString()

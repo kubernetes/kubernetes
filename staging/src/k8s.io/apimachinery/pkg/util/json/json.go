@@ -18,8 +18,13 @@ package json
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
+	"reflect"
+	"strconv"
 
 	kjson "sigs.k8s.io/json"
 )
@@ -44,6 +49,45 @@ const maxDepth = 10000
 // Numbers decoded into interface{} fields are converted to int64 or float64.
 func Unmarshal(data []byte, v interface{}) error {
 	return kjson.UnmarshalCaseSensitivePreserveInts(data, v)
+}
+
+// preserveInts decodes a JSON number into an int64 when it is an integer that
+// fits, and into a float64 otherwise.
+func preserveInts(dec *jsontext.Decoder, val *any) error {
+	// ErrUnsupported falls back to the default decoding.
+	if dec.PeekKind() != '0' {
+		return errors.ErrUnsupported
+	}
+
+	value, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+
+	if i, err := strconv.ParseInt(string(value), 10, 64); err == nil {
+		*val = i
+		return nil
+	}
+
+	f, err := strconv.ParseFloat(string(value), 64)
+	if err != nil {
+		// Out of range, such as 1e400.
+		return &json.UnmarshalTypeError{Value: string(value), Type: reflect.TypeOf(f)}
+	}
+	*val = f
+	return nil
+}
+
+// CaseSensitivePreserveIntsV2Options returns json/v2 options that decode like
+// Unmarshal into interface{} values: object keys match case-sensitively, and
+// numbers are int64 when they are integers that fit, float64 otherwise.
+// Everything else follows encoding/json v1.
+func CaseSensitivePreserveIntsV2Options() jsonv2.Options {
+	return jsonv2.JoinOptions(
+		json.DefaultOptionsV1(),
+		jsonv2.MatchCaseInsensitiveNames(false),
+		jsonv2.WithUnmarshalers(jsonv2.UnmarshalFromFunc(preserveInts)),
+	)
 }
 
 // ConvertInterfaceNumbers converts any json.Number values to int64 or float64.

@@ -27,7 +27,7 @@ var (
 	recoveryLinePctRE    = regexp.MustCompile(`= (.+)%`)
 	recoveryLineFinishRE = regexp.MustCompile(`finish=(.+)min`)
 	recoveryLineSpeedRE  = regexp.MustCompile(`speed=(.+)[A-Z]`)
-	componentDeviceRE    = regexp.MustCompile(`(.*)\[(\d+)\](\([SF]+\))?`)
+	componentDeviceRE    = regexp.MustCompile(`(.*)\[(\d+)\]((?:\([FJRSW]\))+)?`)
 	personalitiesPrefix  = "Personalities : "
 )
 

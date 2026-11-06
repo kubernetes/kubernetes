@@ -1010,6 +1010,41 @@ func TestCustomToUnstructuredTopLevel(t *testing.T) {
 			assert.Equal(t, expected, result)
 		})
 	}
+
+	t.Run("TopLevelKeys", func(t *testing.T) {
+		t.Parallel()
+		type Inlined struct {
+			Kind string `json:"kind,omitempty"`
+		}
+		type TopLevelObj struct {
+			Inlined `json:",inline"`
+			Spec    map[string]string `json:"spec,omitempty"`
+			Status  map[string]string `json:"status,omitempty"`
+		}
+		orig := &TopLevelObj{
+			Inlined: Inlined{Kind: "Pod"},
+			Spec:    map[string]string{"a": "1"},
+			Status:  map[string]string{"phase": "Pending"},
+		}
+		topKeys := map[string]interface{}{"status": nil}
+		u, err := runtime.DefaultUnstructuredConverter.ToUnstructuredTopLevel(orig, topKeys)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]interface{}{
+			"kind":   "Pod",
+			"status": map[string]interface{}{"phase": "Pending"},
+		}, u)
+
+		dst := &TopLevelObj{
+			Inlined: orig.Inlined,
+			Spec:    map[string]string{"a": "1"},
+			Status:  map[string]string{"phase": "Pending", "stale": "true"},
+		}
+		u["status"] = map[string]interface{}{"phase": "Running"}
+		require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructuredWithValidationTopLevel(u, dst, true, topKeys))
+		assert.Equal(t, "Pod", dst.Kind)
+		assert.Equal(t, map[string]string{"a": "1"}, dst.Spec)
+		assert.Equal(t, map[string]string{"phase": "Running"}, dst.Status)
+	})
 }
 
 type OmitemptyNameField struct {
