@@ -295,17 +295,26 @@ func CouldBenefitFromBuiltinEvaluation(d ConditionsAwareDecision, recognizes fun
 	if recognizes == nil {
 		return false
 	}
+	if d.IsUnconditional() {
+		return false
+	}
 	cm, ok := firstConditionsMapToEvaluate(d)
 	if !ok {
 		return false
 	}
-	conditions := cm.AllowConditions()
 	switch {
 	case len(cm.denyConditions) != 0:
-		conditions = cm.DenyConditions()
+		return recognizesAny(cm.DenyConditions(), recognizes)
 	case len(cm.noOpinionConditions) != 0:
-		conditions = cm.NoOpinionConditions()
+		return recognizesAny(cm.NoOpinionConditions(), recognizes)
+	case len(cm.allowConditions) != 0:
+		return recognizesAny(cm.AllowConditions(), recognizes)
+	default:
+		return false // should be unreachable, as a ConditionsMap always has at least one deny or allow condition, but to b
 	}
+}
+
+func recognizesAny(conditions iter.Seq[Condition], recognizes func(Condition) bool) bool {
 	for cond := range conditions {
 		if recognizes(cond) {
 			return true
@@ -322,15 +331,10 @@ func firstConditionsMapToEvaluate(d ConditionsAwareDecision) (ConditionsMap, boo
 		return d.ConditionsMap(), true
 	case d.IsUnion():
 		for _, subDecision := range d.UnionedDecisions() {
-			if subDecision.IsNoOpinion() {
-				continue
+			cm, ok := firstConditionsMapToEvaluate(subDecision)
+			if ok {
+				return cm, ok
 			}
-			if subDecision.IsUnconditional() {
-				// Allow or Deny; the walk returns before evaluating anything after it.
-				return ConditionsMap{}, false
-			}
-			// The walk never proceeds past a sub-decision that stays conditional.
-			return firstConditionsMapToEvaluate(subDecision)
 		}
 	}
 	return ConditionsMap{}, false
