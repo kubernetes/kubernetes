@@ -46,6 +46,9 @@ func setupAPIServer(tCtx ktesting.TContext) (ktesting.TContext, http.Handler, *i
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.AdvertiseAddress = netutils.ParseIPSloppy("10.0.1.1")
 			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			// Prevent periodic 5m auto-compaction from expiring seeded ResourceVersions
+			// (LIST rv=Exact) or injecting mid-benchmark allocation/latency spikes.
+			opts.Etcd.StorageConfig.CompactionInterval = 0
 		},
 		ModifyServerConfig: func(cfg *controlplane.Config) {
 			generic := cfg.ControlPlane.Generic

@@ -688,6 +688,8 @@ func benchmarkScenario(b *testing.B, tCtx ktesting.TContext, server http.Handler
 			}
 
 			var postGCMem runtime.MemStats
+			// Flush both generations of Go's sync.Pool victim cache before sampling retained heap.
+			runtime.GC()
 			debug.FreeOSMemory()
 			runtime.ReadMemStats(&postGCMem)
 
