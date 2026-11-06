@@ -83,6 +83,9 @@ type Config struct {
 	DBMetricPollInterval time.Duration
 	// EventsHistoryWindow specifies minimum history duration that storage is keeping.
 	EventsHistoryWindow time.Duration
+	// WatchCacheMaxEvents, if positive, overrides the upper bound of the watch
+	// cache event history capacity. Zero keeps the value derived from EventsHistoryWindow.
+	WatchCacheMaxEvents int
 	// HealthcheckTimeout specifies the timeout used when checking health
 	HealthcheckTimeout time.Duration
 	// ReadycheckTimeout specifies the timeout used when checking readiness

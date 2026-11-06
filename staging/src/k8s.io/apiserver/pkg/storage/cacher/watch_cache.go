@@ -119,10 +119,11 @@ func newWatchCache(
 	indexers *cache.Indexers,
 	clock clock.WithTicker,
 	eventFreshDuration time.Duration,
+	maxEvents int,
 	groupResource schema.GroupResource,
 	progressRequester *progress.ConditionalProgressRequester,
 	getCurrentRV func(context.Context) (uint64, error),
-) *watchCache {
+) (*watchCache, error) {
 	config := &ImmutableWatchCacheConfig{
 		keyFunc:       keyFunc,
 		getAttrsFunc:  getAttrsFunc,
@@ -133,16 +134,21 @@ func newWatchCache(
 		getCurrentRV:  getCurrentRV,
 	}
 
+	history, err := newWatchCacheHistory(config, eventFreshDuration, maxEvents)
+	if err != nil {
+		return nil, err
+	}
+
 	wc := &watchCache{
 		resourceVersion: 0,
 		config:          config,
-		history:         newWatchCacheHistory(config, eventFreshDuration),
+		history:         history,
 		storage:         store.NewWatchCacheStorage(indexers),
 	}
 	wc.freshness = newFreshnessWaiter(wc.RLocker(), &wc.resourceVersion, clock, groupResource, progressRequester)
 	wc.config.indexValidator = wc.history.isIndexValidLocked
 
-	return wc
+	return wc, nil
 }
 
 // Add takes runtime.Object as an argument.
