@@ -108,7 +108,8 @@ func (pl *DynamicResources) RemoveNomination(ctx context.Context, pod *v1.Pod, n
 // which ended or got replaced, so that pods waiting for devices get another
 // chance, unless the pod keeps them. It keeps them if the nomination which
 // replaces this one holds them for the same claims (kept), or if its claims
-// use them.
+// use them: the nomination of an assumed pod ends after Reserve, so the
+// devices which it reserved are pending allocations of its claims then.
 func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, nomination *podNomination, kept map[types.UID]heldClaim) framework.NominationChangeResult {
 	if nomination == nil {
 		return framework.NominationChangeResult{}

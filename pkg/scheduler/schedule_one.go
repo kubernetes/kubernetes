@@ -232,6 +232,9 @@ func (sched *Scheduler) prepareForBindingCycle(
 
 		return assumedPodInfo, runPermitStatus
 	}
+	if nominationEndsAfterPermit() {
+		schedFramework.DeleteNominatedPodIfExists(assumedPod)
+	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
 	if len(podsToActivate.Map) != 0 {

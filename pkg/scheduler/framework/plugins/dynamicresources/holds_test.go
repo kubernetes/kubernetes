@@ -506,6 +506,8 @@ func testHoldReleaseEvents(tCtx ktesting.TContext) {
 			},
 			wantDevices: []string{"gpu-0"},
 		},
+		// Reserve or Permit rejected the pod: its nomination ends after
+		// Unreserve.
 		"assumed-and-unreserved": {
 			change: func(tCtx ktesting.TContext, testCtx *testContext) framework.NominationChangeResult {
 				deallocate(tCtx, testCtx, "victim-claim")
