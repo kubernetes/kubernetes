@@ -28,10 +28,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
-	apiscel "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -67,10 +65,11 @@ type reloadableAuthorizerResolver struct {
 	reloadInterval         time.Duration
 	requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]
 
-	nodeAuthorizer *node.NodeAuthorizer
-	rbacAuthorizer *rbac.RBACAuthorizer
-	abacAuthorizer abac.PolicyList
-	compiler       authorizationcel.Compiler // non-nil and shared across reloads.
+	nodeAuthorizer                    *node.NodeAuthorizer
+	rbacAuthorizer                    *rbac.RBACAuthorizer
+	abacAuthorizer                    abac.PolicyList
+	compiler                          authorizationcel.Compiler                    // non-nil and shared across reloads.
+	builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder // non-nil when tbe ConditionalAuthorization feature is on, shared across reloads.
 
 	lastLoadedLock   sync.Mutex
 	lastLoadedConfig *authzconfig.AuthorizationConfiguration
@@ -185,7 +184,6 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			}
 			var conditionsReviewConfig *rest.Config
 			var conditionsReviewVersion string
-			var builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder
 			if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
 				if cr := configuredAuthorizer.Webhook.ConditionsReview; cr != nil {
 					conditionsReviewConfig, err = webhookutil.LoadKubeconfigWithContext(
@@ -199,15 +197,6 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 					conditionsReviewVersion = cr.Version
 					if configuredAuthorizer.Webhook.Timeout.Duration != 0 {
 						conditionsReviewConfig.Timeout = configuredAuthorizer.Webhook.Timeout.Duration
-					}
-
-					builtinConditionsEvaluatorBuilder, err = plugincel.NewAuthorizationConditionsEvaluatorBuilder(
-						r.initialConfig.VersionedInformerFactory,
-						r.initialConfig.KubeClient,
-						apiscel.RuntimeCELCostBudget,
-					)
-					if err != nil {
-						klog.Warningf("failed to construct in-process CEL authorization conditions evaluator, conditions will be evaluated by the webhook: %v", err)
 					}
 				}
 			}
@@ -229,7 +218,7 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				webhookMetrics,
 				conditionsReviewConfig,
 				conditionsReviewVersion,
-				builtinConditionsEvaluatorBuilder,
+				r.builtinConditionsEvaluatorBuilder,
 			)
 			if err != nil {
 				return nil, nil, err

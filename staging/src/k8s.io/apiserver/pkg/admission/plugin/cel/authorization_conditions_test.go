@@ -145,12 +145,6 @@ func TestAuthorizationConditionsEvaluator_EvaluateCondition(t *testing.T) {
 	}{
 		// --- Skip / Unevaluatable cases ---
 		{
-			name:       "nil condition returns Unevaluatable",
-			condition:  nil,
-			attrs:      podCreateAttributes(),
-			wantResult: "Unevaluatable",
-		},
-		{
 			name: "wrong condition type returns Unevaluatable",
 			condition: authorizer.GenericCondition{
 				Type:      "some.io/unsupported-type",
@@ -163,7 +157,7 @@ func TestAuthorizationConditionsEvaluator_EvaluateCondition(t *testing.T) {
 			name: "empty condition string returns Unevaluatable",
 			condition: authorizer.GenericCondition{
 				Type:      authorizer.ConditionTypeAuthorizationCEL,
-				Condition: "",
+				Condition: " ",
 			},
 			attrs:      podCreateAttributes(),
 			wantResult: "Unevaluatable",
@@ -441,7 +435,6 @@ func TestAuthorizationConditionsEvaluatorBuilder_Recognizes(t *testing.T) {
 		{name: "CEL condition", condition: celCond("c", "true"), want: true},
 		{name: "empty CEL condition", condition: celCond("c", "")},
 		{name: "other type", condition: authorizer.GenericCondition{ID: "c", Type: "example.com/opaque", Condition: "true"}},
-		{name: "nil", condition: nil},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

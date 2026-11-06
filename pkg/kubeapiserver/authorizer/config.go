@@ -27,11 +27,14 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	authzconfig "k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/load"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
+	apiscel "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1 "k8s.io/client-go/informers/certificates/v1"
@@ -92,6 +95,18 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		lastReadData:     []byte(config.InitialAuthorizationConfigurationData),
 		reloadInterval:   time.Minute,
 		compiler:         authorizationcel.NewDefaultCompiler(),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		var err error
+		r.builtinConditionsEvaluatorBuilder, err = plugincel.NewAuthorizationConditionsEvaluatorBuilder(
+			config.VersionedInformerFactory,
+			config.KubeClient,
+			apiscel.RuntimeCELCostBudget,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to construct in-process CEL authorization conditions evaluator, conditions will be evaluated by the webhook: %v", err)
+		}
 	}
 
 	seenTypes := sets.New[authzconfig.AuthorizerType]()

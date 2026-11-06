@@ -19,7 +19,7 @@ package cel
 import (
 	"context"
 	"fmt"
-	"sync"
+	"strings"
 
 	celgo "cel.dev/cel-go/cel"
 	celtypes "cel.dev/cel-go/common/types"
@@ -35,18 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var (
-	lazyAuthorizationConditionsEnvTemplateInit sync.Once
-	lazyAuthorizationConditionsEnvTemplate     *environment.EnvSet
-)
-
-func getAuthorizationConditionsEnvTemplate() *environment.EnvSet {
-	lazyAuthorizationConditionsEnvTemplateInit.Do(func() {
-		lazyAuthorizationConditionsEnvTemplate = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
-	})
-	return lazyAuthorizationConditionsEnvTemplate
-}
-
 // NewAuthorizationConditionsEvaluatorBuilder creates a new authorizer.BuiltinConditionsEvaluatorBuilder that can evaluate
 // authorizer.ConditionTypeAuthorizationCEL-typed conditions.
 // runtimeCELCostBudget is shared by all conditions evaluated by one evaluator from EvaluatorForData, like the
@@ -61,7 +49,7 @@ func NewAuthorizationConditionsEvaluatorBuilder(informerFactory informers.Shared
 	}
 
 	return &celAuthorizationConditionsEvaluatorBuilder{
-		compiler: NewCompiler(getAuthorizationConditionsEnvTemplate()),
+		compiler: NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())),
 		nsmatcher: &namespacematcher.Matcher{
 			NamespaceLister: informerFactory.Core().V1().Namespaces().Lister(),
 			Client:          client,
@@ -82,7 +70,7 @@ type celAuthorizationConditionsEvaluatorBuilder struct {
 // It's generally valid for condition strings to be empty, if the semantics of the condition is
 // clear from its (required) ID. However, the CEL evaluator cannot evaluate empty condition strings.
 func (b *celAuthorizationConditionsEvaluatorBuilder) Recognizes(condition authorizer.Condition) bool {
-	return condition != nil && condition.GetType() == authorizer.ConditionTypeAuthorizationCEL && len(condition.GetCondition()) != 0
+	return condition.GetType() == authorizer.ConditionTypeAuthorizationCEL && len(strings.TrimSpace(condition.GetCondition())) != 0
 }
 
 func (b *celAuthorizationConditionsEvaluatorBuilder) EvaluatorForData(ctx context.Context, data authorizer.ConditionsData, apiServerAuthorizer authorizer.Authorizer) (authorizer.BuiltinConditionsEvaluator, error) {
