@@ -298,6 +298,14 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
 	}
+	if pl.fts.EnableDRANodeAllocatableResources {
+		// TODO(pravk03): Pods rejected because their node allocatable resources do not fit are not
+		// requeued on assigned pod delete or scale down, because doing that would wake up all the pods
+		// waiting for DRA devices, which could affect performance.
+		// See https://github.com/kubernetes/kubernetes/issues/144130.
+		events = append(events,
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}})
+	}
 
 	return events, nil
 }
