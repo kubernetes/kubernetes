@@ -94,9 +94,13 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 // permissions once the directory is created.
 func MkdirAll(path string, perm os.FileMode) error {
 	klog.V(6).InfoS("Function MkdirAll starts", "path", path, "perm", perm)
-	if _, err := os.Stat(path); err == nil {
-		// Path already exists: nothing to do.
-		return nil
+	// Only skip the Chmod below for a directory that already exists, so that it
+	// keeps the permissions it has. A path that exists and is not a directory is
+	// left to os.MkdirAll, which reports it as ENOTDIR as it does on unix.
+	if info, err := os.Stat(path); err == nil {
+		if info.IsDir() {
+			return nil
+		}
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("error checking path %s: %w", path, err)
 	}
