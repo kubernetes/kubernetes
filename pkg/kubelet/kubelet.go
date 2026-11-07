@@ -226,11 +226,6 @@ const (
 	// Initial period for the exponential backoff for image pulls.
 	imageBackOffPeriod = time.Second * 10
 
-	// ContainerGCPeriod is the period for performing container garbage collection.
-	ContainerGCPeriod = time.Minute
-	// ImageGCPeriod is the period for performing image garbage collection.
-	ImageGCPeriod = 5 * time.Minute
-
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
 
@@ -1761,7 +1756,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 			logger.V(int(vLevel)).Info("Container garbage collection succeeded")
 		}
-	}, ContainerGCPeriod)
+	}, kl.kubeletConfiguration.ContainerGCPeriod.Duration)
 
 	// when the high threshold is set to 100, and the max age is 0 (or the max age feature is disabled)
 	// stub the image GC manager
@@ -1791,7 +1786,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 			logger.V(int(vLevel)).Info("Image garbage collection succeeded")
 		}
-	}, ImageGCPeriod)
+	}, kl.kubeletConfiguration.ImageGCPeriod.Duration)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
