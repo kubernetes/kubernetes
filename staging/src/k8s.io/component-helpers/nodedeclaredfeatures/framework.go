@@ -86,6 +86,8 @@ func (f *Framework) InferForPodScheduling(podInfo *types.PodInfo, targetVersion 
 }
 
 // InferForPodUpdate determines which features are required by a pod update operation for a given target version.
+// A feature is required on update if either its own InferForUpdate returns true, or the new pod requires
+// the feature for scheduling and the old pod did not.
 func (f *Framework) InferForPodUpdate(oldPodInfo, newPodInfo *types.PodInfo, targetVersion *version.Version) (FeatureSet, error) {
 	if targetVersion == nil {
 		return FeatureSet{}, fmt.Errorf("target version cannot be nil")
@@ -96,7 +98,7 @@ func (f *Framework) InferForPodUpdate(oldPodInfo, newPodInfo *types.PodInfo, tar
 			// If target version is greater than the feature's max version, no need to require the feature
 			continue
 		}
-		if f.InferForUpdate(oldPodInfo, newPodInfo) {
+		if f.InferForUpdate(oldPodInfo, newPodInfo) || (f.InferForScheduling(newPodInfo) && !f.InferForScheduling(oldPodInfo)) {
 			reqs.Set(i)
 		}
 	}

@@ -118,11 +118,8 @@ func TestInferForScheduling(t *testing.T) {
 			if got := Feature.InferForScheduling(podInfo); got != tc.expected {
 				t.Errorf("InferForScheduling() = %v, want %v", got, tc.expected)
 			}
-			if got := Feature.InferForUpdate(noOCI, podInfo); got != tc.expected {
-				t.Errorf("InferForUpdate() from a pod without OCI profiles = %v, want %v", got, tc.expected)
-			}
-			if Feature.InferForUpdate(podInfo, podInfo) {
-				t.Error("InferForUpdate() without a change = true, want false")
+			if Feature.InferForUpdate(noOCI, podInfo) {
+				t.Error("InferForUpdate() = true, want false")
 			}
 		})
 	}
