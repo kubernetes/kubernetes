@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -343,6 +344,13 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	}
 	if len(nodeTaints) > 0 {
 		node.Spec.Taints = nodeTaints
+		// If the node is registered with the Unschedulable taint, mark it as unschedulable in the spec as well.
+		if taintutils.TaintExists(node.Spec.Taints, &v1.Taint{
+			Key:    v1.TaintNodeUnschedulable,
+			Effect: v1.TaintEffectNoSchedule,
+		}) {
+			node.Spec.Unschedulable = true
+		}
 	}
 
 	if kl.enableControllerAttachDetach {
