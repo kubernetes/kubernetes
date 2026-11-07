@@ -216,7 +216,9 @@ func validateRequestsWithinAllocatable(pod *corev1.Pod, allocatable corev1.Resou
 	cpuAllocatable := allocatable.Cpu()
 	memAllocatable := allocatable.Memory()
 
-	requests := resource.PodRequests(pod, resource.PodResourcesOptions{})
+	requests := resource.PodRequests(pod, resource.PodResourcesOptions{
+		UseExtraNodeAllocatableResources: true,
+	})
 	cpuRequests := requests[corev1.ResourceCPU]
 	memRequests := requests[corev1.ResourceMemory]
 
