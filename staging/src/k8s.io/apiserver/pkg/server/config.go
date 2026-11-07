@@ -71,6 +71,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/server/routine"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -223,6 +224,9 @@ type Config struct {
 
 	// ResourceTransformers are used to transform resources from and to etcd, e.g. encryption.
 	ResourceTransformers storagevalue.ResourceTransformers
+	// StorageCompressionRules gives each resource's store its compression Rule.
+	// When it's nil, every store gets the zero Rule and writes nothing compressed.
+	StorageCompressionRules storagebackend.CompressionRules
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
 
