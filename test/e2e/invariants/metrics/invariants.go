@@ -64,6 +64,25 @@ var apiServerInvariants = []metricInvariant{
 		owners:     []string{"aaron-prindle", "jpbetz", "thockin"},
 		isValid:    allSamplesZero,
 	},
+	{
+		// Ideally, the apiserver should never terminate a watch.
+		// If that happens, load might be too high. We should avoid that
+		// by sizing the cluster appropriately and/or choosing a suitable
+		// test parallelism.
+		//
+		// TODO: this is an experiment. There will be false positives...
+		metricName: "apiserver_terminated_watchers_total",
+		sig:        "sig-testing",
+		owners:     []string{"pohly"},
+		isValid:    allSamplesZero,
+	},
+	{
+		// Is the typo detected?
+		metricName: "apiserver_terminated_watchers_total_XXXX",
+		sig:        "sig-testing",
+		owners:     []string{"pohly"},
+		isValid:    allSamplesZero,
+	},
 }
 
 // checkInvariants checks the provided metrics against a list of invariants.
