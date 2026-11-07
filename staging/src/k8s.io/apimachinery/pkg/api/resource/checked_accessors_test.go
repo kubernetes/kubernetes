@@ -286,16 +286,12 @@ func TestQuantityAsScaledInt64ExtremeScales(t *testing.T) {
 		{"neg-source-neg-target-saturates", -7, Scale(2000000000), Scale(-2000000000), mostNegative, false, nil, nil},
 		{"minint32-target-saturates", 7, 0, Scale(math.MinInt32), mostPositive, false, nil, nil},
 		{"maxint32-target-rounds-up", 7, 0, Scale(math.MaxInt32), 1, true, nil, nil},
-		// TODO: Should be (1, true) on the inf.Dec route
-		{"minint32-source-rounds-up", 1, Scale(math.MinInt32), 0, 1, true, new(int64(mostPositive)), new(false)},
-		// TODO: Should be (-1, true) on the inf.Dec route
-		{"minint32-source-negative-rounds-up", -1, Scale(math.MinInt32), 0, -1, true, new(int64(mostNegative)), new(false)},
-		// TODO: Should be (1, true) on the inf.Dec route
-		{"minint32-source-exact-at-minint32-plus-1", 10, Scale(math.MinInt32), Scale(math.MinInt32 + 1), 1, true, new(int64(mostPositive)), new(false)},
-		// TODO: Should be (1, true) on the inf.Dec route
-		{"minint32-source-at-minint32-target", 1, Scale(math.MinInt32), Scale(math.MinInt32), 1, true, new(int64(mostPositive)), new(false)},
-		// TODO: Should be (1, true) on the inf.Dec route
-		{"minint32-source-at-maxint32-target", 1, Scale(math.MinInt32), Scale(math.MaxInt32), 1, true, new(int64(10)), nil},
+		{"minint32-source-rounds-up", 1, Scale(math.MinInt32), 0, 1, true, nil, nil},
+		{"minint32-source-negative-rounds-up", -1, Scale(math.MinInt32), 0, -1, true, nil, nil},
+		{"minint32-source-exact-at-minint32-plus-1", 10, Scale(math.MinInt32), Scale(math.MinInt32 + 1), 1, true, nil, nil},
+		// NewScaledQuantity rounds 1*10^MinInt32 up to 1*10^(MinInt32+1), which is 10 at scale MinInt32.
+		{"minint32-source-at-minint32-target", 1, Scale(math.MinInt32), Scale(math.MinInt32), 10, true, nil, nil},
+		{"minint32-source-at-maxint32-target", 1, Scale(math.MinInt32), Scale(math.MaxInt32), 1, true, nil, nil},
 		{"zero-value-any-scale", 0, Scale(math.MinInt32), Scale(math.MaxInt32), 0, true, nil, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
