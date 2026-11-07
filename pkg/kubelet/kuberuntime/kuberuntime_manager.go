@@ -1901,12 +1901,17 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	}
 
+	// imageVolumePullResults caches the image volume pull results for this
+	// sync, keyed by volume name. Image volumes are pulled lazily before the
+	// first container which mounts them is started.
+	imageVolumePullResults := imageVolumePulls{}
+
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a description used to describe this type of container in log messages,
 	// currently: "container", "init container" or "ephemeral container"
 	// metricLabel is the label used to describe this type of container in monitoring metrics.
 	// currently: "container", "init_container" or "ephemeral_container"
-	startWithInitState := func(ctx context.Context, typeName, metricLabel string, spec *startSpec, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls) error {
+	startWithInitState := func(ctx context.Context, typeName, metricLabel string, spec *startSpec, podSandboxConfig *runtimeapi.PodSandboxConfig) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
 		result.AddSyncResult(startContainerResult)
 
@@ -1922,6 +1927,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			metrics.StartedHostProcessContainersTotal.WithLabelValues(metricLabel).Inc()
 		}
 		logger.V(4).Info("Creating container in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod))
+
+		// Pull the image volumes required by this container. Image volumes which have
+		// already been pulled during this sync are not pulled again.
+		if msg, err := m.ensureImageVolumes(ctx, pod, spec.container, podSandboxConfig, pullSecrets, imageVolumePullResults); err != nil {
+			logger.Error(err, "Ensure image volumes for container failed", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod))
+			startContainerResult.Fail(err, msg)
+			return err
+		}
 
 		// We fail late here to populate the "ErrImagePull" and "ImagePullBackOff" correctly to the end user.
 		imageVolumes, err := m.toKubeContainerImageVolumes(ctx, imageVolumePullResults, spec.container, pod, startContainerResult)
@@ -1963,10 +1976,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// State required only if we need to start any containers.
-	var (
-		podSandboxConfig       *runtimeapi.PodSandboxConfig
-		imageVolumePullResults imageVolumePulls
-	)
+	var podSandboxConfig *runtimeapi.PodSandboxConfig
 
 	// lazyStart initializes state required to start containers and returns a start function.
 	lazyStart := func() func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
@@ -1981,18 +1991,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			}
 		}
 
-		if imageVolumePullResults == nil {
-			imageVolumePullResults, err = m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
-			if err != nil {
-				// Don't start any containers until we have all image volumes.
-				logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
-				result.Fail(err)
-				return nil
-			}
-		}
-
 		return func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
-			return startWithInitState(ctx, typeName, metricLabel, spec, podSandboxConfig, imageVolumePullResults)
+			return startWithInitState(ctx, typeName, metricLabel, spec, podSandboxConfig)
 		}
 	}
 
@@ -2127,44 +2127,69 @@ func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(ctx context.Cont
 	return imageVolumes, nil
 }
 
-func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret) (imageVolumePulls, error) {
+// ensureImageVolumes pulls the image volumes mounted by the provided container
+// which are not yet part of pulls, and stores their pull results in pulls.
+// Image volumes which are not mounted by the container are not pulled.
+// Per-volume pull failures are recorded in pulls rather than returned, so that
+// they can be surfaced late by toKubeContainerImageVolumes. A returned error
+// indicates that the pulls could not be attempted at all.
+func (m *kubeGenericRuntimeManager) ensureImageVolumes(ctx context.Context, pod *v1.Pod, container *v1.Container, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret, pulls imageVolumePulls) (string, error) {
 	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
-		return nil, nil
+		return "", nil
+	}
+
+	// Collect the image volumes required by the container which have not
+	// been pulled yet, in the order of the container volume mounts.
+	imageVolumeSources := map[string]*v1.ImageVolumeSource{}
+	for _, volume := range pod.Spec.Volumes {
+		if volume.Image != nil {
+			imageVolumeSources[volume.Name] = volume.Image
+		}
+	}
+	var toPull []string
+	for _, mount := range container.VolumeMounts {
+		if _, isImageVolume := imageVolumeSources[mount.Name]; !isImageVolume {
+			continue
+		}
+		// if the image is mounted twice on the container, only add it once to toPull
+		if _, pulled := pulls[mount.Name]; pulled || slices.Contains(toPull, mount.Name) {
+			continue
+		}
+		toPull = append(toPull, mount.Name)
+	}
+	if len(toPull) == 0 {
+		return "", nil
 	}
 
 	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
 	if err != nil {
 		logger.Error(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
-		return nil, err
+		return "", err
 	}
 
-	res := make(imageVolumePulls)
-	for _, volume := range pod.Spec.Volumes {
-		if volume.Image == nil {
-			continue
-		}
-
-		objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+	objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+	for _, volumeName := range toPull {
+		source := imageVolumeSources[volumeName]
 		ref, msg, err := m.imagePuller.EnsureImageExists(
-			ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
+			ctx, objectRef, pod, source.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, source.PullPolicy,
 		)
 		if err != nil {
-			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod))
-			res[volume.Name] = imageVolumePullResult{err: err, msg: msg}
+			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod), "volume", volumeName)
+			pulls[volumeName] = imageVolumePullResult{err: err, msg: msg}
 			continue
 		}
 
-		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod))
-		res[volume.Name] = imageVolumePullResult{spec: &runtimeapi.ImageSpec{
+		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod), "volume", volumeName)
+		pulls[volumeName] = imageVolumePullResult{spec: &runtimeapi.ImageSpec{
 			Image:              ref,
-			UserSpecifiedImage: volume.Image.Reference,
+			UserSpecifiedImage: source.Reference,
 			RuntimeHandler:     podRuntimeHandler,
 			Annotations:        pod.Annotations,
 		}}
 	}
 
-	return res, nil
+	return "", nil
 }
 
 // If a container is still in backoff, the function will return a brief backoff error and
