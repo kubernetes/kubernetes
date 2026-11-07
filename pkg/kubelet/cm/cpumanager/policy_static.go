@@ -973,6 +973,13 @@ func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID
 	defer logger.V(4).Info("RemoveContainer start")
 	toRelease, ok := s.GetCPUSet(podUID, containerName)
 	if !ok {
+		// The last container deletion may have been checkpointed before the
+		// pod-level allocation was returned to the shared pool.
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+			if podCPUSet, isPodLevel := s.GetPodCPUSet(podUID); isPodLevel && len(s.GetCPUAssignments()[podUID]) == 0 {
+				p.releasePodAllocation(logger, s, podUID, podCPUSet)
+			}
+		}
 		return nil
 	}
 	s.Delete(podUID, containerName)
