@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/ktesting"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -998,6 +999,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tCtx := ktesting.Init(t)
 		t.Logf("test case: %q", tc.name)
 
 		// Arrange
@@ -1021,12 +1023,12 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
 		// Act
-		_, err = nim.CreateCSINode()
+		_, err = nim.CreateCSINode(tCtx)
 		if err != nil {
 			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
 			continue
 		}
-		err = nim.InstallCSIDriver(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+		err = nim.InstallCSIDriver(tCtx, driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
 		if err != nil {
 			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
 			continue
@@ -1059,6 +1061,7 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 
 func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 	for _, tc := range testcases {
+		tCtx := ktesting.Init(t)
 		t.Logf("test case: %q", tc.name)
 
 		//// Arrange
@@ -1081,11 +1084,11 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 		nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
 
 		//// Act
-		nim.CreateCSINode()
+		nim.CreateCSINode(tCtx)
 		if addNodeInfo {
-			err = nim.InstallCSIDriver(tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
+			err = nim.InstallCSIDriver(tCtx, tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
 		} else {
-			err = nim.UninstallCSIDriver(tc.driverName)
+			err = nim.UninstallCSIDriver(tCtx, tc.driverName)
 		}
 
 		//// Assert
@@ -1506,14 +1509,14 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		gcDeletedOldCSI    bool
 		preCreateNewCSI    bool
 		enableVolumeHealth bool
-		act                func(nim *NodeInfoManager) error
+		act                func(ctx context.Context, nim *NodeInfoManager) error
 		verify             func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action)
 	}{
 		{
 			name:            "InstallCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
-			act: func(nim *NodeInfoManager) error {
-				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.InstallCSIDriver(ctx, driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
 				assert.Len(t, csiNode.Spec.Drivers, 1)
@@ -1523,8 +1526,8 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		{
 			name:            "InstallCSIDriver before GC deleted predecessor CSINode",
 			gcDeletedOldCSI: false,
-			act: func(nim *NodeInfoManager) error {
-				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.InstallCSIDriver(ctx, driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
 				// Predecessor driver entry must be gone after replacing the old CSINode.
@@ -1535,8 +1538,8 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		{
 			name:            "UpdateCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
-			act: func(nim *NodeInfoManager) error {
-				return nim.UpdateCSIDriver(driverName, driverID, 16, nil)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.UpdateCSIDriver(ctx, driverName, driverID, 16, nil)
 			},
 		},
 		{
@@ -1544,8 +1547,8 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			gcDeletedOldCSI:    true,
 			preCreateNewCSI:    true,
 			enableVolumeHealth: true,
-			act: func(nim *NodeInfoManager) error {
-				return nim.UpdateCSINodeStorageHealth(t.Context(), driverName, healthConds)
+			act: func(ctx context.Context, nim *NodeInfoManager) error {
+				return nim.UpdateCSINodeStorageHealth(ctx, driverName, healthConds)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action) {
 				for _, action := range actions {
@@ -1560,6 +1563,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			if tc.enableVolumeHealth {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
 			}
@@ -1601,7 +1605,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 
 			// 3. Execute operation with stale nim.nodeID and verify resulting CSINode owns newNodeUID.
 			actionsBefore := len(client.Actions())
-			if err := tc.act(nim); err != nil {
+			if err := tc.act(tCtx, nim); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -1715,9 +1719,10 @@ func TestUninstallCSIDriverRemovesStorageHealth(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			nim, client, nodeName := newStorageHealthTestManager(t, tc.installed, tc.stored)
 
-			if err := nim.uninstallDriverFromCSINode(driver1); err != nil {
+			if err := nim.uninstallDriverFromCSINode(tCtx, driver1); err != nil {
 				t.Fatalf("uninstallDriverFromCSINode returned error: %v", err)
 			}
 
