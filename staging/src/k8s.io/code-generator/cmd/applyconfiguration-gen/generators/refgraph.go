@@ -78,7 +78,7 @@ func (t refGraph) applyConfigForType(field *types.Type) *types.Type {
 	switch field.Kind {
 	case types.Struct:
 		if pkg, ok := t[field.Name]; ok { // TODO(jpbetz): Refs to types defined in a separate system (e.g. TypeMeta if generating a 3rd party controller) end up referencing the go struct, not the apply configuration type
-			return types.Ref(pkg, field.Name.Name+ApplyConfigurationTypeSuffix)
+			return types.Ref(pkg, applyConfigurationName(field))
 		}
 		return field
 	case types.Map:
