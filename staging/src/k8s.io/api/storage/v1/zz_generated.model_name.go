@@ -47,6 +47,11 @@ func (in CSINodeDriver) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CSINodeDriverRegistration) OpenAPIModelName() string {
+	return "io.k8s.api.storage.v1.CSINodeDriverRegistration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CSINodeList) OpenAPIModelName() string {
 	return "io.k8s.api.storage.v1.CSINodeList"
 }
