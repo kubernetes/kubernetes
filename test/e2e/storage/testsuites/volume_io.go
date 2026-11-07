@@ -139,7 +139,7 @@ func (t *volumeIOTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		l.migrationCheck.validateMigrationVolumeOpCounts(ctx)
 	}
 
-	f.It("should write files of various sizes, verify size, validate content", f.WithSlow(), func(ctx context.Context) {
+	f.It("should write files of various sizes, verify size, validate content", func(ctx context.Context) {
 		init(ctx)
 		ginkgo.DeferCleanup(cleanup)
 
