@@ -101,6 +101,36 @@ func Validate_Enum2(
 	return errs
 }
 
+var symbolsForEnumInt32 = sets.New(EInt32V1, EInt32V2)
+
+// Validate_EnumInt32 validates an instance of EnumInt32 according
+// to declarative validation rules in the API schema.
+func Validate_EnumInt32(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *EnumInt32) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnumInt32, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+var symbolsForEnumInt64 = sets.New(EInt64V1, EInt64V2)
+
+// Validate_EnumInt64 validates an instance of EnumInt64 according
+// to declarative validation rules in the API schema.
+func Validate_EnumInt64(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *EnumInt64) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnumInt64, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
 func Validate_Struct(
@@ -243,5 +273,94 @@ func Validate_Struct(
 
 	// field Struct.NotEnumField has no validation
 	// field Struct.NotEnumPtrField has no validation
+
+	{ // field Struct.EnumInt32Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *EnumInt32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EnumInt32(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *EnumInt32 {
+				return &oldObj.EnumInt32Field
+			})
+		errs = append(errs, fn(fldPath.Child("enumInt32Field"), &obj.EnumInt32Field, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.EnumInt32PtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *EnumInt32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EnumInt32(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *EnumInt32 {
+				return oldObj.EnumInt32PtrField
+			})
+		errs = append(errs, fn(fldPath.Child("enumInt32PtrField"), obj.EnumInt32PtrField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.EnumInt64Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *EnumInt64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EnumInt64(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *EnumInt64 {
+				return &oldObj.EnumInt64Field
+			})
+		errs = append(errs, fn(fldPath.Child("enumInt64Field"), &obj.EnumInt64Field, oldVal, oldObj != nil)...)
+	}
+
+	{ // field Struct.EnumInt64PtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *EnumInt64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EnumInt64(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *EnumInt64 {
+				return oldObj.EnumInt64PtrField
+			})
+		errs = append(errs, fn(fldPath.Child("enumInt64PtrField"), obj.EnumInt64PtrField, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
