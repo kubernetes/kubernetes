@@ -1370,7 +1370,11 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	}
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
-	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
+	// An unbound pod's status entries are stale, so only bound and assumed pods count them.
+	// TODO(pravk03): Count the extra node allocatable resources of nominated pods too. A nominated pod
+	// is unbound, and its entries for the nominated node are only in the cycle state of the preemption
+	// attempt, so the node does not hold them for it.
+	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) && pi.Pod.Spec.NodeName != ""
 
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: true,

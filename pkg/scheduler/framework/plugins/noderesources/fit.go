@@ -292,8 +292,9 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	result := computePodResourceRequest(pod, ResourceRequestsOptions{
-		EnablePodLevelResources:           f.enablePodLevelResources,
-		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources,
+		EnablePodLevelResources: f.enablePodLevelResources,
+		// pod.Spec.NodeName != "" is needed here to exclude any stale status from a previously failed PreBind when the pod is not bound yet and the status is not cleared yet in the assumed pod.
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
 	})
 
 	cycleState.Write(preFilterStateKey, result)
@@ -468,9 +469,11 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	}
 
 	opts := ResourceRequestsOptions{
-		EnablePodLevelResources:           f.enablePodLevelResources,
-		EnableDRAExtendedResource:         f.enableDRAExtendedResource,
-		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources,
+		EnablePodLevelResources:   f.enablePodLevelResources,
+		EnableDRAExtendedResource: f.enableDRAExtendedResource,
+		// An unbound pod's status entries are stale, so we should not be considering them when
+		// checking whether the node fits the pod.
+		EnableDRANodeAllocatableResources: f.enableDRANodeAllocatableResources && pod.Spec.NodeName != "",
 	}
 
 	// The node's allocatable is insufficient for the pod regardless of what else runs on it.

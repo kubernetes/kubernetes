@@ -2508,6 +2508,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 		podLevelResourcesEnabled           bool
 		nodeAllocatableResourcesDRAEnabled bool
 		extraNodeAllocatableResources      []v1.ExtraNodeAllocatableResource
+		unbound                            bool
 		expectedResource                   fwk.PodResource
 		initContainers                     []v1.Container
 		overhead                           *v1.ResourceList
@@ -2751,6 +2752,36 @@ func TestPodInfoCalculateResources(t *testing.T) {
 							{
 								Name: "node-allocatable-claim",
 							},
+						},
+					},
+				},
+			},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+					Limits:        v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+				},
+			},
+			expectedResource: fwk.PodResource{
+				Resource: &Resource{
+					MilliCPU: cpu500m.MilliValue(),
+					Memory:   mem500M.Value(),
+				},
+				Non0CPU: cpu500m.MilliValue(),
+				Non0Mem: mem500M.Value(),
+			},
+		},
+		{
+			name:                               "unbound pod ignores stale extra node allocatable resources",
+			nodeAllocatableResourcesDRAEnabled: true,
+			unbound:                            true,
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    cpu500m,
+							v1.ResourceMemory: mem500M,
 						},
 					},
 				},
@@ -3096,6 +3127,9 @@ func TestPodInfoCalculateResources(t *testing.T) {
 				Resources:      tc.podResources,
 				Containers:     tc.containers,
 				InitContainers: tc.initContainers,
+			}
+			if !tc.unbound {
+				podSpec.NodeName = "node"
 			}
 			if tc.overhead != nil {
 				podSpec.Overhead = *tc.overhead
