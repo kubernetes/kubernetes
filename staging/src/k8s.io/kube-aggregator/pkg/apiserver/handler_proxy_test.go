@@ -33,6 +33,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel/propagation"
@@ -51,8 +52,10 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/filters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/apiserver/pkg/server/mux"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
@@ -60,6 +63,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/tracing"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/utils/ptr"
 )
@@ -116,6 +120,100 @@ func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url
 
 func emptyCert() []byte {
 	return []byte{}
+}
+
+func TestRemoveAPIServiceDoesNotCancelInFlightRequest(t *testing.T) {
+	for _, removeFromOtherServer := range []bool{false, true} {
+		name := "same API server"
+		if removeFromOtherServer {
+			name = "different API server"
+		}
+		t.Run(name, func(t *testing.T) {
+			requestStarted := make(chan struct{})
+			releaseRequest := make(chan struct{})
+			target := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if req.Method == http.MethodPut {
+					close(requestStarted)
+					<-releaseRequest
+				}
+				_, _ = w.Write([]byte("backend response"))
+			}))
+			t.Cleanup(target.Close)
+
+			apiService := &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.group.example.com"},
+				Spec: apiregistration.APIServiceSpec{
+					Group:                 "group.example.com",
+					Version:               "v1",
+					Service:               &apiregistration.ServiceReference{Namespace: "test-ns", Name: "test-service", Port: ptr.To[int32](443)},
+					InsecureSkipTLSVerify: true,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{{Type: apiregistration.Available, Status: apiregistration.ConditionTrue}},
+				},
+			}
+			aggregators := make([]*APIAggregator, 2)
+			for i := range aggregators {
+				aggregators[i] = &APIAggregator{
+					GenericAPIServer: &genericapiserver.GenericAPIServer{
+						Handler: &genericapiserver.APIServerHandler{NonGoRestfulMux: mux.NewPathRecorderMux("aggregator_test")},
+					},
+					delegateHandler:            http.NotFoundHandler(),
+					proxyCurrentCertKeyContent: func() ([]byte, []byte) { return nil, nil },
+					serviceResolver:            &mockedRouter{destinationHost: target.Listener.Addr().String()},
+					proxyHandlers:              map[string]*proxyHandler{},
+					handledGroupVersions:       map[string]sets.Set[string]{},
+					tracerProvider:             tracing.NewNoopTracerProvider(),
+				}
+				if err := aggregators[i].AddAPIService(apiService); err != nil {
+					t.Fatal(err)
+				}
+			}
+			path := "/apis/group.example.com/v1/namespaces/default/widgets/example"
+			handler := func(i int) http.Handler {
+				return contextHandler(aggregators[i].GenericAPIServer.Handler.NonGoRestfulMux, &user.DefaultInfo{Name: "test-user"})
+			}
+			response := httptest.NewRecorder()
+			requestDone := make(chan struct{})
+			go func() {
+				defer close(requestDone)
+				handler(0).ServeHTTP(response, httptest.NewRequest(http.MethodPut, path, strings.NewReader(`{}`)))
+			}()
+			t.Cleanup(func() {
+				close(releaseRequest)
+				<-requestDone
+				if response.Code != http.StatusOK || response.Body.String() != "backend response" {
+					t.Errorf("in-flight response = %d %q, want 200 backend response", response.Code, response.Body.String())
+				}
+			})
+			select {
+			case <-requestStarted:
+			case <-time.After(5 * time.Second):
+				t.Fatal("PUT did not reach the aggregated API backend")
+			}
+
+			removedFrom := 0
+			if removeFromOtherServer {
+				removedFrom = 1
+			}
+			// Each API server removes its routes when its own informer observes the deletion.
+			aggregators[removedFrom].RemoveAPIService(apiService.Name)
+			afterRemoval := httptest.NewRecorder()
+			handler(removedFrom).ServeHTTP(afterRemoval, httptest.NewRequest(http.MethodPut, path, nil))
+			if afterRemoval.Code != http.StatusNotFound {
+				t.Errorf("response after removal = %d, want 404", afterRemoval.Code)
+			}
+			if removeFromOtherServer {
+				// The first server can still proxy new requests until it observes the deletion too.
+				beforeObservation := httptest.NewRecorder()
+				handler(0).ServeHTTP(beforeObservation, httptest.NewRequest(http.MethodGet, path, nil))
+				if beforeObservation.Code != http.StatusOK || beforeObservation.Body.String() != "backend response" {
+					t.Errorf("response before observing deletion = %d %q, want 200 backend response", beforeObservation.Code, beforeObservation.Body.String())
+				}
+				aggregators[0].RemoveAPIService(apiService.Name)
+			}
+		})
+	}
 }
 
 func TestProxyHandler(t *testing.T) {
