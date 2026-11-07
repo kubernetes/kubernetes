@@ -28,10 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -755,6 +759,84 @@ func TestMatchService(t *testing.T) {
 			}
 			if result != testCase.expectMatch {
 				t.Errorf("Result %v, Expected %v, Selector: %v, Service: %v", result, testCase.expectMatch, testCase.fieldSelector.String(), testCase.in)
+			}
+		})
+	}
+}
+
+func TestDropServiceStatusDisabledFieldsRouter(t *testing.T) {
+	ipModeRouter := api.LoadBalancerIPModeRouter
+	ipModeVIP := api.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		name           string
+		gateEnabled    bool
+		oldIPMode      *api.LoadBalancerIPMode
+		newIPMode      *api.LoadBalancerIPMode
+		expectedIPMode *api.LoadBalancerIPMode
+	}{
+		{
+			name:           "gate enabled, Router preserved",
+			gateEnabled:    true,
+			newIPMode:      &ipModeRouter,
+			expectedIPMode: &ipModeRouter,
+		},
+		{
+			name:           "gate disabled, Router downgraded to VIP",
+			gateEnabled:    false,
+			newIPMode:      &ipModeRouter,
+			expectedIPMode: &ipModeVIP,
+		},
+		{
+			name:           "gate disabled, Router preserved when already in use",
+			gateEnabled:    false,
+			oldIPMode:      &ipModeRouter,
+			newIPMode:      &ipModeRouter,
+			expectedIPMode: &ipModeRouter,
+		},
+		{
+			name:           "gate disabled, VIP unchanged",
+			gateEnabled:    false,
+			newIPMode:      &ipModeVIP,
+			expectedIPMode: &ipModeVIP,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.39"))
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPModeRouter, tc.gateEnabled)
+
+			var oldSvc *api.Service
+			if tc.oldIPMode != nil {
+				oldSvc = &api.Service{
+					Status: api.ServiceStatus{
+						LoadBalancer: api.LoadBalancerStatus{
+							Ingress: []api.LoadBalancerIngress{{
+								IP:     "10.0.0.1",
+								IPMode: tc.oldIPMode,
+							}},
+						},
+					},
+				}
+			}
+
+			newSvc := &api.Service{
+				Status: api.ServiceStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{{
+							IP:     "10.0.0.1",
+							IPMode: tc.newIPMode,
+						}},
+					},
+				},
+			}
+
+			dropServiceStatusDisabledFields(newSvc, oldSvc)
+
+			got := newSvc.Status.LoadBalancer.Ingress[0].IPMode
+			if !reflect.DeepEqual(got, tc.expectedIPMode) {
+				t.Errorf("expected ipMode %v, got %v", tc.expectedIPMode, got)
 			}
 		})
 	}
