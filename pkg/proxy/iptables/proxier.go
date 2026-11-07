@@ -254,7 +254,7 @@ func NewProxier(ctx context.Context,
 	logger.V(2).Info("Using iptables mark for masquerade", "mark", masqueradeMark)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer, ipFamily)
-	nfacctRunner, err := nfacct.New()
+	nfacctRunner, err := newNFAcctRunner(ipt)
 	if err != nil {
 		logger.Error(err, "Failed to create nfacct runner, nfacct based metrics won't be available")
 	}
@@ -578,6 +578,45 @@ func servicePortEndpointChainName(servicePortName string, protocol string, endpo
 	hash := sha256.Sum256([]byte(servicePortName + protocol + endpoint))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(servicePortEndpointChainNamePrefix + encoded[:16])
+}
+
+// newNFAcctRunner returns an nfacct runner if the nfacct based metrics can be
+// used, or nil and an error if not.
+func newNFAcctRunner(ipt utiliptables.Interface) (nfacct.Interface, error) {
+	runner, err := nfacct.New()
+	if err != nil {
+		return nil, err
+	}
+	if err := checkNFAcctMatch(ipt, runner); err != nil {
+		return nil, err
+	}
+	return runner, nil
+}
+
+// checkNFAcctMatch checks that the iptables "nfacct" match can be used.
+// nfacct.New() only proves that the nfnetlink_acct subsystem works, but the
+// rules also need the xt_nfacct match, which can be missing independently.
+// Since iptables-restore is atomic, a single unusable "-m nfacct" rule would
+// make every sync fail.
+func checkNFAcctMatch(ipt utiliptables.Interface, runner nfacct.Interface) error {
+	// xt_nfacct refuses to load for a counter that doesn't exist, so test with
+	// one that the proxier creates anyway.
+	counter := metrics.IPTablesCTStateInvalidDroppedNFAcctCounter
+	if err := runner.Ensure(counter); err != nil {
+		return fmt.Errorf("failed to create nfacct counter %q: %w", counter, err)
+	}
+	// The canary chain is never jumped to, so the test rule never sees traffic.
+	args := []string{"-m", "nfacct", "--nfacct-name", counter}
+	if _, err := ipt.EnsureChain(utiliptables.TableFilter, kubeProxyCanaryChain); err != nil {
+		return fmt.Errorf("failed to create chain %q: %w", kubeProxyCanaryChain, err)
+	}
+	if _, err := ipt.EnsureRule(utiliptables.Append, utiliptables.TableFilter, kubeProxyCanaryChain, args...); err != nil {
+		return fmt.Errorf("failed to use the iptables nfacct match (is the xt_nfacct kernel module available?): %w", err)
+	}
+	if err := ipt.DeleteRule(utiliptables.TableFilter, kubeProxyCanaryChain, args...); err != nil {
+		return fmt.Errorf("failed to delete nfacct test rule: %w", err)
+	}
+	return nil
 }
 
 func isServiceChainName(chainString string) bool {
