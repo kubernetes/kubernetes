@@ -19,11 +19,15 @@ package deviceattribute
 import (
 	"fmt"
 	"io/fs"
+	"iter"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // GetPCIeRootAttributeByPCIBusID retrieves the PCIe Root Complex for a given PCI Bus ID.
@@ -55,6 +59,234 @@ func GetPCIeRootAttributeByPCIBusID(pciBusID string, mods ...MachineModifier) (D
 	}
 
 	return attr, nil
+}
+
+// GetPCIeRootAttributeMapFromCPUId retrieves the PCIe Root Complex information
+// for each CPU ID in the system.
+//
+// It returns a map of CPU ID to DeviceAttribute, where each attribute encapsulates
+// the associated PCIe Root Complexes as a sorted string list.
+//
+// API Design Note:
+// A dedicated API for looking up PCIe Roots by a single CPU ID is intentionally not
+// provided. While Linux sysfs exposes a PCI-device -> local-CPU relationship via
+// /sys/bus/pci/devices/*/local_cpulist, there is no direct CPU -> PCI-device index.
+// Since a reverse lookup always requires a full scan of all PCI devices, this
+// function builds and returns the complete mapping in a single pass for efficiency.
+//
+// Feature Gate Requirement:
+// String list attributes are an alpha feature. Enabling the "DRAListTypeAttributes"
+// feature gate is required for this data to be processed correctly in the cluster.
+func GetPCIeRootAttributeMapFromCPUId(mods ...MachineModifier) (map[int]DeviceAttribute, error) {
+	var mc machine
+	initDefaultMachine(&mc)
+	for _, mod := range mods {
+		mod(&mc)
+	}
+
+	// First, getting the set of all CPU IDs in the system
+	// to validate the CPU IDs we find in "local_cpulist" files later.
+	cpuIds, err := getCPUIds(mc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get CPU IDs: %w", err)
+	}
+
+	// Next, focusing on the PCI Bus IDs of all PCIe Bridges in the system,
+	// because scanning only PCI Bridges would be enough to resolve the relationship
+	// between CPU and PCIe Roots.
+	pcieBridgeBusIDs, err := getPCIeBridgeBusIDs(mc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PCIe bridges: %w", err)
+	}
+
+	cpuIDToPCIeRoots := map[int]sets.Set[string]{}
+	pciDevicesDir := filepath.Join("bus", "pci", "devices")
+	for _, pcieBridgeBusID := range pcieBridgeBusIDs {
+		pcieRoot, err := resolvePCIeRoot(mc, pcieBridgeBusID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve PCIe Root Complex for PCI Bus ID %s: %w", pcieBridgeBusID, err)
+		}
+
+		localCPUListPaths := filepath.Join(pciDevicesDir, pcieBridgeBusID, "local_cpulist")
+		content, err := fs.ReadFile(mc.sysfs, localCPUListPaths)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read local_cpulist at %s: %w", localCPUListPaths, err)
+		}
+
+		localCPUList, err := parseCPUList(string(content))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CPU list %s at %s: %w", string(content), localCPUListPaths, err)
+		}
+		for cpuID := range localCPUList.Iter() {
+			if !cpuIds.Has(cpuID) {
+				return nil, fmt.Errorf("CPU ID %d from local_cpulist at %s is not in the CPU ID set", cpuID, localCPUListPaths)
+			}
+			if _, ok := cpuIDToPCIeRoots[cpuID]; !ok {
+				cpuIDToPCIeRoots[cpuID] = sets.New[string]()
+			}
+			cpuIDToPCIeRoots[cpuID].Insert(pcieRoot)
+		}
+	}
+
+	results := map[int]DeviceAttribute{}
+	for cpuID, pcieRoots := range cpuIDToPCIeRoots {
+		if pcieRoots.Len() > 0 {
+			results[cpuID] = DeviceAttribute{
+				Name:  StandardDeviceAttributePCIeRoot,
+				Value: resourceapi.DeviceAttribute{StringValues: sort.StringSlice(sets.List(pcieRoots))},
+			}
+		}
+	}
+
+	return results, nil
+}
+
+// getCPUIds returns a set of all online/present CPU IDs by scanning the
+// /sys/devices/system/cpu/ directory. It filters entries matching
+// the 'cpu[0-9]+' pattern to identify individual processor cores.
+func getCPUIds(mc machine) (sets.Set[int], error) {
+	cpuDir := filepath.Join("devices", "system", "cpu")
+	entries, err := fs.ReadDir(mc.sysfs, cpuDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CPU directory: %w", err)
+	}
+	cpuIds := sets.New[int]()
+	cpuDirEntryRegexp := regexp.MustCompile(`^cpu([0-9]+)$`)
+	for _, entry := range entries {
+		name := entry.Name()
+		matches := cpuDirEntryRegexp.FindStringSubmatch(name)
+		if matches == nil {
+			continue
+		}
+		cpuIDStr := matches[1]
+		id, err := strconv.Atoi(cpuIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse CPU ID from path %q: %w", name, err)
+		}
+		cpuIds.Insert(id)
+	}
+	return cpuIds, nil
+}
+
+// getPCIeBridgeBusIDs retrieves the PCI Bus IDs (BDF format) for all devices
+// identified as PCI Bridges (Class Code 0x06).
+//
+// It scans /sys/bus/pci/devices/ to find bridges that define the PCIe hierarchy.
+// By targeting the entire 0x06 class, it captures not only common Host (0x0600)
+// and PCI-to-PCI (0x0604) bridges but also specialized interconnects like
+// Non-Transparent Bridges (0x0609) and InfiniBand-to-PCI bridges (0x060a).
+//
+// This comprehensive scanning is critical for accurate CPU-to-PCIe-root
+// mapping in non-standard hardware topologies.
+//
+// ref: https://wiki.osdev.org/PCI#Class_Codes
+func getPCIeBridgeBusIDs(mc machine) ([]string, error) {
+	pciDevicesDir := filepath.Join("bus", "pci", "devices")
+	pcieDevicePaths, err := fs.ReadDir(mc.sysfs, pciDevicesDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read PCI devices directory: %w", err)
+	}
+
+	bridges := []string{}
+	for _, pcieDevicePath := range pcieDevicePaths {
+		pciBusID := pcieDevicePath.Name()
+		if err := verifyPCIBDFFormat(pciBusID); err != nil {
+			continue
+		}
+
+		classData, err := fs.ReadFile(mc.sysfs, filepath.Join(pciDevicesDir, pciBusID, "class"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read PCI class for PCI Bus ID %s: %w", pciBusID, err)
+		}
+		pciClassInfo := strings.TrimSpace(string(classData))
+		if len(pciClassInfo) != 8 { // format: "0xCCSSpp" (Class, Subclass, Programming Interface)
+			return nil, fmt.Errorf("invalid PCI Class data for PCI Bus ID %s: %q", pciBusID, pciClassInfo)
+		}
+
+		if strings.HasPrefix(pciClassInfo, "0x06") {
+			bridges = append(bridges, pciBusID)
+		}
+	}
+
+	return bridges, nil
+}
+
+// cpuList represents a collection of CPU IDs, supporting the fragmented
+// range format common in Linux sysfs (e.g., "0-3,5,7-31").
+type cpuList []cpuListPart
+
+func (cl cpuList) Iter() iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for _, part := range cl {
+			for e := range part.Iter() {
+				if !yield(e) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// cpuListPart represents a continuous range of CPU IDs,
+// defined by a start and end ID (inclusive).
+type cpuListPart struct {
+	start int
+	end   int
+}
+
+func (p cpuListPart) Iter() iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for i := p.start; i <= p.end; i++ {
+			if !yield(i) {
+				return
+			}
+		}
+	}
+}
+
+// parseCPUList converts a Linux CPU list string (e.g., from local_cpulist)
+// into a structured cpuList. It handles both individual IDs and
+// hyphenated ranges (inclusive).
+func parseCPUList(cpuListStr string) (cpuList, error) {
+	cpuListStr = strings.TrimSpace(cpuListStr)
+	if cpuListStr == "" {
+		return nil, fmt.Errorf("CPU list string is empty")
+	}
+
+	// The CPU list can be in the format of "0-3,5,7-9", so we need to parse it accordingly.
+	parts := strings.Split(cpuListStr, ",")
+	cpuList := make(cpuList, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, fmt.Errorf("invalid CPU list format: empty part in %q", cpuListStr)
+		}
+		if strings.Contains(part, "-") {
+			bounds := strings.Split(part, "-")
+			if len(bounds) != 2 {
+				return nil, fmt.Errorf("invalid CPU list format: %s", cpuListStr)
+			}
+			start, err := strconv.Atoi(bounds[0])
+			if err != nil {
+				return nil, fmt.Errorf("invalid CPU ID in list: %s", bounds[0])
+			}
+			end, err := strconv.Atoi(bounds[1])
+			if err != nil {
+				return nil, fmt.Errorf("invalid CPU ID in list: %s", bounds[1])
+			}
+			if start > end {
+				return nil, fmt.Errorf("invalid CPU range: %d-%d", start, end)
+			}
+			cpuList = append(cpuList, cpuListPart{start: start, end: end})
+		} else {
+			cpuID, err := strconv.Atoi(part)
+			if err != nil {
+				return nil, fmt.Errorf("invalid CPU ID in list: %s", part)
+			}
+			cpuList = append(cpuList, cpuListPart{start: cpuID, end: cpuID})
+		}
+	}
+	return cpuList, nil
 }
 
 // resolvePCIeRoot resolves the PCIe Root for a given PCI Bus ID
