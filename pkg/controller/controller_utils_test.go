@@ -325,6 +325,49 @@ func TestUIDExpectations(t *testing.T) {
 	}
 }
 
+func TestControllerExpectationsWithUID(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	uidExp := NewControllerExpectationsWithUID(NewControllerExpectations())
+
+	rcKey := "default/rc-1"
+	uidA := types.UID(uuid.NewUUID())
+	uidB := types.UID(uuid.NewUUID())
+
+	// No expectations have been set yet: the controller should sync.
+	assert.True(t, uidExp.SatisfiedExpectationsWithUID(logger, rcKey, uidA),
+		"Controller should sync when it has no expectations yet")
+
+	// Set pending expectations for uidA.
+	require.NoError(t, uidExp.ExpectCreationsWithUID(logger, rcKey, uidA, 2))
+
+	// Same UID: expectations are not yet satisfied.
+	assert.False(t, uidExp.SatisfiedExpectationsWithUID(logger, rcKey, uidA),
+		"Controller %v should not sync while its expectations are pending", rcKey)
+
+	// A different UID means the controller was deleted and recreated: the stale
+	// expectations must be discarded and a sync forced.
+	assert.True(t, uidExp.SatisfiedExpectationsWithUID(logger, rcKey, uidB),
+		"Controller with a new UID should sync and discard stale expectations")
+
+	// After the stale expectations were discarded, the same old UID is no longer
+	// remembered, so it behaves like a fresh controller.
+	assert.True(t, uidExp.SatisfiedExpectationsWithUID(logger, rcKey, uidA),
+		"Old UID should no longer be blocked by discarded expectations")
+
+	// Verify deletion expectations are tracked with the UID as well.
+	require.NoError(t, uidExp.ExpectDeletionsWithUID(logger, rcKey, uidB, 1))
+	assert.False(t, uidExp.SatisfiedExpectationsWithUID(logger, rcKey, uidB),
+		"Controller %v should not sync while deletion expectations are pending", rcKey)
+	assert.True(t, uidExp.SatisfiedExpectationsWithUID(logger, rcKey, uidA),
+		"UID change should discard the deletion expectations too")
+
+	// DeleteExpectationsWithUID clears both the expectations and the recorded UID.
+	require.NoError(t, uidExp.ExpectDeletionsWithUID(logger, rcKey, uidA, 1))
+	uidExp.DeleteExpectationsWithUID(logger, rcKey)
+	assert.True(t, uidExp.SatisfiedExpectationsWithUID(logger, rcKey, uidA),
+		"Controller should sync after DeleteExpectationsWithUID")
+}
+
 func TestCreatePodsWithGenerateName(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	generateName := "hello-"

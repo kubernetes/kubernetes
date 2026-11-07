@@ -3673,3 +3673,63 @@ func TestShouldIgnoreNodeUpdate(t *testing.T) {
 		}
 	}
 }
+
+// TestSyncDaemonSetDetectsUIDChange verifies that when a DaemonSet is deleted and
+// recreated under the same namespace/name (its UID changes), syncDaemonSet detects
+// the stale expectations recorded under the old UID via
+// SatisfiedExpectationsWithUID, discards them, and proceeds to synchronize the
+// DaemonSet pods normally instead of waiting on events that will never arrive.
+func TestSyncDaemonSetDetectsUIDChange(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	oldDS := newDaemonSet("foo")
+	newDS := oldDS.DeepCopy()
+	newDS.UID = uuid.NewUUID()
+	if newDS.UID == oldDS.UID {
+		t.Fatal("new DS has the same UID as the old one")
+	}
+
+	const nodeNum = 3
+	manager, podControl, _, err := newTestController(ctx, newDS)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	addNodes(manager.nodeStore, 0, nodeNum, nil)
+	if err := manager.dsStore.Add(newDS); err != nil {
+		t.Fatal(err)
+	}
+
+	dsKey, err := controller.KeyFunc(newDS)
+	if err != nil {
+		t.Fatalf("error getting key for daemon set: %v", err)
+	}
+
+	// Simulate stale, unsatisfied expectations recorded under the OLD UID, as if
+	// the controller had previously synced the old DaemonSet incarnation and its
+	// create events were never observed before the DaemonSet was deleted.
+	if err := manager.expectations.SetExpectationsWithUID(logger, dsKey, oldDS.UID, nodeNum, 0); err != nil {
+		t.Fatalf("failed to set stale expectations: %v", err)
+	}
+
+	// Sanity check: before syncing, the stale expectations (recorded under the
+	// old UID) are unsatisfied, so a check that did not account for the UID
+	// change would skip creating pods.
+	if manager.expectations.SatisfiedExpectationsWithUID(logger, dsKey, oldDS.UID) {
+		t.Fatal("expected stale expectations under the old UID to be unsatisfied")
+	}
+
+	if err := manager.syncDaemonSet(ctx, dsKey); err != nil {
+		t.Fatalf("syncDaemonSet returned error: %v", err)
+	}
+
+	// The UID change must be detected, the stale expectations discarded, and the
+	// DaemonSet fully synchronized: pods are created on all nodes.
+	if err := validateSyncDaemonSets(manager, podControl, nodeNum, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// After syncing, expectations are recorded under the new UID and satisfied.
+	if !manager.expectations.SatisfiedExpectationsWithUID(logger, dsKey, newDS.UID) {
+		t.Errorf("expected expectations to be satisfied under the new UID after sync")
+	}
+}
