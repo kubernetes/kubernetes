@@ -17,6 +17,7 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
@@ -25,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -2132,4 +2134,32 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 		return authorizer.DecisionDeny, "denied", nil
 	}
 	return authorizer.DecisionAllow, "default accept", nil
+}
+
+func TestPrepareForUpdateOpaqueParameters(t *testing.T) {
+	old := obj.DeepCopy()
+	old.ResourceVersion = "1"
+	old.Spec.Devices.Config = []resource.DeviceClaimConfiguration{{
+		Requests: []string{"req-0"},
+		DeviceConfiguration: resource.DeviceConfiguration{Opaque: &resource.OpaqueDeviceConfiguration{
+			Driver:     "driver.example.com",
+			Parameters: runtime.RawExtension{Raw: []byte(`{"z": 1, "a": "b"}`)},
+		}},
+	}}
+	updated := old.DeepCopy()
+	updated.Labels = map[string]string{"test": "updated"}
+	updated.Spec.Devices.Config[0].Opaque.Parameters.Raw = []byte(`{"a":"b","z":1}`)
+	strategy := NewStrategy(nil, nil)
+	strategy.PrepareForUpdate(context.Background(), updated, old)
+	if !bytes.Equal(updated.Spec.Devices.Config[0].Opaque.Parameters.Raw, old.Spec.Devices.Config[0].Opaque.Parameters.Raw) {
+		t.Error("PrepareForUpdate did not preserve the original opaque parameters")
+	}
+	if errs := strategy.ValidateUpdate(context.Background(), updated, old); len(errs) != 0 {
+		t.Fatalf("metadata-only update rejected: %v", errs)
+	}
+	updated.Spec.Devices.Requests[0].Exactly.DeviceClassName = "changed"
+	strategy.PrepareForUpdate(context.Background(), updated, old)
+	if errs := strategy.ValidateUpdate(context.Background(), updated, old); len(errs) == 0 {
+		t.Fatal("expected immutable spec validation to reject changed device class")
+	}
 }
