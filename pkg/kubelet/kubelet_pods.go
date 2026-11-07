@@ -546,8 +546,9 @@ func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]b
 	}
 	var buffer bytes.Buffer
 	buffer.WriteString(managedHostsHeaderWithHostNetwork)
-	buffer.Write(hostsFileContent)
+	// HostAliases go first: resolvers use the first matching entry, so node entries must not shadow them.
 	buffer.Write(hostsEntriesFromHostAliases(hostAliases))
+	buffer.Write(hostsFileContent)
 	return buffer.Bytes(), nil
 }
 

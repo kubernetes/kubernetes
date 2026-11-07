@@ -142,6 +142,9 @@ fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 `,
 			expectedHostsFileContent: `# Kubernetes-managed hosts file (host network).
+
+# Entries added by HostAliases.
+123.45.67.89	foo	bar	baz
 # hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
@@ -150,9 +153,6 @@ fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 123.45.67.89	some.domain
-
-# Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
 `,
 		},
 		{
@@ -171,6 +171,10 @@ fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 `,
 			expectedHostsFileContent: `# Kubernetes-managed hosts file (host network).
+
+# Entries added by HostAliases.
+123.45.67.89	foo	bar	baz
+45.67.89.123	park	doo	boo
 # another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
@@ -179,10 +183,24 @@ fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 12.34.56.78	another.domain
+`,
+		},
+		{
+			hostsFileName: "hosts_test_file_with_host_aliases_shadowing_node_entry",
+			hostAliases: []v1.HostAlias{
+				{IP: "123.45.67.89", Hostnames: []string{"some.domain"}},
+			},
+			rawHostsFileContent: `# hosts file for testing.
+127.0.0.1	localhost
+12.34.56.78	some.domain
+`,
+			expectedHostsFileContent: `# Kubernetes-managed hosts file (host network).
 
 # Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
-45.67.89.123	park	doo	boo
+123.45.67.89	some.domain
+# hosts file for testing.
+127.0.0.1	localhost
+12.34.56.78	some.domain
 `,
 		},
 	}
