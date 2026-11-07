@@ -19,6 +19,7 @@ package printers
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,8 +44,9 @@ type PrintHandler interface {
 }
 
 type handlerEntry struct {
-	columnDefinitions []metav1.TableColumnDefinition
-	printFunc         reflect.Value
+	columnDefinitions        []metav1.TableColumnDefinition
+	defaultColumnDefinitions []metav1.TableColumnDefinition
+	printFunc                reflect.Value
 }
 
 // HumanReadableGenerator is an implementation of TableGenerator used to generate
@@ -52,20 +54,39 @@ type handlerEntry struct {
 // PrintObj().
 type HumanReadableGenerator struct {
 	handlerMap map[reflect.Type]*handlerEntry
+	shared     bool
 }
+
+var sharedHandlerMaps sync.Map // map[uintptr]map[reflect.Type]*handlerEntry
 
 var _ TableGenerator = &HumanReadableGenerator{}
 var _ PrintHandler = &HumanReadableGenerator{}
 
 // NewTableGenerator creates a HumanReadableGenerator suitable for calling GenerateTable().
 func NewTableGenerator() *HumanReadableGenerator {
-	return &HumanReadableGenerator{
-		handlerMap: make(map[reflect.Type]*handlerEntry),
-	}
+	return &HumanReadableGenerator{}
 }
 
 // With method - accepts a list of builder functions that modify HumanReadableGenerator
 func (h *HumanReadableGenerator) With(fns ...func(PrintHandler)) *HumanReadableGenerator {
+	if len(fns) == 1 && len(h.handlerMap) == 0 && fns[0] != nil {
+		fnPtr := reflect.ValueOf(fns[0]).Pointer()
+		if fnPtr != 0 {
+			if cached, ok := sharedHandlerMaps.Load(fnPtr); ok {
+				h.handlerMap = cached.(map[reflect.Type]*handlerEntry)
+				h.shared = true
+				return h
+			}
+			temp := &HumanReadableGenerator{
+				handlerMap: make(map[reflect.Type]*handlerEntry, 128),
+			}
+			fns[0](temp)
+			actual, _ := sharedHandlerMaps.LoadOrStore(fnPtr, temp.handlerMap)
+			h.handlerMap = actual.(map[reflect.Type]*handlerEntry)
+			h.shared = true
+			return h
+		}
+	}
 	for _, fn := range fns {
 		fn(h)
 	}
@@ -90,15 +111,10 @@ func (h *HumanReadableGenerator) GenerateTable(obj runtime.Object, options Gener
 
 	var columns []metav1.TableColumnDefinition
 	if !options.NoHeaders {
-		columns = handler.columnDefinitions
-		if !options.Wide {
-			columns = make([]metav1.TableColumnDefinition, 0, len(handler.columnDefinitions))
-			for i := range handler.columnDefinitions {
-				if handler.columnDefinitions[i].Priority != 0 {
-					continue
-				}
-				columns = append(columns, handler.columnDefinitions[i])
-			}
+		if options.Wide {
+			columns = handler.columnDefinitions
+		} else {
+			columns = handler.defaultColumnDefinitions
 		}
 	}
 	table := &metav1.Table{
@@ -128,9 +144,33 @@ func (h *HumanReadableGenerator) TableHandler(columnDefinitions []metav1.TableCo
 		utilruntime.HandleError(fmt.Errorf("unable to register print function: %v", err))
 		return err
 	}
+	defaultColumns := columnDefinitions
+	for i := range columnDefinitions {
+		if columnDefinitions[i].Priority != 0 {
+			defaultColumns = make([]metav1.TableColumnDefinition, 0, len(columnDefinitions))
+			for j := range columnDefinitions {
+				if columnDefinitions[j].Priority == 0 {
+					defaultColumns = append(defaultColumns, columnDefinitions[j])
+				}
+			}
+			break
+		}
+	}
 	entry := &handlerEntry{
-		columnDefinitions: columnDefinitions,
-		printFunc:         printFuncValue,
+		columnDefinitions:        columnDefinitions,
+		defaultColumnDefinitions: defaultColumns,
+		printFunc:                printFuncValue,
+	}
+
+	if h.handlerMap == nil {
+		h.handlerMap = make(map[reflect.Type]*handlerEntry)
+	} else if h.shared {
+		cloned := make(map[reflect.Type]*handlerEntry, len(h.handlerMap)+4)
+		for k, v := range h.handlerMap {
+			cloned[k] = v
+		}
+		h.handlerMap = cloned
+		h.shared = false
 	}
 
 	objType := printFuncValue.Type().In(0)
