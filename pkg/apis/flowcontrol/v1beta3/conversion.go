@@ -46,7 +46,7 @@ func Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta3_PriorityLevelConf
 	//  - add the roundtrip annotation for the 'NominalConcurrencyShares' field,
 	//      IIF the 'NominalConcurrencyShares' field has a value of zero.
 	//  - make sure we don't mutate the source (internal) object's annotations
-	if limited := in.Spec.Limited; limited != nil && limited.NominalConcurrencyShares == 0 {
+	if limited := in.Spec.Limited; limited != nil && limited.NominalConcurrencyShares != nil && *limited.NominalConcurrencyShares == 0 {
 		annotations, copied := addPriorityLevelConcurrencyShareDefaultAnnotation(out.ObjectMeta.Annotations)
 		if copied {
 			out.ObjectMeta.Annotations = annotations

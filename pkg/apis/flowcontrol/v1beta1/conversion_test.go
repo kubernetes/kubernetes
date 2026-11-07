@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/utils/ptr"
 )
 
 func TestConvert_v1beta1_LimitedPriorityLevelConfiguration_To_flowcontrol_LimitedPriorityLevelConfiguration(t *testing.T) {
@@ -39,7 +40,7 @@ func TestConvert_v1beta1_LimitedPriorityLevelConfiguration_To_flowcontrol_Limite
 				},
 			},
 			expected: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 100,
+				NominalConcurrencyShares: ptr.To[int32](100),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
@@ -69,7 +70,7 @@ func TestConvert_flowcontrol_LimitedPriorityLevelConfiguration_To_v1beta1_Limite
 		{
 			name: "assured concurrency shares is set as expected",
 			in: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: 100,
+				NominalConcurrencyShares: ptr.To[int32](100),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
