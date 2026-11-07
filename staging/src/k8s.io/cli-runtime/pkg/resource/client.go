@@ -41,12 +41,16 @@ func (clientConfigFn ClientConfigFunc) clientForGroupVersion(gv schema.GroupVers
 	return rest.RESTClientFor(cfg)
 }
 
-func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(gv schema.GroupVersion) (RESTClient, error) {
+func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(gv schema.GroupVersion, stable bool) (RESTClient, error) {
 	cfg, err := clientConfigFn()
 	if err != nil {
 		return nil, err
 	}
-	cfg.ContentConfig = UnstructuredPlusDefaultContentConfig()
+	if stable {
+		cfg.ContentConfig = StableUnstructuredPlusDefaultContentConfig()
+	} else {
+		cfg.ContentConfig = UnstructuredPlusDefaultContentConfig()
+	}
 	cfg.GroupVersion = &gv
 	if len(gv.Group) == 0 {
 		cfg.APIPath = "/api"

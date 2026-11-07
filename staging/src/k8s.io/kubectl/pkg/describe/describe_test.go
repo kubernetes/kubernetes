@@ -19,7 +19,9 @@ package describe
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"maps"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -45,13 +47,17 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	restfake "k8s.io/client-go/rest/fake"
 	"k8s.io/utils/ptr"
 )
 
@@ -5611,6 +5617,39 @@ URL:	http://localhost
 				t.Errorf("Didn't expect to find %q in: %q", test.unexpected, output)
 			}
 		}
+	}
+}
+
+func TestGenericDescriberPreservesFieldOrder(t *testing.T) {
+	const response = `{"kind":"Foo","apiVersion":"example.com/v1","metadata":{"name":"foo","namespace":"test"},"spec":{"zeta":"1","alpha":"2"},"status":{"phase":"Ready"}}`
+	g := &genericDescriber{
+		mapping: &meta.RESTMapping{
+			Resource: schema.GroupVersionResource{Group: "example.com", Version: "v1", Resource: "foos"},
+			Scope:    meta.RESTScopeNamespace,
+		},
+		stable: &restfake.RESTClient{
+			GroupVersion:         schema.GroupVersion{Group: "example.com", Version: "v1"},
+			NegotiatedSerializer: runtimeresource.StableUnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+			Client: restfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				if req.URL.Path != "/namespaces/test/foos/foo" {
+					t.Errorf("unexpected request path %q", req.URL.Path)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: map[string][]string{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(response))}, nil
+			}),
+		},
+	}
+
+	out, err := g.Describe("test", "foo", DescriberSettings{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Fields are in the order sent by the server, not sorted.
+	zeta, alpha := strings.Index(out, "Zeta:"), strings.Index(out, "Alpha:")
+	if zeta < 0 || alpha < 0 || zeta > alpha {
+		t.Errorf("expected Zeta before Alpha in:\n%s", out)
+	}
+	if !strings.Contains(out, "Name:") || !strings.Contains(out, "Phase:") {
+		t.Errorf("incomplete output:\n%s", out)
 	}
 }
 

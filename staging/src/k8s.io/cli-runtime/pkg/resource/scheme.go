@@ -80,3 +80,46 @@ func UnstructuredPlusDefaultContentConfig() rest.ContentConfig {
 		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(jsonInfo),
 	}
 }
+
+// stableDynamicCodec is like dynamicCodec, but decodes into
+// unstructured.StableUnstructured to preserve the order of fields.
+type stableDynamicCodec struct{}
+
+func (stableDynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	obj, gvk, err := unstructured.StableUnstructuredJSONScheme.Decode(data, gvk, obj)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if strings.EqualFold(gvk.Kind, "status") && gvk.Version == "v1" && (gvk.Group == "" || gvk.Group == "meta.k8s.io") {
+		if _, ok := obj.(*metav1.Status); !ok {
+			obj = &metav1.Status{}
+			err := json.Unmarshal(data, obj)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	return obj, gvk, nil
+}
+
+func (stableDynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
+	return unstructured.StableUnstructuredJSONScheme.Encode(obj, w)
+}
+
+// Identifier implements runtime.Encoder interface.
+func (stableDynamicCodec) Identifier() runtime.Identifier {
+	return unstructured.StableUnstructuredJSONScheme.Identifier()
+}
+
+// StableUnstructuredPlusDefaultContentConfig is like UnstructuredPlusDefaultContentConfig,
+// but objects are decoded as unstructured.StableUnstructured.
+func StableUnstructuredPlusDefaultContentConfig() rest.ContentConfig {
+	config := UnstructuredPlusDefaultContentConfig()
+	jsonInfo, _ := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	jsonInfo.Serializer = stableDynamicCodec{}
+	jsonInfo.PrettySerializer = nil
+	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(jsonInfo)
+	return config
+}
