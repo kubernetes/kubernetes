@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -27,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	sysruntime "runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -135,7 +137,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
-	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -2912,12 +2913,33 @@ func handleProbeSync(ctx context.Context, kl *Kubelet, update proberesults.Updat
 	handler.HandlePodSyncs(ctx, []*v1.Pod{pod})
 }
 
+// sortPodsForAdmission sorts pods for admission. Pods that were admitted
+// before come first, then new pods. Each group is sorted by creation time,
+// and pods with the same creation time are sorted by UID.
+// This way, after a kubelet restart, a new pod cannot take the resources
+// of an admitted pod.
+func sortPodsForAdmission(pods []*v1.Pod, hasAllocatedResources func(types.UID) bool) {
+	allocatedResourcesOrder := func(uid types.UID) int {
+		if hasAllocatedResources(uid) {
+			return 0
+		}
+		return 1
+	}
+	slices.SortFunc(pods, func(a, b *v1.Pod) int {
+		return cmp.Or(
+			cmp.Compare(allocatedResourcesOrder(a.UID), allocatedResourcesOrder(b.UID)),
+			a.CreationTimestamp.Compare(b.CreationTimestamp.Time),
+			cmp.Compare(a.UID, b.UID),
+		)
+	})
+}
+
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
-	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	sortPodsForAdmission(pods, kl.allocationManager.HasPodAllocatedResources)
 	var pendingResizes []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
