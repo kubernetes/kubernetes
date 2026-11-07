@@ -199,7 +199,7 @@ var (
 			Help:           "Number of requests which apiserver terminated in self-defense.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
+		[]string{"verb", "scope", "component", "code"},
 	)
 
 	apiSelfRequestCounter = compbasemetrics.NewCounterVec(
@@ -527,11 +527,7 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), "", req, requestInfo)
 
-	if requestInfo.IsResourceRequest {
-		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
-	} else {
-		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
-	}
+	requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, scope, component, codeToString(code)).Inc()
 }
 
 // RecordLongRunning tracks the execution of a long running request against the API server. It provides an accurate count
