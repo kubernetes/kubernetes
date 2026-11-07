@@ -452,6 +452,9 @@ type NodeLifecycleControllerConfiguration struct {
 	UnhealthyZoneThreshold float32
 	// NodeMonitorPeriod is the period for syncing NodeStatus in NodeLifecycleController.
 	NodeMonitorPeriod metav1.Duration
+	// NodeLivenessSource determines how NodeLifecycleController detects node liveness.
+	// Valid values are "kubelet" (default) and "external" (requires ExternalNodeLivenessDetection feature gate).
+	NodeLivenessSource string
 }
 
 // PersistentVolumeBinderControllerConfiguration contains elements describing

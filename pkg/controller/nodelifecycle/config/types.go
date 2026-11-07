@@ -20,6 +20,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// NodeLivenessSourceKubelet configures NodeLifecycleController to determine node liveness from kubelet heartbeats.
+	NodeLivenessSourceKubelet = "kubelet"
+	// NodeLivenessSourceExternal configures NodeLifecycleController to delegate node liveness detection to an external component.
+	NodeLivenessSourceExternal = "external"
+)
+
 // NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
 	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
@@ -42,4 +49,7 @@ type NodeLifecycleControllerConfiguration struct {
 	UnhealthyZoneThreshold float32
 	// NodeMonitorPeriod is the period for syncing NodeStatus in NodeLifecycleController.
 	NodeMonitorPeriod metav1.Duration
+	// NodeLivenessSource determines how NodeLifecycleController detects node liveness.
+	// Valid values are "kubelet" (default) and "external" (requires ExternalNodeLivenessDetection feature gate).
+	NodeLivenessSource string
 }

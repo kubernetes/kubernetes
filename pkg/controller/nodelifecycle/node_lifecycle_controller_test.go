@@ -42,9 +42,13 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
@@ -153,21 +157,20 @@ func newNodeLifecycleControllerFromClient(
 	daemonSetInformer := factory.Apps().V1().DaemonSets()
 	podInformer := factory.Core().V1().Pods()
 
-	nc, err := NewNodeLifecycleController(
-		ctx,
-		leaseInformer,
-		podInformer,
-		nodeInformer,
-		daemonSetInformer,
-		kubeClient,
-		nodeMonitorPeriod,
-		nodeStartupGracePeriod,
-		nodeMonitorGracePeriod,
-		evictionLimiterQPS,
-		secondaryEvictionLimiterQPS,
-		largeClusterThreshold,
-		unhealthyZoneThreshold,
-	)
+	nc, err := NewNodeLifecycleController(ctx, ControllerOptions{
+		LeaseInformer:               leaseInformer,
+		PodInformer:                 podInformer,
+		NodeInformer:                nodeInformer,
+		DaemonSetInformer:           daemonSetInformer,
+		KubeClient:                  kubeClient,
+		NodeMonitorPeriod:           nodeMonitorPeriod,
+		NodeStartupGracePeriod:      nodeStartupGracePeriod,
+		NodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		EvictionLimiterQPS:          evictionLimiterQPS,
+		SecondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
+		LargeClusterThreshold:       largeClusterThreshold,
+		UnhealthyZoneThreshold:      unhealthyZoneThreshold,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -4152,6 +4155,889 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 			}
 			if podStatusUpdated != item.expectedPodStatusUpdate {
 				t.Errorf("expect pod status updated to be %v, but got %v", item.expectedPodStatusUpdate, podStatusUpdated)
+			}
+		})
+	}
+}
+
+func newNodeLifecycleControllerWithLivenessSource(
+	ctx context.Context,
+	kubeClient clientset.Interface,
+	nodeLivenessSource string,
+) (*nodeLifecycleController, error) {
+	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+
+	leaseInformer := factory.Coordination().V1().Leases()
+	nodeInformer := factory.Core().V1().Nodes()
+	daemonSetInformer := factory.Apps().V1().DaemonSets()
+	podInformer := factory.Core().V1().Pods()
+
+	nc, err := NewNodeLifecycleController(ctx, ControllerOptions{
+		LeaseInformer:               leaseInformer,
+		PodInformer:                 podInformer,
+		NodeInformer:                nodeInformer,
+		DaemonSetInformer:           daemonSetInformer,
+		KubeClient:                  kubeClient,
+		NodeMonitorPeriod:           testNodeMonitorPeriod,
+		NodeStartupGracePeriod:      testNodeStartupGracePeriod,
+		NodeMonitorGracePeriod:      testNodeMonitorGracePeriod,
+		EvictionLimiterQPS:          testRateLimiterQPS,
+		SecondaryEvictionLimiterQPS: testRateLimiterQPS,
+		LargeClusterThreshold:       testLargeClusterThreshold,
+		UnhealthyZoneThreshold:      testUnhealthyThreshold,
+		NodeLivenessSource:          nodeLivenessSource,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	nc.leaseInformerSynced = alwaysReady
+	nc.podInformerSynced = alwaysReady
+	nc.nodeInformerSynced = alwaysReady
+	nc.daemonSetInformerSynced = alwaysReady
+
+	return &nodeLifecycleController{nc, leaseInformer, nodeInformer, daemonSetInformer, podInformer}, nil
+}
+
+func countNodeScopedEvents(events []*v1.Event, reason string, t *testing.T) int {
+	t.Helper()
+	count := 0
+	for _, ev := range events {
+		if ev.InvolvedObject.Kind == "Node" && ev.Reason == reason {
+			if ev.Count != 1 {
+				t.Errorf("expected Node event %q to have Count=1, got %d", reason, ev.Count)
+			}
+			count++
+		}
+	}
+	return count
+}
+
+func TestNewNodeLifecycleControllerLivenessSource(t *testing.T) {
+	tests := []struct {
+		name        string
+		gateEnabled bool
+		source      string
+		wantErr     string
+		wantMetric  string
+	}{
+		{
+			name:        "empty defaults to kubelet when gate disabled",
+			gateEnabled: false,
+			source:      "",
+			wantMetric: `
+# HELP node_collector_liveness_source [ALPHA] Gauge set to 1 for the configured node liveness source.
+# TYPE node_collector_liveness_source gauge
+node_collector_liveness_source{source="kubelet"} 1
+`,
+		},
+		{
+			name:        "kubelet accepted when gate disabled",
+			gateEnabled: false,
+			source:      nodelifecycleconfig.NodeLivenessSourceKubelet,
+			wantMetric: `
+# HELP node_collector_liveness_source [ALPHA] Gauge set to 1 for the configured node liveness source.
+# TYPE node_collector_liveness_source gauge
+node_collector_liveness_source{source="kubelet"} 1
+`,
+		},
+		{
+			name:        "external rejected when gate disabled",
+			gateEnabled: false,
+			source:      nodelifecycleconfig.NodeLivenessSourceExternal,
+			wantErr:     string(features.ExternalNodeLivenessDetection),
+		},
+		{
+			name:        "external accepted when gate enabled and sets only external label",
+			gateEnabled: true,
+			source:      nodelifecycleconfig.NodeLivenessSourceExternal,
+			wantMetric: `
+# HELP node_collector_liveness_source [ALPHA] Gauge set to 1 for the configured node liveness source.
+# TYPE node_collector_liveness_source gauge
+node_collector_liveness_source{source="external"} 1
+`,
+		},
+		{
+			name:        "invalid value rejected when gate enabled",
+			gateEnabled: true,
+			source:      "unknown-source",
+			wantErr:     "invalid node liveness source",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalNodeLivenessDetection, tc.gateEnabled)
+			tCtx := ktesting.Init(t)
+			_, err := newNodeLifecycleControllerWithLivenessSource(tCtx, fake.NewSimpleClientset(), tc.source)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := metricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.wantMetric), "node_collector_liveness_source"); err != nil {
+				t.Fatalf("unexpected metric output: %v", err)
+			}
+		})
+	}
+}
+
+func TestNodeHealthDataDeepCopyAndDisruptionPreservesLastReady(t *testing.T) {
+	now := metav1.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	orig := &nodeHealthData{
+		probeTimestamp:           now,
+		readyTransitionTimestamp: now,
+		status:                   &v1.NodeStatus{},
+		lastReady: &v1.NodeCondition{
+			Type:               v1.NodeReady,
+			Status:             v1.ConditionUnknown,
+			Reason:             "ExternalDetector",
+			LastTransitionTime: now,
+		},
+	}
+
+	copied := orig.deepCopy()
+	if !apiequality.Semantic.DeepEqual(orig.lastReady, copied.lastReady) {
+		t.Fatalf("deepCopy did not copy lastReady: got %+v, want %+v", copied.lastReady, orig.lastReady)
+	}
+	copied.lastReady.Status = v1.ConditionTrue
+	if orig.lastReady.Status != v1.ConditionUnknown {
+		t.Fatalf("mutating deepCopy mutated original lastReady: got %v, want %v", orig.lastReady.Status, v1.ConditionUnknown)
+	}
+
+	withoutLastReady := (&nodeHealthData{probeTimestamp: now}).deepCopy()
+	if withoutLastReady.lastReady != nil {
+		t.Fatalf("expected nil lastReady to remain nil on deepCopy, got %+v", withoutLastReady.lastReady)
+	}
+
+	// Verify handleDisruption preserves lastReady when exiting full disruption.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalNodeLivenessDetection, true)
+	tCtx := ktesting.Init(t)
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "node0", CreationTimestamp: now},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{Type: v1.NodeReady, Status: v1.ConditionTrue, LastHeartbeatTime: now, LastTransitionTime: now},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(),
+	}
+	nc, err := newNodeLifecycleControllerWithLivenessSource(tCtx, fakeNodeHandler, nodelifecycleconfig.NodeLivenessSourceExternal)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	later := metav1.NewTime(now.Add(10 * time.Second))
+	nc.now = func() metav1.Time { return later }
+	nc.addPodEvictorForNewZone(klog.FromContext(tCtx), fakeNodeHandler.Existing[0])
+	nc.zoneStates[""] = stateFullDisruption
+	expectedLastReady := &v1.NodeCondition{
+		Type:               v1.NodeReady,
+		Status:             v1.ConditionTrue,
+		LastHeartbeatTime:  now,
+		LastTransitionTime: now,
+	}
+	nc.nodeHealthMap.set("node0", &nodeHealthData{
+		probeTimestamp:           now,
+		readyTransitionTimestamp: now,
+		status:                   &fakeNodeHandler.Existing[0].Status,
+		lastReady:                expectedLastReady.DeepCopy(),
+	})
+
+	nc.handleDisruption(tCtx, map[string][]*v1.NodeCondition{"": {expectedLastReady}}, fakeNodeHandler.Existing)
+
+	after := nc.nodeHealthMap.getDeepCopy("node0")
+	if !apiequality.Semantic.DeepEqual(after.lastReady, expectedLastReady) {
+		t.Fatalf("handleDisruption lost lastReady: got %+v, want %+v", after.lastReady, expectedLastReady)
+	}
+	if !after.probeTimestamp.Equal(&later) {
+		t.Fatalf("expected probeTimestamp updated to %v, got %v", later, after.probeTimestamp)
+	}
+}
+
+func TestMonitorNodeHealthExternalLiveness(t *testing.T) {
+	type pass struct {
+		timeToPass    time.Duration
+		nodes         []*v1.Node
+		lease         *coordv1.Lease
+		resetPodReady bool
+	}
+
+	t0 := metav1.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	tMinus5m := metav1.NewTime(t0.Add(-5 * time.Minute))
+	tMinus2m := metav1.NewTime(t0.Add(-2 * time.Minute))
+	tPlus5s := metav1.NewTime(t0.Add(5 * time.Second))
+	tPlus9s := metav1.NewTime(t0.Add(9 * time.Second))
+	tPlus10s := metav1.NewTime(t0.Add(10 * time.Second))
+	tPlus20s := metav1.NewTime(t0.Add(20 * time.Second))
+	tPlus30s := metav1.NewTime(t0.Add(30 * time.Second))
+
+	makeNode := func(status v1.ConditionStatus, reason string, lastHeartbeat, lastTransition metav1.Time, taints ...v1.Taint) []*v1.Node {
+		return []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					UID:               "node0-uid",
+					CreationTimestamp: t0,
+				},
+				Spec: v1.NodeSpec{
+					Taints: taints,
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             status,
+							Reason:             reason,
+							LastHeartbeatTime:  lastHeartbeat,
+							LastTransitionTime: lastTransition,
+						},
+						{
+							Type:               v1.NodeDiskPressure,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  lastHeartbeat,
+							LastTransitionTime: t0,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                         string
+		livenessSource               string
+		passes                       []pass
+		updateReactor                func(action testcore.Action) (bool, runtime.Object, error)
+		getPodsWrapper               func(c *fake.Clientset) func(string) ([]*v1.Pod, error)
+		wantNodeStatusUpdates        int
+		wantNodeStatusReadyCondition *v1.ConditionStatus
+		wantNodeStatusReadyReason    string
+		wantPodStatusUpdates         int
+		wantNodeNotReadyEvents       int
+		wantUnreachableTaintRemoved  bool
+	}{
+		{
+			name:           "grace period expiry does not mark node Unknown in external mode",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: time.Hour,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   0,
+			wantNodeNotReadyEvents: 0,
+		},
+		{
+			name:           "True to Unknown without heartbeat change marks pods NotReady and emits one NodeNotReady event",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: 10 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+				{
+					timeToPass: 20 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   1,
+			wantNodeNotReadyEvents: 1,
+		},
+		{
+			name:           "True to Unknown with heartbeat change marks pods NotReady and emits one NodeNotReady event",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: 10 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", tPlus10s, tPlus10s),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   1,
+			wantNodeNotReadyEvents: 1,
+		},
+		{
+			name:           "False to Unknown without heartbeat change marks pods NotReady and emits one NodeNotReady event",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionFalse, "KubeletNotReady", t0, t0),
+				},
+				{
+					timeToPass: 10 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   1,
+			wantNodeNotReadyEvents: 1,
+		},
+		{
+			name:           "True to False does not mark pods NotReady or emit NodeNotReady event",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: 10 * time.Second,
+					nodes:      makeNode(v1.ConditionFalse, "KubeletNotReady", tPlus10s, tPlus10s),
+				},
+				{
+					timeToPass: time.Hour,
+					nodes:      makeNode(v1.ConditionFalse, "KubeletNotReady", tPlus10s, tPlus10s),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   0,
+			wantNodeNotReadyEvents: 0,
+		},
+		{
+			name:           "recovery back to True clears unreachable taint and allows subsequent Unknown transition",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: 10 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+				{
+					timeToPass:    20 * time.Second,
+					nodes:         makeNode(v1.ConditionTrue, "KubeletReady", t0, tPlus20s, *UnreachableTaintTemplate),
+					resetPodReady: true,
+				},
+				{
+					timeToPass: 30 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus30s),
+				},
+			},
+			wantNodeStatusUpdates:       0,
+			wantPodStatusUpdates:        2,
+			wantNodeNotReadyEvents:      2,
+			wantUnreachableTaintRemoved: true,
+		},
+		{
+			name:           "fast Unknown->True->Unknown flip with newer LastTransitionTime triggers event and marks pods NotReady",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: 5 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus5s),
+				},
+				{
+					// Node recovered to True (kubelet reconciled PodReady=True) and flipped back to Unknown before Pass 3.
+					timeToPass:    10 * time.Second,
+					nodes:         makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus9s),
+					resetPodReady: true,
+				},
+				{
+					// Steady Unknown with unchanged LastTransitionTime is a no-op even if a pod became Ready.
+					timeToPass:    15 * time.Second,
+					nodes:         makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus9s),
+					resetPodReady: true,
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   2,
+			wantNodeNotReadyEvents: 2,
+		},
+		{
+			name:           "first pass after restart with Ready=Unknown marks pods NotReady without emitting NodeNotReady event",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", tMinus5m, tMinus2m),
+				},
+				{
+					timeToPass: 5 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", tMinus5m, tMinus2m),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   1,
+			wantNodeNotReadyEvents: 0,
+		},
+		{
+			name:           "first pass after restart with Ready=False leaves pods untouched",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionFalse, "KubeletNotReady", tMinus5m, tMinus2m),
+				},
+				{
+					timeToPass: 5 * time.Second,
+					nodes:      makeNode(v1.ConditionFalse, "KubeletNotReady", tMinus5m, tMinus2m),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   0,
+			wantNodeNotReadyEvents: 0,
+		},
+		{
+			name:           "never-Ready node is marked Unknown after startup grace period even when Lease is renewed",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes: []*v1.Node{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:              "node0",
+								UID:               "node0-uid",
+								CreationTimestamp: t0,
+							},
+						},
+					},
+					lease: createNodeLease("node0", metav1.NewMicroTime(t0.Time)),
+				},
+				{
+					timeToPass: 70 * time.Second,
+					nodes: []*v1.Node{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:              "node0",
+								UID:               "node0-uid",
+								CreationTimestamp: t0,
+							},
+						},
+					},
+					lease: createNodeLease("node0", metav1.NewMicroTime(t0.Add(70*time.Second))),
+				},
+			},
+			wantNodeStatusUpdates:        1,
+			wantNodeStatusReadyCondition: ptr.To(v1.ConditionUnknown),
+			wantNodeStatusReadyReason:    "NodeStatusNeverUpdated",
+			wantPodStatusUpdates:         1,
+			wantNodeNotReadyEvents:       0,
+		},
+		{
+			name:           "pod list error on external transition queues nodesToRetry and marks pods NotReady on next pass",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			getPodsWrapper: func(c *fake.Clientset) func(string) ([]*v1.Pod, error) {
+				calls := 0
+				base := fakeGetPodsAssignedToNode(c)
+				return func(nodeName string) ([]*v1.Pod, error) {
+					calls++
+					if calls == 2 {
+						return nil, fmt.Errorf("injected pod list error")
+					}
+					return base(nodeName)
+				}
+			},
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: 10 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+				{
+					timeToPass: 15 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   1,
+			wantNodeNotReadyEvents: 0,
+		},
+		{
+			name:           "MarkPodsNotReady error on external transition emits one NodeNotReady event and retries on next pass",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceExternal,
+			updateReactor: func() func(action testcore.Action) (bool, runtime.Object, error) {
+				calls := 0
+				return func(action testcore.Action) (bool, runtime.Object, error) {
+					if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+						calls++
+						if calls == 1 {
+							return true, nil, fmt.Errorf("injected pod status update error")
+						}
+						return false, nil, nil
+					}
+					return false, nil, nil
+				}
+			}(),
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: 10 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+				{
+					timeToPass: 15 * time.Second,
+					nodes:      makeNode(v1.ConditionUnknown, "ExternalDetectorUnreachable", t0, tPlus10s),
+				},
+			},
+			wantNodeStatusUpdates:  0,
+			wantPodStatusUpdates:   2,
+			wantNodeNotReadyEvents: 1,
+		},
+		{
+			name:           "kubelet mode behavior unchanged when ExternalNodeLivenessDetection gate is enabled",
+			livenessSource: nodelifecycleconfig.NodeLivenessSourceKubelet,
+			passes: []pass{
+				{
+					timeToPass: 0,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+				{
+					timeToPass: time.Hour,
+					nodes:      makeNode(v1.ConditionTrue, "KubeletReady", t0, t0),
+				},
+			},
+			wantNodeStatusUpdates:        1,
+			wantNodeStatusReadyCondition: ptr.To(v1.ConditionUnknown),
+			wantNodeStatusReadyReason:    "NodeStatusUnknown",
+			wantPodStatusUpdates:         1,
+			wantNodeNotReadyEvents:       1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalNodeLivenessDetection, true)
+			tCtx := ktesting.Init(t)
+
+			fakeNodeHandler := &testutil.FakeNodeHandler{
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			}
+			if tc.updateReactor != nil {
+				fakeNodeHandler.Clientset.PrependReactor("update", "pods", tc.updateReactor)
+			}
+
+			nc, err := newNodeLifecycleControllerWithLivenessSource(tCtx, fakeNodeHandler, tc.livenessSource)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			fakeRecorder := testutil.NewFakeRecorder()
+			nc.recorder = fakeRecorder
+			if tc.getPodsWrapper != nil {
+				nc.getPodsAssignedToNode = tc.getPodsWrapper(fakeNodeHandler.Clientset)
+			} else {
+				nc.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+			}
+
+			resetPodUpdates := 0
+			removedUnreachableTaint := false
+			for i, p := range tc.passes {
+				if p.resetPodReady {
+					readyPod := testutil.NewPod("pod0", "node0")
+					if _, err := fakeNodeHandler.Clientset.CoreV1().Pods(readyPod.Namespace).UpdateStatus(tCtx, readyPod, metav1.UpdateOptions{}); err != nil {
+						t.Fatalf("pass %d: failed to reset pod ready status: %v", i, err)
+					}
+					resetPodUpdates++
+				}
+				nc.now = func() metav1.Time { return metav1.NewTime(t0.Add(p.timeToPass)) }
+				fakeNodeHandler.UpdatedNodes = nil
+				fakeNodeHandler.Existing = p.nodes
+				if err := nc.syncNodeStore(fakeNodeHandler); err != nil {
+					t.Fatalf("pass %d: syncNodeStore failed: %v", i, err)
+				}
+				if p.lease != nil {
+					if err := nc.syncLeaseStore(p.lease); err != nil {
+						t.Fatalf("pass %d: syncLeaseStore failed: %v", i, err)
+					}
+				}
+				if err := nc.monitorNodeHealth(tCtx); err != nil {
+					t.Fatalf("pass %d: monitorNodeHealth failed: %v", i, err)
+				}
+				if len(fakeNodeHandler.UpdatedNodes) > 0 {
+					latestNode := fakeNodeHandler.UpdatedNodes[len(fakeNodeHandler.UpdatedNodes)-1]
+					if !taintutils.TaintExists(latestNode.Spec.Taints, UnreachableTaintTemplate) {
+						removedUnreachableTaint = true
+					}
+				}
+			}
+
+			if len(fakeNodeHandler.UpdatedNodeStatuses) != tc.wantNodeStatusUpdates {
+				t.Errorf("got %d node status updates, want %d", len(fakeNodeHandler.UpdatedNodeStatuses), tc.wantNodeStatusUpdates)
+			}
+			if tc.wantNodeStatusReadyCondition != nil && len(fakeNodeHandler.UpdatedNodeStatuses) > 0 {
+				_, readyCond := controllerutil.GetNodeCondition(&fakeNodeHandler.UpdatedNodeStatuses[len(fakeNodeHandler.UpdatedNodeStatuses)-1].Status, v1.NodeReady)
+				if readyCond == nil {
+					t.Fatalf("expected NodeReady condition on updated node status, got nil")
+				}
+				if readyCond.Status != *tc.wantNodeStatusReadyCondition || readyCond.Reason != tc.wantNodeStatusReadyReason {
+					t.Errorf("got NodeReady=(%s, %q), want (%s, %q)",
+						readyCond.Status, readyCond.Reason, *tc.wantNodeStatusReadyCondition, tc.wantNodeStatusReadyReason)
+				}
+			}
+
+			if tc.wantUnreachableTaintRemoved && !removedUnreachableTaint {
+				t.Errorf("expected unreachable taint to be removed on recovery")
+			}
+
+			podStatusUpdates := 0
+			for _, action := range fakeNodeHandler.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+					podStatusUpdates++
+				}
+			}
+			podStatusUpdates -= resetPodUpdates
+			if podStatusUpdates != tc.wantPodStatusUpdates {
+				t.Errorf("got %d pod status updates, want %d", podStatusUpdates, tc.wantPodStatusUpdates)
+			}
+
+			gotEvents := countNodeScopedEvents(fakeRecorder.Events, "NodeNotReady", t)
+			if gotEvents != tc.wantNodeNotReadyEvents {
+				t.Errorf("got %d Node-scoped NodeNotReady events, want %d (all events: %+v)", gotEvents, tc.wantNodeNotReadyEvents, fakeRecorder.Events)
+			}
+		})
+	}
+}
+
+func TestExternalLivenessBypassesLeaseCircuitBreaker(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalNodeLivenessDetection, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeControllerLeaseCircuitBreaker, true)
+
+	tCtx := ktesting.Init(t)
+	t0 := metav1.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	createdLongAgo := metav1.NewTime(t0.Add(-time.Hour))
+
+	// node0 has never reported Ready and has a stale Lease in the informer cache (RV 50)
+	// vs a fresher Lease in the API server (RV 100). In kubelet mode, node0's startup
+	// grace expiry would perform a live Lease GET and trip the controller-wide circuit
+	// breaker, stalling node1 on the following pass.
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					UID:               "node0-uid",
+					CreationTimestamp: createdLongAgo,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node1",
+					UID:               "node1-uid",
+					CreationTimestamp: createdLongAgo,
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  t0,
+							LastTransitionTime: t0,
+						},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod1", "node1")}}),
+	}
+
+	liveLease := createNodeLease("node0", metav1.NewMicroTime(t0.Time))
+	liveLease.ResourceVersion = "100"
+	if _, err := fakeNodeHandler.Clientset.CoordinationV1().Leases(v1.NamespaceNodeLease).Create(tCtx, liveLease, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create live lease: %v", err)
+	}
+	fakeNodeHandler.Clientset.ClearActions()
+
+	nc, err := newNodeLifecycleControllerWithLivenessSource(tCtx, fakeNodeHandler, nodelifecycleconfig.NodeLivenessSourceExternal)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeRecorder := testutil.NewFakeRecorder()
+	nc.recorder = fakeRecorder
+	nc.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
+	nc.now = func() metav1.Time { return t0 }
+
+	cachedLease := createNodeLease("node0", metav1.NewMicroTime(createdLongAgo.Time))
+	cachedLease.ResourceVersion = "50"
+	if err := nc.syncLeaseStore(cachedLease); err != nil {
+		t.Fatalf("syncLeaseStore failed: %v", err)
+	}
+	if err := nc.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Fatalf("syncNodeStore failed: %v", err)
+	}
+
+	// Pass 1: node0 exceeds startup grace period and gets marked Unknown without a live Lease GET.
+	if err := nc.monitorNodeHealth(tCtx); err != nil {
+		t.Fatalf("pass 1 monitorNodeHealth failed: %v", err)
+	}
+	if len(fakeNodeHandler.UpdatedNodeStatuses) != 1 || fakeNodeHandler.UpdatedNodeStatuses[0].Name != "node0" {
+		t.Fatalf("expected node0 status update to Unknown on pass 1, got %+v", fakeNodeHandler.UpdatedNodeStatuses)
+	}
+
+	// Pass 2: node1 transitions externally to Ready=Unknown; processing must not stall.
+	tPlus10s := metav1.NewTime(t0.Add(10 * time.Second))
+	nc.now = func() metav1.Time { return tPlus10s }
+	fakeNodeHandler.Existing[0] = fakeNodeHandler.UpdatedNodeStatuses[0].DeepCopy()
+	fakeNodeHandler.Existing[1].Status.Conditions[0].Status = v1.ConditionUnknown
+	fakeNodeHandler.Existing[1].Status.Conditions[0].Reason = "ExternalDetectorUnreachable"
+	fakeNodeHandler.Existing[1].Status.Conditions[0].LastTransitionTime = tPlus10s
+	if err := nc.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Fatalf("pass 2 syncNodeStore failed: %v", err)
+	}
+	if err := nc.monitorNodeHealth(tCtx); err != nil {
+		t.Fatalf("pass 2 monitorNodeHealth failed: %v", err)
+	}
+
+	leaseGets := 0
+	podStatusUpdates := 0
+	for _, action := range fakeNodeHandler.Actions() {
+		if action.GetVerb() == "get" && action.GetResource().Resource == "leases" {
+			leaseGets++
+		}
+		if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+			podStatusUpdates++
+		}
+	}
+	if leaseGets != 0 {
+		t.Errorf("expected 0 live Lease GET calls in external mode, got %d", leaseGets)
+	}
+	if podStatusUpdates != 1 {
+		t.Errorf("expected pod1 to be marked NotReady without circuit-breaker stall, got %d pod status updates", podStatusUpdates)
+	}
+	if got := countNodeScopedEvents(fakeRecorder.Events, "NodeNotReady", t); got != 1 {
+		t.Errorf("expected 1 Node-scoped NodeNotReady event for node1, got %d", got)
+	}
+}
+
+func TestProcessPodMarkPodNotReadyExternalLiveness(t *testing.T) {
+	t0 := metav1.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	tPlus10s := metav1.NewTime(t0.Add(10 * time.Second))
+
+	tests := []struct {
+		name               string
+		nodeStatuses       []v1.ConditionStatus
+		wantPodMarkedUnrdy bool
+	}{
+		{
+			name:               "node health not gathered yet skips pod update",
+			nodeStatuses:       nil,
+			wantPodMarkedUnrdy: false,
+		},
+		{
+			// Pass 1 sees Ready=True (stored in nodeHealth.status); Pass 2 sees Ready=Unknown
+			// without changing LastHeartbeatTime, so nodeHealth.status stays Ready=True while
+			// lastReady becomes Ready=Unknown. processPod must read lastReady and mark pod NotReady.
+			name:               "marks newly assigned pod NotReady when lastReady is Unknown despite stale Ready=True in status",
+			nodeStatuses:       []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionUnknown},
+			wantPodMarkedUnrdy: true,
+		},
+		{
+			// Pass 1 sees Ready=Unknown (stored in nodeHealth.status); Pass 2 sees Ready=True
+			// without changing LastHeartbeatTime, so nodeHealth.status stays Ready=Unknown while
+			// lastReady becomes Ready=True. processPod must read lastReady and keep pod Ready.
+			name:               "does not mark newly assigned pod NotReady when lastReady is True despite stale Ready=Unknown in status",
+			nodeStatuses:       []v1.ConditionStatus{v1.ConditionUnknown, v1.ConditionTrue},
+			wantPodMarkedUnrdy: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalNodeLivenessDetection, true)
+			tCtx := ktesting.Init(t)
+
+			newPod := testutil.NewPod("pod-new", "node0")
+			fakeNodeHandler := &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: t0,
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  t0,
+									LastTransitionTime: t0,
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*newPod}}),
+			}
+
+			nc, err := newNodeLifecycleControllerWithLivenessSource(tCtx, fakeNodeHandler, nodelifecycleconfig.NodeLivenessSourceExternal)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			nc.now = func() metav1.Time { return t0 }
+			nc.recorder = testutil.NewFakeRecorder()
+			// Keep monitorNodeHealth from touching pod-new so we isolate processPod.
+			nc.getPodsAssignedToNode = func(string) ([]*v1.Pod, error) { return nil, nil }
+
+			if err := nc.syncNodeStore(fakeNodeHandler); err != nil {
+				t.Fatalf("syncNodeStore failed: %v", err)
+			}
+			for i, st := range tc.nodeStatuses {
+				transitionTime := t0
+				if i > 0 {
+					transitionTime = tPlus10s
+				}
+				fakeNodeHandler.Existing[0].Status.Conditions[0].Status = st
+				// Keep LastHeartbeatTime constant at t0 across passes so nodeHealth.status is never refreshed.
+				fakeNodeHandler.Existing[0].Status.Conditions[0].LastHeartbeatTime = t0
+				fakeNodeHandler.Existing[0].Status.Conditions[0].LastTransitionTime = transitionTime
+				if err := nc.syncNodeStore(fakeNodeHandler); err != nil {
+					t.Fatalf("pass %d syncNodeStore failed: %v", i, err)
+				}
+				if err := nc.monitorNodeHealth(tCtx); err != nil {
+					t.Fatalf("pass %d monitorNodeHealth failed: %v", i, err)
+				}
+			}
+			fakeNodeHandler.Clientset.ClearActions()
+
+			if err := nc.syncPodStore(newPod); err != nil {
+				t.Fatalf("syncPodStore failed: %v", err)
+			}
+			nc.podUpdated(nil, newPod)
+			nc.processPod(tCtx, podUpdateItem{name: newPod.Name, namespace: newPod.Namespace})
+
+			podStatusUpdated := false
+			for _, action := range fakeNodeHandler.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+					podStatusUpdated = true
+				}
+			}
+			if podStatusUpdated != tc.wantPodMarkedUnrdy {
+				t.Errorf("got podStatusUpdated=%v, want %v", podStatusUpdated, tc.wantPodMarkedUnrdy)
 			}
 		})
 	}
