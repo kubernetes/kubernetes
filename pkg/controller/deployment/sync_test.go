@@ -265,6 +265,16 @@ func TestScale(t *testing.T) {
 			expectedNew: rs("foo-v2", 2, nil, newTimestamp),
 			expectedOld: []*apps.ReplicaSet{rs("foo-v1", 1, nil, oldTimestamp)},
 		},
+		{
+			name:          "deployment and replicaset has the same replicas amount - but replicaset annotation differs",
+			deployment:    newDeployment("foo", 2, nil, ptr.To(intstr.FromInt32(1)), ptr.To(intstr.FromInt32(1)), nil),
+			oldDeployment: newDeployment("foo", 2, nil, ptr.To(intstr.FromInt32(1)), ptr.To(intstr.FromInt32(1)), nil),
+			newRS:         rsWithDesiredReplica("foo-v1", 2, nil, newTimestamp, 3, 1),
+			oldRSs:        []*apps.ReplicaSet{},
+
+			expectedNew: rsWithDesiredReplica("foo-v1", 2, nil, newTimestamp, 2, 1),
+			expectedOld: []*apps.ReplicaSet{},
+		},
 	}
 
 	for _, test := range tests {
@@ -282,7 +292,9 @@ func TestScale(t *testing.T) {
 				if desired, ok := test.desiredReplicasAnnotations[test.newRS.Name]; ok {
 					desiredReplicas = desired
 				}
-				deploymentutil.SetReplicasAnnotations(test.newRS, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
+				if test.newRS.Annotations == nil {
+					deploymentutil.SetReplicasAnnotations(test.newRS, desiredReplicas, desiredReplicas+deploymentutil.MaxSurge(*test.oldDeployment))
+				}
 			}
 			for i := range test.oldRSs {
 				rs := test.oldRSs[i]
@@ -307,8 +319,10 @@ func TestScale(t *testing.T) {
 			// Skip updating the map if the replica set wasn't updated since there will be
 			// no update action for it.
 			nameToSize := make(map[string]int32)
+			nameToAnn := make(map[string]map[string]string)
 			if test.newRS != nil {
 				nameToSize[test.newRS.Name] = *(test.newRS.Spec.Replicas)
+				nameToAnn[test.newRS.Name] = test.newRS.Annotations
 			}
 			for i := range test.oldRSs {
 				rs := test.oldRSs[i]
@@ -319,12 +333,19 @@ func TestScale(t *testing.T) {
 				rs := action.(testclient.UpdateAction).GetObject().(*apps.ReplicaSet)
 				if !test.wasntUpdated[rs.Name] {
 					nameToSize[rs.Name] = *(rs.Spec.Replicas)
+					nameToAnn[rs.Name] = rs.Annotations
 				}
 			}
 
-			if test.expectedNew != nil && test.newRS != nil && *(test.expectedNew.Spec.Replicas) != nameToSize[test.newRS.Name] {
-				t.Errorf("%s: expected new replicas: %d, got: %d", test.name, *(test.expectedNew.Spec.Replicas), nameToSize[test.newRS.Name])
-				return
+			if test.expectedNew != nil && test.newRS != nil {
+				if *(test.expectedNew.Spec.Replicas) != nameToSize[test.newRS.Name] {
+					t.Errorf("%s: expected new replicas: %d, got: %d", test.name, *(test.expectedNew.Spec.Replicas), nameToSize[test.newRS.Name])
+					return
+				}
+				if test.expectedNew.Annotations[deploymentutil.DesiredReplicasAnnotation] != nameToAnn[test.newRS.Name][deploymentutil.DesiredReplicasAnnotation] ||
+					test.expectedNew.Annotations[deploymentutil.MaxReplicasAnnotation] != nameToAnn[test.newRS.Name][deploymentutil.MaxReplicasAnnotation] {
+					t.Errorf("%s: expected new annotations: %v, got: %v", test.name, test.expectedNew.Annotations, test.newRS.Annotations)
+				}
 			}
 			if len(test.expectedOld) != len(test.oldRSs) {
 				t.Errorf("%s: expected %d old replica sets, got %d", test.name, len(test.expectedOld), len(test.oldRSs))
