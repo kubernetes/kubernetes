@@ -32,7 +32,10 @@ var (
 	ErrUnsupportedStrategicMergePatchFormat = errors.New("strategic merge patch format is not supported")
 )
 
-func ErrNoMergeKey(m map[string]interface{}, k string) error {
+func ErrNoMergeKey(m map[string]interface{}, k, fieldName string) error {
+	if fieldName != "" {
+		return fmt.Errorf("%s entry: %v does not contain declared merge key: %s", fieldName, m, k)
+	}
 	return fmt.Errorf("map: %v does not contain declared merge key: %s", m, k)
 }
 
