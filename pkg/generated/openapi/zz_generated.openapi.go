@@ -7685,6 +7685,7 @@ func schema_k8sio_api_apps_v1_DaemonSetCondition(ref common.ReferenceCallback) c
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -8028,6 +8029,7 @@ func schema_k8sio_api_apps_v1_DeploymentCondition(ref common.ReferenceCallback) 
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -8379,6 +8381,7 @@ func schema_k8sio_api_apps_v1_ReplicaSetCondition(ref common.ReferenceCallback) 
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -8738,6 +8741,7 @@ func schema_k8sio_api_apps_v1_StatefulSetCondition(ref common.ReferenceCallback)
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -9281,6 +9285,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentCondition(ref common.ReferenceCallb
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -9886,6 +9891,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetCondition(ref common.ReferenceCall
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -10419,6 +10425,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetCondition(ref common.ReferenceCallba
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -10761,6 +10768,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentCondition(ref common.ReferenceCallb
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -11111,6 +11119,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetCondition(ref common.ReferenceCallb
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
@@ -11589,6 +11598,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetCondition(ref common.ReferenceCall
 						},
 					},
 				},
+				Required: []string{"type"},
 			},
 		},
 		Dependencies: []string{
