@@ -162,11 +162,11 @@ func (v *mockVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 type gvkVerifier struct {
 	supported map[string]bool
 	errs      map[string]error
-	asked     []string
+	asked     []schema.GroupVersionKind
 }
 
 func (v *gvkVerifier) HasSupport(gvk schema.GroupVersionKind) error {
-	v.asked = append(v.asked, gvk.Kind)
+	v.asked = append(v.asked, gvk)
 	if err := v.errs[gvk.Kind]; err != nil {
 		return err
 	}
@@ -193,12 +193,16 @@ func TestParamVerifyingSchemaList(t *testing.T) {
 	service := `{"apiVersion":"v1","kind":"Service","metadata":{"name":"b"}}`
 	foo := `{"apiVersion":"example.com/v1","kind":"Foo","metadata":{"name":"c"}}`
 	bar := `{"apiVersion":"example.com/v1","kind":"Bar","metadata":{"name":"d"}}`
+	podGVK := schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+	serviceGVK := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	fooGVK := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Foo"}
+	barGVK := schema.GroupVersionKind{Group: "example.com", Version: "v1", Kind: "Bar"}
 	tests := []struct {
 		name          string
 		data          string
 		directive     string
 		verifierErrs  map[string]error
-		wantAsked     []string
+		wantAsked     []schema.GroupVersionKind
 		wantValidated int
 		wantErr       string
 	}{
@@ -206,19 +210,44 @@ func TestParamVerifyingSchemaList(t *testing.T) {
 			name:      "v1 List of supported items is not validated client-side",
 			data:      `{"apiVersion":"v1","kind":"List","items":[` + pod + `,` + service + `]}`,
 			directive: "Strict",
-			wantAsked: []string{"Pod", "Service"},
+			wantAsked: []schema.GroupVersionKind{podGVK, serviceGVK},
 		},
 		{
 			name:      "typed list of supported items is not validated client-side",
 			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[` + service + `]}`,
 			directive: "Strict",
-			wantAsked: []string{"Service"},
+			wantAsked: []schema.GroupVersionKind{serviceGVK},
+		},
+		{
+			name:      "typed list items inherit kind and apiVersion under strict",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"metadata":{"name":"a"}},` + service + `]}`,
+			directive: "Strict",
+			wantAsked: []schema.GroupVersionKind{serviceGVK, serviceGVK},
+		},
+		{
+			name:      "typed list items inherit kind and apiVersion under warn",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"metadata":{"name":"a"}}]}`,
+			directive: "Warn",
+			wantAsked: []schema.GroupVersionKind{serviceGVK},
+		},
+		{
+			name:          "unsupported typed list items inherit group and version before fallback",
+			data:          `{"apiVersion":"example.com/v1","kind":"FooList","items":[{"metadata":{"name":"a"}}]}`,
+			directive:     "Strict",
+			wantAsked:     []schema.GroupVersionKind{fooGVK},
+			wantValidated: 1,
+		},
+		{
+			name:      "nested typed list items inherit kind and apiVersion",
+			data:      `{"apiVersion":"v1","kind":"List","items":[{"apiVersion":"v1","kind":"ServiceList","items":[{"metadata":{"name":"a"}}]}]}`,
+			directive: "Strict",
+			wantAsked: []schema.GroupVersionKind{serviceGVK},
 		},
 		{
 			name:      "nested lists are verified per leaf item",
 			data:      `{"apiVersion":"v1","kind":"List","items":[{"apiVersion":"v1","kind":"List","items":[` + pod + `]},` + service + `]}`,
 			directive: "Strict",
-			wantAsked: []string{"Pod", "Service"},
+			wantAsked: []schema.GroupVersionKind{podGVK, serviceGVK},
 		},
 		{
 			name:      "empty list is not validated client-side",
@@ -229,21 +258,21 @@ func TestParamVerifyingSchemaList(t *testing.T) {
 			name:          "list with an unsupported item is validated client-side under strict",
 			data:          `{"apiVersion":"v1","kind":"List","items":[` + pod + `,` + foo + `]}`,
 			directive:     "Strict",
-			wantAsked:     []string{"Pod", "Foo"},
+			wantAsked:     []schema.GroupVersionKind{podGVK, fooGVK},
 			wantValidated: 1,
 		},
 		{
 			name:      "list with an unsupported item is skipped under warn",
 			data:      `{"apiVersion":"v1","kind":"List","items":[` + foo + `]}`,
 			directive: "Warn",
-			wantAsked: []string{"Foo"},
+			wantAsked: []schema.GroupVersionKind{fooGVK},
 		},
 		{
 			name:         "verifier error on a later item is not hidden by an earlier unsupported item",
 			data:         `{"apiVersion":"v1","kind":"List","items":[` + foo + `,` + bar + `]}`,
 			directive:    "Strict",
 			verifierErrs: map[string]error{"Bar": errors.New("openapi v3 error")},
-			wantAsked:    []string{"Foo", "Bar"},
+			wantAsked:    []schema.GroupVersionKind{fooGVK, barGVK},
 			wantErr:      "openapi v3 error",
 		},
 		{
@@ -253,10 +282,52 @@ func TestParamVerifyingSchemaList(t *testing.T) {
 			wantErr:   "kind not set",
 		},
 		{
+			name:      "untyped list cannot supply an item kind",
+			data:      `{"apiVersion":"v1","kind":"List","items":[{"metadata":{"name":"a"}}]}`,
+			directive: "Strict",
+			wantErr:   "kind not set",
+		},
+		{
+			name:      "typed list item missing only kind is an error",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"apiVersion":"v1","metadata":{"name":"a"}}]}`,
+			directive: "Strict",
+			wantErr:   "kind not set",
+		},
+		{
+			name:      "typed list item missing only apiVersion is an error",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"kind":"Service","metadata":{"name":"a"}}]}`,
+			directive: "Strict",
+			wantErr:   "apiVersion not set",
+		},
+		{
+			name:      "typed list item with non-string apiVersion is an error",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"apiVersion":1,"metadata":{"name":"a"}}]}`,
+			directive: "Strict",
+			wantErr:   "apiVersion isn't string type",
+		},
+		{
+			name:      "typed list item with non-string kind is an error",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"kind":true,"metadata":{"name":"a"}}]}`,
+			directive: "Strict",
+			wantErr:   "kind isn't string type",
+		},
+		{
+			name:      "typed list items with null type information inherit kind and apiVersion",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"kind":null,"apiVersion":null,"metadata":{"name":"a"}}]}`,
+			directive: "Strict",
+			wantAsked: []schema.GroupVersionKind{serviceGVK},
+		},
+		{
+			name:      "typed list items with empty type information inherit kind and apiVersion",
+			data:      `{"apiVersion":"v1","kind":"ServiceList","items":[{"kind":"","apiVersion":"","metadata":{"name":"a"}}]}`,
+			directive: "Strict",
+			wantAsked: []schema.GroupVersionKind{serviceGVK},
+		},
+		{
 			name:      "non-list object is verified by its own kind",
 			data:      pod,
 			directive: "Strict",
-			wantAsked: []string{"Pod"},
+			wantAsked: []schema.GroupVersionKind{podGVK},
 		},
 	}
 	for _, tt := range tests {

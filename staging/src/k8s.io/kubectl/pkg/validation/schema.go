@@ -20,9 +20,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	ejson "github.com/exponent-io/jsonpath"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/klog/v2"
@@ -189,5 +191,26 @@ func listItems(obj interface{}) ([]interface{}, bool) {
 		return nil, false
 	}
 	items, ok := fields["items"].([]interface{})
-	return items, ok
+	if !ok {
+		return nil, false
+	}
+	list := unstructured.Unstructured{Object: fields}
+	itemKind := strings.TrimSuffix(list.GetKind(), "List")
+	if len(itemKind) == 0 {
+		return items, true
+	}
+	for _, item := range items {
+		itemFields, ok := item.(map[string]interface{})
+		if !ok || itemFields == nil {
+			continue
+		}
+		itemObject := unstructured.Unstructured{Object: itemFields}
+		// Match UnstructuredJSONScheme's defaulting for typed list items.
+		if (itemFields["kind"] == nil || itemFields["kind"] == "") &&
+			(itemFields["apiVersion"] == nil || itemFields["apiVersion"] == "") {
+			itemObject.SetKind(itemKind)
+			itemObject.SetAPIVersion(list.GetAPIVersion())
+		}
+	}
+	return items, true
 }
