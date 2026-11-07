@@ -19,6 +19,7 @@ package container
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -41,6 +42,9 @@ import (
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
 	utilsnet "k8s.io/utils/net"
 )
+
+// ErrContainerExited indicates that a lifecycle handler's container exited while the handler was running.
+var ErrContainerExited = errors.New("container exited")
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
