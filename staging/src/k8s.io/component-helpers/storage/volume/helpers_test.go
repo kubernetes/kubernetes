@@ -29,6 +29,16 @@ var nodeLabels = map[string]string{
 	"test-key2": "test-value2",
 }
 
+func TestContainsAccessMode(t *testing.T) {
+	modes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany}
+	if !ContainsAccessMode(modes, v1.ReadOnlyMany) {
+		t.Error("expected ReadOnlyMany to be present")
+	}
+	if ContainsAccessMode(modes, v1.ReadWriteMany) {
+		t.Error("did not expect ReadWriteMany to be present")
+	}
+}
+
 func TestCheckVolumeNodeAffinity(t *testing.T) {
 	type affinityTest struct {
 		name          string
