@@ -262,7 +262,7 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo-2.yaml "${kube_flags[@]}"
 
   # Test that we can list this new custom resource
-  kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
+  kube::test::wait_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
 
   # Test alternate forms
   kube::test::get_object_assert foo                 "{{range.items}}{{$id_field}}:{{end}}" 'test:'
