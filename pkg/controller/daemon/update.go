@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -418,13 +419,22 @@ func (dsc *DaemonSetsController) dedupCurHistories(ctx context.Context, ds *apps
 			maxRevision = cur.Revision
 		}
 	}
+	// Only relabel pods that currently belong to one of the duplicate
+	// histories. Pods from older histories must keep their labels so the
+	// rolling update still considers them outdated and replaces them.
+	dupLabels := sets.New[string]()
+	for _, cur := range curHistories {
+		if cur.Name != keepCur.Name {
+			dupLabels.Insert(cur.Labels[apps.DefaultDaemonSetUniqueLabelKey])
+		}
+	}
 	// Relabel pods before dedup
 	pods, err := dsc.getDaemonPods(ctx, ds)
 	if err != nil {
 		return nil, err
 	}
 	for _, pod := range pods {
-		if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
+		if dupLabels.Has(pod.Labels[apps.DefaultDaemonSetUniqueLabelKey]) {
 			patchRaw := map[string]interface{}{
 				"metadata": map[string]interface{}{
 					"labels": map[string]interface{}{
