@@ -18,7 +18,7 @@ package validation
 
 import (
 	"math"
-	"strings"
+	"slices"
 	"testing"
 
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
@@ -63,6 +63,13 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	twoHundredMilli := apiresource.MustParse("200m")
 	oneUnit := apiresource.MustParse("1")
 	oneUnitDecimalPoint := apiresource.MustParse("1.0")
+	oneKi := apiresource.MustParse("1.0Ki")
+	oneKiTwoDecimals := apiresource.MustParse("1.00Ki") // 1024 bytes, spelled with one more digit
+	// Built without the parser so the scales stay -1 and -2, whatever padding ParseQuantity applies.
+	oneKiScaleOne := *apiresource.NewScaledQuantity(10240, -1)  // 1024.0
+	oneKiScaleTwo := *apiresource.NewScaledQuantity(102400, -2) // 1024.00
+	oneE100000 := apiresource.MustParse("1e100000")
+	twoE100000 := apiresource.MustParse("2e100000")
 
 	one := apiresource.MustParse("1Gi")
 	two := apiresource.MustParse("2Gi")
@@ -70,6 +77,16 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	overCapacity := apiresource.MustParse("20Gi")
 
 	zero := apiresource.MustParse("0")
+	zeroExtremeExponent := apiresource.MustParse("0e-2147483647") // an inf.Dec zero at scale 2147483647, see #142489
+	nineOne := apiresource.MustParse("9.1")
+	nineFive := apiresource.MustParse("9.5")
+	nineNine := apiresource.MustParse("9.9")
+	onesAtLimit := slices.Repeat([]apiresource.Quantity{oneUnit}, resource.CapacityRequestPolicyDiscreteMaxOptions)
+	// 1001m, 1002m, ... one more than the limit allows, all of them 2 as integers.
+	tooManyFractions := make([]apiresource.Quantity, resource.CapacityRequestPolicyDiscreteMaxOptions+1)
+	for i := range tooManyFractions {
+		tooManyFractions[i] = *apiresource.NewMilliQuantity(int64(1001+i), apiresource.DecimalSI)
+	}
 	negOne := apiresource.MustParse("-1")
 	maxInt64Q := *apiresource.NewQuantity(math.MaxInt64, apiresource.DecimalSI) // MaxInt64: the largest bound Value() reads faithfully
 	maxInt64Plus1 := maxInt64Q.DeepCopy()                                       // MaxInt64+1: the first bound that does not fit int64
@@ -81,6 +98,14 @@ func TestValidateDeviceCapacity(t *testing.T) {
 	capacityField := field.NewPath("spec", "devices", "capacity")
 	policyField := capacityField.Child("requestPolicy")
 	validValuesField := policyField.Child("validValues")
+	// For options that all compare equal, every entry after the first breaks the strict order.
+	orderErrorsAfterFirst := func(values []apiresource.Quantity) field.ErrorList {
+		var errs field.ErrorList
+		for i, value := range values[1:] {
+			errs = append(errs, field.Invalid(validValuesField.Index(i+1), value.String(), "values must be sorted in strictly ascending order"))
+		}
+		return errs
+	}
 	validRangeField := policyField.Child("validRange")
 
 	scenarios := map[string]struct {
@@ -148,38 +173,110 @@ func TestValidateDeviceCapacity(t *testing.T) {
 			},
 		},
 		"valid-fractional-values": {
-			// 100m (0.1), 200m (0.2), 1 are ascending, all ≤ maxCapacity; AsDec normalises them distinctly
+			// 100m (0.1), 200m (0.2), 1 are ascending, all ≤ maxCapacity
 			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&hundredMilli, []apiresource.Quantity{hundredMilli, twoHundredMilli, oneUnit}, nil)),
+			fractionalCapacityRangeGate: true,
+		},
+		"zero-option-with-extreme-exponent": {
+			// Regression test for #142489.
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&one, []apiresource.Quantity{zeroExtremeExponent, one}, nil)),
 			fractionalCapacityRangeGate: true,
 		},
 		"invalid-options-duplicate": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&one, []apiresource.Quantity{one, one}, nil)),
 			wantFailures: field.ErrorList{
-				field.Duplicate(validValuesField.Index(1), "1073741824"), // 1Gi
+				field.Invalid(validValuesField.Index(1), "1Gi", "values must be sorted in strictly ascending order"),
 			},
 		},
 		"invalid-options-duplicate-normalized": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneKIAbbreviated, []apiresource.Quantity{oneKIAbbreviated, oneKIUnabbreviated}, nil)),
 			wantFailures: field.ErrorList{
-				field.Duplicate(validValuesField.Index(1), "1024"),
+				field.Invalid(validValuesField.Index(1), "1024", "values must be sorted in strictly ascending order"),
 			},
 		},
 		"invalid-options-duplicate-decimal-point": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, []apiresource.Quantity{oneUnit, oneUnitDecimalPoint}, nil)),
 			wantFailures: field.ErrorList{
-				field.Duplicate(validValuesField.Index(1), "1"),
+				field.Invalid(validValuesField.Index(1), "1", "values must be sorted in strictly ascending order"),
 			},
 		},
-		// TODO(#141166): Equal values are duplicates however they are spelled. Expect a duplicate at index 1.
 		"options-duplicate-decimal-point-fractional-gate": {
 			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, []apiresource.Quantity{oneUnit, oneUnitDecimalPoint}, nil)),
 			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(1), "1", "values must be sorted in strictly ascending order"),
+			},
+		},
+		"options-duplicate-binary-scale-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneKi, []apiresource.Quantity{oneKi, oneKiTwoDecimals}, nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(1), "1Ki", "values must be sorted in strictly ascending order"),
+			},
+		},
+		"options-too-many-identical-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, slices.Repeat([]apiresource.Quantity{oneUnit}, resource.CapacityRequestPolicyDiscreteMaxOptions+1), nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.TooMany(validValuesField, resource.CapacityRequestPolicyDiscreteMaxOptions+1, resource.CapacityRequestPolicyDiscreteMaxOptions).WithOrigin("maxItems"),
+			},
+		},
+		"options-duplicate-at-limit-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, onesAtLimit, nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures:                orderErrorsAfterFirst(onesAtLimit),
+		},
+		"options-duplicate-out-of-order-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneUnit, []apiresource.Quantity{oneUnit, apiresource.MustParse("2"), oneUnitDecimalPoint}, nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(2), "1", "values must be sorted in strictly ascending order"),
+			},
+		},
+		"options-duplicate-different-scale-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&oneKiScaleOne, []apiresource.Quantity{oneKiScaleOne, oneKiScaleTwo}, nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(1), "1024", "values must be sorted in strictly ascending order"),
+			},
+		},
+		"options-large-exponent-fractional-gate": {
+			capacity:                    testDeviceCapacity(twoE100000, testCapacityRequestPolicy(&oneE100000, []apiresource.Quantity{oneE100000, twoE100000}, nil)),
+			fractionalCapacityRangeGate: true,
+		},
+		"options-duplicate-large-exponent-fractional-gate": {
+			capacity:                    testDeviceCapacity(twoE100000, testCapacityRequestPolicy(&oneE100000, []apiresource.Quantity{oneE100000, oneE100000}, nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				// The canonical form keeps the exponent a multiple of three.
+				field.Invalid(validValuesField.Index(1), "10e99999", "values must be sorted in strictly ascending order"),
+			},
+		},
+		"options-round-to-same-integer": {
+			// Without the gate these all read as 10, so they are not strictly ascending.
+			capacity:     testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&nineFive, []apiresource.Quantity{nineOne, nineFive, nineNine}, nil)),
+			wantFailures: orderErrorsAfterFirst([]apiresource.Quantity{nineOne, nineFive, nineNine}),
+		},
+		"options-round-to-same-integer-at-limit": {
+			capacity:     testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&tooManyFractions[0], tooManyFractions[:resource.CapacityRequestPolicyDiscreteMaxOptions], nil)),
+			wantFailures: orderErrorsAfterFirst(tooManyFractions[:resource.CapacityRequestPolicyDiscreteMaxOptions]),
+		},
+		"options-at-limit-fractional-gate": {
+			capacity:                    testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&tooManyFractions[0], tooManyFractions[:resource.CapacityRequestPolicyDiscreteMaxOptions], nil)),
+			fractionalCapacityRangeGate: true,
+		},
+		"options-too-many-round-to-same-integer": {
+			// A list that is too long only gets the size error.
+			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&tooManyFractions[0], tooManyFractions, nil)),
+			wantFailures: field.ErrorList{
+				field.TooMany(validValuesField, resource.CapacityRequestPolicyDiscreteMaxOptions+1, resource.CapacityRequestPolicyDiscreteMaxOptions).WithOrigin("maxItems"),
+			},
 		},
 		// TODO(#141166): Distinct values above MaxInt64 are not duplicates. Expect no failures.
 		"options-int64-max-and-plus-one": {
 			capacity: testDeviceCapacity(maxInt64Plus1, testCapacityRequestPolicy(ptr.To(maxInt64Q), []apiresource.Quantity{maxInt64Q, maxInt64Plus1}, nil)),
 			wantFailures: field.ErrorList{
-				field.Duplicate(validValuesField.Index(1), "9223372036854775807"),
+				field.Invalid(validValuesField.Index(1), maxInt64Plus1.String(), "values must be sorted in strictly ascending order"),
 			},
 		},
 		"options-int64-max-and-plus-one-fractional-gate": {
@@ -190,7 +287,7 @@ func TestValidateDeviceCapacity(t *testing.T) {
 		"options-100E-and-1000E": {
 			capacity: testDeviceCapacity(thousandExa, testCapacityRequestPolicy(ptr.To(hundredExa), []apiresource.Quantity{hundredExa, thousandExa}, nil)),
 			wantFailures: field.ErrorList{
-				field.Duplicate(validValuesField.Index(1), "9223372036854775807"),
+				field.Invalid(validValuesField.Index(1), thousandExa.String(), "values must be sorted in strictly ascending order"),
 			},
 		},
 		"options-100E-and-1000E-fractional-gate": {
@@ -200,7 +297,7 @@ func TestValidateDeviceCapacity(t *testing.T) {
 		"invalid-options-unsort": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&one, []apiresource.Quantity{two, one}, nil)),
 			wantFailures: field.ErrorList{
-				field.Invalid(validValuesField.Index(1), one.String(), "values must be sorted in ascending order"),
+				field.Invalid(validValuesField.Index(1), one.String(), "values must be sorted in strictly ascending order"),
 			},
 		},
 		"invalid-range-large-min-small-max": {
@@ -377,29 +474,6 @@ func TestValidateDeviceCapacity(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAFractionalCapacityRange, scenario.fractionalCapacityRangeGate)
 			errs := validateMultiAllocatableDeviceCapacity(scenario.capacity, capacityField)
 			assertFailures(t, scenario.wantFailures, errs)
-		})
-	}
-}
-
-func TestQuantityKeyAsDec(t *testing.T) {
-	scenarios := map[string]struct {
-		quantity string
-		wantKey  string
-	}{
-		"integer":                    {quantity: "1", wantKey: "1"},
-		"integer-with-decimal-point": {quantity: "1.0", wantKey: "1.0"},
-		"unabbreviated-ki":           {quantity: "1024", wantKey: "1024"},
-		"abbreviated-ki":             {quantity: "1Ki", wantKey: "1024"},
-		"exponent":                   {quantity: "1e3", wantKey: "1000"},
-		"milli":                      {quantity: "100m", wantKey: "0.100"},
-		// TODO(#141166): The key must grow with the digits written, not the exponent. Expect a short key.
-		"large-exponent": {quantity: "1e100000", wantKey: "1" + strings.Repeat("0", 100000)},
-	}
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) {
-			if got := quantityKeyAsDec(apiresource.MustParse(scenario.quantity)); got != scenario.wantKey {
-				t.Errorf("quantityKeyAsDec(%s) = %q, want %q", scenario.quantity, got, scenario.wantKey)
-			}
 		})
 	}
 }
