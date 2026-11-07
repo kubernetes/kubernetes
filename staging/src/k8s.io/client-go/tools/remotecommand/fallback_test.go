@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -245,7 +244,6 @@ func TestFallbackClient_SPDYSecondaryNonZeroExitCode(t *testing.T) {
 	// Create fake SPDY server that writes stdout followed by a v4 status error.
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx, err := createHTTPStreams(w, req, &StreamOptions{
-			Stdin:  strings.NewReader("input"),
 			Stdout: &bytes.Buffer{},
 		})
 		if err != nil {
@@ -280,7 +278,7 @@ func TestFallbackClient_SPDYSecondaryNonZeroExitCode(t *testing.T) {
 	spdyLocation, err := url.Parse(spdyServer.URL)
 	require.NoError(t, err)
 	// Primary websocket executor points at a SPDY-only endpoint and should fail.
-	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: spdyLocation.Host}, "GET", spdyServer.URL+"?stdin=true&stdout=true")
+	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: spdyLocation.Host}, "GET", spdyServer.URL+"?stdout=true")
 	require.NoError(t, err)
 	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: spdyLocation.Host}, "POST", spdyLocation)
 	require.NoError(t, err)
@@ -294,7 +292,6 @@ func TestFallbackClient_SPDYSecondaryNonZeroExitCode(t *testing.T) {
 
 	var stdout bytes.Buffer
 	err = exec.StreamWithContext(context.Background(), StreamOptions{
-		Stdin:  strings.NewReader("input"),
 		Stdout: &stdout,
 	})
 	require.Error(t, err)
