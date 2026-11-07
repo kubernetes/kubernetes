@@ -886,6 +886,102 @@ func TestMemoryPressure(t *testing.T) {
 	}
 }
 
+// TestSoftEvictionNegativeMaxPodGracePeriod verifies that when
+// MaxPodGracePeriodSeconds is negative, a soft eviction defers to the pod's
+// terminationGracePeriodSeconds instead of passing the negative value through
+// to the runtime (which would trigger an immediate SIGKILL). This matches the
+// documented --eviction-max-pod-grace-period behavior: "If negative, defer to
+// pod specified value." See https://github.com/kubernetes/kubernetes/issues/118172.
+func TestSoftEvictionNegativeMaxPodGracePeriod(t *testing.T) {
+	testCases := map[string]struct {
+		podTerminationGracePeriodSeconds *int64
+		wantGracePeriod                  int64
+	}{
+		"defers to pod terminationGracePeriodSeconds when set": {
+			podTerminationGracePeriodSeconds: ptr.To(int64(120)),
+			wantGracePeriod:                  120,
+		},
+		"falls back to the default grace period when the pod value is unset": {
+			podTerminationGracePeriodSeconds: nil,
+			wantGracePeriod:                  int64(v1.DefaultTerminationGracePeriodSeconds),
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
+			pod, podStat := makePodWithMemoryStats("best-effort-high-usage", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "400Mi")
+			pod.Spec.TerminationGracePeriodSeconds = tc.podTerminationGracePeriodSeconds
+			pods := []*v1.Pod{pod}
+			podStats := map[*v1.Pod]statsapi.PodStats{pod: podStat}
+			activePodsFunc := func() []*v1.Pod { return pods }
+
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			podKiller := &mockPodKiller{}
+			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+			diskGC := &mockDiskGC{err: nil}
+			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+			config := Config{
+				// A negative value means "defer to pod specified value".
+				MaxPodGracePeriodSeconds: -1,
+				PressureTransitionPeriod: time.Minute * 5,
+				Thresholds: []evictionapi.Threshold{
+					{
+						Signal:   evictionapi.SignalMemoryAvailable,
+						Operator: evictionapi.OpLessThan,
+						Value: evictionapi.ThresholdValue{
+							Quantity: quantityMustParse("2Gi"),
+						},
+						GracePeriod: time.Minute * 2,
+					},
+				},
+			}
+			summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", podStats)}
+			manager := &managerImpl{
+				clock:                        fakeClock,
+				killPodFunc:                  podKiller.killPodNow,
+				imageGC:                      diskGC,
+				containerGC:                  diskGC,
+				config:                       config,
+				recorder:                     &record.FakeRecorder{},
+				summaryProvider:              summaryProvider,
+				nodeRef:                      nodeRef,
+				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+				thresholdsFirstObservedAt:    thresholdsObservedAt{},
+			}
+
+			// induce the soft threshold; no pod should be killed yet because the
+			// grace period has not elapsed.
+			fakeClock.Step(1 * time.Minute)
+			summaryProvider.result = makeMemoryStats("1500Mi", podStats)
+			if _, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc); err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+			if podKiller.pod != nil {
+				t.Fatalf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod.Name)
+			}
+
+			// step past the soft threshold grace period so the pod is evicted.
+			fakeClock.Step(3 * time.Minute)
+			summaryProvider.result = makeMemoryStats("1500Mi", podStats)
+			if _, err := manager.synchronize(tCtx, diskInfoProvider, activePodsFunc); err != nil {
+				t.Fatalf("Manager expects no error but got %v", err)
+			}
+
+			if podKiller.pod != pod {
+				t.Fatalf("Manager should have killed pod %v", pod.Name)
+			}
+			if podKiller.gracePeriodOverride == nil {
+				t.Fatalf("Manager should have set a grace period override")
+			}
+			if observed := *podKiller.gracePeriodOverride; observed != tc.wantGracePeriod {
+				t.Errorf("Expected grace period %d, but got %d", tc.wantGracePeriod, observed)
+			}
+		})
+	}
+}
+
 func makeContainersByQOS(class v1.PodQOSClass) []v1.Container {
 	resource := newResourceList("100m", "1Gi", "")
 	switch class {
