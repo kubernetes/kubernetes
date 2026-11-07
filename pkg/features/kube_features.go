@@ -245,7 +245,8 @@ const (
 	// kep: http://kep.k8s.io/5055
 	//
 	// Allows DeviceTaintRule.spec.deviceSelector.all to explicitly select all
-	// devices. Validation of the field is declarative only.
+	// devices. Validation of the field is declarative only, therefore this
+	// gate depends on DeclarativeValidationBeta.
 	DRADeviceTaintSelectorAll featuregate.Feature = "DRADeviceTaintSelectorAll"
 
 	// owner: @pohly
@@ -2400,7 +2401,7 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DRADeviceTaintRules: {DRADeviceTaints},
 
-	DRADeviceTaintSelectorAll: {},
+	DRADeviceTaintSelectorAll: {genericfeatures.DeclarativeValidationBeta},
 
 	DRADeviceTaints: {},
 
