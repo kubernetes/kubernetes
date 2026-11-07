@@ -644,40 +644,31 @@ func TestIntervalsHaveIndex(t *testing.T) {
 	}
 }
 
-func TestFirstPendingIndexes(t *testing.T) {
+func TestPendingIndexes(t *testing.T) {
 	cases := map[string]struct {
-		cnt              int
 		completions      int
 		activePods       []indexPhase
 		succeededIndexes []interval
 		failedIndexes    *orderedIntervals
 		want             []int
 	}{
-		"cnt greater than completions": {
-			cnt:         5,
+		"all indexes pending": {
 			completions: 3,
 			want:        []int{0, 1, 2},
-		},
-		"cnt less than completions": {
-			cnt:         2,
-			completions: 5,
-			want:        []int{0, 1},
 		},
 		"first pods active": {
 			activePods: []indexPhase{
 				{"0", v1.PodRunning},
 				{"1", v1.PodPending},
 			},
-			cnt:         3,
 			completions: 10,
-			want:        []int{2, 3, 4},
+			want:        []int{2, 3, 4, 5, 6, 7, 8, 9},
 		},
 		"last pods active or succeeded": {
 			activePods: []indexPhase{
 				{"6", v1.PodPending},
 			},
 			succeededIndexes: []interval{{4, 5}},
-			cnt:              6,
 			completions:      6,
 			want:             []int{0, 1, 2, 3},
 		},
@@ -690,9 +681,8 @@ func TestFirstPendingIndexes(t *testing.T) {
 				{"-3", v1.PodRunning},
 			},
 			succeededIndexes: []interval{{2, 4}, {9, 9}},
-			cnt:              5,
 			completions:      20,
-			want:             []int{0, 1, 6, 7, 10},
+			want:             []int{0, 1, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19},
 		},
 		"with failed indexes": {
 			activePods: []indexPhase{
@@ -701,9 +691,8 @@ func TestFirstPendingIndexes(t *testing.T) {
 			},
 			succeededIndexes: []interval{{1, 1}, {5, 5}, {9, 9}},
 			failedIndexes:    &orderedIntervals{{2, 2}, {6, 7}},
-			cnt:              5,
 			completions:      20,
-			want:             []int{0, 4, 8, 10, 11},
+			want:             []int{0, 4, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19},
 		},
 	}
 	for name, tc := range cases {
@@ -714,9 +703,9 @@ func TestFirstPendingIndexes(t *testing.T) {
 				failedIndexes:    tc.failedIndexes,
 				job:              newJob(1, 1, 1, batch.IndexedCompletion),
 			}
-			got := firstPendingIndexes(jobCtx, tc.cnt, tc.completions)
+			got := pendingIndexes(jobCtx, tc.completions)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
-				t.Errorf("Wrong first pending indexes (-want,+got):\n%s", diff)
+				t.Errorf("Wrong pending indexes (-want,+got):\n%s", diff)
 			}
 		})
 	}

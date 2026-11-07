@@ -239,15 +239,13 @@ func parseIndexesFromString(logger klog.Logger, indexesStr string, completions i
 	return result
 }
 
-// firstPendingIndexes returns `count` indexes less than `completions` that are
-// not covered by `activePods`, `succeededIndexes` or `failedIndexes`.
+// pendingIndexes returns all indexes less than `completions` that are not
+// covered by `activePods`, `succeededIndexes` or `failedIndexes`.
 // In cases of PodReplacementPolicy as Failed we will include `terminatingPods` in this list.
-func firstPendingIndexes(jobCtx *syncJobCtx, count, completions int) []int {
-	if count == 0 {
-		return nil
-	}
+// The caller is responsible for applying per-index backoff and capping how many
+// of these indexes receive pods in a given sync (parallelism / diff).
+func pendingIndexes(jobCtx *syncJobCtx, completions int) []int {
 	active := getIndexes(jobCtx.activePods)
-	result := make([]int, 0, count)
 	nonPending := jobCtx.succeededIndexes.withOrderedIndexes(sets.List(active))
 	if onlyReplaceFailedPods(jobCtx.job) {
 		terminating := getIndexes(controller.FilterTerminatingPods(jobCtx.pods))
@@ -256,17 +254,18 @@ func firstPendingIndexes(jobCtx *syncJobCtx, count, completions int) []int {
 	if jobCtx.failedIndexes != nil {
 		nonPending = nonPending.merge(*jobCtx.failedIndexes)
 	}
-	// The following algorithm is bounded by len(nonPending) and count.
+	// Bounded by len(nonPending) and completions.
+	result := make([]int, 0, max(0, completions-nonPending.total()))
 	candidate := 0
 	for _, sInterval := range nonPending {
-		for ; candidate < completions && len(result) < count && candidate < sInterval.First; candidate++ {
+		for ; candidate < completions && candidate < sInterval.First; candidate++ {
 			result = append(result, candidate)
 		}
 		if candidate < sInterval.Last+1 {
 			candidate = sInterval.Last + 1
 		}
 	}
-	for ; candidate < completions && len(result) < count; candidate++ {
+	for ; candidate < completions; candidate++ {
 		result = append(result, candidate)
 	}
 	return result

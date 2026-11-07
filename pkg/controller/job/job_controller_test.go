@@ -5041,9 +5041,10 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		job        batch.Job
-		pods       []v1.Pod
-		wantStatus batch.JobStatus
+		job                batch.Job
+		pods               []v1.Pod
+		wantStatus         batch.JobStatus
+		wantCreatedIndexes sets.Set[int] // nil means do not assert creates
 	}{
 		"successful job after a single failure within index": {
 			job: batch.Job{
@@ -5180,6 +5181,45 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				FailedIndexes:           new(string),
 			},
+		},
+		// Lower indexes in per-index backoff must not block creating pods for
+		// higher pending indexes (KEP-3850 index independence / HOL fix).
+		"creates higher indexes while lower index is in per-index backoff": {
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:             validSelector,
+					Template:             validTemplate,
+					Parallelism:          ptr.To[int32](1),
+					Completions:          ptr.To[int32](3),
+					BackoffLimit:         ptr.To[int32](math.MaxInt32),
+					CompletionMode:       ptr.To(batch.IndexedCompletion),
+					BackoffLimitPerIndex: ptr.To[int32](1),
+				},
+			},
+			pods: []v1.Pod{
+				*buildPod().uid("a").index("0").status(v1.PodStatus{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "x",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									FinishedAt: metav1.NewTime(now),
+								},
+							},
+						},
+					},
+				}).indexFailureCount("0").trackingFinalizer().Pod,
+			},
+			wantStatus: batch.JobStatus{
+				Active:                  1,
+				Terminating:             ptr.To[int32](0),
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				FailedIndexes:           new(string),
+			},
+			wantCreatedIndexes: sets.New(1),
 		},
 		"single failed index due to exceeding the backoff limit per index, the job continues": {
 			job: batch.Job{
@@ -5519,6 +5559,9 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 				t.Errorf("unexpected job status. Diff: %s\n", diff)
 			}
+			if tc.wantCreatedIndexes != nil {
+				checkIndexedJobPods(t, &fakePodControl, tc.wantCreatedIndexes, job.Name)
+			}
 		})
 	}
 }
@@ -5655,6 +5698,7 @@ func TestGetPodCreationInfoForIndependentIndexes(t *testing.T) {
 	cases := map[string]struct {
 		indexesToAdd                    []int
 		podsWithDelayedDeletionPerIndex map[int]*v1.Pod
+		maxReady                        int // 0 means use len(indexesToAdd)
 		wantIndexesToAdd                []int
 		wantRemainingTime               time.Duration
 	}{
@@ -5695,12 +5739,29 @@ func TestGetPodCreationInfoForIndependentIndexes(t *testing.T) {
 			},
 			wantRemainingTime: DefaultJobPodFailureBackOff - time.Second,
 		},
+		"skips lower index in backoff and stops at maxReady": {
+			indexesToAdd: []int{0, 1, 2},
+			podsWithDelayedDeletionPerIndex: map[int]*v1.Pod{
+				0: buildPod().indexFailureCount("0").customDeletionTimestamp(now).Pod,
+			},
+			maxReady:         1,
+			wantIndexesToAdd: []int{1},
+		},
+		"stops at maxReady when more indexes are ready": {
+			indexesToAdd:     []int{1, 2, 3},
+			maxReady:         2,
+			wantIndexesToAdd: []int{1, 2},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			fakeClock := clocktesting.NewFakeClock(now)
 			manager, _ := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
-			gotIndexesToAdd, gotRemainingTime := manager.getPodCreationInfoForIndependentIndexes(logger, tc.indexesToAdd, tc.podsWithDelayedDeletionPerIndex)
+			maxReady := tc.maxReady
+			if maxReady == 0 {
+				maxReady = len(tc.indexesToAdd)
+			}
+			gotIndexesToAdd, gotRemainingTime := manager.getPodCreationInfoForIndependentIndexes(logger, tc.indexesToAdd, tc.podsWithDelayedDeletionPerIndex, maxReady)
 			if diff := cmp.Diff(tc.wantIndexesToAdd, gotIndexesToAdd); diff != "" {
 				t.Fatalf("Unexpected indexes to add: %s", diff)
 			}
