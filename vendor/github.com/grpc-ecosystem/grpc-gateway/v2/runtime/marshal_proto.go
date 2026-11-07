@@ -40,6 +40,13 @@ func (marshaller *ProtoMarshaller) NewDecoder(reader io.Reader) Decoder {
 		if err != nil {
 			return err
 		}
+		// ReadAll drains the reader, so a call with nothing left to read has
+		// to report io.EOF like the other decoders. Otherwise it decodes an
+		// empty message every time, and a loop decoding until io.EOF, such as
+		// the generated client streaming handlers, never terminates.
+		if len(buffer) == 0 {
+			return io.EOF
+		}
 		return marshaller.Unmarshal(buffer, value)
 	})
 }
