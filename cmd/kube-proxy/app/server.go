@@ -25,11 +25,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/flagz"
@@ -47,8 +50,12 @@ import (
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	v1informers "k8s.io/client-go/informers/core/v1"
+	discoveryv1informers "k8s.io/client-go/informers/discovery/v1"
+	networkingv1informers "k8s.io/client-go/informers/networking/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/events"
@@ -74,7 +81,6 @@ import (
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	v1alpha1conversion "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/nodemanager"
@@ -600,10 +606,9 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 			options.LabelSelector = labelSelectorNoHeadlessEndpoints.String()
 		}))
 
-	// Create configs (i.e. Watches for Services, EndpointSlices and ServiceCIDRs)
-	// Note: RegisterHandler() calls need to happen before creation of Sources because sources
-	// only notify on changes, and the initial update (on process start) may be lost if no handlers
-	// are registered yet.
+	// Create informer event handlers for Services, EndpointSlices and ServiceCIDRs
+	// Note: event handler registration calls need to happen before starting the informer factories
+	// so the initial list updates are not lost.
 	// don't watch headless services for kube-proxy, they are proxied by DNS.
 	serviceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
 		informers.WithTransform(trimManagedFields),
@@ -611,33 +616,126 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 			options.LabelSelector = labelSelectorNoProxyName.String()
 			options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", v1.ClusterIPNone).String()
 		}))
-	serviceConfig := config.NewServiceConfig(ctx, serviceInformerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
-	serviceConfig.RegisterEventHandler(s.Proxier)
-	go serviceConfig.Run(ctx.Done())
+	serviceRegistration, err := serviceInformerFactory.Core().V1().Services().TypedInformer().AddTypedEventHandler(
+		v1informers.ServiceHandlerFuncs{
+			AddFunc:    s.Proxier.OnServiceAdd,
+			UpdateFunc: s.Proxier.OnServiceUpdate,
+			DeleteFunc: func(deleted v1informers.DeletedService) {
+				if svc := deleted.OptionalObj; svc != nil {
+					s.Proxier.OnServiceDelete(svc)
+				}
+			},
+		},
+		cache.HandlerOptions{ResyncPeriod: &s.Config.ConfigSyncPeriod.Duration},
+	)
+	if err != nil {
+		return err
+	}
+	go func() {
+		if !cache.WaitForNamedCacheSync("service", ctx.Done(), serviceRegistration.HasSynced) {
+			return
+		}
+		s.Proxier.OnServiceSynced()
+	}()
 
-	endpointSliceConfig := config.NewEndpointSliceConfig(ctx, endpointSliceInformerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
-	endpointSliceConfig.RegisterEventHandler(s.Proxier)
-	go endpointSliceConfig.Run(ctx.Done())
+	endpointSliceRegistration, err := endpointSliceInformerFactory.Discovery().V1().EndpointSlices().TypedInformer().AddTypedEventHandler(
+		discoveryv1informers.EndpointSliceHandlerFuncs{
+			AddFunc:    s.Proxier.OnEndpointSliceAdd,
+			UpdateFunc: s.Proxier.OnEndpointSliceUpdate,
+			DeleteFunc: func(deleted discoveryv1informers.DeletedEndpointSlice) {
+				if slice := deleted.OptionalObj; slice != nil {
+					s.Proxier.OnEndpointSliceDelete(slice)
+				}
+			},
+		},
+		cache.HandlerOptions{ResyncPeriod: &s.Config.ConfigSyncPeriod.Duration},
+	)
+	if err != nil {
+		return err
+	}
+	go func() {
+		if !cache.WaitForNamedCacheSync("endpoint slice", ctx.Done(), endpointSliceRegistration.HasSynced) {
+			return
+		}
+		s.Proxier.OnEndpointSlicesSynced()
+	}()
 
-	serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
-	serviceCIDRConfig.RegisterEventHandler(s.Proxier)
-	go serviceCIDRConfig.Run(wait.NeverStop)
+	var (
+		serviceCIDRsLock sync.Mutex
+		serviceCIDRs     = sets.New[string]()
+	)
+	serviceCIDRRegistration, err := informerFactory.Networking().V1().ServiceCIDRs().TypedInformer().AddTypedEventHandler(
+		networkingv1informers.ServiceCIDRHandlerFuncs{
+			AddFunc: func(serviceCIDR *networkingv1.ServiceCIDR) {
+				serviceCIDRsLock.Lock()
+				defer serviceCIDRsLock.Unlock()
+				serviceCIDRs.Insert(serviceCIDR.Spec.CIDRs...)
+				s.Proxier.OnServiceCIDRsChanged(serviceCIDRs.UnsortedList())
+			},
+			UpdateFunc: func(oldServiceCIDR, newServiceCIDR *networkingv1.ServiceCIDR) {
+				serviceCIDRsLock.Lock()
+				defer serviceCIDRsLock.Unlock()
+				serviceCIDRs.Delete(oldServiceCIDR.Spec.CIDRs...)
+				serviceCIDRs.Insert(newServiceCIDR.Spec.CIDRs...)
+				s.Proxier.OnServiceCIDRsChanged(serviceCIDRs.UnsortedList())
+			},
+			DeleteFunc: func(deleted networkingv1informers.DeletedServiceCIDR) {
+				if serviceCIDR := deleted.OptionalObj; serviceCIDR != nil {
+					serviceCIDRsLock.Lock()
+					defer serviceCIDRsLock.Unlock()
+					serviceCIDRs.Delete(serviceCIDR.Spec.CIDRs...)
+					s.Proxier.OnServiceCIDRsChanged(serviceCIDRs.UnsortedList())
+				}
+			},
+		},
+		cache.HandlerOptions{ResyncPeriod: &s.Config.ConfigSyncPeriod.Duration},
+	)
+	if err != nil {
+		return err
+	}
+	go func() {
+		if !cache.WaitForNamedCacheSync("serviceCIDR", ctx.Done(), serviceCIDRRegistration.HasSynced) {
+			return
+		}
+		serviceCIDRsLock.Lock()
+		defer serviceCIDRsLock.Unlock()
+		s.Proxier.OnServiceCIDRsChanged(serviceCIDRs.UnsortedList())
+	}()
 
-	// This has to start after the calls to NewServiceConfig because that
-	// function must configure its shared informer event handlers first.
 	informerFactory.StartWithContext(ctx)
 	endpointSliceInformerFactory.StartWithContext(ctx)
 	serviceInformerFactory.StartWithContext(ctx)
 
 	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.
 	if s.NodeManager != nil {
-		nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
-		nodeConfig.RegisterEventHandler(s.NodeManager)
-		// NodeManager has already started and synced the node informer, so the handler must be attached in one step
-		// Ref: https://issues.k8s.io/143275
-		config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration, s.Proxier)
-
-		go nodeConfig.Run(wait.NeverStop)
+		s.NodeManager.RegisterTopologyHandler(s.Proxier)
+		_, err = s.NodeManager.NodeInformer().Informer().AddEventHandlerWithResyncPeriod(
+			cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					if node, ok := obj.(*v1.Node); ok {
+						s.NodeManager.OnNodeChange(node)
+					}
+				},
+				UpdateFunc: func(_, newObj interface{}) {
+					if node, ok := newObj.(*v1.Node); ok {
+						s.NodeManager.OnNodeChange(node)
+					}
+				},
+				DeleteFunc: func(obj interface{}) {
+					if node, ok := obj.(*v1.Node); ok {
+						s.NodeManager.OnNodeDelete(node)
+					} else if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+						if node, ok := tombstone.Obj.(*v1.Node); ok {
+							s.NodeManager.OnNodeDelete(node)
+						}
+					}
+				},
+			},
+			s.Config.ConfigSyncPeriod.Duration,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Birth Cry after the birth is successful
