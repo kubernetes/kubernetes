@@ -65,14 +65,7 @@ func (f *securityProfileOCIFeature) InferForScheduling(podInfo *types.PodInfo) b
 }
 
 func (f *securityProfileOCIFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
-	// Seccomp profiles of existing containers are immutable, so only an update
-	// that adds the first OCI profile introduces the requirement: adding an
-	// ephemeral container with an OCI profile to a pod without one. The API
-	// server does not validate the ephemeralcontainers subresource against
-	// declared features; the kubelet reports a missing feature with a
-	// FailedNodeDeclaredFeaturesCheck event, and the container runtime
-	// rejects the profile.
-	return !podSpecUsesSeccompProfileOCI(oldPodInfo.Spec) && podSpecUsesSeccompProfileOCI(newPodInfo.Spec)
+	return false
 }
 
 func (f *securityProfileOCIFeature) MaxVersion() *version.Version {
