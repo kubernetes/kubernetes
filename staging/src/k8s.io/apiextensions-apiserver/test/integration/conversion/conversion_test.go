@@ -278,8 +278,10 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 	// This allows us to start the webhook server ONCE at the beginning of the test.
 	// Crucially, this allows us to enforce teardown order: API Server stops -> Webhook Server stops.
 
-	// Create the mutable handler.
-	proxyHandler := &dynamicWebhookHandler{}
+	// Create the mutable handler with a noopConverter fallback so that background
+	// operations (e.g. watch cache syncs, storage draining, and CRD finalizer instance
+	// deletion during teardown) can convert objects cleanly when no test-specific delegate is active.
+	proxyHandler := newDynamicWebhookHandler(NewObjectConverterWebhookHandler(t, noopConverter))
 
 	// Start Webhook Server FIRST.
 	// This ensures its deferred teardown runs LAST (after API server stop).
@@ -1641,21 +1643,35 @@ func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
 
 }
 
-// dynamicWebhookHandler is a thread-safe http. Handler that allows swapping
+// dynamicWebhookHandler is a thread-safe http.Handler that allows swapping
 // the underlying delegate handler at runtime. This is useful for sharing a single
 // server instance across multiple test cases that require different behaviors.
+// When no delegate is set, it falls back to defaultHandler (e.g. noopConverter)
+// so that background operations such as watch cache syncs or CRD finalizer instance
+// deletions during teardown can convert objects without failing.
 type dynamicWebhookHandler struct {
-	mu       sync.RWMutex
-	delegate http.Handler
+	mu             sync.RWMutex
+	delegate       http.Handler
+	defaultHandler http.Handler
+}
+
+func newDynamicWebhookHandler(defaultHandler http.Handler) *dynamicWebhookHandler {
+	return &dynamicWebhookHandler{
+		defaultHandler: defaultHandler,
+	}
 }
 
 // ServeHTTP implements http.Handler. It delegates the request to the currently
-// configured handler. If no handler is set, it returns an internal server error.
+// configured handler, falling back to defaultHandler if no delegate is set.
 func (h *dynamicWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-	if h.delegate != nil {
-		h.delegate.ServeHTTP(w, r)
+	delegate := h.delegate
+	if delegate == nil {
+		delegate = h.defaultHandler
+	}
+	h.mu.RUnlock()
+	if delegate != nil {
+		delegate.ServeHTTP(w, r)
 	} else {
 		http.Error(w, "unexpected call", http.StatusInternalServerError)
 	}
