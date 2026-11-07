@@ -52,6 +52,7 @@ type ResizableContainerInfo struct {
 	RestartCount  int32
 	RestartPolicy v1.ContainerRestartPolicy
 	InitCtr       bool
+	Command       string
 }
 
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
@@ -68,6 +69,9 @@ func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.Containe
 
 func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	if tcInfo.Command != "" {
+		cmd = tcInfo.Command
+	}
 	resizePol := getTestResizePolicy(tcInfo)
 	tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmd)
 	tc.ResizePolicy = resizePol
@@ -76,6 +80,27 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	}
 
 	return tc
+}
+
+func makeResizableInitContainer(tcInfo ResizableContainerInfo) v1.Container {
+	cmd := "grep Cpus_allowed_list /proc/self/status"
+	cmdSidecar := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+	resizePol := getTestResizePolicy(tcInfo)
+	if tcInfo.RestartPolicy == v1.ContainerRestartPolicyAlways {
+		tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmdSidecar)
+		tc.ResizePolicy = resizePol
+		if tcInfo.RestartPolicy != "" {
+			tc.RestartPolicy = &tcInfo.RestartPolicy
+		}
+		return tc
+	} else {
+		tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmd)
+		tc.ResizePolicy = resizePol
+		if tcInfo.RestartPolicy != "" {
+			tc.RestartPolicy = &tcInfo.RestartPolicy
+		}
+		return tc
+	}
 }
 
 func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo, podResources *v1.ResourceRequirements) *v1.Pod {
@@ -111,10 +136,11 @@ func separateContainers(tcInfo []ResizableContainerInfo) ([]v1.Container, []v1.C
 	var initContainers, containers []v1.Container
 
 	for _, ci := range tcInfo {
-		tc := makeResizableContainer(ci)
 		if ci.InitCtr {
+			tc := makeResizableInitContainer(ci)
 			initContainers = append(initContainers, tc)
 		} else {
+			tc := makeResizableContainer(ci)
 			containers = append(containers, tc)
 		}
 	}
@@ -517,4 +543,37 @@ func formatErrors(err error) error {
 		errStrings[i] = err.Error()
 	}
 	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
+}
+
+func ExpectPodResizePending(ctx context.Context, f *framework.Framework, resizePendingPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
+	ginkgo.GinkgoHelper()
+
+	// Verify Pod Containers Cgroup Values
+	var errs []error
+	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizePendingPod, expectedContainers); cgroupErrs != nil {
+		errs = append(errs, fmt.Errorf("container cgroup values don't match expected: %w", formatErrors(cgroupErrs)))
+	}
+	if resourceErrs := VerifyPodStatusResources(resizePendingPod, expectedContainers); resourceErrs != nil {
+		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
+	}
+	if restartErrs := VerifyPodRestarts(ctx, f, resizePendingPod, expectedContainers); restartErrs != nil {
+		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
+	}
+
+	// Verify PodResizePending conditions are not empty.
+	podResizePendingFound := false
+	for _, condition := range resizePendingPod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			podResizePendingFound = true
+		}
+	}
+	if !podResizePendingFound {
+		errs = append(errs, fmt.Errorf("resize condition type %s not found in pod status", v1.PodResizePending))
+	}
+
+	if len(errs) > 0 {
+		resizePendingPod.ManagedFields = nil // Suppress managed fields in error output.
+		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
+			"Verifying pod resources resize state. Pod: %s", framework.PrettyPrintJSON(resizePendingPod))
+	}
 }
