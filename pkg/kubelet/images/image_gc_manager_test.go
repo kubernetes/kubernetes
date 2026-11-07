@@ -948,3 +948,76 @@ func TestValidateImageGCPolicy(t *testing.T) {
 		}
 	}
 }
+
+// TestFreeOldImagesRespectsRecentPulls checks that an image no container has
+// used is not removed for age until it has been known for longer than MaxAge,
+// so a pod stuck in CreateContainerConfigError does not cause a GC/re-pull loop.
+func TestFreeOldImagesRespectsRecentPulls(t *testing.T) {
+	ctx := ktesting.Init(t)
+	policy := ImageGCPolicy{
+		HighThresholdPercent: 90,
+		LowThresholdPercent:  80,
+		MinAge:               0,
+		MaxAge:               time.Hour,
+	}
+	fakeRuntime := &containertest.FakeRuntime{}
+	mockStatsProvider := statstest.NewMockProvider(t)
+	manager := &realImageGCManager{
+		runtime:       fakeRuntime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: mockStatsProvider,
+		recorder:      &record.FakeRecorder{},
+	}
+
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+	}
+	fakeRuntime.AllPodList = []*containertest.FakePod{}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	startTime := fakeClock.Now().Add(-3 * time.Hour)
+	assert := assert.New(t)
+
+	_, err := manager.imagesInEvictionOrder(ctx, fakeClock.Now())
+	require.NoError(t, err)
+
+	// Known for longer than MaxAge and never used: removed.
+	fakeClock.Step(2 * time.Hour)
+	images, err := manager.imagesInEvictionOrder(ctx, fakeClock.Now())
+	require.NoError(t, err)
+	require.Len(t, images, 1)
+	images, err = manager.freeOldImages(ctx, images, fakeClock.Now(), startTime)
+	require.NoError(t, err)
+	assert.Empty(images)
+	assert.Empty(fakeRuntime.ImageList)
+
+	// The kubelet pulls the image again; it is still unused.
+	fakeClock.Step(30 * time.Minute)
+	repullTime := fakeClock.Now()
+	fakeRuntime.ImageList = []container.Image{
+		makeImage(0, 1024),
+	}
+	images, err = manager.imagesInEvictionOrder(ctx, repullTime)
+	require.NoError(t, err)
+	require.Len(t, images, 1)
+	rec, ok := manager.getImageRecord(imageID(0))
+	require.True(t, ok)
+	assert.Equal(repullTime, rec.firstDetected)
+
+	images, err = manager.freeOldImages(ctx, images, fakeClock.Now(), startTime)
+	require.NoError(t, err)
+	assert.Len(images, 1, "an image first detected within MaxAge should be kept")
+	assert.Len(fakeRuntime.ImageList, 1)
+
+	// Once it has been known for longer than MaxAge, it is removed.
+	fakeClock.Step(time.Hour + 10*time.Minute)
+	images, err = manager.imagesInEvictionOrder(ctx, fakeClock.Now())
+	require.NoError(t, err)
+	require.Len(t, images, 1)
+	assert.Equal(repullTime, images[0].firstDetected)
+	images, err = manager.freeOldImages(ctx, images, fakeClock.Now(), startTime)
+	require.NoError(t, err)
+	assert.Empty(images)
+	assert.Empty(fakeRuntime.ImageList)
+}
