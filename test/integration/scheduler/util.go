@@ -65,43 +65,6 @@ import (
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
 type ShutdownFunc func()
 
-// createPausePod creates a pause pod, optionally wrapping it in a basic PodGroup when scheduleAsPodGroup is true.
-func createPausePod(cs clientset.Interface, p *v1.Pod, scheduleAsPodGroup bool) (*v1.Pod, error) {
-	if scheduleAsPodGroup {
-		pg := st.MakePodGroup().Namespace(p.Namespace).BasicPolicy().Obj()
-		pg.GenerateName = p.Name + "-"
-		createdPG, err := cs.SchedulingV1beta1().PodGroups(p.Namespace).Create(context.TODO(), pg, metav1.CreateOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create PodGroup for pod %s/%s: %w", p.Namespace, p.Name, err)
-		}
-		p = p.DeepCopy()
-		p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
-			PodGroupName: &createdPG.Name,
-		}
-	}
-	return testutils.CreatePausePod(cs, p)
-}
-
-// createPausePodWithResource creates a pause pod with the given resource requests, optionally wrapping it in a basic PodGroup.
-func createPausePodWithResource(cs clientset.Interface, podName, nsName string, res *v1.ResourceList, scheduleAsPodGroup bool) (*v1.Pod, error) {
-	var conf testutils.PausePodConfig
-	if res == nil {
-		conf = testutils.PausePodConfig{
-			Name:      podName,
-			Namespace: nsName,
-		}
-	} else {
-		conf = testutils.PausePodConfig{
-			Name:      podName,
-			Namespace: nsName,
-			Resources: &v1.ResourceRequirements{
-				Requests: *res,
-			},
-		}
-	}
-	return createPausePod(cs, testutils.InitPausePod(&conf), scheduleAsPodGroup)
-}
-
 // The returned shutdown func will delete created resources and scheduler, resources should be those
 // that will affect the scheduling result, like nodes, pods, etc.. Namespaces should not be
 // deleted here because it's created together with the apiserver, they should be deleted
@@ -501,9 +464,9 @@ func WaitForNodesInCache(ctx context.Context, sched *scheduler.Scheduler, nodeCo
 
 // CreatePausePodWithResource creates a pod with "Pause" image and the given
 // resources and returns its pointer and error status. The resource list can be
-// nil.
+// nil. If scheduleAsPodGroup is true, the pod is wrapped in a basic PodGroup.
 func CreatePausePodWithResource(cs clientset.Interface, podName string,
-	nsName string, res *v1.ResourceList) (*v1.Pod, error) {
+	nsName string, res *v1.ResourceList, scheduleAsPodGroup ...bool) (*v1.Pod, error) {
 	var conf testutils.PausePodConfig
 	if res == nil {
 		conf = testutils.PausePodConfig{
@@ -519,7 +482,7 @@ func CreatePausePodWithResource(cs clientset.Interface, podName string,
 			},
 		}
 	}
-	return testutils.CreatePausePod(cs, testutils.InitPausePod(&conf))
+	return testutils.CreatePausePod(cs, testutils.InitPausePod(&conf), scheduleAsPodGroup...)
 }
 
 // CreatePVC creates a PersistentVolumeClaim with the given config and returns
