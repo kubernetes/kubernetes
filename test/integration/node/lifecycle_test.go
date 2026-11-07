@@ -113,21 +113,20 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 
 			// Start NodeLifecycleController for taint.
-			nc, err := nodelifecycle.NewNodeLifecycleController(
-				testCtx.Ctx,
-				externalInformers.Coordination().V1().Leases(),
-				externalInformers.Core().V1().Pods(),
-				externalInformers.Core().V1().Nodes(),
-				externalInformers.Apps().V1().DaemonSets(),
-				cs,
-				1*time.Second,    // Node monitor grace period
-				time.Minute,      // Node startup grace period
-				time.Millisecond, // Node monitor period
-				100,              // Eviction limiter QPS
-				100,              // Secondary eviction limiter QPS
-				50,               // Large cluster threshold
-				0.55,             // Unhealthy zone threshold
-			)
+			nc, err := nodelifecycle.NewNodeLifecycleController(testCtx.Ctx, nodelifecycle.ControllerOptions{
+				LeaseInformer:               externalInformers.Coordination().V1().Leases(),
+				PodInformer:                 externalInformers.Core().V1().Pods(),
+				NodeInformer:                externalInformers.Core().V1().Nodes(),
+				DaemonSetInformer:           externalInformers.Apps().V1().DaemonSets(),
+				KubeClient:                  cs,
+				NodeMonitorPeriod:           1 * time.Second,
+				NodeStartupGracePeriod:      time.Minute,
+				NodeMonitorGracePeriod:      time.Millisecond,
+				EvictionLimiterQPS:          100,
+				SecondaryEvictionLimiterQPS: 100,
+				LargeClusterThreshold:       50,
+				UnhealthyZoneThreshold:      0.55,
+			})
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
 			}
@@ -282,21 +281,20 @@ func TestTaintBasedEvictions(t *testing.T) {
 			cs := testCtx.ClientSet
 
 			// Start NodeLifecycleController for taint.
-			nc, err := nodelifecycle.NewNodeLifecycleController(
-				testCtx.Ctx,
-				externalInformers.Coordination().V1().Leases(),
-				externalInformers.Core().V1().Pods(),
-				externalInformers.Core().V1().Nodes(),
-				externalInformers.Apps().V1().DaemonSets(),
-				cs,
-				1*time.Second,    // Node monitor grace period
-				time.Minute,      // Node startup grace period
-				time.Millisecond, // Node monitor period
-				100,              // Eviction limiter QPS
-				100,              // Secondary eviction limiter QPS
-				50,               // Large cluster threshold
-				0.55,             // Unhealthy zone threshold
-			)
+			nc, err := nodelifecycle.NewNodeLifecycleController(testCtx.Ctx, nodelifecycle.ControllerOptions{
+				LeaseInformer:               externalInformers.Coordination().V1().Leases(),
+				PodInformer:                 externalInformers.Core().V1().Pods(),
+				NodeInformer:                externalInformers.Core().V1().Nodes(),
+				DaemonSetInformer:           externalInformers.Apps().V1().DaemonSets(),
+				KubeClient:                  cs,
+				NodeMonitorPeriod:           1 * time.Second,
+				NodeStartupGracePeriod:      time.Minute,
+				NodeMonitorGracePeriod:      time.Millisecond,
+				EvictionLimiterQPS:          100,
+				SecondaryEvictionLimiterQPS: 100,
+				LargeClusterThreshold:       50,
+				UnhealthyZoneThreshold:      0.55,
+			})
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
 			}
