@@ -145,18 +145,32 @@ func (nim *NodeInfoManager) UninstallCSIDriver(driverName string) error {
 }
 
 func (nim *NodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
-	var updateErrs []error
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if err := nim.tryUpdateNode(updateFuncs...); err != nil {
-			updateErrs = append(updateErrs, err)
+	if err := retry(context.TODO(), func(context.Context) error {
+		return nim.tryUpdateNode(updateFuncs...)
+	}); err != nil {
+		return fmt.Errorf("error updating node: %w", err)
+	}
+	return nil
+}
+
+// retry calls fn until it succeeds, ctx is done, or updateBackoff runs out.
+// Errors of the failed attempts are appended to the returned one.
+func retry(ctx context.Context, fn func(context.Context) error) error {
+	var errs []error
+	err := wait.ExponentialBackoffWithContext(ctx, updateBackoff, func(ctx context.Context) (bool, error) {
+		if err := fn(ctx); err != nil {
+			errs = append(errs, err)
 			return false, nil
 		}
 		return true, nil
 	})
-	if err != nil {
-		return fmt.Errorf("error updating node: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+	if err == nil {
+		return nil
 	}
-	return nil
+	if len(errs) == 0 {
+		return err
+	}
+	return fmt.Errorf("%w; caused by: %w", err, utilerrors.NewAggregate(errs))
 }
 
 // updateNode repeatedly attempts to update the corresponding node object
@@ -354,16 +368,10 @@ func (nim *NodeInfoManager) updateCSINode(
 		return fmt.Errorf("error getting CSI client")
 	}
 
-	var updateErrs []error
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if err := nim.tryUpdateCSINode(csiKubeClient, driverName, driverNodeID, maxAttachLimit, topology); err != nil {
-			updateErrs = append(updateErrs, err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return fmt.Errorf("error updating CSINode: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+	if err := retry(context.TODO(), func(context.Context) error {
+		return nim.tryUpdateCSINode(csiKubeClient, driverName, driverNodeID, maxAttachLimit, topology)
+	}); err != nil {
+		return fmt.Errorf("error updating CSINode: %w", err)
 	}
 	return nil
 }
@@ -399,16 +407,15 @@ func (nim *NodeInfoManager) InitializeCSINodeWithAnnotation() error {
 		return goerrors.New("error getting CSI client")
 	}
 
-	var lastErr error
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if lastErr = nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); lastErr != nil {
-			klog.V(2).Infof("Failed to publish CSINode: %v", lastErr)
-			return false, nil
+	err := retry(context.TODO(), func(context.Context) error {
+		err := nim.tryInitializeCSINodeWithAnnotation(csiKubeClient)
+		if err != nil {
+			klog.V(2).Infof("Failed to publish CSINode: %v", err)
 		}
-		return true, nil
+		return err
 	})
 	if err != nil {
-		return fmt.Errorf("error updating CSINode annotation: %v; caused by: %v", err, lastErr)
+		return fmt.Errorf("error updating CSINode annotation: %w", err)
 	}
 
 	return nil
@@ -662,16 +669,10 @@ func (nim *NodeInfoManager) uninstallDriverFromCSINode(
 		return fmt.Errorf("error getting CSI client")
 	}
 
-	var updateErrs []error
-	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if err := nim.tryUninstallDriverFromCSINode(csiKubeClient, csiDriverName); err != nil {
-			updateErrs = append(updateErrs, err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return fmt.Errorf("error updating CSINode: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+	if err := retry(context.TODO(), func(context.Context) error {
+		return nim.tryUninstallDriverFromCSINode(csiKubeClient, csiDriverName)
+	}); err != nil {
+		return fmt.Errorf("error updating CSINode: %w", err)
 	}
 	return nil
 }
@@ -749,16 +750,10 @@ func (nim *NodeInfoManager) UpdateCSINodeStorageHealth(ctx context.Context, driv
 		return goerrors.New("error getting CSI client")
 	}
 
-	var updateErrs []error
-	err := wait.ExponentialBackoffWithContext(ctx, updateBackoff, func(ctx context.Context) (bool, error) {
-		if err := nim.tryUpdateCSINodeStorageHealth(ctx, csiKubeClient, driverName, conditions); err != nil {
-			updateErrs = append(updateErrs, err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return fmt.Errorf("error updating CSINode status: %w; caused by: %w", err, utilerrors.NewAggregate(updateErrs))
+	if err := retry(ctx, func(ctx context.Context) error {
+		return nim.tryUpdateCSINodeStorageHealth(ctx, csiKubeClient, driverName, conditions)
+	}); err != nil {
+		return fmt.Errorf("error updating CSINode status: %w", err)
 	}
 	return nil
 }
