@@ -186,6 +186,51 @@ func TestWatch(t *testing.T) {
 // impact.
 // =======================================================================
 
+// TestWatchRecordTimestamps checks that, with RecordTimestamps set, every
+// non-initial event carries all storage-layer timestamps in order. The dispatch
+// latency stages derived from them are silently skipped when any is missing.
+func TestWatchRecordTimestamps(t *testing.T) {
+	for _, concurrentDecode := range []bool{false, true} {
+		t.Run(fmt.Sprintf("ConcurrentWatchObjectDecode=%v", concurrentDecode), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, concurrentDecode)
+			ctx, store, _ := testSetup(t)
+
+			// An explicit revision prevents initial sync from returning the pod without timestamps.
+			rv, err := store.GetCurrentResourceVersion(ctx)
+			if err != nil {
+				t.Fatalf("GetCurrentResourceVersion failed: %v", err)
+			}
+			w, err := store.Watch(ctx, "/pods/", storage.ListOptions{ResourceVersion: fmt.Sprint(rv), Predicate: storage.Everything, Recursive: true, RecordTimestamps: true})
+			if err != nil {
+				t.Fatalf("Watch failed: %v", err)
+			}
+			defer w.Stop()
+
+			pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns", Name: "foo"}}
+			if err := store.Create(ctx, "/pods/test-ns/foo", pod, &example.Pod{}, 0); err != nil {
+				t.Fatalf("Create failed: %v", err)
+			}
+
+			select {
+			case event := <-w.ResultChan():
+				withTimestamps, ok := event.Object.(storage.WatchEventWithTimestamps)
+				if !ok {
+					t.Fatalf("expected a %T, got %T", withTimestamps, event.Object)
+				}
+				ts := withTimestamps.Timestamps()
+				if ts.Received.IsZero() || ts.DecodeStarted.IsZero() || ts.Decoded.IsZero() {
+					t.Fatalf("expected all timestamps to be set, got %+v", ts)
+				}
+				if ts.DecodeStarted.Before(ts.Received) || ts.Decoded.Before(ts.DecodeStarted) {
+					t.Errorf("expected Received <= DecodeStarted <= Decoded, got %+v", ts)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("timed out waiting for the watch event")
+			}
+		})
+	}
+}
+
 // TestWatchErrorIncorrectConfiguration checks if an error
 // will be returned when the storage hasn't been properly
 // initialised for watch requests
@@ -432,7 +477,7 @@ func TestWatchChanSyncStreamMatchesPaginated(t *testing.T) {
 	if len(stream) != len(want) {
 		t.Errorf("syncStreamRecursive queued %d events, expected %d", len(stream), len(want))
 	}
-	if diff := cmp.Diff(paginated, stream, cmp.AllowUnexported(event{}), cmpopts.IgnoreFields(event{}, "recordTime")); diff != "" {
+	if diff := cmp.Diff(paginated, stream, cmp.AllowUnexported(event{}), cmpopts.IgnoreFields(event{}, "receivedAt")); diff != "" {
 		t.Errorf("syncStreamRecursive and syncPaginated queued different events (-paginated +stream):\n%s", diff)
 	}
 }
