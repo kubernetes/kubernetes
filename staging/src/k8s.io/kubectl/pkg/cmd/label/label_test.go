@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -472,6 +474,55 @@ func TestLabelLocal(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "labeled") {
 		t.Errorf("did not set labels: %s", buf.String())
+	}
+}
+
+func TestLabelLocalYAMLSeparator(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cms.yaml")
+	body := "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test1\n---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test2\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdLabel(tf, ioStreams)
+	opts := NewLabelOptions(ioStreams)
+	opts.Filenames = []string{path}
+	opts.local = true
+	if err := opts.Complete(tf, cmd, []string{"a=b"}); err != nil {
+		t.Fatal(err)
+	}
+	format := "yaml"
+	opts.outputFormat = format
+	opts.PrintFlags.OutputFormat = &format
+	if err := opts.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := opts.RunLabel(); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "name: test1") || !strings.Contains(out, "name: test2") {
+		t.Fatalf("missing objects:\n%s", out)
+	}
+	if !strings.Contains(out, "\n---\n") {
+		t.Fatalf("expected a document separator between objects:\n%s", out)
+	}
+	if !strings.Contains(out, "a: b") {
+		t.Fatalf("label was not applied:\n%s", out)
 	}
 }
 
