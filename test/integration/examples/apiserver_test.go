@@ -595,9 +595,12 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 
 	redirectedURL := backendServer.URL
 	redirectServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "tryRedirect") {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "tryRedirect"):
 			http.Redirect(w, r, redirectedURL+"/redirectTarget", http.StatusMovedPermanently)
-		} else {
+		case strings.HasSuffix(r.URL.Path, "notModified"):
+			w.WriteHeader(http.StatusNotModified)
+		default:
 			w.WriteHeader(http.StatusOK)
 		}
 	}))
@@ -692,6 +695,17 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 		t.Errorf("expect server to reject redirect response, but forwarded")
 	} else if !strings.Contains(string(bytes), expectedMsg) {
 		t.Errorf("expect response contains %s, got %s", expectedMsg, string(bytes))
+	}
+
+	statusCode := 0
+	result := kubeClient.RESTClient().Get().
+		AbsPath("/apis/reject.redirect.example.com/v1alpha1/notModified").
+		Do(ctx).
+		StatusCode(&statusCode)
+
+	// client-go treats non-2xx responses as errors, so check the HTTP status.
+	if statusCode != http.StatusNotModified {
+		t.Fatalf("expected HTTP 304, got %d: %v", statusCode, result.Error())
 	}
 }
 
