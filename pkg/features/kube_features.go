@@ -912,12 +912,6 @@ const (
 	// bursting into resources requested at higher QoS levels (memory only for now)
 	QOSReserved featuregate.Feature = "QOSReserved"
 
-	// owner: @AkihiroSuda
-	// kep: https://kep.k8s.io/3857
-	//
-	// Allows recursive read-only mounts.
-	RecursiveReadOnlyMounts featuregate.Feature = "RecursiveReadOnlyMounts"
-
 	// owner: @lauralorenz
 	// kep: https://kep.k8s.io/4603
 	//
@@ -1872,12 +1866,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.11"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	RecursiveReadOnlyMounts: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
-	},
-
 	ReduceDefaultCrashLoopBackOffDecay: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2600,8 +2588,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ProcMountType: {UserNamespacesSupport},
 
 	QOSReserved: {},
-
-	RecursiveReadOnlyMounts: {},
 
 	ReduceDefaultCrashLoopBackOffDecay: {},
 
