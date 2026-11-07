@@ -38,6 +38,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/utils/ptr"
 )
 
 // cadvisorStatsProvider implements the containerStatsProvider interface by
@@ -99,7 +100,7 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
+	filteredInfos, _ := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range filteredInfos {
@@ -153,20 +154,18 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	for _, podStats := range podToStats {
 		makePodStorageStats(logger, podStats, &rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, false)
 
-		podUID := types.UID(podStats.PodRef.UID)
-		// Lookup the pod-level cgroup's CPU and memory stats
-		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-		if podInfo != nil {
-			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
-			podStats.CPU = cpu
-			podStats.Memory = memory
-			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
-			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
-				podStats.IO = cadvisorInfoToIOStats(podInfo)
-			}
-			// ProcessStats were accumulated as the containers were iterated.
+		// Aggregate pod-level CPU, memory, swap, and IO stats from individual
+		// container stats to avoid including stats from terminated containers
+		// (e.g. init containers) whose resource usage is still charged to the
+		// pod cgroup.
+		for i := range podStats.Containers {
+			cs := &podStats.Containers[i]
+			addContainerCPUMemoryStats(podStats, cs)
+			addContainerSwapStats(podStats, cs)
+			addContainerIOStats(podStats, cs)
 		}
 
+		podUID := types.UID(podStats.PodRef.UID)
 		status, found := p.statusProvider.GetPodStatus(podUID)
 		if found && status.StartTime != nil && !status.StartTime.IsZero() {
 			podStats.StartTime = *status.StartTime
@@ -230,7 +229,7 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
+	filteredInfos, _ := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
 	// Map each container to a pod and update the PodStats with container data.
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range filteredInfos {
@@ -270,14 +269,11 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([
 	// Add each PodStats to the result.
 	result := make([]statsapi.PodStats, 0, len(podToStats))
 	for _, podStats := range podToStats {
-		podUID := types.UID(podStats.PodRef.UID)
-		// Lookup the pod-level cgroup's CPU and memory stats
-		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-		if podInfo != nil {
-			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
-			podStats.CPU = cpu
-			podStats.Memory = memory
-			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
+		// Aggregate pod-level stats from individual container stats.
+		for i := range podStats.Containers {
+			cs := &podStats.Containers[i]
+			addContainerCPUMemoryStats(podStats, cs)
+			addContainerSwapStats(podStats, cs)
 		}
 		result = append(result, *podStats)
 	}
@@ -418,14 +414,6 @@ func isPodManagedContainer(logger klog.Logger, cinfo *cadvisorapi.ContainerInfo)
 			"podNameLabel", podName, "podNamespaceLabel", podNamespace)
 	}
 	return managed
-}
-
-// getCadvisorPodInfoFromPodUID returns a pod cgroup information by matching the podUID with its CgroupName identifier base name
-func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapi.ContainerInfo) *cadvisorapi.ContainerInfo {
-	if info, found := infos[cm.GetPodCgroupNameSuffix(podUID)]; found {
-		return &info
-	}
-	return nil
 }
 
 // filterTerminatedContainerInfoAndAssembleByPodCgroupKey returns the specified containerInfo but with
@@ -575,4 +563,58 @@ func getCadvisorContainerInfo(logger klog.Logger, ca cadvisor.Interface) (map[st
 		}
 	}
 	return infos, nil
+}
+
+func addContainerCPUMemoryStats(ps *statsapi.PodStats, cs *statsapi.ContainerStats) {
+	if cs.CPU != nil {
+		if ps.CPU == nil {
+			ps.CPU = &statsapi.CPUStats{}
+		}
+		ps.CPU.Time = cs.CPU.Time
+		usageCoreNanoSeconds := ptr.Deref(cs.CPU.UsageCoreNanoSeconds, 0) + ptr.Deref(ps.CPU.UsageCoreNanoSeconds, 0)
+		usageNanoCores := ptr.Deref(cs.CPU.UsageNanoCores, 0) + ptr.Deref(ps.CPU.UsageNanoCores, 0)
+		ps.CPU.UsageCoreNanoSeconds = &usageCoreNanoSeconds
+		ps.CPU.UsageNanoCores = &usageNanoCores
+	}
+	if cs.Memory != nil {
+		if ps.Memory == nil {
+			ps.Memory = &statsapi.MemoryStats{}
+		}
+		ps.Memory.Time = cs.Memory.Time
+		availableBytes := ptr.Deref(cs.Memory.AvailableBytes, 0) + ptr.Deref(ps.Memory.AvailableBytes, 0)
+		usageBytes := ptr.Deref(cs.Memory.UsageBytes, 0) + ptr.Deref(ps.Memory.UsageBytes, 0)
+		workingSetBytes := ptr.Deref(cs.Memory.WorkingSetBytes, 0) + ptr.Deref(ps.Memory.WorkingSetBytes, 0)
+		rSSBytes := ptr.Deref(cs.Memory.RSSBytes, 0) + ptr.Deref(ps.Memory.RSSBytes, 0)
+		pageFaults := ptr.Deref(cs.Memory.PageFaults, 0) + ptr.Deref(ps.Memory.PageFaults, 0)
+		majorPageFaults := ptr.Deref(cs.Memory.MajorPageFaults, 0) + ptr.Deref(ps.Memory.MajorPageFaults, 0)
+		ps.Memory.AvailableBytes = &availableBytes
+		ps.Memory.UsageBytes = &usageBytes
+		ps.Memory.WorkingSetBytes = &workingSetBytes
+		ps.Memory.RSSBytes = &rSSBytes
+		ps.Memory.PageFaults = &pageFaults
+		ps.Memory.MajorPageFaults = &majorPageFaults
+	}
+}
+
+func addContainerSwapStats(ps *statsapi.PodStats, cs *statsapi.ContainerStats) {
+	if cs.Swap != nil {
+		if ps.Swap == nil {
+			ps.Swap = &statsapi.SwapStats{Time: cs.Swap.Time}
+		}
+		swapAvailableBytes := ptr.Deref(cs.Swap.SwapAvailableBytes, 0) + ptr.Deref(ps.Swap.SwapAvailableBytes, 0)
+		swapUsageBytes := ptr.Deref(cs.Swap.SwapUsageBytes, 0) + ptr.Deref(ps.Swap.SwapUsageBytes, 0)
+		ps.Swap.SwapAvailableBytes = &swapAvailableBytes
+		ps.Swap.SwapUsageBytes = &swapUsageBytes
+	}
+}
+
+func addContainerIOStats(ps *statsapi.PodStats, cs *statsapi.ContainerStats) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		return
+	}
+	if cs.IO != nil {
+		if ps.IO == nil {
+			ps.IO = &statsapi.IOStats{Time: cs.IO.Time}
+		}
+	}
 }
