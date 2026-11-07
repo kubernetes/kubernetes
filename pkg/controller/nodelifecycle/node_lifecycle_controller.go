@@ -702,9 +702,10 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		var currentReadyCondition *v1.NodeCondition
 		node := nodes[piece].DeepCopy()
 
+		var noPriorHealthState bool
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) {
 			var err error
-			_, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(ctx, node)
+			_, observedReadyCondition, currentReadyCondition, noPriorHealthState, err = nc.tryUpdateNodeHealth(ctx, node)
 			if err == nil {
 				return true, nil
 			}
@@ -754,6 +755,8 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 				controllerutil.RecordNodeStatusChange(logger, nc.recorder, node, "NodeNotReady")
 				fallthrough
 			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
+				fallthrough
+			case noPriorHealthState:
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to mark all pods NotReady on node; queuing for retry", "node", node.Name)
 					nc.nodesToRetry.Store(node.Name, struct{}{})
@@ -824,8 +827,9 @@ func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
 }
 
 // tryUpdateNodeHealth checks a given node's conditions and tries to update it. Returns grace period to
-// which given node is entitled, state of current and last observed Ready Condition, and an error if it occurred.
-func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
+// which given node is entitled, state of current and last observed Ready Condition, whether the node had
+// no prior health state and is already not Ready, and an error if it occurred.
+func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, bool, error) {
 	nodeHealth := nc.nodeHealthMap.getDeepCopy(node.Name)
 	defer func() {
 		nc.nodeHealthMap.set(node.Name, nodeHealth)
@@ -837,7 +841,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 		err := nc.consistencyStore.EnsureReady(types.NamespacedName{})
 		// Skip processing this node in this cycle if the node controller cache is not ready yet.
 		if err != nil {
-			return 0, v1.NodeCondition{}, nil, shortCircuitError{err}
+			return 0, v1.NodeCondition{}, nil, false, shortCircuitError{err}
 		}
 	}
 
@@ -933,6 +937,12 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 			readyTransitionTimestamp: transitionTime,
 		}
 	}
+
+	// With no saved health state for this node (e.g. after the controller restarted),
+	// a Ready->NotReady transition cannot be observed, so a node whose Ready condition
+	// is already not True must have its pods marked NotReady directly.
+	noPriorHealthState := savedCondition == nil && currentReadyCondition != nil && currentReadyCondition.Status != v1.ConditionTrue
+
 	// Always update the probe time if node lease is renewed.
 	// Note: If kubelet never posted the node status, but continues renewing the
 	// heartbeat leases, the node controller will assume the node is healthy and
@@ -962,14 +972,14 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 						leaseResource,
 						liveLease.ResourceVersion,
 					)
-					return 0, v1.NodeCondition{}, nil, shortCircuitError{&consistencyutil.ConsistencyError{
+					return 0, v1.NodeCondition{}, nil, false, shortCircuitError{&consistencyutil.ConsistencyError{
 						ReadRV:        nodeHealthLeaseRV,
 						WroteRV:       liveLease.ResourceVersion,
 						GroupResource: leaseResource,
 					}}
 				}
 			} else if !apierrors.IsNotFound(err) {
-				return 0, v1.NodeCondition{}, nil, shortCircuitError{fmt.Errorf("error looking up lease to verify node %s: %w", node.Name, err)}
+				return 0, v1.NodeCondition{}, nil, false, shortCircuitError{fmt.Errorf("error looking up lease to verify node %s: %w", node.Name, err)}
 			}
 		}
 
@@ -1015,7 +1025,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 		if !apiequality.Semantic.DeepEqual(currentReadyCondition, &observedReadyCondition) {
 			if _, err := nc.kubeClient.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{}); err != nil {
 				logger.Error(err, "Error updating node", "node", klog.KObj(node))
-				return gracePeriod, observedReadyCondition, currentReadyCondition, err
+				return gracePeriod, observedReadyCondition, currentReadyCondition, noPriorHealthState, err
 			}
 			nodeHealth = &nodeHealthData{
 				status:                   &node.Status,
@@ -1023,11 +1033,11 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 				readyTransitionTimestamp: nc.now(),
 				lease:                    observedLease,
 			}
-			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
+			return gracePeriod, observedReadyCondition, currentReadyCondition, noPriorHealthState, nil
 		}
 	}
 
-	return gracePeriod, observedReadyCondition, currentReadyCondition, nil
+	return gracePeriod, observedReadyCondition, currentReadyCondition, noPriorHealthState, nil
 }
 
 func (nc *Controller) handleDisruption(ctx context.Context, zoneToNodeConditions map[string][]*v1.NodeCondition, nodes []*v1.Node) {
