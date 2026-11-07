@@ -207,7 +207,7 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 		kc := fake.NewSimpleClientset(expected...)
 		informers := informers.NewSharedInformerFactory(kc, controller.NoResyncPeriodFunc())
 		_, ctx := ktesting.NewTestContext(t)
-		c, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), kc)
+		c, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), informers.Scheduling().V1beta1().Workloads(), kc)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}

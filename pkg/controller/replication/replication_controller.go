@@ -66,6 +66,8 @@ func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInf
 				// ReplicationController API does not support the .status.terminatingReplicas field. However,
 				// ReplicaSets do support this field, which is then propagated to Deployments for higher-level features.
 				EnableStatusTerminatingReplicas: false,
+				// Workload/PodGroup scheduling integration applies to ReplicaSet only.
+				EnableWorkloadScheduling: false,
 			},
 			// TODO: Replication controller does not currently support stale controller consistency.
 			// In order to support stale controller consistency, we would need to parameterize the metrics

@@ -24,12 +24,15 @@ import (
 	"fmt"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1beta1"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newDaemonSetControllerDescriptor() *ControllerDescriptor {
@@ -105,13 +108,25 @@ func newReplicaSetController(ctx context.Context, controllerContext ControllerCo
 		return nil, err
 	}
 
-	rsc := replicaset.NewReplicaSetController(
+	var workloadInformer schedulinginformers.WorkloadInformer
+	var podGroupInformer schedulinginformers.PodGroupInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
+		workloadInformer = controllerContext.InformerFactory.Scheduling().V1beta1().Workloads()
+		podGroupInformer = controllerContext.InformerFactory.Scheduling().V1beta1().PodGroups()
+	}
+
+	rsc, err := replicaset.NewReplicaSetController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
+		workloadInformer,
+		podGroupInformer,
 		client,
 		replicaset.BurstReplicas,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating ReplicaSet controller: %w", err)
+	}
 	return newControllerLoop(func(ctx context.Context) {
 		rsc.Run(ctx, int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs))
 	}, controllerName), nil
@@ -131,11 +146,17 @@ func newDeploymentController(ctx context.Context, controllerContext ControllerCo
 		return nil, err
 	}
 
+	var workloadInformer schedulinginformers.WorkloadInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithDeployment) {
+		workloadInformer = controllerContext.InformerFactory.Scheduling().V1beta1().Workloads()
+	}
+
 	dc, err := deployment.NewDeploymentController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
+		workloadInformer,
 		client,
 	)
 	if err != nil {
