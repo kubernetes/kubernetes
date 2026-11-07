@@ -18,6 +18,7 @@ package structured
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -130,6 +131,7 @@ func NewAllocator(ctx context.Context,
 	classLister DeviceClassLister,
 	slices []*draapi.ResourceSlice,
 	celCache *cel.Cache,
+	opts ...Option,
 ) (Allocator, error) {
 	// The actual implementation may vary depending on which features are enabled.
 	// At the moment there is only one. The goal is to have three:
@@ -155,6 +157,7 @@ func NewAllocator(ctx context.Context,
 	//
 	// Unit tests are shared between all implementations.
 	var enabledAllocators []string
+	var optionErr error
 	for _, allocator := range availableAllocators {
 		// Disabled?
 		if !allocatorEnabled(allocator.name) {
@@ -165,8 +168,22 @@ func NewAllocator(ctx context.Context,
 		// All required features supported?
 		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			impl, err := allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+			if err != nil {
+				return nil, err
+			}
+			if err := applyOptions(impl, opts); err != nil {
+				if err == errAllocationConstraintsUnsupported {
+					optionErr = err
+					continue
+				}
+				return nil, err
+			}
+			return impl, nil
 		}
+	}
+	if optionErr != nil {
+		return nil, optionErr
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %+v, enabled allocators: %s", features, strings.Join(enabledAllocators, ", "))
 }
@@ -176,6 +193,34 @@ func NewAllocator(ctx context.Context,
 // Not thread-safe, meant for use during testing.
 func EnableAllocators(names ...string) {
 	explicitlyEnabledAllocators = sets.New(names...)
+}
+
+// applyOptions installs the options on the selected allocator.
+// The constraint provider is only supported by allocators that implement
+// allocationConstraintSetter. NewAllocator skips implementations that do not
+// support it instead of silently dropping caller policy.
+var errAllocationConstraintsUnsupported = errors.New("no allocator for the requested feature set supports caller-supplied allocation constraints")
+
+func applyOptions(allocator Allocator, opts []Option) error {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	if o.newAllocationConstraints == nil {
+		return nil
+	}
+	setter, ok := allocator.(interface {
+		SetAllocationConstraintProvider(internal.NewAllocationConstraintFunc)
+	})
+	if !ok {
+		// The selected allocator does not implement the constraint hook yet.
+		// Fail rather than silently ignoring the option, because a silently
+		// ignored policy is worse than no policy.
+		// Currently only the incubating allocator supports constraints.
+		return errAllocationConstraintsUnsupported
+	}
+	setter.SetAllocationConstraintProvider(o.newAllocationConstraints)
+	return nil
 }
 
 // explicitlyEnabledAllocators stores the result of EnableAllocators.
