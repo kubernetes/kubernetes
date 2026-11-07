@@ -72,7 +72,7 @@ func TestWatchResponseWriter(t *testing.T) {
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			rw := newWatchResponseWriter(recorder, recorder, scenario.contentEncoding, true)
+			rw := newWatchResponseWriter(recorder, recorder, scenario.contentEncoding, true, t.Context().Done())
 			rw.BeginStream("application/json")
 
 			// verify headers
@@ -126,15 +126,23 @@ func TestWatchResponseWriterDoubleClose(t *testing.T) {
 		newWriter func(*testing.T, *httptest.ResponseRecorder) watchStreamWriter
 	}{
 		{
+			name: "plainResponseWriter batched",
+			newWriter: func(t *testing.T, r *httptest.ResponseRecorder) watchStreamWriter {
+				w := &plainResponseWriter{w: r, flusher: r}
+				w.StartBatch()
+				return w
+			},
+		},
+		{
 			name: "perFlushGzipWriter",
 			newWriter: func(t *testing.T, r *httptest.ResponseRecorder) watchStreamWriter {
 				return &perFlushGzipWriter{delegateRW: r, flusher: r}
 			},
 		},
 		{
-			name: "watchResponseWriter",
+			name: "watchResponseWriter gzip",
 			newWriter: func(t *testing.T, r *httptest.ResponseRecorder) watchStreamWriter {
-				rw := newWatchResponseWriter(r, r, "gzip", true)
+				rw := newWatchResponseWriter(r, r, "gzip", true, t.Context().Done())
 				rw.BeginStream("application/json")
 				return rw
 			},

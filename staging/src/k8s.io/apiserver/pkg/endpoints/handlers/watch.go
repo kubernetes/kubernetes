@@ -17,11 +17,13 @@ limitations under the License.
 package handlers
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -243,30 +245,98 @@ func (c *watchEventMetricsRecorder) RecordEvent() {
 // watchGzipPool is a no-op until the first Get call (https://pkg.go.dev/sync#Pool.Get).
 var watchGzipPool = responsewriters.NewGzipWriterPoolOrDie()
 
+// watchBatchSize is the size of the buffer used to batch uncompressed watch
+// frames while more events are queued. Over HTTP/2, ResponseWriter buffers 4 KiB
+// (handlerChunkWriteSize) and waits for the connection's frame writer on each
+// chunk, which throttles a backlogged watch stream on a busy server.
+const watchBatchSize = 128 * 1024
+
+var watchBatchPool = sync.Pool{
+	New: func() any {
+		return bufio.NewWriterSize(nil, watchBatchSize)
+	},
+}
+
 type watchStreamWriter interface {
 	io.WriteCloser
+	StartBatch()
 	Flush() error
 }
 
 var _ watchStreamWriter = &plainResponseWriter{}
 
+// plainResponseWriter writes uncompressed watch frames to the response.
+// Between StartBatch and Flush (or Close), frames are collected in a pooled
+// buffer so only a watch with queued events holds one.
 type plainResponseWriter struct {
-	w       http.ResponseWriter
-	flusher http.Flusher
+	w           http.ResponseWriter
+	flusher     http.Flusher
+	done        <-chan struct{}
+	bw          *bufio.Writer
+	writeFailed bool
+}
+
+func (p *plainResponseWriter) StartBatch() {
+	if p.bw != nil {
+		return
+	}
+
+	p.bw = watchBatchPool.Get().(*bufio.Writer)
+	p.bw.Reset(p.w)
+	p.writeFailed = false
 }
 
 func (p *plainResponseWriter) Write(b []byte) (int, error) {
-	return p.w.Write(b)
+	if p.bw == nil {
+		return p.w.Write(b)
+	}
+
+	n, err := p.bw.Write(b)
+	if err != nil {
+		p.writeFailed = true
+	}
+	return n, err
 }
 
 func (p *plainResponseWriter) Flush() error {
+	if p.bw != nil {
+		err := p.bw.Flush()
+		p.release()
+		if err != nil {
+			return err
+		}
+	}
+
 	p.flusher.Flush()
 	return nil
 }
 
-// Close is a no-op because http.ResponseWriter (p.w) doesn't implement io.Closer.
+// Close releases any pooled buffer, flushing buffered frames only when the
+// client request is still live and no earlier write failed.
 func (p *plainResponseWriter) Close() error {
-	return nil
+	if p.bw == nil {
+		return nil
+	}
+
+	var err error
+	if !p.writeFailed {
+		select {
+		case <-p.done:
+		default:
+			err = p.bw.Flush()
+		}
+	}
+
+	p.release()
+	return err
+}
+
+func (p *plainResponseWriter) release() {
+	p.bw.Reset(nil)
+	watchBatchPool.Put(p.bw)
+	// prevent double-close returning the writer to the pool twice
+	p.bw = nil
+	p.writeFailed = false
 }
 
 var _ watchStreamWriter = &perFlushGzipWriter{}
@@ -276,6 +346,9 @@ type perFlushGzipWriter struct {
 	flusher    http.Flusher
 	gw         *gzip.Writer
 }
+
+// StartBatch is a no-op because perFlushGzipWriter already buffers until Flush or Close.
+func (p *perFlushGzipWriter) StartBatch() {}
 
 func (p *perFlushGzipWriter) Write(b []byte) (int, error) {
 	if p.gw == nil {
@@ -321,13 +394,13 @@ type watchResponseWriter struct {
 	writer             watchStreamWriter
 }
 
-func newWatchResponseWriter(delegateRW http.ResponseWriter, flusher http.Flusher, contentEncoding string, isWatchListRequest bool) *watchResponseWriter {
+func newWatchResponseWriter(delegateRW http.ResponseWriter, flusher http.Flusher, contentEncoding string, isWatchListRequest bool, done <-chan struct{}) *watchResponseWriter {
 	return &watchResponseWriter{
 		delegateRW:         delegateRW,
 		flusher:            flusher,
 		contentEncoding:    contentEncoding,
 		isWatchListRequest: isWatchListRequest,
-		writer:             &plainResponseWriter{w: delegateRW, flusher: flusher},
+		writer:             &plainResponseWriter{w: delegateRW, flusher: flusher, done: done},
 	}
 }
 
@@ -343,6 +416,10 @@ func (w *watchResponseWriter) BeginStream(mediaType string) {
 	// Flush HTTP headers only
 	// gzip applies to the body, not headers.
 	w.flusher.Flush()
+}
+
+func (w *watchResponseWriter) StartBatch() {
+	w.writer.StartBatch()
 }
 
 func (w *watchResponseWriter) Write(p []byte) (int, error) {
@@ -384,7 +461,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	contentEncoding := responsewriters.ContentEncodingSupported(req, features.WatchListCompression)
-	rw := newWatchResponseWriter(w, flusher, contentEncoding, s.isWatchListRequest)
+	rw := newWatchResponseWriter(w, flusher, contentEncoding, s.isWatchListRequest, req.Context().Done())
 	defer func() {
 		if err := rw.Close(); err != nil {
 			utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to close watch response writer")
@@ -439,6 +516,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
+			// Collect frames while more events are queued so a backlog reaches
+			// the HTTP/2 connection in large writes instead of 4 KiB chunks.
+			if len(ch) > 0 {
+				rw.StartBatch()
+			}
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
