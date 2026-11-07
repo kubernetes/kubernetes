@@ -1093,13 +1093,13 @@ func TestDiscoverySync(t *testing.T) {
 	defer close(stopSync)
 	// The pseudo-code of Sync():
 	// Sync(client, period, stopCh):
-	//    wait.Until() loops with `period` until the `stopCh` is closed :
+	//    wait.NonSlidingUntil() loops with `period` until the `stopCh` is closed:
 	//       GetQuotableResources()
 	//       resyncMonitors()
 	//       cache.WaitForNamedCacheSync() loops with `syncedPollPeriod` (hardcoded to 100ms), until either its stop channel is closed after `period`, or all caches synced.
 	//
 	// Setting the period to 200ms allows the WaitForCacheSync() to check
-	// for cache sync ~2 times in every wait.Until() loop.
+	// for cache sync ~2 times in every wait.NonSlidingUntil() loop.
 	//
 	// The 1s sleep in the test allows GetQuotableResources and
 	// resyncMonitors to run ~5 times to ensure the changes to the

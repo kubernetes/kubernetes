@@ -464,7 +464,7 @@ func (rq *Controller) replenishQuota(ctx context.Context, groupResource schema.G
 func (rq *Controller) Sync(ctx context.Context, discoveryFunc NamespacedResourcesFunc, period time.Duration) {
 	// Something has changed, so track the new state and perform a sync.
 	oldResources := make(map[schema.GroupVersionResource]struct{})
-	wait.UntilWithContext(ctx, func(ctx context.Context) {
+	wait.NonSlidingUntilWithContext(ctx, func(ctx context.Context) {
 		// Get the current resource list from discovery.
 		newResources, err := GetQuotableResources(discoveryFunc)
 		if err != nil {
