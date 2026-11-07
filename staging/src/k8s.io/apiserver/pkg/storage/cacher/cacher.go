@@ -131,12 +131,12 @@ type Config struct {
 
 type watchersMap map[int]*cacheWatcher
 
-func (wm watchersMap) addWatcher(w *cacheWatcher, number int) {
-	wm[number] = w
+func (wm watchersMap) addWatcher(w *cacheWatcher) {
+	wm[w.idx] = w
 }
 
-func (wm watchersMap) deleteWatcher(number int) {
-	delete(wm, number)
+func (wm watchersMap) deleteWatcher(w *cacheWatcher) {
+	delete(wm, w.idx)
 }
 
 func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
@@ -151,30 +151,30 @@ type indexedWatchers struct {
 	indexWatchers map[string]watchersMap
 }
 
-func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int) {
+func (i *indexedWatchers) addWatcher(w *cacheWatcher) {
 	if w.selector.indexValue != nil {
 		if _, ok := i.indexWatchers[*w.selector.indexValue]; !ok {
 			i.indexWatchers[*w.selector.indexValue] = watchersMap{}
 		}
-		i.indexWatchers[*w.selector.indexValue].addWatcher(w, number)
+		i.indexWatchers[*w.selector.indexValue].addWatcher(w)
 	} else {
 		scopedWatchers, ok := i.scopeWatchers[w.selector.scope]
 		if !ok {
 			scopedWatchers = watchersMap{}
 			i.scopeWatchers[w.selector.scope] = scopedWatchers
 		}
-		scopedWatchers.addWatcher(w, number)
+		scopedWatchers.addWatcher(w)
 	}
 }
 
-func (i *indexedWatchers) deleteWatcher(w *cacheWatcher, number int) {
+func (i *indexedWatchers) deleteWatcher(w *cacheWatcher) {
 	if w.selector.indexValue != nil {
-		i.indexWatchers[*w.selector.indexValue].deleteWatcher(number)
+		i.indexWatchers[*w.selector.indexValue].deleteWatcher(w)
 		if len(i.indexWatchers[*w.selector.indexValue]) == 0 {
 			delete(i.indexWatchers, *w.selector.indexValue)
 		}
 	} else {
-		i.scopeWatchers[w.selector.scope].deleteWatcher(number)
+		i.scopeWatchers[w.selector.scope].deleteWatcher(w)
 		if len(i.scopeWatchers[w.selector.scope]) == 0 {
 			delete(i.scopeWatchers, w.selector.scope)
 		}
@@ -546,7 +546,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 
-	watcher, err := c.watch(ctx, key, requestedWatchRV, readyGeneration, opts)
+	watcher, requiredResourceVersion, err := c.watch(ctx, key, requestedWatchRV, readyGeneration, opts)
 	if err != nil {
 		// To match the uncached watch implementation, once we have passed authn/authz/admission,
 		// and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
@@ -563,11 +563,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	if opts.Predicate.ShardingEnabled() {
 		metrics.RecordShardedWatchStarted(c.groupResource)
 	}
-	go watcher.process(ctx)
+	go watcher.process(ctx, requiredResourceVersion)
 	return watcher, nil
 }
 
-func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64, readyGeneration int, opts storage.ListOptions) (*cacheWatcher, error) {
+func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64, readyGeneration int, opts storage.ListOptions) (*cacheWatcher, uint64, error) {
 	span := tracing.SpanFromContext(ctx)
 
 	eventFilter := newWatchEventFilter(key, opts, c.groupResource)
@@ -583,13 +583,13 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	// client-go is going to fall back to a standard LIST on any error
 	// returned for watch-list requests
 	if isListWatchRequest(opts) && !etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
-		return nil, fmt.Errorf("a watch stream was requested by the client but the required storage feature %s is disabled", storage.RequestWatchProgress)
+		return nil, 0, fmt.Errorf("a watch stream was requested by the client but the required storage feature %s is disabled", storage.RequestWatchProgress)
 	}
 
 	// Determine the ResourceVersion to which the watch cache must be synchronized
 	requiredResourceVersion, err := c.getWatchCacheResourceVersion(ctx, requestedWatchRV, opts)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// Determine watch timeout('0' means deadline is not set, ignore checking)
@@ -613,7 +613,6 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		c.clock,
 		identifier,
 		selector,
-		requiredResourceVersion,
 	)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
@@ -628,7 +627,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 		err := c.watchCache.waitUntilFreshLocked(ctx, requiredResourceVersion)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		span.AddEvent("watchCache fresh enough")
 	}
@@ -637,12 +636,11 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 	// and we would like to start watching from ~now.
 	if requiredResourceVersion == 0 && opts.SendInitialEvents != nil && !*opts.SendInitialEvents {
 		requiredResourceVersion = c.watchCache.resourceVersion
-		watcher.requiredResourceVersion = requiredResourceVersion
 	}
 
-	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher)
+	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher, requiredResourceVersion)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	c.Lock()
@@ -652,11 +650,13 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		// We went unready or are already on a different generation.
 		// Avoid registering and starting the watch as it will have to be
 		// terminated immediately anyway.
-		return nil, nil
+		return nil, 0, nil
 	}
 
+	watcher.idx = c.watcherIdx
+	c.watcherIdx++
 	// Update watcher.forget function once we can compute it.
-	watcher.forget = forgetWatcher(c, watcher, c.watcherIdx)
+	watcher.forget = forgetWatcher(c, watcher)
 	if opts.Predicate.ShardingEnabled() {
 		originalForget := watcher.forget
 		watcher.forget = func(drainWatcher bool) {
@@ -664,13 +664,12 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 			originalForget(drainWatcher)
 		}
 	}
-	c.registerWatcherLocked(watcher, c.watcherIdx, cacheInterval)
-	c.watcherIdx++
-	return watcher, nil
+	c.registerWatcherLocked(watcher, cacheInterval)
+	return watcher, requiredResourceVersion, nil
 }
 
-func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, idx int, cacheInterval *watchCacheInterval) {
-	c.watchers.addWatcher(watcher, idx)
+func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, cacheInterval *watchCacheInterval) {
+	c.watchers.addWatcher(watcher)
 	// Add it to the queue only when the client support watch bookmarks.
 	if watcher.allowWatchBookmarks {
 		c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
@@ -678,9 +677,9 @@ func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, idx int, cacheInte
 	watcher.input <- watcherInput{interval: cacheInterval}
 }
 
-func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWatcher) (*watchCacheInterval, error) {
+func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWatcher, requiredResourceVersion uint64) (*watchCacheInterval, error) {
 	opts := watcher.filter.opts
-	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(ctx, watcher.requiredResourceVersion, watcher.filter.prefix, opts)
+	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(ctx, requiredResourceVersion, watcher.filter.prefix, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -1236,6 +1235,9 @@ func (c *Cacher) finishDispatching() {
 	}
 	c.watchersToStop = c.watchersToStop[:0]
 
+	clear(c.blockedWatchers)
+	c.blockedWatchers = c.blockedWatchers[:0]
+
 	for _, watcher := range c.expiredBookmarkWatchers {
 		if watcher.stopped {
 			continue
@@ -1309,7 +1311,7 @@ func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
 	return storage.PrepareKey(c.resourcePrefix, key, recursive)
 }
 
-func forgetWatcher(c *Cacher, w *cacheWatcher, index int) func(bool) {
+func forgetWatcher(c *Cacher, w *cacheWatcher) func(bool) {
 	return func(drainWatcher bool) {
 		c.Lock()
 		defer c.Unlock()
@@ -1317,7 +1319,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int) func(bool) {
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(w, index)
+		c.watchers.deleteWatcher(w)
 		c.stopWatcherLocked(w, drainWatcher)
 	}
 }
