@@ -130,6 +130,14 @@ func NewMonitor(ctx context.Context, informersStarted <-chan struct{}, informerF
 type monitor struct {
 	controller cache.Controller
 
+	// informer is the shared informer the monitor's event handler is
+	// registered on, and registration identifies that handler. They are kept so
+	// the handler can be removed when the monitor is torn down; the informer is
+	// cached per resource by the factory and outlives the monitor, so leaving
+	// the handler registered leaks it.
+	informer     cache.SharedIndexInformer
+	registration cache.ResourceEventHandlerRegistration
+
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
 	stopCh chan struct{}
@@ -143,10 +151,23 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
+// removeMonitorHandler unregisters the event handler that controllerFor added
+// to the monitor's shared informer, so the handler is not leaked once the
+// monitor is torn down. It is safe to call for monitors built before this field
+// was populated (informer/registration nil).
+func (qm *QuotaMonitor) removeMonitorHandler(logger klog.Logger, m *monitor) {
+	if m == nil || m.informer == nil || m.registration == nil {
+		return
+	}
+	if err := m.informer.RemoveEventHandler(m.registration); err != nil {
+		logger.V(4).Info("QuotaMonitor unable to remove event handler for monitor", "err", err)
+	}
+}
+
 // UpdateFilter is a function that returns true if the update event should be added to the resourceChanges queue.
 type UpdateFilter func(resource schema.GroupVersionResource, oldObj, newObj interface{}) bool
 
-func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.Controller, error) {
+func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.Controller, cache.SharedIndexInformer, cache.ResourceEventHandlerRegistration, error) {
 	logger := klog.FromContext(ctx)
 
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -178,17 +199,20 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 	if err == nil {
 		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
 		resyncPeriod := qm.resyncPeriod()
-		_, _ = shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
+		registration, err := shared.Informer().AddEventHandlerWithOptions(handlers, cache.HandlerOptions{
 			Logger:       &logger,
 			ResyncPeriod: &resyncPeriod,
 		})
-		return shared.Informer().GetController(), nil
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return shared.Informer().GetController(), shared.Informer(), registration, nil
 	}
 	logger.V(4).Info("QuotaMonitor unable to use a shared informer", "resource", resource.String(), "err", err)
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
-	return nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
+	return nil, nil, nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
 }
 
 // SyncMonitors rebuilds the monitor set according to the supplied resources,
@@ -221,7 +245,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 			kept++
 			continue
 		}
-		c, err := qm.controllerFor(ctx, resource)
+		c, informer, registration, err := qm.controllerFor(ctx, resource)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
@@ -238,7 +262,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		}
 
 		// track the monitor
-		current[resource] = &monitor{controller: c}
+		current[resource] = &monitor{controller: c, informer: informer, registration: registration}
 		added++
 	}
 	qm.monitors = current
@@ -247,6 +271,11 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		if monitor.stopCh != nil {
 			close(monitor.stopCh)
 		}
+		// Remove the event handler that controllerFor registered on the shared
+		// informer. The factory caches the informer per resource, so it outlives
+		// the monitor (for example when a CRD is deleted and later recreated with
+		// the same GroupVersionResource); not removing the handler leaks it.
+		qm.removeMonitorHandler(logger, monitor)
 	}
 
 	logger.V(4).Info("quota synced monitors", "added", added, "kept", kept, "removed", len(toRemove))
@@ -353,6 +382,7 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 			stopped++
 			close(monitor.stopCh)
 		}
+		qm.removeMonitorHandler(logger, monitor)
 	}
 	qm.monitors = nil
 	qm.monitorWG.Wait()
