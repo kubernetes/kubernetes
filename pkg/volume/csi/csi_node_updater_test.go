@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 )
 
 const testDriverName = "test-driver"
@@ -200,6 +201,47 @@ func TestSyncDriverUpdater(t *testing.T) {
 			close(newStopCh)
 		}
 	})
+}
+
+func TestDriverDelete(t *testing.T) {
+	driver := createTestDriver(testDriverName, ptr.To[int64](10))
+
+	tests := []struct {
+		name string
+		obj  interface{}
+	}{
+		{
+			name: "normal delete",
+			obj:  driver,
+		},
+		{
+			name: "tombstone delete",
+			obj:  cache.DeletedFinalStateUnknown{Key: testDriverName, Obj: driver},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := setupTest(t, driver)
+			defer f.cleanup()
+			registerTestDriver(testDriverName)
+			defer unregisterTestDriver(testDriverName)
+
+			stopCh := make(chan struct{})
+			f.updater.driverUpdaters.Store(testDriverName, stopCh)
+
+			// The informer has already dropped the object, as it does on relist.
+			if err := f.driverInformer.GetStore().Delete(driver); err != nil {
+				t.Fatal(err)
+			}
+
+			f.updater.onDriverDelete(tt.obj)
+
+			if _, running := f.updater.driverUpdaters.Load(testDriverName); running {
+				t.Errorf("periodic updater for %q still running after its CSIDriver was deleted", testDriverName)
+			}
+		})
+	}
 }
 
 func (f *testFixture) cleanup() {
