@@ -26,6 +26,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	stagingloader "k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/loader"
@@ -159,16 +160,31 @@ func (s *staticWebhookSource[T]) RunReloadLoop(ctx context.Context) {
 func (s *staticWebhookSource[T]) checkAndReload() {
 	configs, hash, err := s.loadFunc(s.manifestsDir)
 	if err != nil {
-		klog.ErrorS(err, "reloading admission manifest config", "plugin", string(s.webhookType), "dir", s.manifestsDir)
-		metrics.RecordAutomaticReloadFailure(s.webhookType, s.apiServerID)
-		return
+		contentErr, ok := errors.AsType[*manifest.InvalidContentError](err)
+		if !ok {
+			// The content could not be read, so it is unknown whether it changed.
+			// Forget the last read hash so the next successful read is reloaded and
+			// recorded, even if the content matches what was last loaded.
+			s.lastReadHash.Store(nil)
+			klog.ErrorS(err, "reloading admission manifest config", "plugin", string(s.webhookType), "dir", s.manifestsDir)
+			metrics.RecordAutomaticReloadFailure(s.webhookType, s.apiServerID)
+			return
+		}
+		hash = contentErr.Hash
 	}
 
-	// Short-circuit if file content hasn't changed since last read.
+	// Short-circuit if file content hasn't changed since last read. Invalid
+	// content is tracked too, so it is reported once rather than on every check.
 	if last := s.lastReadHash.Load(); last != nil && hash == *last {
 		return
 	}
 	s.lastReadHash.Store(&hash)
+
+	if err != nil {
+		klog.ErrorS(err, "reloading admission manifest config", "plugin", string(s.webhookType), "dir", s.manifestsDir)
+		metrics.RecordAutomaticReloadFailure(s.webhookType, s.apiServerID)
+		return
+	}
 
 	// Build and validate accessors (configs may be empty if files deleted)
 	accessors := s.buildAccessors(configs)

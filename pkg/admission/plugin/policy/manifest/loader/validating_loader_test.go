@@ -17,10 +17,13 @@ limitations under the License.
 package loader
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"k8s.io/apiserver/pkg/admission/plugin/manifest"
 )
 
 func TestLoadValidatingManifestsFromDirectory(t *testing.T) {
@@ -324,11 +327,14 @@ spec:
 
 			if tt.wantErr {
 				if err == nil {
-					t.Error("expected error but got none")
-				} else if tt.wantErrContain != "" {
-					if !strings.Contains(err.Error(), tt.wantErrContain) {
-						t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
-					}
+					t.Fatal("expected error but got none")
+				}
+				if tt.wantErrContain != "" && !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Errorf("expected error containing %q, got %q", tt.wantErrContain, err.Error())
+				}
+				contentErr, ok := errors.AsType[*manifest.InvalidContentError](err)
+				if !ok || len(contentErr.Hash) == 0 {
+					t.Errorf("expected InvalidContentError with a hash, got %T: %v", err, err)
 				}
 				return
 			}
