@@ -78,9 +78,7 @@ func (c *countingRESTOptionsGetter) snapshot() map[schema.GroupResource]int {
 // changes. Entries should only ever be removed, never added.
 // Kube-apiserver built-in resource only.
 // See https://github.com/kubernetes/kubernetes/issues/133877.
-var knownDuplicateStorageInstances = map[schema.GroupResource]int{
-	{Group: "", Resource: "events"}: 2,
-}
+var knownDuplicateStorageInstances = map[schema.GroupResource]int{}
 
 func TestSingleStorageInstancePerResource(t *testing.T) {
 	counter := &countingRESTOptionsGetter{counts: map[schema.GroupResource]int{}}

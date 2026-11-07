@@ -389,8 +389,9 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 }
 
 func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]controlplaneapiserver.RESTStorageProvider, error) {
+	coreGenericConfig := c.ControlPlane.NewCoreGenericConfig()
 	legacyRESTStorageProvider, err := corerest.New(corerest.Config{
-		GenericConfig: *c.ControlPlane.NewCoreGenericConfig(),
+		GenericConfig: *coreGenericConfig,
 		Proxy: corerest.ProxyConfig{
 			Transport:           c.ControlPlane.Extra.ProxyTransport,
 			KubeletClientConfig: c.Extra.KubeletClientConfig,
@@ -438,7 +439,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: client.Discovery()},
-		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
+		eventsrest.RESTStorageProvider{EventStorage: coreGenericConfig.EventStorage},
 		resourcerest.RESTStorageProvider{
 			NamespaceClient: client.CoreV1().Namespaces(),
 			Authorizer:      c.ControlPlane.Generic.Authorization.Authorizer,
