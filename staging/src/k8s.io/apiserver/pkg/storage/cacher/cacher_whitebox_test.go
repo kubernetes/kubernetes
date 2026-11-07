@@ -76,9 +76,9 @@ func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cach
 	return newTestCacherWithoutSyncingAndIndexers(s, c, nil)
 }
 
-func newTestCacherWithoutSyncingAndIndexers(s storage.Interface, c clock.WithTicker, indexers *cache.Indexers) (*Cacher, storage.Versioner, error) {
+func newTestCacherConfig(s storage.Interface) Config {
 	prefix := "/pods/"
-	config := Config{
+	return Config{
 		Storage:             s,
 		Versioner:           storage.APIObjectVersioner{},
 		GroupResource:       schema.GroupResource{Resource: "pods"},
@@ -97,12 +97,17 @@ func newTestCacherWithoutSyncingAndIndexers(s storage.Interface, c clock.WithTic
 			fieldsSet["spec.nodeName"] = pod.Spec.NodeName
 			return labelsSet, fieldsSet, nil
 		},
-		Indexers:    indexers,
 		NewFunc:     func() runtime.Object { return &example.Pod{} },
 		NewListFunc: func() runtime.Object { return &example.PodList{} },
 		Codec:       cachertesting.Codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:       c,
+		Clock:       clock.RealClock{},
 	}
+}
+
+func newTestCacherWithoutSyncingAndIndexers(s storage.Interface, c clock.WithTicker, indexers *cache.Indexers) (*Cacher, storage.Versioner, error) {
+	config := newTestCacherConfig(s)
+	config.Indexers = indexers
+	config.Clock = c
 	cacher, err := NewCacherFromConfig(config)
 
 	return cacher, storage.APIObjectVersioner{}, err
@@ -855,10 +860,11 @@ func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 
 func TestGetCacheBypass(t *testing.T) {
 	scenarios := []struct {
-		name                   string
-		consistentGetFromCache bool
-		watchProgressSupported bool
-		expectConsistentBypass bool
+		name                          string
+		consistentGetFromCache        bool
+		watchProgressSupported        bool
+		disableConsistentGetFromCache bool
+		expectConsistentBypass        bool
 	}{
 		{
 			name:                   "ConsistentGetFromCache=true,RequestWatchProgress=true",
@@ -878,6 +884,13 @@ func TestGetCacheBypass(t *testing.T) {
 			watchProgressSupported: true,
 			expectConsistentBypass: true,
 		},
+		{
+			name:                          "ConsistentGetFromCache=true,RequestWatchProgress=true,DisableConsistentGetFromCache=true",
+			consistentGetFromCache:        true,
+			watchProgressSupported:        true,
+			disableConsistentGetFromCache: true,
+			expectConsistentBypass:        true,
+		},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -892,12 +905,24 @@ func TestGetCacheBypass(t *testing.T) {
 				})
 			}
 
-			backingStorage := &cachertesting.MockStorage{}
-			cacher, _, err := newTestCacher(backingStorage)
+			backingStorage := &cachertesting.MockStorage{
+				DeleteFn: func(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object, _ storage.DeleteOptions) error {
+					return errDummy
+				},
+				GuaranteedUpdateFn: func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
+					return errDummy
+				},
+			}
+			config := newTestCacherConfig(backingStorage)
+			config.DisableConsistentGetFromCache = scenario.disableConsistentGetFromCache
+			cacher, err := NewCacherFromConfig(config)
 			if err != nil {
 				t.Fatalf("Couldn't create cacher: %v", err)
 			}
 			defer cacher.Stop()
+			if err := cacher.Wait(context.Background()); err != nil {
+				t.Fatalf("Couldn't initialize cacher: %v", err)
+			}
 			delegator := NewCacheDelegator(cacher, backingStorage)
 			defer delegator.Stop()
 
@@ -917,6 +942,20 @@ func TestGetCacheBypass(t *testing.T) {
 					newTestGetCacheBypass(t, delegator, result, tc.resourceVersion, tc.expectBypass)
 				})
 			}
+			t.Run("Delete", func(t *testing.T) {
+				err := delegator.Delete(context.TODO(), "/pods/ns/pod-0", result, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+				if errors.Is(err, errDummy) != scenario.expectConsistentBypass {
+					t.Errorf("Unexpected bypass result for Delete, expectBypass=%v, err=%v", scenario.expectConsistentBypass, err)
+				}
+			})
+			t.Run("GuaranteedUpdate", func(t *testing.T) {
+				err := delegator.GuaranteedUpdate(context.TODO(), "/pods/ns/pod-0", result, false, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+					return in, nil
+				}), nil)
+				if errors.Is(err, errDummy) != scenario.expectConsistentBypass {
+					t.Errorf("Unexpected bypass result for GuaranteedUpdate, expectBypass=%v, err=%v", scenario.expectConsistentBypass, err)
+				}
+			})
 		})
 	}
 }
