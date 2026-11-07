@@ -2621,6 +2621,7 @@ func TestConflictingData(t *testing.T) {
 				dependencyGraphBuilder: &GraphBuilder{
 					eventRecorder:    eventRecorder,
 					metadataClient:   metadataClient,
+					restMapper:       restMapper,
 					informersStarted: alwaysStarted,
 					graphChanges:     graphChanges,
 					uidToNode: &concurrentUIDToNode{
