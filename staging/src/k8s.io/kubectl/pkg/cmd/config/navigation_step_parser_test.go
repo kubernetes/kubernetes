@@ -84,6 +84,26 @@ func TestParseWithNoMatchingValue(t *testing.T) {
 	test.run(t)
 }
 
+func TestParseIntoNonPointerMap(t *testing.T) {
+	for _, path := range []string{
+		"extensions.foo",
+		"preferences.extensions.foo",
+		"clusters.foo.extensions.bar",
+		"users.foo.extensions.bar",
+		"contexts.foo.extensions.bar",
+		"users.foo.act-as-user-extra.scopes",
+	} {
+		t.Run(path, func(t *testing.T) {
+			test := stepParserTest{
+				path:          path,
+				expectedError: "unable to parse one or more field values of " + path,
+			}
+
+			test.run(t)
+		})
+	}
+}
+
 func (test stepParserTest) run(t *testing.T) {
 	actualSteps, err := newNavigationSteps(test.path)
 	if len(test.expectedError) != 0 {
