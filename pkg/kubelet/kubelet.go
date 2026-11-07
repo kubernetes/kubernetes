@@ -786,6 +786,7 @@ func NewMainKubelet(ctx context.Context,
 		backOffPeriod,
 		klet.podCache,
 		klet.allocationManager,
+		klet, // podRelistSuspender; delegates to klet.pleg, which is created below.
 	)
 
 	var singleProcessOOMKill *bool
@@ -3636,6 +3637,16 @@ func (kl *Kubelet) RequestPodReinspect(podUID types.UID) {
 
 func (kl *Kubelet) RequestPodRelist(logger klog.Logger, podUID types.UID) {
 	kl.pleg.RequestRelist(logger, podUID)
+}
+
+// SuspendRelist implements podRelistSuspender.
+func (kl *Kubelet) SuspendRelist(podUID types.UID) {
+	kl.pleg.SuspendRelist(podUID)
+}
+
+// ResumeRelist implements podRelistSuspender.
+func (kl *Kubelet) ResumeRelist(logger klog.Logger, podUID types.UID, changed bool) {
+	kl.pleg.ResumeRelist(logger, podUID, changed)
 }
 
 var _ allocation.PodProvider = &Kubelet{}
