@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/lib/model"
 	"github.com/stretchr/testify/assert"
 	"sigs.k8s.io/randfill"
 
@@ -76,6 +77,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
+	mockStatsProvider.EXPECT().GetCachedMachineInfo().Return(&cadvisorapi.MachineInfo{}, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
@@ -177,6 +179,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
+	mockStatsProvider.EXPECT().GetCachedMachineInfo().Return(&cadvisorapi.MachineInfo{}, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
 	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
@@ -277,6 +280,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
+	mockStatsProvider.EXPECT().GetCachedMachineInfo().Return(&cadvisorapi.MachineInfo{}, nil)
 	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
 	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
 	mockStatsProvider.EXPECT().ListPodCPUAndMemoryStats(ctx).Return(podStats, nil)
