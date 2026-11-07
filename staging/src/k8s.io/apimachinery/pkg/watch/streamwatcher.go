@@ -113,6 +113,12 @@ func (sw *StreamWatcher) receive() {
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {
+			// Ignore expected error if the watcher was stopped.
+			select {
+			case <-sw.done:
+				return
+			default:
+			}
 			switch err {
 			case io.EOF:
 				// watch closed normally
