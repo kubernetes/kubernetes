@@ -169,6 +169,14 @@ type TracingConfiguration struct {
 type AuthenticationConfiguration struct {
 	metav1.TypeMeta `json:""`
 
+	// userValidationRules are rules that are applied to the authenticated user
+	// from any authenticator (x509, JWT, webhook, etc.) before completing
+	// authentication. The rules are logically ANDed together; all must return
+	// true for authentication to succeed. This allows blocking specific
+	// credentials regardless of the authentication method used.
+	// +optional
+	UserValidationRules []UserValidationRule `json:"userValidationRules,omitempty"`
+
 	// jwt is a list of authenticator to authenticate Kubernetes users using
 	// JWT compliant tokens. The authenticator will attempt to parse a raw ID token,
 	// verify it's been signed by the configured issuer. The public key to verify the
