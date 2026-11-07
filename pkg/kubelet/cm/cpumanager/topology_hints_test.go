@@ -254,6 +254,7 @@ func TestGetTopologyHints(t *testing.T) {
 			policy: &staticPolicy{
 				topology:  topology,
 				numaNodes: topology.CPUDetails.NUMANodes().List(),
+				affinity:  scoringTopologyStore(logger),
 			},
 			state: &mockState{
 				assignments:   tc.assignments,
@@ -307,6 +308,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			policy: &staticPolicy{
 				topology:  topology,
 				numaNodes: topology.CPUDetails.NUMANodes().List(),
+				affinity:  scoringTopologyStore(logger),
 			},
 			state: &mockState{
 				assignments:   tc.assignments,
@@ -509,6 +511,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 					topology:  testCase.topology,
 					options:   policyOpt,
 					numaNodes: testCase.topology.CPUDetails.NUMANodes().List(),
+					affinity:  scoringTopologyStore(tCtx.Logger()),
 				},
 				state: &mockState{
 					assignments:   testCase.assignments,
@@ -640,6 +643,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 				policy: &staticPolicy{
 					topology:  topology,
 					numaNodes: topology.CPUDetails.NUMANodes().List(),
+					affinity:  scoringTopologyStore(logger),
 				},
 				state: &mockState{
 					assignments:   tc.assignments,

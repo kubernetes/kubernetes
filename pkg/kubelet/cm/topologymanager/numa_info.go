@@ -89,6 +89,30 @@ func (n *NUMAInfo) Closest(m1 bitmask.BitMask, m2 bitmask.BitMask) bitmask.BitMa
 	return m2
 }
 
+// equallyFit reports whether the structural comparison used to choose between
+// two affinity masks - Closest when preferClosest is set, Narrowest otherwise -
+// has no reason to prefer either of them. Both Narrowest and Closest always
+// return one of their arguments, so they resolve such masks with an arbitrary
+// fallback; callers which have a further preference to express need to know
+// when that fallback is all that is left.
+func (n *NUMAInfo) equallyFit(m1 bitmask.BitMask, m2 bitmask.BitMask, preferClosest bool) bool {
+	// Masks of different widths are never equally fit - the narrower one is
+	// structurally better. This must be checked first, before any distance
+	// comparison, to prevent the strategy from overriding structural preference.
+	if m1.Count() != m2.Count() {
+		return false
+	}
+
+	if !preferClosest {
+		// For narrowest preference, masks with the same width are equally fit.
+		return true
+	}
+
+	// For closest preference, masks are equally fit only if they also have the
+	// same average distance. This matches the pattern in Closest().
+	return n.NUMADistances.CalculateAverageFor(m1) == n.NUMADistances.CalculateAverageFor(m2)
+}
+
 func (n NUMAInfo) DefaultAffinityMask() bitmask.BitMask {
 	defaultAffinity, _ := bitmask.NewBitMask(n.Nodes...)
 	return defaultAffinity

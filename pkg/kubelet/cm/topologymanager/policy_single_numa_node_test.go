@@ -147,11 +147,63 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		actual := filterSingleNumaHints(tc.allResources)
-		if !reflect.DeepEqual(tc.expectedResources, actual) {
+		actual := filterSingleNumaHints(unnamedHintLists(tc.allResources))
+		expected := unnamedHintLists(tc.expectedResources)
+		if !reflect.DeepEqual(expected, actual) {
 			t.Errorf("Test Case: %s", tc.name)
-			t.Errorf("Expected result to be %v, got %v", tc.expectedResources, actual)
+			t.Errorf("Expected result to be %v, got %v", expected, actual)
 		}
+	}
+}
+
+// TestPolicySingleNumaNodeFilterHintsKeepsResourceNames checks that the filter
+// returns one entry per input entry, in order, still carrying the name of the
+// resource the hints came from. The merge relies on that to attribute a hint
+// in a permutation back to its resource.
+func TestPolicySingleNumaNodeFilterHintsKeepsResourceNames(t *testing.T) {
+	input := []resourceHints{
+		{
+			resource: "cpu",
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+				{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false},
+			},
+		},
+		{
+			// Everything is filtered out, but the entry and its name stay.
+			resource: "nvidia.com/gpu",
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false},
+			},
+		},
+		{
+			// A provider with no preference at all names no resource.
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
+		},
+	}
+
+	expected := []resourceHints{
+		{
+			resource: "cpu",
+			hints: []TopologyHint{
+				{NUMANodeAffinity: NewTestBitMask(0), Preferred: true},
+			},
+		},
+		{
+			resource: "nvidia.com/gpu",
+		},
+		{
+			hints: []TopologyHint{
+				{NUMANodeAffinity: nil, Preferred: true},
+			},
+		},
+	}
+
+	actual := filterSingleNumaHints(input)
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected result to be %v, got %v", expected, actual)
 	}
 }
 
