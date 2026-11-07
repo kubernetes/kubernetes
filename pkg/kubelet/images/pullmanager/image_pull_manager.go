@@ -240,6 +240,18 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 		return true, nil
 	}
 
+	// if the credential mapping has entries for other repos but not this one,
+	// kubelet never pulled this specific image treat it as preloaded.
+	if imagePulledByKubelet && pulledRecord != nil && len(pulledRecord.CredentialMapping) > 0 {
+		sanitizedImage, err := trimImageTagDigest(image)
+		if err == nil {
+
+			if _, found := pulledRecord.CredentialMapping[sanitizedImage]; !found {
+				imagePulledByKubelet = false
+			}
+		}
+	}
+
 	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, imagePulledByKubelet) {
 		resultForMetrics = checkResultCredentialPolicyAllowed
 		return false, nil
