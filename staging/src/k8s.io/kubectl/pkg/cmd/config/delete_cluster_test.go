@@ -22,10 +22,12 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 type deleteClusterTest struct {
@@ -50,6 +52,59 @@ func TestDeleteCluster(t *testing.T) {
 	}
 
 	test.run(t)
+}
+
+func TestDeleteClusterWithoutArgs(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube": {Server: "https://192.168.0.99"},
+		},
+	}
+
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
+	err = clientcmd.WriteToFile(conf, fakeKubeFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	pathOptions := clientcmd.NewDefaultPathOptions()
+	pathOptions.GlobalFile = fakeKubeFile.Name()
+	pathOptions.EnvVar = ""
+
+	defer cmdutil.DefaultBehaviorOnFatal()
+	fatalCalled := false
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		fatalCalled = true
+		if code != 1 {
+			t.Errorf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(str, "cluster to delete is required") {
+			t.Errorf("expected error to contain %q, got %q", "cluster to delete is required", str)
+		}
+	})
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdConfigDeleteCluster(buf, pathOptions)
+	cmd.SetArgs([]string{})
+	cmd.Execute()
+
+	if !fatalCalled {
+		t.Fatal("expected a usage error when no cluster name is provided, got none")
+	}
+
+	// Verify no clusters were removed from the kubeconfig file
+	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+	}
+
+	if _, ok := config.Clusters["minikube"]; !ok {
+		t.Errorf("expected cluster minikube to still exist in kubeconfig")
+	}
 }
 
 func (test deleteClusterTest) run(t *testing.T) {
