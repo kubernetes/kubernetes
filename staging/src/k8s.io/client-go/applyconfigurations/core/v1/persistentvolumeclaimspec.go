@@ -33,6 +33,7 @@ type PersistentVolumeClaimSpecApplyConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 	// selector is a label query over volumes to consider for binding.
+	// A null or empty selector matches all volumes. This selector is ignored when volumeName is set.
 	Selector *metav1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
 	// resources represents the minimum resources the volume should have.
 	// Users are allowed to specify resource requirements
