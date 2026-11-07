@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/emicklei/go-restful/v3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -305,7 +306,7 @@ func (s *specProxier) register(handler common.PathHandlerByGroupVersion) {
 		/* component = */ "",
 		/* deprecated */ false,
 		/* removedRelease */ "",
-		http.HandlerFunc(s.handleDiscovery)))
+		gziphandler.GzipHandler(http.HandlerFunc(s.handleDiscovery)).ServeHTTP))
 	handler.HandlePrefix("/openapi/v3/", metrics.InstrumentHandlerFunc("GET",
 		/* group = */ "",
 		/* version = */ "",
@@ -315,5 +316,5 @@ func (s *specProxier) register(handler common.PathHandlerByGroupVersion) {
 		/* component = */ "",
 		/* deprecated */ false,
 		/* removedRelease */ "",
-		http.HandlerFunc(s.handleGroupVersion)))
+		gziphandler.GzipHandler(http.HandlerFunc(s.handleGroupVersion)).ServeHTTP))
 }
