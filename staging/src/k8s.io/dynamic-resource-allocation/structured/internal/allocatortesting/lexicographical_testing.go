@@ -77,6 +77,12 @@ func TestLexicographicalAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool2, device2, false),
 				deviceAllocationResult(req0, driverA, pool3, device3, false),
 			)},
+			// Without the feature, devices with binding conditions are skipped.
+			expectResultsWithoutFeatures: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool2, device2, false),
+				deviceAllocationResult(req0, driverA, pool3, device3, false),
+			)},
 		},
 		"lexicographical-sorting-slices": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 2))),
@@ -121,6 +127,12 @@ func TestLexicographicalAllocator(t *testing.T,
 					NodeSelector: localNodeSelector(node1),
 				},
 			},
+			// Without the feature, devices with binding conditions are skipped.
+			expectResultsWithoutFeatures: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
 		},
 	}
 
