@@ -1033,7 +1033,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 				// Not allocated yet, and no pending allocation. Skip.
 				continue
 			}
-			status := pl.validateNodeAllocatableDRAClaimSharing(pod, claim, state, podGroupState)
+			status := pl.validateNodeAllocatableDRAClaimSharing(pod, claim, state, podGroupState, nodeInfo)
 			if status != nil {
 				return status
 			}
