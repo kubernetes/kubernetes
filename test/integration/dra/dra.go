@@ -300,6 +300,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				runSubTest(tCtx, "Convert", testConvert)
+				runSubTest(tCtx, "OpaqueParametersMetadataUpdates", testOpaqueParametersMetadataUpdates)
 				runSubTest(tCtx, "ControllerManagerMetrics", testControllerManagerMetrics)
 				runSubTest(tCtx, "ResourceSliceFieldSelectors", testResourceSliceFieldSelectors)
 				runSubTest(tCtx, "DerivedAttributes", testDerivedAttributes)
@@ -374,6 +375,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				server.TearDownFn()
 			})
 			tCtx = tCtx.WithRESTConfig(server.ClientConfig)
+			tCtx = tCtx.WithValue(apiServerKey, &server)
 
 			nodes := createNodes(tCtx)
 			for feature, setup := range featureNodeSetups {
@@ -707,3 +709,7 @@ func (claimController *claimControllerSingleton) stop(tCtx ktesting.TContext) {
 type claimControllerKeyType int
 
 var claimControllerKey claimControllerKeyType
+
+type apiServerKeyType int
+
+var apiServerKey apiServerKeyType
