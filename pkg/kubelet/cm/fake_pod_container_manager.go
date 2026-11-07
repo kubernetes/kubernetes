@@ -30,6 +30,7 @@ type FakePodContainerManager struct {
 	sync.Mutex
 	CalledFunctions []string
 	Cgroups         map[types.UID]CgroupName
+	ValidateErr     error
 }
 
 var _ PodContainerManager = &FakePodContainerManager{}
@@ -44,6 +45,13 @@ func (m *FakePodContainerManager) AddPodFromCgroups(pod *kubecontainer.Pod) {
 	m.Lock()
 	defer m.Unlock()
 	m.Cgroups[pod.ID] = []string{pod.Name}
+}
+
+func (m *FakePodContainerManager) Validate(_ *v1.Pod) error {
+	m.Lock()
+	defer m.Unlock()
+	m.CalledFunctions = append(m.CalledFunctions, "Validate")
+	return m.ValidateErr
 }
 
 func (m *FakePodContainerManager) Exists(_ *v1.Pod) bool {
