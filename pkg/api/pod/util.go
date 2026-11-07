@@ -419,6 +419,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
 		AllowNonLocalProjectedTokenPath:                     false,
 		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		AllowPodPIDLimit:                                    utilfeature.DefaultFeatureGate.Enabled(features.PerPodPIDLimit),
 		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
 		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
@@ -476,6 +477,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 				}
 			}
 		}
+
+		// If old pod already has a PID limit, allow it even if the gate is now off
+		opts.AllowPodPIDLimit = opts.AllowPodPIDLimit || podPIDLimitInUse(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
 		opts.AllowRestartAllContainers = opts.AllowRestartAllContainers || restartAllContainersActionInUse(oldPodSpec)
@@ -2102,6 +2106,18 @@ func DefaultPodLevelResources(pod *api.Pod) {
 		return
 	}
 
+	// A pod whose only pod-level entries are limit-only resources (e.g. pids)
+	// has not opted into pod-level cpu/memory/hugepages semantics; defaulting
+	// must be a no-op for it. Checked once here so the property holds
+	// regardless of which defaulting steps run or in what order.
+	v1Resources := &apiv1.ResourceRequirements{}
+	if err := corev1.Convert_core_ResourceRequirements_To_v1_ResourceRequirements(pod.Spec.Resources, v1Resources, nil); err != nil {
+		return
+	}
+	if !resourcehelper.HasAccountablePodLevelResource(v1Resources) {
+		return
+	}
+
 	v1PodSpec := &apiv1.PodSpec{}
 	// Ephemeral containers are excluded here as they cannot specify resources and do not contribute
 	// to QoS or pod-level resource defaulting. If this changes, this location may need to be updated.
@@ -2127,7 +2143,6 @@ func defaultHugePagePodLevelLimits(pod *api.Pod, v1Pod *apiv1.Pod) {
 	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
 		return
 	}
-
 	podLims := pod.Spec.Resources.Limits
 	if podLims == nil {
 		podLims = make(api.ResourceList)
@@ -2180,7 +2195,7 @@ func defaultPodLevelRequests(pod *api.Pod, v1Pod *apiv1.Pod) {
 
 	if pod.Spec.Resources.Limits != nil {
 		for key, podLim := range pod.Spec.Resources.Limits {
-			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) {
+			if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(apiv1.ResourceName(key)) && !resourcehelper.IsLimitOnlyPodLevelResource(apiv1.ResourceName(key)) {
 				podReqs[key] = podLim.DeepCopy()
 			}
 		}
@@ -2305,4 +2320,13 @@ func evictionRespondersInUse(podSpec *api.PodSpec) bool {
 	}
 
 	return len(podSpec.EvictionResponders) > 0
+}
+
+// podPIDLimitInUse returns true if the pod spec has a pid limit set at the pod level.
+func podPIDLimitInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil || podSpec.Resources == nil {
+		return false
+	}
+	_, ok := podSpec.Resources.Limits[api.ResourcePID]
+	return ok
 }
