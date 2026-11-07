@@ -19,6 +19,7 @@ package populator
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -36,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -322,6 +326,131 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 }
 
+// lockedPodStateProvider lets a test change pod state while Run is reading it.
+type lockedPodStateProvider struct {
+	lock  sync.Mutex
+	state fakePodStateProvider
+}
+
+func (p *lockedPodStateProvider) ShouldPodContainersBeTerminating(uid kubetypes.UID) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.state.ShouldPodContainersBeTerminating(uid)
+}
+
+func (p *lockedPodStateProvider) ShouldPodRuntimeBeRemoved(uid kubetypes.UID) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.state.ShouldPodRuntimeBeRemoved(uid)
+}
+
+func (p *lockedPodStateProvider) markRemoved(uid kubetypes.UID) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.state.removed = map[kubetypes.UID]struct{}{uid: {}}
+}
+
+// Like a static etcd pod being replaced while the local API server hangs.
+func TestRunRemovesDeletedPodWhilePVCGetHangs(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	dswp, _, terminatedPod, volumeName, _ := prepareDSWPWithPodPV(t)
+	podState := &lockedPodStateProvider{}
+	dswp.podStateProvider = podState
+
+	getStarted := make(chan struct{})
+	var startedOnce sync.Once
+	release := make(chan struct{})
+	dswp.kubeClient.(*fake.Clientset).PrependReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		if action.(core.GetAction).GetName() != "hanging-claim" {
+			return false, nil, nil
+		}
+		startedOnce.Do(func() { close(getStarted) })
+		<-release
+		return true, nil, fmt.Errorf("the server was unable to return a response in the time allotted")
+	})
+
+	containers := []v1.Container{{VolumeMounts: []v1.VolumeMount{{Name: "hanging-volume", MountPath: "/mnt"}}}}
+	pendingPod := createPodWithVolume("pending-pod", "hanging-volume", "hanging-claim", containers)
+	dswp.podManager.(kubepod.Manager).AddPod(pendingPod)
+
+	ctx, cancel := context.WithCancel(tCtx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		dswp.Run(ctx, config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }))
+	}()
+	// The fake clientset ignores ctx, so the PVC Get has to be released as well
+	// before Run can return. Run must return before the test ends, as it logs through t.
+	t.Cleanup(func() {
+		cancel()
+		close(release)
+		<-done
+	})
+
+	select {
+	case <-getStarted:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatal("findAndAddNewPods did not reach the PVC Get")
+	}
+
+	dswp.podManager.(mutablePodManager).RemovePod(terminatedPod)
+	podState.markRemoved(terminatedPod.UID)
+
+	podName := util.GetUniquePodName(terminatedPod)
+	err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, 5*time.Second, true, func(context.Context) (bool, error) {
+		return !dswp.desiredStateOfWorld.PodExistsInVolume(podName, volumeName, "" /* SELinuxContext */), nil
+	})
+	if err != nil {
+		t.Fatalf("Volume %q of the terminated pod is still in the desired state while a PVC Get hangs: %v", volumeName, err)
+	}
+}
+
+func TestFindAndAddNewPodsSkipsPodTerminatedDuringPVCGet(t *testing.T) {
+	tests := []struct {
+		name         string
+		hasAddedPods bool
+		setState     func(p *fakePodStateProvider, uid kubetypes.UID)
+	}{
+		{
+			name:         "terminating after initial population",
+			hasAddedPods: true,
+			setState: func(p *fakePodStateProvider, uid kubetypes.UID) {
+				p.terminating = map[kubetypes.UID]struct{}{uid: {}}
+			},
+		},
+		{
+			name:         "runtime removed during initial population",
+			hasAddedPods: false,
+			setState: func(p *fakePodStateProvider, uid kubetypes.UID) {
+				p.removed = map[kubetypes.UID]struct{}{uid: {}}
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			dswp, fakePodManager, podState := prepareDswpWithVolume(t)
+			dswp.hasAddedPods = tc.hasAddedPods
+			containers := []v1.Container{{VolumeMounts: []v1.VolumeMount{{Name: "dswp-test-volume-name", MountPath: "/mnt"}}}}
+			pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+			fakePodManager.AddPod(pod)
+
+			dswp.kubeClient.(*fake.Clientset).PrependReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+				tc.setState(podState, pod.UID)
+				return false, nil, nil
+			})
+
+			dswp.findAndAddNewPods(tCtx)
+
+			if volumes := dswp.desiredStateOfWorld.GetVolumesToMount(); len(volumes) != 0 {
+				t.Fatalf("Expected no volumes for a pod that terminated during the PVC Get, got %d", len(volumes))
+			}
+			if dswp.podPreviouslyProcessed(util.GetUniquePodName(pod)) {
+				t.Fatalf("Expected the pod not to be marked processed, so a later pass retries it")
+			}
+		})
+	}
+}
 func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	dswp, fakePodState, pod, expectedVolumeName, _ := prepareDSWPWithPodPV(t)
