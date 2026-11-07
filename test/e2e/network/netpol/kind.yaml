@@ -1,0 +1,42 @@
+# Local development cluster for NetworkPolicy e2e tests.
+#
+# Prerequisites:
+#   - kind v0.24.0+ (kindnet enforces NetworkPolicy by default)
+#   - cloud-provider-kind (for LoadBalancer IP assignment)
+#
+# Usage:
+#   # Build a node image from this repo (optional; use a released image if preferred):
+#   kind build node-image --image netpol/node:latest
+#
+#   # Create the cluster:
+#   kind create cluster --config test/e2e/network/netpol/kind.yaml --image netpol/node:latest
+#
+#   # In a separate terminal, start cloud-provider-kind (provides LoadBalancer IPs):
+#   sudo cloud-provider-kind   # sudo required on macOS/Linux for raw socket access
+#
+#   # Build the e2e binary:
+#   make WHAT=test/e2e/e2e.test
+#
+#   # Run NetworkPolicy tests (NodePort spec only — no cloud LB needed):
+#   KUBECONFIG=~/.kube/config _output/bin/ginkgo -v \
+#     --focus='Feature:NetworkPolicy' \
+#     --skip='Feature:LoadBalancer' \
+#     ./test/e2e/
+#
+#   # Run all NetworkPolicy tests including LoadBalancer spec:
+#   KUBECONFIG=~/.kube/config _output/bin/ginkgo -v \
+#     --focus='Feature:NetworkPolicy' \
+#     ./test/e2e/
+#
+# Note: the LoadBalancer spec probes the LB IP from the test runner. On macOS/Windows,
+# the kind LB IP is not host-routable. In that case run the e2e binary from a container
+# attached to the 'kind' Docker network:
+#   docker run --rm --network kind -v ~/.kube:/root/.kube \
+#     -v $(pwd)/_output/bin/e2e.test:/e2e.test \
+#     alpine /e2e.test --focus='Feature:NetworkPolicy'
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker

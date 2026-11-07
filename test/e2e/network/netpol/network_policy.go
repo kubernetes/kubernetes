@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -34,6 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1320,6 +1325,111 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 	})
+
+	ginkgo.Context("NetworkPolicy and north/south traffic", func() {
+		f.It("should deny NodePort traffic to a pod isolated for ingress when externalTrafficPolicy is Local", feature.NetworkPolicy, func(ctx context.Context) {
+			k8s := initializeResources(ctx, f, []v1.Protocol{protocolTCP}, []int32{80}, "x/a", "y/b")
+			nsX, nsY, _ := getK8sNamespaces(k8s)
+
+			server, err := k8s.getPod(ctx, nsX, "a")
+			framework.ExpectNoError(err, "Unable to get server pod x/a")
+			if server.Status.HostIP == "" {
+				framework.Failf("Server pod x/a has no HostIP assigned")
+			}
+
+			sameNode, otherNode, err := createNorthSouthClients(ctx, k8s, nsY, server.Spec.NodeName)
+			framework.ExpectNoError(err)
+
+			// With ETP=Cluster, kube-proxy SNATs NodePort traffic to the node IP; some CNIs
+			// incorrectly exempt node-IP sources from NetworkPolicy, bypassing enforcement.
+			// ETP=Local preserves the client source IP so the policy applies normally.
+			jig := e2eservice.NewTestJig(k8s.clientSet, nsX, "ns-nodeport")
+			svc, err := jig.CreateTCPService(ctx, func(s *v1.Service) {
+				s.Spec.Type = v1.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+				s.Spec.Selector = map[string]string{"pod": "a"}
+			})
+			framework.ExpectNoError(err, "Unable to create NodePort service in %s", nsX)
+			ginkgo.DeferCleanup(k8s.clientSet.CoreV1().Services(nsX).Delete, ctx, svc.Name, metav1.DeleteOptions{})
+
+			framework.ExpectNoError(
+				jig.WaitForEndpointOnNode(ctx, server.Spec.NodeName),
+				"Unable to wait for endpoint on node %s", server.Spec.NodeName,
+			)
+
+			nodePort := int(svc.Spec.Ports[0].NodePort)
+			clients := []string{sameNode, otherNode}
+
+			// Positive control: path must work before the policy is applied.
+			expectNodePortReachability(k8s, nsY, clients, server.Status.HostIP, nodePort, true)
+
+			CreatePolicy(ctx, k8s, GenNetworkPolicyWithNameAndPodSelector(
+				"deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules()), nsX)
+
+			// East/west must also be blocked.
+			reachability := NewReachability(k8s.AllPodStrings(), true)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+			ValidateOrFail(k8s, &TestCase{
+				ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability,
+			})
+
+			// North/south must be blocked — this fails if the CNI does not enforce NP on the NodePort path.
+			expectNodePortReachability(k8s, nsY, clients, server.Status.HostIP, nodePort, false)
+		})
+
+		f.It("should deny LoadBalancer and NodePort traffic to a pod isolated for ingress when externalTrafficPolicy is Local", feature.NetworkPolicy, feature.LoadBalancer, f.WithSlow(), func(ctx context.Context) {
+			k8s := initializeResources(ctx, f, []v1.Protocol{protocolTCP}, []int32{80}, "x/a", "y/b")
+			nsX, nsY, _ := getK8sNamespaces(k8s)
+
+			server, err := k8s.getPod(ctx, nsX, "a")
+			framework.ExpectNoError(err, "Unable to get server pod x/a")
+			if server.Status.HostIP == "" {
+				framework.Failf("Server pod x/a has no HostIP assigned")
+			}
+
+			sameNode, otherNode, err := createNorthSouthClients(ctx, k8s, nsY, server.Spec.NodeName)
+			framework.ExpectNoError(err)
+
+			jig := e2eservice.NewTestJig(k8s.clientSet, nsX, "ns-loadbalancer")
+			timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, k8s.clientSet)
+			svc, err := jig.CreateLoadBalancerService(ctx, timeout, func(s *v1.Service) {
+				s.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+				s.Spec.Selector = map[string]string{"pod": "a"}
+			})
+			framework.ExpectNoError(err, "Unable to create LoadBalancer service in %s", nsX)
+			ginkgo.DeferCleanup(e2eservice.WaitForServiceDeletedWithFinalizer, k8s.clientSet, nsX, svc.Name)
+
+			framework.ExpectNoError(
+				jig.WaitForEndpointOnNode(ctx, server.Spec.NodeName),
+				"Unable to wait for endpoint on node %s", server.Spec.NodeName,
+			)
+
+			lbHost := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			lbPort := int(svc.Spec.Ports[0].Port)
+			nodePort := int(svc.Spec.Ports[0].NodePort)
+			clients := []string{sameNode, otherNode}
+
+			// Positive controls: both paths must work before the policy is applied.
+			// The LB is probed from the test runner — in-cluster pods to a Proxy-mode VIP are
+			// short-circuited by the service proxy and would not be true north/south traffic.
+			propTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, k8s.clientSet)
+			expectExternalHTTPReachability(ctx, lbHost, lbPort, true, propTimeout)
+			expectNodePortReachability(k8s, nsY, clients, server.Status.HostIP, nodePort, true)
+
+			CreatePolicy(ctx, k8s, GenNetworkPolicyWithNameAndPodSelector(
+				"deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules()), nsX)
+
+			reachability := NewReachability(k8s.AllPodStrings(), true)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+			ValidateOrFail(k8s, &TestCase{
+				ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability,
+			})
+
+			pollTimeout := time.Duration(getPollTimeoutSeconds()) * time.Second
+			expectExternalHTTPReachability(ctx, lbHost, lbPort, false, pollTimeout)
+			expectNodePortReachability(k8s, nsY, clients, server.Status.HostIP, nodePort, false)
+		})
+	})
 })
 
 var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
@@ -1606,4 +1716,103 @@ func makeLargeCIDRForIP(ip string) string {
 	}
 	cidrBase := podIP.Mask(net.CIDRMask(4, 8*len(podIP)))
 	return fmt.Sprintf("%s/4", cidrBase.String())
+}
+
+// createNorthSouthClients creates two client pods in ns: one scheduled on serverNode,
+// one scheduled on a different node. Requires at least 2 schedulable nodes.
+func createNorthSouthClients(ctx context.Context, k8s *kubeManager, ns, serverNode string) (sameNode, otherNode string, err error) {
+	nodes, err := e2enode.GetReadySchedulableNodes(ctx, k8s.clientSet)
+	if err != nil {
+		return "", "", err
+	}
+	if len(nodes.Items) < 2 {
+		e2eskipper.Skipf("Requires at least 2 schedulable nodes to probe a NodePort from a remote node; got %d", len(nodes.Items))
+	}
+
+	create := func(name string, affine bool) (string, error) {
+		pod := (&Pod{Name: name, Ports: []int32{80}, Protocols: []v1.Protocol{protocolTCP}}).KubePod(ns)
+		existingNodeSelector := pod.Spec.NodeSelector // preserve OS selector from KubePod
+		sel := e2epod.NodeSelection{}
+		if affine {
+			e2epod.SetAffinity(&sel, serverNode)
+		} else {
+			e2epod.SetAntiAffinity(&sel, serverNode)
+		}
+		e2epod.SetNodeSelection(&pod.Spec, sel)
+		// Restore OS selector (SetNodeSelection clobbers NodeSelector)
+		for k, v := range existingNodeSelector {
+			if pod.Spec.NodeSelector == nil {
+				pod.Spec.NodeSelector = map[string]string{}
+			}
+			pod.Spec.NodeSelector[k] = v
+		}
+		if _, err := k8s.createPod(ctx, pod); err != nil {
+			return "", fmt.Errorf("unable to create client pod %s in %s: %w", name, ns, err)
+		}
+		if err := e2epod.WaitForPodRunningInNamespace(ctx, k8s.clientSet, pod); err != nil {
+			return "", fmt.Errorf("unable to wait for client pod %s in %s: %w", name, ns, err)
+		}
+		return name, nil
+	}
+
+	sameNode, err = create("client-same-node", true)
+	if err != nil {
+		return "", "", err
+	}
+	otherNode, err = create("client-other-node", false)
+	return sameNode, otherNode, err
+}
+
+// expectNodePortReachability probes hostIP:nodePort from each client pod and asserts the
+// outcome matches expect. Uses kube-proxy lag timeout when expecting reachability.
+func expectNodePortReachability(k8s *kubeManager, ns string, clients []string, hostIP string, nodePort int, expect bool) {
+	pollTimeout := getPollTimeoutSeconds()
+	if expect {
+		pollTimeout = int(e2eservice.KubeProxyLagTimeout.Seconds())
+	}
+	for _, client := range clients {
+		reachable, _, _ := k8s.probeConnectivity(&probeConnectivityArgs{
+			nsFrom:              ns,
+			podFrom:             client,
+			addrTo:              hostIP,
+			protocol:            v1.ProtocolTCP,
+			toPort:              nodePort,
+			expectConnectivity:  expect,
+			timeoutSeconds:      getProbeTimeoutSeconds(),
+			pollIntervalSeconds: getPollIntervalSeconds(),
+			pollTimeoutSeconds:  pollTimeout,
+		})
+		if reachable != expect {
+			if expect {
+				framework.Failf("Failed: %s/%s could not reach %s:%d via NodePort (service path broken before policy was applied)",
+					ns, client, hostIP, nodePort)
+			} else {
+				framework.Failf("Failed: %s/%s reached %s:%d via NodePort despite default-deny-ingress policy (NetworkPolicy not enforced on north/south path)",
+					ns, client, hostIP, nodePort)
+			}
+		}
+	}
+}
+
+// expectExternalHTTPReachability probes host:port via HTTP from the test runner and asserts
+// the outcome matches expect within timeout.
+func expectExternalHTTPReachability(ctx context.Context, host string, port int, expect bool, timeout time.Duration) {
+	var lastStatus e2enetwork.HTTPPokeStatus
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
+		result := e2enetwork.PokeHTTP(host, port, "/", &e2enetwork.HTTPPokeParams{
+			Timeout: time.Duration(getProbeTimeoutSeconds()) * time.Second,
+		})
+		lastStatus = result.Status
+		reached := result.Status == e2enetwork.HTTPSuccess
+		return reached == expect, nil
+	})
+	if err != nil {
+		if expect {
+			framework.Failf("Failed: LoadBalancer %s:%d not reachable from test runner after %v (last status: %v; service path broken before policy was applied)",
+				host, port, timeout, lastStatus)
+		} else {
+			framework.Failf("Failed: LoadBalancer %s:%d still reachable from test runner after %v (last status: %v; NetworkPolicy not enforced on north/south path)",
+				host, port, timeout, lastStatus)
+		}
+	}
 }
