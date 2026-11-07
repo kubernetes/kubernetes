@@ -1037,8 +1037,10 @@ func (f *frameworkImpl) runRankNodesPlugin(ctx context.Context, pl framework.Ran
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod) (_ *fwk.PreFilterResult, status *fwk.Status, _ sets.Set[string]) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
+	skipAllPreFilterExtensions := false
 	defer func() {
 		state.SetSkipFilterPlugins(skipPlugins)
+		state.SetSkipAllPreFilterExtensions(skipAllPreFilterExtensions)
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	nodes, err := f.SnapshotSharedLister().NodeInfos().List()
@@ -1053,6 +1055,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 		logger = klog.LoggerWithName(logger, "PreFilter")
 	}
 	var returnStatus *fwk.Status
+	hasActivePreFilterExtensions := false
 	for _, pl := range f.preFilterPlugins {
 		ctx := ctx
 		if verboseLogs {
@@ -1063,6 +1066,9 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 		if s.IsSkip() {
 			skipPlugins.Insert(pl.Name())
 			continue
+		}
+		if pl.PreFilterExtensions() != nil {
+			hasActivePreFilterExtensions = true
 		}
 		if !s.IsSuccess() {
 			s.SetPlugin(pl.Name())
@@ -1094,6 +1100,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 			return result, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, msg), pluginsWithNodes
 		}
 	}
+	skipAllPreFilterExtensions = !hasActivePreFilterExtensions
 	return result, returnStatus, pluginsWithNodes
 }
 
@@ -1117,6 +1124,9 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	podInfoToAdd fwk.PodInfo,
 	nodeInfo fwk.NodeInfo,
 ) (status *fwk.Status) {
+	if state.ShouldSkipAllPreFilterExtensions() || state.GetFilterPluginExecutionMode() == fwk.FilterPluginModeNodeLocalOnly {
+		return nil
+	}
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
@@ -1162,6 +1172,9 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	podInfoToRemove fwk.PodInfo,
 	nodeInfo fwk.NodeInfo,
 ) (status *fwk.Status) {
+	if state.ShouldSkipAllPreFilterExtensions() || state.GetFilterPluginExecutionMode() == fwk.FilterPluginModeNodeLocalOnly {
+		return nil
+	}
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
@@ -1217,7 +1230,16 @@ func (f *frameworkImpl) RunFilterPlugins(
 		logger = klog.LoggerWithName(logger, "Filter")
 	}
 
+	executionMode := state.GetFilterPluginExecutionMode()
 	for _, pl := range f.filterPlugins {
+		if executionMode != fwk.FilterPluginModeAll {
+			c, ok := pl.(fwk.NodeLocalFilterPlugin)
+			isNodeLocal := ok && c.IsNodeLocal()
+			if (executionMode == fwk.FilterPluginModeNodeLocalOnly && !isNodeLocal) ||
+				(executionMode == fwk.FilterPluginModeNonNodeLocalOnly && isNodeLocal) {
+				continue
+			}
+		}
 		if state.GetSkipFilterPlugins().Has(pl.Name()) {
 			continue
 		}
@@ -1442,17 +1464,29 @@ func addGENominatedPods(ctx context.Context, fh fwk.Handle, pod *v1.Pod, state f
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
-	nodeInfoOut := nodeInfo.Snapshot()
-	stateOut := state.Clone()
+	nodeInfoOut := nodeInfo
+	stateOut := state
+	runPreFilterExtensions := !state.ShouldSkipAllPreFilterExtensions() &&
+		state.GetFilterPluginExecutionMode() != fwk.FilterPluginModeNodeLocalOnly
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
 		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID {
-			nodeInfoOut.AddPodInfo(pi)
-			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
-			if !status.IsSuccess() {
-				return false, state, nodeInfo, status.AsError()
+			if !podsAdded {
+				nodeInfoOut = nodeInfo.Snapshot()
+				// Clone CycleState only when PreFilterExtensions will mutate it via AddPod;
+				// Filter plugins do not mutate shared PreFilter state across passes.
+				if runPreFilterExtensions {
+					stateOut = state.Clone()
+				}
+				podsAdded = true
 			}
-			podsAdded = true
+			nodeInfoOut.AddPodInfo(pi)
+			if runPreFilterExtensions {
+				status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
+				if !status.IsSuccess() {
+					return false, state, nodeInfo, status.AsError()
+				}
+			}
 		}
 	}
 	return podsAdded, stateOut, nodeInfoOut, nil
@@ -2130,10 +2164,33 @@ func (f *frameworkImpl) runPostBindPlugin(ctx context.Context, pl fwk.PostBindPl
 // continue running the remaining ones and returns the error. In such a case,
 // the pod will not be scheduled and the caller will be expected to call
 // RunReservePluginsUnreserve.
+func shouldRunReservePlugin(pl fwk.ReservePlugin, state fwk.CycleState) bool {
+	executionMode := state.GetFilterPluginExecutionMode()
+	if executionMode == fwk.FilterPluginModeAll {
+		return true
+	}
+	if _, ok := pl.(fwk.FilterPlugin); !ok {
+		return false
+	}
+	if state.GetSkipFilterPlugins().Has(pl.Name()) {
+		return false
+	}
+	c, ok := pl.(fwk.NodeLocalFilterPlugin)
+	isNodeLocal := ok && c.IsNodeLocal()
+	return (executionMode == fwk.FilterPluginModeNodeLocalOnly && isNodeLocal) ||
+		(executionMode == fwk.FilterPluginModeNonNodeLocalOnly && !isNodeLocal)
+}
+
 func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
-	startTime := time.Now()
+	var startTime time.Time
+	recordMetrics := state.GetFilterPluginExecutionMode() == fwk.FilterPluginModeAll
+	if recordMetrics {
+		startTime = time.Now()
+	}
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		if recordMetrics {
+			metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		}
 	}()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -2142,6 +2199,13 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state fwk.
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	for _, pl := range f.reservePlugins {
+		if !shouldRunReservePlugin(pl, state) {
+			continue
+		}
+		if !recordMetrics {
+			recordMetrics = true
+			startTime = time.Now()
+		}
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2175,9 +2239,15 @@ func (f *frameworkImpl) runReservePluginReserve(ctx context.Context, pl fwk.Rese
 // RunReservePluginsUnreserve runs the Unreserve method in the set of
 // configured reserve plugins.
 func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
-	startTime := time.Now()
+	var startTime time.Time
+	recordMetrics := state.GetFilterPluginExecutionMode() == fwk.FilterPluginModeAll
+	if recordMetrics {
+		startTime = time.Now()
+	}
 	defer func() {
-		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Unreserve, fwk.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		if recordMetrics {
+			metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Unreserve, fwk.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+		}
 	}()
 	// Execute the Unreserve operation of each reserve plugin in the
 	// *reverse* order in which the Reserve operation was executed.
@@ -2189,6 +2259,13 @@ func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state fw
 	}
 	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
 		pl := f.reservePlugins[i]
+		if !shouldRunReservePlugin(pl, state) {
+			continue
+		}
+		if !recordMetrics {
+			recordMetrics = true
+			startTime = time.Now()
+		}
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())

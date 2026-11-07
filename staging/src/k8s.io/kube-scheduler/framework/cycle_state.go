@@ -38,6 +38,21 @@ type StateData interface {
 // StateKey is the type of keys stored in CycleState.
 type StateKey string
 
+// FilterPluginExecutionMode specifies which subset of Filter plugins should be executed
+// in the Filter extension point.
+type FilterPluginExecutionMode int
+
+const (
+	// FilterPluginModeAll executes all Filter plugins (the default).
+	FilterPluginModeAll FilterPluginExecutionMode = iota
+	// FilterPluginModeNodeLocalOnly executes only Filter plugins that implement
+	// NodeLocalFilterPlugin with IsNodeLocal() returning true.
+	FilterPluginModeNodeLocalOnly
+	// FilterPluginModeNonNodeLocalOnly executes only Filter plugins that do not implement
+	// NodeLocalFilterPlugin or whose IsNodeLocal() returns false.
+	FilterPluginModeNonNodeLocalOnly
+)
+
 // CycleState provides a mechanism for plugins to store and retrieve arbitrary data.
 // StateData stored by one plugin can be read, altered, or deleted by another plugin.
 // CycleState does not provide any data protection, as all plugins are assumed to be
@@ -76,6 +91,22 @@ type CycleState interface {
 	// ShouldSkipAllPostFilterPlugins returns whether all plugins should be skipped in the PostFilter extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	ShouldSkipAllPostFilterPlugins() bool
+	// GetFilterPluginExecutionMode returns the FilterPluginExecutionMode that controls
+	// which Filter plugins are executed in the Filter extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	GetFilterPluginExecutionMode() FilterPluginExecutionMode
+	// SetFilterPluginExecutionMode sets the FilterPluginExecutionMode that controls
+	// which Filter plugins are executed in the Filter extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetFilterPluginExecutionMode(mode FilterPluginExecutionMode)
+	// ShouldSkipAllPreFilterExtensions returns whether all PreFilterExtensions plugins should be skipped
+	// in RunPreFilterExtensionAddPod and RunPreFilterExtensionRemovePod.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	ShouldSkipAllPreFilterExtensions() bool
+	// SetSkipAllPreFilterExtensions sets whether all PreFilterExtensions plugins should be skipped
+	// in RunPreFilterExtensionAddPod and RunPreFilterExtensionRemovePod.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetSkipAllPreFilterExtensions(flag bool)
 
 	// Read retrieves data with the given "key" from CycleState. If the key is not
 	// present, ErrNotFound is returned.

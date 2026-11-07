@@ -41,6 +41,7 @@ type TaintToleration struct {
 
 var _ fwk.PreFilterPlugin = &TaintToleration{}
 var _ fwk.FilterPlugin = &TaintToleration{}
+var _ fwk.NodeLocalFilterPlugin = &TaintToleration{}
 var _ fwk.PreScorePlugin = &TaintToleration{}
 var _ fwk.ScorePlugin = &TaintToleration{}
 var _ fwk.EnqueueExtensions = &TaintToleration{}
@@ -58,6 +59,10 @@ const (
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *TaintToleration) Name() string {
 	return Name
+}
+
+func (pl *TaintToleration) IsNodeLocal() bool {
+	return true
 }
 
 // Feasibility and scoring based on the pod's tolerations.
