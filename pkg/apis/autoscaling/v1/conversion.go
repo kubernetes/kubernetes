@@ -467,6 +467,7 @@ func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAutoscal
 
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
+	out.SyncPeriodSeconds = in.SyncPeriodSeconds
 
 	for _, metric := range in.Metrics {
 		if metric.Type == autoscaling.ResourceMetricSourceType && metric.Resource != nil && metric.Resource.Name == core.ResourceCPU && metric.Resource.Target.AverageUtilization != nil {
@@ -486,6 +487,7 @@ func Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscal
 
 	out.MinReplicas = in.MinReplicas
 	out.MaxReplicas = in.MaxReplicas
+	out.SyncPeriodSeconds = in.SyncPeriodSeconds
 
 	if in.TargetCPUUtilizationPercentage != nil {
 		out.Metrics = []autoscaling.MetricSpec{

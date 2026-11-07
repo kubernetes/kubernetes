@@ -6753,6 +6753,7 @@ type spyWorkQueue struct {
 	mu                  sync.Mutex
 	addCalls            []string
 	addRateLimitedCalls []string
+	addAfterDelays      []time.Duration
 	onAdd               func(string)
 }
 
@@ -6785,6 +6786,13 @@ func (s *spyWorkQueue) AddRateLimited(item string) {
 	s.TypedRateLimitingInterface.AddRateLimited(item)
 }
 
+func (s *spyWorkQueue) AddAfter(item string, duration time.Duration) {
+	s.mu.Lock()
+	s.addAfterDelays = append(s.addAfterDelays, duration)
+	s.mu.Unlock()
+	s.TypedRateLimitingInterface.AddAfter(item, duration)
+}
+
 func (s *spyWorkQueue) getAddCalls() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -6798,6 +6806,14 @@ func (s *spyWorkQueue) getAddRateLimitedCalls() []string {
 	defer s.mu.Unlock()
 	result := make([]string, len(s.addRateLimitedCalls))
 	copy(result, s.addRateLimitedCalls)
+	return result
+}
+
+func (s *spyWorkQueue) getAddAfterDelays() []time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]time.Duration, len(s.addAfterDelays))
+	copy(result, s.addAfterDelays)
 	return result
 }
 

@@ -106,6 +106,15 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior
+
+	// syncPeriodSeconds is the delay after a reconciliation completes before
+	// the next periodic reconciliation of this HPA is eligible to run.
+	// Other events may trigger reconciliation before the delay expires.
+	// When unset, the global --horizontal-pod-autoscaler-sync-period is used.
+	// The value must be in the range [3, 3600]. Timing is best-effort.
+	// +featureGate=HPAConfigurableSyncPeriod
+	// +optional
+	SyncPeriodSeconds *int32
 }
 
 // HorizontalPodAutoscalerBehavior configures a scaling behavior for Up and Down direction

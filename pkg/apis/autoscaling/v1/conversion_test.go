@@ -175,6 +175,24 @@ func TestConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 			},
 			false,
 		},
+		{
+			"TestConversionWithSyncPeriodSeconds",
+			args{
+				in: &autoscaling.HorizontalPodAutoscalerSpec{
+					MinReplicas:       ptr.To[int32](1),
+					MaxReplicas:       3,
+					SyncPeriodSeconds: ptr.To[int32](30),
+				},
+				out: &autoscalingv1.HorizontalPodAutoscalerSpec{},
+				expectOut: &autoscalingv1.HorizontalPodAutoscalerSpec{
+					MinReplicas:       ptr.To[int32](1),
+					MaxReplicas:       3,
+					SyncPeriodSeconds: ptr.To[int32](30),
+				},
+				s: nil,
+			},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -183,6 +201,49 @@ func TestConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 			}
 
 			assert.Equal(t, tt.args.expectOut, tt.args.out)
+		})
+	}
+}
+
+func TestConvert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(t *testing.T) {
+	tests := []struct {
+		name      string
+		in        *autoscalingv1.HorizontalPodAutoscalerSpec
+		expectOut *autoscaling.HorizontalPodAutoscalerSpec
+	}{
+		{
+			name: "with syncPeriodSeconds",
+			in: &autoscalingv1.HorizontalPodAutoscalerSpec{
+				MinReplicas:       ptr.To[int32](1),
+				MaxReplicas:       3,
+				SyncPeriodSeconds: ptr.To[int32](30),
+			},
+			expectOut: &autoscaling.HorizontalPodAutoscalerSpec{
+				MinReplicas:       ptr.To[int32](1),
+				MaxReplicas:       3,
+				SyncPeriodSeconds: ptr.To[int32](30),
+			},
+		},
+		{
+			name: "without syncPeriodSeconds",
+			in: &autoscalingv1.HorizontalPodAutoscalerSpec{
+				MinReplicas: ptr.To[int32](1),
+				MaxReplicas: 3,
+			},
+			expectOut: &autoscaling.HorizontalPodAutoscalerSpec{
+				MinReplicas: ptr.To[int32](1),
+				MaxReplicas: 3,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &autoscaling.HorizontalPodAutoscalerSpec{}
+			if err := Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(tt.in, out, nil); err != nil {
+				t.Fatalf("Convert_v1_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec() error = %v", err)
+			}
+
+			assert.Equal(t, tt.expectOut, out)
 		})
 	}
 }
