@@ -858,3 +858,55 @@ func TestNativeHistogramMetricCollection(t *testing.T) {
 		})
 	}
 }
+
+type plainObserver struct {
+	observed []float64
+}
+
+func (p *plainObserver) Observe(v float64) {
+	p.observed = append(p.observed, v)
+}
+
+func TestObserveWithExemplar(t *testing.T) {
+	histogramVec := NewHistogramVec(&HistogramOpts{
+		Name:    "histogram_observe_with_exemplar_test",
+		Help:    "helpless",
+		Buckets: []float64{100},
+	}, []string{"group"})
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	registry.MustRegister(histogramVec)
+
+	ObserveWithExemplar(histogramVec.WithLabelValues("foo"), 10, map[string]string{"image": "registry.example.com/app:v1", "pull_policy": "Always"})
+
+	mfs, err := registry.Gather()
+	require.NoError(t, err)
+	require.Len(t, mfs, 1)
+	require.Equal(t, dto.MetricType_HISTOGRAM, mfs[0].GetType())
+	m := mfs[0].GetMetric()[0]
+	assert.InDelta(t, 10.0, m.GetHistogram().GetSampleSum(), 0.0001)
+	assert.Equal(t, uint64(1), m.GetHistogram().GetSampleCount())
+
+	e := m.GetHistogram().GetBucket()[0].GetExemplar()
+	require.NotNil(t, e, "want an exemplar on the bucket the observation landed in")
+	got := map[string]string{}
+	for _, l := range e.GetLabel() {
+		got[l.GetName()] = l.GetValue()
+	}
+	assert.Equal(t, map[string]string{"image": "registry.example.com/app:v1", "pull_policy": "Always"}, got)
+}
+
+func TestObserveWithExemplarUnsupportedObserver(t *testing.T) {
+	o := &plainObserver{}
+
+	ObserveWithExemplar(o, 3, map[string]string{"image": "app"})
+
+	assert.Equal(t, []float64{3}, o.observed, "an observer without exemplar support is observed without one")
+}
+
+func TestExemplarMaxRunes(t *testing.T) {
+	assert.Equal(t, prometheus.ExemplarMaxRunes, ExemplarMaxRunes)
+}

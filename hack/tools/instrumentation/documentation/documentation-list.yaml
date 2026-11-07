@@ -3895,6 +3895,7 @@
   stabilityLevel: ALPHA
   labels:
   - image_size_in_bytes
+  - pull_policy
   buckets:
   - 1
   - 5
