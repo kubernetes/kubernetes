@@ -37,10 +37,37 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	externaljwtv1 "k8s.io/externaljwt/apis/v1"
 )
+
+func TestPluginLifetimeIsIndependentFromInitializationContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	socketPath := utilnettesting.MakeSocketNameForTest(t, "external-jwt-signer.sock")
+	v1testing.NewMockSigner(t, socketPath)
+
+	p, _, err := New(ctx, "issuer", socketPath, time.Second, false)
+	if err != nil {
+		t.Fatalf("failed to create plugin: %v", err)
+	}
+	t.Cleanup(func() { _ = p.Close() })
+
+	cancel()
+	requestCtx, requestCancel := context.WithTimeout(context.Background(), time.Second)
+	defer requestCancel()
+	if _, err := p.GetServiceMetadata(requestCtx); err != nil {
+		t.Fatalf("external signer is unavailable after initialization context cancellation: %v", err)
+	}
+
+	if err := p.Close(); err != nil {
+		t.Fatalf("failed to close plugin: %v", err)
+	}
+	if err := p.Close(); err != nil {
+		t.Fatalf("second close failed: %v", err)
+	}
+}
 
 var (
 	rsaKey1 *rsa.PrivateKey

@@ -99,6 +99,7 @@ type Extra struct {
 	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
 
 	ServiceAccountIssuer                serviceaccount.TokenGenerator
+	ServiceAccountIssuerCleanup         func()
 	ServiceAccountMaxExpiration         time.Duration
 	ServiceAccountExtendedMaxExpiration time.Duration
 	ExtendExpiration                    bool
@@ -349,6 +350,7 @@ func CreateConfig(
 			SystemNamespaces:        opts.SystemNamespaces,
 
 			ServiceAccountIssuer:                opts.ServiceAccountIssuer,
+			ServiceAccountIssuerCleanup:         opts.ServiceAccountIssuerCleanup,
 			ServiceAccountMaxExpiration:         opts.ServiceAccountTokenMaxExpiration,
 			ServiceAccountExtendedMaxExpiration: opts.Authentication.ServiceAccounts.MaxExtendedExpiration,
 			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
