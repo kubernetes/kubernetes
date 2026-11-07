@@ -20,6 +20,11 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 func ExampleIsEnvironmentArgument_true() {
@@ -93,4 +98,47 @@ func ExampleParseEnv_bad_fourth() {
 	fmt.Println(ParseEnv(bad, r))
 	// Output:
 	// [] [] false "..ENV" is not a valid key name: must not start with '..'
+}
+
+func TestParseEnvWithHashInStdin(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []v1.EnvVar
+	}{
+		{
+			name:  "hash in values is preserved",
+			input: "TOKEN=ab#cd\nDB_URL=postgres://u:p@h/db#x\n",
+			expected: []v1.EnvVar{
+				{Name: "TOKEN", Value: "ab#cd"},
+				{Name: "DB_URL", Value: "postgres://u:p@h/db#x"},
+			},
+		},
+		{
+			name:     "comment lines are skipped",
+			input:    "# leading comment\nTOKEN=value\n \t# indented comment\n",
+			expected: []v1.EnvVar{{Name: "TOKEN", Value: "value"}},
+		},
+		{
+			name:     "only a hash comment yields no env vars",
+			input:    "# ab=test",
+			expected: []v1.EnvVar{},
+		},
+		{
+			name:     "hash after the value is not a comment",
+			input:    "TOKEN=ab #cd\n",
+			expected: []v1.EnvVar{{Name: "TOKEN", Value: "ab #cd"}},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env, _, _, err := ParseEnv([]string{"-"}, strings.NewReader(tc.input))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expected, env); diff != "" {
+				t.Errorf("unexpected env vars (-want +got):\n%s", diff)
+			}
+		})
+	}
 }
