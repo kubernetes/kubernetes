@@ -1,0 +1,692 @@
+{
+  "SSA.accepted_valid": {
+    "title": "Accepted states satisfy the model invariant",
+    "scope": "guard",
+    "meaning": "Successful Apply implies the model's shape, required-value, and full-manager predicates.",
+    "limits": "This is the proposed item-core policy. Structural well-formedness is strengthened and has separate ancestor/no-scalar-descendant theorems."
+  },
+  "SSA.accepted_complete": {
+    "title": "Successful Apply leaves complete item ownership",
+    "scope": "guard",
+    "meaning": "Every accepted result passes the per-item full-manager check.",
+    "limits": "Completeness is an acceptance condition; this alone establishes no progress."
+  },
+  "SSA.every_surviving_item_has_full": {
+    "title": "Each surviving item has an individual full manager",
+    "scope": "guard",
+    "meaning": "For any item descriptor in the schema whose membership survives, there is one manager covering membership and the whole required core.",
+    "limits": "The witness is local to each associative-list item. It need not be the same manager at another level."
+  },
+  "SSA.rejected_is_atomic": {
+    "title": "Rejected requests retain the old state",
+    "scope": "guard",
+    "meaning": "The model's commit wrapper returns the original object and claims for any error.",
+    "limits": "This is a fact about the wrapper, not a proof of etcd transactionality."
+  },
+  "SSA.committed_valid": {
+    "title": "One committed transition preserves validity",
+    "scope": "guard",
+    "meaning": "From a valid state, either a successful valid result is committed or a rejected request retains the valid original.",
+    "limits": "Validity is the stated item-core predicate, before external admission or the additional object-scope policy."
+  },
+  "SSA.key_only_full": {
+    "title": "Key-only items: every membership claimant is full",
+    "scope": "definition",
+    "meaning": "When there are no required fields beyond the key, full ownership reduces exactly to membership ownership.",
+    "limits": "The key is carried by the item path. Last-claim deletion is also exercised by execution fixtures."
+  },
+  "SSA.required_branches_same_manager": {
+    "title": "One manager must cover all required branches",
+    "scope": "definition",
+    "meaning": "Covering a conjunction requires both branches to be covered by the same manager argument.",
+    "limits": "A coalition where A covers one branch and B another is insufficient."
+  },
+  "SSA.partial_cannot_directly_delete": {
+    "title": "Partial managers cannot authorize direct item deletion",
+    "scope": "definition",
+    "meaning": "The lifetime-deletion predicate is false when the departing actor was not full.",
+    "limits": "An item can still disappear when an ancestor is deleted."
+  },
+  "SSA.surviving_full_blocks_direct_deletion": {
+    "title": "Another full manager blocks direct deletion",
+    "scope": "definition",
+    "meaning": "A full owner remaining in the provisional state prevents the direct deletion rule from firing.",
+    "limits": "The provisional state is after ownership transfers. Ancestor deletion is a separate operation."
+  },
+  "SSA.subtree_frame": {
+    "title": "Values outside deleted subtrees are unchanged",
+    "meaning": "A cell outside every deletion root belongs to the result of dropSubtrees exactly when it belonged to the input.",
+    "limits": "This theorem concerns the subtree-deletion phase, not the whole Apply transition."
+  },
+  "SSA.claims_frame": {
+    "title": "Claims outside deleted subtrees are unchanged",
+    "meaning": "Subtree deletion preserves exactly the claims whose targets lie outside every removed subtree.",
+    "limits": "Ownership replacement, force, and pruning have separate obligations."
+  },
+  "SSA.candidate_preserves_unrelated_value": {
+    "title": "Unwritten, unreleased values survive",
+    "meaning": "An old scalar survives the candidate when the request neither overwrites nor releases it and no deletion root contains it.",
+    "limits": "The theorem has explicit no-overwrite, no-release, and lifetime-boundary premises."
+  },
+  "SSA.ancestor_deletion_dominates": {
+    "title": "Ancestor deletion removes descendants",
+    "meaning": "A cell below a selected deletion root is absent after subtree deletion.",
+    "limits": "A child's own full manager does not shield it from a deleted ancestor."
+  },
+  "SSA.owns_monotone": {
+    "title": "Adding claims preserves existing ownership",
+    "meaning": "A manager's existing claim survives any extension of the claim set.",
+    "limits": "This says nothing about transitions that remove or transfer claims."
+  },
+  "SSA.map_presence_monotone": {
+    "title": "Adding claims preserves map presence coverage",
+    "meaning": "Existing descendant-based map presence coverage remains true when claims are added."
+  },
+  "SSA.covers_monotone": {
+    "title": "Adding claims preserves required-core coverage",
+    "meaning": "Coverage is monotone for every recursively defined required core.",
+    "limits": "The proof inducts over the required core; schema changes are not included."
+  },
+  "SSA.full_monotone": {
+    "title": "Co-ownership cannot make a full owner partial",
+    "meaning": "Adding claims preserves both membership ownership and required-core coverage."
+  },
+  "SSA.Contracts.accepted_preserves_intent": {
+    "title": "Successful Apply preserves every asserted cell",
+    "meaning": "Every value, item, or presence marker written by a successful request is in the accepted result.",
+    "limits": "Inputs are normalized assertions. This is conditional on the first request succeeding.",
+    "sketch": "Normalization requires enclosing item membership. Written cells therefore lie outside deletion roots. The actor also keeps each written footprint, so release pruning cannot remove those cells."
+  },
+  "SSA.Contracts.accepted_actor_claims_exact": {
+    "title": "The actor's resulting footprint is exactly its intent",
+    "meaning": "A footprint is owned by the actor after success if and only if the request contains it.",
+    "limits": "This is the model's normalized footprint, including presence assertions not all represented by current SMD.",
+    "sketch": "Old actor claims are replaced. Every new desired claim is tied to a written cell, whose enclosing membership keeps it outside deleted subtrees."
+  },
+  "SSA.Contracts.foreign_change_conflicts": {
+    "title": "Changing a foreign-owned scalar conflicts",
+    "meaning": "A valid initial state and normalized request that changes a foreign-owned scalar are rejected with conflict when force is false.",
+    "limits": "This models Apply; Update and admission are outside the operation."
+  },
+  "SSA.Contracts.equal_writes_do_not_conflict": {
+    "title": "Unchanged assertions cannot create a conflict",
+    "meaning": "If all writes leave values unchanged, the conflict predicate is false regardless of their owners.",
+    "limits": "Other acceptance guards may still reject the request."
+  },
+  "SSA.Contracts.force_transfers_changed_claim": {
+    "title": "Force removes changed foreign value claims",
+    "meaning": "The ownership-update phase removes each foreign scalar claim overwritten with a changed value under force.",
+    "limits": "This is a phase theorem. Force does not bypass required-value or full-manager guards."
+  },
+  "SSA.Contracts.unchanged_foreign_claim_preserved": {
+    "title": "Equal-value assertions preserve co-ownership",
+    "meaning": "A foreign claim survives ownership updating when writes at its path do not change the value, including under force.",
+    "limits": "Later ancestor deletion can still remove the claim."
+  },
+  "SSA.Contracts.unwritten_foreign_claim_preserved": {
+    "title": "Unwritten foreign claims survive ownership updating",
+    "meaning": "A request preserves another actor's claim when it does not write at that path.",
+    "limits": "The conclusion concerns updatedClaims, before lifetime deletion."
+  },
+  "SSA.Contracts.shared_omission_preserves_value": {
+    "title": "Shared unclaiming preserves the old scalar",
+    "meaning": "An old scalar survives if a foreign owner remains, it is not overwritten, and no deletion root contains it.",
+    "limits": "The no-ancestor-deletion premise matters: the proposed lifetime rule can remove a whole item and its partial contributions."
+  },
+  "SSA.Contracts.exclusive_omission_removes_value": {
+    "title": "Exclusive unclaiming removes the scalar",
+    "meaning": "Omitting a scalar previously owned only by the actor removes that scalar from the candidate.",
+    "limits": "This is before defaulting. A later defaulter could supply a new API value."
+  },
+  "SSA.Contracts.accepted_nonforce_preserves_foreign_assertion": {
+    "title": "Successful non-forced assertions retain foreign values",
+    "meaning": "If a successful request without force writes a foreign-owned scalar, that write did not change its value.",
+    "limits": "It does not prevent lifetime deletion from removing foreign fields elsewhere."
+  },
+  "SSA.Contracts.handoff_preserves_full_successor": {
+    "title": "An already-full successor stays full during release",
+    "meaning": "Another actor's successful non-forced request preserves a full successor when none of the successor's claims is below a deletion root.",
+    "limits": "This proves release safety. Progress.unchanged_snapshot_acquisition separately proves fresh-manager acquisition under unchanged-snapshot preconditions."
+  },
+  "SSA.Contracts.finite_history_preserves_validity": {
+    "title": "Every finite committed history preserves validity",
+    "meaning": "Starting from a valid state, any finite request sequence ends in a valid committed state, including rejected requests.",
+    "limits": "Every prefix is also a finite history. This is safety, not availability or fairness.",
+    "sketch": "Induct over the request list. The one-step commit theorem preserves validity, so the induction hypothesis applies to the remaining requests."
+  },
+  "SSA.Contracts.accepted_reapply_writes_unchanged": {
+    "title": "The first accepted result already contains every write",
+    "meaning": "After one success, every write in the same request is unchanged relative to that result.",
+    "sketch": "Intent preservation supplies each written cell. Unique cell paths in accepted results rule out a second cell with different content."
+  },
+  "SSA.Contracts.accepted_reapply_has_no_conflicts": {
+    "title": "Immediate repetition has no ownership conflict",
+    "meaning": "After one successful Apply, repeating that request cannot trigger the conflict predicate.",
+    "limits": "The stronger final idempotence theorem also proves that all remaining guards accept."
+  },
+  "SSA.Contracts.accepted_reapply_candidate_fixed": {
+    "title": "The transition phases reach an exact fixed point",
+    "meaning": "Running the same request's merge, deletion, and pruning phases again produces exactly the accepted state, including internal list order.",
+    "sketch": "Exact actor claims imply no releases and no deletion roots. The first success establishes stable cell/claim list forms, so replacing the same writes and claims changes neither list."
+  },
+  "SSA.Contracts.accepted_apply_idempotent": {
+    "title": "Proposed core: repeating successful Apply returns the same state",
+    "meaning": "For every schema, state, and request: if the first Apply succeeds, the immediate repetition succeeds and returns exactly that result, even with force.",
+    "limits": "This proves the proposed item-core Apply, with no intervening operation. Scoped histories, Update and admission composition have separate theorems; arbitrary admission is not part of this idempotence result. The unrestricted current-SSA law is refuted by Counterexamples.raw_apply_is_not_unconditionally_idempotent and an actual CRD HTTP regression.",
+    "sketch": "First prove that repeated writes are unchanged and cannot conflict. Exact actor claims eliminate releases and lifetime deletion. Stable list forms give the same candidate. That unchanged state is already valid, so every acceptance guard succeeds."
+  },
+  "SSA.Contracts.repeated_apply_observationally_equal": {
+    "title": "Repeated Apply preserves values and ownership observations",
+    "meaning": "Two immediately repeated successful requests yield identical cell and claim membership observations.",
+    "limits": "This follows from the stronger exact-state idempotence result."
+  },
+  "SSA.Examples.all_fixtures_pass": {
+    "title": "Fourteen scenarios satisfy their assertions",
+    "meaning": "The kernel checks the recorded expectations across fourteen finite scenarios and 49 transitions.",
+    "limits": "These are concrete execution witnesses, not a general theorem covering every possible sequence."
+  },
+  "SSA.Examples.fragment_values_are_valid": {
+    "title": "The fragmented counterexample still has valid required values",
+    "meaning": "In this specific counterexample, all required values remain present despite fragmented ownership."
+  },
+  "SSA.Examples.fragment_has_no_full_manager": {
+    "title": "The same counterexample has no full manager",
+    "meaning": "Although the required values exist, neither actor individually covers the whole required core."
+  },
+  "SSA.Examples.unchecked_partial_omission_deletes_foreign_host": {
+    "title": "The reduced unsafe rule deletes a foreign host",
+    "meaning": "In the concrete fragmented state, the reduced PR-style deletion rule removes another actor's host field.",
+    "limits": "The unsafe rule is a countermodel, not a mechanically translated Go revision."
+  },
+  "SSA.Examples.corrected_apply_rejects_fragment": {
+    "title": "The proposed Apply rejects this fragmentation",
+    "meaning": "The specific request that fragments the required core returns orphanedItem."
+  },
+  "SSA.Examples.repeating_same_apply_is_idempotent": {
+    "title": "A concrete repeated Apply is unchanged",
+    "meaning": "The initial example request is idempotent in its concrete accepted state.",
+    "limits": "The Contracts module also contains a separate general idempotence theorem."
+  },
+  "SSA.Contracts.nodup_of_eraseDups_length": {
+    "scope": "helper",
+    "title": "Nodup of erasedups length"
+  },
+  "SSA.Contracts.cells_unique_by_path": {
+    "scope": "helper",
+    "title": "Cells unique by path"
+  },
+  "SSA.Contracts.valid_unique_paths": {
+    "scope": "helper",
+    "title": "Valid unique paths"
+  },
+  "SSA.Contracts.scalar_has_no_descendants": {
+    "title": "Scalars cannot have descendants",
+    "meaning": "A well-shaped state cannot store both a scalar at a path and another cell below it.",
+    "limits": "General structural result at arbitrary path depth; the root is an implicit object."
+  },
+  "SSA.Progress.unchanged_snapshot_acquisition": {
+    "title": "A fresh manager can acquire unchanged data",
+    "meaning": "A fresh manager applying a normalized snapshot of the existing data succeeds without changing the data or losing any old claim.",
+    "limits": "The requested sparse footprint is unchanged data, the initial state is valid, and the actor is fresh. External validators may still forbid acquisition. The normalized cell-list order must match the state; no arbitrary admission policy is included."
+  },
+  "SSA.Locality.full_manager_is_item_local": {
+    "title": "Full ownership is local to one item",
+    "meaning": "Agreement of all claims below an item gives the same full classification for that item.",
+    "limits": "The required core stays inside the item; arbitrary request commutativity is not asserted."
+  },
+  "SSA.accepted_objects_have_full_owner": {
+    "title": "Required-bearing objects retain a whole owner",
+    "meaning": "Successful scoped writes leave each existing required-bearing ordinary object with an individual full manager.",
+    "limits": "An acceptance-guard consequence; the separate sibling execution demonstrates successful progress and rejection.",
+    "scope": "guard"
+  },
+  "SSA.no_required_transition_equivalence": {
+    "title": "No required metadata means unchanged behavior",
+    "meaning": "For arbitrary finite states and requests, the PR and current wire transitions are equal if every item has an empty additional required core.",
+    "limits": "This concerns the modeled single-version wire modes; the bounded upstream comparisons check their implementation correspondence."
+  },
+  "SSA.explicit_map_shortcuts_required_children": {
+    "title": "The PR map-member shortcut bypasses required children",
+    "meaning": "Whenever an explicit map member exists but required-child coverage is missing, the PR classifier returns true while the strict classifier returns false.",
+    "limits": "This general classifier counterexample is also instantiated and run against the actual pinned upstream code.",
+    "scope": "definition"
+  },
+  "SSA.Boundary.accepted_satisfies_validator": {
+    "title": "Final states satisfy the selected validator",
+    "meaning": "Any accepted boundary result satisfies its old/new-state predicate after the mutator runs.",
+    "limits": "The validator is a function parameter. This is not a proof of the CEL or webhook interpreter.",
+    "scope": "guard"
+  },
+  "SSA.Boundary.validator_can_block_any_handoff": {
+    "title": "Arbitrary admission can forbid every handoff",
+    "meaning": "A validator returning false rejects any proposed handoff.",
+    "limits": "Full-owner invariants cannot alone guarantee liveness under arbitrary admission constraints."
+  },
+  "SSA.Counterexamples.pr_accepts_fragment_without_full_owner": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_partial_can_delete_foreign_required_branch": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_map_shortcut_retains_invalid_item": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.pr_required_list_owner_is_misclassified": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_objects_have_independent_roles": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_fragmentation_rejects_entire_request": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.Counterexamples.sibling_lifetime_deletion_preserves_other_full_owner": {
+    "scope": "execution",
+    "limits": "A kernel-checked finite witness. General locality, classifier and compatibility theorems are separate statements."
+  },
+  "SSA.check_objects_valid": {
+    "scope": "helper"
+  },
+  "SSA.checked_proposal": {
+    "scope": "helper"
+  },
+  "SSA.scoped_history_preserves_invariants": {
+    "title": "Mixed scoped histories preserve both invariants",
+    "meaning": "Every committed finite history of scoped Apply and Update retains valid item ownership and valid ordinary-object ownership.",
+    "limits": "A safety induction over the guarded operation; it includes rejections, but not storage concurrency or eventual success."
+  },
+  "SSA.Boundary.accepted_scoped_boundary": {
+    "title": "Post-admission state passes all three checks",
+    "meaning": "After mutation and validation, successful boundary results satisfy the item invariant, object-scope invariant, and the old/new validator.",
+    "limits": "This composes explicit function stages and a final guard. It does not verify interpreter implementations or Kubernetes stage wiring.",
+    "scope": "guard"
+  },
+  "SSA.accepted_scoped_valid": {
+    "scope": "guard"
+  },
+  "SSA.accepted_full_update_valid": {
+    "scope": "guard"
+  },
+  "SSA.Boundary.accepted_final_valid": {
+    "scope": "guard"
+  },
+  "SSA.Boundary.validation_rejection_is_atomic": {
+    "scope": "guard"
+  },
+  "SSA.granular_list_without_member_is_partial": {
+    "scope": "definition"
+  },
+  "SSA.current_key_only_last_claimant": {
+    "scope": "definition"
+  },
+  "SSA.no_required_retains_same_key": {
+    "scope": "definition"
+  },
+  "SSA.updater_keeps_membership": {
+    "scope": "definition",
+    "limits": "This is membership eligibility in the modeled PR classifier; the actual pruning passes and pinned Go comparisons are separate evidence."
+  },
+  "SSA.WireContracts.candidate_foreign_claim_exact": {
+    "title": "Exact final foreign-claim survival in raw SSA",
+    "meaning": "A foreign claim survives exactly when it existed before, its path exists after pruning, and the final comparison reports no modification at that path.",
+    "limits": "Current/PR normalized wire transition. This characterizes ownership updating; it does not prove the Go typed tree operations."
+  },
+  "SSA.WireContracts.accepted_nonforce_foreign_unchanged": {
+    "title": "Successful raw Apply does not modify a foreign final target",
+    "meaning": "For each original foreign owner and matching cell in the final pruned object, acceptance without force implies that comparison reports no modification.",
+    "limits": "This concerns surviving final targets. It does not assert that every foreign-owned target survives deletion or prove conversion/admission behavior."
+  },
+  "SSA.WireContracts.unchanged_snapshot_acquisition": {
+    "title": "Fresh snapshot acquisition in current and PR SSA",
+    "meaning": "A fresh actor can apply a normalized unchanged snapshot to any structurally valid state; the request succeeds, data stays unchanged, and all old claims remain alongside the new footprint.",
+    "limits": "No full-manager invariant is assumed. Snapshot equality includes the normalized cell-list order. It is not arbitrary edit progress or admission-constrained liveness."
+  },
+  "SSA.FieldsV1.root_roundtrip": {
+    "title": "Canonical FieldsV1 trie/object-grammar round trip",
+    "meaning": "At arbitrary finite depth, encoding and decoding preserve the canonical root trie, including leaf membership and membership shared with descendants.",
+    "limits": "The grammar begins after JSON and path-element parsing. Unique keys and nonempty child sets are premises; Go JSON bytes and parser correctness are not proved."
+  },
+  "SSA.SourceContracts.imported_dangling_matches_spec": {
+    "title": "Imported Go pruning source satisfies its outcome contract",
+    "meaning": "Executing the complete imported addBackDanglingItems AST returns the specified result for every object/error domain and every supplied primitive implementation, including all failure and missing-version branches.",
+    "limits": "One source function. The Go parser/importer and Go-subset semantics need review; conversion and typed operations are explicit pure-function parameters, not proved Go implementations. A semantic source mutation must invalidate this theorem."
+  },
+  "SSA.SourceContracts.source_dangling_refines_model": {
+    "title": "Imported source specializes to normalized final pruning",
+    "meaning": "With the normalized single-version primitives, the imported Go function computes exactly the model's dangling-field removal expression for arbitrary states and field sets.",
+    "limits": "The specialization does not prove that the Go implementations of those primitives refine the normalized definitions."
+  },
+  "SSA.SourceContracts.imported_owned_version_matches_spec": {
+    "title": "Imported per-version restoration covers all source exits",
+    "meaning": "The complete Go helper matches its contract, including both conversions, field-set errors, restoration and missing-version returns carrying the actual optional conversion result.",
+    "limits": "Successful conversion is non-nil in the primitive interface. Conversion and typed/set implementations remain explicit proof obligations."
+  },
+  "SSA.OwnedSource.imported_owned_items_matches_spec": {
+    "title": "Imported ownership restoration for any finite manager map",
+    "meaning": "The entire Go helper computes version grouping, restores the last-applied version first, then traverses every remaining version under any lawful permutation, propagating the exact success/error result.",
+    "limits": "Manager/version counts are arbitrary finite sizes. The per-version callee is an explicit contract; source semantics and primitive implementations still require their separate justification."
+  },
+  "SSA.PruneSource.imported_prune_matches_spec": {
+    "title": "Complete imported three-phase pruning orchestration",
+    "meaning": "The actual Go AST short-circuits nil/empty last sets, performs initial conversion and removal, invokes ownership and dangling restoration in order, propagates all errors, and performs the final actor-version conversion.",
+    "limits": "Requires the actor entry installed by Apply. Callees and typed/conversion primitives are explicit contracts; this theorem alone does not discharge them."
+  },
+  "SSA.PruningRefinement.single_version_pruning_refinement": {
+    "title": "All four source functions compose in the single-version model",
+    "meaning": "For arbitrary states, field sets and finite manager counts, the imported pruning function equals the normalized three-pass model, with callee-realization witnesses proved from all three other imported functions.",
+    "limits": "All managers share the last-applied API version, and the actor entry exists. Typed/set primitives are normalized definitions; their actual Go implementations are not proved by this composition result."
+  },
+  "SSA.PruningRefinement.linked_restore_preserves_objects": {
+    "title": "Model restoration never falls into nullable-input recovery",
+    "meaning": "Every finite restoration schedule under the identity-conversion primitives succeeds with two present object values.",
+    "limits": "This is a non-vacuity and call-domain result for the normalized primitive instance, not a claim about arbitrary external Go converters."
+  },
+  "SSA.FieldPathSet.paths_membership": {
+    "title": "Trie normalization preserves every membership claim",
+    "meaning": "For arbitrary finite tries and paths, flat path membership is equivalent to recursive trie membership, preserving the distinction between direct membership and descendants.",
+    "limits": "This proves the normalization relation, not Go JSON-byte parsing or sorting implementation correctness."
+  },
+  "SSA.pruning_pipeline_formula": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_assign": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_branch": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_range": {
+    "scope": "definition"
+  },
+  "SSA.GoSubset.exec_declare_error": {
+    "scope": "definition"
+  },
+  "SSA.Counterexamples.raw_apply_is_not_unconditionally_idempotent": {
+    "title": "Current SSA: immediate data idempotence is false",
+    "meaning": "A owns a nonempty associative list. Applying an empty list first removes the field; the identical request then creates the empty list. These accepted transitions refute the universal immediate-idempotence proposition.",
+    "limits": "A concrete counterexample, also reproduced on both pinned SMD revisions and through CRD HTTP. This does not refute every conditional idempotence law.",
+    "sketch": "Instantiate the universal law with the populated state and empty-list request. The first transition succeeds. Kernel evaluation of its repetition yields different cells, contradicting equality."
+  },
+  "SSA.Counterexamples.required_list_retries_never_empty_the_list": {
+    "scope": "general",
+    "title": "Presence validation blocks every finite number of identical retries",
+    "meaning": "The empty-list request is valid as data, but its first pruned proposal lacks the required field. Validation rejects it atomically. Induction proves that every finite retry count leaves the original populated state unchanged.",
+    "limits": "The chosen policy checks list presence with no mutation or defaulting. Real OpenAPI required and CEL has(self.endpoints) are additionally exercised through HTTP; their interpreters are not generally formalized."
+  },
+  "SSA.RawSourceCounterexamples.imported_pruning_loses_explicit_empty_list": {
+    "title": "Imported Go pruning reproduces the empty-list loss",
+    "meaning": "The source-bound four-function pruning chain returns the state without the explicitly applied empty list, with all callees realized under every lawful map-iteration schedule.",
+    "limits": "Concrete normalized object/field-set primitives. Their actual Go implementations remain a separate proof obligation; Go comparisons and the HTTP regression supply implementation evidence."
+  },
+  "SSA.bootstrap_preserves_data": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_keeps_nonempty_manager_map": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_from_empty_claims": {
+    "scope": "definition"
+  },
+  "SSA.bootstrap_creates_update_claims": {
+    "scope": "definition"
+  },
+  "SSA.Counterexamples.raw_apply_is_not_presence_idempotent": {
+    "title": "Even application-data presence changes on immediate repetition",
+    "meaning": "The current-SSA counterexample refutes the universal law that every field has the same container presence after the first and second identical accepted Apply.",
+    "limits": "This is independent of metadata, timestamps and internal list ordering. The concrete trace is also checked through the CRD HTTP API."
+  },
+  "SSA.Counterexamples.default_wrapper_bootstraps_empty_list_owner": {
+    "title": "The default wrapper creates an Update owner on the third Apply",
+    "meaning": "With no remaining claims, Update-from-empty initialization gives before-first-apply a presence claim on the existing empty list. The identical Apply retains that foreign Update claim.",
+    "limits": "A concrete proof in the separate bootstrap model, matched by NewSkipNonAppliedManager and HTTP/etcd execution. This is not a general source-refinement theorem for the default manager stack."
+  },
+  "SSA.Counterexamples.default_wrapper_fourth_apply_is_fixed": {
+    "title": "The fourth Apply preserves the bootstrapped data and claims",
+    "meaning": "The nonempty Update-manager map suppresses reinitialization; the repeated request returns the same modeled data and claims.",
+    "limits": "Concrete ownership/data fixed point. ResourceVersion stability is observed separately in the real HTTP test."
+  },
+  "SSA.ContainerCounterexamples.empty_map_first_apply_creates_null": {
+    "title": "SSA-02: explicit empty-map intent becomes null while its claim survives",
+    "meaning": "A releases the last granular-map child by applying an empty map. The accepted raw result is null, with A still holding the requested map-presence claim.",
+    "limits": "Concrete normalized trace, reproduced by managedfields, both pinned SMD revisions and CRD HTTP. Map presence is already claimed, so a missing collection marker does not explain this case."
+  },
+  "SSA.ContainerCounterexamples.nonnullable_map_retries_never_empty": {
+    "scope": "general",
+    "title": "Optional non-nullable maps fail after every finite retry count",
+    "meaning": "The validator permits an absent settings field or an object. The first Apply instead produces null and is rejected atomically. Induction proves that every finite number of identical requests preserves the populated map.",
+    "limits": "No required-field premise. The object-or-absent policy is explicit; the actual optional non-nullable CRD schema independently reproduces the failure through HTTP."
+  },
+  "SSA.ContainerCounterexamples.empty_map_can_conflict_with_identical_previous_intent": {
+    "title": "An identical empty-map intent conflicts until the first actor repairs null",
+    "meaning": "After A applies an empty map and stores null, B conflicts when applying the same empty-map intent. A repeats its request, creating the actual empty object; B can then co-own it without force.",
+    "limits": "The stored value before B’s failure is null, not the intended empty object. This is a downstream effect of lost intent, rather than a counterexample to conflict-free acquisition of equal stored values."
+  },
+  "SSA.ContainerCounterexamples.imported_pruning_creates_null": {
+    "title": "The imported four-function pruning chain creates the null map",
+    "meaning": "The source-bound pruning composition produces the null result, with all callees realized and every lawful version-map schedule.",
+    "limits": "Concrete object/field-set instance with normalized typed/set primitives. Actual Go and HTTP results independently confirm the trace; a universal primitive refinement is still separate."
+  },
+  "SSA.ContainerCounterexamples.empty_object_default_repairs_this_proposal": {
+    "title": "A specific empty-object default repairs the unexpected null",
+    "meaning": "The explicit post-pruning mutation replaces null with the empty map before type validation. The resulting state equals A’s repaired second raw result.",
+    "limits": "Concrete mutator and trace. The real HTTP test checks the matching CRD default; this theorem does not formalize arbitrary defaulting programs."
+  },
+  "SSA.ContainerCounterexamples.empty_map_null_for_every_scalar_payload": {
+    "scope": "general",
+    "title": "The empty-map failure is independent of the removed scalar payload",
+    "meaning": "For every encoded scalar value at settings.left, replacing the populated granular map with the same empty-map intent yields the identical null result and retained map claim.",
+    "limits": "One map/child shape in the raw transition, arbitrary scalar text. The concrete witness uses the same JSON string encoding as the Go adapter. This is not a universal Go primitive refinement."
+  },
+  "SSA.owns_member_of_owns": {
+    "scope": "definition"
+  },
+  "SSA.direct_value_member_covers_containers": {
+    "scope": "definition",
+    "title": "The raw PR counts a direct null member for maps and lists",
+    "meaning": "An explicit null claim has a value tag in the normalized model but only a direct path member on the wire. The PR classifier counts that member for required maps and lists.",
+    "limits": "This concerns ownership classification. Null validity depends on the API schema; the stronger nullable-container policy has a separate schema-mapping obligation."
+  },
+  "SSA.Counterexamples.pr_explicit_null_list_has_direct_membership": {
+    "title": "Explicit null retains membership that an empty granular list lacks",
+    "meaning": "A supplies a required children field as null. Its direct member causes the actual PR to retain A’s item when partial B leaves. The same trace matches both pinned revisions.",
+    "limits": "A contrasting ownership control that corrected a model mismatch. API admission may reject null; no nullable-schema validity theorem is asserted here."
+  },
+  "SSA.WireContracts.accepted_candidate": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.accepted_cells": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.wire_merge_existing_cell": {
+    "scope": "helper"
+  },
+  "SSA.WireContracts.foreign_change_conflicts": {
+    "title": "Changing a foreign final target conflicts without force",
+    "meaning": "For either raw mode, a structurally valid initial state and a normalized non-forced request, any modified final cell with an original foreign owner forces the conflict result.",
+    "limits": "The comparison is against the final pruned data. A removed target is a separate case. Typed comparison and Go updater refinement remain open."
+  },
+  "SSA.WireContracts.forced_accepts_valid_candidate": {
+    "title": "Force admits a structurally valid raw candidate",
+    "meaning": "A normalized forced request from a valid initial shape succeeds if its final candidate has valid shape, regardless of ownership conflicts.",
+    "limits": "Current/PR model theorem, before API defaulting or admission. Force does not bypass schema, CEL or webhook validation."
+  },
+  "SSA.WireContracts.accepted_foreign_claim_exact": {
+    "title": "Exact foreign ownership after raw Apply",
+    "meaning": "An original foreign claim survives precisely when its final path remains and no final cell at that path is modified by the typed comparison.",
+    "limits": "Arbitrary finite normalized raw states in either mode. This characterizes final ownership, not just a provisional ownership phase; Go primitives and the updater still require refinement."
+  },
+  "SSA.WireContracts.force_transfers_changed_claim": {
+    "title": "A changed final target loses its old foreign claims",
+    "meaning": "After successful raw Apply, an old foreign claim cannot remain on a final target whose typed value changed.",
+    "limits": "Current/PR transition. Without force such a request conflicts; the acceptance premise allows this transfer law to apply after a successful forced change."
+  },
+  "SSA.WireContracts.unchanged_foreign_claim_preserved": {
+    "title": "Equal final values preserve foreign co-ownership",
+    "meaning": "An original foreign claim survives a successful raw Apply when its target path remains and the typed comparison reports no modification there, including with force enabled.",
+    "limits": "Final values are compared to stored values. Equal request payloads alone do not satisfy this premise if pruning changes their result."
+  },
+  "SSA.WireContracts.removed_foreign_claim_dropped": {
+    "title": "A removed target loses its foreign claim",
+    "meaning": "A successful raw Apply cannot leave an original foreign claim whose target path has disappeared.",
+    "limits": "This is ownership cleanup, not permission to delete foreign data. The cause and legality of the removal require separate properties."
+  },
+  "SSA.ContainerCounterexamples.null_member_survives_a_new_map_child": {
+    "scope": "general",
+    "title": "A claim acquired from null survives a new map child",
+    "meaning": "For every encoded scalar payload, B can add a map child while the direct member A acquired from null remains at the map path.",
+    "limits": "One fixed map/child shape and manager pair. Actual Go controls cover both maps and lists; the empty-map alternative conflicts. This corrects a model discrepancy rather than identifying another SSA bug."
+  },
+  "SSA.HandoffCounterexamples.update_acquires_child_without_item": {
+    "title": "Update acquires a child without acquiring its item",
+    "meaning": "Starting from A’s Apply, B’s Update takes ownership of the changed host leaf. A retains item membership, which B never acquires.",
+    "limits": "Concrete reachable history; actual Go and HTTP ownership assertions reproduce both operation flags and the distinct claims."
+  },
+  "SSA.HandoffCounterexamples.unrestricted_foreign_omission_safety_is_false": {
+    "title": "Foreign scalar ownership alone cannot guarantee handoff safety",
+    "meaning": "A’s non-forced omission removes an Update-owned scalar belonging to B when A releases the containing item. The request writes no value at B’s path. This refutes unrestricted BASE-07.",
+    "limits": "The statement intentionally has no item-lifetime premise. Conditional shared-omission and full-successor theorems retain theirs. Nullable HTTP accepts the deletion; non-nullable HTTP rejects its null result."
+  },
+  "SSA.HandoffCounterexamples.nonnullable_list_omission_retries_fail": {
+    "scope": "general",
+    "title": "Non-nullable list omission fails after every retry count",
+    "meaning": "Induction proves that every finite repetition preserves the pre-omission state under the explicit list-or-absent validator, because pruning proposes null.",
+    "limits": "One Apply/Update history, arbitrary finite retry count. Real HTTP checks optional non-nullable and nullable list schemas, including unchanged data, ownership and resourceVersion on rejection."
+  },
+  "SSA.HandoffCounterexamples.imported_pruning_removes_update_child": {
+    "title": "Imported pruning removes the Update-owned child",
+    "meaning": "The complete four-function pruning chain produces the item-removal proposal under every lawful manager-version schedule, with every callee realized.",
+    "limits": "Concrete same-version object/field-set witness using normalized typed/set primitives. Final foreign-claim cleanup and HTTP validation are separate checked stages."
+  },
+  "SSA.ApplySource.imported_apply_matches_spec": {
+    "title": "Complete imported Apply control flow",
+    "scope": "general",
+    "meaning": "The complete Go Apply body agrees with an independently factored specification for every explicit primitive outcome.",
+    "limits": "Merge, extraction, reconciliation, pruning and final update remain callbacks. Successful callback objects are non-nil, logical managed maps allocated, and alias side effects absent; this is not an end-to-end Go refinement theorem."
+  },
+  "SSA.ApplySource.imported_apply_success_iff": {
+    "title": "Characterize every returned Apply result",
+    "scope": "helper",
+    "meaning": "A returned source-interpreter result is exactly a result of the independent Apply specification, including nil on a data no-op.",
+    "limits": "Derived from the complete control-flow theorem and inherits its primitive contracts."
+  },
+  "SSA.ApplySource.imported_apply_excludes_reset_fields": {
+    "title": "Configured reset roots stay outside actor ownership",
+    "scope": "general",
+    "meaning": "With the stated prefix filter, every descendant of every reset root is absent from the final actor field set.",
+    "limits": "Conditional on UpdateDoesNotGrowActor for the final updater callback and correct Go realization of the configured filter. Neither remaining implementation obligation is assumed closed."
+  },
+  "SSA.ResetFields.filter_membership": {
+    "title": "Prefix-filter membership",
+    "scope": "general",
+    "meaning": "A path survives precisely when it belonged to the input and no reset root prefixes it.",
+    "limits": "Normalized finite field sets; JSON bytes and actual Go recursive exclusion still require refinement."
+  },
+  "SSA.ResetFields.filter_excludes_descendants": {
+    "title": "Reset exclusion reaches all depths",
+    "scope": "general",
+    "meaning": "No direct reset root or descendant can survive prefix filtering.",
+    "limits": "Arbitrary finite roots and paths; prefix filtering is distinct from ordinary field-set Difference."
+  },
+  "SSA.ResetFields.filter_is_idempotent": {
+    "title": "Reset filtering is idempotent",
+    "scope": "general",
+    "meaning": "Filtering the same field set twice with the same reset roots produces the same list.",
+    "limits": "This is a filter law, not SSA Apply idempotence."
+  },
+  "SSA.ResetFields.filter_preserves_other_top_field": {
+    "title": "Unrelated root membership is retained",
+    "scope": "general",
+    "meaning": "Filtering one named top-level root leaves membership under any different top-level root unchanged, at every finite depth.",
+    "limits": "This explains why spec/metadata exclusion cannot remove a valid settings root."
+  },
+  "SSA.ResetFields.flat_filter_refines_trie": {
+    "title": "Flat reset filter matches trie selection",
+    "scope": "general",
+    "meaning": "Filtered normalized path membership equals recursively selected trie membership.",
+    "limits": "Membership refinement only; empty structural nodes and wire serialization are separate."
+  },
+  "SSA.ResetFields.installed_actor_excludes_reset": {
+    "title": "Installing filtered claims excludes reset fields",
+    "scope": "general",
+    "meaning": "Replacing the actor entry with the filtered extracted set cannot install a reset root or descendant.",
+    "limits": "Concerns installation; the later updater stage requires the separate non-growth premise."
+  },
+  "SSA.ResetFields.update_preserves_reset_exclusion": {
+    "title": "Non-growing update preserves reset exclusion",
+    "scope": "general",
+    "meaning": "An update stage that never grows the actor field set preserves installed prefix exclusion.",
+    "limits": "ActorDoesNotGrow is the remaining local callback contract, not a premise about the entire Apply result."
+  },
+  "SSA.ResetCounterexamples.restoration_preserves_nonstatus_data": {
+    "title": "Status restoration retains every other data cell",
+    "scope": "general",
+    "meaning": "For arbitrary before/proposal states, restoring non-status fields preserves every non-status cell exactly.",
+    "limits": "A normalized REST restoration model. Claims intentionally remain from the proposal; the full Go REST strategy is not imported."
+  },
+  "SSA.ResetCounterexamples.broad_status_reset_contract_is_false": {
+    "title": "Refute ownership exclusion for every REST-reset field",
+    "scope": "execution",
+    "meaning": "A reachable fresh status actor acquires an unchanged settings claim, despite the status strategy restoring every non-status data field.",
+    "limits": "The actual CRD HTTP test independently reproduces the claim and subsequent conflict. This refutes BASE-12b, not conventional spec/status exclusion."
+  },
+  "SSA.ResetCounterexamples.status_acquires_a_reset_field": {
+    "title": "Status can claim a restored settings field",
+    "scope": "execution",
+    "meaning": "The concrete co-ownership request leaves settings unchanged but installs the status actor claim.",
+    "limits": "The API test uses the same literal manager name on main and status; the inner model uses distinct logical identities."
+  },
+  "SSA.ResetCounterexamples.status_claim_blocks_regular_apply": {
+    "title": "The restored-field claim causes a later conflict",
+    "scope": "execution",
+    "meaning": "The original main actor cannot change settings without force once the status actor co-owns it; rejection preserves the state.",
+    "limits": "HTTP GET additionally checks unchanged stored ownership and resourceVersion."
+  },
+  "SSA.ResetCounterexamples.imported_apply_installs_nonstatus_claim": {
+    "title": "Complete imported Apply installs the unwanted claim",
+    "scope": "execution",
+    "meaning": "A concrete normalized primitive instance of the imported Apply body installs settings ownership because the configured roots omit settings.",
+    "limits": "Merge and final update are explicit normalized primitive instances. The real HTTP test is independent evidence, not their general refinement proof."
+  },
+  "SSA.ResetCounterexamples.imported_prune_callback_is_realized": {
+    "title": "Realize fresh status actor pruning in source",
+    "scope": "execution",
+    "meaning": "The imported prune body returns directly when the fresh status actor has no last-applied set.",
+    "limits": "Closes this concrete pruning callback only, not the merge or final updater callbacks."
+  },
+  "SSA.ElementDifference.difference_membership": {
+    "title": "Two-pointer difference has exact set membership",
+    "scope": "general",
+    "meaning": "For every finite pair of sorted input lists, an element survives exactly when it occurs on the left and not on the right.",
+    "limits": "Requires the explicit strict-total-order laws. The functional algorithm is connected to the imported Go method by imported_difference_matches."
+  },
+  "SSA.ElementDifference.difference_sublist": {
+    "title": "Difference preserves left-input order and uniqueness",
+    "scope": "general",
+    "meaning": "For any comparator and finite inputs, the output is a sublist of the left input.",
+    "limits": "This is an algorithm theorem; sortedness and uniqueness are inherited when present, rather than assumed for every possible input."
+  },
+  "SSA.ElementDifference.imported_difference_matches": {
+    "title": "Complete imported Go element-set difference",
+    "scope": "general",
+    "meaning": "The complete PathElementSet.Difference AST executes successfully and equals the independently factored two-pointer algorithm for every finite input pair, using a linear fuel bound.",
+    "limits": "The typed interpreter models non-nil input sets, fresh output slices, pure element comparisons and bounded index access. Parser/subset semantics need human review; comparison semantics and the Go compiler/runtime are outside this theorem."
+  },
+  "SSA.ElementDifference.imported_difference_membership": {
+    "title": "Go source computes exact membership difference",
+    "scope": "general",
+    "meaning": "On finite sorted inputs under strict-total-order comparator laws, every returned element belongs precisely to the left input and not to the right input.",
+    "limits": "The actual PathElement.Less/Compare implementation remains a refinement obligation. This is the element component, not the full recursive Set or reset filter."
+  },
+  "SSA.ElementDifference.imported_difference_preserves_order": {
+    "title": "Go element-set result remains sorted",
+    "scope": "general",
+    "meaning": "Whenever the left input is sorted, the imported method returns a sorted list; no ordering premise on the right input is needed for this preservation fact.",
+    "limits": "Exact difference membership still needs both inputs sorted and the comparator laws. Full recursive set composition remains open."
+  }
+}
