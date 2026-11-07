@@ -3790,11 +3790,13 @@
     endpoint: /metrics
 - name: evictions
   subsystem: kubelet
-  help: Cumulative number of pod evictions by eviction signal
+  help: Cumulative number of pod evictions by eviction signal and eviction type (hard
+    or soft). Local storage limit evictions are counted as hard.
   type: Counter
   stabilityLevel: ALPHA
   labels:
   - eviction_signal
+  - eviction_type
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics

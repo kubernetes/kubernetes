@@ -549,15 +549,16 @@ var (
 		[]string{"operation_type"},
 	)
 	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
-	// Broken down by eviction signal.
+	// Broken down by eviction signal and eviction type (hard or soft). Local storage limit
+	// evictions, which always use an immediate grace period, are counted as hard.
 	Evictions = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           EvictionsKey,
-			Help:           "Cumulative number of pod evictions by eviction signal",
+			Help:           "Cumulative number of pod evictions by eviction signal and eviction type (hard or soft). Local storage limit evictions are counted as hard.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"eviction_signal"},
+		[]string{"eviction_signal", "eviction_type"},
 	)
 	// EvictionStatsAge is a Histogram that tracks the time (in seconds) between when stats are collected and when a pod is evicted
 	// based on those stats. Broken down by eviction signal.
