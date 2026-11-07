@@ -51239,7 +51239,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref common.Ref
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+				Description: "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status has a Complete or Failed condition, the request will not be reprocessed. Users should delete and recreate requests to get updated information.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -51272,7 +51272,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref common.Ref
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "status is populated by the controller with the calculated pool status. When status is non-nil, the request is considered complete and the entire object becomes immutable.",
+							Description: "status is populated by the controller with the calculated pool status. While pools are still being published, the controller may first set a status with only a WaitingForPools condition. Once status has a Complete or Failed condition, the entire object becomes immutable.",
 							Ref:         ref(v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -51423,7 +51423,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "conditions provide information about the state of the request. A condition with type=Complete or type=Failed will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+							Description: "conditions provide information about the state of the request. The final status always has a condition with type=Complete or type=Failed. Before that, a status with only WaitingForPools=True may be set; its poolCount is 0 and pools is empty.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed - \"WaitingForPools\": True while the controller waits for incomplete pools",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51493,14 +51493,14 @@ func schema_k8sio_api_resource_v1alpha3_ShareableSummaryStatus(ref common.Refere
 				Properties: map[string]spec.Schema{
 					"fullyAvailableDevices": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fullyAvailableDevices is the number of shareable devices with no capacity consumed.",
+							Description: "fullyAvailableDevices is the number of shareable devices with no allocation other than for admin access.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
 					},
 					"partiallyAvailableDevices": {
 						SchemaProps: spec.SchemaProps{
-							Description: "partiallyAvailableDevices is the number of shareable devices with some but not all capacity consumed.",
+							Description: "partiallyAvailableDevices is the number of shareable devices with at least one allocation other than for admin access, regardless of remaining capacity.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

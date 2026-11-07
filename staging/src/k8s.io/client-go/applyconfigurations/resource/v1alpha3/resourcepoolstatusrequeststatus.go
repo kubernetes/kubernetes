@@ -37,12 +37,14 @@ type ResourcePoolStatusRequestStatusApplyConfiguration struct {
 	// When omitted, no pools matched the request filters.
 	Pools []PoolStatusApplyConfiguration `json:"pools,omitempty"`
 	// conditions provide information about the state of the request.
-	// A condition with type=Complete or type=Failed will always be set
-	// when the status is populated.
+	// The final status always has a condition with type=Complete or
+	// type=Failed. Before that, a status with only WaitingForPools=True may
+	// be set; its poolCount is 0 and pools is empty.
 	//
 	// Known condition types:
 	// - "Complete": True when the request has been processed successfully
 	// - "Failed": True when the request could not be processed
+	// - "WaitingForPools": True while the controller waits for incomplete pools
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
