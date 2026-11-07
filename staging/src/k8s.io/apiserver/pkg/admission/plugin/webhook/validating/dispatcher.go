@@ -227,6 +227,11 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 		}(relevantHooks[i], i)
 	}
 	wg.Wait()
+	if wd, ok := endpointsrequest.LatencyTrackersFrom(ctx); ok {
+		if rc, ok := wd.ValidatingWebhookTracker.(endpointsrequest.RoundCommitter); ok {
+			rc.CommitRound()
+		}
+	}
 	close(errCh)
 
 	var errs []error
