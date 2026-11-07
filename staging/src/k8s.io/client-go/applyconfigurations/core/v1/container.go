@@ -164,6 +164,18 @@ type ContainerApplyConfiguration struct {
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	SecurityContext *SecurityContextApplyConfiguration `json:"securityContext,omitempty"`
+	// hostCgroupNamespace specifies whether the container uses the host's cgroup namespace.
+	// If true, the container shares the cgroup namespace with the host, so cgroups
+	// other than the container's own cgroup are visible to the container.
+	// If false, a new cgroup namespace rooted at the container's own cgroup is created
+	// for the container.
+	// If unset, the default behavior of the container runtime is used.
+	// Must not be set to true when the pod uses user namespaces (spec.hostUsers is false).
+	// Must not be set when spec.os.name is windows.
+	// The runtime handler must support cgroup namespaces, otherwise the container will
+	// fail to start.
+	// Cannot be updated.
+	HostCgroupNamespace *bool `json:"hostCgroupNamespace,omitempty"`
 	// stdin indicates whether this container should allocate a buffer for stdin in the container runtime. If this
 	// is not set, reads from stdin in the container will always result in EOF.
 	// Default is false.
@@ -399,6 +411,14 @@ func (b *ContainerApplyConfiguration) WithImagePullPolicy(value corev1.PullPolic
 // If called multiple times, the SecurityContext field is set to the value of the last call.
 func (b *ContainerApplyConfiguration) WithSecurityContext(value *SecurityContextApplyConfiguration) *ContainerApplyConfiguration {
 	b.SecurityContext = value
+	return b
+}
+
+// WithHostCgroupNamespace sets the HostCgroupNamespace field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostCgroupNamespace field is set to the value of the last call.
+func (b *ContainerApplyConfiguration) WithHostCgroupNamespace(value bool) *ContainerApplyConfiguration {
+	b.HostCgroupNamespace = &value
 	return b
 }
 

@@ -4428,6 +4428,90 @@ func TestDropEmptyDirVolumeMode(t *testing.T) {
 	}
 }
 
+func TestDropHostCgroupNamespace(t *testing.T) {
+	podWithHostCgroupNamespace := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers:      []api.Container{{Name: "init", HostCgroupNamespace: new(false)}},
+				Containers:          []api.Container{{Name: "ctr", HostCgroupNamespace: new(true)}},
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "eph", HostCgroupNamespace: new(true)}}},
+			},
+		}
+	}
+	podWithoutHostCgroupNamespace := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				InitContainers:      []api.Container{{Name: "init"}},
+				Containers:          []api.Container{{Name: "ctr"}},
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "eph"}}},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasField    bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "pod with hostCgroupNamespace",
+			hasField:    true,
+			pod:         podWithHostCgroupNamespace,
+		},
+		{
+			description: "pod without hostCgroupNamespace",
+			hasField:    false,
+			pod:         podWithoutHostCgroupNamespace,
+		},
+		{
+			description: "is nil",
+			hasField:    false,
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasField, oldPod := oldPodInfo.hasField, oldPodInfo.pod()
+				newPodHasField, newPod := newPodInfo.hasField, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, enabled)
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasField:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasField:
+						if exp := podWithoutHostCgroupNamespace(); !reflect.DeepEqual(newPod, exp) {
+							t.Errorf("new pod had hostCgroupNamespace but should have been stripped: %v", cmp.Diff(newPod, exp))
+						}
+					default:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestDropVolumeBindMountOptions(t *testing.T) {
 	podWithBindMountOptions := func() *api.Pod {
 		return &api.Pod{

@@ -171,7 +171,8 @@
         "name": "nameValue",
         "features": {
           "recursiveReadOnlyMounts": true,
-          "userNamespaces": true
+          "userNamespaces": true,
+          "cgroupNamespaces": true
         }
       }
     ],

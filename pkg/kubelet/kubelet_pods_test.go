@@ -10506,3 +10506,64 @@ func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckCgroupNamespaceSupport(t *testing.T) {
+	testCases := []struct {
+		name         string
+		gateEnabled  bool
+		handlers     []kubecontainer.RuntimeHandler
+		hostCgroupNS *bool
+		expectedErr  string
+	}{
+		{
+			name:         "unset",
+			gateEnabled:  true,
+			handlers:     []kubecontainer.RuntimeHandler{{Name: ""}},
+			hostCgroupNS: nil,
+		},
+		{
+			name:         "supported",
+			gateEnabled:  true,
+			handlers:     []kubecontainer.RuntimeHandler{{Name: "", SupportsCgroupNamespaces: true}},
+			hostCgroupNS: new(true),
+		},
+		{
+			name:         "unsupported",
+			gateEnabled:  true,
+			handlers:     []kubecontainer.RuntimeHandler{{Name: "", SupportsCgroupNamespaces: false}, {Name: "other", SupportsCgroupNamespaces: true}},
+			hostCgroupNS: new(false),
+			expectedErr:  `container "ctr" specifies hostCgroupNamespace, but the runtime handler "" does not support cgroup namespaces`,
+		},
+		{
+			name:         "runtime does not report handlers",
+			gateEnabled:  true,
+			handlers:     nil,
+			hostCgroupNS: new(true),
+			expectedErr:  `container "ctr" specifies hostCgroupNamespace, but the runtime handler "" does not support cgroup namespaces`,
+		},
+		{
+			name:         "gate disabled",
+			gateEnabled:  false,
+			handlers:     []kubecontainer.RuntimeHandler{{Name: ""}},
+			hostCgroupNS: new(true),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, tc.gateEnabled)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kl.runtimeState.setRuntimeHandlers(tc.handlers)
+
+			container := v1.Container{Name: "ctr", HostCgroupNamespace: tc.hostCgroupNS}
+			pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{container}}}
+			err := kl.checkCgroupNamespaceSupport(pod, &container)
+			if tc.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.expectedErr)
+			}
+		})
+	}
+}

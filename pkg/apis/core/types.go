@@ -2940,6 +2940,20 @@ type Container struct {
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// +optional
 	SecurityContext *SecurityContext
+	// HostCgroupNamespace specifies whether the container uses the host's cgroup namespace.
+	// If true, the container shares the cgroup namespace with the host, so cgroups
+	// other than the container's own cgroup are visible to the container.
+	// If false, a new cgroup namespace rooted at the container's own cgroup is created
+	// for the container.
+	// If unset, the default behavior of the container runtime is used.
+	// Must not be set to true when the pod uses user namespaces (spec.hostUsers is false).
+	// Must not be set when spec.os.name is windows.
+	// The runtime handler must support cgroup namespaces, otherwise the container will
+	// fail to start.
+	// Cannot be updated.
+	// +featureGate=CgroupNamespacesSupport
+	// +optional
+	HostCgroupNamespace *bool
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
@@ -4808,6 +4822,20 @@ type EphemeralContainerCommon struct {
 	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// +optional
 	SecurityContext *SecurityContext
+	// HostCgroupNamespace specifies whether the container uses the host's cgroup namespace.
+	// If true, the container shares the cgroup namespace with the host, so cgroups
+	// other than the container's own cgroup are visible to the container.
+	// If false, a new cgroup namespace rooted at the container's own cgroup is created
+	// for the container.
+	// If unset, the default behavior of the container runtime is used.
+	// Must not be set to true when the pod uses user namespaces (spec.hostUsers is false).
+	// Must not be set when spec.os.name is windows.
+	// The runtime handler must support cgroup namespaces, otherwise the container will
+	// fail to start.
+	// Cannot be updated.
+	// +featureGate=CgroupNamespacesSupport
+	// +optional
+	HostCgroupNamespace *bool
 
 	// Variables for interactive containers, these have very specialized use-cases (e.g. debugging)
 	// and shouldn't be used for general purpose containers.
@@ -5917,6 +5945,11 @@ type NodeRuntimeHandlerFeatures struct {
 	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
 	// +optional
 	UserNamespaces *bool
+	// CgroupNamespaces is set to true if the runtime handler supports specifying
+	// whether to use the host cgroup namespace for privileged and non-privileged containers.
+	// +featureGate=CgroupNamespacesSupport
+	// +optional
+	CgroupNamespaces *bool
 }
 
 // NodeRuntimeHandler is a set of runtime handler information.

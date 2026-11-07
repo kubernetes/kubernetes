@@ -462,6 +462,9 @@ func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 					UserNamespaces:          &h.SupportsUserNamespaces,
 				},
 			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) {
+				node.Status.RuntimeHandlers[i].Features.CgroupNamespaces = &h.SupportsCgroupNamespaces
+			}
 		}
 		return nil
 	}

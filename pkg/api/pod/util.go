@@ -770,6 +770,13 @@ func dropDisabledFields(
 		dropContainerRestartRules(podSpec)
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CgroupNamespacesSupport) && !hostCgroupNamespaceInUse(oldPodSpec) {
+		VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+			c.HostCgroupNamespace = nil
+			return true
+		})
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
 		for i := range podSpec.Containers {
 			for j := range podSpec.Containers[i].VolumeMounts {
@@ -1406,6 +1413,21 @@ func rroInUse(podSpec *api.PodSpec) bool {
 				inUse = true
 				return false
 			}
+		}
+		return true
+	})
+	return inUse
+}
+
+func hostCgroupNamespaceInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		if c.HostCgroupNamespace != nil {
+			inUse = true
+			return false
 		}
 		return true
 	})

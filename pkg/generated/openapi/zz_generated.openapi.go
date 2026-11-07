@@ -21556,6 +21556,13 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Ref:         ref(corev1.SecurityContext{}.OpenAPIModelName()),
 						},
 					},
+					"hostCgroupNamespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "hostCgroupNamespace specifies whether the container uses the host's cgroup namespace. If true, the container shares the cgroup namespace with the host, so cgroups other than the container's own cgroup are visible to the container. If false, a new cgroup namespace rooted at the container's own cgroup is created for the container. If unset, the default behavior of the container runtime is used. Must not be set to true when the pod uses user namespaces (spec.hostUsers is false). Must not be set when spec.os.name is windows. The runtime handler must support cgroup namespaces, otherwise the container will fail to start. Cannot be updated.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"stdin": {
 						SchemaProps: spec.SchemaProps{
 							Description: "stdin indicates whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
@@ -22999,6 +23006,13 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Ref:         ref(corev1.SecurityContext{}.OpenAPIModelName()),
 						},
 					},
+					"hostCgroupNamespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "hostCgroupNamespace specifies whether the container uses the host's cgroup namespace. If true, the container shares the cgroup namespace with the host, so cgroups other than the container's own cgroup are visible to the container. If false, a new cgroup namespace rooted at the container's own cgroup is created for the container. If unset, the default behavior of the container runtime is used. Must not be set to true when the pod uses user namespaces (spec.hostUsers is false). Must not be set when spec.os.name is windows. The runtime handler must support cgroup namespaces, otherwise the container will fail to start. Cannot be updated.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"stdin": {
 						SchemaProps: spec.SchemaProps{
 							Description: "stdin indicates whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
@@ -23315,6 +23329,13 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Description: "securityContext is optional: SecurityContext defines the security options the ephemeral container should be run with. If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.",
 							Ref:         ref(corev1.SecurityContext{}.OpenAPIModelName()),
+						},
+					},
+					"hostCgroupNamespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "hostCgroupNamespace specifies whether the container uses the host's cgroup namespace. If true, the container shares the cgroup namespace with the host, so cgroups other than the container's own cgroup are visible to the container. If false, a new cgroup namespace rooted at the container's own cgroup is created for the container. If unset, the default behavior of the container runtime is used. Must not be set to true when the pod uses user namespaces (spec.hostUsers is false). Must not be set when spec.os.name is windows. The runtime handler must support cgroup namespaces, otherwise the container will fail to start. Cannot be updated.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"stdin": {
@@ -26074,6 +26095,13 @@ func schema_k8sio_api_core_v1_NodeRuntimeHandlerFeatures(ref common.ReferenceCal
 					"userNamespaces": {
 						SchemaProps: spec.SchemaProps{
 							Description: "userNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"cgroupNamespaces": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cgroupNamespaces is set to true if the runtime handler supports specifying whether to use the host cgroup namespace for privileged and non-privileged containers.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
