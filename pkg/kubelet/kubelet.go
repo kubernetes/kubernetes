@@ -3016,7 +3016,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		recordResizeOperations(oldPod, pod)
-		_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+		allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 		if updatedFromAllocation {
 			if !kl.IsPodTerminatingOrTerminal(pod) {
 				kl.allocationManager.PushPendingAllocation(logger, pod.UID)
@@ -3031,8 +3031,10 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && oldPod != nil {
-			oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec, Status: &oldPod.Status}
-			newPodInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
+			// Check only passthrough fields here; gated fields are checked in declaredFeaturesAdmitHandler.
+			oldAllocated, _ := kl.allocationManager.UpdatePodFromAllocation(oldPod)
+			oldPodInfo := &ndf.PodInfo{Spec: &oldAllocated.Spec, Status: &oldAllocated.Status}
+			newPodInfo := &ndf.PodInfo{Spec: &allocatedPod.Spec, Status: &allocatedPod.Status}
 			reqs, err := kl.nodeDeclaredFeaturesFramework.InferForPodUpdate(oldPodInfo, newPodInfo, kl.version)
 			if err != nil {
 				logger.Error(err, "Failed to infer required features for pod update", "pod", klog.KObj(pod))

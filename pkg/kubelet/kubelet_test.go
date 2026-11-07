@@ -84,6 +84,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
@@ -5962,6 +5963,15 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 	}
 	newPod := oldPod.DeepCopy()
 	newPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu2000m
+	podWithEphemeral := oldPod.DeepCopy()
+	podWithEphemeral.Spec.EphemeralContainers = []v1.EphemeralContainer{{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"},
+	}}
+	podPendingResizeWithEphemeral := newPod.DeepCopy()
+	podPendingResizeWithEphemeral.Spec.EphemeralContainers = []v1.EphemeralContainer{{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debugger"},
+	}}
+
 	createMockFeature := func(t *testing.T, name string, inferForUpdate bool, maxVersionStr string) *ndftesting.MockFeature {
 		m := ndftesting.NewMockFeature(t)
 		m.SetName(name)
@@ -5973,17 +5983,39 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 		}
 		return m
 	}
+	createEphemeralContainerFeature := func(t *testing.T, name string) *ndftesting.MockFeature {
+		m := ndftesting.NewMockFeature(t)
+		m.SetName(name)
+		m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
+			return podInfo.Spec != nil && len(podInfo.Spec.EphemeralContainers) > 0
+		})
+		m.SetMaxVersion(nil)
+		return m
+	}
+	createCPU2Feature := func(t *testing.T, name string) *ndftesting.MockFeature {
+		m := ndftesting.NewMockFeature(t)
+		m.SetName(name)
+		m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool {
+			return podInfo.Spec != nil && len(podInfo.Spec.Containers) > 0 &&
+				cpu2000m.Equal(*podInfo.Spec.Containers[0].Resources.Requests.Cpu())
+		})
+		m.SetMaxVersion(nil)
+		return m
+	}
 
 	testCases := []struct {
-		name               string
-		featureGateEnabled bool
-		nodeFeatures       []string
-		oldPod             *v1.Pod
-		newPod             *v1.Pod
-		registeredFeatures []ndf.Feature
-		expectEvent        bool
-		expectedEventMsg   string
-		componentVersion   string
+		name                    string
+		featureGateEnabled      bool
+		nodeFeatures            []string
+		allocatedPod            *v1.Pod
+		oldPod                  *v1.Pod
+		newPod                  *v1.Pod
+		registeredFeatures      []ndf.Feature
+		registerAdmitHandler    bool
+		expectEvent             bool
+		expectedEventMsg        string
+		expectPendingCondition  bool
+		componentVersion        string
 	}{
 		{
 			name:               "Feature gate disabled",
@@ -6045,6 +6077,44 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			registeredFeatures: []ndf.Feature{createMockFeature(t, "FeatureA", true, ""), createMockFeature(t, "FeatureB", false, "")},
 			expectEvent:        false,
 		},
+		{
+			name:               "Passthrough field update (ephemeral container) emits FailedNodeDeclaredFeaturesCheck event when unsupported",
+			featureGateEnabled: true,
+			componentVersion:   "1.35.0",
+			allocatedPod:       oldPod,
+			oldPod:             oldPod,
+			newPod:             podWithEphemeral,
+			nodeFeatures:       []string{},
+			registeredFeatures: []ndf.Feature{createEphemeralContainerFeature(t, "EphemeralFeature")},
+			expectEvent:        true,
+			expectedEventMsg:   "Pod requires node features that are not available: EphemeralFeature",
+		},
+		{
+			name:                   "Gated field update rejected in allocation admission does not emit FailedNodeDeclaredFeaturesCheck event",
+			featureGateEnabled:     true,
+			componentVersion:       "1.35.0",
+			allocatedPod:           oldPod,
+			oldPod:                 oldPod,
+			newPod:                 newPod,
+			nodeFeatures:           []string{},
+			registeredFeatures:     []ndf.Feature{createCPU2Feature(t, "CPU2Feature")},
+			registerAdmitHandler:   true,
+			expectEvent:            false,
+			expectPendingCondition: true,
+		},
+		{
+			name:                   "Unallocated gated update already pending on oldPod does not cause false-positive event on passthrough update",
+			featureGateEnabled:     true,
+			componentVersion:       "1.35.0",
+			allocatedPod:           oldPod,
+			oldPod:                 newPod,
+			newPod:                 podPendingResizeWithEphemeral,
+			nodeFeatures:           []string{},
+			registeredFeatures:     []ndf.Feature{createCPU2Feature(t, "CPU2Feature")},
+			registerAdmitHandler:   true,
+			expectEvent:            false,
+			expectPendingCondition: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -6055,7 +6125,12 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, false)
 			}
 
-			testKubelet := newTestKubelet(t, false)
+			var testKubelet *TestKubelet
+			if tc.registerAdmitHandler {
+				testKubelet = newTestKubeletExcludeAdmitHandlers(t, false, true)
+			} else {
+				testKubelet = newTestKubelet(t, false)
+			}
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 
@@ -6068,27 +6143,46 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			kubelet.nodeDeclaredFeatures = tc.nodeFeatures
 			kubelet.nodeDeclaredFeaturesSet = framework.MustMapSorted(kubelet.nodeDeclaredFeatures)
 			kubelet.version = utilversion.MustParse("1.35.0")
+			if tc.registerAdmitHandler {
+				kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{
+					lifecycle.NewDeclaredFeaturesAdmitHandler(framework, kubelet.nodeDeclaredFeaturesSet, kubelet.version),
+				})
+			}
 
 			if tc.oldPod != nil {
 				kubelet.podManager.SetPods([]*v1.Pod{tc.oldPod})
 			}
 
-			kubelet.statusManager.SetPodStatus(logger, tc.newPod, v1.PodStatus{Phase: v1.PodRunning})
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.newPod))
+			allocated := tc.allocatedPod
+			if allocated == nil {
+				allocated = tc.newPod
+			}
+			kubelet.statusManager.SetPodStatus(logger, allocated, v1.PodStatus{Phase: v1.PodRunning})
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, allocated))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{tc.newPod})
+			if tc.expectPendingCondition {
+				conditions := kubelet.statusManager.GetPodResizeConditions(tc.newPod.UID)
+				require.Len(t, conditions, 1)
+				assert.Equal(t, v1.PodResizePending, conditions[0].Type)
+			}
 			if tc.expectEvent {
-				select {
-				case event := <-recorder.Events:
-					assert.Contains(t, event, tc.expectedEventMsg)
-				default:
-					t.Errorf("Expected an event but did not receive one.")
+				found := false
+				for len(recorder.Events) > 0 {
+					event := <-recorder.Events
+					if strings.Contains(event, events.FailedNodeDeclaredFeaturesCheck) {
+						assert.Contains(t, event, tc.expectedEventMsg)
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("Expected a %s event containing %q, but did not receive one.", events.FailedNodeDeclaredFeaturesCheck, tc.expectedEventMsg)
 				}
 			} else {
-				select {
-				case event := <-recorder.Events:
-					t.Errorf("Expected no event, but received: %s", event)
-				default:
-					// No event received, which is correct.
+				for len(recorder.Events) > 0 {
+					event := <-recorder.Events
+					if strings.Contains(event, events.FailedNodeDeclaredFeaturesCheck) {
+						t.Errorf("Expected no %s event, but received: %s", events.FailedNodeDeclaredFeaturesCheck, event)
+					}
 				}
 			}
 		})
