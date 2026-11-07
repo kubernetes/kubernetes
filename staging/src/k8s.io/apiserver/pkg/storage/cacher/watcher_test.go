@@ -32,15 +32,23 @@ import (
 )
 
 func TestWatch(t *testing.T) {
-	for _, watchWithoutPrevKV := range []bool{true, false} {
-		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
-			testWatch(t)
+	for _, tc := range []struct {
+		watchCacheStallResume bool
+		watchWithoutPrevKV    bool
+	}{
+		{watchCacheStallResume: false, watchWithoutPrevKV: true},
+		{watchCacheStallResume: false, watchWithoutPrevKV: false},
+		{watchCacheStallResume: true, watchWithoutPrevKV: true},
+	} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v/WatchWithoutPrevKV=%v", tc.watchCacheStallResume, tc.watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, tc.watchCacheStallResume)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, tc.watchWithoutPrevKV)
+			testWatch(t, tc.watchCacheStallResume)
 		})
 	}
 }
 
-func testWatch(t *testing.T) {
+func testWatch(t *testing.T, watchCacheStallResume bool) {
 	t.Run("Watch", func(t *testing.T) {
 		t.Parallel()
 		ctx, cacher, terminate := setup.Setup(t)
@@ -146,7 +154,7 @@ func testWatch(t *testing.T) {
 			fakeClock.Step(cacher.DefaultBookmarkFrequency + time.Second)
 			time.Sleep(50 * time.Millisecond)
 		}
-		storagetesting.RunTestWatchResync(ctx, t, store, true, cacher.CompactWatch(delegator, server.V3Client.Client), resync, triggerBookmarks)
+		storagetesting.RunTestWatchResync(ctx, t, store, true, watchCacheStallResume, cacher.CompactWatch(delegator, server.V3Client.Client), resync, triggerBookmarks)
 	})
 	// These tests override WatchList and must finish before the parallel subtests start.
 	t.Run("WatchSemantics", func(t *testing.T) {

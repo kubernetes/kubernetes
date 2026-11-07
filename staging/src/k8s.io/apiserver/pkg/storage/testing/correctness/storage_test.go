@@ -235,7 +235,7 @@ func TestStorageWatchListMatchSingle(t *testing.T) {
 
 func TestStorageWatchResync(t *testing.T) {
 	s := newTestStorage()
-	storagetesting.RunTestWatchResync(t.Context(), t, s, false, compactFunc(s), nil, nil)
+	storagetesting.RunTestWatchResync(t.Context(), t, s, false, false, compactFunc(s), nil, nil)
 }
 
 func TestStorageCorrectness(t *testing.T) {
