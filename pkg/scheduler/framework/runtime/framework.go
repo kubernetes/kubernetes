@@ -2446,6 +2446,11 @@ func (f *frameworkImpl) MutableSnapshotSharedLister() fwk.MutableSnapshotSharedL
 	return f.mutableSnapshotLister
 }
 
+// NewPodGroupCycleState returns a fresh, empty PodGroupCycleState.
+func (f *frameworkImpl) NewPodGroupCycleState() fwk.PodGroupCycleState {
+	return framework.NewCycleState()
+}
+
 // IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 func (f *frameworkImpl) IterateOverWaitingPods(callback func(fwk.WaitingPod)) {
 	f.waitingPods.iterate(callback)
