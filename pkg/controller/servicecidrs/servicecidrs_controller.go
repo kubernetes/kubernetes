@@ -371,9 +371,7 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 		// Find if there is a larger subnet that contains the existing one,
 		// or there is another ServiceCIDR with the same subnet.
 		if prefix, err := netip.ParsePrefix(cidr); err == nil {
-			serviceCIDRs := servicecidr.ContainsPrefix(c.serviceCIDRLister, prefix)
-			if len(serviceCIDRs) == 0 ||
-				len(serviceCIDRs) == 1 && serviceCIDRs[0].Name == serviceCIDR.Name {
+			if len(c.serviceCIDRsContainingPrefix(prefix)) == 0 {
 				hasParent = false
 			}
 		}
@@ -390,6 +388,11 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 	// Since current ServiceCIDR does not have another ServiceCIDR containing it,
 	// verify there are no existing IPAddresses referencing it that will be orphan.
 	for _, cidr := range serviceCIDR.Spec.CIDRs {
+		prefix, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			// the ServiceCIDR object validates that the CIDRs are valid
+			continue
+		}
 		// get all the IPv4 addresses
 		ipLabelSelector := labels.Set(map[string]string{
 			networkingapiv1.LabelIPAddressFamily: string(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))),
@@ -400,18 +403,16 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 			return false, err
 		}
 		for _, ip := range ips {
-			// if the longest prefix match is the ServiceCIDR to be deleted
-			// and is the only existing one, at least one IPAddress will be
-			// orphan, block the ServiceCIDR deletion.
+			// if the IPAddress is in the ServiceCIDR to be deleted and no
+			// other ServiceCIDR contains it, it will be orphan, block the
+			// ServiceCIDR deletion.
 			address, err := netip.ParseAddr(ip.Name)
 			if err != nil {
 				// the IPAddress object validates that the name is a valid IPAddress
 				logger.Info("[SHOULD NOT HAPPEN] unexpected error parsing IPAddress", "IPAddress", ip.Name, "error", err)
 				continue
 			}
-			// find all ServiceCIDRs containing this IP
-			serviceCIDRs := servicecidr.ContainsAddress(c.serviceCIDRLister, address)
-			if len(serviceCIDRs) == 1 && serviceCIDRs[0].Name == serviceCIDR.Name {
+			if servicecidr.PrefixContainsIP(prefix, address) && len(c.serviceCIDRsContainingAddress(address)) == 0 {
 				logger.Info("Deleting ServiceCIDR blocked by IP address", "IPAddress", address.String())
 				return false, nil
 			}
@@ -422,6 +423,23 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 	// it is safe to delete, remove finalizer.
 	logger.Info("Deleting ServiceCIDR no longer have orphan IPs", "ServiceCIDR", serviceCIDR.String())
 	return true, nil
+}
+
+// serviceCIDRsContainingPrefix returns the ServiceCIDRs that contain prefix and
+// are not being deleted. A ServiceCIDR being deleted can't keep IP addresses, so
+// ServiceCIDRs deleted at the same time must not let each other go.
+func (c *Controller) serviceCIDRsContainingPrefix(prefix netip.Prefix) []*networkingapiv1.ServiceCIDR {
+	return slices.DeleteFunc(servicecidr.ContainsPrefix(c.serviceCIDRLister, prefix), isDeleting)
+}
+
+// serviceCIDRsContainingAddress returns the ServiceCIDRs that contain address
+// and are not being deleted.
+func (c *Controller) serviceCIDRsContainingAddress(address netip.Addr) []*networkingapiv1.ServiceCIDR {
+	return slices.DeleteFunc(servicecidr.ContainsAddress(c.serviceCIDRLister, address), isDeleting)
+}
+
+func isDeleting(serviceCIDR *networkingapiv1.ServiceCIDR) bool {
+	return !serviceCIDR.GetDeletionTimestamp().IsZero()
 }
 
 func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
