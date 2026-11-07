@@ -65,7 +65,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"spec.type: Limited with limited=nil": {
 			input: mkPLC(tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
+				field.Required(specPath.Child("limited"), ""),
 			},
 		},
 		"spec.type: Exempt with limited set": {
@@ -78,13 +78,13 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			expectedErrs: field.ErrorList{
 				// Mandatory object check: spec of 'exempt' differs from bootstrap (HW-only)
 				field.Invalid(specPath, nil, "").MarkFromImperative(),
-				field.Forbidden(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
+				field.Forbidden(specPath.Child("limited"), ""),
 			},
 		},
 		"spec.type: Limited with exempt set": {
 			input: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkBeta(),
+				field.Forbidden(specPath.Child("exempt"), ""),
 			},
 		},
 		"limitResponse.type: Queue with queuing=nil": {
@@ -106,7 +106,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		"spec.type: empty": {
 			input: mkPLC(tweakSpecType(""), tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkBeta(),
+				field.Required(specPath.Child("type"), ""),
 			},
 		},
 		"limitResponse.type: empty": {
@@ -154,14 +154,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			old:    mkPLC(),
 			update: mkPLC(tweakLimited(nil)),
 			expectedErrs: field.ErrorList{
-				field.Required(specPath.Child("limited"), "").MarkCoveredByDeclarative().MarkBeta(),
+				field.Required(specPath.Child("limited"), ""),
 			},
 		},
 		"update: add exempt field to Limited PLC": {
 			old:    mkPLC(),
 			update: mkPLC(tweakExemptConfig(&flowcontrol.ExemptPriorityLevelConfiguration{})),
 			expectedErrs: field.ErrorList{
-				field.Forbidden(specPath.Child("exempt"), "").MarkCoveredByDeclarative().MarkBeta(),
+				field.Forbidden(specPath.Child("exempt"), ""),
 			},
 		},
 		"update: Queue with queuing set to nil": {
