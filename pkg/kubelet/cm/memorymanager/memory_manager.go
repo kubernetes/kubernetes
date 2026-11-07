@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sort"
 	"sync"
 
 	cadvisorapi "github.com/google/cadvisor/lib/model"
@@ -31,6 +32,7 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,6 +54,7 @@ type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
 	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
+	ListContainers(ctx context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
 }
 
 type sourcesReadyStub struct{}
@@ -229,10 +232,64 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 		logger.Error(err, "Policy start error")
 		return err
 	}
+	if err := m.recoverPodMemoryAssignments(ctx); err != nil {
+		logger.Error(err, "Could not safely recover pod memory assignments, checkpoint retained")
+		return err
+	}
 
 	m.allocatableMemory = m.policy.GetAllocatableMemory(m.state)
 
 	logger.V(4).Info("memorymanager started", "policy", m.policy.Name())
+	return nil
+}
+
+func (m *manager) recoverPodMemoryAssignments(ctx context.Context) error {
+	policyName := m.policy.Name()
+	if (policyName != string(PolicyTypeStatic) && policyName != string(policyTypeBestEffort)) || !feature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		return nil
+	}
+	assignments := m.state.GetMemoryAssignments()
+	var podUIDs []string
+	for podUID := range m.state.GetPodMemoryAssignments() {
+		if len(assignments[podUID]) == 0 {
+			podUIDs = append(podUIDs, podUID)
+		}
+	}
+	sort.Strings(podUIDs)
+	if len(podUIDs) > 0 && policyName != string(PolicyTypeStatic) {
+		// Windows BestEffort does not support pod-level allocations.
+		return fmt.Errorf("[memorymanager] pod %q has a pod memory assignment but no container memory assignments", podUIDs[0])
+	}
+
+	// The checkpoint and every candidate have already been validated by the
+	// policy. Runtime state must also permit a fresh allocation: older kubelets
+	// could admit a pod-only checkpoint and start containers without a reservation.
+	for _, podUID := range podUIDs {
+		containers, err := m.containerRuntime.ListContainers(ctx, &runtimeapi.ContainerFilter{
+			LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: podUID},
+		})
+		if err != nil {
+			return fmt.Errorf("[memorymanager] cannot check runtime containers for pod %q: %w", podUID, err)
+		}
+		for _, container := range containers {
+			if container == nil || container.Labels[kubelettypes.KubernetesPodUIDLabel] != podUID {
+				return fmt.Errorf("[memorymanager] cannot recover pod %q: runtime returned a container without the requested pod UID", podUID)
+			}
+			if container.Id == "" {
+				return fmt.Errorf("[memorymanager] cannot recover pod %q: runtime returned a container without an ID", podUID)
+			}
+			if container.State != runtimeapi.ContainerState_CONTAINER_EXITED {
+				return fmt.Errorf("[memorymanager] cannot recover pod %q: container %q is in state %s", podUID, container.Id, container.State)
+			}
+		}
+	}
+
+	// Preserve all candidates if any runtime lookup fails or finds a container
+	// whose placement cannot safely be changed by a subsequent admission.
+	for _, podUID := range podUIDs {
+		m.state.DeletePod(podUID)
+		klog.FromContext(ctx).Info("Removed pod memory assignment without container assignments", "podUID", podUID)
+	}
 	return nil
 }
 

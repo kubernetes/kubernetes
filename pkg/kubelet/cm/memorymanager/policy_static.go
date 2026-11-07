@@ -19,6 +19,7 @@ package memorymanager
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -1108,10 +1109,14 @@ func areGroupsEqual(group1, group2 []int) bool {
 func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	machineState := s.GetMachineState()
 	memoryAssignments := s.GetMemoryAssignments()
+	var podAssignments state.PodMemoryAssignments
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
+		podAssignments = s.GetPodMemoryAssignments()
+	}
 
 	if len(machineState) == 0 {
 		// Machine state cannot be empty when assignments exist
-		if len(memoryAssignments) != 0 {
+		if len(memoryAssignments) != 0 || len(podAssignments) != 0 {
 			return fmt.Errorf("[memorymanager] machine state can not be empty when it has memory assignments")
 		}
 
@@ -1124,13 +1129,14 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 	// calculate all memory assigned to containers
 	expectedMachineState := p.getDefaultMachineState()
 	for pod, container := range memoryAssignments {
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
-			if podBlocks := s.GetPodMemoryBlocks(pod); len(podBlocks) > 0 {
-				if err := p.updateExpectedMachineState(expectedMachineState, podBlocks, pod, ""); err != nil {
-					return err
-				}
-				continue
+		if len(container) == 0 {
+			continue
+		}
+		if podBlocks := podAssignments[pod].MemoryBlocks; len(podBlocks) > 0 {
+			if err := p.updateExpectedMachineState(expectedMachineState, podBlocks, pod, ""); err != nil {
+				return err
 			}
+			continue
 		}
 
 		for containerName, blocks := range container {
@@ -1148,6 +1154,88 @@ func (p *staticPolicy) validateState(logger klog.Logger, s state.State) error {
 		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
 	}
 
+	// Pod-only entries are excluded from accounting, but must still be valid
+	// allocations. The manager checks runtime state before removing them.
+	hasPodOnlyAssignments := false
+	for podUID, entry := range podAssignments {
+		if len(memoryAssignments[podUID]) == 0 {
+			hasPodOnlyAssignments = true
+			if err := validatePodMemoryAssignment(podUID, entry.MemoryBlocks, expectedMachineState); err != nil {
+				return fmt.Errorf("[memorymanager] invalid pod memory assignment for pod %q: %w", podUID, err)
+			}
+		}
+	}
+	if hasPodOnlyAssignments {
+		// Group totals permit different valid distributions across NUMA nodes.
+		// Recovery must also preserve valid accounting on each individual node.
+		for _, node := range p.machineInfo.Topology {
+			for resourceName, memory := range machineState[node.Id].MemoryMap {
+				if memory.Free > memory.Allocatable || memory.Reserved != memory.Allocatable-memory.Free {
+					return fmt.Errorf("[memorymanager] cannot recover pod memory assignments: invalid accounting for NUMA node %d resource %q", node.Id, resourceName)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func validatePodMemoryAssignment(podUID string, blocks []state.Block, machineState state.NUMANodeMap) error {
+	if podUID == "" {
+		return fmt.Errorf("empty pod UID")
+	}
+	if len(blocks) == 0 {
+		return fmt.Errorf("no memory blocks")
+	}
+	resources := make(map[v1.ResourceName]bool)
+	for _, block := range blocks {
+		if len(block.NUMAAffinity) == 0 {
+			return fmt.Errorf("empty NUMA affinity")
+		}
+		if !slices.Equal(block.NUMAAffinity, blocks[0].NUMAAffinity) {
+			return fmt.Errorf("memory blocks use different NUMA affinities")
+		}
+		if resources[block.Type] {
+			return fmt.Errorf("duplicate memory resource %q", block.Type)
+		}
+		resources[block.Type] = true
+		if block.Size == 0 {
+			return fmt.Errorf("zero-sized memory block")
+		}
+		remaining := block.Size
+		for i, nodeID := range block.NUMAAffinity {
+			if i > 0 && nodeID <= block.NUMAAffinity[i-1] {
+				return fmt.Errorf("NUMA affinity is not strictly increasing")
+			}
+			node, ok := machineState[nodeID]
+			if !ok {
+				return fmt.Errorf("NUMA node %d does not exist", nodeID)
+			}
+			memory, ok := node.MemoryMap[block.Type]
+			if !ok {
+				return fmt.Errorf("memory resource %q does not exist on NUMA node %d", block.Type, nodeID)
+			}
+			// Check physical capacity, not current free memory: another pod can
+			// have consumed memory after an older kubelet restored this entry.
+			if remaining <= memory.Allocatable {
+				remaining = 0
+			} else {
+				remaining -= memory.Allocatable
+			}
+		}
+		if remaining != 0 {
+			return fmt.Errorf("memory block exceeds allocatable %q in its NUMA affinity", block.Type)
+		}
+		if corehelper.IsHugePageResourceName(block.Type) {
+			pageSize, err := corehelper.HugePageSizeFromResourceName(block.Type)
+			if err != nil || pageSize.Value() <= 0 || block.Size%uint64(pageSize.Value()) != 0 {
+				return fmt.Errorf("memory block is not aligned to %q", block.Type)
+			}
+		}
+	}
+	if !resources[v1.ResourceMemory] {
+		return fmt.Errorf("no memory resource")
+	}
 	return nil
 }
 
