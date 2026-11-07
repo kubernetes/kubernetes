@@ -89,11 +89,15 @@ type KubeProxyNFTablesConfiguration struct {
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
 	// maxPerCore is the maximum number of NAT connections to track
-	// per CPU core (0 to leave the limit as-is and ignore min).
+	// per CPU core (0 to leave the limit as-is and ignore min and max).
 	MaxPerCore *int32
 	// min is the minimum value of connect-tracking records to allocate,
 	// regardless of maxPerCore (set maxPerCore=0 to leave the limit as-is).
 	Min *int32
+	// max caps the calculated conntrack limit. Defaults to 1048576.
+	// Set to 0 to disable the cap. Ignored when maxPerCore is 0.
+	// This does not lower an existing host limit that is higher than the calculated limit.
+	Max *int32
 	// tcpEstablishedTimeout is how long an idle TCP connection will be kept open
 	// (e.g. '2s').  Must be greater than 0 to set.
 	TCPEstablishedTimeout *metav1.Duration

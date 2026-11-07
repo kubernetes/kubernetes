@@ -147,6 +147,12 @@ func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyCon
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("min"), config.Min, "must be greater than or equal to 0"))
 	}
 
+	if config.Max != nil && *config.Max < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), *config.Max, "must be greater than or equal to 0"))
+	}
+	if config.MaxPerCore != nil && *config.MaxPerCore > 0 && config.Max != nil && *config.Max > 0 && config.Min != nil && *config.Min > *config.Max {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("max"), *config.Max, "must be greater than or equal to min when maxPerCore is greater than 0"))
+	}
 	// config.TCPEstablishedTimeout has a default value, so can't be nil.
 	if config.TCPEstablishedTimeout.Duration < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("tcpEstablishedTimeout"), config.TCPEstablishedTimeout, "must be greater than or equal to 0"))
