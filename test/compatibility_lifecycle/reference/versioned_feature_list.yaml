@@ -534,12 +534,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.38"
-- name: DRADeviceTaintSelectorAll
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.38"
 - name: DRADeviceTaints
   versionedSpecs:
   - default: false
@@ -557,6 +551,12 @@
   - default: true
     lockToDefault: true
     preRelease: GA
+    version: "1.38"
+- name: DRADeviceTaintSelectorAll
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
     version: "1.38"
 - name: DRAExtendedResource
   versionedSpecs:
