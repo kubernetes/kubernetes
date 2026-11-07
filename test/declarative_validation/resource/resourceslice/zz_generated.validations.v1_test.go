@@ -108,6 +108,9 @@ func init() {
 			"spec.devices[*].nodeAllocatableResources[*].mapping.capacityMultiplier": {
 				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
 			},
+			"spec.devices[*].taints": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
 			"spec.devices[*].taints[*].effect": {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},

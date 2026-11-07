@@ -140,6 +140,51 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 	meta.RunObjectMetaUpdateTestCases(t, ctx, &updateObj, registry.Strategy, meta.WithStringentFinalizerValidation())
 }
 
+func TestDeclarativeValidateStatusUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateStatusUpdate(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:          "resource.k8s.io",
+		APIVersion:        apiVersion,
+		Resource:          "devicetaintrules",
+		Subresource:       "status",
+		IsResourceRequest: true,
+		Verb:              "update",
+	})
+
+	testCases := map[string]struct {
+		old          resource.DeviceTaintRule
+		update       resource.DeviceTaintRule
+		expectedErrs field.ErrorList
+	}{
+		"valid status.conditions, max allowed": {
+			old:    mkValidDeviceTaintRule(),
+			update: mkValidDeviceTaintRule(tweakStatusConditions(resource.DeviceTaintRuleStatusMaxConditions)),
+		},
+		"invalid status.conditions, too many items": {
+			old:    mkValidDeviceTaintRule(),
+			update: mkValidDeviceTaintRule(tweakStatusConditions(resource.DeviceTaintRuleStatusMaxConditions + 1)),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "conditions"), resource.DeviceTaintRuleStatusMaxConditions+1, resource.DeviceTaintRuleStatusMaxConditions).WithOrigin("maxItems").MarkAlpha(),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "1"
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.StatusStrategy, tc.expectedErrs, apitesting.WithSubResources("status"))
+		})
+	}
+}
+
 func mkValidDeviceTaintRule(tweaks ...func(*resource.DeviceTaintRule)) resource.DeviceTaintRule {
 	rule := resource.DeviceTaintRule{
 		ObjectMeta: metav1.ObjectMeta{
@@ -161,5 +206,11 @@ func mkValidDeviceTaintRule(tweaks ...func(*resource.DeviceTaintRule)) resource.
 func tweakTaintEffect(effect resource.DeviceTaintEffect) func(*resource.DeviceTaintRule) {
 	return func(r *resource.DeviceTaintRule) {
 		r.Spec.Taint.Effect = effect
+	}
+}
+
+func tweakStatusConditions(count int) func(*resource.DeviceTaintRule) {
+	return func(r *resource.DeviceTaintRule) {
+		r.Status.Conditions = meta.MkConditions(count)
 	}
 }
