@@ -683,9 +683,22 @@ func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, r
 	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
 	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
 	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
-	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(logger, podUID, contName) {
-		logger.V(3).Info("Container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
-		return nil, nil
+	if !m.sourcesReady.AllReady() {
+		foundAny, foundRunning := m.getContainerPresence(logger, podUID, contName)
+		if foundRunning {
+			logger.V(3).Info("Container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+			return nil, nil
+		}
+		// The same reasoning applies to a container which already ran to completion before the kubelet restarted,
+		// typically a non-restartable init container (see https://github.com/kubernetes/kubernetes/issues/138446).
+		// It is no longer running, but the runtime still reports it, and its devices are already allocated
+		// (needed == 0, restored from the checkpoint). It will not run again, so there is nothing to do.
+		// On node reboot the runtime does not report it anymore (foundAny is false), so we still fall through
+		// to the checks below, as required to fix issue #109595.
+		if foundAny && needed == 0 {
+			logger.V(3).Info("Container detected completed before kubelet restart, nothing to do", "resourceName", resource, "podUID", podUID, "containerName", contName)
+			return nil, nil
+		}
 	}
 
 	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
@@ -1350,39 +1363,32 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return len(checkpoints) == 0
 }
 
-func (m *ManagerImpl) isContainerAlreadyRunning(logger klog.Logger, podUID, cntName string) bool {
-	// Check if ANY container for this pod/container name is running.
+// getContainerPresence reports whether the runtime reported ANY container for this pod/container name
+// when the kubelet started (foundAny), and whether ANY of them was running (foundRunning).
+func (m *ManagerImpl) getContainerPresence(logger klog.Logger, podUID, cntName string) (foundAny, foundRunning bool) {
+	// Check ALL the containers for this pod/container name.
 	// This handles the case where a container restarted before kubelet restart,
 	// so the containerMap might have multiple entries (old exited + new running).
-	// We need to check all of them to see if any are running.
 	//
-	// Note: if container runtime is down when kubelet restarts, containerRunningSet will be empty,
-	// so containers will fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559.
+	// Note: if container runtime is down when kubelet restarts, containerMap and containerRunningSet
+	// will be empty, so containers will fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559.
 	// This scenario should however be rare enough.
-	foundAnyContainer := false
-	foundRunningContainer := false
-
 	m.containerMap.Visit(func(visitPodUID, visitContainerName, visitContainerID string) {
 		if visitPodUID == podUID && visitContainerName == cntName {
-			foundAnyContainer = true
+			foundAny = true
 			if m.containerRunningSet.Has(visitContainerID) {
-				foundRunningContainer = true
+				foundRunning = true
 				logger.V(4).Info("Container found in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", visitContainerID)
 			}
 		}
 	})
 
-	if !foundAnyContainer {
+	if !foundAny {
 		logger.V(4).Info("Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
-		return false
-	}
-
-	if !foundRunningContainer {
+	} else if !foundRunning {
 		logger.V(4).Info("Container found in map but not in running set", "podUID", podUID, "containerName", cntName)
-		return false
 	}
-
-	return true
+	return foundAny, foundRunning
 }
 
 func (m *ManagerImpl) CanAllocateExclusively(res v1.ResourceName) bool {
