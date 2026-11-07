@@ -23,14 +23,28 @@ import (
 )
 
 // PodAdmitAttributes is the context for a pod admission decision.
+// Top-level fields describe the admission itself, while Update holds facts about the
+// allocated -> desired change precomputed once by the allocation manager.
 // The member fields of this struct should never be mutated.
 type PodAdmitAttributes struct {
 	// the pod to evaluate for admission
 	Pod *v1.Pod
 	// all pods bound to the kubelet excluding the pod being evaluated
 	OtherPods []*v1.Pod
-	// the operation being performed; either "add" or "resize"
+	// the operation being performed; either "add" or "update"
 	Operation Operation
+	// Update holds information about the pod update being evaluated.
+	// It is set if and only if Operation == UpdateOperation (nil for AddOperation).
+	Update *PodUpdate
+}
+
+// PodUpdate holds facts about the allocated -> desired change for an UpdateOperation,
+// precomputed once by the allocation manager.
+type PodUpdate struct {
+	// AllocatedPod is the pod as it is currently allocated on the node.
+	AllocatedPod *v1.Pod
+	// Resize is true if the update changes resources.
+	Resize bool
 }
 
 // Operation represents the type of operation being performed on a pod.
@@ -39,8 +53,8 @@ type Operation string
 const (
 	// AddOperation indicates that the pod is being added to the kubelet.
 	AddOperation Operation = "add"
-	// ResizeOperation indicates that the pod is being resized.
-	ResizeOperation Operation = "resize"
+	// UpdateOperation indicates that an existing pod's allocation is being updated.
+	UpdateOperation Operation = "update"
 )
 
 // PodAdmitResult provides the result of a pod admission decision.

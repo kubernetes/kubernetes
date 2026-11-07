@@ -2918,7 +2918,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	var pendingResizes []types.UID
+	var pendingAllocations []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
@@ -2965,12 +2965,12 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 
 			kl.podCertificateManager.TrackPod(ctx, pod)
 
-			// Backfill the queue of pending resizes, but only after all the pods have
-			// been added. This ensures that no resizes get resolved until all the
+			// Backfill the queue of pending allocations, but only after all the pods have
+			// been added. This ensures that no pending allocations get resolved until all the
 			// existing pods are added.
 			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 			if updatedFromAllocation {
-				pendingResizes = append(pendingResizes, pod.UID)
+				pendingAllocations = append(pendingAllocations, pod.UID)
 			}
 		}
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
@@ -2981,13 +2981,13 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 		})
 	}
 	kl.statusManager.BackfillPodResizeConditions(pods)
-	// Admitted pods with DeletionTimestamp set are still pushed here so RetryPendingResizes
+	// Admitted pods with DeletionTimestamp set are still pushed here so RetryPendingAllocations
 	// clears any backfilled PodResizePending condition with DeferredResizeResolutionTerminated.
-	for _, uid := range pendingResizes {
-		kl.allocationManager.PushPendingResize(logger, uid)
+	for _, uid := range pendingAllocations {
+		kl.allocationManager.PushPendingAllocation(logger, uid)
 	}
-	if len(pendingResizes) > 0 {
-		kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsAdded)
+	if len(pendingAllocations) > 0 {
+		kl.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonPodsAdded)
 	}
 }
 
@@ -3016,14 +3016,14 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		recordResizeOperations(oldPod, pod)
-		_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+		allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 		if updatedFromAllocation {
 			if !kl.IsPodTerminatingOrTerminal(pod) {
-				kl.allocationManager.PushPendingResize(logger, pod.UID)
+				kl.allocationManager.PushPendingAllocation(logger, pod.UID)
 			}
 			// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
 			// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
-			kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodUpdated)
+			kl.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonPodUpdated)
 		} else {
 			// We can hit this case if a pending resize has been reverted,
 			// so we need to clear the pending resize condition.
@@ -3031,8 +3031,10 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && oldPod != nil {
-			oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec, Status: &oldPod.Status}
-			newPodInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
+			// Check only passthrough fields here; gated fields are checked in declaredFeaturesAdmitHandler.
+			oldAllocated, _ := kl.allocationManager.UpdatePodFromAllocation(oldPod)
+			oldPodInfo := &ndf.PodInfo{Spec: &oldAllocated.Spec, Status: &oldAllocated.Status}
+			newPodInfo := &ndf.PodInfo{Spec: &allocatedPod.Spec, Status: &allocatedPod.Status}
 			reqs, err := kl.nodeDeclaredFeaturesFramework.InferForPodUpdate(oldPodInfo, newPodInfo, kl.version)
 			if err != nil {
 				logger.Error(err, "Failed to infer required features for pod update", "pod", klog.KObj(pod))
@@ -3188,7 +3190,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 		}
 	}
 
-	kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsRemoved)
+	kl.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonPodsRemoved)
 }
 
 // HandlePodReconcile is the callback in the SyncHandler interface for pods
@@ -3197,9 +3199,9 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
-	retryPendingResizes := false
+	retryPendingAllocations := false
 	var triggerReason string
-	hasPendingResizes := kl.allocationManager.HasPendingResizes()
+	hasPendingAllocations := kl.allocationManager.HasPendingAllocations()
 	for _, pod := range pods {
 		// Update the pod in pod manager, status manager will do periodically reconcile according
 		// to the pod manager.
@@ -3215,16 +3217,16 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 			// Static pods should be reconciled the same way as regular pods
 		}
 
-		if hasPendingResizes && !retryPendingResizes && oldPod != nil {
-			// If the pod has reached a terminal phase, we retry all pending resizes.
+		if hasPendingAllocations && !retryPendingAllocations && oldPod != nil {
+			// If the pod has reached a terminal phase, we retry all pending allocations.
 			// A terminated pod releases capacity even if its allocation has already
 			// been purged, so check this before the non-allocated skip below.
 			if podutil.IsPodTerminal(pod) && !podutil.IsPodTerminal(oldPod) {
-				retryPendingResizes = true
+				retryPendingAllocations = true
 				triggerReason = allocation.TriggerReasonPodTerminated
 			}
 
-			// If there are pending resizes, check whether the requests shrank as a result of the status
+			// If there are pending allocations, check whether the requests shrank as a result of the status
 			// resources changing.
 			opts := resourcehelper.PodResourcesOptions{
 				UseStatusResources:                             true,
@@ -3240,10 +3242,10 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 			oldRequest := resourcehelper.PodRequests(allocatedOldPod, opts)
 			newRequest := resourcehelper.PodRequests(allocatedPod, opts)
 
-			// If cpu or memory requests shrank, then retry the pending resizes.
+			// If cpu or memory requests shrank, then retry the pending allocations.
 			if newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
 				newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 0 {
-				retryPendingResizes = true
+				retryPendingAllocations = true
 				triggerReason = allocation.TriggerReasonPodResized
 			}
 		}
@@ -3284,8 +3286,8 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		}
 	}
 
-	if retryPendingResizes {
-		kl.allocationManager.RetryPendingResizes(ctx, triggerReason)
+	if retryPendingAllocations {
+		kl.allocationManager.RetryPendingAllocations(ctx, triggerReason)
 	}
 }
 

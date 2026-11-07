@@ -323,6 +323,7 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	previousCondition := m.podResizeConditions[podUID].PodResizePending
 
 	if reason != v1.PodReasonInfeasible {
+		// TODO: Treat non-deferrable admission rejections (such as PodFeatureUnsupported) as Infeasible.
 		// For all other "pending" reasons, we set the reason to "Deferred".
 		reason = v1.PodReasonDeferred
 	}

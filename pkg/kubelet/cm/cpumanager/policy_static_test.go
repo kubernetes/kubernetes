@@ -3148,8 +3148,8 @@ func TestStaticPolicyLifecycleAllocate(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -3211,8 +3211,8 @@ func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -3273,8 +3273,8 @@ func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{
@@ -3581,8 +3581,8 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
+			description: "CPUManager static policy skips UpdateOperation",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     true,
 		},
 		{

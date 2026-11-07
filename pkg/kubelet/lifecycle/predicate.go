@@ -97,7 +97,7 @@ type pluginResourceUpdateFuncType func(*schedulerframework.NodeInfo, *PodAdmitAt
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
-	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason, operation Operation) ([]PredicateFailureReason, error)
+	HandleAdmissionFailure(ctx context.Context, admitPod *v1.Pod, failureReasons []PredicateFailureReason, attrs *PodAdmitAttributes) ([]PredicateFailureReason, error)
 }
 
 type predicateAdmitHandler struct {
@@ -186,7 +186,7 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0
 	if !fit {
-		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons, attrs.Operation)
+		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons, attrs)
 		fit = len(reasons) == 0 && err == nil
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
