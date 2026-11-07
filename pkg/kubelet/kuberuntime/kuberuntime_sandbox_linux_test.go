@@ -34,6 +34,149 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+func TestApplySandboxResourcesHugepageOverhead(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name     string
+		overhead v1.ResourceList
+		expected []*runtimeapi.HugepageLimit
+	}{
+		{
+			name: "no overhead",
+		},
+		{
+			name: "CPU and memory only",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			name: "multiple hugepage sizes",
+			overhead: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+				"hugepages-1Gi":   resource.MustParse("192Gi"),
+				"hugepages-2Mi":   resource.MustParse("4Mi"),
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{PageSize: "1GB", Limit: 192 * 1024 * 1024 * 1024},
+				{PageSize: "2MB", Limit: 4 * 1024 * 1024},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{
+				Overhead: tc.overhead,
+				Containers: []v1.Container{{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{"hugepages-1Gi": resource.MustParse("1Gi")},
+					},
+				}},
+			}}
+			config := &runtimeapi.PodSandboxConfig{Linux: &runtimeapi.LinuxPodSandboxConfig{}}
+			require.NoError(t, m.applySandboxResources(tCtx, pod, config))
+			assert.ElementsMatch(t, tc.expected, config.Linux.Overhead.HugepageLimits)
+			assert.Equal(t, []*runtimeapi.HugepageLimit{{PageSize: "1GB", Limit: 1024 * 1024 * 1024}}, config.Linux.Resources.HugepageLimits)
+		})
+	}
+}
+
+func TestApplySandboxResourcesHugepages(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	container := func(name, hugepages string) v1.Container {
+		limits := v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")}
+		if hugepages != "" {
+			limits["hugepages-1Gi"] = resource.MustParse(hugepages)
+		}
+		return v1.Container{
+			Name: name,
+			Resources: v1.ResourceRequirements{
+				Requests: limits.DeepCopy(),
+				Limits:   limits,
+			},
+		}
+	}
+	sidecar := container("sidecar", "2Gi")
+	sidecar.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+	multipleSizes := container("app", "1Gi")
+	multipleSizes.Resources.Requests["hugepages-2Mi"] = resource.MustParse("4Mi")
+	multipleSizes.Resources.Limits["hugepages-2Mi"] = resource.MustParse("4Mi")
+	podResources := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{"hugepages-1Gi": resource.MustParse("192Gi")},
+		Limits:   v1.ResourceList{"hugepages-1Gi": resource.MustParse("192Gi")},
+	}
+
+	for _, tc := range []struct {
+		name                     string
+		containers               []v1.Container
+		initContainers           []v1.Container
+		podResources             *v1.ResourceRequirements
+		podLevelResourcesEnabled bool
+		expected                 []*runtimeapi.HugepageLimit
+	}{
+		{
+			name:       "no workload hugepages",
+			containers: []v1.Container{container("app", "")},
+		},
+		{
+			name:       "aggregate containers and page sizes",
+			containers: []v1.Container{multipleSizes, container("other", "2Gi")},
+			expected: []*runtimeapi.HugepageLimit{
+				{PageSize: "1GB", Limit: 3 * 1024 * 1024 * 1024},
+				{PageSize: "2MB", Limit: 4 * 1024 * 1024},
+			},
+		},
+		{
+			name:           "init container peak",
+			containers:     []v1.Container{container("app", "3Gi")},
+			initContainers: []v1.Container{container("init", "8Gi")},
+			expected:       []*runtimeapi.HugepageLimit{{PageSize: "1GB", Limit: 8 * 1024 * 1024 * 1024}},
+		},
+		{
+			name:           "restartable init container overlaps init peak",
+			containers:     []v1.Container{container("app", "3Gi")},
+			initContainers: []v1.Container{sidecar, container("init", "8Gi")},
+			expected:       []*runtimeapi.HugepageLimit{{PageSize: "1GB", Limit: 10 * 1024 * 1024 * 1024}},
+		},
+		{
+			name:                     "pod level limit takes precedence",
+			containers:               []v1.Container{container("app", "3Gi")},
+			podResources:             podResources,
+			podLevelResourcesEnabled: true,
+			expected:                 []*runtimeapi.HugepageLimit{{PageSize: "1GB", Limit: 192 * 1024 * 1024 * 1024}},
+		},
+		{
+			name:         "pod level limit ignored when feature disabled",
+			containers:   []v1.Container{container("app", "3Gi")},
+			podResources: podResources,
+			expected:     []*runtimeapi.HugepageLimit{{PageSize: "1GB", Limit: 3 * 1024 * 1024 * 1024}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+			pod := &v1.Pod{Spec: v1.PodSpec{
+				Containers:     tc.containers,
+				InitContainers: tc.initContainers,
+				Resources:      tc.podResources,
+				Overhead: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("1Gi"),
+					"hugepages-1Gi":   resource.MustParse("4Gi"),
+				},
+			}}
+			config := &runtimeapi.PodSandboxConfig{Linux: &runtimeapi.LinuxPodSandboxConfig{}}
+			require.NoError(t, m.applySandboxResources(tCtx, pod, config))
+			assert.Equal(t, tc.expected, config.Linux.Resources.HugepageLimits)
+		})
+	}
+}
+
 func TestApplySandboxResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
