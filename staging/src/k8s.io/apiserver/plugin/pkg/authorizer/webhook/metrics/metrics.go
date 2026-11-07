@@ -113,7 +113,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "webhook_evaluations_total",
 			Help:           "Round-trips to authorization webhooks.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"name", "result"},
 	)
@@ -125,7 +125,7 @@ var (
 			Name:           "webhook_duration_seconds",
 			Help:           "Request latency in seconds.",
 			Buckets:        compbasemetrics.DefBuckets,
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"name", "result"},
 	)
@@ -136,7 +136,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "webhook_evaluations_fail_open_total",
 			Help:           "NoOpinion results due to webhook timeout or error.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		[]string{"name", "result"},
 	)
