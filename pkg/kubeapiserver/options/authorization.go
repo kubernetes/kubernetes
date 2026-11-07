@@ -22,6 +22,7 @@ import (
 	"time"
 
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/spf13/pflag"
 
@@ -205,7 +206,7 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ToAuthorizationConfig convert BuiltInAuthorizationOptions to authorizer.Config
-func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) (*authorizer.Config, error) {
+func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory, client kubernetes.Interface) (*authorizer.Config, error) {
 	if o == nil {
 		return nil, nil
 	}
@@ -241,6 +242,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 	return &authorizer.Config{
 		PolicyFile:               o.PolicyFile,
 		VersionedInformerFactory: versionedInformerFactory,
+		KubeClient:               client,
 		WebhookRetryBackoff:      o.WebhookRetryBackoff,
 
 		ReloadFile:                            o.AuthorizationConfigurationFile,
