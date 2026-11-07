@@ -74,6 +74,7 @@
       constraints:
       - matchAttribute: dra.example.com/match
   - name: empty_500nodes
+    labels: [performance]
     params:
       nodesWithDRA: 500
       measurePods: 500
