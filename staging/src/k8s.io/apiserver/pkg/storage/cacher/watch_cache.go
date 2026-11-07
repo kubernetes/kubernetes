@@ -635,9 +635,9 @@ func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) in
 // getAllEventsSinceLocked returns a watchCacheInterval that can be used to
 // retrieve events since a certain resourceVersion. This function assumes to
 // be called under the watchCache lock.
-func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
+func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string, opts storage.ListOptions, matchValues []storage.MatchValue) (*watchCacheInterval, error) {
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
+		interval, _, err := w.getIntervalFromStoreLocked(key, opts, matchValues)
 		return interval, err
 	}
 
@@ -646,7 +646,7 @@ func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersio
 		// current state and only then start watching from that point.
 		//
 		// TODO: In v2 api, we should stop returning the current state - #13969.
-		interval, _, err := w.getIntervalFromStoreLocked(ctx, key, opts)
+		interval, _, err := w.getIntervalFromStoreLocked(key, opts, matchValues)
 		return interval, err
 	}
 
@@ -656,8 +656,8 @@ func (w *watchCache) getAllEventsSinceLocked(ctx context.Context, resourceVersio
 // getIntervalFromStoreLocked returns a watchCacheInterval
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
-func (w *watchCache) getIntervalFromStoreLocked(ctx context.Context, key string, opts storage.ListOptions) (*watchCacheInterval, string, error) {
-	snapshot, index := w.getLatestSnapshot(ctx, opts.Recursive, opts.Predicate.MatcherIndex(ctx))
+func (w *watchCache) getIntervalFromStoreLocked(key string, opts storage.ListOptions, matchValues []storage.MatchValue) (*watchCacheInterval, string, error) {
+	snapshot, index := w.getLatestSnapshot(context.Background(), opts.Recursive, matchValues)
 	w.checkSnapshotResourceVersion(snapshot, w.resourceVersion)
 	return newCacheIntervalFromLazySnapshot(w.resourceVersion, snapshot, key, opts.Recursive), index, nil
 }

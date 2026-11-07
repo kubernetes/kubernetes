@@ -107,7 +107,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(context.Background(), resourceVersion, "", opts)
+	return w.getAllEventsSinceLocked(resourceVersion, "", opts, nil)
 }
 
 // newTestWatchCache just adds a fake clock.
