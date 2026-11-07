@@ -143,9 +143,26 @@ func TestValidateListOptions(t *testing.T) {
 			expectedRev: 200,
 		},
 		{
-			name: "rev resolve to 0 if not recursive",
+			name: "specified rev if non-recursive with limit",
 			opts: ListOptions{
 				ResourceVersion: "200",
+				Predicate: SelectionPredicate{
+					Limit: 1,
+				},
+			},
+			expectedRev: 200,
+		},
+		{
+			name: "rev resolve to 0 if non-recursive without limit",
+			opts: ListOptions{
+				ResourceVersion: "200",
+			},
+			expectedRev: 0,
+		},
+		{
+			name: "rev resolve to 0 if non-recursive with limit and resourceVersion is 0",
+			opts: ListOptions{
+				ResourceVersion: "0",
 				Predicate: SelectionPredicate{
 					Limit: 1,
 				},
