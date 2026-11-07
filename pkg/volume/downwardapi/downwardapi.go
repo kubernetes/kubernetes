@@ -182,6 +182,13 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 		return err
 	}
 
+	// If the volume directory has already been populated by a previous successful
+	// setup, this SetUpAt call is a resync of an already-mounted volume. In that
+	// case a failure must not tear the directory down, because it is bind-mounted
+	// into the running container and removing it breaks the mount, leaving the
+	// volume permanently empty (https://github.com/kubernetes/kubernetes/issues/113242).
+	alreadyPopulated := volumeutil.IsTargetPopulated(dir)
+
 	setupSuccess := false
 	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		klog.Errorf("Unable to setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
@@ -193,17 +200,25 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	}
 
 	defer func() {
-		// Clean up directories if setup fails
-		if !setupSuccess {
-			unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
-			if unmountCreateErr != nil {
-				klog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
-				return
-			}
-			tearDownErr := unmounter.TearDown()
-			if tearDownErr != nil {
-				klog.Errorf("error tearing down volume %s: %v", b.volName, tearDownErr)
-			}
+		if setupSuccess {
+			return
+		}
+		if alreadyPopulated {
+			// A resync of an already-populated volume failed. Leave the existing
+			// content in place and let the volume manager retry; tearing down a
+			// bind-mounted directory would leave the volume permanently empty.
+			klog.Warningf("failed to update volume %s for pod %s/%s, keeping the previously projected content until the next successful resync", b.volName, b.pod.Namespace, b.pod.Name)
+			return
+		}
+		// Clean up directories on a failed first-time setup.
+		unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
+		if unmountCreateErr != nil {
+			klog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
+			return
+		}
+		tearDownErr := unmounter.TearDown()
+		if tearDownErr != nil {
+			klog.Errorf("error tearing down volume %s: %v", b.volName, tearDownErr)
 		}
 	}()
 
