@@ -54,5 +54,5 @@ type ErrNotInRange struct {
 }
 
 func (e *ErrNotInRange) Error() string {
-	return fmt.Sprintf("the provided IP (%v) is not in the valid range. The range of valid IPs is %s", e.IP, e.ValidRange)
+	return fmt.Sprintf("the provided IP (%v) is not in the valid range", e.IP)
 }
