@@ -61,9 +61,9 @@ var (
 	}
 )
 
-// nodeInfoManager contains necessary common dependencies to update node info on both
+// NodeInfoManager contains necessary common dependencies to update node info on both
 // the Node and CSINode objects.
-type nodeInfoManager struct {
+type NodeInfoManager struct {
 	nodeName        types.NodeName
 	nodeID          types.UID
 	volumeHost      volume.VolumeHost
@@ -75,38 +75,12 @@ type nodeInfoManager struct {
 // If no updates is needed, the function must return the same Node object as the input.
 type nodeUpdateFunc func(*v1.Node) (newNode *v1.Node, updated bool, err error)
 
-// Interface implements an interface for managing labels of a node
-type Interface interface {
-	CreateCSINode() (*storagev1.CSINode, error)
-
-	// Updates or Creates the CSINode object with annotations for CSI Migration
-	InitializeCSINodeWithAnnotation() error
-
-	// Record in the cluster the given node information from the CSI driver with the given name.
-	// Concurrent calls to InstallCSIDriver() is allowed, but they should not be intertwined with calls
-	// to other methods in this interface.
-	InstallCSIDriver(driverName string, driverNodeID string, maxVolumeLimit int64, topology map[string]string) error
-
-	// UpdateCSIDriver updates CSIDrivers field in the CSINode object.
-	UpdateCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error
-
-	// Remove in the cluster node information from the CSI driver with the given name.
-	// Concurrent calls to UninstallCSIDriver() is allowed, but they should not be intertwined with calls
-	// to other methods in this interface.
-	UninstallCSIDriver(driverName string) error
-
-	// UpdateCSINodeStorageHealth updates CSINode.Status.StorageHealth for the given
-	// driver with the provided conditions. Other drivers' entries are preserved.
-	// No-ops if the condition identity set for this driver is unchanged.
-	UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error
-}
-
-// NewNodeInfoManager initializes nodeInfoManager
+// NewNodeInfoManager initializes NodeInfoManager
 func NewNodeInfoManager(
 	nodeName types.NodeName,
 	volumeHost volume.VolumeHost,
-	migratedPlugins map[string](func() bool)) Interface {
-	return &nodeInfoManager{
+	migratedPlugins map[string](func() bool)) *NodeInfoManager {
+	return &NodeInfoManager{
 		nodeName:        nodeName,
 		volumeHost:      volumeHost,
 		migratedPlugins: migratedPlugins,
@@ -117,7 +91,8 @@ func NewNodeInfoManager(
 // CSINode object. If the CSINode object doesn't yet exist, it will be created.
 // If multiple calls to InstallCSIDriver() are made in parallel, some calls might receive Node or
 // CSINode update conflicts, which causes the function to retry the corresponding update.
-func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error {
+// Concurrent calls are allowed, but they must not be intertwined with calls to other methods.
+func (nim *NodeInfoManager) InstallCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error {
 	if driverNodeID == "" {
 		return fmt.Errorf("error adding CSI driver node info: driverNodeID must not be empty")
 	}
@@ -141,7 +116,7 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 }
 
 // UpdateCSIDriver updates CSIDrivers field in the CSINode object.
-func (nim *nodeInfoManager) UpdateCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error {
+func (nim *NodeInfoManager) UpdateCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error {
 	err := nim.updateCSINode(driverName, driverNodeID, maxAttachLimit, topology)
 	if err != nil {
 		return fmt.Errorf("error updating CSINode object with CSI driver node info: %w", err)
@@ -153,7 +128,8 @@ func (nim *nodeInfoManager) UpdateCSIDriver(driverName string, driverNodeID stri
 // CSINode object. If the CSINodeInfo object contains no CSIDrivers, it will be deleted.
 // If multiple calls to UninstallCSIDriver() are made in parallel, some calls might receive Node or
 // CSINode update conflicts, which causes the function to retry the corresponding update.
-func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
+// Concurrent calls are allowed, but they must not be intertwined with calls to other methods.
+func (nim *NodeInfoManager) UninstallCSIDriver(driverName string) error {
 	err := nim.uninstallDriverFromCSINode(driverName)
 	if err != nil {
 		return fmt.Errorf("error uninstalling CSI driver from CSINode object %v", err)
@@ -168,7 +144,7 @@ func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
 	return nil
 }
 
-func (nim *nodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
+func (nim *NodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
 	var updateErrs []error
 	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
 		if err := nim.tryUpdateNode(updateFuncs...); err != nil {
@@ -188,7 +164,7 @@ func (nim *nodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
 // Because updateFuncs are applied sequentially, later updateFuncs should take into account
 // the effects of previous updateFuncs to avoid potential conflicts. For example, if multiple
 // functions update the same field, updates in the last function are persisted.
-func (nim *nodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
+func (nim *NodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
 	nim.lock.Lock()
 	defer nim.lock.Unlock()
 
@@ -367,7 +343,7 @@ func updateTopologyLabels(topology map[string]string) nodeUpdateFunc {
 	}
 }
 
-func (nim *nodeInfoManager) updateCSINode(
+func (nim *NodeInfoManager) updateCSINode(
 	driverName string,
 	driverNodeID string,
 	maxAttachLimit int64,
@@ -392,7 +368,7 @@ func (nim *nodeInfoManager) updateCSINode(
 	return nil
 }
 
-func (nim *nodeInfoManager) tryUpdateCSINode(
+func (nim *NodeInfoManager) tryUpdateCSINode(
 	csiKubeClient clientset.Interface,
 	driverName string,
 	driverNodeID string,
@@ -417,7 +393,7 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 	return nim.installDriverToCSINode(nodeInfo, driverName, driverNodeID, maxAttachLimit, topology)
 }
 
-func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
+func (nim *NodeInfoManager) InitializeCSINodeWithAnnotation() error {
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
 		return goerrors.New("error getting CSI client")
@@ -438,7 +414,7 @@ func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
 	return nil
 }
 
-func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient clientset.Interface) error {
+func (nim *NodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient clientset.Interface) error {
 	nim.lock.Lock()
 	defer nim.lock.Unlock()
 
@@ -471,9 +447,9 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 
 }
 
-// ensureNodeOwnsCSINode will ensure that the current CSINode object is owned by the node represented by this nodeInfoManager.
+// ensureNodeOwnsCSINode will ensure that the current CSINode object is owned by the node represented by this NodeInfoManager.
 // If not, it will delete the existing CSINode object and return an error.
-func (nim *nodeInfoManager) ensureNodeOwnsCSINode(csiKubeClient clientset.Interface, nodeInfo *storagev1.CSINode) error {
+func (nim *NodeInfoManager) ensureNodeOwnsCSINode(csiKubeClient clientset.Interface, nodeInfo *storagev1.CSINode) error {
 	owned, csiNodeOwnerID := nim.nodeOwnsCSINode(nodeInfo)
 	if owned {
 		return nil
@@ -498,9 +474,9 @@ func (nim *nodeInfoManager) ensureNodeOwnsCSINode(csiKubeClient clientset.Interf
 	return fmt.Errorf("CSINode %q was owned by different node (oldNodeID=%q, newNodeID=%q), deleted it", nodeInfo.Name, csiNodeOwnerID, nim.nodeID)
 }
 
-// nodeOwnsCSINode checks if the CSINode object is owned by the node represented by this nodeInfoManager.
+// nodeOwnsCSINode checks if the CSINode object is owned by the node represented by this NodeInfoManager.
 // It also returns the current owner UID.
-func (nim *nodeInfoManager) nodeOwnsCSINode(nodeInfo *storagev1.CSINode) (bool, types.UID) {
+func (nim *NodeInfoManager) nodeOwnsCSINode(nodeInfo *storagev1.CSINode) (bool, types.UID) {
 	var csiNodeOwnerID types.UID
 	var found bool
 	for _, ownerRef := range nodeInfo.OwnerReferences {
@@ -521,7 +497,8 @@ func (nim *nodeInfoManager) nodeOwnsCSINode(nodeInfo *storagev1.CSINode) (bool, 
 	return found, csiNodeOwnerID
 }
 
-func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
+// CreateCSINode creates the CSINode object of this node, owned by the Node object.
+func (nim *NodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
@@ -555,7 +532,8 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 	return csiKubeClient.StorageV1().CSINodes().Create(context.TODO(), nodeInfo, metav1.CreateOptions{})
 }
 
-func (nim *nodeInfoManager) DeleteCSINode() error {
+// DeleteCSINode deletes the CSINode object of this node.
+func (nim *NodeInfoManager) DeleteCSINode() error {
 
 	csiKubeClient := nim.volumeHost.GetKubeClient()
 	if csiKubeClient == nil {
@@ -615,7 +593,7 @@ func keepAllocatableCount(driverInfoSpec storagev1.CSINodeDriver, maxAttachLimit
 	return driverInfoSpec.Allocatable != nil && driverInfoSpec.Allocatable.Count != nil && int64(*driverInfoSpec.Allocatable.Count) == maxAttachLimit
 }
 
-func (nim *nodeInfoManager) installDriverToCSINode(
+func (nim *NodeInfoManager) installDriverToCSINode(
 	nodeInfo *storagev1.CSINode,
 	driverName string,
 	driverNodeID string,
@@ -676,7 +654,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	return err
 }
 
-func (nim *nodeInfoManager) uninstallDriverFromCSINode(
+func (nim *NodeInfoManager) uninstallDriverFromCSINode(
 	csiDriverName string) error {
 
 	csiKubeClient := nim.volumeHost.GetKubeClient()
@@ -698,7 +676,7 @@ func (nim *nodeInfoManager) uninstallDriverFromCSINode(
 	return nil
 }
 
-func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
+func (nim *NodeInfoManager) tryUninstallDriverFromCSINode(
 	csiKubeClient clientset.Interface,
 	csiDriverName string) error {
 
@@ -761,7 +739,7 @@ func withoutStorageHealth(health []storagev1.StorageHealth, driverName string) (
 // driver with the provided conditions. Other drivers' entries are preserved.
 // No-ops if the status, reason, and volume-capability identities for this driver
 // are unchanged.
-func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error {
+func (nim *NodeInfoManager) UpdateCSINodeStorageHealth(ctx context.Context, driverName string, conditions []storagev1.StorageHealthCondition) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
 		return nil
 	}
@@ -785,7 +763,7 @@ func (nim *nodeInfoManager) UpdateCSINodeStorageHealth(ctx context.Context, driv
 	return nil
 }
 
-func (nim *nodeInfoManager) tryUpdateCSINodeStorageHealth(
+func (nim *NodeInfoManager) tryUpdateCSINodeStorageHealth(
 	ctx context.Context,
 	csiKubeClient clientset.Interface,
 	driverName string,

@@ -1506,13 +1506,13 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		gcDeletedOldCSI    bool
 		preCreateNewCSI    bool
 		enableVolumeHealth bool
-		act                func(nim Interface) error
+		act                func(nim *NodeInfoManager) error
 		verify             func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action)
 	}{
 		{
 			name:            "InstallCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
-			act: func(nim Interface) error {
+			act: func(nim *NodeInfoManager) error {
 				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
@@ -1523,7 +1523,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		{
 			name:            "InstallCSIDriver before GC deleted predecessor CSINode",
 			gcDeletedOldCSI: false,
-			act: func(nim Interface) error {
+			act: func(nim *NodeInfoManager) error {
 				return nim.InstallCSIDriver(driverName, driverID, 0, nil)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, _ []clienttesting.Action) {
@@ -1535,7 +1535,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 		{
 			name:            "UpdateCSIDriver after GC deleted predecessor CSINode",
 			gcDeletedOldCSI: true,
-			act: func(nim Interface) error {
+			act: func(nim *NodeInfoManager) error {
 				return nim.UpdateCSIDriver(driverName, driverID, 16, nil)
 			},
 		},
@@ -1544,7 +1544,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 			gcDeletedOldCSI:    true,
 			preCreateNewCSI:    true,
 			enableVolumeHealth: true,
-			act: func(nim Interface) error {
+			act: func(nim *NodeInfoManager) error {
 				return nim.UpdateCSINodeStorageHealth(t.Context(), driverName, healthConds)
 			},
 			verify: func(t *testing.T, csiNode *storage.CSINode, actions []clienttesting.Action) {
@@ -1571,7 +1571,7 @@ func TestNodeRecreatedSameNameRefreshesCSINodeOwnerUID(t *testing.T) {
 
 			client := getClientSet(oldNode, oldCSINode)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, nodeName, nil, nil)
-			nim := NewNodeInfoManager(nodeName, host, nil).(*nodeInfoManager)
+			nim := NewNodeInfoManager(nodeName, host, nil)
 
 			if err := nim.InitializeCSINodeWithAnnotation(); err != nil {
 				t.Fatalf("InitializeCSINodeWithAnnotation failed: %v", err)
@@ -1755,9 +1755,9 @@ func checkFreshTransitionTimes(t *testing.T, got, want []storage.StorageHealth, 
 	}
 }
 
-// newStorageHealthTestManager returns a nodeInfoManager backed by a fake client
+// newStorageHealthTestManager returns a NodeInfoManager backed by a fake client
 // holding a CSINode with the given drivers installed and the given storage health.
-func newStorageHealthTestManager(t *testing.T, installed []string, stored []storage.StorageHealth) (*nodeInfoManager, *fake.Clientset, string) {
+func newStorageHealthTestManager(t *testing.T, installed []string, stored []storage.StorageHealth) (*NodeInfoManager, *fake.Clientset, string) {
 	t.Helper()
 	node := generateNode(nil, nil, nil)
 	drivers := make([]storage.CSINodeDriver, 0, len(installed))
@@ -1778,7 +1778,7 @@ func newStorageHealthTestManager(t *testing.T, installed []string, stored []stor
 	}
 	client := getClientSet(node, csiNode)
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(t, t.TempDir(), client, nil, node.Name, nil, nil)
-	nim := NewNodeInfoManager(types.NodeName(node.Name), host, nil).(*nodeInfoManager)
+	nim := NewNodeInfoManager(types.NodeName(node.Name), host, nil)
 	nim.nodeID = node.UID
 	return nim, client, node.Name
 }

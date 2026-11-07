@@ -92,7 +92,7 @@ type RegistrationHandler struct {
 // corresponding sockets
 var csiDrivers = &DriversStore{}
 
-var nim nodeinfomanager.Interface
+var nim *nodeinfomanager.NodeInfoManager
 
 var csiNodeUpdaterVar *csiNodeUpdater
 
