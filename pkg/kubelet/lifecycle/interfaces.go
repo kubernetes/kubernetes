@@ -23,6 +23,8 @@ import (
 )
 
 // PodAdmitAttributes is the context for a pod admission decision.
+// Top-level fields describe the admission itself, while Update holds facts about the
+// allocated -> desired change precomputed once by the allocation manager.
 // The member fields of this struct should never be mutated.
 type PodAdmitAttributes struct {
 	// the pod to evaluate for admission
@@ -31,6 +33,18 @@ type PodAdmitAttributes struct {
 	OtherPods []*v1.Pod
 	// the operation being performed; either "add" or "update"
 	Operation Operation
+	// Update holds information about the pod update being evaluated.
+	// It is set if and only if Operation == UpdateOperation (nil for AddOperation).
+	Update *PodUpdate
+}
+
+// PodUpdate holds facts about the allocated -> desired change for an UpdateOperation,
+// precomputed once by the allocation manager.
+type PodUpdate struct {
+	// AllocatedPod is the pod as it is currently allocated on the node.
+	AllocatedPod *v1.Pod
+	// Resize is true if the update changes resources.
+	Resize bool
 }
 
 // Operation represents the type of operation being performed on a pod.

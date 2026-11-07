@@ -819,3 +819,53 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 		})
 	}
 }
+
+type recordingFailureHandler struct {
+	recordedAttrs *PodAdmitAttributes
+}
+
+func (f *recordingFailureHandler) HandleAdmissionFailure(_ context.Context, _ *v1.Pod, failureReasons []PredicateFailureReason, attrs *PodAdmitAttributes) ([]PredicateFailureReason, error) {
+	f.recordedAttrs = attrs
+	return failureReasons, nil
+}
+
+func TestPredicateAdmitHandlerPassesPodAdmitAttributes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(1000, 1000, 32, 0, 0, 0), Allocatable: makeAllocatableResources(1000, 1000, 32, 0, 0, 0)},
+	}
+	pod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(2000, resource.DecimalSI)})
+	allocatedPod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1000, resource.DecimalSI)})
+
+	var pluginUpdateAttrs *PodAdmitAttributes
+	failureHandler := &recordingFailureHandler{}
+	handler := NewPredicateAdmitHandler(
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil },
+		failureHandler,
+		func(_ *schedulerframework.NodeInfo, attrs *PodAdmitAttributes) error {
+			pluginUpdateAttrs = attrs
+			return nil
+		},
+	)
+
+	attrs := &PodAdmitAttributes{
+		Pod:       pod,
+		Operation: UpdateOperation,
+		Update: &PodUpdate{
+			AllocatedPod: allocatedPod,
+			Resize:       true,
+		},
+	}
+	res := handler.Admit(tCtx, attrs)
+	if res.Admit {
+		t.Fatalf("expected admission failure due to insufficient CPU, got Admit=true")
+	}
+	if pluginUpdateAttrs != attrs {
+		t.Errorf("expected pluginResourceUpdateFunc to receive attrs %v, got %v", attrs, pluginUpdateAttrs)
+	}
+	if failureHandler.recordedAttrs != attrs {
+		t.Errorf("expected HandleAdmissionFailure to receive attrs %v, got %v", attrs, failureHandler.recordedAttrs)
+	}
+}
+
