@@ -3230,6 +3230,30 @@ func TestDropHTTPProbeProtocol(t *testing.T) {
 	}
 }
 
+func TestDropHTTPProbeProtocolUnsupportedValue(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, false)
+
+	// Unsupported values must not be dropped, so that validation can reject
+	// them regardless of the feature gate state.
+	proto := api.HTTPProtocol("SPDY")
+	podSpec := &api.PodSpec{
+		Containers: []api.Container{{
+			Name: "test",
+			LivenessProbe: &api.Probe{
+				ProbeHandler: api.ProbeHandler{
+					HTTPGet: &api.HTTPGetAction{Path: "/", Port: intstr.FromInt32(80), Scheme: api.URISchemeHTTP, Protocol: &proto},
+				},
+			},
+		}},
+	}
+
+	dropDisabledFields(podSpec, nil, nil, nil)
+
+	if got := podSpec.Containers[0].LivenessProbe.HTTPGet.Protocol; got == nil || *got != proto {
+		t.Fatalf("expected unsupported protocol to be preserved for validation, got %v", got)
+	}
+}
+
 func TestSupplementalGroupsPolicyNotDropped(t *testing.T) {
 	supplementalGroupsPolicyMerge := api.SupplementalGroupsPolicyMerge
 	podWithSupplementalGroupsPolicy := func() *api.Pod {

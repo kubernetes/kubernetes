@@ -68,6 +68,18 @@ var ProberDuration = metrics.NewHistogramVec(
 		"namespace"},
 )
 
+// ProbeProtocolResults stores the cumulative number of HTTP probes by protocol and result as a
+// low-cardinality prometheus metric, independent of ProberResults' per-pod/container labels.
+var ProbeProtocolResults = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Subsystem:      "kubelet",
+		Name:           "probe_protocol_total",
+		Help:           "Cumulative number of HTTP probes by protocol and result.",
+		StabilityLevel: metrics.BETA,
+	},
+	[]string{"protocol", "result"},
+)
+
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
