@@ -469,22 +469,6 @@ func (p *params) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// set stores an integer parameter for subsequent operations that need it.
-func (p *params) set(key string, val int) error {
-	if p.params == nil {
-		p.params = map[string]any{}
-	}
-	if p.isUsed == nil {
-		p.isUsed = map[string]bool{}
-	}
-	if _, exists := p.params[key]; exists && !p.isUsed[key] {
-		return fmt.Errorf("parameter %s is already defined", key)
-	}
-	p.params[key] = float64(val)
-	p.isUsed[key] = false
-	return nil
-}
-
 // get retrieves the parameter as an integer
 func (p params) get(key string) (int, error) {
 	// JSON unmarshal integer constants in an "any" field as float.
