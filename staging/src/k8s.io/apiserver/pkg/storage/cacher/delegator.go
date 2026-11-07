@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -91,18 +92,34 @@ func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Obj
 	if !canServeDeleteFromCache {
 		return c.deleteUsingStore(ctx, key, out, preconditions, validateDeletion, opts)
 	}
-	err := c.deleteUsingCache(ctx, key, out, preconditions, validateDeletion)
+	var userErr error
+	wrappedValidate := validateDeletion
+	if validateDeletion != nil {
+		wrappedValidate = func(ctx context.Context, obj runtime.Object) error {
+			userErr = validateDeletion(ctx, obj)
+			return userErr
+		}
+	}
+	err := c.deleteUsingCache(ctx, key, out, preconditions, wrappedValidate)
+	success := "true"
+	fallback := "false"
 	if err != nil {
 		// IsTooLargeResourceVersion occurs when the requested RV is higher than cache's current RV
 		// and cache hasn't caught up within the timeout period.
 		if storage.IsTooLargeResourceVersion(err) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCacheSkipTimeoutFallback) {
+				fallback = "skipped"
 				err = errors.NewTooManyRequests(err.Error(), resourceVersionTooHighRetrySeconds)
 			} else {
-				err = c.deleteUsingStore(ctx, key, out, preconditions, validateDeletion, opts)
+				fallback = "true"
+				err = c.deleteUsingStore(ctx, key, out, preconditions, wrappedValidate, opts)
 			}
 		}
+		if err != nil && !storage.IsNotFound(err) && !storage.IsInvalidObj(err) && !goerrors.Is(err, userErr) {
+			success = "false"
+		}
 	}
+	metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, requestVerb(ctx), success, fallback).Add(1)
 	return err
 }
 
@@ -188,7 +205,7 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 				success = "false"
 			}
 		}
-		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, requestVerb(ctx), success, fallback).Add(1)
 	}
 	return err
 }
@@ -237,12 +254,12 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 			if err != nil {
 				success = "false"
 			}
-			metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+			metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, requestVerb(ctx), success, fallback).Add(1)
 		}
 		return err
 	}
 	if result.ConsistentRead {
-		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
+		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, requestVerb(ctx), success, fallback).Add(1)
 	}
 	return nil
 }
@@ -260,18 +277,36 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	if !canServeUpdateFromCache {
 		return c.updateUsingStore(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate)
 	}
-	err := c.updateUsingCache(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate)
+	var userErr error
+	wrappedUpdate := tryUpdate
+	if tryUpdate != nil {
+		wrappedUpdate = func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			var ret runtime.Object
+			var ttl *uint64
+			ret, ttl, userErr = tryUpdate(input, res)
+			return ret, ttl, userErr
+		}
+	}
+	err := c.updateUsingCache(ctx, key, destination, ignoreNotFound, preconditions, wrappedUpdate)
+	success := "true"
+	fallback := "false"
 	if err != nil {
 		// IsTooLargeResourceVersion occurs when the requested RV is higher than cache's current RV
 		// and cache hasn't caught up within the timeout period.
 		if storage.IsTooLargeResourceVersion(err) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCacheSkipTimeoutFallback) {
+				fallback = "skipped"
 				err = errors.NewTooManyRequests(err.Error(), resourceVersionTooHighRetrySeconds)
 			} else {
-				err = c.updateUsingStore(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate)
+				fallback = "true"
+				err = c.updateUsingStore(ctx, key, destination, ignoreNotFound, preconditions, wrappedUpdate)
 			}
 		}
+		if err != nil && !storage.IsNotFound(err) && !storage.IsInvalidObj(err) && !goerrors.Is(err, userErr) {
+			success = "false"
+		}
 	}
+	metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, requestVerb(ctx), success, fallback).Add(1)
 	return err
 }
 

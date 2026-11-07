@@ -38,7 +38,9 @@ type MockStorage struct {
 	GetRVFn            func(_ context.Context) (uint64, error)
 	WatchFn            func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 	DeleteFn           func(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object, _ storage.DeleteOptions) error
+	DeleteOnceFn       func(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object) error
 	GuaranteedUpdateFn func(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error
+	UpdateOnceFn       func(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object, _ uint64, _ runtime.Object, _ bool) (*storage.ObjState, error)
 
 	// use GetRequestWatchProgressCounter when reading
 	// the value of the counter
@@ -94,7 +96,10 @@ func (d *MockStorage) Delete(ctx context.Context, key string, out runtime.Object
 	}
 	return fmt.Errorf("unimplemented")
 }
-func (d *MockStorage) DeleteOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object) error {
+func (d *MockStorage) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
+	if d.DeleteOnceFn != nil {
+		return d.DeleteOnceFn(ctx, key, origState, out)
+	}
 	return fmt.Errorf("unimplemented")
 }
 func (d *MockStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
@@ -130,7 +135,10 @@ func (d *MockStorage) GuaranteedUpdate(ctx context.Context, key string, destinat
 	}
 	return fmt.Errorf("unimplemented")
 }
-func (d *MockStorage) UpdateOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object, _ uint64, _ runtime.Object, _ bool) (*storage.ObjState, error) {
+func (d *MockStorage) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, error) {
+	if d.UpdateOnceFn != nil {
+		return d.UpdateOnceFn(ctx, key, origState, obj, ttl, destination, ignoreNotFound)
+	}
 	return nil, fmt.Errorf("unimplemented")
 }
 func (d *MockStorage) Stats(_ context.Context) (storage.Stats, error) {

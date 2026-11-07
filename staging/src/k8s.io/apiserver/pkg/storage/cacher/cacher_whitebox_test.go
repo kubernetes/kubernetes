@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
@@ -397,8 +398,10 @@ func mustAtoi(s string) int {
 func TestConsistentReadFallback(t *testing.T) {
 	tcs := []struct {
 		name                string
-		getOnly             bool
+		singleKeyOnly       bool
+		txnOnly             bool
 		notFound            bool
+		callbackError       bool
 		skipStorageFallback bool
 		watchCacheRV        string
 		storageRV           string
@@ -421,12 +424,12 @@ func TestConsistentReadFallback(t *testing.T) {
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true", verb="%s"} 1
 `,
 		},
 		{
 			name:                    "Success NotFound",
-			getOnly:                 true,
+			singleKeyOnly:           true,
 			notFound:                true,
 			watchCacheRV:            "42",
 			storageRV:               "42",
@@ -436,7 +439,22 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true", verb="%s"} 1
+`,
+		},
+		{
+			name:                    "Success Callback Error",
+			singleKeyOnly:           true,
+			txnOnly:                 true,
+			callbackError:           true,
+			watchCacheRV:            "42",
+			storageRV:               "42",
+			expectError:             true,
+			expectRequestsToStorage: 1,
+			expectMetric: `
+# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
+# TYPE apiserver_watch_cache_consistent_read_total counter
+apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true", verb="%s"} 1
 `,
 		},
 		{
@@ -449,12 +467,12 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true", verb="%s"} 1
 `,
 		},
 		{
 			name:                    "Fallback NotFound",
-			getOnly:                 true,
+			singleKeyOnly:           true,
 			notFound:                true,
 			watchCacheRV:            "2",
 			storageRV:               "42",
@@ -465,7 +483,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true", verb="%s"} 1
 `,
 		},
 		{
@@ -479,7 +497,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="false"} 1
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="false", verb="%s"} 1
 `,
 		},
 		{
@@ -494,22 +512,45 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resource="pods", success="false"} 1
+apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resource="pods", success="false", verb="%s"} 1
 `,
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.getOnly {
+			if !tc.singleKeyOnly {
 				t.Run("GetList", func(t *testing.T) {
 					delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
-					testConsistentListFallback(t, delegator, fakeClock, requestToStorageCount, registry, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+					listCtx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Verb: "list"})
+					testConsistentListFallback(t, listCtx, delegator, fakeClock, requestToStorageCount, registry, "LIST", tc.expectRV, tc.expectBlock, tc.expectError, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
 				})
 			}
-			t.Run("Get", func(t *testing.T) {
+			if !tc.txnOnly {
+				t.Run("Get", func(t *testing.T) {
+					delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
+					getCtx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Verb: "get"})
+					testConsistentGetFallback(t, getCtx, delegator, fakeClock, requestToStorageCount, registry, "GET", tc.notFound, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectNotFound, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+				})
+				t.Run("GetWithoutRequestInfo", func(t *testing.T) {
+					delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
+					testConsistentGetFallback(t, context.TODO(), delegator, fakeClock, requestToStorageCount, registry, "", tc.notFound, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectNotFound, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+				})
+			}
+			t.Run("Delete", func(t *testing.T) {
 				delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
-				testConsistentGetFallback(t, delegator, fakeClock, requestToStorageCount, registry, tc.notFound, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectNotFound, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+				deleteCtx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Verb: "delete"})
+				testConsistentDeleteFallback(t, deleteCtx, delegator, fakeClock, requestToStorageCount, registry, "DELETE", tc.notFound, tc.callbackError, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectNotFound, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+			})
+			t.Run("GuaranteedUpdate", func(t *testing.T) {
+				delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
+				updateCtx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Verb: "update"})
+				testConsistentUpdateFallback(t, updateCtx, delegator, fakeClock, requestToStorageCount, registry, "UPDATE", tc.notFound, tc.callbackError, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectNotFound, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
+			})
+			t.Run("Patch", func(t *testing.T) {
+				delegator, fakeClock, requestToStorageCount, registry := setupConsistentReadFallback(t, tc.watchCacheRV, tc.storageRV, tc.fallbackError, tc.skipStorageFallback)
+				patchCtx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Verb: "patch"})
+				testConsistentUpdateFallback(t, patchCtx, delegator, fakeClock, requestToStorageCount, registry, "PATCH", tc.notFound, tc.callbackError, tc.expectRV, tc.expectBlock, tc.expectError, tc.expectNotFound, tc.expectTooManyRequests, tc.expectRequestsToStorage, tc.expectMetric)
 			})
 		})
 	}
@@ -588,6 +629,74 @@ func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, f
 		}
 		return nil
 	}
+	backingStorage.DeleteOnceFn = func(_ context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
+		requestToStorageCount += 1
+		rv := int64(mustAtoi(storageRV))
+		if origState.Rev != rv {
+			return storage.NewResourceVersionConflictsError(key, rv)
+		}
+		pod := out.(*example.Pod)
+		*pod = example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod1",
+				Namespace:       "ns",
+				ResourceVersion: storageRV,
+			},
+		}
+		return nil
+	}
+	backingStorage.DeleteFn = func(_ context.Context, key string, out runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc, _ runtime.Object, _ storage.DeleteOptions) error {
+		requestToStorageCount += 1
+		if fallbackError {
+			return errDummy
+		}
+		if key != "/pods/ns/pod1" {
+			return storage.NewKeyNotFoundError(key, int64(mustAtoi(storageRV)))
+		}
+		pod := out.(*example.Pod)
+		*pod = example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod1",
+				Namespace:       "ns",
+				ResourceVersion: storageRV,
+			},
+		}
+		return nil
+	}
+	backingStorage.UpdateOnceFn = func(_ context.Context, key string, origState *storage.ObjState, _ runtime.Object, _ uint64, destination runtime.Object, _ bool) (*storage.ObjState, error) {
+		requestToStorageCount += 1
+		rv := int64(mustAtoi(storageRV))
+		if origState.Rev != rv {
+			return nil, storage.NewResourceVersionConflictsError(key, rv)
+		}
+		pod := destination.(*example.Pod)
+		*pod = example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod1",
+				Namespace:       "ns",
+				ResourceVersion: storageRV,
+			},
+		}
+		return origState, nil
+	}
+	backingStorage.GuaranteedUpdateFn = func(_ context.Context, key string, destination runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
+		requestToStorageCount += 1
+		if fallbackError {
+			return errDummy
+		}
+		if key != "/pods/ns/pod1" {
+			return storage.NewKeyNotFoundError(key, int64(mustAtoi(storageRV)))
+		}
+		pod := destination.(*example.Pod)
+		*pod = example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod1",
+				Namespace:       "ns",
+				ResourceVersion: storageRV,
+			},
+		}
+		return nil
+	}
 	backingStorage.GetRVFn = func(_ context.Context) (uint64, error) {
 		requestToStorageCount += 1
 		rv, err := strconv.Atoi(storageRV)
@@ -599,16 +708,16 @@ func setupConsistentReadFallback(t *testing.T, watchCacheRV, storageRV string, f
 	return delegator, fakeClock, &requestToStorageCount, registry
 }
 
-func testConsistentListFallback(t *testing.T, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, expectRV string, expectBlock, expectError, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
+func testConsistentListFallback(t *testing.T, reqCtx context.Context, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, expectVerb, expectRV string, expectBlock, expectError, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
 	t.Helper()
 	testConsistentReadFallback(t, fakeClock, requestToStorageCount, registry, func() (string, error) {
 		result := &example.PodList{}
-		err := delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
+		err := delegator.GetList(reqCtx, "/pods/ns", storage.ListOptions{ResourceVersion: "", Recursive: true}, result)
 		return result.ResourceVersion, err
-	}, expectRV, expectBlock, expectError, false, expectTooManyRequests, expectRequestsToStorage, expectMetric)
+	}, expectRV, expectBlock, expectError, false, expectTooManyRequests, expectRequestsToStorage, fmt.Sprintf(expectMetric, expectVerb))
 }
 
-func testConsistentGetFallback(t *testing.T, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, notFound bool, expectRV string, expectBlock, expectError, expectNotFound, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
+func testConsistentGetFallback(t *testing.T, reqCtx context.Context, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, expectVerb string, notFound bool, expectRV string, expectBlock, expectError, expectNotFound, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
 	t.Helper()
 	key := "/pods/ns/pod1"
 	if notFound {
@@ -616,9 +725,49 @@ func testConsistentGetFallback(t *testing.T, delegator *CacheDelegator, fakeCloc
 	}
 	testConsistentReadFallback(t, fakeClock, requestToStorageCount, registry, func() (string, error) {
 		result := &example.Pod{}
-		err := delegator.Get(context.TODO(), key, storage.GetOptions{ResourceVersion: ""}, result)
+		err := delegator.Get(reqCtx, key, storage.GetOptions{ResourceVersion: ""}, result)
 		return result.ResourceVersion, err
-	}, expectRV, expectBlock, expectError, expectNotFound, expectTooManyRequests, expectRequestsToStorage, expectMetric)
+	}, expectRV, expectBlock, expectError, expectNotFound, expectTooManyRequests, expectRequestsToStorage, fmt.Sprintf(expectMetric, expectVerb))
+}
+
+func testConsistentDeleteFallback(t *testing.T, reqCtx context.Context, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, expectVerb string, notFound, callbackError bool, expectRV string, expectBlock, expectError, expectNotFound, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
+	t.Helper()
+	key := "/pods/ns/pod1"
+	if notFound {
+		key = "/pods/ns/missing"
+	}
+	validateDeletion := storage.ValidateAllObjectFunc
+	if callbackError {
+		errValidation := errors.New("validation error")
+		validateDeletion = func(_ context.Context, _ runtime.Object) error {
+			return errValidation
+		}
+	}
+	testConsistentReadFallback(t, fakeClock, requestToStorageCount, registry, func() (string, error) {
+		result := &example.Pod{}
+		err := delegator.Delete(reqCtx, key, result, &storage.Preconditions{}, validateDeletion, nil, storage.DeleteOptions{})
+		return result.ResourceVersion, err
+	}, expectRV, expectBlock, expectError, expectNotFound, expectTooManyRequests, expectRequestsToStorage, fmt.Sprintf(expectMetric, expectVerb))
+}
+
+func testConsistentUpdateFallback(t *testing.T, reqCtx context.Context, delegator *CacheDelegator, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, expectVerb string, notFound, callbackError bool, expectRV string, expectBlock, expectError, expectNotFound, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
+	t.Helper()
+	key := "/pods/ns/pod1"
+	if notFound {
+		key = "/pods/ns/missing"
+	}
+	errCallback := errors.New("update callback error")
+	tryUpdate := storage.SimpleUpdate(func(input runtime.Object) (runtime.Object, error) {
+		if callbackError {
+			return nil, errCallback
+		}
+		return input, nil
+	})
+	testConsistentReadFallback(t, fakeClock, requestToStorageCount, registry, func() (string, error) {
+		result := &example.Pod{}
+		err := delegator.GuaranteedUpdate(reqCtx, key, result, false, &storage.Preconditions{}, tryUpdate, nil)
+		return result.ResourceVersion, err
+	}, expectRV, expectBlock, expectError, expectNotFound, expectTooManyRequests, expectRequestsToStorage, fmt.Sprintf(expectMetric, expectVerb))
 }
 
 func testConsistentReadFallback(t *testing.T, fakeClock *testingclock.FakeClock, requestToStorageCount *int, registry k8smetrics.KubeRegistry, readFn func() (string, error), expectRV string, expectBlock, expectError, expectNotFound, expectTooManyRequests bool, expectRequestsToStorage int, expectMetric string) {
