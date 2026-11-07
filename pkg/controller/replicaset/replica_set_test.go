@@ -1225,7 +1225,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, informerSyncTimeout, true, func(ctx context.Context) (bool, error) {
 		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
@@ -1277,7 +1277,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, informerSyncTimeout, true, func(ctx context.Context) (bool, error) {
 		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
@@ -1319,7 +1319,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatal("New RS has the same UID as the old one!")
 	}
 
-	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, informerSyncTimeout, true, func(ctx context.Context) (bool, error) {
 		logger.V(8).Info("Waiting for queue to have 1 item", "length", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
