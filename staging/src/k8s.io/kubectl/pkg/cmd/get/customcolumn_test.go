@@ -326,7 +326,61 @@ foo    baz           <none>
 				},
 			},
 			expectedOutput: `NAME
-^[ \r
+^[ ...
+`,
+		},
+		{
+			// tabwriter ends a row at a break character, so a value that spans
+			// several lines would be printed as extra lines that belong to no
+			// object. Cut the value there, the way the default table printer
+			// already does.
+			columns: []Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "NOTE",
+					FieldSpec: "{.metadata.annotations.note}",
+				},
+			},
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
+					{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{"note": "first line\nsecond line"}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "bar", Annotations: map[string]string{"note": "visible\rOVERWRITTEN"}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "baz", Annotations: map[string]string{"note": "page-one\fpage-two"}}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "qux", Annotations: map[string]string{"note": "single line"}}},
+				},
+			},
+			expectedOutput: `NAME   NOTE
+foo    first line...
+bar    visible...
+baz    page-one...
+qux    single line
+`,
+		},
+		{
+			columns: []Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "MESSAGE",
+					FieldSpec: "{.status.containerStatuses[*].state.terminated.message}",
+				},
+			},
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Status: corev1.PodStatus{
+					ContainerStatuses: []corev1.ContainerStatus{
+						{Name: "app", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Message: "panic: boom\ngoroutine 1 [running]:"}}},
+						{Name: "sidecar", State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{Message: "done"}}},
+					},
+				},
+			},
+			expectedOutput: `NAME   MESSAGE
+foo    panic: boom...,done
 `,
 		},
 	}

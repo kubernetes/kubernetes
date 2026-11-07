@@ -38,6 +38,20 @@ import (
 
 var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
 
+// cellBreakChars are characters that cause cell value truncation.
+// Formfeed is included because tabwriter treats it as a newline.
+const cellBreakChars = "\f\n\r"
+
+// escapeCell cuts a value at its first line break, the way the default table
+// printer does, so that a multi-line value cannot spill into rows that belong
+// to no object.
+func escapeCell(str string) string {
+	if breakIndex := strings.IndexAny(str, cellBreakChars); breakIndex >= 0 {
+		str = str[:breakIndex] + "..."
+	}
+	return printers.EscapeTerminal(str)
+}
+
 // RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
 //   - metadata.name (no leading '.' or curly braces '{...}'
 //   - {metadata.name} (no leading '.')
@@ -253,7 +267,7 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 		}
 		for arrIx := range values {
 			for valIx := range values[arrIx] {
-				valueStrings = append(valueStrings, printers.EscapeTerminal(fmt.Sprint(values[arrIx][valIx].Interface())))
+				valueStrings = append(valueStrings, escapeCell(fmt.Sprint(values[arrIx][valIx].Interface())))
 			}
 		}
 		columns[ix] = strings.Join(valueStrings, ",")
