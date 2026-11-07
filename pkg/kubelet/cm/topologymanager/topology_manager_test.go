@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -762,6 +763,64 @@ func TestAdmitWithPodLevelResources(t *testing.T) {
 			}
 			if tracker.allocateContainerCalled != tc.expectedAllocateContainerCalled {
 				t.Errorf("Expected allocateContainerCalled to be %v got %v", tc.expectedAllocateContainerCalled, tracker.allocateContainerCalled)
+			}
+		})
+	}
+}
+
+// mockAdmitTransactionalHintProvider is a HintProvider implementing AdmitTransactionalHintProvider
+// that records its calls, prefixed with its name, in a slice shared by providers.
+type mockAdmitTransactionalHintProvider struct {
+	mockHintProvider
+	name  string
+	calls *[]string
+}
+
+func (m *mockAdmitTransactionalHintProvider) CompleteAdmit(_ context.Context, _ *v1.Pod, operation lifecycle.Operation, result lifecycle.AdmitResult) {
+	*m.calls = append(*m.calls, fmt.Sprintf("%s:Complete(%s, %s)", m.name, operation, result))
+}
+
+func TestCompleteAdmit(t *testing.T) {
+	tcases := []struct {
+		name      string
+		operation lifecycle.Operation
+		result    lifecycle.AdmitResult
+		expected  []string
+	}{
+		{
+			name:      "success",
+			operation: lifecycle.ResizeOperation,
+			result:    lifecycle.AdmitSuccess,
+			expected:  []string{"first:Complete(resize, success)", "second:Complete(resize, success)"},
+		},
+		{
+			name:      "failure",
+			operation: lifecycle.ResizeOperation,
+			result:    lifecycle.AdmitFailure,
+			expected:  []string{"first:Complete(resize, failure)", "second:Complete(resize, failure)"},
+		},
+		{
+			name:      "the operation is passed to the providers",
+			operation: lifecycle.AddOperation,
+			result:    lifecycle.AdmitSuccess,
+			expected:  []string{"first:Complete(add, success)", "second:Complete(add, success)"},
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			var calls []string
+			m := &manager{scope: NewNoneScope()}
+			m.AddHintProvider(logger, &mockAdmitTransactionalHintProvider{name: "first", calls: &calls})
+			// A provider that does not implement AdmitTransactionalHintProvider is skipped.
+			m.AddHintProvider(logger, &mockHintProvider{})
+			m.AddHintProvider(logger, &mockAdmitTransactionalHintProvider{name: "second", calls: &calls})
+
+			m.CompleteAdmit(ctx, &lifecycle.PodAdmitAttributes{Pod: &v1.Pod{}, Operation: tc.operation}, tc.result)
+
+			if !slices.Equal(calls, tc.expected) {
+				t.Errorf("Expected calls %v, got %v", tc.expected, calls)
 			}
 		})
 	}

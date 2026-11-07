@@ -856,7 +856,8 @@ func returnTestCases() []testCase {
 				},
 			},
 			defaultCPUSet: cpuset.New(),
-			expectedHints: []topologymanager.TopologyHint{},
+			// Handled as a resize, which the static policy does not support yet.
+			expectedHints: nil,
 		},
 		{
 			name:      "Requested more than already allocated",
@@ -868,7 +869,8 @@ func returnTestCases() []testCase {
 				},
 			},
 			defaultCPUSet: cpuset.New(),
-			expectedHints: []topologymanager.TopologyHint{},
+			// Handled as a resize, which the static policy does not support yet.
+			expectedHints: nil,
 		},
 		{
 			name:                            "Pod has pod level resources but PodLevelResourceManagersEnabled is disabled, no hint generation",
