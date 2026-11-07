@@ -114,8 +114,7 @@ func (c *Controller) Run(ctx context.Context) {
 		wg.Wait()
 	}()
 
-	if !cache.WaitForCacheSync(ctx.Done(), c.leasesSynced, c.storageVersionSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.leasesSynced, c.storageVersionSynced) {
 		return
 	}
 
