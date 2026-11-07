@@ -584,16 +584,6 @@ const (
 	// Enables the kubelet allocated pods endpoint.
 	KubeletAllocatedPodsEndpoint featuregate.Feature = "KubeletAllocatedPodsEndpoint"
 
-	// owner: @marquiz
-	// kep: http://kep.k8s.io/4033
-	//
-	// Enable detection of the kubelet cgroup driver configuration option from
-	// the CRI.  The CRI runtime also needs to support this feature in which
-	// case the kubelet will ignore the cgroupDriver (--cgroup-driver)
-	// configuration option. If runtime doesn't support it, the kubelet will
-	// fallback to using it's cgroupDriver option.
-	KubeletCgroupDriverFromCRI featuregate.Feature = "KubeletCgroupDriverFromCRI"
-
 	// owner: @lauralorenz @hankfreund
 	// kep: https://kep.k8s.io/5593
 	//
@@ -677,6 +667,14 @@ const (
 	// Enable kubelet to send the service account token bound to the pod for which the image
 	// is being pulled to the credential provider plugin.
 	KubeletServiceAccountTokenForCredentialProviders featuregate.Feature = "KubeletServiceAccountTokenForCredentialProviders"
+
+	// owner: @carlory
+	// kep: https://kep.k8s.io/4033
+	//
+	// Fall back to the cgroup driver from the kubelet configuration when the
+	// runtime does not implement RuntimeConfig. Enable temporarily to allow
+	// the runtime to be upgraded after a kubelet upgrade.
+	LegacyCgroupDriverFallback featuregate.Feature = "LegacyCgroupDriverFallback"
 
 	// owner: @RobertKrawitz
 	//
@@ -1626,12 +1624,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	KubeletCgroupDriverFromCRI: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
 	KubeletCrashLoopBackOffMax: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -1689,6 +1681,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	KubeletServiceAccountTokenForCredentialProviders: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	LegacyCgroupDriverFallback: {
+		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {
@@ -2505,8 +2502,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	KubeletAllocatedPodsEndpoint: {},
 
-	KubeletCgroupDriverFromCRI: {},
-
 	KubeletCrashLoopBackOffMax: {},
 
 	KubeletEnsureSecretPulledImages: {},
@@ -2528,6 +2523,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletSeparateDiskGC: {},
 
 	KubeletServiceAccountTokenForCredentialProviders: {},
+
+	LegacyCgroupDriverFallback: {},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {},
 

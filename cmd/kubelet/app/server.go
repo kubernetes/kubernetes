@@ -813,7 +813,8 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Get cgroup driver setting from CRI
-	if err := getCgroupDriverFromCRI(ctx, s, kubeDeps); err != nil {
+	cgroupDriver, err := getCgroupDriverFromCRI(ctx, s, kubeDeps)
+	if err != nil {
 		return err
 	}
 
@@ -824,7 +825,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	var cgroupRoots []string
-	nodeAllocatableRoot := cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupsPerQOS, s.CgroupDriver)
+	nodeAllocatableRoot := cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupsPerQOS, cgroupDriver)
 	cgroupRoots = append(cgroupRoots, nodeAllocatableRoot)
 	kubeletCgroup, err := cm.GetKubeletContainer(logger, s.KubeletCgroups)
 	if err != nil {
@@ -932,7 +933,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				KubeletOOMScoreAdj:    s.OOMScoreAdj,
 				CgroupsPerQOS:         s.CgroupsPerQOS,
 				CgroupRoot:            s.CgroupRoot,
-				CgroupDriver:          s.CgroupDriver,
+				CgroupDriver:          cgroupDriver,
 				KubeletRootDir:        s.RootDirectory,
 				ProtectKernelDefaults: s.ProtectKernelDefaults,
 				NodeAllocatableConfig: cm.NodeAllocatableConfig{
@@ -1466,7 +1467,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	return tp, nil
 }
 
-func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
+func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (string, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Getting CRI runtime configuration information")
 
@@ -1479,40 +1480,43 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 	for range 3 {
 		runtimeConfig, err = kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
 		if err != nil {
-			s, ok := status.FromError(err)
-			if !ok || s.Code() != codes.Unimplemented {
+			runtimeStatus, ok := status.FromError(err)
+			if !ok || runtimeStatus.Code() != codes.Unimplemented {
 				// We could introduce a backoff delay or jitter, but this is largely catching cases
 				// where the runtime is still starting up and we request too early.
 				// Give it a little more time.
 				time.Sleep(time.Second * 2)
 				continue
 			}
-			// CRI implementation doesn't support RuntimeConfig, fallback
+			if !utilfeature.DefaultFeatureGate.Enabled(features.LegacyCgroupDriverFallback) {
+				return "", fmt.Errorf("the container runtime does not implement RuntimeConfig: upgrade the runtime, or temporarily set --feature-gates=LegacyCgroupDriverFallback=true to use cgroupDriver from the kubelet configuration: %w", err)
+			}
 			legacyregistry.MustRegister(kubeletmetrics.CRILosingSupport)
 			kubeletmetrics.CRILosingSupport.WithLabelValues("1.38.0").Inc()
-			logger.Info("CRI implementation should be updated to support RuntimeConfig. Falling back to using cgroupDriver from kubelet config.")
-			return nil
+			logger.Info("Falling back to cgroupDriver from the kubelet configuration because LegacyCgroupDriverFallback is enabled. This fallback is deprecated; upgrade the container runtime to support RuntimeConfig")
+			return s.CgroupDriver, nil
 		}
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Calling GetLinux().GetCgroupDriver() won't segfault, but it will always default to systemd
 	// which is not intended by the fields not being populated
 	linuxConfig := runtimeConfig.GetLinux()
 	if linuxConfig == nil {
-		return nil
+		return "", nil
 	}
 
+	var driver string
 	switch d := linuxConfig.GetCgroupDriver(); d {
 	case runtimeapi.CgroupDriver_SYSTEMD:
-		s.CgroupDriver = "systemd"
+		driver = "systemd"
 	case runtimeapi.CgroupDriver_CGROUPFS:
-		s.CgroupDriver = "cgroupfs"
+		driver = "cgroupfs"
 	default:
-		return fmt.Errorf("runtime returned an unknown cgroup driver %d", d)
+		return "", fmt.Errorf("runtime returned an unknown cgroup driver %d", d)
 	}
-	logger.Info("Using cgroup driver setting received from the CRI runtime", "cgroupDriver", s.CgroupDriver)
-	return nil
+	logger.Info("Using cgroup driver setting received from the CRI runtime", "cgroupDriver", driver)
+	return driver, nil
 }
