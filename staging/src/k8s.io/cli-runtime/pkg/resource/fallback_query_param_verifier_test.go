@@ -119,10 +119,10 @@ func TestFallbackQueryParamVerifier_PrimaryNoFallback(t *testing.T) {
 		},
 	}
 
-	root := openapi3.NewRoot(cached.NewClient(openapitest.NewEmbeddedFileClient()))
+	resources := openapi3.NewResources(cached.NewClient(openapitest.NewEmbeddedFileClient()))
 	for tn, tc := range tests {
 		t.Run(tn, func(t *testing.T) {
-			primary := createFakeV3Verifier(tc.crds, root, tc.queryParam)
+			primary := createFakeV3Verifier(tc.crds, resources, tc.queryParam)
 			// secondary verifier should not be called.
 			secondary := &failingVerifier{name: "secondary", t: t}
 			verifier := NewFallbackQueryParamVerifier(primary, secondary)
@@ -270,11 +270,11 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 
 	// Primary OpenAPI client always returns "NotFound" error, so secondary verifier is used.
 	fakeOpenAPIClient := openapitest.NewFakeClient()
-	root := openapi3.NewRoot(fakeOpenAPIClient)
+	resources := openapi3.NewResources(fakeOpenAPIClient)
 	for tn, tc := range tests {
 		t.Run(tn, func(t *testing.T) {
 			fakeOpenAPIClient.ForcedErr = tc.primaryError
-			primary := createFakeV3Verifier(tc.crds, root, tc.queryParam)
+			primary := createFakeV3Verifier(tc.crds, resources, tc.queryParam)
 			secondary := createFakeLegacyVerifier(tc.crds, &fakeSchema, tc.queryParam)
 			verifier := NewFallbackQueryParamVerifier(primary, secondary)
 			err := verifier.HasSupport(tc.gvk)
@@ -289,12 +289,12 @@ func TestFallbackQueryParamVerifier_SecondaryFallback(t *testing.T) {
 
 // createFakeV3Verifier returns a fake OpenAPI V3 queryParamVerifierV3 struct
 // filled in with passed values; implements Verifier interface.
-func createFakeV3Verifier(crds []schema.GroupKind, root openapi3.Root, queryParam VerifiableQueryParam) Verifier {
+func createFakeV3Verifier(crds []schema.GroupKind, resources openapi3.Resources, queryParam VerifiableQueryParam) Verifier {
 	return &queryParamVerifierV3{
 		finder: NewCRDFinder(func() ([]schema.GroupKind, error) {
 			return crds, nil
 		}),
-		root:       root,
+		resources:  resources,
 		queryParam: queryParam,
 	}
 }

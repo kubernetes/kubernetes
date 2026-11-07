@@ -113,3 +113,10 @@ func TestOpenAPITest(t *testing.T) {
 		}
 	}
 }
+
+func TestFakeGroupVersionServerRelativeURL(t *testing.T) {
+	gv := openapitest.FakeGroupVersion{GVSpec: []byte(`{}`)}
+	if got := gv.ServerRelativeURL(); got != "" {
+		t.Fatalf("expected empty ServerRelativeURL, got %q", got)
+	}
+}

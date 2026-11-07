@@ -17,15 +17,13 @@ limitations under the License.
 package resource
 
 import (
-	"fmt"
-	"strings"
+	"errors"
+	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi3"
-	"k8s.io/kube-openapi/pkg/spec3"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 var _ Verifier = &queryParamVerifierV3{}
@@ -38,7 +36,7 @@ var _ Verifier = &queryParamVerifierV3{}
 func NewQueryParamVerifierV3(dynamicClient dynamic.Interface, oapiClient openapi.Client, queryParam VerifiableQueryParam) Verifier {
 	return &queryParamVerifierV3{
 		finder:     NewCRDFinder(CRDFromDynamic(dynamicClient)),
-		root:       openapi3.NewRoot(oapiClient),
+		resources:  openapi3.NewResources(oapiClient),
 		queryParam: queryParam,
 	}
 }
@@ -48,7 +46,7 @@ func NewQueryParamVerifierV3(dynamicClient dynamic.Interface, oapiClient openapi
 // passed GVK.
 type queryParamVerifierV3 struct {
 	finder     CRDFinder
-	root       openapi3.Root
+	resources  openapi3.Resources
 	queryParam VerifiableQueryParam
 }
 
@@ -63,86 +61,28 @@ func (v *queryParamVerifierV3) HasSupport(gvk schema.GroupVersionKind) error {
 	if (gvk == schema.GroupVersionKind{Version: "v1", Kind: "List"}) {
 		return NewParamUnsupportedError(gvk, v.queryParam)
 	}
-	gvSpec, err := v.root.GVSpec(gvk.GroupVersion())
+	supported, err := v.resources.SupportsQueryParam(gvk, http.MethodPatch, string(v.queryParam))
 	if err == nil {
-		return supportsQueryParamV3(gvSpec, gvk, v.queryParam)
+		if !supported {
+			return NewParamUnsupportedError(gvk, v.queryParam)
+		}
+		return nil
 	}
-	if _, isErr := err.(*openapi3.GroupVersionNotFoundError); !isErr {
+	if _, ok := errors.AsType[*openapi3.GroupVersionNotFoundError](err); !ok {
 		return err
 	}
 	// If the spec for the passed GVK is not found, then check if it is a CRD.
 	// For CRD's substitute Namespace OpenAPI V3 spec to check if query param is supported.
 	if found, _ := v.finder.HasCRD(gvk.GroupKind()); found {
-		namespaceSpec, err := v.root.GVSpec(namespaceGVK.GroupVersion())
+		nsSupported, err := v.resources.SupportsQueryParam(namespaceGVK, http.MethodPatch, string(v.queryParam))
 		if err != nil {
 			// If error retrieving Namespace spec, propagate error.
 			return err
 		}
-		return supportsQueryParamV3(namespaceSpec, namespaceGVK, v.queryParam)
+		if !nsSupported {
+			return NewParamUnsupportedError(namespaceGVK, v.queryParam)
+		}
+		return nil
 	}
 	return NewParamUnsupportedError(gvk, v.queryParam)
-}
-
-// hasGVKExtensionV3 returns true if the passed OpenAPI extensions map contains
-// the passed GVK; false otherwise.
-func hasGVKExtensionV3(extensions spec.Extensions, gvk schema.GroupVersionKind) bool {
-	var oapiGVK map[string]string
-	err := extensions.GetObject("x-kubernetes-group-version-kind", &oapiGVK)
-	if err != nil {
-		return false
-	}
-	if oapiGVK["group"] == gvk.Group &&
-		oapiGVK["version"] == gvk.Version &&
-		oapiGVK["kind"] == gvk.Kind {
-		return true
-	}
-	return false
-}
-
-// supportsQueryParam is a method that let's us look in the OpenAPI if the
-// specific group-version-kind supports the specific query parameter for
-// the PATCH end-point. Returns nil if the passed GVK supports the passed
-// query parameter; otherwise, a "paramUnsupportedError" is returned (except
-// when an invalid document error is returned when an invalid OpenAPI V3
-// is passed in).
-func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, queryParam VerifiableQueryParam) error {
-	if doc == nil || doc.Paths == nil {
-		return fmt.Errorf("Invalid OpenAPI V3 document")
-	}
-	for _, path := range doc.Paths.Paths {
-		// If operation is not PATCH, then continue.
-		if path == nil {
-			continue
-		}
-		op := path.PathProps.Patch
-		if op == nil {
-			continue
-		}
-		// Is this PATCH operation for the passed GVK?
-		if !hasGVKExtensionV3(op.VendorExtensible.Extensions, gvk) {
-			continue
-		}
-		// Now look for the query parameter among the parameters
-		// for the PATCH operation.
-		for _, param := range op.OperationProps.Parameters {
-			if param.ParameterProps.Name == string(queryParam) && param.In == "query" {
-				return nil
-			}
-
-			// lookup global parameters
-			if ref := param.Refable.Ref.Ref.String(); strings.HasPrefix(ref, "#/parameters/") && doc.Components != nil {
-				k := strings.TrimPrefix(ref, "#/parameters/")
-				if globalParam, ok := doc.Components.Parameters[k]; ok && globalParam != nil {
-					if globalParam.In == "query" && globalParam.Name == string(queryParam) {
-						return nil
-					}
-				}
-			}
-		}
-		return NewParamUnsupportedError(gvk, queryParam)
-	}
-	// If no PATCH endpoint exists for this GVK in the GroupVersion's OpenAPI V3
-	// document (for example, non-patchable list kinds such as ReplicationControllerList
-	// or ServiceList), the query parameter is not supported for this GVK.
-	return NewParamUnsupportedError(gvk, queryParam)
 }
