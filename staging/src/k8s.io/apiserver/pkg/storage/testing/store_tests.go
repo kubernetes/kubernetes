@@ -739,6 +739,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 
 	tests := []struct {
 		name                       string
+		nonRecursive               bool
 		rv                         string
 		rvMatch                    metav1.ResourceVersionMatch
 		prefix                     string
@@ -757,6 +758,31 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		expectRVFunc               func(string) error
 		expectCacherRequestsToEtcd func() []RecordedList
 	}{
+		{
+			name:         "non-recursive legacy exact list before update",
+			nonRecursive: true,
+			prefix:       "/pods/first/bar",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			rv:          compactRV,
+			expectedOut: []example.Pod{*createdPods[0]},
+			expectRV:    compactRV,
+		},
+		{
+			name:         "non-recursive legacy exact list at compacted revision",
+			nonRecursive: true,
+			prefix:       "/pods/first/bar",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			rv:             initialRV,
+			expectRVTooOld: true,
+		},
 		{
 			name:        "rejects invalid resource version",
 			prefix:      "/pods/",
@@ -2404,7 +2430,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				ResourceVersion:      tt.rv,
 				ResourceVersionMatch: tt.rvMatch,
 				Predicate:            tt.pred,
-				Recursive:            true,
+				Recursive:            !tt.nonRecursive,
 			}
 			recorderKey := t.Name()
 			listCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
