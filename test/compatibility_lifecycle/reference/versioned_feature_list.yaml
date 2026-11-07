@@ -236,9 +236,9 @@
     version: "1.38"
 - name: ConsistentGetFromCache
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
+    preRelease: Beta
     version: "1.38"
 - name: ConsistentListFromCacheSkipTimeoutFallback
   versionedSpecs:
