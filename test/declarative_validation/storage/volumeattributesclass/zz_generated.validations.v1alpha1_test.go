@@ -30,6 +30,10 @@ func init() {
 	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1alpha1", Kind: "VolumeAttributesClass"},
 		coverage.FieldRules{
+			"driverName": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired"},
+			},
 			"metadata.creationTimestamp": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
