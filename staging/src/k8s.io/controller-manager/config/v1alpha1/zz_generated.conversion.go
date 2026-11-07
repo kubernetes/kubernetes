@@ -101,6 +101,7 @@ func autoConvert_v1alpha1_GenericControllerManagerConfiguration_To_config_Generi
 	if err := configv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
+	out.LeaderElectionRecoveryDeadline = in.LeaderElectionRecoveryDeadline
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
 	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
@@ -123,6 +124,7 @@ func autoConvert_config_GenericControllerManagerConfiguration_To_v1alpha1_Generi
 	if err := configv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
+	out.LeaderElectionRecoveryDeadline = in.LeaderElectionRecoveryDeadline
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
 	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
