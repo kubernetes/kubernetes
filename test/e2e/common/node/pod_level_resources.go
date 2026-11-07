@@ -408,6 +408,30 @@ func podLevelResourcesTests(f *framework.Framework) {
 				totalPodResources: &cgroups.ContainerResources{CPUReq: "", CPULim: "", MemReq: "", MemLim: ""},
 			},
 		},
+		{
+			name:         "Guaranteed QoS pod with one container with exclusive CPUs other container resources",
+			podResources: &cgroups.ContainerResources{CPUReq: "2050m", CPULim: "2050m", MemReq: "100Mi", MemLim: "100Mi"},
+			containers: []containerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "50Mi", MemLim: "100Mi"}},
+				{Name: "c2", Resources: &cgroups.ContainerResources{CPUReq: "50m", CPULim: "100m", MemReq: "50Mi", MemLim: "100Mi"}},
+			},
+			expected: expectedPodConfig{
+				qos:               v1.PodQOSGuaranteed,
+				totalPodResources: &cgroups.ContainerResources{CPUReq: "2050m", CPULim: "2050m", MemReq: "100Mi", MemLim: "100Mi"},
+			},
+		},
+		{
+			name:         "Guaranteed QoS pod, 1 container with resources and exclusive CPUs",
+			podResources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "100Mi", MemLim: "100Mi"},
+			containers: []containerInfo{
+				{Name: "c1", Resources: &cgroups.ContainerResources{CPUReq: "2000m", CPULim: "2000m", MemReq: "50Mi", MemLim: "100Mi"}},
+				{Name: "c2"},
+			},
+			expected: expectedPodConfig{
+				qos:               v1.PodQOSGuaranteed,
+				totalPodResources: &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "100Mi", MemLim: "100Mi"},
+			},
+		},
 	}
 
 	for _, tc := range tests {
