@@ -2110,8 +2110,8 @@ func TestLifecycleGetTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "DeviceManager ignores ResizeOperation and runs",
-			operation:   lifecycle.ResizeOperation,
+			description: "DeviceManager ignores UpdateOperation and runs",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     false,
 		},
 		{
@@ -2217,8 +2217,8 @@ func TestLifecycleGetPodTopologyHints(t *testing.T) {
 			skipped:     false,
 		},
 		{
-			description: "DeviceManager ignores ResizeOperation and runs",
-			operation:   lifecycle.ResizeOperation,
+			description: "DeviceManager ignores UpdateOperation and runs",
+			operation:   lifecycle.UpdateOperation,
 			skipped:     false,
 		},
 		{

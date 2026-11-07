@@ -93,17 +93,17 @@ type Manager interface {
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
 
 	// Run starts the allocation manager. This is currently only used to handle periodic retry of
-	// pending resizes.
+	// pending allocations.
 	Run(ctx context.Context)
 
-	// PushPendingResize queues a pod with a pending resize request for later reevaluation.
-	PushPendingResize(logger klog.Logger, uid types.UID)
+	// PushPendingAllocation queues a pod with a pending allocation request for later reevaluation.
+	PushPendingAllocation(logger klog.Logger, uid types.UID)
 
-	// HasPendingResizes returns whether there are currently any pending resizes.
-	HasPendingResizes() bool
+	// HasPendingAllocations returns whether there are currently any pending allocations.
+	HasPendingAllocations() bool
 
-	// RetryPendingResizes retries all pending resizes.
-	RetryPendingResizes(ctx context.Context, trigger string)
+	// RetryPendingAllocations retries all pending allocations.
+	RetryPendingAllocations(ctx context.Context, trigger string)
 
 	// HasPodAllocatedResources returns whether a pod has been allocated resources.
 	HasPodAllocatedResources(podUID types.UID) bool
@@ -130,8 +130,8 @@ type manager struct {
 	ticker      *time.Ticker
 	podProvider PodProvider
 
-	allocationMutex        sync.Mutex
-	podsWithPendingResizes []types.UID
+	allocationMutex            sync.Mutex
+	podsWithPendingAllocations []types.UID
 
 	recorder record.EventRecorderLogger
 }
@@ -191,15 +191,15 @@ func NewInMemoryManager(
 }
 
 func (m *manager) Run(ctx context.Context) {
-	// Start a goroutine to periodically check for pending resizes and process them if needed.
+	// Start a goroutine to periodically check for pending allocations and process them if needed.
 	go func() {
 		logger := klog.FromContext(ctx)
 		for {
 			select {
 			case <-m.ticker.C:
-				successfulResizes := m.retryPendingResizes(ctx, triggerReasonPeriodic)
-				for _, po := range successfulResizes {
-					logger.Info("Successfully retried resize after timeout", "pod", klog.KObj(po))
+				successfulAllocations := m.retryPendingAllocations(ctx, triggerReasonPeriodic)
+				for _, po := range successfulAllocations {
+					logger.Info("Successfully retried allocation after timeout", "pod", klog.KObj(po))
 				}
 			case <-ctx.Done():
 				m.ticker.Stop()
@@ -209,38 +209,38 @@ func (m *manager) Run(ctx context.Context) {
 	}()
 }
 
-func (m *manager) RetryPendingResizes(ctx context.Context, trigger string) {
-	m.retryPendingResizes(ctx, trigger)
+func (m *manager) RetryPendingAllocations(ctx context.Context, trigger string) {
+	m.retryPendingAllocations(ctx, trigger)
 }
 
-func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1.Pod {
+func (m *manager) retryPendingAllocations(ctx context.Context, trigger string) []*v1.Pod {
 	logger := klog.FromContext(ctx)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
 	if !m.sourcesReady.AllReady() {
-		logger.V(4).Info("Skipping evaluation of pending resizes; sources are not ready")
+		logger.V(4).Info("Skipping evaluation of pending allocations; sources are not ready")
 		m.ticker.Reset(initialRetryDelay)
 		return nil
 	}
 
 	m.ticker.Reset(retryDelay)
 
-	var newPendingResizes []types.UID
-	var successfulResizes []*v1.Pod
+	var newPendingAllocations []types.UID
+	var successfulAllocations []*v1.Pod
 
-	// Retry all pending resizes.
-	for _, uid := range m.podsWithPendingResizes {
+	// Retry all pending allocations.
+	for _, uid := range m.podsWithPendingAllocations {
 		pod, found := m.podProvider.GetPodByUID(uid)
 		if !found {
-			logger.V(4).Info("Pod not found; removing from pending resizes", "podUID", uid)
+			logger.V(4).Info("Pod not found; removing from pending allocations", "podUID", uid)
 			continue
 		}
 
 		oldResizeStatus := m.statusManager.GetPodResizeConditions(uid)
-		// The pod may have started terminating after its resize was queued.
+		// The pod may have started terminating after its allocation was queued.
 		if m.podProvider.IsPodTerminatingOrTerminal(pod) {
-			logger.V(4).Info("Pod is terminating or terminal; removing from pending resizes", "pod", klog.KObj(pod))
+			logger.V(4).Info("Pod is terminating or terminal; removing from pending allocations", "pod", klog.KObj(pod))
 			m.statusManager.ClearPodResizePendingCondition(uid, metrics.DeferredResizeResolutionTerminated)
 			if !apiequality.Semantic.DeepEqual(oldResizeStatus, m.statusManager.GetPodResizeConditions(uid)) {
 				m.podProvider.SyncPodNow(ctx, pod)
@@ -250,19 +250,19 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
 
-		resizeAllocated, err := m.handlePodResourcesResize(ctx, pod)
+		allocated, err := m.handlePendingAllocation(ctx, pod)
 		switch {
 		case err != nil:
-			logger.Error(err, "Failed to handle pod resources resize", "pod", klog.KObj(pod))
-			newPendingResizes = append(newPendingResizes, uid)
+			logger.Error(err, "Failed to handle pending pod allocation", "pod", klog.KObj(pod))
+			newPendingAllocations = append(newPendingAllocations, uid)
 		case m.statusManager.IsPodResizeDeferred(uid):
 			logger.V(4).Info("Pod resize is deferred; will reevaluate later", "pod", klog.KObj(pod))
-			newPendingResizes = append(newPendingResizes, uid)
+			newPendingAllocations = append(newPendingAllocations, uid)
 		case m.statusManager.IsPodResizeInfeasible(uid):
 			logger.V(4).Info("Pod resize is infeasible", "pod", klog.KObj(pod))
 		default:
-			logger.V(4).Info("Pod resize successfully allocated", "pod", klog.KObj(pod))
-			successfulResizes = append(successfulResizes, pod)
+			logger.V(4).Info("Pod allocation successfully updated", "pod", klog.KObj(pod))
+			successfulAllocations = append(successfulAllocations, pod)
 			if isDeferred {
 				metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
 			}
@@ -270,42 +270,42 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 
 		// If the pod resize status has changed, we need to update the pod status.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
-		if resizeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
+		if allocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
 			m.podProvider.SyncPodNow(ctx, pod)
 		}
 	}
 
-	m.podsWithPendingResizes = newPendingResizes
-	return successfulResizes
+	m.podsWithPendingAllocations = newPendingAllocations
+	return successfulAllocations
 }
 
-func (m *manager) PushPendingResize(logger klog.Logger, uid types.UID) {
+func (m *manager) PushPendingAllocation(logger klog.Logger, uid types.UID) {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
-	for _, p := range m.podsWithPendingResizes {
+	for _, p := range m.podsWithPendingAllocations {
 		if p == uid {
-			// Pod is already in the pending resizes queue.
+			// Pod is already in the pending allocations queue.
 			return
 		}
 	}
 
-	// Add the pod to the pending resizes list and sort by priority.
-	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
-	m.sortPendingResizes(logger)
+	// Add the pod to the pending allocations list and sort by priority.
+	m.podsWithPendingAllocations = append(m.podsWithPendingAllocations, uid)
+	m.sortPendingAllocations(logger)
 }
 
-// sortPendingResizes sorts the list of pending resizes:
-// - First, prioritizing resizes that do not increase requests.
+// sortPendingAllocations sorts the list of pending allocations:
+// - First, prioritizing allocations that do not increase requests.
 // - Second, based on the pod's PriorityClass.
 // - Third, based on the pod's QoS class.
-// - Last, prioritizing resizes that have been in the deferred state the longest.
-func (m *manager) sortPendingResizes(logger klog.Logger) {
+// - Last, prioritizing allocations that have been in the deferred state the longest.
+func (m *manager) sortPendingAllocations(logger klog.Logger) {
 	var pendingPods []*v1.Pod
-	for _, uid := range m.podsWithPendingResizes {
+	for _, uid := range m.podsWithPendingAllocations {
 		pod, found := m.podProvider.GetPodByUID(uid)
 		if !found {
-			logger.V(4).Info("Pod not found; removing from pending resizes", "podUID", uid)
+			logger.V(4).Info("Pod not found; removing from pending allocations", "podUID", uid)
 			continue
 		}
 		pendingPods = append(pendingPods, pod)
@@ -378,9 +378,9 @@ func (m *manager) sortPendingResizes(logger klog.Logger) {
 		return 1
 	})
 
-	m.podsWithPendingResizes = make([]types.UID, len(pendingPods))
+	m.podsWithPendingAllocations = make([]types.UID, len(pendingPods))
 	for i, pod := range pendingPods {
-		m.podsWithPendingResizes[i] = pod.UID
+		m.podsWithPendingAllocations[i] = pod.UID
 	}
 }
 
@@ -401,11 +401,11 @@ func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
 		newRequest.Cpu().Cmp(*oldRequest.Cpu()) > 0
 }
 
-func (m *manager) HasPendingResizes() bool {
+func (m *manager) HasPendingAllocations() bool {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
-	return len(m.podsWithPendingResizes) > 0
+	return len(m.podsWithPendingAllocations) > 0
 }
 
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
@@ -541,7 +541,7 @@ func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	m.allocated.RemoveOrphanedPods(remainingPods)
 }
 
-func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bool, error) {
+func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (bool, error) {
 	logger := klog.FromContext(ctx)
 	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
@@ -556,7 +556,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
-	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.podProvider.GetActivePods()), pod, lifecycle.ResizeOperation)
+	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.podProvider.GetActivePods()), pod, lifecycle.UpdateOperation)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(logger, pod); err != nil {

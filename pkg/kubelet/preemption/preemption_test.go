@@ -196,7 +196,7 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			expectedOutput:       nil,
 			expectReasons:        getPredicateFailureReasons(0, 100, 0, false),
 			featureGateEnabled:   true,
-			operation:            lifecycle.ResizeOperation,
+			operation:            lifecycle.UpdateOperation,
 		},
 		{
 			testName:             "critical pod resize, feature gate disabled -> perform preemption (evicts best effort pod)",
@@ -208,7 +208,7 @@ func TestHandleAdmissionFailure(t *testing.T) {
 			expectedOutput:       []*v1.Pod{allPods[highRequestBurstable]},
 			expectReasons:        getPredicateFailureReasons(0, 0, 0, false),
 			featureGateEnabled:   false,
-			operation:            lifecycle.ResizeOperation,
+			operation:            lifecycle.UpdateOperation,
 		},
 	}
 	for _, r := range runs {

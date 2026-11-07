@@ -54,7 +54,7 @@ type podResizesAdmitHandler struct {
 }
 
 func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	if attrs.Operation != lifecycle.ResizeOperation {
+	if attrs.Operation != lifecycle.UpdateOperation {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
