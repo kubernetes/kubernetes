@@ -470,10 +470,18 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 	ctx := t.Context()
 	s := newTestWatchCache(3, DefaultEventFreshDuration, testIndexers())
 	t.Cleanup(s.Stop)
+	s.config.getCurrentRV = func(context.Context) (uint64, error) {
+		return 5, nil
+	}
 
 	pod1 := makeTestPodDetails("pod1", 2, "node1", map[string]string{"label": "value1"})
 	pod2 := makeTestPodDetails("pod2", 3, "node1", map[string]string{"label": "value1"})
 	pod3 := makeTestPodDetails("pod3", 5, "node2", map[string]string{"label": "value2"})
+
+	continueNegativeRV, err := storage.EncodeContinue("/prefix/ns/pod1\x00", "/prefix/", -1)
+	require.NoError(t, err)
+	continueExactRV, err := storage.EncodeContinue("/prefix/ns/pod1\x00", "/prefix/", 5)
+	require.NoError(t, err)
 
 	var wg sync.WaitGroup
 	t.Cleanup(wg.Wait)
@@ -549,6 +557,32 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 			},
 			expectedOut: []*v1.Pod{pod1, pod2, pod3},
 			expectRV:    5,
+		},
+		{
+			name:   "list with spec.nodeName index and negative-RV continue",
+			prefix: "/prefix/",
+			pred: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+				Continue:    continueNegativeRV,
+			},
+			expectedOut: []*v1.Pod{pod2},
+			expectRV:    5,
+			expectIndex: "f:spec.nodeName",
+		},
+		{
+			name:   "list with spec.nodeName index and positive-RV continue",
+			prefix: "/prefix/",
+			pred: storage.SelectionPredicate{
+				Label:       labels.Everything(),
+				Field:       fields.SelectorFromSet(map[string]string{"spec.nodeName": "node1"}),
+				IndexFields: []string{"spec.nodeName"},
+				Continue:    continueExactRV,
+			},
+			expectedOut: []*v1.Pod{pod2, pod3},
+			expectRV:    5,
+			expectIndex: "",
 		},
 	}
 
