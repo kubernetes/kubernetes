@@ -19,6 +19,7 @@ package completion
 import (
 	"net/http"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -584,6 +585,116 @@ func TestResourceTypeAndNameCompletionFuncResourceList(t *testing.T) {
 			comps, directive := compFunc(cmd, tc.args, tc.toComplete)
 			checkCompletion(t, comps, tc.expectedComps, directive, tc.expectedDirective)
 		})
+	}
+}
+
+func TestLabelSelectorCompletionFunc(t *testing.T) {
+	pods := &corev1.PodList{
+		ListMeta: metav1.ListMeta{ResourceVersion: "15"},
+		Items: []corev1.Pod{
+			{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", Labels: map[string]string{"app": "web", "tier": "frontend"}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", Labels: map[string]string{"app": "db", "tier": "backend"}}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", Labels: map[string]string{"app": "web"}}},
+		},
+	}
+
+	testCases := []struct {
+		name              string
+		resourceType      string
+		args              []string
+		toComplete        string
+		expectedComps     []string
+		expectedDirective cobra.ShellCompDirective
+	}{
+		{
+			name:              "keys",
+			args:              []string{"pods"},
+			toComplete:        "",
+			expectedComps:     []string{"app=", "tier="},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace,
+		},
+		{
+			name:              "keys with prefix",
+			args:              []string{"pods"},
+			toComplete:        "ti",
+			expectedComps:     []string{"tier="},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace,
+		},
+		{
+			name:              "values",
+			args:              []string{"pods"},
+			toComplete:        "app=",
+			expectedComps:     []string{"app=db", "app=web"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "values with operator and prefix",
+			args:              []string{"pods"},
+			toComplete:        "app!=w",
+			expectedComps:     []string{"app!=web"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "keys after comma",
+			args:              []string{"pods"},
+			toComplete:        "app=web,t",
+			expectedComps:     []string{"app=web,tier="},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace,
+		},
+		{
+			name:              "values after comma",
+			args:              []string{"pods"},
+			toComplete:        "app=web,tier==",
+			expectedComps:     []string{"app=web,tier==backend", "app=web,tier==frontend"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "fixed resource type",
+			resourceType:      "pods",
+			args:              []string{},
+			toComplete:        "tier=f",
+			expectedComps:     []string{"tier=frontend"},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+		{
+			name:              "no resource type",
+			args:              []string{},
+			toComplete:        "",
+			expectedComps:     []string{},
+			expectedDirective: cobra.ShellCompDirectiveNoFileComp,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tf, cmd := prepareCompletionTest()
+			addResourceToFactory(tf, pods)
+			compFunc := LabelSelectorCompletionFunc(tf, tc.resourceType)
+			comps, directive := compFunc(cmd, tc.args, tc.toComplete)
+			checkCompletion(t, comps, tc.expectedComps, directive, tc.expectedDirective)
+		})
+	}
+}
+
+func TestLabelSelectorCompletionFuncAllNamespaces(t *testing.T) {
+	tf, cmd := prepareCompletionTest()
+	pods, _, _ := cmdtesting.TestData()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	var paths []string
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			paths = append(paths, req.URL.Path)
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
+		}),
+	}
+	if err := cmd.Flags().Set("all-namespaces", "true"); err != nil {
+		t.Fatal(err)
+	}
+
+	LabelSelectorCompletionFunc(tf, "")(cmd, []string{"pods"}, "")
+	if len(paths) != 1 || strings.Contains(paths[0], "/namespaces/") {
+		t.Errorf("expected a single request across all namespaces, got %v", paths)
 	}
 }
 
