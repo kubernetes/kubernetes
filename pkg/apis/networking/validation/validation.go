@@ -192,6 +192,13 @@ func ValidateNetworkPolicy(np *networking.NetworkPolicy, opts NetworkPolicyValid
 }
 
 // ValidationOptionsForNetworking generates NetworkPolicyValidationOptions for Networking
+//
+// AllowInvalidLabelValueInSelector is only derived from spec.podSelector of the
+// old object, but it is applied to every selector in the policy, including the
+// ingress and egress peer selectors. A policy that was persisted before label
+// values in matchExpressions were validated and that has an invalid value only
+// in a peer selector is therefore rejected on update. This is known and left
+// as is, because it has not been reported since the validation was added.
 func ValidationOptionsForNetworking(new, old *networking.NetworkPolicy) NetworkPolicyValidationOptions {
 	opts := NetworkPolicyValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
