@@ -17,6 +17,7 @@ limitations under the License.
 package qos
 
 import (
+	"math"
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +35,14 @@ const (
 	KubeProxyOOMScoreAdj  int = -999
 	guaranteedOOMScoreAdj int = -997
 	besteffortOOMScoreAdj int = 1000
+
+	// Logarithmic Burstable oom_score_adj formula (KubeletLogarithmicOOMScoreAdj):
+	//   800 - 400*(R/L) - 350*(log2(1+R)/log2(1+C))
+	// Baseline 800 keeps a gap vs BestEffort (1000). See
+	// https://github.com/kubernetes/kubernetes/issues/142230.
+	burstableOOMScoreAdjBase            = 800
+	burstableOOMScoreAdjGuaranteeWeight = 400
+	burstableOOMScoreAdjLogWeight       = 350
 )
 
 // GetContainerOOMScoreAdjust returns the amount by which the OOM score of all processes in the
@@ -81,31 +90,42 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		// TODO(ndixita): Refactor to use this formula in all cases, as
 		// remainingReqPerContainer will be 0 when pod-level resources are not set.
 		remainingReqPerContainer = remainingPodMemReqPerContainer(pod)
-		oomScoreAdjust = 1000 - (1000 * (containerMemReq + remainingReqPerContainer) / memoryCapacity)
-	} else {
-		oomScoreAdjust = 1000 - (1000*containerMemReq)/memoryCapacity
+		containerMemReq += remainingReqPerContainer
 	}
 
-	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
-	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
-	if isSidecarContainer(pod, container) {
-		// check min memory quantity in regular containers
-		minMemoryRequest := minRegularContainerMemory(pod)
-
-		// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
-		// we add the per-container share of unallocated pod memory requests to the minimum memory request.
-		// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
-		// calculation remains consistent
-		//  with how we handle pod-level memory requests for regular containers.
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-			resourcehelper.IsPodLevelRequestsSet(pod) {
-			minMemoryRequest += remainingReqPerContainer
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletLogarithmicOOMScoreAdj) {
+		oomScoreAdjust = logarithmicBurstableOOMScoreAdjust(containerMemReq, getEffectiveContainerMemoryLimit(container, memoryCapacity), memoryCapacity)
+		// Preserve sidecar clamping from #128029: a sidecar must not be killed
+		// before the worst (highest-scoring) regular container in the pod.
+		if isSidecarContainer(pod, container) {
+			maxRegularAdj := maxRegularContainerLogarithmicOOMScoreAdjust(pod, remainingReqPerContainer, memoryCapacity)
+			if oomScoreAdjust > maxRegularAdj {
+				oomScoreAdjust = maxRegularAdj
+			}
 		}
-		minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
-		// the OOM adjustment for sidecar container will match
-		// or fall below the OOM score adjustment of regular containers in the Pod.
-		if oomScoreAdjust > minMemoryOomScoreAdjust {
-			oomScoreAdjust = minMemoryOomScoreAdjust
+	} else {
+		oomScoreAdjust = 1000 - (1000*containerMemReq)/memoryCapacity
+
+		// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
+		// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
+		if isSidecarContainer(pod, container) {
+			// check min memory quantity in regular containers
+			minMemoryRequest := minRegularContainerMemory(pod)
+
+			// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
+			// we add the per-container share of unallocated pod memory requests to the minimum memory request.
+			// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
+			// calculation remains consistent
+			//  with how we handle pod-level memory requests for regular containers.
+			if remainingReqPerContainer != 0 {
+				minMemoryRequest += remainingReqPerContainer
+			}
+			minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
+			// the OOM adjustment for sidecar container will match
+			// or fall below the OOM score adjustment of regular containers in the Pod.
+			if oomScoreAdjust > minMemoryOomScoreAdjust {
+				oomScoreAdjust = minMemoryOomScoreAdjust
+			}
 		}
 	}
 
@@ -119,6 +139,59 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		return int(oomScoreAdjust - 1)
 	}
 	return int(oomScoreAdjust)
+}
+
+// logarithmicBurstableOOMScoreAdjust implements the KubeletLogarithmicOOMScoreAdj formula:
+//
+//	oom_score_adj = 800 - 400*(R/L) - 350*(log2(1+R)/log2(1+C))
+//
+// R is the effective memory request, L is the effective memory limit (node
+// capacity when unset), and C is node memory capacity. Result is not clamped.
+func logarithmicBurstableOOMScoreAdjust(memoryRequest, memoryLimit, memoryCapacity int64) int64 {
+	if memoryCapacity <= 0 {
+		return int64(besteffortOOMScoreAdj - 1)
+	}
+	if memoryRequest < 0 {
+		memoryRequest = 0
+	}
+	if memoryLimit <= 0 || memoryLimit > memoryCapacity {
+		memoryLimit = memoryCapacity
+	}
+	if memoryRequest > memoryLimit {
+		memoryRequest = memoryLimit
+	}
+
+	guarantee := float64(memoryRequest) / float64(memoryLimit)
+	logDenom := math.Log2(1 + float64(memoryCapacity))
+	var logRatio float64
+	if logDenom > 0 {
+		logRatio = math.Log2(1+float64(memoryRequest)) / logDenom
+	}
+	score := float64(burstableOOMScoreAdjBase) - float64(burstableOOMScoreAdjGuaranteeWeight)*guarantee - float64(burstableOOMScoreAdjLogWeight)*logRatio
+	return int64(math.Round(score))
+}
+
+// maxRegularContainerLogarithmicOOMScoreAdjust returns the highest (worst)
+// logarithmic oom_score_adj among regular containers in the pod. Sidecars are
+// clamped to this value so they are not killed before the least-protected
+// regular container, matching the linear sidecar rule from #128029.
+func maxRegularContainerLogarithmicOOMScoreAdjust(pod *v1.Pod, remainingReqPerContainer, memoryCapacity int64) int64 {
+	maxAdj := logarithmicBurstableOOMScoreAdjust(
+		getEffectiveContainerMemoryRequest(pod, &pod.Spec.Containers[0])+remainingReqPerContainer,
+		getEffectiveContainerMemoryLimit(&pod.Spec.Containers[0], memoryCapacity),
+		memoryCapacity,
+	)
+	for i := 1; i < len(pod.Spec.Containers); i++ {
+		adj := logarithmicBurstableOOMScoreAdjust(
+			getEffectiveContainerMemoryRequest(pod, &pod.Spec.Containers[i])+remainingReqPerContainer,
+			getEffectiveContainerMemoryLimit(&pod.Spec.Containers[i], memoryCapacity),
+			memoryCapacity,
+		)
+		if adj > maxAdj {
+			maxAdj = adj
+		}
+	}
+	return maxAdj
 }
 
 // isSidecarContainer returns a boolean indicating whether a container is a sidecar or not.
