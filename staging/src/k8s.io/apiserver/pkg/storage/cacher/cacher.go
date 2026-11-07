@@ -564,6 +564,14 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		metrics.RecordShardedWatchStarted(c.groupResource)
 	}
 	go watcher.process(ctx)
+	select {
+	case <-watcher.synced.Wait():
+	case <-watcher.done:
+	case <-ctx.Done():
+		watcher.Stop()
+	case <-c.stopCh:
+		watcher.Stop()
+	}
 	return watcher, nil
 }
 
@@ -676,6 +684,7 @@ func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, idx int, cacheInte
 		c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
 	}
 	watcher.input <- watcherInput{interval: cacheInterval}
+	watcher.synced.Notify()
 }
 
 func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWatcher) (*watchCacheInterval, error) {

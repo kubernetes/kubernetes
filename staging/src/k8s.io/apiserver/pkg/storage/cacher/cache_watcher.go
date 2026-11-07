@@ -68,6 +68,7 @@ type cacheWatcher struct {
 	done      chan struct{}
 	filter    watchEventFilter
 	stopped   bool
+	synced    notifier
 	forget    func(bool)
 	versioner storage.Versioner
 	// The watcher will be closed by server after the deadline,
@@ -125,6 +126,7 @@ func newCacheWatcher(
 		input:                   make(chan watcherInput, max(chanSize, 1)),
 		result:                  make(chan watch.Event, chanSize),
 		done:                    make(chan struct{}),
+		synced:                  *newNotifier(),
 		filter:                  filter,
 		stopped:                 false,
 		forget:                  forget,
@@ -670,4 +672,24 @@ func (c *cacheWatcher) observeDispatchMetrics(event *watchCacheEvent, dequeuedAt
 	tl.MarkAt(metrics.PointEventBuilt, builtAt)
 	tl.MarkAt(metrics.PointSentToClient, sentAt)
 	c.watcherMetrics.ObserveTimeline(&tl)
+}
+
+type notifier struct {
+	once sync.Once
+	done chan struct{}
+}
+
+func newNotifier() *notifier {
+	return &notifier{
+		once: sync.Once{},
+		done: make(chan struct{}),
+	}
+}
+
+func (s *notifier) Notify() {
+	s.once.Do(func() { close(s.done) })
+}
+
+func (s *notifier) Wait() <-chan struct{} {
+	return s.done
 }
