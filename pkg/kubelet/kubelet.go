@@ -264,7 +264,7 @@ var (
 		lifecycle.OutOfPods,
 		lifecycle.PodLevelResourcesNotAdmittedReason,
 		lifecycle.PodFeatureUnsupported,
-		tainttoleration.ErrReasonNotMatch,
+		tainttoleration.Name,
 		eviction.Reason,
 		sysctl.ForbiddenReason,
 		topologymanager.ErrorTopologyAffinity,
