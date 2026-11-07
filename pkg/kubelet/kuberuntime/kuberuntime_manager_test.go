@@ -5868,6 +5868,7 @@ func TestValidatePodResizeAction(t *testing.T) {
 		currentResources, desiredResources     resourceRequirements
 		currentPodMemLimit, desiredPodMemLimit *int64
 		containerMemoryUsage, podMemoryUsage   *uint64
+		extraNodeAllocatableMemoryLimit        int64
 		expectedError                          bool
 	}{
 		{
@@ -5961,6 +5962,20 @@ func TestValidatePodResizeAction(t *testing.T) {
 			containerMemoryUsage: ptr.To[uint64](150),
 			podMemoryUsage:       ptr.To[uint64](150),
 			expectedError:        true,
+		},
+		{
+			testName: "Decrease container limits, usage within the limit including extra node allocatable memory",
+			currentResources: resourceRequirements{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: resourceRequirements{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			// The applied limit is 100 + 100.
+			extraNodeAllocatableMemoryLimit: 100,
+			containerMemoryUsage:            ptr.To[uint64](150),
+			podMemoryUsage:                  ptr.To[uint64](150),
+			expectedError:                   false,
 		},
 		{
 			testName: "Decrease container limits, high usage, missing pod usage",
@@ -6073,6 +6088,15 @@ func TestValidatePodResizeAction(t *testing.T) {
 					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuLimit, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryLimit, resource.DecimalSI),
 				},
+			}
+
+			if tc.extraNodeAllocatableMemoryLimit > 0 {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
+				memory := *resource.NewQuantity(tc.extraNodeAllocatableMemoryLimit, resource.DecimalSI)
+				pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+					{Requests: v1.ResourceList{v1.ResourceMemory: memory}, Limits: v1.ResourceList{v1.ResourceMemory: memory}},
+					{ContainerName: pod.Spec.Containers[0].Name, Limits: v1.ResourceList{v1.ResourceMemory: memory}},
+				}
 			}
 
 			updateInfo := containerToUpdateInfo{

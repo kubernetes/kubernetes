@@ -44,6 +44,7 @@ import (
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
+	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierror "k8s.io/cri-api/pkg/errors"
@@ -1251,6 +1252,16 @@ func (m *kubeGenericRuntimeManager) validatePodResizeAction(
 	return nil
 }
 
+// extraNodeAllocatableMemoryLimit returns the memory that getMemoryLimit adds to the container's
+// memory limit for its extra node allocatable resources.
+func extraNodeAllocatableMemoryLimit(pod *v1.Pod, container *v1.Container) int64 {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || container.Resources.Limits.Memory().IsZero() {
+		return 0
+	}
+	limits := resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, container.Name)
+	return limits.Memory().Value()
+}
+
 func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	ctx context.Context,
 	pod *v1.Pod,
@@ -1268,7 +1279,7 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 		if cUpdate.desiredContainerResources.memoryLimit != 0 {
 			if cUpdate.currentContainerResources == nil || cUpdate.currentContainerResources.memoryLimit == 0 || // Limit added
 				cUpdate.desiredContainerResources.memoryLimit < cUpdate.currentContainerResources.memoryLimit { // Limit decreasing
-				decreasingContainerLimits[cUpdate.container.Name] = cUpdate.desiredContainerResources.memoryLimit
+				decreasingContainerLimits[cUpdate.container.Name] = cUpdate.desiredContainerResources.memoryLimit + extraNodeAllocatableMemoryLimit(pod, cUpdate.container)
 			}
 		}
 	}
