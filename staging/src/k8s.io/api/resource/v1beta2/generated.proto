@@ -65,8 +65,8 @@ message AllocatedDeviceStatus {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:format=k8s-uuid
+  // +k8s:optional
+  // +k8s:format=k8s-uuid
   optional string shareID = 7;
 
   // Conditions contains the latest observation of the device's state.
@@ -93,7 +93,7 @@ message AllocatedDeviceStatus {
   // NetworkData contains network-related information specific to the device.
   //
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:optional
   optional NetworkDeviceData networkData = 6;
 }
 
@@ -527,7 +527,7 @@ message DeviceAllocationConfiguration {
   // or from a claim.
   //
   // +required
-  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:required
   optional string source = 1;
 
   // requests lists the names of requests where the configuration applies.
@@ -539,10 +539,10 @@ message DeviceAllocationConfiguration {
   //
   // +optional
   // +listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:optional
   // +k8s:listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:unique=set
-  // +k8s:beta(since: "1.37")=+k8s:maxItems=32
+  // +k8s:unique=set
+  // +k8s:maxItems=32
   repeated string requests = 2;
 
   optional DeviceConfiguration deviceConfiguration = 3;
@@ -554,8 +554,8 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:maxItems=32
+  // +k8s:optional
+  // +k8s:maxItems=32
   repeated DeviceRequestAllocationResult results = 1;
 
   // config is a combination of all the claim and class configuration parameters.
@@ -568,8 +568,8 @@ message DeviceAllocationResult {
   //
   // +optional
   // +listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:maxItems=64
+  // +k8s:optional
+  // +k8s:maxItems=64
   repeated DeviceAllocationConfiguration config = 2;
 }
 
@@ -1073,9 +1073,9 @@ message DeviceRequestAllocationResult {
   // vendor of the driver. It should use only lower case characters.
   //
   // +required
-  // +k8s:beta(since: "1.37")=+k8s:format=k8s-long-name-caseless
-  // +k8s:beta(since: "1.37")=+k8s:maxLength=63
-  // +k8s:beta(since: "1.37")=+k8s:required
+  // +k8s:format=k8s-long-name-caseless
+  // +k8s:maxLength=63
+  // +k8s:required
   optional string driver = 2;
 
   // pool together with the driver name and the device name field
@@ -1085,8 +1085,8 @@ message DeviceRequestAllocationResult {
   // DNS sub-domains separated by slashes.
   //
   // +required
-  // +k8s:beta(since: "1.37")=+k8s:required
-  // +k8s:beta(since: "1.37")=+k8s:format=k8s-resource-pool-name
+  // +k8s:required
+  // +k8s:format=k8s-resource-pool-name
   optional string pool = 3;
 
   // device references one device instance via its name in the driver's
@@ -1118,7 +1118,7 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceTaints
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:optional
   repeated DeviceToleration tolerations = 6;
 
   // bindingConditions contains a copy of the BindingConditions
@@ -1127,8 +1127,8 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:maxItems=4
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingConditions = 7;
 
   // bindingFailureConditions contains a copy of the BindingFailureConditions
@@ -1137,8 +1137,8 @@ message DeviceRequestAllocationResult {
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:maxItems=4
+  // +k8s:optional
+  // +k8s:maxItems=4
   repeated string bindingFailureConditions = 8;
 
   // shareID uniquely identifies an individual allocation share of the device,
@@ -1148,8 +1148,8 @@ message DeviceRequestAllocationResult {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:format=k8s-uuid
+  // +k8s:optional
+  // +k8s:format=k8s-uuid
   optional string shareID = 9;
 
   // consumedCapacity tracks the amount of capacity consumed per device as part of the claim request.
@@ -1700,8 +1700,8 @@ message NetworkDeviceData {
   // Must not be longer than 256 bytes.
   //
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:maxBytes=256
+  // +k8s:optional
+  // +k8s:maxBytes=256
   optional string interfaceName = 1;
 
   // ips lists the network addresses assigned to the device's network interface.
@@ -1712,10 +1712,10 @@ message NetworkDeviceData {
   //
   // +optional
   // +listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:optional
   // +k8s:listType=atomic
-  // +k8s:beta(since: "1.37")=+k8s:unique=set
-  // +k8s:beta(since: "1.37")=+k8s:maxItems=16
+  // +k8s:unique=set
+  // +k8s:maxItems=16
   repeated string ips = 2;
 
   // hardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
@@ -1723,8 +1723,8 @@ message NetworkDeviceData {
   // Must not be longer than 128 bytes.
   //
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:maxBytes=128
+  // +k8s:optional
+  // +k8s:maxBytes=128
   optional string hardwareAddress = 3;
 }
 
@@ -1929,8 +1929,8 @@ message ResourceClaimStatus {
   // allocation is set once the claim has been allocated successfully.
   //
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:update=NoModify
+  // +k8s:optional
+  // +k8s:update=NoModify
   optional AllocationResult allocation = 1;
 
   // reservedFor indicates which entities are currently allowed to use
@@ -1958,10 +1958,10 @@ message ResourceClaimStatus {
   // +listMapKey=uid
   // +patchStrategy=merge
   // +patchMergeKey=uid
-  // +k8s:beta(since: "1.37")=+k8s:optional
-  // +k8s:beta(since: "1.37")=+k8s:listType=map
-  // +k8s:beta(since: "1.37")=+k8s:listMapKey=uid
-  // +k8s:beta(since: "1.37")=+k8s:maxItems=256
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=uid
+  // +k8s:maxItems=256
   repeated ResourceClaimConsumerReference reservedFor = 2;
 
   // devices contains the status of each device allocated for this
@@ -1969,18 +1969,18 @@ message ResourceClaimStatus {
   // information. Entries are owned by their respective drivers.
   //
   // +optional
-  // +k8s:beta(since: "1.37")=+k8s:optional
+  // +k8s:optional
   // +listType=map
   // +listMapKey=driver
   // +listMapKey=device
   // +listMapKey=pool
   // +listMapKey=shareID
   // +featureGate=DRAResourceClaimDeviceStatus
-  // +k8s:beta(since: "1.37")=+k8s:listType=map
-  // +k8s:beta(since: "1.37")=+k8s:listMapKey=driver
-  // +k8s:beta(since: "1.37")=+k8s:listMapKey=device
-  // +k8s:beta(since: "1.37")=+k8s:listMapKey=pool
-  // +k8s:beta(since: "1.37")=+k8s:listMapKey=shareID
+  // +k8s:listType=map
+  // +k8s:listMapKey=driver
+  // +k8s:listMapKey=device
+  // +k8s:listMapKey=pool
+  // +k8s:listMapKey=shareID
   repeated AllocatedDeviceStatus devices = 4;
 }
 
