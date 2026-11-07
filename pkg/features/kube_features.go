@@ -255,6 +255,13 @@ const (
 	// Enables support for providing extended resource requests backed by DRA.
 	DRAExtendedResource featuregate.Feature = "DRAExtendedResource"
 
+	// owner: @shivamerla
+	// kep: https://kep.k8s.io/6406
+	//
+	// Allows a DeviceClass to declare the capacity that each device allocated
+	// for its extended resource consumes.
+	DRAExtendedResourceCapacity featuregate.Feature = "DRAExtendedResourceCapacity"
+
 	// owner: @sunya-ch
 	// kep: https://kep.k8s.io/5075
 	//
@@ -1388,6 +1395,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.37; remove in 1.40
 	},
 
+	DRAExtendedResourceCapacity: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	DRAFractionalCapacityRange: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta, MinCompatibilityVersion: version.MustParse("1.37")},
@@ -2406,6 +2417,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DRADeviceTaints: {},
 
 	DRAExtendedResource: {},
+
+	DRAExtendedResourceCapacity: {DRAConsumableCapacity},
 
 	DRAFractionalCapacityRange: {DRAConsumableCapacity},
 
