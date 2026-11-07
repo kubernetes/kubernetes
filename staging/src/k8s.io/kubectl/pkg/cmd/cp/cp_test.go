@@ -27,7 +27,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +46,9 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	kexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	utilexec "k8s.io/utils/exec"
 )
 
 type FileType int
@@ -1102,4 +1106,170 @@ type testWriter testing.T
 func (t *testWriter) Write(p []byte) (n int, err error) {
 	t.Log(string(p))
 	return len(p), nil
+}
+
+// tarPipeExecutor plays the pod for TestCopyFromPodRetries: attempt i writes
+// the archive from the offset its tail -c+N asks for up to cuts[i].at and
+// returns cuts[i].err; the attempt after the last cut writes the rest.
+type tarPipeExecutor struct {
+	archive []byte
+	cuts    []tarPipeCut
+
+	mu       sync.Mutex
+	commands []string
+}
+
+type tarPipeCut struct {
+	at  int
+	err error
+}
+
+func (e *tarPipeExecutor) Execute(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+	return e.ExecuteWithContext(context.Background(), url, config, stdin, stdout, stderr, tty, terminalSizeQueue)
+}
+
+func (e *tarPipeExecutor) ExecuteWithContext(_ context.Context, reqURL *url.URL, _ *restclient.Config, _ io.Reader, stdout, _ io.Writer, _ bool, _ remotecommand.TerminalSizeQueue) error {
+	command := strings.Join(reqURL.Query()["command"], " ")
+	e.mu.Lock()
+	e.commands = append(e.commands, command)
+	attempt := len(e.commands) - 1
+	e.mu.Unlock()
+
+	from := 0
+	if _, n, ok := strings.Cut(command, "tail -c+"); ok {
+		offset, err := strconv.Atoi(n)
+		if err != nil {
+			return err
+		}
+		from = max(offset-1, 0) // like tail, +0 and +1 both start at the first byte
+	}
+	if attempt < len(e.cuts) {
+		cut := e.cuts[attempt]
+		_, _ = stdout.Write(e.archive[from:max(from, cut.at)])
+		return cut.err
+	}
+	_, err := stdout.Write(e.archive[from:])
+	return err
+}
+
+func TestCopyFromPodRetries(t *testing.T) {
+	content := bytes.Repeat([]byte("0123456789"), 500)
+	var archive bytes.Buffer
+	tw := tar.NewWriter(&archive)
+	require.NoError(t, tw.WriteHeader(&tar.Header{Name: "tmp/big", Mode: 0o644, Size: int64(len(content))}))
+	_, err := tw.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+
+	// What a session returns when the connection is cut mid-copy, over
+	// WebSocket and over SPDY with the client-go status check.
+	wsCut := fmt.Errorf("error reading from error stream: next reader: websocket: close 1006 (abnormal closure): unexpected EOF")
+	noStatus := fmt.Errorf("connection closed before the command's status was received; the output may be incomplete")
+	tarFailed := utilexec.CodeExitError{Err: fmt.Errorf("command terminated with exit code 2"), Code: 2}
+	podGone := errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "pod-name")
+
+	tests := []struct {
+		name         string
+		retries      int
+		cuts         []tarPipeCut
+		wantAttempts int
+		wantErr      string
+		wantExit     string // printed by cmdutil.CheckErr
+		wantResumeAt []string
+	}{{
+		name:         "clean copy",
+		retries:      3,
+		wantAttempts: 1,
+	}, {
+		name:         "resumes after a cut on either transport",
+		retries:      3,
+		cuts:         []tarPipeCut{{at: 3584, err: wsCut}, {at: 5632, err: noStatus}},
+		wantAttempts: 3,
+		wantResumeAt: []string{"tail -c+3585", "tail -c+5633"},
+	}, {
+		name:         "retries=-1 resumes as long as the copy moves on",
+		retries:      -1,
+		cuts:         []tarPipeCut{{at: 1024, err: wsCut}, {at: 2048, err: wsCut}, {at: 3072, err: wsCut}},
+		wantAttempts: 4,
+	}, {
+		name:         "an attempt that fails before copying a byte ends the copy",
+		retries:      -1,
+		cuts:         []tarPipeCut{{at: 3584, err: wsCut}, {at: 3584, err: noStatus}},
+		wantAttempts: 2,
+		wantErr:      "status was received",
+	}, {
+		name:         "the remote command failing is fatal",
+		retries:      3,
+		cuts:         []tarPipeCut{{at: 3584, err: tarFailed}},
+		wantAttempts: 1,
+		wantErr:      "command terminated with exit code 2",
+	}, {
+		name:         "the pod being gone is fatal, also with retries=-1",
+		retries:      -1,
+		cuts:         []tarPipeCut{{err: podGone}},
+		wantAttempts: 1,
+		wantErr:      `pods "pod-name" not found`,
+	}, {
+		name:         "the last error is returned once retries run out",
+		retries:      1,
+		cuts:         []tarPipeCut{{at: 3584, err: wsCut}, {at: 3584, err: wsCut}},
+		wantAttempts: 2,
+		wantErr:      "close 1006",
+	}, {
+		name:         "without retries kubectl exits on the exec error as before",
+		retries:      0,
+		cuts:         []tarPipeCut{{at: 3584, err: wsCut}},
+		wantAttempts: 1,
+		wantErr:      "close 1006",
+		wantExit:     "error: " + wsCut.Error(),
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var exitMsg string
+			cmdutil.BehaviorOnFatal(func(msg string, _ int) { exitMsg = msg })
+			defer cmdutil.DefaultBehaviorOnFatal()
+
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					pod := &v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod-name", Namespace: "pod-ns"},
+						Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "container"}}},
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, pod))))}, nil
+				}),
+			}
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+
+			dest := filepath.Join(t.TempDir(), "big")
+			executor := &tarPipeExecutor{archive: archive.Bytes(), cuts: tc.cuts}
+			opts := NewCopyOptions(ioStreams)
+			opts.MaxTries = tc.retries
+			require.NoError(t, opts.Complete(tf, NewCmdCp(tf, ioStreams), []string{"pod-ns/pod-name:/tmp/big", dest}))
+			opts.Executor = executor
+
+			err := opts.Run()
+
+			executor.mu.Lock()
+			defer executor.mu.Unlock()
+			assert.Len(t, executor.commands, tc.wantAttempts)
+			assert.Equal(t, tc.wantExit, exitMsg)
+			for i, want := range tc.wantResumeAt {
+				assert.Contains(t, executor.commands[i+1], want)
+			}
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			got, err := os.ReadFile(dest)
+			require.NoError(t, err)
+			assert.Equal(t, content, got)
+		})
+	}
 }
