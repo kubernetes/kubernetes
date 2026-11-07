@@ -262,3 +262,30 @@ func TestResourceLocation(t *testing.T) {
 		})
 	}
 }
+
+func TestEtcdPodCIDRsReadCompatibility(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceNone)
+
+	stored := newNode("node0")
+	stored.Spec.PodCIDR = "10.0.0.0/24"
+	stored.Spec.PodCIDRs = nil
+	key, _ := storage.KeyFunc(ctx, stored.Name)
+	if err := storage.Storage.Create(ctx, key, stored, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	obj, err := storage.Get(ctx, stored.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	served := obj.(*api.Node)
+	if served.Spec.PodCIDR != "10.0.0.0/24" {
+		t.Errorf("expected podCIDR 10.0.0.0/24, got %q", served.Spec.PodCIDR)
+	}
+	if len(served.Spec.PodCIDRs) != 1 || served.Spec.PodCIDRs[0] != "10.0.0.0/24" {
+		t.Errorf("expected podCIDRs synthesized from podCIDR by storage-decode defaulting, got %#v", served.Spec.PodCIDRs)
+	}
+}

@@ -5840,6 +5840,13 @@ func (in *Secret) DeepCopyInto(out *Secret) {
 			(*out)[key] = outVal
 		}
 	}
+	if in.StringData != nil {
+		in, out := &in.StringData, &out.StringData
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
