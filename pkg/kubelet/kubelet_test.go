@@ -863,6 +863,7 @@ func TestVolumeAttachLimitExceededCleanup(t *testing.T) {
 		kl, kl.recorder, kl.workQueue,
 		kl.resyncInterval, backOffPeriod,
 		kl.podCache, kl.allocationManager,
+		nil,
 	)
 
 	kl.volumeManager = kubeletvolume.NewFakeVolumeManager(nil, 0, nil, true /* volumeAttachLimitExceededError  */)
