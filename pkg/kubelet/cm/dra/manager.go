@@ -874,6 +874,7 @@ func (m *Manager) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod
 	logger = logger.WithName("dra-manager")
 	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	enableHealthMessage := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ResourceHealthStatusMessage)
+	enableExtendedResources := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRAExtendedResource)
 	for i := range status.ContainerStatuses {
 		containerStatus := &status.ContainerStatuses[i]
 
@@ -886,8 +887,7 @@ func (m *Manager) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod
 			}
 		}
 
-		// Skip if there's no matching container spec or it has no resource claims.
-		if containerSpec == nil || len(containerSpec.Resources.Claims) == 0 {
+		if containerSpec == nil {
 			continue
 		}
 
@@ -906,6 +906,8 @@ func (m *Manager) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod
 			}
 		}
 
+		var claims []v1.ResourceClaim
+		var actualClaimNames []string
 		// Iterate through the claims requested by this specific container.
 		for _, claim := range containerSpec.Resources.Claims {
 			// Find the actual name of the ResourceClaim object.
@@ -932,6 +934,34 @@ func (m *Manager) UpdateAllocatedResourcesStatus(logger klog.Logger, pod *v1.Pod
 				continue
 			}
 
+			claims = append(claims, claim)
+			actualClaimNames = append(actualClaimNames, actualClaimName)
+		}
+
+		if extendedClaim := pod.Status.ExtendedResourceClaimStatus; enableExtendedResources && extendedClaim != nil {
+			for _, mapping := range extendedClaim.RequestMappings {
+				if mapping.ContainerName != containerSpec.Name {
+					continue
+				}
+				resourceName := v1.ResourceName(mapping.ResourceName)
+				quantity := containerSpec.Resources.Requests[resourceName]
+				if quantity.IsZero() || !schedutil.IsDRAExtendedResourceName(resourceName) {
+					continue
+				}
+				claims = append(claims, v1.ResourceClaim{
+					Name:    extendedClaim.ResourceClaimName,
+					Request: mapping.RequestName,
+				})
+				actualClaimNames = append(actualClaimNames, extendedClaim.ResourceClaimName)
+			}
+		}
+
+		if len(containerSpec.Resources.Claims) == 0 && len(claims) == 0 {
+			continue
+		}
+
+		for i, claim := range claims {
+			actualClaimName := actualClaimNames[i]
 			func() {
 				m.cache.RLock()
 				defer m.cache.RUnlock()
