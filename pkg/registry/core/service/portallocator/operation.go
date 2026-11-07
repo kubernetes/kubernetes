@@ -16,6 +16,8 @@ limitations under the License.
 
 package portallocator
 
+import "slices"
+
 // Encapsulates the semantics of a port allocation 'transaction':
 // It is better to leak ports than to double-allocate them,
 // so we allocate immediately, but defer release.
@@ -112,10 +114,8 @@ func (op *PortAllocationOperation) Allocate(port int) error {
 		if op.pa.Has(port) {
 			return ErrAllocated
 		}
-		for _, a := range op.allocated {
-			if port == a {
-				return ErrAllocated
-			}
+		if slices.Contains(op.allocated, port) {
+			return ErrAllocated
 		}
 		op.allocated = append(op.allocated, port)
 		return nil
