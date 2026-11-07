@@ -18,6 +18,8 @@ package daemonset
 
 import (
 	"context"
+	"maps"
+	"strconv"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 
@@ -32,6 +34,29 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 )
+
+func getTemplateGeneration(ds *apps.DaemonSet) int64 {
+	if value, ok := ds.Annotations[apps.DeprecatedTemplateGeneration]; ok {
+		if generation, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return generation
+		}
+	}
+	return 0
+}
+
+func setTemplateGeneration(ds *apps.DaemonSet, generation int64) {
+	if generation > 0 {
+		if ds.Annotations == nil {
+			ds.Annotations = make(map[string]string)
+		} else {
+			ds.Annotations = maps.Clone(ds.Annotations)
+		}
+		ds.Annotations[apps.DeprecatedTemplateGeneration] = strconv.FormatInt(generation, 10)
+	} else if _, ok := ds.Annotations[apps.DeprecatedTemplateGeneration]; ok {
+		ds.Annotations = maps.Clone(ds.Annotations)
+		delete(ds.Annotations, apps.DeprecatedTemplateGeneration)
+	}
+}
 
 // daemonSetStrategy implements verification logic for daemon sets.
 type daemonSetStrategy struct {
@@ -73,8 +98,8 @@ func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	daemonSet.Status = apps.DaemonSetStatus{}
 
 	daemonSet.Generation = 1
-	if daemonSet.Spec.TemplateGeneration < 1 {
-		daemonSet.Spec.TemplateGeneration = 1
+	if getTemplateGeneration(daemonSet) < 1 {
+		setTemplateGeneration(daemonSet, 1)
 	}
 
 	pod.DropDisabledTemplateFields(&daemonSet.Spec.Template, nil)
@@ -91,7 +116,8 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	newDaemonSet.Status = oldDaemonSet.Status
 
 	// update is not allowed to set TemplateGeneration
-	newDaemonSet.Spec.TemplateGeneration = oldDaemonSet.Spec.TemplateGeneration
+	oldTemplateGeneration := getTemplateGeneration(oldDaemonSet)
+	setTemplateGeneration(newDaemonSet, oldTemplateGeneration)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -105,7 +131,7 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	// TODO: Any changes to a part of the object that represents desired state (labels,
 	// annotations etc) should also increment the generation.
 	if !apiequality.Semantic.DeepEqual(oldDaemonSet.Spec.Template, newDaemonSet.Spec.Template) {
-		newDaemonSet.Spec.TemplateGeneration = oldDaemonSet.Spec.TemplateGeneration + 1
+		setTemplateGeneration(newDaemonSet, oldTemplateGeneration+1)
 		newDaemonSet.Generation = oldDaemonSet.Generation + 1
 		return
 	}
@@ -153,7 +179,7 @@ func (daemonSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	var warnings []string
 	newDaemonSet := obj.(*apps.DaemonSet)
 	oldDaemonSet := old.(*apps.DaemonSet)
-	if newDaemonSet.Spec.TemplateGeneration != oldDaemonSet.Spec.TemplateGeneration {
+	if getTemplateGeneration(newDaemonSet) != getTemplateGeneration(oldDaemonSet) {
 		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
 	}
 	return warnings

@@ -2677,7 +2677,7 @@ func TestPrintDeployment(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: 5,
+			Replicas: new(int32(5)),
 			Template: api.PodTemplateSpec{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -5013,7 +5013,7 @@ func TestPrintReplicaSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 5,
+					Replicas: new(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -5047,7 +5047,7 @@ func TestPrintReplicaSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 5,
+					Replicas: new(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -5099,7 +5099,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 5,
+					Replicas: new(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -5126,7 +5126,7 @@ func TestPrintReplicaSetList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.ReplicaSetSpec{
-					Replicas: 4,
+					Replicas: new(int32(4)),
 					Template: api.PodTemplateSpec{},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
@@ -5170,7 +5170,7 @@ func TestPrintStatefulSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 5,
+					Replicas: new(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{
@@ -5203,7 +5203,7 @@ func TestPrintStatefulSet(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: apps.StatefulSetSpec{
-					Replicas: 5,
+					Replicas: new(int32(5)),
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
 							Containers: []api.Container{

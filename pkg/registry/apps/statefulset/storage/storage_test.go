@@ -79,7 +79,7 @@ func validNewStatefulSet() *apps.StatefulSet {
 					TerminationGracePeriodSeconds: ptr.To[int64](30),
 				},
 			},
-			Replicas:       7,
+			Replicas:       new(int32(7)),
 			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 		},
 		Status: apps.StatefulSetStatus{},
@@ -118,7 +118,7 @@ func TestStatusUpdate(t *testing.T) {
 	update := apps.StatefulSet{
 		ObjectMeta: validStatefulSet.ObjectMeta,
 		Spec: apps.StatefulSetSpec{
-			Replicas: 7,
+			Replicas: new(int32(7)),
 		},
 		Status: apps.StatefulSetStatus{
 			Replicas: 7,
@@ -134,8 +134,8 @@ func TestStatusUpdate(t *testing.T) {
 	}
 
 	ps := obj.(*apps.StatefulSet)
-	if ps.Spec.Replicas != 7 {
-		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", ps.Spec.Replicas)
+	if ptr.Deref(ps.Spec.Replicas, 0) != 7 {
+		t.Errorf("we expected .spec.replicas to not be updated but it was updated to %v", ptr.Deref(ps.Spec.Replicas, 0))
 	}
 	if ps.Status.Replicas != 7 {
 		t.Errorf("we expected .status.replicas to be updated to %d but it was %v", 7, ps.Status.Replicas)
@@ -238,7 +238,7 @@ func TestScaleGet(t *testing.T) {
 			CreationTimestamp: sts.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: validStatefulSet.Spec.Replicas,
+			Replicas: *validStatefulSet.Spec.Replicas,
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: validStatefulSet.Status.Replicas,

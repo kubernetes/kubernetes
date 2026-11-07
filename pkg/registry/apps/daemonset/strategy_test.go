@@ -85,8 +85,8 @@ func TestSelectorImmutability(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		oldDaemonSet := newDaemonSetWithSelectorLabels(test.oldSelectorLabels, 1)
-		newDaemonSet := newDaemonSetWithSelectorLabels(test.newSelectorLabels, 2)
+		oldDaemonSet := newDaemonSetWithSelectorLabels(test.oldSelectorLabels)
+		newDaemonSet := newDaemonSetWithSelectorLabels(test.newSelectorLabels)
 		context := genericapirequest.NewContext()
 		context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
 		errorList := daemonSetStrategy{}.ValidateUpdate(context, newDaemonSet, oldDaemonSet)
@@ -97,9 +97,9 @@ func TestSelectorImmutability(t *testing.T) {
 }
 
 func TestValidateToleratingBadLabels(t *testing.T) {
-	oldObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"}, 1)
+	oldObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"})
 	oldObj.Spec.Selector.MatchExpressions = []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}}
-	newObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"}, 1)
+	newObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"})
 	newObj.Spec.Selector.MatchExpressions = []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}}
 
 	context := genericapirequest.NewContext()
@@ -109,7 +109,7 @@ func TestValidateToleratingBadLabels(t *testing.T) {
 	}
 }
 
-func newDaemonSetWithSelectorLabels(selectorLabels map[string]string, templateGeneration int64) *apps.DaemonSet {
+func newDaemonSetWithSelectorLabels(selectorLabels map[string]string) *apps.DaemonSet {
 	return &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            daemonsetName,
@@ -124,7 +124,6 @@ func newDaemonSetWithSelectorLabels(selectorLabels map[string]string, templateGe
 			UpdateStrategy: apps.DaemonSetUpdateStrategy{
 				Type: apps.OnDeleteDaemonSetStrategyType,
 			},
-			TemplateGeneration: templateGeneration,
 			Template: api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: selectorLabels,

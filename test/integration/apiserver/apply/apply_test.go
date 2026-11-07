@@ -4235,10 +4235,6 @@ func TestDuplicatesInAssociativeLists(t *testing.T) {
 		"fieldsType": "FieldsV1",
 		"fieldsV1": {
 			"f:metadata": {
-				"f:annotations": {
-					".": {},
-					"f:deprecated.daemonset.template.generation": {}
-				},
 				"f:labels": {
 					".": {},
 					"f:app": {}
@@ -4401,10 +4397,6 @@ spec:
 		"fieldsType": "FieldsV1",
 		"fieldsV1": {
 			"f:metadata": {
-				"f:annotations": {
-					".": {},
-					"f:deprecated.daemonset.template.generation": {}
-				},
 				"f:labels": {
 					".": {},
 					"f:app": {}
@@ -4613,7 +4605,6 @@ spec:
 		"fieldsType": "FieldsV1",
 		"fieldsV1": {
 			"f:metadata": {
-				"f:annotations": {},
 				"f:labels": {
 					".": {},
 					"f:app": {}
@@ -4683,11 +4674,6 @@ spec:
 		"time": null,
 		"fieldsType": "FieldsV1",
 		"fieldsV1": {
-			"f:metadata": {
-				"f:annotations": {
-				"f:deprecated.daemonset.template.generation": {}
-				}
-			},
 			"f:spec": {
 				"f:template": {
 					"f:spec": {
@@ -4808,7 +4794,6 @@ spec:
 		"fieldsType": "FieldsV1",
 		"fieldsV1": {
 			"f:metadata": {
-				"f:annotations": {},
 				"f:labels": {
 					".": {},
 					"f:app": {}
@@ -4867,20 +4852,6 @@ spec:
 						"f:maxUnavailable": {}
 					},
 					"f:type": {}
-				}
-			}
-		}
-	},
-	{
-		"manager": "update",
-		"operation": "Update",
-		"apiVersion": "apps/v1",
-		"time": null,
-		"fieldsType": "FieldsV1",
-		"fieldsV1": {
-			"f:metadata": {
-				"f:annotations": {
-					"f:deprecated.daemonset.template.generation": {}
 				}
 			}
 		}
