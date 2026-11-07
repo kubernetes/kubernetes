@@ -110,19 +110,11 @@ func (a *Plugin) filterAnnotations(allAnnotations map[string]string) map[string]
 }
 
 // Function to call on webhook failure; behavior determined by defaultAllow flag
-func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err error) error {
+func (a *Plugin) webhookError(attributes admission.Attributes, err error) error {
 	if err != nil {
 		klog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
 			attributes.AddAnnotation(AuditKeyPrefix+ImagePolicyFailedOpenKeySuffix, "true")
-			// TODO(wteiken): Remove the annotation code for the 1.13 release
-			annotations := pod.GetAnnotations()
-			if annotations == nil {
-				annotations = make(map[string]string)
-			}
-			annotations[api.ImagePolicyFailedOpenKey] = "true"
-			pod.ObjectMeta.SetAnnotations(annotations)
-
 			klog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
 		}
@@ -167,13 +159,13 @@ func (a *Plugin) Validate(ctx context.Context, attributes admission.Attributes, 
 			Namespace:   attributes.GetNamespace(),
 		},
 	}
-	if err := a.admitPod(ctx, pod, attributes, &imageReview); err != nil {
+	if err := a.admitPod(ctx, attributes, &imageReview); err != nil {
 		return admission.NewForbidden(attributes, err)
 	}
 	return nil
 }
 
-func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
+func (a *Plugin) admitPod(ctx context.Context, attributes admission.Attributes, review *v1alpha1.ImageReview) error {
 	cacheKey, err := json.Marshal(review.Spec)
 	if err != nil {
 		return err
@@ -186,15 +178,15 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 		})
 
 		if err := result.Error(); err != nil {
-			return a.webhookError(pod, attributes, err)
+			return a.webhookError(attributes, err)
 		}
 		var statusCode int
 		if result.StatusCode(&statusCode); statusCode < 200 || statusCode >= 300 {
-			return a.webhookError(pod, attributes, fmt.Errorf("Error contacting webhook: %d", statusCode))
+			return a.webhookError(attributes, fmt.Errorf("error contacting webhook: %d", statusCode))
 		}
 
 		if err := result.Into(review); err != nil {
-			return a.webhookError(pod, attributes, err)
+			return a.webhookError(attributes, err)
 		}
 
 		a.responseCache.Add(string(cacheKey), review.Status, a.statusTTL(review.Status))
