@@ -85,9 +85,15 @@ func (c *CacheDelegator) EnableResourceSizeEstimation(keys storage.KeysFunc) err
 	return c.storage.EnableResourceSizeEstimation(keys)
 }
 
+func (c *CacheDelegator) consistentGetFromCacheEnabled() bool {
+	return !c.cacher.disableConsistentGetFromCache &&
+		utilfeature.DefaultFeatureGate.Enabled(features.ConsistentGetFromCache) &&
+		delegator.ConsistentReadSupported()
+}
+
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	expectTransformOrDecodeError := opts.ExpectTransformOrDecodeError && utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion)
-	canServeDeleteFromCache := !expectTransformOrDecodeError && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentGetFromCache) && delegator.ConsistentReadSupported()
+	canServeDeleteFromCache := !expectTransformOrDecodeError && c.consistentGetFromCacheEnabled()
 	if !canServeDeleteFromCache {
 		return c.deleteUsingStore(ctx, key, out, preconditions, validateDeletion, opts)
 	}
@@ -155,8 +161,7 @@ func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.Lis
 func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
 	consistentRead := opts.ResourceVersion == ""
 	if consistentRead {
-		canServeGetFromCache := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentGetFromCache) && delegator.ConsistentReadSupported()
-		if !canServeGetFromCache {
+		if !c.consistentGetFromCacheEnabled() {
 			return c.storage.Get(ctx, key, opts, objPtr)
 		}
 	}
@@ -256,8 +261,7 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 }
 
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	canServeUpdateFromCache := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentGetFromCache) && delegator.ConsistentReadSupported()
-	if !canServeUpdateFromCache {
+	if !c.consistentGetFromCacheEnabled() {
 		return c.updateUsingStore(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate)
 	}
 	err := c.updateUsingCache(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate)

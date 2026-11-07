@@ -127,6 +127,10 @@ type Config struct {
 	// CompactorPollPeriod specifies how frequently compactor polls storage for compaction revision.
 	// Defaults to 15s when zero.
 	CompactorPollPeriod time.Duration
+
+	// DisableConsistentGetFromCache disables serving consistent Get, Delete, and GuaranteedUpdate
+	// from cache, e.g. when a storage value transformer is configured.
+	DisableConsistentGetFromCache bool
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -349,9 +353,10 @@ type Cacher struct {
 	// Note that this field when accessed MUST be protected by the Cacher.lock.
 	bookmarkWatchers *watcherBookmarkTimeBuckets
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
-	expiredBookmarkWatchers []*cacheWatcher
-	compactor               *compactor
-	watcherMetrics          *metrics.WatcherMetricsObservers
+	expiredBookmarkWatchers       []*cacheWatcher
+	compactor                     *compactor
+	watcherMetrics                *metrics.WatcherMetricsObservers
+	disableConsistentGetFromCache bool
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -421,11 +426,12 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
-		stopCh:           stopCh,
-		clock:            config.Clock,
-		timer:            time.NewTimer(time.Duration(0)),
-		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
-		watcherMetrics:   metrics.NewWatcherMetricsObservers(config.GroupResource),
+		stopCh:                        stopCh,
+		clock:                         config.Clock,
+		timer:                         time.NewTimer(time.Duration(0)),
+		bookmarkWatchers:              newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
+		watcherMetrics:                metrics.NewWatcherMetricsObservers(config.GroupResource),
+		disableConsistentGetFromCache: config.DisableConsistentGetFromCache,
 	}
 
 	// Ensure that timer is stopped.
