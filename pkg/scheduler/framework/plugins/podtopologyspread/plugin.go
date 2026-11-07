@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -87,19 +88,33 @@ func (pl *PodTopologySpread) Name() string {
 	return Name
 }
 
-// Pod topology spread is not localized to a pod and node, so we cannot
-// sign pods that have topology spread constraints, either explicit or
-// defaulted.
-func (pl *PodTopologySpread) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	if len(pod.Spec.TopologySpreadConstraints) > 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with topology constraints are not signable")
+type topologySpreadSignature struct {
+	Constraints     []v1.TopologySpreadConstraint
+	DefaultSelector string
+}
+
+func (pl *PodTopologySpread) SignPod(_ context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
+	if len(pod.Spec.TopologySpreadConstraints) == 0 && len(pl.defaultConstraints) == 0 {
+		return nil, nil
 	}
 
-	if len(pl.defaultConstraints) > 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with default topology constraints are not signable")
+	signature := topologySpreadSignature{Constraints: pod.Spec.TopologySpreadConstraints}
+	if len(signature.Constraints) == 0 {
+		signature.Constraints = pl.defaultConstraints
+		signature.DefaultSelector = helper.DefaultSelector(
+			pod,
+			pl.services,
+			pl.replicationCtrls,
+			pl.replicaSets,
+			pl.statefulSets,
+		).String()
 	}
 
-	return nil, nil
+	return []fwk.SignFragment{
+		{Key: fwk.NamespaceSignerName, Value: pod.Namespace},
+		{Key: fwk.LabelsSignerName, Value: pod.Labels},
+		{Key: fwk.TopologySpreadConstraintsSignerName, Value: signature},
+	}, nil
 }
 
 // New initializes a new plugin and returns it.
