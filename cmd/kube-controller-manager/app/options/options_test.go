@@ -46,9 +46,12 @@ import (
 	cpoptions "k8s.io/cloud-provider/options"
 
 	eventv1 "k8s.io/api/events/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgofeaturegate "k8s.io/client-go/features"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
+	cmfeatures "k8s.io/controller-manager/pkg/features"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -81,6 +84,7 @@ import (
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -148,6 +152,7 @@ var args = []string{
 	"--leader-elect-renew-deadline=15s",
 	"--leader-elect-resource-lock=leases",
 	"--leader-elect-retry-period=5s",
+	"--leader-elect-recovery-deadline=90s",
 	"--legacy-service-account-token-clean-up-period=8760h",
 	"--master=192.168.4.20",
 	"--max-endpoints-per-slice=200",
@@ -210,7 +215,8 @@ func TestAddFlags(t *testing.T) {
 					ResourceName:      "kube-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 			},
 			Debugging: &cmoptions.DebuggingOptions{
 				DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{
@@ -606,7 +612,8 @@ func TestApplyTo(t *testing.T) {
 					ResourceName:      "kube-controller-manager",
 					ResourceNamespace: "kube-system",
 				},
-				Controllers: []string{"foo", "bar"},
+				LeaderElectionRecoveryDeadline: metav1.Duration{Duration: 90 * time.Second},
+				Controllers:                    []string{"foo", "bar"},
 				Debugging: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           false,
 					EnableContentionProfiling: true,
@@ -1756,4 +1763,36 @@ func (r sortedGCIgnoredResources) Less(i, j int) bool {
 
 func (r sortedGCIgnoredResources) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
+}
+
+func TestValidateLeaderElectionRecoveryDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		recovery, coordinated bool
+		wantErr               string
+	}{
+		{name: "gate off", wantErr: "leader-elect-recovery-deadline requires the LeaderElectionRecovery feature gate"},
+		{name: "gate on", recovery: true},
+		{name: "gate on with coordinated leader election", recovery: true, coordinated: true, wantErr: "leader-elect-recovery-deadline is not yet supported with the CoordinatedLeaderElection feature gate"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, cmfeatures.LeaderElectionRecovery, tc.recovery)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.CoordinatedLeaderElection, tc.coordinated)
+			s, err := NewKubeControllerManagerOptions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.Generic.LeaderElectionRecoveryDeadline = metav1.Duration{Duration: 30 * time.Second}
+			got := ""
+			if err := s.Validate([]string{""}, []string{""}, nil); err != nil {
+				got = err.Error()
+			}
+			if tc.wantErr == "" && strings.Contains(got, "leader-elect-recovery-deadline") {
+				t.Errorf("unexpected recovery deadline error: %s", got)
+			}
+			if tc.wantErr != "" && !strings.Contains(got, tc.wantErr) {
+				t.Errorf("expected an error containing %q, got %q", tc.wantErr, got)
+			}
+		})
+	}
 }

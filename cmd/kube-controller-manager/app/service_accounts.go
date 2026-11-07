@@ -30,12 +30,12 @@ import (
 
 // serviceAccountTokenController is special because it must run first to set up permissions for other controllers.
 // It cannot use the "normal" client builder, so it tracks its own.
-func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.TypedClientBuilder) *ControllerDescriptor {
+func newServiceAccountTokenControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:    names.ServiceAccountTokenController,
 		aliases: []string{"serviceaccount-token"},
 		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			return newServiceAccountTokenController(ctx, controllerContext, controllerName, rootClientBuilder)
+			return newServiceAccountTokenController(ctx, controllerContext, controllerName, controllerContext.RootClientBuilder)
 		},
 		// This controller is started manually before any other controller.
 		requiresSpecialHandling: true,
@@ -84,7 +84,7 @@ func newServiceAccountTokenController(
 		return nil, fmt.Errorf("error creating Tokens controller: %w", err)
 	}
 
-	return newControllerLoop(func(ctx context.Context) {
+	return newPausableControllerLoop(func(ctx context.Context) {
 		tokenController.Run(ctx, int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs))
-	}, controllerName), nil
+	}, controllerName, tokenController), nil
 }

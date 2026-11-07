@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/dump"
@@ -577,3 +578,7 @@ func TestQueueServiceAccountSync_Tombstone(t *testing.T) {
 		t.Errorf("expected UID %s, got %s", sa.UID, key.uid)
 	}
 }
+
+// The tokens controller must pause with the leader election write gate, see
+// the serviceaccount-token descriptor in kube-controller-manager.
+var _ leaderelection.Pausable = &TokensController{}

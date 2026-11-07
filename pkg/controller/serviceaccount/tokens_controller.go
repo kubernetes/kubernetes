@@ -89,14 +89,14 @@ func NewTokensController(ctx context.Context, serviceAccounts informers.ServiceA
 				Logger: &logger,
 				Name:   "serviceaccount_tokens_service",
 			},
-		),
+		).(pausableQueue[serviceAccountQueueKey]),
 		syncSecretQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[secretQueueKey](),
 			workqueue.TypedRateLimitingQueueConfig[secretQueueKey]{
 				Logger: &logger,
 				Name:   "serviceaccount_tokens_service",
 			},
-		),
+		).(pausableQueue[secretQueueKey]),
 
 		maxRetries: maxRetries,
 	}
@@ -160,19 +160,33 @@ type TokensController struct {
 	// syncServiceAccountQueue handles service account events:
 	//   * ensures tokens are removed for service accounts which no longer exist
 	// key is "<namespace>/<name>/<uid>"
-	syncServiceAccountQueue workqueue.TypedRateLimitingInterface[serviceAccountQueueKey]
+	syncServiceAccountQueue pausableQueue[serviceAccountQueueKey]
 
 	// syncSecretQueue handles secret events:
 	//   * deletes tokens whose service account no longer exists
 	//   * updates tokens with missing token or namespace data, or mismatched ca data
 	//   * ensures service account secret references are removed for tokens which are deleted
 	// key is a secretQueueKey{}
-	syncSecretQueue workqueue.TypedRateLimitingInterface[secretQueueKey]
+	syncSecretQueue pausableQueue[secretQueueKey]
 
 	maxRetries int
 }
 
 // Run runs controller blocks until stopCh is closed
+// Pause blocks both controller workqueues from dequeuing items while the
+// leader election write gate is closed.
+func (e *TokensController) Pause() {
+	e.syncServiceAccountQueue.Pause()
+	e.syncSecretQueue.Pause()
+}
+
+// Resume unblocks both controller workqueues after the leader election write
+// gate reopens.
+func (e *TokensController) Resume() {
+	e.syncServiceAccountQueue.Resume()
+	e.syncSecretQueue.Resume()
+}
+
 func (e *TokensController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	logger := klog.FromContext(ctx)
