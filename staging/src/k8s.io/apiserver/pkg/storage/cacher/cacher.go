@@ -135,12 +135,12 @@ type Config struct {
 
 type watchersMap map[int]*cacheWatcher
 
-func (wm watchersMap) addWatcher(w *cacheWatcher, number int) {
-	wm[number] = w
+func (wm watchersMap) addWatcher(w *cacheWatcher) {
+	wm[w.id] = w
 }
 
-func (wm watchersMap) deleteWatcher(number int) {
-	delete(wm, number)
+func (wm watchersMap) deleteWatcher(w *cacheWatcher) {
+	delete(wm, w.id)
 }
 
 func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
@@ -155,30 +155,30 @@ type indexedWatchers struct {
 	indexWatchers map[string]watchersMap
 }
 
-func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int) {
+func (i *indexedWatchers) addWatcher(w *cacheWatcher) {
 	if w.selector.indexValue != nil {
 		if _, ok := i.indexWatchers[*w.selector.indexValue]; !ok {
 			i.indexWatchers[*w.selector.indexValue] = watchersMap{}
 		}
-		i.indexWatchers[*w.selector.indexValue].addWatcher(w, number)
+		i.indexWatchers[*w.selector.indexValue].addWatcher(w)
 	} else {
 		scopedWatchers, ok := i.scopeWatchers[w.selector.scope]
 		if !ok {
 			scopedWatchers = watchersMap{}
 			i.scopeWatchers[w.selector.scope] = scopedWatchers
 		}
-		scopedWatchers.addWatcher(w, number)
+		scopedWatchers.addWatcher(w)
 	}
 }
 
-func (i *indexedWatchers) deleteWatcher(w *cacheWatcher, number int) {
+func (i *indexedWatchers) deleteWatcher(w *cacheWatcher) {
 	if w.selector.indexValue != nil {
-		i.indexWatchers[*w.selector.indexValue].deleteWatcher(number)
+		i.indexWatchers[*w.selector.indexValue].deleteWatcher(w)
 		if len(i.indexWatchers[*w.selector.indexValue]) == 0 {
 			delete(i.indexWatchers, *w.selector.indexValue)
 		}
 	} else {
-		i.scopeWatchers[w.selector.scope].deleteWatcher(number)
+		i.scopeWatchers[w.selector.scope].deleteWatcher(w)
 		if len(i.scopeWatchers[w.selector.scope]) == 0 {
 			delete(i.scopeWatchers, w.selector.scope)
 		}
@@ -669,8 +669,10 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		return nil, nil
 	}
 
+	watcher.id = c.watcherIdx
+	c.watcherIdx++
 	// Update watcher.forget function once we can compute it.
-	watcher.forget = forgetWatcher(c, watcher, c.watcherIdx)
+	watcher.forget = forgetWatcher(c, watcher)
 	if opts.Predicate.ShardingEnabled() {
 		originalForget := watcher.forget
 		watcher.forget = func(drainWatcher bool) {
@@ -678,13 +680,12 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 			originalForget(drainWatcher)
 		}
 	}
-	c.registerWatcherLocked(watcher, c.watcherIdx, cacheInterval)
-	c.watcherIdx++
+	c.registerWatcherLocked(watcher, cacheInterval)
 	return watcher, nil
 }
 
-func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, idx int, cacheInterval *watchCacheInterval) {
-	c.watchers.addWatcher(watcher, idx)
+func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, cacheInterval *watchCacheInterval) {
+	c.watchers.addWatcher(watcher)
 	// Add it to the queue only when the client support watch bookmarks.
 	if watcher.allowWatchBookmarks {
 		c.bookmarkWatchers.addWatcherThreadUnsafe(watcher)
@@ -1324,7 +1325,7 @@ func (c *Cacher) prepareKey(key string, recursive bool) (string, error) {
 	return storage.PrepareKey(c.resourcePrefix, key, recursive)
 }
 
-func forgetWatcher(c *Cacher, w *cacheWatcher, index int) func(bool) {
+func forgetWatcher(c *Cacher, w *cacheWatcher) func(bool) {
 	return func(drainWatcher bool) {
 		c.Lock()
 		defer c.Unlock()
@@ -1332,7 +1333,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int) func(bool) {
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(w, index)
+		c.watchers.deleteWatcher(w)
 		c.stopWatcherLocked(w, drainWatcher)
 	}
 }

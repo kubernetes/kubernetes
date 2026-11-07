@@ -2837,13 +2837,13 @@ func TestStartDispatchingSelectsWatchers(t *testing.T) {
 				{namespace: "other-ns", name: "pod"}, {namespace: "ns", name: "other-pod"}, {namespace: "other-ns"}, {name: "other-pod"},
 			} {
 				for range 2 {
-					cacher.watchers.addWatcher(&cacheWatcher{identifier: scope.namespace + "/" + scope.name, selector: watchSelector{scope: scope}}, number)
+					cacher.watchers.addWatcher(&cacheWatcher{id: number, identifier: scope.namespace + "/" + scope.name, selector: watchSelector{scope: scope}})
 					number++
 				}
 			}
 			for _, value := range []string{"node-a", "node-b", "node-c"} {
 				for range 2 {
-					cacher.watchers.addWatcher(&cacheWatcher{identifier: value, selector: watchSelector{indexValue: &value}}, number)
+					cacher.watchers.addWatcher(&cacheWatcher{id: number, identifier: value, selector: watchSelector{indexValue: &value}})
 					number++
 				}
 			}
@@ -2960,12 +2960,12 @@ func TestForgetWatcher(t *testing.T) {
 		watchSelector{},
 		0,
 	)
-	forgetWatcherFn = forgetWatcher(cacher, w, 0)
+	forgetWatcherFn = forgetWatcher(cacher, w)
 	addWatcher := func(w *cacheWatcher) {
 		cacher.Lock()
 		defer cacher.Unlock()
 
-		cacher.watchers.addWatcher(w, 0)
+		cacher.watchers.addWatcher(w)
 	}
 
 	addWatcher(w)
