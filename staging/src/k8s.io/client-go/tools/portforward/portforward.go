@@ -53,6 +53,7 @@ var (
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
 type PortForwarder struct {
+	ctx       context.Context
 	addresses []listenAddress
 	ports     []ForwardedPort
 	stopChan  <-chan struct{}
@@ -62,10 +63,39 @@ type PortForwarder struct {
 	streamConn    httpstream.Connection
 	listeners     []io.Closer
 	Ready         chan struct{}
+	errorHandler  func(ctx context.Context, port ForwardedPort, err error) (fatal bool)
 	requestIDLock sync.Mutex
 	requestID     int
 	out           io.Writer
 	errOut        io.Writer
+}
+
+// Option configures optional PortForwarder behavior.
+type Option func(*PortForwarder)
+
+// WithErrorHandler sets a handler that decides, for an error the remote side
+// reported about a single forwarded connection, whether the whole forwarding
+// session must be torn down (fatal) or only that one connection is affected.
+//
+// The handler is called only for non-empty remote error messages successfully
+// read from a connection's error stream. Failure to read the error stream
+// bypasses the handler and closes the session.
+//
+// Returning false prevents this remote error from closing the session. It
+// does not prevent termination caused by transport closure or context
+// cancellation.
+//
+// The handler receives the session context and the local/remote port pair.
+// The context is canceled when forwarding stops; a blocking handler should
+// observe its cancellation. The handler may be called concurrently for
+// different forwarded connections.
+//
+// Without a handler every remote error is fatal, for backwards compatibility
+// with callers that rely on kubectl exiting when the target pod is gone.
+func WithErrorHandler(handler func(ctx context.Context, port ForwardedPort, err error) (fatal bool)) Option {
+	return func(pf *PortForwarder) {
+		pf.errorHandler = handler
+	}
 }
 
 // ForwardedPort contains a Local:Remote port pairing.
@@ -185,6 +215,12 @@ func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string
 
 // NewOnAddressesWithContext creates a new PortForwarder with custom listen addresses.
 func NewOnAddressesWithContext(ctx context.Context, dialer httpstream.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+	return NewOnAddressesWithOptions(ctx, dialer, addresses, ports, readyChan, out, errOut)
+}
+
+// NewOnAddressesWithOptions creates a new PortForwarder with custom listen
+// addresses and optional behavior, using ctx for cancellation and logging.
+func NewOnAddressesWithOptions(ctx context.Context, dialer httpstream.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer, opts ...Option) (*PortForwarder, error) {
 	if len(addresses) == 0 {
 		return nil, errors.New("you must specify at least 1 address")
 	}
@@ -199,7 +235,8 @@ func NewOnAddressesWithContext(ctx context.Context, dialer httpstream.Dialer, ad
 	if err != nil {
 		return nil, err
 	}
-	return &PortForwarder{
+	pf := &PortForwarder{
+		ctx:       ctx,
 		logger:    klog.FromContext(ctx),
 		dialer:    dialer,
 		addresses: parsedAddresses,
@@ -208,7 +245,11 @@ func NewOnAddressesWithContext(ctx context.Context, dialer httpstream.Dialer, ad
 		Ready:     readyChan,
 		out:       out,
 		errOut:    errOut,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(pf)
+	}
+	return pf, nil
 }
 
 // NewOnAddressesForStreaming creates a new PortForwarder with custom listen
@@ -222,7 +263,14 @@ func NewOnAddressesForStreaming(dialer streamhttp.Dialer, addresses []string, po
 // NewOnAddressesForStreamingWithContext creates a new PortForwarder with custom listen
 // addresses for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
 func NewOnAddressesForStreamingWithContext(ctx context.Context, dialer streamhttp.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
-	return NewOnAddressesWithContext(ctx, &compatDialerAdapter{logger: klog.FromContext(ctx), delegate: dialer}, addresses, ports, readyChan, out, errOut)
+	return NewOnAddressesForStreamingWithOptions(ctx, dialer, addresses, ports, readyChan, out, errOut)
+}
+
+// NewOnAddressesForStreamingWithOptions creates a new PortForwarder with custom
+// listen addresses and optional behavior for in-tree callers that use
+// k8s.io/streaming/pkg/httpstream types, using ctx for cancellation and logging.
+func NewOnAddressesForStreamingWithOptions(ctx context.Context, dialer streamhttp.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer, opts ...Option) (*PortForwarder, error) {
+	return NewOnAddressesWithOptions(ctx, &compatDialerAdapter{logger: klog.FromContext(ctx), delegate: dialer}, addresses, ports, readyChan, out, errOut, opts...)
 }
 
 type compatDialerAdapter struct {
@@ -313,6 +361,9 @@ func (s *compatStreamAdapter) Identifier() uint32 {
 // ForwardPorts formats and executes a port forwarding request. The connection will remain
 // open until stopChan is closed.
 func (pf *PortForwarder) ForwardPorts() error {
+	ctx, cancel := context.WithCancel(pf.ctx)
+	pf.ctx = ctx
+	defer cancel()
 	defer pf.Close()
 
 	var err error
@@ -541,13 +592,31 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	// always expect something on errorChan (it may be empty)
 	errResult := <-errorChan
+	// A session policy check may block; the failed local connection must not.
+	if errResult.err != nil || len(errResult.message) > 0 {
+		// An orderly close would make a failed remote transfer look like a
+		// successful EOF to the local client.
+		if tcpConn, ok := conn.(*net.TCPConn); ok {
+			if err := tcpConn.SetLinger(0); err != nil {
+				runtime.HandleErrorWithLogger(pf.logger, err, "Error configuring local connection reset", "localPort", port.Local, "remotePort", port.Remote)
+			}
+		}
+		_ = conn.Close()
+	}
 	switch {
 	case errResult.err != nil:
+		// failing to read the error stream means the session itself is broken
 		runtime.HandleErrorWithLogger(pf.logger, errResult.err, "Error reading from error stream", "localPort", port.Local, "remotePort", port.Remote)
-		pf.streamConn.Close()
+		_ = pf.streamConn.Close()
 	case len(errResult.message) > 0:
-		runtime.HandleErrorWithLogger(pf.logger, errors.New(string(errResult.message)), "An error occurred forwarding", "localPort", port.Local, "remotePort", port.Remote)
-		pf.streamConn.Close()
+		err := errors.New(string(errResult.message))
+		runtime.HandleErrorWithLogger(pf.logger, err, "An error occurred forwarding", "localPort", port.Local, "remotePort", port.Remote)
+		if pf.errorHandler == nil || pf.errorHandler(pf.ctx, port, err) {
+			_ = pf.streamConn.Close()
+		}
+		// Non-fatal: the error only describes this connection, and the remote
+		// side has already reset its stream pair, so the session stays usable
+		// for other and future connections.
 	}
 }
 
