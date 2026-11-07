@@ -29,7 +29,7 @@ type PodAdmitAttributes struct {
 	Pod *v1.Pod
 	// all pods bound to the kubelet excluding the pod being evaluated
 	OtherPods []*v1.Pod
-	// the operation being performed; either "add" or "resize"
+	// the operation being performed; either "add" or "update"
 	Operation Operation
 }
 
@@ -39,8 +39,8 @@ type Operation string
 const (
 	// AddOperation indicates that the pod is being added to the kubelet.
 	AddOperation Operation = "add"
-	// ResizeOperation indicates that the pod is being resized.
-	ResizeOperation Operation = "resize"
+	// UpdateOperation indicates that an existing pod's allocation is being updated.
+	UpdateOperation Operation = "update"
 )
 
 // PodAdmitResult provides the result of a pod admission decision.

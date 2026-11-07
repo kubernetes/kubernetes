@@ -68,7 +68,7 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(ctx context.Context
 		return failureReasons, nil
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
-		if operation == lifecycle.ResizeOperation {
+		if operation == lifecycle.UpdateOperation {
 			// For in-place pod resizes, the scheduler owns all preemption decisions.
 			// When a resize cannot be accommodated immediately on the node, Kubelet defers the
 			// resize request and relies on the scheduler to handle preemption asynchronously.

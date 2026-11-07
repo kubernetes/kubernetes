@@ -1192,8 +1192,8 @@ func TestRetryPendingResizes(t *testing.T) {
 				allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 					return newPod, true
 				}
-				allocationManager.PushPendingResize(logger, originalPod.UID)
-				allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+				allocationManager.PushPendingAllocation(logger, originalPod.UID)
+				allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 				var updatedPod *v1.Pod
 				if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) || allocationManager.(*manager).statusManager.IsPodResizeDeferred(newPod.UID) {
@@ -1450,8 +1450,8 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 				allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 					return newPod, true
 				}
-				allocationManager.PushPendingResize(logger, originalPod.UID)
-				allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+				allocationManager.PushPendingAllocation(logger, originalPod.UID)
+				allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 				var updatedPod *v1.Pod
 				if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) || allocationManager.(*manager).statusManager.IsPodResizeDeferred(newPod.UID) {
@@ -1660,8 +1660,8 @@ func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
 			allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 				return newPod, true
 			}
-			allocationManager.PushPendingResize(logger, originalPod.UID)
-			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+			allocationManager.PushPendingAllocation(logger, originalPod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 			resizeStatus := allocationManager.(*manager).statusManager.GetPodResizeConditions(newPod.UID)
 			verifyResizeConditions(t, tt.expectedResize, resizeStatus)
@@ -1818,8 +1818,8 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 			allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 				return newPod, true
 			}
-			allocationManager.PushPendingResize(logger, testPod.UID)
-			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+			allocationManager.PushPendingAllocation(logger, testPod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 			var updatedPod *v1.Pod
 			if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) {
@@ -2020,8 +2020,8 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 				},
 			}
 
-			allocationManager.PushPendingResize(logger, testPod.UID)
-			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+			allocationManager.PushPendingAllocation(logger, testPod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(testPod.UID)
 			verifyResizeConditions(t, tc.expectedConditions, conditions)
@@ -2146,8 +2146,8 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 				statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "deferred by the test", pod.Generation)
 			}
 
-			allocationManager.PushPendingResize(logger, pod.UID)
-			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+			allocationManager.PushPendingAllocation(logger, pod.UID)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 			verifyResizeConditions(t, tc.expectedConditions, statusManager.GetPodResizeConditions(pod.UID))
 			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
@@ -2918,16 +2918,16 @@ func TestSortPendingResizes(t *testing.T) {
 
 	// Push all the pods to the queue.
 	for i := range testPods {
-		allocationManager.PushPendingResize(logger, testPods[i].UID)
+		allocationManager.PushPendingAllocation(logger, testPods[i].UID)
 	}
-	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
+	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingAllocations)
 
 	// Clear the queue and push the pods in reverse order to spice things up.
-	allocationManager.(*manager).podsWithPendingResizes = nil
+	allocationManager.(*manager).podsWithPendingAllocations = nil
 	for i := len(testPods) - 1; i >= 0; i-- {
-		allocationManager.PushPendingResize(logger, testPods[i].UID)
+		allocationManager.PushPendingAllocation(logger, testPods[i].UID)
 	}
-	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
+	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingAllocations)
 }
 
 func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
@@ -3023,8 +3023,8 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			am.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 				return resizedPod, true
 			}
-			am.PushPendingResize(logger, original.UID)
-			resizedPods := am.(*manager).retryPendingResizes(tCtx, tc.trigger)
+			am.PushPendingAllocation(logger, original.UID)
+			resizedPods := am.(*manager).retryPendingAllocations(tCtx, tc.trigger)
 
 			require.Len(t, resizedPods, 1)
 			require.Equal(t, original.UID, resizedPods[0].UID)
@@ -4071,7 +4071,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			}
 
 			// Actuate
-			resizeAllocated, err := allocationManager.(*manager).handlePodResourcesResize(tCtx, test.targetPod)
+			resizeAllocated, err := allocationManager.(*manager).handlePendingAllocation(tCtx, test.targetPod)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectResizeAllocated, resizeAllocated)
 
@@ -4230,8 +4230,8 @@ func TestNonAllocatedPodsExcludedFromCapacity_Resize(t *testing.T) {
 		return nil, false
 	}
 
-	allocationManager.PushPendingResize(logger, runningPod.UID)
-	allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+	allocationManager.PushPendingAllocation(logger, runningPod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 	// If pendingPod was incorrectly included in capacity calculations, this
 	// resize would be deferred (1500m + 10000m > 4000m allocatable).
@@ -4480,13 +4480,13 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 				am.statusManager.SetPodResizePendingCondition(resizedPod.UID, v1.PodReasonDeferred, "deferred", resizedPod.Generation)
 			}
 
-			allocationManager.PushPendingResize(logger, resizedPod.UID)
-			require.True(t, allocationManager.HasPendingResizes())
+			allocationManager.PushPendingAllocation(logger, resizedPod.UID)
+			require.True(t, allocationManager.HasPendingAllocations())
 
 			am.podProvider.(*fakePodProvider).terminating = tc.terminating
-			allocationManager.RetryPendingResizes(tCtx, TriggerReasonPodUpdated)
+			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
-			assert.False(t, allocationManager.HasPendingResizes(), "pending resize queue should be drained")
+			assert.False(t, allocationManager.HasPendingAllocations(), "pending resize queue should be drained")
 
 			alloc, found := allocationManager.GetContainerResourceAllocation(resizedPod.UID, "c1")
 			require.True(t, found)

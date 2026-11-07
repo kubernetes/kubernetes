@@ -5440,7 +5440,7 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 
 			allocatedPod, wasUpdated := kubelet.allocationManager.UpdatePodFromAllocation(resizedPod.DeepCopy())
 			assert.Equal(t, tt.allocatedDiffersFromDesired, wasUpdated)
-			assert.Equal(t, tt.allocatedDiffersFromDesired, kubelet.allocationManager.HasPendingResizes())
+			assert.Equal(t, tt.allocatedDiffersFromDesired, kubelet.allocationManager.HasPendingAllocations())
 
 			if tt.allocatedDiffersFromDesired {
 				// Reverted back to the initial (old) limit!
@@ -5909,7 +5909,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 
 			kubelet.podManager.AddPod(pendingResizeDesired)
 			kubelet.podManager.AddPod(tc.oldPod)
-			kubelet.allocationManager.PushPendingResize(logger, pendingResizeDesired.UID)
+			kubelet.allocationManager.PushPendingAllocation(logger, pendingResizeDesired.UID)
 
 			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID, metrics.DeferredResizeResolutionAccepted)
 			kubelet.HandlePodReconcile(tCtx, []*v1.Pod{tc.newPod})
@@ -6345,7 +6345,7 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 
 	assertResizeHalted := func(t *testing.T, kl *Kubelet) {
 		t.Helper()
-		assert.False(t, kl.allocationManager.HasPendingResizes())
+		assert.False(t, kl.allocationManager.HasPendingAllocations())
 		assertAllocatedCPU(t, kl, cpu100m)
 		assert.Empty(t, kl.statusManager.GetPodResizeConditions(podUID))
 	}
@@ -6416,8 +6416,8 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 				resizedPod := newPod(2, cpu200m)
 				logger, tCtx, kl := setup(t, resizedPod)
 				kl.statusManager.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "deferred", resizedPod.Generation)
-				kl.allocationManager.PushPendingResize(logger, podUID)
-				require.True(t, kl.allocationManager.HasPendingResizes())
+				kl.allocationManager.PushPendingAllocation(logger, podUID)
+				require.True(t, kl.allocationManager.HasPendingAllocations())
 
 				updatedPod := resizedPod.DeepCopy()
 				tc.mutate(logger, kl, updatedPod)
