@@ -17,6 +17,7 @@ limitations under the License.
 package event
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	core "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	registry "k8s.io/kubernetes/pkg/registry/core/event"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
@@ -58,6 +60,16 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 		obj := mkValidEvent()
 		apitesting.VerifyValidationEquivalence(t, ctx, &obj, registry.Strategy, nil)
 	})
+
+	// core/v1 does not validate the series, unlike events.k8s.io/v1.
+	for _, count := range []int32{-1, 0, 1, 2} {
+		t.Run(fmt.Sprintf("series: count %d is accepted", count), func(t *testing.T) {
+			obj := mkValidEvent()
+			obj.Series = &core.EventSeries{Count: count, LastObservedTime: metav1.NewMicroTime(time.Now())}
+			apitesting.VerifyValidationEquivalence(t, ctx, &obj, registry.Strategy, nil,
+				apitesting.WithOmittedFieldPaths(validation.EventOmittedFieldPaths()))
+		})
+	}
 
 	obj := mkValidEvent()
 	meta.RunObjectMetaTestCases(t, ctx, &obj, registry.Strategy)

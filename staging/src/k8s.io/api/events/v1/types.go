@@ -45,6 +45,7 @@ type Event struct {
 
 	// series is data about the Event series this event represents or nil if it's a singleton Event.
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
 	Series *EventSeries `json:"series,omitempty" protobuf:"bytes,3,opt,name=series"`
 
 	// reportingController is the name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
@@ -112,6 +113,8 @@ type Event struct {
 type EventSeries struct {
 	// count is the number of occurrences in this series up to the last heartbeat time.
 	// +required
+	// +k8s:alpha(since: "1.38")=+k8s:required
+	// +k8s:alpha(since: "1.38")=+k8s:minimum=2
 	Count int32 `json:"count" protobuf:"varint,1,opt,name=count"`
 	// lastObservedTime is the time when last Event from the series was seen before last heartbeat.
 	// +required
