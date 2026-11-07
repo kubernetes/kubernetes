@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package server
+package serving
 
 import (
 	"context"
@@ -175,7 +175,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
-	setMaxHeaderValueCount(secureServer)
+	SetMaxHeaderValueCount(secureServer)
 
 	if !s.DisableHTTP2 {
 		// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.

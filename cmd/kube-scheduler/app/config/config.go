@@ -19,8 +19,8 @@ package config
 import (
 	"time"
 
-	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
+	apiserver "k8s.io/apiserver/pkg/server/serving"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
