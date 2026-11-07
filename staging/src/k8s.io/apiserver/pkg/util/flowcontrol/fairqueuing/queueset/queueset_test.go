@@ -1548,6 +1548,53 @@ func newFIFO(requests ...*request) fifo {
 	return l
 }
 
+func TestLingeringRequestDoesNotCauseDoubleQueueRemoval(t *testing.T) {
+	metrics.Register()
+	now := time.Now()
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+
+	// HandSize 1 => a hash maps to a single deterministic queue index.
+	qCfg := fq.QueuingConfig{Name: "lingering", DesiredNumQueues: 3, QueueLengthLimit: 10, HandSize: 1}
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), fq.NewNamedIntegrator(clk, "lingering"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsComplete(qsc, 100) // ample concurrency: dispatch immediately
+	qsi := qs.(*queueSet)
+	ctx := context.Background()
+
+	// Two requests into the same queue (highest index, 2): r lingers, s does not.
+	weLinger := &fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 1, AdditionalLatency: time.Second}
+	weNormal := &fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 0}
+	const hash = uint64(2)
+	r, _ := qs.StartRequest(ctx, weLinger, hash, "", "fs", "r", nil, nil)
+	s, _ := qs.StartRequest(ctx, weNormal, hash, "", "fs", "s", nil, nil)
+	if r == nil || s == nil {
+		t.Fatal("requests not dispatched")
+	}
+
+	// Reduce the desired number of queues; the three queues remain (attrition).
+	newQCfg := fq.QueuingConfig{Name: "lingering", DesiredNumQueues: 1, QueueLengthLimit: 10, HandSize: 1}
+	dealer, derr := checkConfig(newQCfg)
+	if derr != nil {
+		t.Fatal(derr)
+	}
+	qsi.setConfiguration(ctx, newQCfg, dealer, fq.DispatchingConfig{ConcurrencyLimit: 100, ConcurrencyDenominator: 100})
+
+	// r finishes first and lingers (seats retained); s then finishes.
+	r.Finish(func() {})
+	s.Finish(func() {})
+
+	// Fire r's lingering timer. On unfixed code this panics (apiserver crash) in
+	// the eventclock goroutine; with the fix it removes the queue exactly once.
+	clk.SetTime(now.Add(2 * time.Second))
+
+	if got, want := len(qsi.queues), 2; got != want {
+		t.Fatalf("expected %d queues after lingering completion, got %d", want, got)
+	}
+}
+
 func newGaugePair(clk clock.PassiveClock) metrics.RatioedGaugePair {
 	return metrics.RatioedGaugeVecPhasedElementPair(metrics.PriorityLevelConcurrencyGaugeVec, 1, 1, []string{"test"})
 }
