@@ -142,9 +142,10 @@ func IsUsageError(err error) bool {
 }
 
 type FilenameOptions struct {
-	Filenames []string
-	Kustomize string
-	Recursive bool
+	Filenames  []string
+	Kustomize  string
+	Recursive  bool
+	EnableHelm bool
 }
 
 func (o *FilenameOptions) validate() []error {
@@ -154,6 +155,9 @@ func (o *FilenameOptions) validate() []error {
 	}
 	if len(o.Kustomize) > 0 && o.Recursive {
 		errs = append(errs, fmt.Errorf("the -k flag can't be used with -f or -R"))
+	}
+	if o.EnableHelm && len(o.Kustomize) == 0 {
+		errs = append(errs, fmt.Errorf("the --enable-helm flag can only be used with -k"))
 	}
 	return errs
 }
@@ -286,10 +290,11 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 		b.paths = append(
 			b.paths,
 			&KustomizeVisitor{
-				mapper:  b.mapper,
-				dirPath: filenameOptions.Kustomize,
-				schema:  b.schema,
-				fSys:    filesys.MakeFsOnDisk(),
+				mapper:     b.mapper,
+				dirPath:    filenameOptions.Kustomize,
+				schema:     b.schema,
+				fSys:       filesys.MakeFsOnDisk(),
+				enableHelm: filenameOptions.EnableHelm,
 			})
 	}
 
