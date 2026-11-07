@@ -80,6 +80,9 @@ func LoadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err 
 	if err == nil && verifyKeyData(loadedData) {
 		return loadedData, false, err
 	}
+	if err == nil {
+		return nil, false, fmt.Errorf("error loading key from %s: the file is empty or does not contain a valid private key", keyPath)
+	}
 	if !os.IsNotExist(err) {
 		return nil, false, fmt.Errorf("error loading key from %s: %v", keyPath, err)
 	}
