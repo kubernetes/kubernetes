@@ -2912,6 +2912,16 @@ func handleProbeSync(ctx context.Context, kl *Kubelet, update proberesults.Updat
 	handler.HandlePodSyncs(ctx, []*v1.Pod{pod})
 }
 
+// resolvePodAndMirrorPod looks up the pod and its mirror pod in the pod manager.
+func (kl *Kubelet) resolvePodAndMirrorPod(ctx context.Context, pod *v1.Pod) (resolved, mirrorPod *v1.Pod, wasMirror, ok bool) {
+	resolved, mirrorPod, wasMirror = kl.podManager.GetPodAndMirrorPod(pod)
+	if wasMirror && resolved == nil {
+		klog.FromContext(ctx).V(2).Info("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
+		return nil, mirrorPod, true, false
+	}
+	return resolved, mirrorPod, wasMirror, true
+}
+
 // HandlePodAdditions is the callback in SyncHandler for pods being added from
 // a config source.
 func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
@@ -2926,12 +2936,11 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 		// the apiserver and no action (other than cleanup) is required.
 		kl.podManager.AddPod(pod)
 
-		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		pod, mirrorPod, wasMirror, ok := kl.resolvePodAndMirrorPod(ctx, pod)
+		if !ok {
+			continue
+		}
 		if wasMirror {
-			if pod == nil {
-				logger.V(2).Info("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
-				continue
-			}
 			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
@@ -3007,12 +3016,9 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			continue
 		}
 
-		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
-		if wasMirror {
-			if pod == nil {
-				logger.V(2).Info("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
-				continue
-			}
+		pod, mirrorPod, _, ok := kl.resolvePodAndMirrorPod(ctx, pod)
+		if !ok {
+			continue
 		}
 
 		recordResizeOperations(oldPod, pod)
@@ -3166,12 +3172,11 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 		kl.podManager.RemovePod(pod)
 		kl.allocationManager.RemovePod(logger, pod.UID)
 
-		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		pod, mirrorPod, wasMirror, ok := kl.resolvePodAndMirrorPod(ctx, pod)
+		if !ok {
+			continue
+		}
 		if wasMirror {
-			if pod == nil {
-				logger.V(2).Info("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
-				continue
-			}
 			kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
@@ -3206,13 +3211,10 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
 
-		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
-		if wasMirror {
-			if pod == nil {
-				logger.V(2).Info("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
-				continue
-			}
-			// Static pods should be reconciled the same way as regular pods
+		// Static pods are reconciled the same way as regular pods.
+		pod, mirrorPod, _, ok := kl.resolvePodAndMirrorPod(ctx, pod)
+		if !ok {
+			continue
 		}
 
 		if hasPendingResizes && !retryPendingResizes && oldPod != nil {
@@ -3295,12 +3297,11 @@ func (kl *Kubelet) HandlePodSyncs(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
 	for _, pod := range pods {
-		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
+		pod, mirrorPod, wasMirror, ok := kl.resolvePodAndMirrorPod(ctx, pod)
+		if !ok {
+			continue
+		}
 		if wasMirror {
-			if pod == nil {
-				logger.V(2).Info("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
-				continue
-			}
 			// Syncing a mirror pod is a programmer error since the intent of sync is to
 			// batch notify all pending work. We should make it impossible to double sync,
 			// but for now log a programmer error to prevent accidental introduction.
