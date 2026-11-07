@@ -35,24 +35,6 @@ import (
 // All limits in the resource.k8s.io API together have to fit into 1.5 MiB, the
 // default maximum object size in etcd.
 //
-// What the limits cap, following the structure of a slice:
-//
-//	spec.devices             ResourceSliceMaxDevices (128), or
-//	                         ResourceSliceMaxDevicesWithAdvancedFeatures (64) when any
-//	                         device uses taints, consumesCounters or list attributes
-//	  .attributes/.capacity  ResourceSliceMaxAttributesAndCapacitiesPerDevice (32)
-//	                         entries combined, of which the attributes contribute at
-//	                         most ResourceSliceMaxAttributeValuesPerDevice (48) values
-//	  .taints                DeviceTaintsMaxLength (16)
-//	  .consumesCounters      ResourceSliceMaxDeviceCounterConsumptionsPerDevice (2), each
-//	                         with ResourceSliceMaxCountersPerDeviceCounterConsumption (32)
-//	                         counters and DeviceCompatibilityGroupsMaxSize (2) groups
-//	  .bindingConditions     BindingConditionsMaxSize (4), and
-//	                         BindingFailureConditionsMaxSize (4)
-//	spec.sharedCounters      ResourceSliceMaxCounterSets (8), each with
-//	                         ResourceSliceMaxCountersPerCounterSet (32) counters
-//	                         (a slice has either devices or sharedCounters)
-//
 // Why the device limit is conditional and why attributes are capped twice:
 //
 //   - The device limit is halved as soon as one device uses a feature which adds
