@@ -1007,7 +1007,14 @@ func dropDisabledGRPCContainerProbeTLS(podSpec, oldPodSpec *api.PodSpec) {
 }
 
 func dropProbeGRPCTLS(p *api.Probe) {
-	if p != nil && p.GRPC != nil {
+	if p == nil || p.GRPC == nil || p.GRPC.Mode == nil {
+		return
+	}
+	// Only drop supported values. Unsupported values must survive the drop so
+	// that validation can reject them with NotSupported, regardless of the
+	// feature gate state.
+	switch *p.GRPC.Mode {
+	case api.GRPCProbeModeTLS, api.GRPCProbeModePlaintext:
 		p.GRPC.Mode = nil
 	}
 }
