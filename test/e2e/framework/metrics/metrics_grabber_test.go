@@ -150,3 +150,25 @@ func TestNewMetricsGrabberPicksLeader(t *testing.T) {
 		})
 	}
 }
+
+func TestMatchControlPlaneComponent(t *testing.T) {
+	for podName, want := range map[string]struct {
+		component string
+		port      int
+		ok        bool
+	}{
+		"kube-controller-manager-node-1": {component: "kube-controller-manager", port: kubeControllerManagerPort, ok: true},
+		"kube-scheduler-node-1":          {component: "kube-scheduler", port: kubeSchedulerPort, ok: true},
+		"kube-apiserver-node-1":          {},
+		"etcd-node-1":                    {},
+		"coredns-abc-def":                {},
+	} {
+		t.Run(podName, func(t *testing.T) {
+			component, port, ok := MatchControlPlaneComponent(podName)
+			if component != want.component || port != want.port || ok != want.ok {
+				t.Errorf("MatchControlPlaneComponent(%q) = (%q, %d, %v), want (%q, %d, %v)",
+					podName, component, port, ok, want.component, want.port, want.ok)
+			}
+		})
+	}
+}
