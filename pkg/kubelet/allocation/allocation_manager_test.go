@@ -4651,3 +4651,89 @@ func TestIsMemoryBackedVolumeResizeRequested(t *testing.T) {
 		})
 	}
 }
+
+type recordingAdmitHandler struct {
+	recorded []*lifecycle.PodAdmitAttributes
+}
+
+func (h *recordingAdmitHandler) Admit(_ context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	h.recorded = append(h.recorded, attrs)
+	return lifecycle.PodAdmitResult{Admit: true}
+}
+
+func TestAllocationManagerPopulatesPodUpdate(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	mem100Mi := resource.MustParse("100Mi")
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:        "pod-update-attrs",
+			Name:       "pod-update-attrs",
+			Namespace:  "default",
+			Generation: 1,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "image:v1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100Mi},
+				},
+			}},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+	recorder := &recordingAdmitHandler{}
+	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{recorder})
+
+	// 1. AddPod should pass Operation == AddOperation and Update == nil.
+	ok, _, _ := allocationManager.AddPod(tCtx, []*v1.Pod{}, pod)
+	require.True(t, ok)
+	require.Len(t, recorder.recorded, 1)
+	assert.Equal(t, lifecycle.AddOperation, recorder.recorded[0].Operation)
+	assert.Nil(t, recorder.recorded[0].Update)
+
+	// 2. Non-resize pending allocation should pass Operation == UpdateOperation, AllocatedPod, and Resize == false.
+	recorder.recorded = nil
+	nonResizePod := pod.DeepCopy()
+	nonResizePod.Generation = 2
+	nonResizePod.Spec.Containers[0].Command = []string{"new-cmd"}
+	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+		return nonResizePod, true
+	}
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	require.Len(t, recorder.recorded, 1)
+	assert.Equal(t, lifecycle.UpdateOperation, recorder.recorded[0].Operation)
+	require.NotNil(t, recorder.recorded[0].Update)
+	assert.False(t, recorder.recorded[0].Update.Resize)
+	require.NotNil(t, recorder.recorded[0].Update.AllocatedPod)
+	assert.Empty(t, recorder.recorded[0].Update.AllocatedPod.Spec.Containers[0].Command)
+
+	// 3. Resize pending allocation should pass Operation == UpdateOperation, AllocatedPod, and Resize == true.
+	recorder.recorded = nil
+	resizePod := nonResizePod.DeepCopy()
+	resizePod.Generation = 3
+	resizePod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
+	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+		return resizePod, true
+	}
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	require.Len(t, recorder.recorded, 1)
+	assert.Equal(t, lifecycle.UpdateOperation, recorder.recorded[0].Operation)
+	require.NotNil(t, recorder.recorded[0].Update)
+	assert.True(t, recorder.recorded[0].Update.Resize)
+	require.NotNil(t, recorder.recorded[0].Update.AllocatedPod)
+	assert.True(t, cpu100m.Equal(*recorder.recorded[0].Update.AllocatedPod.Spec.Containers[0].Resources.Requests.Cpu()))
+}
