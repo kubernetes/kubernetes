@@ -461,6 +461,7 @@ type testInformerMetricsProvider struct {
 	gauge                *metrics.GaugeVec
 	histogram            *metrics.HistogramVec
 	storeResourceVersion *metrics.GaugeVec
+	listDuration         *metrics.HistogramVec
 }
 
 func newTestInformerMetricsProvider() *testInformerMetricsProvider {
@@ -493,14 +494,26 @@ func newTestInformerMetricsProvider() *testInformerMetricsProvider {
 		},
 		[]string{"name", "group", "version", "resource"},
 	)
+	listDuration := metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      "informer",
+			Name:           "list_duration_seconds",
+			Help:           "Time taken by the reflector to fetch the initial state (via LIST or WatchList) and replace the contents of the store.",
+			Buckets:        []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300},
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource", "verb"},
+	)
 	registry.MustRegister(gauge)
 	registry.MustRegister(histogram)
 	registry.MustRegister(storeResourceVersion)
+	registry.MustRegister(listDuration)
 	return &testInformerMetricsProvider{
 		registry:             registry,
 		gauge:                gauge,
 		histogram:            histogram,
 		storeResourceVersion: storeResourceVersion,
+		listDuration:         listDuration,
 	}
 }
 
@@ -514,6 +527,10 @@ func (p *testInformerMetricsProvider) NewProcessingLatencyMetric(id cache.Inform
 
 func (p *testInformerMetricsProvider) NewStoreResourceVersionMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
 	return p.storeResourceVersion.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
+}
+
+func (p *testInformerMetricsProvider) NewListDurationMetric(id cache.InformerNameAndResource, verb string) cache.HistogramMetric {
+	return p.listDuration.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource, verb)
 }
 
 func verifyQueuedItems(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int) {
