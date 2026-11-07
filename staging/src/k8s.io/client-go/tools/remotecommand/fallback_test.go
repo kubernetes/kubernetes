@@ -56,6 +56,10 @@ func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
 		}
+		// A v5 server writes the command's status before it closes.
+		if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
+		}
 	}))
 	defer websocketServer.Close()
 
@@ -125,6 +129,10 @@ func TestFallbackClient_SPDYSecondarySucceeds(t *testing.T) {
 		_, err = io.Copy(ctx.stdoutStream, ctx.stdinStream)
 		if err != nil {
 			t.Fatalf("error copying STDIN to STDOUT: %v", err)
+		}
+		// A v4 server writes the command's status before it closes.
+		if err := ctx.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
 		}
 	}))
 	defer spdyServer.Close()
@@ -393,6 +401,10 @@ func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
 		if err != nil {
 			t.Fatalf("websocket copy error: %v", err)
+		}
+		// A v5 server writes the command's status before it closes.
+		if err := conns.writeStatus(&apierrors.StatusError{ErrStatus: metav1.Status{Status: metav1.StatusSuccess}}); err != nil {
+			t.Errorf("error writing status: %v", err)
 		}
 	}))
 	defer websocketServer.Close() //nolint:errcheck
