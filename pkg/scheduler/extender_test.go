@@ -18,7 +18,11 @@ package scheduler
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -578,4 +582,116 @@ func TestConvertToVictims(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHTTPExtenderFailureBackoff(t *testing.T) {
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n1"}})
+	nodes := []fwk.NodeInfo{nodeInfo}
+	pod := st.MakePod().Name("p").Obj()
+
+	newExtender := func(t *testing.T, verb string, ignorable bool, status int, body string) (*HTTPExtender, *atomic.Int32, *time.Time) {
+		t.Helper()
+		var calls atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte(body))
+		}))
+		t.Cleanup(srv.Close)
+		now := time.Unix(1_000, 0)
+		h := &HTTPExtender{
+			extenderURL: srv.URL,
+			client:      srv.Client(),
+			ignorable:   ignorable,
+			now:         func() time.Time { return now },
+		}
+		switch verb {
+		case "filter":
+			h.filterVerb = "filter"
+		case "prioritize":
+			h.prioritizeVerb = "prioritize"
+		case "bind":
+			h.bindVerb = "bind"
+		}
+		return h, &calls, &now
+	}
+
+	t.Run("ignorable filter stops calling during backoff", func(t *testing.T) {
+		h, calls, now := newExtender(t, "filter", true, http.StatusInternalServerError, "down")
+		for i := 0; i < extenderFailureThreshold; i++ {
+			if _, _, _, err := h.Filter(pod, nodes); err == nil {
+				t.Fatalf("call %d: expected an error", i)
+			}
+		}
+		if got := calls.Load(); got != extenderFailureThreshold {
+			t.Fatalf("calls = %d, want %d", got, extenderFailureThreshold)
+		}
+		if _, _, _, err := h.Filter(pod, nodes); err == nil {
+			t.Fatal("expected backoff error")
+		}
+		if got := calls.Load(); got != extenderFailureThreshold {
+			t.Fatalf("backoff still called the extender: calls = %d", got)
+		}
+		*now = now.Add(extenderBackoffInitial)
+		if _, _, _, err := h.Filter(pod, nodes); err == nil {
+			t.Fatal("expected probe to fail")
+		}
+		if got := calls.Load(); got != extenderFailureThreshold+1 {
+			t.Fatalf("probe calls = %d, want %d", got, extenderFailureThreshold+1)
+		}
+	})
+
+	t.Run("successful probe clears backoff", func(t *testing.T) {
+		h, calls, now := newExtender(t, "filter", true, http.StatusInternalServerError, "down")
+		for i := 0; i < extenderFailureThreshold; i++ {
+			_, _, _, _ = h.Filter(pod, nodes)
+		}
+		*now = now.Add(extenderBackoffInitial)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		t.Cleanup(srv.Close)
+		h.extenderURL = srv.URL
+		h.client = srv.Client()
+		if _, _, _, err := h.Filter(pod, nodes); err != nil {
+			t.Fatalf("probe success: %v", err)
+		}
+		before := calls.Load()
+		if _, _, _, err := h.Filter(pod, nodes); err != nil {
+			t.Fatalf("call after recovery: %v", err)
+		}
+		if calls.Load() != before+1 {
+			t.Fatalf("recovered extender was skipped: calls %d -> %d", before, calls.Load())
+		}
+	})
+
+	t.Run("non-ignorable filter does not back off", func(t *testing.T) {
+		h, calls, _ := newExtender(t, "filter", false, http.StatusInternalServerError, "down")
+		for i := 0; i < extenderFailureThreshold+1; i++ {
+			if _, _, _, err := h.Filter(pod, nodes); err == nil {
+				t.Fatalf("call %d: expected an error", i)
+			}
+		}
+		if got := int(calls.Load()); got != extenderFailureThreshold+1 {
+			t.Fatalf("calls = %d, want %d", got, extenderFailureThreshold+1)
+		}
+	})
+
+	t.Run("prioritize backs off", func(t *testing.T) {
+		h, calls, _ := newExtender(t, "prioritize", false, http.StatusInternalServerError, "down")
+		for i := 0; i < extenderFailureThreshold; i++ {
+			if _, _, err := h.Prioritize(pod, nodes); err == nil {
+				t.Fatalf("call %d: expected an error", i)
+			}
+		}
+		if _, _, err := h.Prioritize(pod, nodes); err == nil {
+			t.Fatal("expected backoff error")
+		}
+		if got := calls.Load(); got != extenderFailureThreshold {
+			t.Fatalf("calls = %d, want %d", got, extenderFailureThreshold)
+		}
+	})
 }
