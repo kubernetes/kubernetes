@@ -1000,12 +1000,10 @@ func TestCalculateNodeAllocatableRequestSaturatesRequested(t *testing.T) {
 		t.Fatalf("precondition: node requested memory = %d, want MaxInt64 (NodeInfo did not saturate)", got)
 	}
 
-	scorer := &resourceAllocationScorer{
-		resources: []config.ResourceSpec{
-			{Name: string(v1.ResourceCPU)},
-			{Name: string(v1.ResourceMemory)},
-		},
-	}
+	scorer := newResourceAllocationScorer("", nil, []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU)},
+		{Name: string(v1.ResourceMemory)},
+	})
 
 	requested, allocated, _ := scorer.calculateNodeAllocatableRequest(tCtx, nodeInfo, []int64{1, 1}, nil)
 
