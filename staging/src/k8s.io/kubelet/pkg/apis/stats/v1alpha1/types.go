@@ -210,6 +210,12 @@ type InterfaceStats struct {
 	// Cumulative count of transmit errors encountered.
 	// +optional
 	TxErrors *uint64 `json:"txErrors,omitempty"`
+	// Cumulative count of receive packets dropped.
+	// +optional
+	RxDropped *uint64 `json:"rxDropped,omitempty"`
+	// Cumulative count of transmit packets dropped.
+	// +optional
+	TxDropped *uint64 `json:"txDropped,omitempty"`
 }
 
 // NetworkStats contains data about network resources.
