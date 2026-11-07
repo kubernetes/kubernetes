@@ -475,7 +475,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 
 	// Every store reads compressed values, so turning compression off strands no
 	// data. It wraps any encryption and sits inside any corrupt object wrapper.
-	transformer = compression.WithCompression(transformer, compression.Rule{}, c.GroupResource)
+	transformer = compression.WithCompression(transformer, c.CompressionRule, c.GroupResource)
 
 	versioner := storage.APIObjectVersioner{}
 	decoder := etcd3.NewDefaultDecoder(c.Codec, versioner)
