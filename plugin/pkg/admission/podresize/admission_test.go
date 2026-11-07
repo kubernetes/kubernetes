@@ -523,6 +523,40 @@ func TestValidateRequestsWithinAllocatable(t *testing.T) {
 			expectedMsg: "cpu, requested: 250, allocatable: 200",
 		},
 		{
+			name: "cpu and mem alone are within allocatable, but extra node allocatable resources cause failure",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "c1",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("150m"),
+									corev1.ResourceMemory: resource.MustParse("150Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					ExtraNodeAllocatableResources: []corev1.ExtraNodeAllocatableResource{
+						{
+							ContainerName: "",
+							Requests:      corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+							Limits:        corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("100m")},
+						},
+					},
+				},
+			},
+			allocatable: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("200m"),
+				corev1.ResourceMemory: resource.MustParse("200Mi"),
+			},
+			expectedErr: true,
+			// CPU: 150m + 100m = 250m.
+			expectedMsg: "cpu, requested: 250, allocatable: 200",
+		},
+		{
 			name: "pod level resources override container requests and fit",
 			pod: &corev1.Pod{
 				Spec: corev1.PodSpec{
