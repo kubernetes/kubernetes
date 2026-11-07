@@ -2008,6 +2008,34 @@ func TestMetricMethodBuckets(t *testing.T) {
 	}
 }
 
+// The long_running metric label is derived from the bucket name, so the names
+// in longRunningRequestPathMap have to match the buckets the server registers.
+func TestIsLongRunningRequestBuckets(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	tests := map[string]struct {
+		url         string
+		longRunning bool
+	}{
+		"exec":        {url: "/exec/podNamespace/podID/containerName", longRunning: true},
+		"attach":      {url: "/attach/podNamespace/podID/containerName", longRunning: true},
+		"portForward": {url: "/portForward/podNamespace/podID", longRunning: true},
+		"debug":       {url: "/debug/pprof/profile", longRunning: true},
+		"run":         {url: "/run/podNamespace/podID/containerName", longRunning: false},
+		"pods":        {url: "/pods/", longRunning: false},
+		"other":       {url: "/junk", longRunning: false},
+	}
+
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			bucket := fw.serverUnderTest.getMetricBucket(test.url)
+			require.Equal(t, test.longRunning, isLongRunningRequest(bucket), "bucket %q", bucket)
+		})
+	}
+}
+
 func TestDebuggingDisabledHandlers(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	// for backward compatibility even if enablesystemLogHandler or enableProfilingHandler is set but not
