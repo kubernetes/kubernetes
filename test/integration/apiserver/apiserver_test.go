@@ -629,6 +629,164 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	}
 }
 
+// TestSingleObjectListResourceVersion exercises the selector optimization through
+// the API server, including delegation to etcd when the watch cache is enabled.
+func TestSingleObjectListResourceVersion(t *testing.T) {
+	for _, watchCacheEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			etcdConfig := storagebackend.Config{
+				Prefix:    path.Join("/", guuid.New().String(), "registry"),
+				Transport: storagebackend.TransportConfig{ServerList: []string{framework.GetEtcdURL()}},
+			}
+			rawClient, kvClient, err := integration.GetEtcdClients(etcdConfig.Transport)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := rawClient.Close(); err != nil {
+					t.Error(err)
+				}
+			})
+			client, _, tearDown := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Etcd.EnableWatchCache = watchCacheEnabled
+					opts.Etcd.StorageConfig = etcdConfig
+				},
+			})
+			t.Cleanup(tearDown)
+			ns, err := client.CoreV1().Namespaces().Create(tCtx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "list-rv-"}}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cms := client.CoreV1().ConfigMaps(ns.Name)
+			cm, err := cms.Create(tCtx, &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "x"}, Data: map[string]string{"k": "old"}}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rv1 := cm.ResourceVersion
+			cm.Data["k"] = "new"
+			cm, err = cms.Update(tCtx, cm, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rv2 := cm.ResourceVersion
+
+			// Wait for the cache to observe the update before exercising Any reads.
+			if _, err := cms.List(tCtx, metav1.ListOptions{ResourceVersion: rv2, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}); err != nil {
+				t.Fatal(err)
+			}
+
+			for _, clusterWide := range []bool{false, true} {
+				t.Run(fmt.Sprintf("clusterWide=%t", clusterWide), func(t *testing.T) {
+					listClient := cms
+					selector := "metadata.name=x"
+					if clusterWide {
+						listClient = client.CoreV1().ConfigMaps("")
+						selector += ",metadata.namespace=" + ns.Name
+					}
+					for _, tc := range []struct {
+						name  string
+						opts  metav1.ListOptions
+						exact bool
+					}{
+						{"legacy exact", metav1.ListOptions{FieldSelector: selector, Limit: 1, ResourceVersion: rv1}, true},
+						{"explicit exact", metav1.ListOptions{FieldSelector: selector, Limit: 1, ResourceVersion: rv1, ResourceVersionMatch: metav1.ResourceVersionMatchExact}, true},
+						{"no limit", metav1.ListOptions{FieldSelector: selector, ResourceVersion: rv1}, false},
+						{"any", metav1.ListOptions{FieldSelector: selector, Limit: 1, ResourceVersion: "0"}, false},
+					} {
+						t.Run(tc.name, func(t *testing.T) {
+							list, err := listClient.List(tCtx, tc.opts)
+							if err != nil {
+								t.Fatal(err)
+							}
+							if len(list.Items) != 1 {
+								t.Fatalf("expected one ConfigMap, got %d", len(list.Items))
+							}
+							item := list.Items[0]
+							if tc.exact {
+								if list.ResourceVersion != rv1 || item.ResourceVersion != rv1 || item.Data["k"] != "old" {
+									t.Fatalf("expected old data at revision %s, got listRV=%s objectRV=%s data=%v", rv1, list.ResourceVersion, item.ResourceVersion, item.Data)
+								}
+							} else {
+								// Any may read a stale cache snapshot; NotOlderThan only sets a lower bound.
+								if item.ResourceVersion != rv1 && item.ResourceVersion != rv2 {
+									t.Fatalf("unexpected object revision %s", item.ResourceVersion)
+								}
+								want := "old"
+								if item.ResourceVersion == rv2 {
+									want = "new"
+								}
+								if item.Data["k"] != want {
+									t.Fatalf("expected data %q, got %v", want, item.Data)
+								}
+								listRV, err := strconv.ParseUint(list.ResourceVersion, 10, 64)
+								if err != nil {
+									t.Fatal(err)
+								}
+								minRV, err := strconv.ParseUint(item.ResourceVersion, 10, 64)
+								if err != nil {
+									t.Fatal(err)
+								}
+								if listRV < minRV {
+									t.Fatalf("list revision %d precedes object revision %d", listRV, minRV)
+								}
+							}
+						})
+					}
+				})
+			}
+			list, err := cms.List(tCtx, metav1.ListOptions{Limit: 1, ResourceVersion: rv1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if list.ResourceVersion != rv1 || len(list.Items) != 1 || list.Items[0].Data["k"] != "old" {
+				t.Fatalf("expected recursive list with old data at revision %s, got %#v", rv1, list)
+			}
+
+			compactRV, err := strconv.ParseInt(rv2, 10, 64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := kvClient.Compact(tCtx, compactRV); err != nil {
+				t.Fatal(err)
+			}
+			// A write after compaction provides a revision that is unambiguously available.
+			cm.Annotations = map[string]string{"after-compaction": "true"}
+			cm, err = cms.Update(tCtx, cm, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, clusterWide := range []bool{false, true} {
+				t.Run(fmt.Sprintf("compacted/clusterWide=%t", clusterWide), func(t *testing.T) {
+					listClient := cms
+					selector := "metadata.name=x"
+					if clusterWide {
+						listClient = client.CoreV1().ConfigMaps("")
+						selector += ",metadata.namespace=" + ns.Name
+					}
+					opts := metav1.ListOptions{FieldSelector: selector, Limit: 1, ResourceVersion: rv1}
+					_, err := listClient.List(tCtx, opts)
+					if !apierrors.IsResourceExpired(err) {
+						t.Fatalf("expected ResourceExpired for compacted revision %s, got %v", rv1, err)
+					}
+					if status, ok := err.(apierrors.APIStatus); !ok || status.Status().Code != http.StatusGone {
+						t.Fatalf("expected HTTP 410, got %v", err)
+					}
+					opts.ResourceVersion = cm.ResourceVersion
+					list, err := listClient.List(tCtx, opts)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if list.ResourceVersion != cm.ResourceVersion || len(list.Items) != 1 || list.Items[0].Data["k"] != "new" {
+						t.Fatalf("expected new data at revision %s after compaction, got %#v", cm.ResourceVersion, list)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestGetOptions(t *testing.T) {
 	for _, watchCacheEnabled := range []bool{false, true} {
 		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
