@@ -255,6 +255,12 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid: shared counter key": {
 					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(counters("valid-key"))),
 				},
+				"invalid: shared counter negative value": {
+					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(countersWithValue("valid-key", "-1"))),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key("valid-key").Child("value"), "-1", "").WithOrigin("minimum"),
+					},
+				},
 				"invalid: shared counters empty": {
 					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(nil)),
 					expectedErrs: field.ErrorList{
@@ -270,6 +276,12 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				"valid: device counter key": {
 					input: mkResourceSliceWithDevices(tweakDeviceCounter(counters("valid-key"))),
+				},
+				"invalid: device counter negative value": {
+					input: mkResourceSliceWithDevices(tweakDeviceCounter(countersWithValue("valid-key", "-1"))),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters").Key("valid-key").Child("value"), "-1", "").WithOrigin("minimum"),
+					},
 				},
 				"invalid: device counters empty": {
 					input: mkResourceSliceWithDevices(tweakDeviceCounter(nil)),
@@ -1134,6 +1146,14 @@ func tweakDeviceCounter(counters map[string]resource.Counter) func(*resource.Res
 func counters(key string) map[string]resource.Counter {
 	return map[string]resource.Counter{
 		key: {},
+	}
+}
+
+func countersWithValue(key string, val string) map[string]resource.Counter {
+	return map[string]resource.Counter{
+		key: {
+			Value: apiresource.MustParse(val),
+		},
 	}
 }
 
