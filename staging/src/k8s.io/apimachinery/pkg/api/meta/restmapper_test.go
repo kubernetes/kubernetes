@@ -442,24 +442,42 @@ func TestKindToResource(t *testing.T) {
 		Kind             string
 		Plural, Singular string
 	}{
+		{Kind: "", Plural: "", Singular: ""},
 		{Kind: "Pod", Plural: "pods", Singular: "pod"},
 
 		{Kind: "ReplicationController", Plural: "replicationcontrollers", Singular: "replicationcontroller"},
 
-		// Add "ies" when ending with "y"
+		// Preserve "y" when it follows a vowel.
+		{Kind: "Gateway", Plural: "gateways", Singular: "gateway"},
+		{Kind: "Key", Plural: "keys", Singular: "key"},
+		{Kind: "Iy", Plural: "iys", Singular: "iy"},
+		{Kind: "Toy", Plural: "toys", Singular: "toy"},
+		{Kind: "Buy", Plural: "buys", Singular: "buy"},
+		{Kind: "GATEWAY", Plural: "gateways", Singular: "gateway"},
+		// Preserve the existing rule for a lone "y" and consonant endings.
+		{Kind: "Y", Plural: "ies", Singular: "y"},
+		{Kind: "Policy", Plural: "policies", Singular: "policy"},
 		{Kind: "ImageRepository", Plural: "imagerepositories", Singular: "imagerepository"},
+		{Kind: "Endpoints", Plural: "endpoints", Singular: "endpoints"},
 		// Add "es" when ending with "s"
 		{Kind: "miss", Plural: "misses", Singular: "miss"},
 		// Add "s" otherwise
 		{Kind: "lowercase", Plural: "lowercases", Singular: "lowercase"},
 	}
-	for i, testCase := range testCases {
-		version := schema.GroupVersion{}
-
-		plural, singular := UnsafeGuessKindToResource(version.WithKind(testCase.Kind))
-		if singular != version.WithResource(testCase.Singular) || plural != version.WithResource(testCase.Plural) {
-			t.Errorf("%d: unexpected plural and singular: %v %v", i, plural, singular)
-		}
+	for _, testCase := range testCases {
+		t.Run(testCase.Kind, func(t *testing.T) {
+			for _, version := range []schema.GroupVersion{{}, {Group: "example.com", Version: "v1"}} {
+				wantPlural := version.WithResource(testCase.Plural)
+				wantSingular := version.WithResource(testCase.Singular)
+				if testCase.Kind == "" {
+					wantPlural, wantSingular = schema.GroupVersionResource{}, schema.GroupVersionResource{}
+				}
+				plural, singular := UnsafeGuessKindToResource(version.WithKind(testCase.Kind))
+				if plural != wantPlural || singular != wantSingular {
+					t.Errorf("group/version %q: got (%v, %v), want (%v, %v)", version, plural, singular, wantPlural, wantSingular)
+				}
+			}
+		})
 	}
 }
 
@@ -472,6 +490,8 @@ func TestRESTMapperResourceSingularizer(t *testing.T) {
 		Singular string
 	}{
 		{Kind: "Pod", Plural: "pods", Singular: "pod"},
+		{Kind: "Gateway", Plural: "gateways", Singular: "gateway"},
+		{Kind: "Key", Plural: "keys", Singular: "key"},
 		{Kind: "ReplicationController", Plural: "replicationcontrollers", Singular: "replicationcontroller"},
 		{Kind: "ImageRepository", Plural: "imagerepositories", Singular: "imagerepository"},
 		{Kind: "Status", Plural: "statuses", Singular: "status"},
