@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	goruntime "runtime"
 	"sort"
 	"sync"
 	"testing"
@@ -765,4 +766,94 @@ func (lw *fakeListWatcher) ResultChan() <-chan watch.Event {
 	lw.lock.Lock()
 	defer lw.lock.Unlock()
 	return lw.fakeWatcher.ResultChan()
+}
+
+// TestWatchListDoesNotRetainInitialWatcher checks that the watcher that served the
+// initial watch-list stream can be garbage collected once that watch has ended and
+// the reflector has moved on to the next one. A real watcher holds decode buffers
+// sized for the largest object in the initial stream.
+func TestWatchListDoesNotRetainInitialWatcher(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	collected := make(chan struct{})
+	lw := &initialWatcherTrackingLW{
+		followUpWatchStarted: make(chan struct{}),
+		initialWatcherCollected: func() {
+			close(collected)
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0) //nolint:logcheck // Intentionally testing old API here.
+	go r.RunWithContext(ctx)
+
+	select {
+	case <-lw.followUpWatchStarted:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the reflector did not open a watch after the initial watch-list stream ended")
+	}
+
+	deadline := time.After(10 * time.Second)
+	for {
+		goruntime.GC()
+		select {
+		case <-collected:
+			return
+		case <-deadline:
+			t.Fatal("the reflector still references the watcher that served the initial watch-list stream")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// trackedWatcher is a separate allocation so a finalizer can report when it becomes unreachable.
+type trackedWatcher struct {
+	*watch.FakeWatcher
+}
+
+// initialWatcherTrackingLW serves one watch-list stream that ends after the
+// initial-events-end bookmark plus one event, then serves open, idle watches.
+type initialWatcherTrackingLW struct {
+	lock                    sync.Mutex
+	watchCalls              int
+	followUpWatchStarted    chan struct{}
+	initialWatcherCollected func()
+}
+
+func (lw *initialWatcherTrackingLW) IsWatchListSemanticsUnSupported() bool { return false }
+
+func (lw *initialWatcherTrackingLW) List(metav1.ListOptions) (runtime.Object, error) {
+	return nil, fmt.Errorf("unexpected list request")
+}
+
+func (lw *initialWatcherTrackingLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
+	lw.lock.Lock()
+	defer lw.lock.Unlock()
+	lw.watchCalls++
+	if lw.watchCalls > 1 {
+		if lw.watchCalls == 2 {
+			close(lw.followUpWatchStarted)
+		}
+		return watch.NewFake(), nil
+	}
+	if options.SendInitialEvents == nil || !*options.SendInitialEvents {
+		return nil, fmt.Errorf("expected the first watch to be a watch-list request")
+	}
+
+	initial := &trackedWatcher{FakeWatcher: watch.NewFake()}
+	goruntime.SetFinalizer(initial, func(*trackedWatcher) { lw.initialWatcherCollected() })
+	fw := initial.FakeWatcher
+	go func() {
+		fw.Add(makePod("p1", "1"))
+		fw.Action(watch.Bookmark, &v1.Pod{ObjectMeta: metav1.ObjectMeta{
+			ResourceVersion: "1",
+			Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+		}})
+		// The event after the bookmark makes the rest of this watch end without error,
+		// so the reflector keeps going in the same ListAndWatch call.
+		fw.Add(makePod("p2", "2"))
+		fw.Stop()
+	}()
+	return initial, nil
 }

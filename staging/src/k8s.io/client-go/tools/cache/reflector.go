@@ -507,7 +507,11 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	}
 
 	logger.V(2).Info("Caches populated", "type", r.typeDescription, "reflector", r.name)
-	return r.watchWithResync(ctx, w)
+	// watchWithResync stops w. Clearing w drops the deferred closure's reference,
+	// which would otherwise keep the watcher reachable until this function returns.
+	initialWatcher := w
+	w = nil
+	return r.watchWithResync(ctx, initialWatcher)
 }
 
 // startResync periodically calls r.store.Resync() method.
