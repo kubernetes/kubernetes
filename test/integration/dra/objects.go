@@ -35,17 +35,19 @@ import (
 // All limits in the resource.k8s.io API together have to fit into 1.5 MiB, the
 // default maximum object size in etcd.
 //
-// Why the device limit is conditional and why attributes are capped twice:
+// Why the device limit is conditional and attribute entries and values have
+// separate limits:
 //
 //   - The device limit is halved as soon as one device uses a feature which adds
 //     a significant number of bytes, instead of giving each feature a limit of its
 //     own. A table of limits per feature combination would be more precise, but
 //     harder to reason about.
 //
-//   - Attributes are capped twice so that list values cannot multiply the size of
-//     a device: the first limit counts entries, the second the values in them,
-//     with each item of a list attribute counting separately. 48 rather than 64
-//     leaves headroom for future features.
+//   - The combined limit on attribute and capacity entries bounds the space used
+//     by map keys and entry overhead. A separate per-device limit counts all
+//     attribute values, including each scalar value and each list item, to bound
+//     the payload size even when lists are used. The value limit was chosen to
+//     leave room in the object size budget for future device features.
 //
 // Only the largest valid slices are built here, not every feature combination:
 // what has to fit into the budget is the maximum.
