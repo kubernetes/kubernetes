@@ -1534,6 +1534,42 @@ func TestKMSv2PluginHealthzTTL(t *testing.T) {
 	}
 }
 
+// testKMSv2DecryptErrorService simulates a plugin whose Status and Encrypt
+// methods work but whose Decrypt method fails.
+type testKMSv2DecryptErrorService struct {
+	*testKMSv2EnvelopeService
+	decryptErr error
+}
+
+func (t *testKMSv2DecryptErrorService) Decrypt(ctx context.Context, uid string, req *kmsservice.DecryptRequest) ([]byte, error) {
+	return nil, t.decryptErr
+}
+
+func TestKMSv2PluginHealthzFailsWhenDecryptFails(t *testing.T) {
+	ctx := testContext(t)
+	base := &testKMSv2EnvelopeService{keyID: "1"}
+	service := &testKMSv2DecryptErrorService{
+		testKMSv2EnvelopeService: base,
+		decryptErr:               errors.New("decrypt is broken"),
+	}
+	probe := &kmsv2PluginProbe{
+		name:         "test",
+		ttl:          kmsPluginHealthzNegativeTTL,
+		service:      service,
+		l:            &sync.Mutex{},
+		lastResponse: &kmsPluginHealthzResponse{},
+	}
+	probe.state.Store(&envelopekmsv2.State{KMSProviderName: "test"})
+
+	err := probe.check(ctx)
+	if err == nil {
+		t.Fatal("expected health check to fail when KMS Decrypt fails")
+	}
+	if base.encryptCalls != 1 {
+		t.Fatalf("expected Encrypt once, got %d calls", base.encryptCalls)
+	}
+}
+
 func TestKMSv2InvalidKeyID(t *testing.T) {
 	ctx := testContext(t)
 	invalidKeyIDService, _ := newMockInvalidKeyIDEnvelopeKMSv2Service(ctx, "unix:///tmp/testprovider.sock", 3*time.Second, "")
