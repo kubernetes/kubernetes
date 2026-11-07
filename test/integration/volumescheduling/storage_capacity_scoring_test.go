@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutil "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -52,27 +53,27 @@ func mergeNodeLabels(node *v1.Node, labels map[string]string) *v1.Node {
 }
 
 func setupClusterForStorageCapacityScoring(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
-	testutil.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.Ctx)
+	testCtx := schedulerutils.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
+	schedulerutils.SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx)
 
-	clientset := testCtx.ClientSet
-	ns := testCtx.NS.Name
+	clientset := testCtx.Client()
+	ns := testCtx.Namespace()
 
-	ctrl, informerFactory, err := initPVController(t, testCtx, provisionDelaySeconds)
+	ctrl, informerFactory, err := initPVController(t, testCtx.TContext, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(testCtx.Ctx)
+	go ctrl.Run(testCtx)
 
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(testCtx.Ctx.Done())
-	informerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	informerFactory.StartWithContext(testCtx)
+	informerFactory.WaitForCacheSync(testCtx.Done())
 
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   testCtx.Ctx.Done(),
+		stop:   testCtx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
@@ -85,7 +86,7 @@ func waitForCSIDriversInSchedulerCache(t *testing.T, config *testConfig, names .
 	t.Helper()
 	lister := config.testCtx.InformerFactory.Storage().V1().CSIDrivers().Lister()
 	if err := wait.PollUntilContextTimeout(
-		config.testCtx.Ctx, 100*time.Millisecond, 30*time.Second, false,
+		config.testCtx, 100*time.Millisecond, 30*time.Second, false,
 		func(ctx context.Context) (bool, error) {
 			for _, name := range names {
 				if _, err := lister.Get(name); err != nil {

@@ -52,8 +52,8 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "node-allocatable-decrease")
 	defer testCtx.SchedulerCloseFn()
 
-	cs := testCtx.ClientSet
-	ns := testCtx.NS.Name
+	cs := testCtx.Client()
+	ns := testCtx.Namespace()
 
 	tests := []struct {
 		name            string
@@ -82,17 +82,17 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 					v1.ResourcePods:   "10",
 					v1.ResourceMemory: "8Gi",
 				}).Obj()
-				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("failed to create node %s: %v", name, err)
 				}
 			}
 			t.Cleanup(func() {
-				_ = cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, fmt.Sprintf("target-%d", idx), *metav1.NewDeleteOptions(0))
+				_ = cs.CoreV1().Pods(ns).Delete(testCtx, fmt.Sprintf("target-%d", idx), *metav1.NewDeleteOptions(0))
 				for _, name := range []string{nominatedNode, otherNode} {
-					_ = cs.CoreV1().Pods(ns).DeleteCollection(testCtx.Ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{
+					_ = cs.CoreV1().Pods(ns).DeleteCollection(testCtx, *metav1.NewDeleteOptions(0), metav1.ListOptions{
 						FieldSelector: "spec.nodeName=" + name,
 					})
-					_ = cs.CoreV1().Nodes().Delete(testCtx.Ctx, name, *metav1.NewDeleteOptions(0))
+					_ = cs.CoreV1().Nodes().Delete(testCtx, name, *metav1.NewDeleteOptions(0))
 				}
 			})
 
@@ -113,7 +113,7 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 						v1.ResourceMemory: resource.MustParse("6Gi"),
 					}},
 				})
-				if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, victim, metav1.CreateOptions{}); err != nil {
+				if _, err := cs.CoreV1().Pods(ns).Create(testCtx, victim, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("failed to create victim on node %s: %v", name, err)
 				}
 			}
@@ -127,12 +127,12 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 					v1.ResourceMemory: resource.MustParse("4Gi"),
 				}},
 			})
-			target, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, target, metav1.CreateOptions{})
+			target, err := cs.CoreV1().Pods(ns).Create(testCtx, target, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create target pod: %v", err)
 			}
 
-			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+			if err := wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 10*time.Second, false,
 				testutils.PodIsGettingEvicted(cs, ns, "victim-"+nominatedNode)); err != nil {
 				t.Fatalf("victim on %s did not enter Terminating state: %v", nominatedNode, err)
 			}
@@ -141,7 +141,7 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 			// then snapshot the attempt count as the baseline.
 			queue := testCtx.Scheduler.SchedulingQueue
 			var initialAttempts int
-			if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+			if err := wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				for _, p := range queue.UnschedulablePods() {
 					if p.Name == target.Name && p.Status.NominatedNodeName == nominatedNode {
 						qp, found := queue.GetPod(ctx, p.Name, p.Namespace, nil)
@@ -161,19 +161,19 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 			if tc.shrinkNominated {
 				shrinkNode = nominatedNode
 			}
-			node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, shrinkNode, metav1.GetOptions{})
+			node, err := cs.CoreV1().Nodes().Get(testCtx, shrinkNode, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("failed to get node %s: %v", shrinkNode, err)
 			}
 			node.Status.Allocatable[v1.ResourceMemory] = resource.MustParse("1Gi")
-			if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+			if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx, node, metav1.UpdateOptions{}); err != nil {
 				t.Fatalf("failed to update status of node %s: %v", shrinkNode, err)
 			}
 
 			if tc.expectIncrement {
 				// The queueing hint must fire and move the target to activeQ, causing the scheduler to attempt it.
 				currentAttempts := initialAttempts
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
+				if err := wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 5*time.Second, false, func(ctx context.Context) (bool, error) {
 					p, found := queue.GetPod(ctx, target.Name, ns, nil)
 					if found {
 						currentAttempts = p.Attempts
@@ -184,7 +184,7 @@ func TestNominatedPodRequeuesOnNodeAllocatableDecrease(t *testing.T) {
 				}
 			} else {
 				// The allocatable change is on a node the target pod was not nominated to, so no increment is expected.
-				_ = wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 300*time.Millisecond, false, func(ctx context.Context) (bool, error) {
+				_ = wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 300*time.Millisecond, false, func(ctx context.Context) (bool, error) {
 					p, found := queue.GetPod(ctx, target.Name, ns, nil)
 					if found && p.Attempts > initialAttempts {
 						t.Errorf("attempts incremented from %d to %d unexpectedly", initialAttempts, p.Attempts)
@@ -211,15 +211,15 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "nominated-node-shrink")
 	defer testCtx.SchedulerCloseFn()
 
-	cs := testCtx.ClientSet
-	ns := testCtx.NS.Name
+	cs := testCtx.Client()
+	ns := testCtx.Namespace()
 
 	for _, name := range []string{"node-a", "node-b"} {
 		node := st.MakeNode().Name(name).Capacity(map[v1.ResourceName]string{
 			v1.ResourcePods:   "10",
 			v1.ResourceMemory: "8Gi",
 		}).Obj()
-		if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(testCtx, node, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("failed to create node %s: %v", name, err)
 		}
 	}
@@ -241,7 +241,7 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 				v1.ResourceMemory: resource.MustParse("6Gi"),
 			}},
 		})
-		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, victim, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx, victim, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("failed to create victim on %s: %v", nodeName, err)
 		}
 	}
@@ -255,16 +255,16 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 			v1.ResourceMemory: resource.MustParse("4Gi"),
 		}},
 	})
-	target, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, target, metav1.CreateOptions{})
+	target, err := cs.CoreV1().Pods(ns).Create(testCtx, target, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create target pod: %v", err)
 	}
 
 	// The scheduler always nominates node-a first (lowest-priority victim).
-	if err := schedulerutils.WaitForNominatedNodeName(testCtx.Ctx, cs, target); err != nil {
+	if err := schedulerutils.WaitForNominatedNodeName(testCtx, cs, target); err != nil {
 		t.Fatalf("target pod did not get NominatedNodeName: %v", err)
 	}
-	target, err = cs.CoreV1().Pods(ns).Get(testCtx.Ctx, target.Name, metav1.GetOptions{})
+	target, err = cs.CoreV1().Pods(ns).Get(testCtx, target.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to re-fetch target: %v", err)
 	}
@@ -273,24 +273,24 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	}
 
 	// Wait until the victim on node-a is Terminating (preemption has acted).
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+	if err := wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 10*time.Second, false,
 		testutils.PodIsGettingEvicted(cs, ns, "victim-node-a")); err != nil {
 		t.Fatalf("victim on node-a did not enter Terminating state: %v", err)
 	}
 
 	// Shrink node-a's allocatable below the target's request while the victim is still
 	// Terminating. The queueing hint should fire and re-queue the target.
-	node, err := cs.CoreV1().Nodes().Get(testCtx.Ctx, "node-a", metav1.GetOptions{})
+	node, err := cs.CoreV1().Nodes().Get(testCtx, "node-a", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get node-a: %v", err)
 	}
 	node.Status.Allocatable[v1.ResourceMemory] = resource.MustParse("1Gi")
-	if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
+	if _, err := cs.CoreV1().Nodes().UpdateStatus(testCtx, node, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("failed to shrink node-a: %v", err)
 	}
 
 	// The target must be re-nominated to node-b while the node-a victim is still Terminating.
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 		p, err := cs.CoreV1().Pods(ns).Get(ctx, target.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -301,7 +301,7 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	}
 
 	// Confirm node-a's victim is still Terminating.
-	firstVictim, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "victim-node-a", metav1.GetOptions{})
+	firstVictim, err := cs.CoreV1().Pods(ns).Get(testCtx, "victim-node-a", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to fetch victim-node-a: %v", err)
 	}
@@ -310,21 +310,21 @@ func TestPreemptsElsewhereWhenNominatedNodeShrinks(t *testing.T) {
 	}
 
 	// Assert that the victim on node-b was preempted before manually cleaning up.
-	if err := wait.PollUntilContextTimeout(testCtx.Ctx, 50*time.Millisecond, 10*time.Second, false,
+	if err := wait.PollUntilContextTimeout(testCtx, 50*time.Millisecond, 10*time.Second, false,
 		testutils.PodIsGettingEvicted(cs, ns, "victim-node-b")); err != nil {
 		t.Fatalf("victim on node-b was not preempted after re-nomination: %v", err)
 	}
 
 	// Force-delete the victims so the target can actually bind, then wait for it to schedule.
 	for _, nodeName := range []string{"node-a", "node-b"} {
-		if err := cs.CoreV1().Pods(ns).Delete(testCtx.Ctx, "victim-"+nodeName, *metav1.NewDeleteOptions(0)); err != nil {
+		if err := cs.CoreV1().Pods(ns).Delete(testCtx, "victim-"+nodeName, *metav1.NewDeleteOptions(0)); err != nil {
 			t.Fatalf("failed to force-delete victim-%s: %v", nodeName, err)
 		}
 	}
-	if err := schedulerutils.WaitForPodToSchedule(testCtx.Ctx, cs, target); err != nil {
+	if err := schedulerutils.WaitForPodToSchedule(testCtx, cs, target); err != nil {
 		t.Fatalf("target pod did not schedule after victims were removed: %v", err)
 	}
-	finalTarget, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, target.Name, metav1.GetOptions{})
+	finalTarget, err := cs.CoreV1().Pods(ns).Get(testCtx, target.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to fetch final target state: %v", err)
 	}

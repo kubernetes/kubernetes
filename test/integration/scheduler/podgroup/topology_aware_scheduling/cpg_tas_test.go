@@ -3390,7 +3390,7 @@ func runCPGTestScenario(t *testing.T, tt scenario, opts ...scheduler.Option) {
 		scheduler.WithPodInitialBackoffSeconds(0),
 	}, opts...)
 	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "cpg-tas", opts...)
-	ns := testCtx.NS.Name
+	ns := testCtx.Namespace()
 
 	if err := stepsframework.RunSteps(testCtx, t, ns, tt.steps); err != nil {
 		t.Fatal(err)

@@ -222,7 +222,7 @@ func TestHierarchyValidation(t *testing.T) {
 				},
 			}
 
-			if err := stepsframework.RunSteps(testCtx, t, testCtx.NS.Name, append(commonSteps, tt.steps...)); err != nil {
+			if err := stepsframework.RunSteps(testCtx, t, testCtx.Namespace(), append(commonSteps, tt.steps...)); err != nil {
 				t.Errorf("Test failed: %v", err)
 			}
 		})
