@@ -230,6 +230,8 @@ type PriorityQueue struct {
 
 	// preEnqueuePluginMap is keyed with profile and plugin name, valued with registered preEnqueue plugins.
 	preEnqueuePluginMap map[string]map[string]fwk.PreEnqueuePlugin
+	// resizePreEnqueuePluginMap is the subset of preEnqueuePluginMap relevant to deferred pod resizes.
+	resizePreEnqueuePluginMap map[string]map[string]fwk.PreEnqueuePlugin
 	// queueingHintMap is keyed with profile name, valued with registered queueing hint functions.
 	queueingHintMap QueueingHintMapPerProfile
 	// pluginToEventsMap shows which plugin is interested in which events.
@@ -285,6 +287,7 @@ type priorityQueueOptions struct {
 	metricsRecorder                   *metrics.MetricAsyncRecorder
 	pluginMetricsSamplePercent        int
 	preEnqueuePluginMap               map[string]map[string]fwk.PreEnqueuePlugin
+	resizePreEnqueuePluginMap         map[string]map[string]fwk.PreEnqueuePlugin
 	queueingHintMap                   QueueingHintMapPerProfile
 	apiDispatcher                     fwk.APIDispatcher
 	podSigners                        map[string]PodSigner
@@ -345,6 +348,13 @@ func WithQueueingHintMapPerProfile(m QueueingHintMapPerProfile) Option {
 func WithPreEnqueuePluginMap(m map[string]map[string]fwk.PreEnqueuePlugin) Option {
 	return func(o *priorityQueueOptions) {
 		o.preEnqueuePluginMap = m
+	}
+}
+
+// WithResizePreEnqueuePluginMap sets resizePreEnqueuePluginMap for PriorityQueue.
+func WithResizePreEnqueuePluginMap(m map[string]map[string]fwk.PreEnqueuePlugin) Option {
+	return func(o *priorityQueueOptions) {
+		o.resizePreEnqueuePluginMap = m
 	}
 }
 
@@ -449,6 +459,7 @@ func NewPriorityQueue(
 		incompletePodGroupPods:            newPodGroupMemberPods(metrics.IncompletePodGroupPods()),
 		workloadForest:                    newWorkloadForest(isCompositePodGroupEnabled),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
+		resizePreEnqueuePluginMap:         options.resizePreEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
 		pluginToEventsMap:                 buildEventMap(options.queueingHintMap),
 		metricsRecorder:                   options.metricsRecorder,
@@ -541,7 +552,6 @@ func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
 	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled {
 		// Deferred resize pods must be queued and evaluated individually rather than as a pod group because they are
 		// already running on assigned nodes and undergo atomic individual resource adjustments rather than group gang-scheduling.
-		// TODO: This implementation will be reevaluated in beta.
 		if resource.IsPodResizeDeferred(pod) {
 			return false
 		}
@@ -754,18 +764,26 @@ func (p *PriorityQueue) runPreEnqueuePluginsForPod(ctx context.Context, pInfo *f
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preEnqueue, s.Code().String(), pod.Spec.SchedulerName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
+	plugins := p.preEnqueuePluginMap[pod.Spec.SchedulerName]
+	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled && resource.IsPodResizeDeferred(pod) {
+		// As in the scheduling cycle, irrelevant plugins sit out a resize.
+		plugins = p.resizePreEnqueuePluginMap[pod.Spec.SchedulerName]
+	}
+
 	shouldRecordMetric := rand.Intn(100) < p.pluginMetricsSamplePercent
 	gatingPlugin := pInfo.GatingPlugin
 	if gatingPlugin != "" {
-		// Run the gating plugin first
-		s = p.runPreEnqueuePlugin(ctx, p.preEnqueuePluginMap[pod.Spec.SchedulerName][gatingPlugin], pInfo, shouldRecordMetric)
-		if !s.IsSuccess() {
-			// No need to iterate other plugins
-			return
+		if pl, ok := plugins[gatingPlugin]; ok {
+			// Run the gating plugin first
+			s = p.runPreEnqueuePlugin(ctx, pl, pInfo, shouldRecordMetric)
+			if !s.IsSuccess() {
+				// No need to iterate other plugins
+				return
+			}
 		}
 	}
 
-	for _, pl := range p.preEnqueuePluginMap[pod.Spec.SchedulerName] {
+	for _, pl := range plugins {
 		if gatingPlugin != "" && pl.Name() == gatingPlugin {
 			// should be run already above.
 			continue
@@ -793,7 +811,7 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl fwk.PreEnque
 		return s
 	}
 	// Only increment metric and insert if not already incremented for this plugin
-	if !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
+	if !pInfo.IsResize() && !pInfo.UnschedulablePlugins.Has(pl.Name()) && !pInfo.PendingPlugins.Has(pl.Name()) {
 		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
 	}
 	if pInfo.UnschedulablePlugins == nil {
@@ -912,7 +930,11 @@ func (p *PriorityQueue) addPod(ctx context.Context, pod *v1.Pod) {
 		p.addPodGroupMember(logger, pInfo)
 		return
 	}
-	if added := p.moveToActiveQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label(), false, nil); added {
+	event := framework.EventUnscheduledPodAdd.Label()
+	if pInfo.IsResize() {
+		event = framework.AssignedPodResize
+	}
+	if added := p.moveToActiveQ(logger, pInfo, event, false, nil); added {
 		p.activeQ.broadcast()
 	}
 }
@@ -1153,8 +1175,10 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pIn
 
 	p.activeQ.clearPoppedEntity()
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
-	for plugin := range rejectorPlugins {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+	if !pInfo.IsResize() {
+		for plugin := range rejectorPlugins {
+			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+		}
 	}
 
 	// We check whether this Pod may change its scheduling result by any of events that happened during scheduling.
@@ -1495,6 +1519,9 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 // which are both UnschedulablePlugins and PendingPlugins.
 func decreaseUnschedulableReasonMetric(entity framework.QueuedEntityInfo) {
 	for pInfo := range entity.ForEachPodInfo() {
+		if pInfo.IsResize() {
+			continue
+		}
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
@@ -1587,7 +1614,7 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 
 	// Check unschedulableEntities
 	if entity := p.unschedulableEntities.get(pInfoLookup); entity != nil {
-		p.unschedulableEntities.delete(pInfoLookup, entity.Gated())
+		p.unschedulableEntities.delete(entity, entity.Gated())
 		// Drop metric for deleted pod.
 		decreaseUnschedulableReasonMetric(entity)
 	}

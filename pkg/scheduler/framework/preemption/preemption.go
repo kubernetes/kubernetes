@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
+	compresource "k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -92,19 +93,26 @@ func NewEvaluator(pluginName string, fh fwk.Handle, i Interface, fts feature.Fea
 func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (_ fwk.PreemptionCandidate, _ *fwk.PostFilterResult, status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
+	isResize := ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod)
 	defer func() {
-		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+		metrics.PreemptionEvaluationDuration.WithLabelValues(metrics.Pod, status.Code().String(), metrics.OperationToLabel(isResize)).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
 	// initialized when creating the Scheduler obj.
 	// However, tests may need to manually initialize the shared pod informer.
+	evaluatedUID := pod.UID
 	podNamespace, podName := pod.Namespace, pod.Name
 	pod, err := ev.PodLister.Pods(podNamespace).Get(podName)
 	if err != nil {
 		logger.Error(err, "Could not get the updated preemptor pod object", "pod", klog.KRef(podNamespace, podName))
 		return nil, nil, fwk.AsStatus(err)
+	}
+	// The queued copy of a deferred resize pod can be stale. Don't preempt for a resize that was
+	// resolved or already evaluated since, or for a recreated pod.
+	if isResize && (pod.UID != evaluatedUID || !compresource.IsPodResizeDeferred(pod) || util.IsPodResizeSchedulerEvaluationCompleted(pod)) {
+		return nil, nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("pod resize on node %v is no longer deferred or already evaluated", pod.Spec.NodeName))
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
@@ -136,7 +144,13 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
 			},
 		}
-		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
+		absentMsg := "Preemption is not helpful for scheduling"
+		if isResize {
+			// A deferred resize pod can only stay on its assigned node, so report on that node alone.
+			fitError.NumAllNodes = 1
+			absentMsg = "Preemption is not helpful for pod resize"
+		}
+		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, absentMsg))
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
 		return nil, framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
 	}
@@ -187,6 +201,10 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 		return nil, status
 	}
 
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found potential victims for pod resize on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))
+	}
+
 	return framework.NewPostFilterResultWithNominatedNode(bestCandidate.Name()), fwk.NewStatus(fwk.Success, fmt.Sprintf("found a potential placement for pod on node %v, preempting %d victims", bestCandidate.Name(), len(bestCandidate.Victims().Pods)))
 }
 
@@ -226,6 +244,9 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, a
 // or omit the node to reject it. Candidates that still have no victims after all extenders
 // run are dropped.
 func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates []fwk.PreemptionCandidate) ([]fwk.PreemptionCandidate, *fwk.Status) {
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return candidates, nil
+	}
 	extenders := ev.Handler.Extenders()
 	nodeLister := ev.Handler.MutableSnapshotSharedLister().NodeInfos()
 	if len(extenders) == 0 {
@@ -300,6 +321,9 @@ func (ev *Evaluator) callExtenders(logger klog.Logger, pod *v1.Pod, candidates [
 // via ProcessPreemption, which is the only HTTP extender API that can observe
 // proposed victims.
 func (ev *Evaluator) hasInterestedPreemptExtender(pod *v1.Pod) bool {
+	if ev.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && compresource.IsPodResizeDeferred(pod) {
+		return false
+	}
 	for _, extender := range ev.Handler.Extenders() {
 		if extender.SupportsPreemption() && extender.IsInterested(pod) {
 			return true

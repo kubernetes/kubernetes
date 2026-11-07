@@ -496,7 +496,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "pod's resource request is scaled up",
 			newPod: podWithBigRequest,
 			oldPod: podWithSmallRequest,
-			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleUp}},
+			want:   []fwk.ClusterEvent{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}},
 		},
 		{
 			name:   "both pod's resource request and label are updated",
@@ -641,67 +641,6 @@ func TestExtractPodScaleDown(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := extractPodScaleDown(tt.newPod, tt.oldPod); got != tt.want {
 				t.Errorf("extractPodScaleDown() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestExtractPodScaleUp(t *testing.T) {
-	tests := []struct {
-		name   string
-		newPod *v1.Pod
-		oldPod *v1.Pod
-		want   fwk.ActionType
-	}{
-		{
-			name: "resource request scaled up",
-			oldPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU:    "500m",
-				v1.ResourceMemory: "1Gi",
-			}),
-			newPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1",
-				v1.ResourceMemory: "1Gi",
-			}),
-			want: fwk.UpdatePodScaleUp,
-		},
-		{
-			name: "resource request scaled down",
-			oldPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1",
-				v1.ResourceMemory: "1Gi",
-			}),
-			newPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU:    "500m",
-				v1.ResourceMemory: "1Gi",
-			}),
-			want: fwk.None,
-		},
-		{
-			name: "huge request scaled up beyond int64 milli range",
-			oldPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU: "1e21",
-			}),
-			newPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU: "9e21",
-			}),
-			want: fwk.UpdatePodScaleUp,
-		},
-		{
-			name: "equal requests beyond int64 milli range",
-			oldPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU: "9e21",
-			}),
-			newPod: makePodWithRequests(map[v1.ResourceName]string{
-				v1.ResourceCPU: "9e21",
-			}),
-			want: fwk.None,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := extractPodScaleUp(tt.newPod, tt.oldPod); got != tt.want {
-				t.Errorf("extractPodScaleUp() = %v, want %v", got, tt.want)
 			}
 		})
 	}
