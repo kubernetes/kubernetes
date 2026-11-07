@@ -55,6 +55,11 @@ type DesiredStateOfWorldPopulator interface {
 // that exist on this host
 //
 // desiredStateOfWorld - the cache to populate
+//
+// nodeLister - used to check the health of the node a pod is scheduled to;
+// pods with a deletion timestamp on an unhealthy node are treated as
+// terminated so that their volumes are removed from the desired state of
+// the world and the reconciler's force-detach timer can fire.
 func NewDesiredStateOfWorldPopulator(
 	loopSleepDuration time.Duration,
 	listPodsRetryDuration time.Duration,
@@ -64,7 +69,8 @@ func NewDesiredStateOfWorldPopulator(
 	pvcLister corelisters.PersistentVolumeClaimLister,
 	pvLister corelisters.PersistentVolumeLister,
 	csiMigratedPluginManager csimigration.PluginManager,
-	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
+	intreeToCSITranslator csimigration.InTreeToCSITranslator,
+	nodeLister corelisters.NodeLister) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		loopSleepDuration:        loopSleepDuration,
 		listPodsRetryDuration:    listPodsRetryDuration,
@@ -75,6 +81,7 @@ func NewDesiredStateOfWorldPopulator(
 		pvLister:                 pvLister,
 		csiMigratedPluginManager: csiMigratedPluginManager,
 		intreeToCSITranslator:    intreeToCSITranslator,
+		nodeLister:               nodeLister,
 	}
 }
 
@@ -89,6 +96,7 @@ type desiredStateOfWorldPopulator struct {
 	timeOfLastListPods       time.Time
 	csiMigratedPluginManager csimigration.PluginManager
 	intreeToCSITranslator    csimigration.InTreeToCSITranslator
+	nodeLister               corelisters.NodeLister
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context) {
@@ -142,7 +150,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 				informerPod,
 				true /* default volume action */)
 
-			if volumeActionFlag {
+			if volumeActionFlag && !util.IsPodTerminatingOnUnhealthyNode(logger, informerPod, dswp.nodeLister) {
 				informerPodUID := volutil.GetUniquePodName(informerPod)
 				// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
 				if informerPodUID == dswPodUID {
@@ -153,8 +161,8 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 		}
 
 		// the pod from dsw does not exist in pod informer, or it does not match the unique identifier retrieved
-		// from the informer, delete it from dsw
-		logger.V(1).Info("Removing pod from dsw because it does not exist in pod informer", "podName", dswPodKey, "podUID", dswPodUID)
+		// from the informer, or it is terminating on an unhealthy node, delete it from dsw
+		logger.V(1).Info("Removing pod from dsw because it does not exist in pod informer or is terminating on an unhealthy node", "podName", dswPodKey, "podUID", dswPodUID)
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
 
@@ -186,6 +194,17 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods(logger klog.Logge
 	for _, pod := range pods {
 		if volutil.IsPodTerminated(pod, pod.Status) {
 			// Do not add volumes for terminated pods
+			continue
+		}
+		// A pod that has been marked for deletion but whose kubelet is
+		// unreachable (node NotReady) will never report its containers as
+		// terminated, so IsPodTerminated() above will return false even
+		// though the pod is effectively gone. Treat such pods as terminated
+		// so that their volumes are removed from the desired state of the
+		// world and the reconciler's force-detach timer can fire.
+		if util.IsPodTerminatingOnUnhealthyNode(logger, pod, dswp.nodeLister) {
+			logger.V(4).Info("Skipping pod because it is terminating on an unhealthy node",
+				"pod", klog.KObj(pod), "node", pod.Spec.NodeName)
 			continue
 		}
 		util.ProcessPodVolumes(logger, pod, true,

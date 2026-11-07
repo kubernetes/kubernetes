@@ -22,12 +22,14 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -187,6 +189,29 @@ func DetermineVolumeAction(pod *v1.Pod, defaultAction bool) bool {
 		return false
 	}
 	return defaultAction
+}
+
+// IsPodTerminatingOnUnhealthyNode returns true when a pod has been marked for
+// deletion (DeletionTimestamp is set) and its node is not Ready. In that
+// situation the kubelet cannot acknowledge container termination, so the pod
+// status will never reflect the true container state. Removing such pods from
+// the desired state of the world allows the reconciler's force-detach timer to
+// trigger after maxWaitForUnmountDuration, mirroring the documented behaviour
+// for non-graceful node shutdowns.
+func IsPodTerminatingOnUnhealthyNode(logger klog.Logger, pod *v1.Pod, nodeLister corelisters.NodeLister) bool {
+	if pod == nil || pod.DeletionTimestamp == nil || pod.Spec.NodeName == "" || nodeLister == nil {
+		return false
+	}
+	node, err := nodeLister.Get(pod.Spec.NodeName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return true
+		}
+		logger.V(4).Info("Failed to get node for pod, assuming node is healthy",
+			"pod", klog.KObj(pod), "node", pod.Spec.NodeName, "err", err)
+		return false
+	}
+	return !nodeutil.IsNodeReady(node)
 }
 
 // ProcessPodVolumes processes the volumes in the given pod and adds them to the
