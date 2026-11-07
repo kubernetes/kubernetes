@@ -202,6 +202,7 @@ const (
 	Controller_ControllerExpandVolume_FullMethodName     = "/csi.v1.Controller/ControllerExpandVolume"
 	Controller_ControllerGetVolume_FullMethodName        = "/csi.v1.Controller/ControllerGetVolume"
 	Controller_ControllerModifyVolume_FullMethodName     = "/csi.v1.Controller/ControllerModifyVolume"
+	Controller_ControllerGetNodeInfo_FullMethodName      = "/csi.v1.Controller/ControllerGetNodeInfo"
 )
 
 // ControllerClient is the client API for Controller service.
@@ -225,6 +226,7 @@ type ControllerClient interface {
 	ControllerExpandVolume(ctx context.Context, in *ControllerExpandVolumeRequest, opts ...grpc.CallOption) (*ControllerExpandVolumeResponse, error)
 	ControllerGetVolume(ctx context.Context, in *ControllerGetVolumeRequest, opts ...grpc.CallOption) (*ControllerGetVolumeResponse, error)
 	ControllerModifyVolume(ctx context.Context, in *ControllerModifyVolumeRequest, opts ...grpc.CallOption) (*ControllerModifyVolumeResponse, error)
+	ControllerGetNodeInfo(ctx context.Context, in *ControllerGetNodeInfoRequest, opts ...grpc.CallOption) (*ControllerGetNodeInfoResponse, error)
 }
 
 type controllerClient struct {
@@ -388,6 +390,15 @@ func (c *controllerClient) ControllerModifyVolume(ctx context.Context, in *Contr
 	return out, nil
 }
 
+func (c *controllerClient) ControllerGetNodeInfo(ctx context.Context, in *ControllerGetNodeInfoRequest, opts ...grpc.CallOption) (*ControllerGetNodeInfoResponse, error) {
+	out := new(ControllerGetNodeInfoResponse)
+	err := c.cc.Invoke(ctx, Controller_ControllerGetNodeInfo_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControllerServer is the server API for Controller service.
 // All implementations must embed UnimplementedControllerServer
 // for forward compatibility
@@ -409,6 +420,7 @@ type ControllerServer interface {
 	ControllerExpandVolume(context.Context, *ControllerExpandVolumeRequest) (*ControllerExpandVolumeResponse, error)
 	ControllerGetVolume(context.Context, *ControllerGetVolumeRequest) (*ControllerGetVolumeResponse, error)
 	ControllerModifyVolume(context.Context, *ControllerModifyVolumeRequest) (*ControllerModifyVolumeResponse, error)
+	ControllerGetNodeInfo(context.Context, *ControllerGetNodeInfoRequest) (*ControllerGetNodeInfoResponse, error)
 	mustEmbedUnimplementedControllerServer()
 }
 
@@ -466,6 +478,9 @@ func (UnimplementedControllerServer) ControllerGetVolume(context.Context, *Contr
 }
 func (UnimplementedControllerServer) ControllerModifyVolume(context.Context, *ControllerModifyVolumeRequest) (*ControllerModifyVolumeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ControllerModifyVolume not implemented")
+}
+func (UnimplementedControllerServer) ControllerGetNodeInfo(context.Context, *ControllerGetNodeInfoRequest) (*ControllerGetNodeInfoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ControllerGetNodeInfo not implemented")
 }
 func (UnimplementedControllerServer) mustEmbedUnimplementedControllerServer() {}
 
@@ -786,6 +801,24 @@ func _Controller_ControllerModifyVolume_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Controller_ControllerGetNodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerGetNodeInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).ControllerGetNodeInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Controller_ControllerGetNodeInfo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).ControllerGetNodeInfo(ctx, req.(*ControllerGetNodeInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Controller_ServiceDesc is the grpc.ServiceDesc for Controller service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -860,6 +893,10 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ControllerModifyVolume",
 			Handler:    _Controller_ControllerModifyVolume_Handler,
+		},
+		{
+			MethodName: "ControllerGetNodeInfo",
+			Handler:    _Controller_ControllerGetNodeInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
