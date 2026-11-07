@@ -1086,12 +1086,58 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			listContainers := test.pod.Spec.InitContainers
 			listContainers = append(listContainers, test.pod.Spec.Containers...)
 			for _, container := range listContainers {
-				oomScoreAdj := GetContainerOOMScoreAdjust(test.pod, &container, test.memoryCapacity)
+				oomScoreAdj, err := GetContainerOOMScoreAdjust(test.pod, &container, test.memoryCapacity)
+				if err != nil {
+					t.Fatalf("GetContainerOOMScoreAdjust(%s) failed: %v", container.Name, err)
+				}
 				if oomScoreAdj < test.lowHighOOMScoreAdj[container.Name].lowOOMScoreAdj || oomScoreAdj > test.lowHighOOMScoreAdj[container.Name].highOOMScoreAdj {
 					t.Errorf("oom_score_adj %s should be between %d and %d, but was %d", container.Name, test.lowHighOOMScoreAdj[container.Name].lowOOMScoreAdj, test.lowHighOOMScoreAdj[container.Name].highOOMScoreAdj, oomScoreAdj)
 				}
 			}
 		})
 
+	}
+}
+
+func TestGetContainerOOMScoreAdjustInvalidMemoryCapacity(t *testing.T) {
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		podLevelResources bool
+		expectError       bool
+		expectedScore     int
+	}{
+		{name: "cpu-limit", pod: &cpuLimit, expectError: true},
+		{name: "sidecar", pod: &burstableMixedMultiContainerSmallSidecarPod, expectError: true},
+		{name: "pod-level-resources", pod: &burstablePodResourcesNoContainerResourcesWithSidecar, podLevelResources: true, expectError: true},
+		{name: "best-effort", pod: &noRequestLimit, expectedScore: besteffortOOMScoreAdj},
+		{name: "guaranteed", pod: &equalRequestLimitCPUMemory, expectedScore: guaranteedOOMScoreAdj},
+		{name: "node-critical", pod: &nodeCritical, expectedScore: guaranteedOOMScoreAdj},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResources)
+			for _, memoryCapacity := range []int64{0, -1} {
+				t.Run(strconv.FormatInt(memoryCapacity, 10), func(t *testing.T) {
+					containers := append([]v1.Container{}, test.pod.Spec.InitContainers...)
+					containers = append(containers, test.pod.Spec.Containers...)
+					for _, container := range containers {
+						score, err := GetContainerOOMScoreAdjust(test.pod, &container, memoryCapacity)
+						if test.expectError {
+							if err == nil {
+								t.Errorf("GetContainerOOMScoreAdjust(%s) should reject memory capacity %d", container.Name, memoryCapacity)
+							}
+							continue
+						}
+						if err != nil {
+							t.Fatalf("GetContainerOOMScoreAdjust(%s) failed: %v", container.Name, err)
+						}
+						if score != test.expectedScore {
+							t.Errorf("GetContainerOOMScoreAdjust(%s) = %d, want %d", container.Name, score, test.expectedScore)
+						}
+					}
+				})
+			}
+		})
 	}
 }
