@@ -507,7 +507,7 @@ func (f *featureGate) SetFromMapWithLogger(logger klog.Logger, m map[string]bool
 	if len(errs) == 0 {
 		// Persist changes
 		f.enabled.Store(enabled)
-		logger.V(1).Info("Updated", "featureGates", enabled)
+		logger.V(1).Info("Updated", "featureGates", enabled, "resolved", f.resolvedMap())
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -832,6 +832,23 @@ func (f *featureGate) GetAll() map[Feature]FeatureSpec {
 		retval[k] = *spec
 	}
 	return retval
+}
+
+func (f *featureGate) resolvedMap() map[Feature]bool {
+	known := f.known.Load().(map[Feature]VersionedSpecs)
+	enabled := f.enabled.Load().(map[Feature]bool)
+	emulationVersion := f.EmulationVersion()
+	minCompatibilityVersion := f.MinCompatibilityVersion()
+
+	resolved := map[Feature]bool{}
+	for k, v := range known {
+		featureSpec := featureSpecAtEmulationAndMinCompatVersion(v, emulationVersion, minCompatibilityVersion)
+		if featureSpec.PreRelease == PreAlpha {
+			continue
+		}
+		resolved[k] = featureEnabled(k, enabled, known, emulationVersion, minCompatibilityVersion)
+	}
+	return resolved
 }
 
 // GetAllVersioned returns a copy of the map of known feature names to versioned feature specs.
