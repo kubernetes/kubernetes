@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/utils/ptr"
 )
 
 // ResourceBuilderFlags are flags for finding resources
@@ -48,7 +47,7 @@ func NewResourceBuilderFlags() *ResourceBuilderFlags {
 		FileNameFlags: &FileNameFlags{
 			Usage:     "identifying the resource.",
 			Filenames: &filenames,
-			Recursive: ptr.To(true),
+			Recursive: new(true),
 		},
 	}
 }
@@ -61,7 +60,7 @@ func (o *ResourceBuilderFlags) WithFile(recurse bool, kustomize *string, files .
 		Usage:     "identifying the resource.",
 		Filenames: &files,
 		Kustomize: kustomize,
-		Recursive: ptr.To(recurse),
+		Recursive: new(recurse),
 	}
 
 	return o
