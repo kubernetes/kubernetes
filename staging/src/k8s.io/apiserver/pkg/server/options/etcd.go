@@ -245,7 +245,7 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 	}
 	metrics.SetStorageMonitorGetter(monitorCache.get)
 
-	c.RESTOptionsGetter = s.CreateRESTOptionsGetter(factory, c.ResourceTransformers)
+	c.RESTOptionsGetter = s.CreateRESTOptionsGetter(factory, c.ResourceTransformers, c.StorageCompressionRules)
 	return nil
 }
 
@@ -335,11 +335,17 @@ func (c *monitorCache) close() {
 	c.monitors = nil
 }
 
-func (s *EtcdOptions) CreateRESTOptionsGetter(factory serverstorage.StorageFactory, resourceTransformers storagevalue.ResourceTransformers) generic.RESTOptionsGetter {
+func (s *EtcdOptions) CreateRESTOptionsGetter(factory serverstorage.StorageFactory, resourceTransformers storagevalue.ResourceTransformers, compressionRules storagebackend.CompressionRules) generic.RESTOptionsGetter {
 	if resourceTransformers != nil {
 		factory = &transformerStorageFactory{
 			delegate:             factory,
 			resourceTransformers: resourceTransformers,
+		}
+	}
+	if compressionRules != nil {
+		factory = &compressionStorageFactory{
+			delegate:         factory,
+			compressionRules: compressionRules,
 		}
 	}
 	return &StorageFactoryRestOptionsFactory{Options: *s, StorageFactory: factory}
@@ -618,6 +624,38 @@ func (t *transformerStorageFactory) Configs() []storagebackend.Config {
 
 func (t *transformerStorageFactory) Backends() []serverstorage.Backend {
 	return t.delegate.Backends()
+}
+
+var _ serverstorage.StorageFactory = &compressionStorageFactory{}
+
+// compressionStorageFactory sets the compression Rule on each config its
+// delegate returns.
+type compressionStorageFactory struct {
+	delegate         serverstorage.StorageFactory
+	compressionRules storagebackend.CompressionRules
+}
+
+func (c *compressionStorageFactory) NewConfig(resource schema.GroupResource, example runtime.Object) (*storagebackend.ConfigForResource, error) {
+	config, err := c.delegate.NewConfig(resource, example)
+	if err != nil {
+		return nil, err
+	}
+
+	configCopy := *config
+	configCopy.CompressionRule = c.compressionRules.RuleFor(resource)
+	return &configCopy, nil
+}
+
+func (c *compressionStorageFactory) ResourcePrefix(resource schema.GroupResource) string {
+	return c.delegate.ResourcePrefix(resource)
+}
+
+func (c *compressionStorageFactory) Configs() []storagebackend.Config {
+	return c.delegate.Configs()
+}
+
+func (c *compressionStorageFactory) Backends() []serverstorage.Backend {
+	return c.delegate.Backends()
 }
 
 type EtcdServerOverride struct {

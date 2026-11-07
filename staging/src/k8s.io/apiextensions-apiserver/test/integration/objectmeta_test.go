@@ -131,7 +131,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, nil, nil)
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, nil, nil, nil)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: noxuDefinition.Spec.Group, Resource: noxuDefinition.Spec.Names.Plural}, nil)
 	if err != nil {
 		t.Fatal(err)

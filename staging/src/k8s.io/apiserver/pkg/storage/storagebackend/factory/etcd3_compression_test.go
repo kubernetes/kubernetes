@@ -65,10 +65,10 @@ var (
 	}
 )
 
-// newPodStorage builds a pods store the way kube-apiserver does. encryption is
-// the transformer an EncryptionConfiguration would give pods, or nil when
-// encryption at rest isn't configured.
-func newPodStorage(t *testing.T, encryption value.Transformer) (storage.Interface, *kubernetes.Client) {
+// newPodStorage builds a pods store the way kube-apiserver does, writing with
+// rule. encryption is the transformer an EncryptionConfiguration would give
+// pods, or nil when encryption at rest isn't configured.
+func newPodStorage(t *testing.T, encryption value.Transformer, rule compression.Rule) (storage.Interface, *kubernetes.Client) {
 	t.Helper()
 	client := testserver.RunEtcd(t)
 	cfg := storagebackend.Config{
@@ -80,7 +80,9 @@ func newPodStorage(t *testing.T, encryption value.Transformer) (storage.Interfac
 		Codec:       apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion),
 		Transformer: encryption,
 	}
-	s, destroy, err := newETCD3Storage(*cfg.ForResource(podsGR),
+	resourceConfig := cfg.ForResource(podsGR)
+	resourceConfig.CompressionRule = rule
+	s, destroy, err := newETCD3Storage(*resourceConfig,
 		func() runtime.Object { return &example.Pod{} },
 		func() runtime.Object { return &example.PodList{} },
 		nil, "/pods")
@@ -155,7 +157,7 @@ func compressionMetricsText(t *testing.T) string {
 // reading the value back records a compression metric.
 func TestStoresWithoutARuleAreInert(t *testing.T) {
 	ctx := context.Background()
-	s, client := newPodStorage(t, nil)
+	s, client := newPodStorage(t, nil, compression.Rule{})
 	before := compressionMetricsText(t)
 
 	pod := compressiblePod()
@@ -182,6 +184,33 @@ func TestStoresWithoutARuleAreInert(t *testing.T) {
 	}
 }
 
+// TestStoresWriteWithTheirRule checks that a store whose config carries a
+// compressing Rule frames what it writes and reads the value back.
+func TestStoresWriteWithTheirRule(t *testing.T) {
+	ctx := context.Background()
+	s, client := newPodStorage(t, nil, compressAll)
+
+	pod := compressiblePod()
+	key := "/pods/ns/foo"
+	if err := s.Create(ctx, key, pod, nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := client.KV.Get(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Kvs) != 1 {
+		t.Fatalf("got %d values at %s, want 1", len(resp.Kvs), key)
+	}
+	if stored := resp.Kvs[0].Value; !bytes.HasPrefix(stored, []byte("\x00k8s")) || len(stored) >= len(encodePod(t, pod)) {
+		t.Errorf("stored value isn't a compressed frame: %q", stored)
+	}
+	got := &example.Pod{}
+	if err := s.Get(ctx, key, storage.GetOptions{}, got); err != nil || got.Annotations["note"] != pod.Annotations["note"] {
+		t.Errorf("Get: got %v, %#v", err, got)
+	}
+}
+
 // TestStoresReadCompressedValues checks that every store reads a compressed
 // value through Get, GetList and Watch without any configuration. With AES-GCM
 // configured, the stored value is an encrypted frame, so reading it back shows
@@ -196,7 +225,7 @@ func TestStoresReadCompressedValues(t *testing.T) {
 	for name, encryption := range map[string]value.Transformer{"no encryption": nil, "AES-GCM": aesgcm} {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			s, client := newPodStorage(t, encryption)
+			s, client := newPodStorage(t, encryption, compression.Rule{})
 			list := &example.PodList{}
 			if err := s.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, list); err != nil {
 				t.Fatal(err)
@@ -240,7 +269,7 @@ func TestStoresReadCompressedValues(t *testing.T) {
 func TestOnlyAFailedChecksumIsACorruptObject(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
 	ctx := context.Background()
-	s, client := newPodStorage(t, nil)
+	s, client := newPodStorage(t, nil, compression.Rule{})
 	unsafeDeletionStore := etcd3.NewStoreWithUnsafeCorruptObjectDeletion(s, podsGR)
 
 	damaged := compressedValue(t, nil, "/pods/ns/damaged", compressiblePod())
