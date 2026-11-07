@@ -340,8 +340,8 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0
-## explicit; go 1.21
+# github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 => github.com/skitt/go-grpc-middleware/providers/prometheus v0.0.0-20261102150504-c19cbb1cb1e5
+## explicit; go 1.26.0
 github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus
 # github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 ## explicit; go 1.23.0
@@ -1299,3 +1299,4 @@ sigs.k8s.io/yaml/kyaml
 # tags.cncf.io/container-device-interface/specs-go v1.1.1
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
+# github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus => github.com/skitt/go-grpc-middleware/providers/prometheus v0.0.0-20261102150504-c19cbb1cb1e5
