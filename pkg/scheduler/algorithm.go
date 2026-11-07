@@ -698,10 +698,7 @@ func (a *SchedulingAlgorithm) prepareAssumedPod(state fwk.CycleState, podInfo *f
 		// Any potential ExtraNodeAllocatableResources from a previously failed scheduling attempt is overwritten.
 		// This field is not explicitly cleared as the Pod object is reconstructed in handleSchedulingFailure()
 		// before re-queueing.
-		assumedPodInfo.Pod.Status.ExtraNodeAllocatableResources = nil
-		if allocState := framework.GetExtraNodeAllocatableResourcesState(state); allocState != nil {
-			assumedPodInfo.Pod.Status.ExtraNodeAllocatableResources = allocState.Get(host)
-		}
+		assumedPodInfo.Pod.Status.ExtraNodeAllocatableResources = framework.GetExtraNodeAllocatableResources(state, host)
 	}
 	return assumedPodInfo
 }

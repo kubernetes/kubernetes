@@ -247,3 +247,11 @@ func GetOrCreateExtraNodeAllocatableResourcesState(cs fwk.CycleState) *ExtraNode
 	cs.Write(ExtraNodeAllocatableResourcesStateKey, s)
 	return s
 }
+
+// GetExtraNodeAllocatableResources returns the entries that plugins recorded in cs for nodeName.
+func GetExtraNodeAllocatableResources(cs fwk.CycleState, nodeName string) []v1.ExtraNodeAllocatableResource {
+	if s := GetExtraNodeAllocatableResourcesState(cs); s != nil {
+		return s.Get(nodeName)
+	}
+	return nil
+}
