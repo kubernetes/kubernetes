@@ -411,6 +411,32 @@ func TestEmptyRange(t *testing.T) {
 	testJSONPath(tests, true, t)
 }
 
+func TestEmptySliceDoesNotDropOtherInputs(t *testing.T) {
+	var input = []byte(`{
+		"items": [
+			{
+				"metadata": {"name": "pod1"},
+				"spec": {"containers": [{"name": "app", "ports": []}]}
+			},
+			{
+				"metadata": {"name": "pod2"},
+				"spec": {"containers": [{"name": "app", "ports": [{"containerPort": 8080}]}, {"name": "sidecar", "ports": [{"containerPort": 9090}]}]}
+			}
+		]
+	}`)
+	var data interface{}
+	err := json.Unmarshal(input, &data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []jsonpathTest{
+		{"empty list in the first item", `{.items[*].spec.containers[*].ports[*].containerPort}`, data, "8080 9090", false},
+		{"slice selecting nothing in the first item", `{.items[*].spec.containers[1:].name}`, data, "sidecar", false},
+	}
+	testJSONPath(tests, false, t)
+}
+
 func TestNestedRanges(t *testing.T) {
 	var input = []byte(`{
 		"items": [
