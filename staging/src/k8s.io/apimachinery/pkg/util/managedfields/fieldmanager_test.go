@@ -1203,3 +1203,163 @@ func TestUpdateSkipsLiveManagedFieldsConversion(t *testing.T) {
 		t.Fatalf("expected 2 managedFields entries on updated object, got %d", got)
 	}
 }
+
+func TestApplyPreservesUnmanagedFinalizers(t *testing.T) {
+	gvk := schema.FromAPIVersionAndKind("v1", "ConfigMap")
+	fm, err := managedfields.NewDefaultFieldManager(
+		fakeTypeConverter,
+		&managedfieldstesting.FakeObjectConvertor{},
+		&managedfieldstesting.FakeObjectDefaulter{},
+		&managedfieldstesting.FakeObjectCreater{},
+		gvk,
+		gvk.GroupVersion(),
+		"",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("failed to create field manager: %v", err)
+	}
+
+	applied1 := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "parent",
+			"finalizers": ["example.com/cleanup"]
+		},
+		"data": {"k": "v"}
+	}`), &applied1.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	live, err := fm.Apply(&unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata": map[string]interface{}{
+				"name": "parent",
+			},
+		},
+	}, applied1, "my-controller", false)
+	if err != nil {
+		t.Fatalf("failed initial apply: %v", err)
+	}
+
+	// Simulate foregroundDeletion and orphan finalizers added by kube-apiserver
+	// (not tracked in managedFields).
+	liveObj := live.DeepCopyObject().(*unstructured.Unstructured)
+	liveObj.SetFinalizers([]string{"example.com/cleanup", "foregroundDeletion", "orphan"})
+
+	applied2 := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "parent"
+		},
+		"data": {"k": "v"}
+	}`), &applied2.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	result, err := fm.Apply(liveObj, applied2, "my-controller", false)
+	if err != nil {
+		t.Fatalf("failed second apply: %v", err)
+	}
+
+	resultAccessor, err := meta.Accessor(result)
+	if err != nil {
+		t.Fatalf("failed to get accessor: %v", err)
+	}
+	expectedFinalizers := []string{"foregroundDeletion", "orphan"}
+	if !reflect.DeepEqual(resultAccessor.GetFinalizers(), expectedFinalizers) {
+		t.Fatalf("expected finalizers %v, got %v", expectedFinalizers, resultAccessor.GetFinalizers())
+	}
+
+	// Verify multi-manager: manager A drops its finalizer while manager B still owns one,
+	// and unmanaged finalizer foregroundDeletion is preserved throughout.
+	appliedMgrA := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "parent",
+			"finalizers": ["example.com/cleanup-a"]
+		}
+	}`), &appliedMgrA.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	multiLive, err := fm.Apply(&unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "ConfigMap",
+			"metadata":   map[string]interface{}{"name": "parent"},
+		},
+	}, appliedMgrA, "manager-a", false)
+	if err != nil {
+		t.Fatalf("failed manager-a apply: %v", err)
+	}
+
+	appliedMgrB := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "parent",
+			"finalizers": ["example.com/cleanup-b"]
+		}
+	}`), &appliedMgrB.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	multiLive, err = fm.Apply(multiLive, appliedMgrB, "manager-b", false)
+	if err != nil {
+		t.Fatalf("failed manager-b apply: %v", err)
+	}
+
+	// Add unmanaged foregroundDeletion
+	multiLiveObj := multiLive.DeepCopyObject().(*unstructured.Unstructured)
+	multiLiveObj.SetFinalizers([]string{"example.com/cleanup-a", "example.com/cleanup-b", "foregroundDeletion"})
+
+	// Manager A drops its finalizer
+	appliedMgrADrop := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "parent"
+		}
+	}`), &appliedMgrADrop.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	resMulti, err := fm.Apply(multiLiveObj, appliedMgrADrop, "manager-a", false)
+	if err != nil {
+		t.Fatalf("failed manager-a drop apply: %v", err)
+	}
+	resAcc, _ := meta.Accessor(resMulti)
+	expectedMulti := []string{"example.com/cleanup-b", "foregroundDeletion"}
+	if !reflect.DeepEqual(resAcc.GetFinalizers(), expectedMulti) {
+		t.Fatalf("expected finalizers after manager-a drop %v, got %v", expectedMulti, resAcc.GetFinalizers())
+	}
+
+	// Manager B drops its finalizer (now last manager dropping finalizer)
+	appliedMgrBDrop := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "ConfigMap",
+		"metadata": {
+			"name": "parent"
+		}
+	}`), &appliedMgrBDrop.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	resFinal, err := fm.Apply(resMulti, appliedMgrBDrop, "manager-b", false)
+	if err != nil {
+		t.Fatalf("failed manager-b drop apply: %v", err)
+	}
+	resFinalAcc, _ := meta.Accessor(resFinal)
+	expectedFinal := []string{"foregroundDeletion"}
+	if !reflect.DeepEqual(resFinalAcc.GetFinalizers(), expectedFinal) {
+		t.Fatalf("expected finalizers after manager-b drop %v, got %v", expectedFinal, resFinalAcc.GetFinalizers())
+	}
+}
