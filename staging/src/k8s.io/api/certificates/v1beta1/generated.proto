@@ -52,6 +52,7 @@ message CertificateSigningRequest {
 
 message CertificateSigningRequestCondition {
   // type of the condition. Known conditions include "Approved", "Denied", and "Failed".
+  // +required
   optional string type = 1;
 
   // status is the status of the condition, one of True, False, Unknown.
@@ -90,6 +91,7 @@ message CertificateSigningRequestList {
 // CertificateSigningRequestSpec contains the certificate request.
 message CertificateSigningRequestSpec {
   // request is Base64-encoded PKCS#10 CSR data
+  // +required
   optional bytes request = 1;
 
   // signerName is the requested signer for the request. It is a qualified name in the form:
@@ -159,7 +161,7 @@ message CertificateSigningRequestSpec {
   //  "netscape sgc"
   // +listType=atomic
   // +k8s:alpha(since: "1.38")=+k8s:listType=atomic
-  // +required
+  // +optional
   // +k8s:alpha(since: "1.38")=+k8s:required
   repeated string usages = 5;
 
@@ -224,6 +226,7 @@ message ClusterTrustBundle {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec contains the signer (if any) and trust anchors.
+  // +required
   optional ClusterTrustBundleSpec spec = 2;
 }
 
@@ -275,6 +278,7 @@ message ClusterTrustBundleSpec {
   // Users of ClusterTrustBundles, including Kubelet, are free to reorder and
   // deduplicate certificate blocks in this file according to their own logic,
   // as well as to drop PEM block headers and inter-block data.
+  // +required
   optional string trustBundle = 2;
 }
 
@@ -445,6 +449,7 @@ message PodCertificateRequestSpec {
   // setting a status.conditions entry with a type of "Denied" and a reason of
   // "UnsupportedKeyType". It may also suggest a key type that it does support
   // in the message field.
+  // +optional
   optional bytes stubPKCS10Request = 12;
 
   // unverifiedUserAnnotations allow pod authors to pass additional information to
@@ -457,6 +462,7 @@ message PodCertificateRequestSpec {
   //
   // Signers should document the keys and values they support.  Signers should
   // deny requests that contain keys they do not recognize.
+  // +optional
   map<string, string> unverifiedUserAnnotations = 11;
 }
 
