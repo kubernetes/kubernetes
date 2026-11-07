@@ -187,23 +187,34 @@ func (pl *InterPodAffinity) PreScore(
 	logger := klog.FromContext(pCtx)
 	state.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
 
+	// The scores either come from a memo validated by node generation, or from a full computation over
+	// this cycle's snapshot. Both are synchronous and both read the snapshot Score is about to read,
+	// so the scores can never be behind the events that woke this pod.
+	useMemo := !cycleState.IsPodGroupSchedulingCycle() && pl.scoringMemoReady()
+
+	var contributed bool
+	if useMemo {
+		state.topologyScore, contributed = pl.topologyScoreByMemo(pCtx, pod, state, allNodes, hasConstraints)
+	} else {
+		contributed = pl.topologyScoreFull(pCtx, state, pod, allNodes, hasConstraints)
+	}
+
+	if !contributed {
+		return fwk.NewStatus(fwk.Skip)
+	}
+
+	cycleState.Write(preScoreStateKey, state)
+	return nil
+}
+
+// topologyScoreFull is the community computation: every node's contribution in parallel, then one
+// serial merge. It reports whether any node contributed at all, which is what PreScore's Skip branch
+// asks - not whether the aggregate ended up non-empty, see scoringEntry.contributing.
+func (pl *InterPodAffinity) topologyScoreFull(pCtx context.Context, state *preScoreState, pod *v1.Pod, allNodes []fwk.NodeInfo, hasConstraints bool) bool {
 	topoScores := make([]scoreMap, len(allNodes))
 	index := int32(-1)
 	processNode := func(i int) {
-		nodeInfo := allNodes[i]
-
-		// Unless the pod being scheduled has preferred affinity terms, we only
-		// need to process pods with affinity in the node.
-		podsToProcess := nodeInfo.GetPodsWithAffinity()
-		if hasConstraints {
-			// We need to process all the pods.
-			podsToProcess = nodeInfo.GetPods()
-		}
-
-		topoScore := make(scoreMap)
-		for _, existingPod := range podsToProcess {
-			pl.processExistingPod(state, existingPod, nodeInfo, pod, topoScore)
-		}
+		topoScore := pl.scoreNode(state, allNodes[i], pod, hasConstraints)
 		if len(topoScore) > 0 {
 			topoScores[atomic.AddInt32(&index, 1)] = topoScore
 		}
@@ -211,15 +222,32 @@ func (pl *InterPodAffinity) PreScore(
 	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
 
 	if index == -1 {
-		return fwk.NewStatus(fwk.Skip)
+		return false
 	}
 
 	for i := 0; i <= int(index); i++ {
 		state.topologyScore.append(topoScores[i])
 	}
+	return true
+}
 
-	cycleState.Write(preScoreStateKey, state)
-	return nil
+// scoreNode is the per node body of PreScore: what the pods of one node contribute to the incoming
+// pod's topology scores. The full computation above and the memo in scoring_memo.go both call it, so
+// the two paths cannot drift in what they score - only the traversal is incremental.
+func (pl *InterPodAffinity) scoreNode(state *preScoreState, nodeInfo fwk.NodeInfo, pod *v1.Pod, hasConstraints bool) scoreMap {
+	// Unless the pod being scheduled has preferred affinity terms, we only
+	// need to process pods with affinity in the node.
+	podsToProcess := nodeInfo.GetPodsWithAffinity()
+	if hasConstraints {
+		// We need to process all the pods.
+		podsToProcess = nodeInfo.GetPods()
+	}
+
+	topoScore := make(scoreMap)
+	for _, existingPod := range podsToProcess {
+		pl.processExistingPod(state, existingPod, nodeInfo, pod, topoScore)
+	}
+	return topoScore
 }
 
 func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
