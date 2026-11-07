@@ -113,7 +113,16 @@ type calcScenario struct {
 	// Per-pod state. When non-nil, each slice must be at least currentReplicas
 	// long (or longer if the fixture is also describing failed/deleted pods
 	// that aren't counted in currentReplicas).
-	podReadiness         []v1.ConditionStatus
+	podReadiness []v1.ConditionStatus
+	// podResources and podStatusResources set pod.spec.resources and
+	// pod.status.resources (pod-level, spec vs. actuated) respectively.
+	podResources       []v1.ResourceRequirements
+	podStatusResources []v1.ResourceRequirements
+	// podContainerStatusResources sets status.resources on every container status
+	// of the pod (the actuated container-level resources).
+	podContainerStatusResources []v1.ResourceRequirements
+	// podResizeInfeasible marks every pod with PodResizePending=Infeasible.
+	podResizeInfeasible  bool
 	podStartTime         []metav1.Time
 	podPhase             []v1.PodPhase
 	podDeletionTimestamp []bool
@@ -178,6 +187,9 @@ type resourceCase struct {
 
 	// tolerances, if non-nil, overrides the default setup tolerances.
 	tolerances *Tolerances
+
+	// enableInPlaceResizeGates turns on PodLevelResources and InPlacePodLevelResourcesVerticalScaling for the case.
+	enableInPlaceResizeGates bool
 }
 
 // metricCase bundles a single input fixture with expected outputs for pod-metric-based, object-metric-based, and external-metric-based replica tests.
@@ -303,6 +315,27 @@ func buildFakePod(f *calcScenario, i int) v1.Pod {
 	}
 	if deleted {
 		pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	}
+	if i < len(f.podResources) {
+		pod.Spec.Resources = &f.podResources[i]
+	}
+	if i < len(f.podStatusResources) {
+		pod.Status.Resources = &f.podStatusResources[i]
+	}
+	if f.podResizeInfeasible {
+		pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
+			Type:   v1.PodResizePending,
+			Status: v1.ConditionTrue,
+			Reason: v1.PodReasonInfeasible,
+		})
+	}
+	if i < len(f.podContainerStatusResources) {
+		for _, c := range pod.Spec.Containers {
+			pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, v1.ContainerStatus{
+				Name:      c.Name,
+				Resources: &f.podContainerStatusResources[i],
+			})
+		}
 	}
 	if f.resource != nil && i < len(f.resource.requests) {
 		req := v1.ResourceRequirements{
@@ -945,9 +978,128 @@ func TestReplicaCalcResourceScale(t *testing.T) {
 			expectedUtilization: 28,
 			expectedRawValue:    280,
 		},
+		{
+			name: "scale up: pod-level in-flight resize uses actuated requests",
+			fixture: calcScenario{
+				currentReplicas: 1,
+				resource: &cpuResource{
+					levels: makePodMetricLevels(900),
+				},
+				podResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("8")}},
+				},
+				podStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+				},
+			},
+			enableInPlaceResizeGates: true,
+			targetUtilization:        80,
+			expectedReplicas:         2,
+			expectedUtilization:      90,
+			expectedRawValue:         numContainersPerPod * 900,
+		},
+		{
+			name: "scale down: pod-level in-flight resize uses actuated requests",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					levels: makePodMetricLevels(300, 300, 300),
+				},
+				podResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+				},
+				podStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
+				},
+			},
+			enableInPlaceResizeGates: true,
+			targetUtilization:        60,
+			expectedReplicas:         2,
+			expectedUtilization:      30,
+			expectedRawValue:         numContainersPerPod * 300,
+		},
+		{
+			name: "scale up: container-level in-flight resize uses actuated status.Resources instead of spec",
+			fixture: calcScenario{
+				currentReplicas: 1,
+				resource: &cpuResource{
+					requests: cpuRequests(1, "4.0"),
+					levels:   makePodMetricLevels(900),
+				},
+				podContainerStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+				},
+			},
+			targetUtilization:   80,
+			expectedReplicas:    2,
+			expectedUtilization: 90,
+			expectedRawValue:    numContainersPerPod * 900,
+		},
+		{
+			name: "scale down: container-level in-flight resize uses actuated status.Resources instead of spec",
+			fixture: calcScenario{
+				currentReplicas: 3,
+				resource: &cpuResource{
+					requests: cpuRequests(3, "0.5"),
+					levels:   makePodMetricLevels(300, 300, 300),
+				},
+				podContainerStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+				},
+			},
+			targetUtilization:   60,
+			expectedReplicas:    2,
+			expectedUtilization: 30,
+			expectedRawValue:    numContainersPerPod * 300,
+		},
+		{
+			name: "container-level resize adding a cpu request falls back to spec until status reports it",
+			fixture: calcScenario{
+				currentReplicas: 1,
+				resource: &cpuResource{
+					requests: cpuRequests(1, "1.0"),
+					levels:   makePodMetricLevels(900),
+				},
+				podContainerStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")}},
+				},
+			},
+			targetUtilization:   80,
+			expectedReplicas:    2,
+			expectedUtilization: 90,
+			expectedRawValue:    numContainersPerPod * 900,
+		},
+		{
+			name: "container-level infeasible resize uses actuated status.Resources, not the unreachable spec",
+			fixture: calcScenario{
+				currentReplicas: 1,
+				resource: &cpuResource{
+					requests: cpuRequests(1, "4.0"),
+					levels:   makePodMetricLevels(900),
+				},
+				podContainerStatusResources: []v1.ResourceRequirements{
+					{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1.0")}},
+				},
+				podResizeInfeasible: true,
+			},
+			targetUtilization:   80,
+			expectedReplicas:    2,
+			expectedUtilization: 90,
+			expectedRawValue:    numContainersPerPod * 900,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.enableInPlaceResizeGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+			}
 			h := newReplicaCalcSetup(t, &tc.fixture)
 			if tc.tolerances != nil {
 				h.tolerances = *tc.tolerances
@@ -2493,6 +2645,75 @@ func TestCalculateRequests(t *testing.T) {
 			resource:         v1.ResourceCPU,
 			expectedRequests: map[string]int64{testPod: 800},
 			expectedError:    nil,
+		},
+		{
+			name:                    "Pod-level requests set only for cpu: memory falls back to the sum of container requests",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceMemory,
+			expectedRequests: map[string]int64{testPod: 150 * 1024 * 1024 * 1000}, // 150Mi as a milli-value
+			expectedError:    nil,
+		},
+		{
+			name:                    "Pod-level requests set only for cpu: cpu still uses the pod-level request",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name:                    "Pod-level requests set only for cpu: memory missing from a container is an error",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("50Mi")}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceMemory,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceMemory, "container1", testPod),
 		},
 		{
 			name: "Container: if a container name is specified, calculate requests only for that container",
