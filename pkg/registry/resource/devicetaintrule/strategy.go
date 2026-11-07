@@ -29,9 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // deviceTaintRuleStrategy implements behavior for DeviceTaintRule objects
@@ -73,6 +75,8 @@ func (*deviceTaintRuleStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	// Status must not be set by user on create.
 	rule.Status = resource.DeviceTaintRuleStatus{}
 	rule.Generation = 1
+
+	dropDisabledFields(rule, nil)
 }
 
 func (*deviceTaintRuleStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -86,15 +90,18 @@ func (*deviceTaintRuleStrategy) WarningsOnCreate(ctx context.Context, obj runtim
 }
 
 // warningsForDeviceTaintRule returns a warning when spec.deviceSelector is
-// present but empty (driver, pool, and device all unset). Such a selector
-// matches every device from every driver in the cluster, which is easy to
-// trigger by mistake. See https://github.com/kubernetes/kubernetes/issues/141422.
+// present but empty (no field set). Such a selector matches every device from
+// every driver in the cluster, which is easy to trigger by mistake.
+// See https://github.com/kubernetes/kubernetes/issues/141422.
+// A selector with all set is not empty: all: true is the intentional way to
+// select every device and all: false is rejected by validation.
 func warningsForDeviceTaintRule(rule *resource.DeviceTaintRule) []string {
 	sel := rule.Spec.DeviceSelector
-	if sel != nil && sel.Driver == nil && sel.Pool == nil && sel.Device == nil {
+	var emptySel resource.DeviceTaintSelector
+	if sel != nil && *sel == emptySel {
 		return []string{
 			field.NewPath("spec", "deviceSelector").String() +
-				": an empty selector matches every device from every driver in the cluster",
+				": an empty selector matches every device from every driver in the cluster; set `all: true` to make this explicit and silence this warning",
 		}
 	}
 	return nil
@@ -133,6 +140,8 @@ func (*deviceTaintRuleStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	if !apiequality.Semantic.DeepEqual(oldRule.Spec, rule.Spec) {
 		rule.Generation = oldRule.Generation + 1
 	}
+
+	dropDisabledFields(rule, oldRule)
 }
 
 func (*deviceTaintRuleStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -196,4 +205,23 @@ func (r *deviceTaintRuleStatusStrategy) ValidateUpdate(ctx context.Context, obj,
 // WarningsOnUpdate returns warnings for the given update.
 func (*deviceTaintRuleStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropDisabledFields removes fields which are covered by a feature gate.
+func dropDisabledFields(newRule, oldRule *resource.DeviceTaintRule) {
+	dropDisabledDRADeviceTaintSelectorAllFields(newRule, oldRule)
+}
+
+func dropDisabledDRADeviceTaintSelectorAllFields(newRule, oldRule *resource.DeviceTaintRule) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintSelectorAll) || draDeviceTaintSelectorAllFeatureInUse(oldRule) {
+		return
+	}
+
+	if newRule.Spec.DeviceSelector != nil {
+		newRule.Spec.DeviceSelector.All = nil
+	}
+}
+
+func draDeviceTaintSelectorAllFeatureInUse(rule *resource.DeviceTaintRule) bool {
+	return rule != nil && rule.Spec.DeviceSelector != nil && rule.Spec.DeviceSelector.All != nil
 }
