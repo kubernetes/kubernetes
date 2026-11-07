@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -642,7 +643,7 @@ func ValidateJobUpdate(job, oldJob *batch.Job, opts JobValidationOptions) field.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"), opts)...)
 	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&job.ObjectMeta, &oldJob.ObjectMeta, &job.Spec, &oldJob.Spec, field.NewPath("spec", "scheduling"))...)
-	allErrs = append(allErrs, validateDelegationAnnotations(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata", "annotations"))...)
+	allErrs = append(allErrs, validateDelegationAnnotationsUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, validateNameAllowsCompletions(job, opts)...)
 	return allErrs
 }
@@ -756,7 +757,9 @@ func validateDelegationAnnotations(meta, oldMeta *metav1.ObjectMeta, fldPath *fi
 	if !hasWorkload && !hasTemplate {
 		return nil
 	}
-	if oldMeta != nil && delegationAnnotationsUnchanged(meta, oldMeta) {
+	if oldMeta != nil && !slices.ContainsFunc(delegationAnnotations, func(key string) bool {
+		return annotationChanged(meta, oldMeta, key)
+	}) {
 		return nil
 	}
 	var allErrs field.ErrorList
@@ -770,15 +773,20 @@ func validateDelegationAnnotations(meta, oldMeta *metav1.ObjectMeta, fldPath *fi
 	return allErrs
 }
 
-func delegationAnnotationsUnchanged(meta, oldMeta *metav1.ObjectMeta) bool {
-	for _, key := range delegationAnnotations {
-		value, ok := meta.Annotations[key]
-		oldValue, oldOk := oldMeta.Annotations[key]
-		if ok != oldOk || value != oldValue {
-			return false
+func validateDelegationAnnotationsUpdate(meta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, key := range append(slices.Clone(delegationAnnotations), apischeduling.ParentCompositePodGroupAnnotation) {
+		if annotationChanged(meta, oldMeta, key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(key), meta.Annotations[key], apimachineryapivalidation.FieldImmutableErrorMsg))
 		}
 	}
-	return true
+	return allErrs
+}
+
+func annotationChanged(meta, oldMeta *metav1.ObjectMeta, key string) bool {
+	value, ok := meta.Annotations[key]
+	oldValue, oldOk := oldMeta.Annotations[key]
+	return ok != oldOk || value != oldValue
 }
 
 // validateJobSchedulingUpdate enforces the spec.scheduling immutability
