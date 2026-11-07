@@ -19,6 +19,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -94,6 +95,7 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 			}
 
 			mockPCM := cmtesting.NewMockPodContainerManager(t)
+			mockPCM.EXPECT().Exists(pod).Return(true)
 			mockPCM.EXPECT().GetPodCgroupConfig(pod, v1.ResourceMemory).Return(nil, nil)
 			mockPCM.EXPECT().GetPodCgroupConfig(pod, v1.ResourceCPU).Return(cpuCfg, nil)
 
@@ -106,4 +108,68 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 			require.Equal(t, tc.expectedMilliCPU, got.Requests.Cpu().MilliValue())
 		})
 	}
+}
+
+func TestConvertToAPIPodLevelResourcesStatusMissingCgroup(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
+	})
+
+	runningPod := func() *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("50m"),
+						v1.ResourceMemory: resource.MustParse("50Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
+				Containers: []v1.Container{{Name: "pause"}},
+			},
+			Status: v1.PodStatus{Phase: v1.PodRunning},
+		}
+	}
+
+	t.Run("skip cgroup read when pod cgroup is gone", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		pod := runningPod()
+
+		mockPCM := cmtesting.NewMockPodContainerManager(t)
+		mockPCM.EXPECT().Exists(pod).Return(false)
+
+		mockCM := cmtesting.NewMockContainerManager(t)
+		mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+
+		kl := &Kubelet{containerManager: mockCM}
+		got := kl.convertToAPIPodLevelResourcesStatus(logger, pod, v1.PodStatus{})
+		require.NotNil(t, got)
+		require.Equal(t, int64(50), got.Requests.Cpu().MilliValue())
+		require.Equal(t, resource.MustParse("50Mi"), got.Requests[v1.ResourceMemory])
+		require.Equal(t, int64(100), got.Limits.Cpu().MilliValue())
+		require.Equal(t, resource.MustParse("100Mi"), got.Limits[v1.ResourceMemory])
+	})
+
+	t.Run("ENOENT from cgroup read is not fatal", func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+		pod := runningPod()
+
+		mockPCM := cmtesting.NewMockPodContainerManager(t)
+		mockPCM.EXPECT().Exists(pod).Return(true)
+		mockPCM.EXPECT().GetPodCgroupConfig(pod, v1.ResourceMemory).Return(nil, os.ErrNotExist)
+		mockPCM.EXPECT().GetPodCgroupConfig(pod, v1.ResourceCPU).Return(nil, os.ErrNotExist)
+
+		mockCM := cmtesting.NewMockContainerManager(t)
+		mockCM.EXPECT().NewPodContainerManager().Return(mockPCM)
+
+		kl := &Kubelet{containerManager: mockCM}
+		got := kl.convertToAPIPodLevelResourcesStatus(logger, pod, v1.PodStatus{})
+		require.NotNil(t, got)
+		require.Equal(t, int64(50), got.Requests.Cpu().MilliValue())
+		require.Equal(t, resource.MustParse("100Mi"), got.Limits[v1.ResourceMemory])
+	})
 }
