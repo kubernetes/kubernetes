@@ -58,8 +58,9 @@ import (
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
@@ -3929,12 +3930,9 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 		// Apply the validation common to all container types
 		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts, podRestartPolicy, hostUsers)...)
 
-		restartAlways := false
 		// Apply the validation specific to init containers
 		allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, ctr.RestartPolicyRules, idxPath, opts)...)
-		if ctr.RestartPolicy != nil {
-			restartAlways = *ctr.RestartPolicy == core.ContainerRestartPolicyAlways
-		}
+		restartAlways := podutil.IsRestartableInitContainer(&ctr)
 
 		// Names must be unique within regular and init containers. Collisions with ephemeral containers
 		// will be detected by validateEphemeralContainers().
@@ -4560,71 +4558,6 @@ func validateContainerOnlyForPod(ctr *core.Container, path *field.Path) field.Er
 		allErrs = append(allErrs, field.Invalid(path.Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
 	}
 	return allErrs
-}
-
-// PodValidationOptions contains the different settings for pod validation
-type PodValidationOptions struct {
-	// Allow invalid pod-deletion-cost annotation value for backward compatibility.
-	AllowInvalidPodDeletionCost bool
-	// Allow invalid label-value in LabelSelector
-	AllowInvalidLabelValueInSelector bool
-	// Allow pod spec to use non-integer multiple of huge page unit size
-	AllowIndivisibleHugePagesValues bool
-	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
-	AllowInvalidTopologySpreadConstraintLabelSelector bool
-	// Allow projected token volumes with non-local paths
-	AllowNonLocalProjectedTokenPath bool
-	// Allow namespaced sysctls in hostNet and hostIPC pods
-	AllowNamespacedSysctlsForHostNetAndHostIPC bool
-	// The top-level resource being validated is a Pod, not just a PodSpec
-	// embedded in some other resource.
-	ResourceIsPod bool
-	// Allow relaxed validation of environment variable names
-	AllowRelaxedEnvironmentVariableValidation bool
-	// Allow only Recursive value of SELinuxChangePolicy.
-	AllowOnlyRecursiveSELinuxChangePolicy bool
-	// Indicates whether PodLevelResources feature is enabled or disabled.
-	PodLevelResourcesEnabled bool
-	// Indicates whether InPlacePodLevelResourcesVerticalScaling feature is enabled
-	// or disabled.
-	InPlacePodLevelResourcesVerticalScalingEnabled bool
-	// Indicates whether InPlacePodVerticalScalingMemoryBackedVolumes feature is enabled
-	// or disabled.
-	InPlacePodVerticalScalingMemoryBackedVolumesEnabled bool
-	// Allow invalid label-value in RequiredNodeSelector
-	AllowInvalidLabelValueInRequiredNodeAffinity bool
-	// Allow feature of MatchLabelKeys in TopologySpreadConstraints
-	AllowMatchLabelKeysInPodTopologySpread bool
-	// Allow merging selectors built from MatchLabelKeys into LabelSelector of TopologySpreadConstraints
-	AllowMatchLabelKeysInPodTopologySpreadSelectorMerge bool
-	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against current(>=v1.34) validation
-	OldPodViolatesMatchLabelKeysValidation bool
-	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.34) validation
-	OldPodViolatesLegacyMatchLabelKeysValidation bool
-	// Allows containers to consume environment variables via environment variable files.
-	AllowEnvFilesValidation bool
-	// Allows containers have restart policy and restart policy rules.
-	AllowContainerRestartPolicyRules bool
-	// Allow existing RestartContainer resize policy for non-sidecar init containers for backward compatibility
-	AllowExistingRestartContainerForNonSidecarInitContainer bool
-	// Allow user namespaces with volume devices, even though they will not function properly (should only be tolerated in updates of objects which already have this invalid configuration).
-	AllowUserNamespacesWithVolumeDevices bool
-	// Allow taint toleration comparison operators (Lt, Gt)
-	AllowTaintTolerationComparisonOperators bool
-	// Allow hostNetwork pods to use user namespaces
-	AllowUserNamespacesHostNetworkSupport bool
-	// Allow containers to have restart policy rule with RestartAllContainers action, applicable for init, sidecar, and regular containers.
-	AllowRestartAllContainers bool
-	// Allows container statuses to contain image volume digest
-	AllowImageVolumeWithDigest bool
-	// Allow empty image volume reference for backward compatibility
-	AllowEmptyImageVolumeReference bool
-	// Allow containers to have CAP_SYS_ADMIN even if AllowPrivilegeEscalation is false
-	AllowSysAdminWhenPrivilegeEscalationFalse bool
-	// Allow seccomp profiles of type OCI
-	AllowSecurityProfileOCI bool
-	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
-	AllowMLDSAPodCertificateKeyTypes bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -5625,15 +5558,12 @@ func validateAppArmorAnnotationsAndFieldsMatchOnCreate(objectMeta metav1.ObjectM
 }
 
 func podSpecHasContainer(spec *core.PodSpec, containerName string) bool {
-	var hasContainer bool
-	podshelper.VisitContainersWithPath(spec, field.NewPath("spec"), func(c *core.Container, _ *field.Path) bool {
+	for c := range podutil.ContainerIter(spec, podutil.AllContainers) {
 		if c.Name == containerName {
-			hasContainer = true
-			return false
+			return true
 		}
-		return true
-	})
-	return hasContainer
+	}
+	return false
 }
 
 const (
@@ -6063,7 +5993,7 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 			// If any container has a restart rule action of RestartAllContainer, it means all container
 			// could be restarted, no matter their own restart policy. Therefore, all container could transition
 			// from terminated to non-terminated states.
-			if podutil.AllContainersCouldRestart(v1PodSpec) {
+			if podutilv1.AllContainersCouldRestart(v1PodSpec) {
 				return allErrs
 			}
 		}
@@ -6077,7 +6007,7 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 					allowed := false
 					for _, c := range v1PodSpec.Containers {
 						if c.Name == oldStatus.Name {
-							allowed = podutil.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
+							allowed = podutilv1.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
 							break
 						}
 					}
@@ -6128,7 +6058,7 @@ func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.Contai
 			// If any container has a restart rule action of RestartAllContainer, it means all container
 			// could be restarted, no matter their own restart policy. Therefore, all container could transition
 			// from terminated to non-terminated states.
-			if podutil.AllContainersCouldRestart(v1PodSpec) {
+			if podutilv1.AllContainersCouldRestart(v1PodSpec) {
 				return allErrs
 			}
 		}
@@ -6142,7 +6072,7 @@ func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.Contai
 					allowed := false
 					for _, c := range v1PodSpec.InitContainers {
 						if c.Name == oldStatus.Name {
-							allowed = podutil.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
+							allowed = podutilv1.ContainerShouldRestart(c, *v1PodSpec, oldStatus.State.Terminated.ExitCode)
 							break
 						}
 					}
@@ -6173,7 +6103,7 @@ func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.Contai
 		isRestartableInitCtr := false
 		for _, c := range podSpec.InitContainers {
 			if oldStatus.Name == c.Name {
-				if isRestartableInitContainer(&c) {
+				if podutil.IsRestartableInitContainer(&c) {
 					isRestartableInitCtr = true
 				}
 				break
@@ -6447,11 +6377,8 @@ func validatePodExtendedResourceClaimStatus(status *core.PodExtendedResourceClai
 	}
 
 	containers := make(map[string]*core.Container)
-	for _, c := range spec.InitContainers {
-		containers[c.Name] = &c
-	}
-	for _, c := range spec.Containers {
-		containers[c.Name] = &c
+	for c := range podutil.ContainerIter(spec, podutil.InitContainers|podutil.Containers) {
+		containers[c.Name] = c
 	}
 
 	var allErrs field.ErrorList
@@ -6600,7 +6527,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	// Do not allow removing resource requests/limits on resize.
 	for ix, ctr := range oldPod.Spec.InitContainers {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) && !isRestartableInitContainer(&ctr) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) && !podutil.IsRestartableInitContainer(&ctr) {
 			continue
 		}
 		allErrs = append(allErrs, validateContainerResize(
@@ -6633,7 +6560,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Ensure that only CPU and memory resources are mutable for restartable init containers.
 	var newInitContainers []core.Container
 	for ix, container := range newPodSpecCopy.InitContainers {
-		isRestartable := isRestartableInitContainer(&container)
+		isRestartable := podutil.IsRestartableInitContainer(&container)
 		canResize := isRestartable || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)
 		modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
 
@@ -10083,14 +10010,6 @@ func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *fie
 	}
 	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)
 	return allErrs
-}
-
-// isRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
-func isRestartableInitContainer(initContainer *core.Container) bool {
-	if initContainer == nil || initContainer.RestartPolicy == nil {
-		return false
-	}
-	return *initContainer.RestartPolicy == core.ContainerRestartPolicyAlways
 }
 
 // IsValidIPForLegacyField is a wrapper around validation.IsValidIPForLegacyField that
