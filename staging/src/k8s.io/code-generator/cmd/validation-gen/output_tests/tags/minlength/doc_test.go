@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -33,19 +32,19 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		Min2Field:                          strings.Repeat("x", 1),
-		Min2PtrField:                       ptr.To(strings.Repeat("x", 1)),
+		Min2PtrField:                       new(strings.Repeat("x", 1)),
 		Min2UnvalidatedTypedefField:        UnvalidatedStringType(strings.Repeat("x", 1)),
-		Min2UnvalidatedTypedefPtrField:     ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Min2UnvalidatedTypedefPtrField:     new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Min2ValidatedTypedefField:          Min2Type(strings.Repeat("x", 1)),
-		Min2ValidatedTypedefPtrField:       ptr.To(Min2Type(strings.Repeat("x", 1))),
+		Min2ValidatedTypedefPtrField:       new(Min2Type(strings.Repeat("x", 1))),
 		Min10Field:                         strings.Repeat("x", 1),
-		Min10PtrField:                      ptr.To(strings.Repeat("x", 1)),
+		Min10PtrField:                      new(strings.Repeat("x", 1)),
 		Min10UnvalidatedTypedefField:       UnvalidatedStringType(strings.Repeat("x", 1)),
-		Min10UnvalidatedTypedefPtrField:    ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Min10UnvalidatedTypedefPtrField:    new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Min10ValidatedTypedefField:         Min10Type(strings.Repeat("x", 1)),
-		Min10ValidatedTypedefPtrField:      ptr.To(Min10Type(strings.Repeat("x", 1))),
+		Min10ValidatedTypedefPtrField:      new(Min10Type(strings.Repeat("x", 1))),
 		Min2UnvalidatedStringAliasField:    strings.Repeat("x", 1),
-		Min2UnvalidatedStringAliasPtrField: ptr.To(strings.Repeat("x", 1)),
+		Min2UnvalidatedStringAliasPtrField: new(strings.Repeat("x", 1)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.TooShort(field.NewPath("min10Field"), "", 10),
 		field.TooShort(field.NewPath("min10PtrField"), "", 10),
@@ -65,19 +64,19 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		Min2Field:                          strings.Repeat("x", 1),
-		Min2PtrField:                       ptr.To(strings.Repeat("x", 1)),
+		Min2PtrField:                       new(strings.Repeat("x", 1)),
 		Min2UnvalidatedTypedefField:        UnvalidatedStringType(strings.Repeat("x", 1)),
-		Min2UnvalidatedTypedefPtrField:     ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Min2UnvalidatedTypedefPtrField:     new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Min2ValidatedTypedefField:          Min2Type(strings.Repeat("x", 1)),
-		Min2ValidatedTypedefPtrField:       ptr.To(Min2Type(strings.Repeat("x", 1))),
+		Min2ValidatedTypedefPtrField:       new(Min2Type(strings.Repeat("x", 1))),
 		Min10Field:                         strings.Repeat("x", 9),
-		Min10PtrField:                      ptr.To(strings.Repeat("x", 9)),
+		Min10PtrField:                      new(strings.Repeat("x", 9)),
 		Min10UnvalidatedTypedefField:       UnvalidatedStringType(strings.Repeat("x", 9)),
-		Min10UnvalidatedTypedefPtrField:    ptr.To(UnvalidatedStringType(strings.Repeat("x", 9))),
+		Min10UnvalidatedTypedefPtrField:    new(UnvalidatedStringType(strings.Repeat("x", 9))),
 		Min10ValidatedTypedefField:         Min10Type(strings.Repeat("x", 9)),
-		Min10ValidatedTypedefPtrField:      ptr.To(Min10Type(strings.Repeat("x", 9))),
+		Min10ValidatedTypedefPtrField:      new(Min10Type(strings.Repeat("x", 9))),
 		Min2UnvalidatedStringAliasField:    strings.Repeat("x", 1),
-		Min2UnvalidatedStringAliasPtrField: ptr.To(strings.Repeat("x", 1)),
+		Min2UnvalidatedStringAliasPtrField: new(strings.Repeat("x", 1)),
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.TooShort(field.NewPath("min10Field"), "", 10),
 		field.TooShort(field.NewPath("min10PtrField"), "", 10),
@@ -97,64 +96,64 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		Min2Field:                          strings.Repeat("x", 2),
-		Min2PtrField:                       ptr.To(strings.Repeat("x", 2)),
+		Min2PtrField:                       new(strings.Repeat("x", 2)),
 		Min2UnvalidatedTypedefField:        UnvalidatedStringType(strings.Repeat("x", 2)),
-		Min2UnvalidatedTypedefPtrField:     ptr.To(UnvalidatedStringType(strings.Repeat("x", 2))),
+		Min2UnvalidatedTypedefPtrField:     new(UnvalidatedStringType(strings.Repeat("x", 2))),
 		Min2ValidatedTypedefField:          Min2Type(strings.Repeat("x", 2)),
 		Min10Field:                         strings.Repeat("x", 10),
-		Min10PtrField:                      ptr.To(strings.Repeat("x", 10)),
+		Min10PtrField:                      new(strings.Repeat("x", 10)),
 		Min10UnvalidatedTypedefField:       UnvalidatedStringType(strings.Repeat("x", 10)),
-		Min10UnvalidatedTypedefPtrField:    ptr.To(UnvalidatedStringType(strings.Repeat("x", 10))),
+		Min10UnvalidatedTypedefPtrField:    new(UnvalidatedStringType(strings.Repeat("x", 10))),
 		Min10ValidatedTypedefField:         Min10Type(strings.Repeat("x", 10)),
-		Min10ValidatedTypedefPtrField:      ptr.To(Min10Type(strings.Repeat("x", 10))),
+		Min10ValidatedTypedefPtrField:      new(Min10Type(strings.Repeat("x", 10))),
 		Min2UnvalidatedStringAliasField:    strings.Repeat("x", 2),
-		Min2UnvalidatedStringAliasPtrField: ptr.To(strings.Repeat("x", 2)),
+		Min2UnvalidatedStringAliasPtrField: new(strings.Repeat("x", 2)),
 	}).ExpectValid()
 
 	testVal := &Struct{
 		Min2Field:                          strings.Repeat("x", 3),
-		Min2PtrField:                       ptr.To(strings.Repeat("x", 3)),
+		Min2PtrField:                       new(strings.Repeat("x", 3)),
 		Min10Field:                         strings.Repeat("x", 11),
-		Min10PtrField:                      ptr.To(strings.Repeat("x", 11)),
+		Min10PtrField:                      new(strings.Repeat("x", 11)),
 		Min2UnvalidatedTypedefField:        UnvalidatedStringType(strings.Repeat("x", 3)),
-		Min2UnvalidatedTypedefPtrField:     ptr.To(UnvalidatedStringType(strings.Repeat("x", 3))),
+		Min2UnvalidatedTypedefPtrField:     new(UnvalidatedStringType(strings.Repeat("x", 3))),
 		Min10UnvalidatedTypedefField:       UnvalidatedStringType(strings.Repeat("x", 11)),
-		Min10UnvalidatedTypedefPtrField:    ptr.To(UnvalidatedStringType(strings.Repeat("x", 11))),
+		Min10UnvalidatedTypedefPtrField:    new(UnvalidatedStringType(strings.Repeat("x", 11))),
 		Min2ValidatedTypedefField:          Min2Type(strings.Repeat("x", 3)),
-		Min2ValidatedTypedefPtrField:       ptr.To(Min2Type(strings.Repeat("x", 3))),
+		Min2ValidatedTypedefPtrField:       new(Min2Type(strings.Repeat("x", 3))),
 		Min10ValidatedTypedefField:         Min10Type(strings.Repeat("x", 11)),
-		Min10ValidatedTypedefPtrField:      ptr.To(Min10Type(strings.Repeat("x", 11))),
+		Min10ValidatedTypedefPtrField:      new(Min10Type(strings.Repeat("x", 11))),
 		Min2UnvalidatedStringAliasField:    strings.Repeat("x", 3),
-		Min2UnvalidatedStringAliasPtrField: ptr.To(strings.Repeat("x", 3)),
+		Min2UnvalidatedStringAliasPtrField: new(strings.Repeat("x", 3)),
 	}
 	st.Value(testVal).ExpectValid()
 
 	// Test validation ratcheting
 	st.Value(&Struct{
 		Min2Field:                       strings.Repeat("x", 2),
-		Min2PtrField:                    ptr.To(strings.Repeat("x", 2)),
+		Min2PtrField:                    new(strings.Repeat("x", 2)),
 		Min10Field:                      strings.Repeat("x", 11),
-		Min10PtrField:                   ptr.To(strings.Repeat("x", 11)),
+		Min10PtrField:                   new(strings.Repeat("x", 11)),
 		Min2UnvalidatedTypedefField:     UnvalidatedStringType(strings.Repeat("x", 2)),
-		Min2UnvalidatedTypedefPtrField:  ptr.To(UnvalidatedStringType(strings.Repeat("x", 2))),
+		Min2UnvalidatedTypedefPtrField:  new(UnvalidatedStringType(strings.Repeat("x", 2))),
 		Min10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 11)),
-		Min10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 11))),
+		Min10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 11))),
 		Min2ValidatedTypedefField:       Min2Type(strings.Repeat("x", 2)),
-		Min2ValidatedTypedefPtrField:    ptr.To(Min2Type(strings.Repeat("x", 2))),
+		Min2ValidatedTypedefPtrField:    new(Min2Type(strings.Repeat("x", 2))),
 		Min10ValidatedTypedefField:      Min10Type(strings.Repeat("x", 11)),
-		Min10ValidatedTypedefPtrField:   ptr.To(Min10Type(strings.Repeat("x", 11))),
+		Min10ValidatedTypedefPtrField:   new(Min10Type(strings.Repeat("x", 11))),
 	}).OldValue(&Struct{
 		Min2Field:                       strings.Repeat("x", 1),
-		Min2PtrField:                    ptr.To(strings.Repeat("x", 1)),
+		Min2PtrField:                    new(strings.Repeat("x", 1)),
 		Min10Field:                      strings.Repeat("x", 9),
-		Min10PtrField:                   ptr.To(strings.Repeat("x", 1)),
+		Min10PtrField:                   new(strings.Repeat("x", 1)),
 		Min2UnvalidatedTypedefField:     UnvalidatedStringType(strings.Repeat("x", 1)),
-		Min2UnvalidatedTypedefPtrField:  ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Min2UnvalidatedTypedefPtrField:  new(UnvalidatedStringType(strings.Repeat("x", 1))),
 		Min10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 9)),
-		Min10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 9))),
+		Min10UnvalidatedTypedefPtrField: new(UnvalidatedStringType(strings.Repeat("x", 9))),
 		Min2ValidatedTypedefField:       Min2Type(strings.Repeat("x", 1)),
-		Min2ValidatedTypedefPtrField:    ptr.To(Min2Type(strings.Repeat("x", 1))),
+		Min2ValidatedTypedefPtrField:    new(Min2Type(strings.Repeat("x", 1))),
 		Min10ValidatedTypedefField:      Min10Type(strings.Repeat("x", 9)),
-		Min10ValidatedTypedefPtrField:   ptr.To(Min10Type(strings.Repeat("x", 9))),
+		Min10ValidatedTypedefPtrField:   new(Min10Type(strings.Repeat("x", 9))),
 	}).ExpectValid()
 }
