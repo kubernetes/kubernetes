@@ -432,6 +432,39 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 			wantStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
+			name: "mapped claim, reserved for same pod group, 2 pods cannot get the same mapped claim",
+			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").
+				PodGroupName("my-pod-group").Obj(),
+			claim: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: claimNameSpace,
+					UID:       "claim-uid",
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{
+						Devices: resourceapi.DeviceAllocationResult{
+							Results: []resourceapi.DeviceRequestAllocationResult{{Pool: "pool-1", Device: "cpu0"}},
+						},
+					},
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+						{
+							APIGroup: "scheduling.k8s.io",
+							Resource: "podgroups",
+							Name:     "my-pod-group",
+						},
+					},
+				},
+			},
+			nodeInfo: framework.NewNodeInfo(st.MakePod().Name("other-member").Namespace(claimNameSpace).UID("other-pod-uid").
+				PodGroupName("my-pod-group").PodResourceClaims(v1.PodResourceClaim{Name: "cpu", ResourceClaimName: &claimName}).Obj()),
+			draManager: &mockDRAManager{
+				resourceSlices: apiSlices([]*resourceapi.ResourceSlice{sliceMapped}...),
+			},
+			features:   feature.Features{EnableDRAWorkloadResourceClaims: true},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node allocatable resource claim node-allocatable-claim has a mapped device and cannot be shared across pods"),
+		},
+		{
 			name: "mapped claim, reserved for different pod group, workload claims enabled - exit early",
 			pod: st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("pod-uid").
 				PodGroupName("my-pod-group").Obj(),
@@ -545,7 +578,11 @@ func TestValidateNodeAllocatableDRAClaimSharing(t *testing.T) {
 				slices, _ := tt.draManager.ResourceSlices().ListWithDeviceTaintRules()
 				state.claimHasNodeAllocatableMappedDevice[tt.claim.UID] = allocationHasNodeAllocatableMapping(tt.claim.Status.Allocation, nodeAllocatableSlicesByPool(slices))
 			}
-			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.claim, state, tt.podGroupState)
+			nodeInfo := tt.nodeInfo
+			if nodeInfo == nil {
+				nodeInfo = framework.NewNodeInfo()
+			}
+			gotStatus := pl.validateNodeAllocatableDRAClaimSharing(tt.pod, tt.claim, state, tt.podGroupState, nodeInfo)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
 				t.Errorf("validateDRAClaimShareState() returned diff (-want +got):\n%s", diff)
 			}

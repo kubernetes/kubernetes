@@ -362,7 +362,7 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 }
 
 // validateNodeAllocatableDRAClaimSharing ensures that a node-allocatable DRA claim is not already in use by another pod on this node.
-func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, claim *resourceapi.ResourceClaim, state *stateData, podGroupState *podGroupStateData) *fwk.Status {
+func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, claim *resourceapi.ResourceClaim, state *stateData, podGroupState *podGroupStateData, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if claim == nil {
 		return nil
 	}
@@ -372,8 +372,9 @@ func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, 
 		return nil
 	}
 
-	// If the claim is already reserved for another pod or pod group, fail immediately.
-	if len(claim.Status.ReservedFor) > 0 && !resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
+	// If the claim is already reserved for another pod or pod group, or another member of the pod's
+	// group on this node uses it, fail immediately.
+	if len(claim.Status.ReservedFor) > 0 && (!resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) || otherPodOnNodeUsesClaim(nodeInfo, pod, claim)) {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node allocatable resource claim %s has a mapped device and cannot be shared across pods", claim.Name))
 	}
 
@@ -389,6 +390,22 @@ func (pl *DynamicResources) validateNodeAllocatableDRAClaimSharing(pod *v1.Pod, 
 	}
 
 	return nil
+}
+
+// otherPodOnNodeUsesClaim reports whether a pod on the node other than pod references the claim.
+func otherPodOnNodeUsesClaim(nodeInfo fwk.NodeInfo, pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
+	for _, podInfo := range nodeInfo.GetPods() {
+		other := podInfo.GetPod()
+		if other.UID == pod.UID || other.Namespace != claim.Namespace {
+			continue
+		}
+		for i := range other.Spec.ResourceClaims {
+			if name, _, err := resourceclaim.Name(other, &other.Spec.ResourceClaims[i]); err == nil && name != nil && *name == claim.Name {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // validatePodLevelResourcesCoverDRA checks if
