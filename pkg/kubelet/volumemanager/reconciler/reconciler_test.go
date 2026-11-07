@@ -1644,8 +1644,19 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				}
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
-				// Start the reconciler to fill ASW.
-				runReconciler(ctx, reconciler)
+				// Start the reconciler to fill ASW, and stop it when the
+				// subtest returns, so the goroutine does not keep spinning
+				// at the 1ns loop interval and starve the other subtests.
+				runCtx, cancel := context.WithCancel(ctx)
+				stoppedChan := make(chan struct{})
+				go func() {
+					defer close(stoppedChan)
+					reconciler.Run(runCtx)
+				}()
+				t.Cleanup(func() {
+					cancel()
+					<-stoppedChan
+				})
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				if tc.volumeName == volumetesting.TimeoutAndFailOnMountDeviceVolumeName {
 					// Wait upto 10s for reconciler to catch up
@@ -1866,8 +1877,19 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				}
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
 
-				// Start the reconciler to fill ASW.
-				runReconciler(ctx, reconciler)
+				// Start the reconciler to fill ASW, and stop it when the
+				// subtest returns, so the goroutine does not keep spinning
+				// at the 1ns loop interval and starve the other subtests.
+				runCtx, cancel := context.WithCancel(ctx)
+				stoppedChan := make(chan struct{})
+				go func() {
+					defer close(stoppedChan)
+					reconciler.Run(runCtx)
+				}()
+				t.Cleanup(func() {
+					cancel()
+					<-stoppedChan
+				})
 				waitForVolumeToExistInASW(t, volumeName, asw)
 				// all of these tests rely on device to be globally mounted and hence waiting for global
 				// mount ensures that unmountDevice is called as expected.
