@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -95,5 +97,50 @@ func Test_processEnvFileLine_readEnvironment(t *testing.T) {
 	}
 	if value != realValue {
 		t.Errorf(`expected value %q, received %q`, realValue, value)
+	}
+}
+
+// AddFromEnvFile must not report success when bufio.Scanner stops early: a line longer than the
+// 64KiB token limit otherwise silently truncates the ConfigMap or Secret and kubectl exits 0.
+func TestAddFromEnvFile_oversizedLineIsAnError(t *testing.T) {
+	const key = "KEY"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "big.env")
+	content := key + "=" + strings.Repeat("a", 70*1024) + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]string{}
+	err := AddFromEnvFile(path, func(k, v string) error {
+		got[k] = v
+		return nil
+	})
+	if err == nil {
+		t.Fatalf("expected an error for a value beyond the scanner token limit, got nil (collected %d keys)", len(got))
+	}
+	if _, ok := got[key]; ok {
+		t.Errorf("the truncated value must not be reported as a key/value pair")
+	}
+}
+
+// A file that stays within the token limit keeps working.
+func TestAddFromEnvFile_withinTokenLimit(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.env")
+	value := strings.Repeat("a", 60*1024)
+	if err := os.WriteFile(path, []byte("A=1\nB="+value+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]string{}
+	if err := AddFromEnvFile(path, func(k, v string) error {
+		got[k] = v
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got["A"] != "1" || got["B"] != value {
+		t.Errorf("unexpected values: A=%q len(B)=%d", got["A"], len(got["B"]))
 	}
 }
