@@ -251,6 +251,21 @@ type PodFailurePolicyRule struct {
 	// +listType=atomic
 	// +optional
 	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions,omitempty" protobuf:"bytes,3,opt,name=onPodConditions"`
+
+	// name of the pod failure policy rule. When a rule with the FailJob action
+	// fails the Job, its name is included in the Job failure condition message.
+	// The condition reason remains PodFailurePolicy. Unnamed rules are identified
+	// by their zero-based index in the message.
+	// The name must be a non-empty DNS label of at most 63 characters, containing
+	// only lowercase alphanumeric characters or hyphens, starting and ending with
+	// an alphanumeric character, and must be unique within the Job.
+	// This field is alpha-level and is only honored by servers that enable the
+	// PodFailurePolicyName feature gate.
+	// +featureGate=PodFailurePolicyName
+	// +optional
+	// +k8s:optional
+	// +k8s:format=k8s-short-name
+	Name *string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
 }
 
 // PodFailurePolicy describes how failed pods influence the backoffLimit.
@@ -262,6 +277,7 @@ type PodFailurePolicy struct {
 	// the backoffLimit. At most 20 elements are allowed.
 	// +listType=atomic
 	// +optional
+	// +k8s:optional
 	Rules []PodFailurePolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
 }
 
@@ -354,6 +370,7 @@ type JobSpec struct {
 	// with restartPolicy=OnFailure.
 	//
 	// +optional
+	// +k8s:optional
 	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty" protobuf:"bytes,11,opt,name=podFailurePolicy"`
 
 	// successPolicy specifies the policy when the Job can be declared as succeeded.

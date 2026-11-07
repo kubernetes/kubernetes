@@ -17372,6 +17372,13 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 							},
 						},
 					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name of the pod failure policy rule. When a rule with the FailJob action fails the Job, its name is included in the Job failure condition message. The condition reason remains PodFailurePolicy. Unnamed rules are identified by their zero-based index in the message. The name must be a non-empty DNS label of at most 63 characters, containing only lowercase alphanumeric characters or hyphens, starting and ending with an alphanumeric character, and must be unique within the Job. This field is alpha-level and is only honored by servers that enable the PodFailurePolicyName feature gate.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"action"},
 			},

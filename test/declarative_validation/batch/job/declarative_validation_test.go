@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -41,6 +42,104 @@ import (
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		testDeclarativeValidate(t, apiVersion)
+	}
+}
+
+func TestDeclarativeValidatePodFailurePolicyNames(t *testing.T) {
+	maxName := strings.Repeat("a", 63)
+	namePath := func(i int) *field.Path {
+		return field.NewPath("spec", "podFailurePolicy", "rules").Index(i).Child("name")
+	}
+	testCases := map[string]struct {
+		names        []*string
+		expectedErrs field.ErrorList
+	}{
+		"unnamed rules": {names: []*string{nil, nil}},
+		"DNS labels": {
+			names: []*string{new("oom-killed"), nil, new("out-of-quota")},
+		},
+		"own index":          {names: []*string{nil, new("1")}},
+		"out of range index": {names: []*string{new("5"), nil}},
+		"leading zero":       {names: []*string{nil, new("00")}},
+		"63 character name":  {names: []*string{new(maxName)}},
+		"empty": {
+			names:        []*string{new("")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"duplicate": {
+			names:        []*string{new("a"), nil, new("a")},
+			expectedErrs: field.ErrorList{field.Duplicate(namePath(2), "a").MarkFromImperative()},
+		},
+		"another rule index": {
+			names: []*string{nil, new("0")},
+		},
+		"64 character name": {
+			names:        []*string{new(maxName + "a")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"uppercase name": {
+			names:        []*string{new("OutOfQuota")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"dotted name": {
+			names:        []*string{new("out.of.quota")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"non-ASCII name": {
+			names: []*string{new("\u00e9")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name"),
+			},
+		},
+		"space": {
+			names:        []*string{new("bad name")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"trailing colon": {
+			names:        []*string{new("reason:")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"condition reason punctuation is not DNS syntax": {
+			names: []*string{new("x_1"), new("a,b")},
+			expectedErrs: field.ErrorList{
+				field.Invalid(namePath(0), nil, "").WithOrigin("format=k8s-short-name"),
+				field.Invalid(namePath(1), nil, "").WithOrigin("format=k8s-short-name"),
+			},
+		},
+	}
+	for _, apiVersion := range apiVersions {
+		for name, tc := range testCases {
+			for _, enabled := range []bool{false, true} {
+				t.Run(apiVersion+"/"+name+"/gate="+strconv.FormatBool(enabled), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodFailurePolicyName, enabled)
+					ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+						APIGroup: "batch", APIVersion: apiVersion, Resource: "jobs", IsResourceRequest: true, Verb: "create",
+					})
+					job := mkJob(tweakPodFailurePolicyRuleNames(tc.names...))
+					registry.Strategy.PrepareForCreate(ctx, &job)
+					var expectedErrs field.ErrorList
+					if enabled {
+						expectedErrs = tc.expectedErrs
+					}
+					apitesting.VerifyValidationEquivalence(t, ctx, &job, registry.Strategy, expectedErrs)
+				})
+			}
+		}
+	}
+}
+
+func tweakPodFailurePolicyRuleNames(names ...*string) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.PodFailurePolicy = &batch.PodFailurePolicy{}
+		for _, name := range names {
+			job.Spec.PodFailurePolicy.Rules = append(job.Spec.PodFailurePolicy.Rules, batch.PodFailurePolicyRule{
+				Name: name, Action: batch.PodFailurePolicyActionFailJob,
+				OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+					Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			})
+		}
 	}
 }
 

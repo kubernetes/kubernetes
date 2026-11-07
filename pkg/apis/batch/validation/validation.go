@@ -326,15 +326,24 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 	if len(spec.PodFailurePolicy.Rules) > maxPodFailurePolicyRules {
 		allErrs = append(allErrs, field.TooMany(rulesPath, len(spec.PodFailurePolicy.Rules), maxPodFailurePolicyRules))
 	}
-	containerNames := sets.NewString()
+	containerNames := sets.Set[string]{}
 	for _, containerSpec := range spec.Template.Spec.Containers {
 		containerNames.Insert(containerSpec.Name)
 	}
 	for _, containerSpec := range spec.Template.Spec.InitContainers {
 		containerNames.Insert(containerSpec.Name)
 	}
+
+	ruleNames := sets.Set[string]{}
 	for i, rule := range spec.PodFailurePolicy.Rules {
-		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), containerNames)...)
+		rulePath := rulesPath.Index(i)
+		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulePath, containerNames)...)
+		if rule.Name != nil {
+			if ruleNames.Has(*rule.Name) {
+				allErrs = append(allErrs, field.Duplicate(rulePath.Child("name"), *rule.Name))
+			}
+			ruleNames.Insert(*rule.Name)
+		}
 	}
 	return allErrs
 }
@@ -355,7 +364,7 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
@@ -400,7 +409,7 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 	return allErrs
 }
 
-func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {

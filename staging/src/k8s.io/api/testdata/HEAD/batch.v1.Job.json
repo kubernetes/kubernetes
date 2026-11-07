@@ -63,7 +63,8 @@
               "type": "typeValue",
               "status": "statusValue"
             }
-          ]
+          ],
+          "name": "nameValue"
         }
       ]
     },
