@@ -1371,6 +1371,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.36"
+- name: NodeSystemPartition
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: NominatedNodeNameForExpectation
   versionedSpecs:
   - default: false

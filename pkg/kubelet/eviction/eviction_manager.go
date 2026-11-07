@@ -386,10 +386,14 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 	if !foundAny {
 		return nil, nil
 	}
-	logger.Info("Eviction manager: attempting to reclaim", "resourceName", resourceToReclaim)
+	logger.Info("Eviction manager: attempting to reclaim", "resourceName", resourceToReclaim, "signal", thresholdToReclaim.Signal)
 
 	// record an event about the resources we are now attempting to reclaim via eviction
-	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
+	if thresholdToReclaim.Signal == evictionapi.SignalSystemPartitionMemoryAvailable {
+		m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s in the system partition", resourceToReclaim)
+	} else {
+		m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
+	}
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
 	if m.reclaimNodeLevelResources(ctx, thresholdToReclaim.Signal, resourceToReclaim) {
@@ -410,6 +414,22 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 	if len(activePods) == 0 {
 		logger.Error(nil, "Eviction manager: eviction thresholds have been met, but no pods are active to evict")
 		return nil, nil
+	}
+
+	// Pressure inside the system partition is relieved only by evicting the
+	// partition's own pods. Pods elsewhere do not charge its memory.
+	if thresholdToReclaim.Signal == evictionapi.SignalSystemPartitionMemoryAvailable {
+		var partitionPods []*v1.Pod
+		for _, pod := range activePods {
+			if m.config.SystemPartitionHasPod != nil && m.config.SystemPartitionHasPod(pod) {
+				partitionPods = append(partitionPods, pod)
+			}
+		}
+		activePods = partitionPods
+		if len(activePods) == 0 {
+			logger.Error(nil, "Eviction manager: system partition eviction thresholds have been met, but no pods in the partition are active to evict")
+			return nil, nil
+		}
 	}
 
 	// rank the running pods for eviction for the specified resource
@@ -436,7 +456,13 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 			}
 		}
 
-		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
+		var message string
+		var annotations map[string]string
+		if thresholdToReclaim.Signal == evictionapi.SignalSystemPartitionMemoryAvailable {
+			message, annotations = systemPartitionEvictionMessage(resourceToReclaim, pod, statsFunc, thresholdToReclaim, observations)
+		} else {
+			message, annotations = evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
+		}
 		condition := &v1.PodCondition{
 			Type:               v1.DisruptionTarget,
 			ObservedGeneration: pod.Generation,
