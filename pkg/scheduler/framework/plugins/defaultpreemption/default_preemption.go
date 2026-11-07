@@ -19,14 +19,17 @@ package defaultpreemption
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"slices"
 	"sort"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -38,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -46,7 +50,57 @@ const (
 
 	// reserveStateKey is the key in CycleState to DefaultPreemption data recorded in Reserve.
 	reserveStateKey = "Reserve" + Name
+
+	// AnnotationPodGroup is the standard annotation key for scheduler-plugins coscheduling.
+	AnnotationPodGroup = "pod-group.scheduling.sigs.k8s.io"
+	// LabelPodGroup is the standard label key for scheduler-plugins coscheduling.
+	LabelPodGroup = "pod-group.scheduling.sigs.k8s.io"
+	// AnnotationGangScheduling is the annotation key for gang-scheduling.
+	AnnotationGangScheduling = "gang.scheduling.sigs.k8s.io"
+	// AnnotationCustomPodGroup is the annotation key for extended pod groups.
+	AnnotationCustomPodGroup = "scheduling.x-k8s.io/pod-group"
+	// AnnotationGroupName is the annotation key for group scheduling.
+	AnnotationGroupName = "scheduling.k8s.io/group-name"
+	// LabelVolcanoJob is the label key for Volcano jobs.
+	LabelVolcanoJob = "volcano.sh/job-name"
+	// AnnotationVolcanoJob is the annotation key for Volcano jobs.
+	AnnotationVolcanoJob = "volcano.sh/job-name"
+	// LabelKubeflowJob is the label key for Kubeflow training jobs.
+	LabelKubeflowJob = "training.kubeflow.org/job-name"
+	// AnnotationKubeflowJob is the annotation key for Kubeflow training jobs.
+	AnnotationKubeflowJob = "training.kubeflow.org/job-name"
 )
+
+// GangMembershipFunc determines whether a pod belongs to a gang or co-scheduled workload.
+// It returns a gang identifier (such as "namespace/gang-name") and true if the pod is a gang member.
+type GangMembershipFunc func(pod *v1.Pod) (gangKey string, isGang bool)
+
+// DefaultGangMembership inspects standard gang and co-scheduling annotations, labels,
+// and scheduling group specifications to identify whether a pod belongs to an atomic gang workload.
+func DefaultGangMembership(pod *v1.Pod) (string, bool) {
+	if pod == nil {
+		return "", false
+	}
+	if pod.Spec.SchedulingGroup != nil && pod.Spec.SchedulingGroup.PodGroupName != nil && *pod.Spec.SchedulingGroup.PodGroupName != "" {
+		return fmt.Sprintf("%s/%s", pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName), true
+	}
+	for _, key := range []string{
+		AnnotationPodGroup,
+		AnnotationGangScheduling,
+		AnnotationCustomPodGroup,
+		AnnotationGroupName,
+		LabelKubeflowJob,
+		LabelVolcanoJob,
+	} {
+		if val, ok := pod.Annotations[key]; ok && val != "" {
+			return fmt.Sprintf("%s/%s", pod.Namespace, val), true
+		}
+		if val, ok := pod.Labels[key]; ok && val != "" {
+			return fmt.Sprintf("%s/%s", pod.Namespace, val), true
+		}
+	}
+	return "", false
+}
 
 // IsEligiblePodFunc is a function which may be assigned to the DefaultPreemption plugin.
 // This may implement rules/filtering around preemption eligibility, which is in addition to
@@ -89,6 +143,10 @@ type DefaultPreemption struct {
 	// priority than the preemptor pod. Any customizations should always allow system services
 	// to preempt normal pods, to avoid problems if system pods are unable to find space.
 	IsEligiblePod IsEligiblePodFunc
+
+	// GangMembership is used to identify whether a pod belongs to a gang or co-scheduled workload.
+	// By default, it checks standard gang/coscheduling annotations and labels.
+	GangMembership GangMembershipFunc
 
 	// MoreImportantVictim is used to sort eligible victims in-place in descending order of highest to
 	// lowest importance. Victims with higher importance are less likely to be preempted.
@@ -141,12 +199,15 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 		return true
 	}
 
+	pl.GangMembership = DefaultGangMembership
+
 	// Default behavior, defines the order for victims sorting. The order is:
 	// 1. Higher Priority.
-	// 2. Workload Type: CompositePodGroup > PodGroup > Individual Pod.
-	// 3. For individual Pods: Older StartTime (longer runtime).
-	// 4. For Group types: Larger Group Size, then Older StartTime.
-	pl.MoreImportantVictim = preemption.MoreImportantVictim
+	// 2. Workload Type: CompositePodGroup > PodGroup.
+	// 3. Gang Pod > Individual non-gang Pod.
+	// 4. For individual Pods: Older StartTime (longer runtime).
+	// 5. For Group types: Larger Group Size, then Older StartTime.
+	pl.MoreImportantVictim = pl.defaultMoreImportantVictim
 
 	return &pl, nil
 }
@@ -467,9 +528,224 @@ func (pl *DefaultPreemption) isPreemptionAllowed(nodeInfo fwk.NodeInfo, victim p
 	return victim.Priority() < corev1helpers.PodPriority(preemptor) && pl.IsEligiblePod(nodeInfo, victim, preemptor)
 }
 
+func preemptionVictimRank(vi preemption.Victim) int {
+	switch vi.Type() {
+	case fwk.CompositePodGroupKeyType:
+		return 3
+	case fwk.PodGroupKeyType:
+		return 2
+	default:
+		return 1
+	}
+}
+
+func (pl *DefaultPreemption) getGangKey(p *v1.Pod) (string, bool) {
+	if p == nil {
+		return "", false
+	}
+	if pl.GangMembership != nil {
+		return pl.GangMembership(p)
+	}
+	return DefaultGangMembership(p)
+}
+
+func (pl *DefaultPreemption) isVictimGang(vi preemption.Victim) bool {
+	if vi == nil {
+		return false
+	}
+	if vi.Type() == fwk.CompositePodGroupKeyType || vi.Type() == fwk.PodGroupKeyType {
+		return true
+	}
+	for _, pInfo := range vi.Pods() {
+		if pInfo != nil {
+			if _, isGang := pl.getGangKey(pInfo.GetPod()); isGang {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (pl *DefaultPreemption) defaultMoreImportantVictim(vi1, vi2 preemption.Victim) bool {
+	if vi1.Priority() != vi2.Priority() {
+		return vi1.Priority() > vi2.Priority()
+	}
+
+	rank1 := preemptionVictimRank(vi1)
+	rank2 := preemptionVictimRank(vi2)
+	if rank1 != rank2 {
+		return rank1 > rank2
+	}
+
+	isGang1 := pl.isVictimGang(vi1)
+	isGang2 := pl.isVictimGang(vi2)
+	if isGang1 != isGang2 {
+		return isGang1
+	}
+
+	return preemption.MoreImportantVictim(vi1, vi2)
+}
+
+func getMinAvailable(p *v1.Pod) int {
+	if p == nil {
+		return 0
+	}
+	for _, key := range []string{
+		"pod-group.scheduling.sigs.k8s.io/min-available",
+		"gang.scheduling.sigs.k8s.io/min-available",
+		"volcano.sh/min-available",
+	} {
+		if val, ok := p.Annotations[key]; ok && val != "" {
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				return n
+			}
+		}
+	}
+	return 0
+}
+
+func (pl *DefaultPreemption) countPartialGangVictims(victims *extenderv1.Victims, gangClusterCounts map[string]int) int {
+	if victims == nil || len(victims.Pods) == 0 {
+		return 0
+	}
+	victimsOnNodeGangCounts := make(map[string]int)
+	for _, p := range victims.Pods {
+		if key, isGang := pl.getGangKey(p); isGang {
+			victimsOnNodeGangCounts[key]++
+		}
+	}
+	partialCount := 0
+	for _, p := range victims.Pods {
+		if key, isGang := pl.getGangKey(p); isGang {
+			totalClusterCount := gangClusterCounts[key]
+			nodeVictimCount := victimsOnNodeGangCounts[key]
+			minAvailable := getMinAvailable(p)
+			if minAvailable > totalClusterCount {
+				totalClusterCount = minAvailable
+			}
+			if totalClusterCount > nodeVictimCount {
+				partialCount++
+			}
+		}
+	}
+	return partialCount
+}
+
+func (pl *DefaultPreemption) countGangVictims(victims *extenderv1.Victims) int {
+	if victims == nil || len(victims.Pods) == 0 {
+		return 0
+	}
+	count := 0
+	for _, p := range victims.Pods {
+		if _, isGang := pl.getGangKey(p); isGang {
+			count++
+		}
+	}
+	return count
+}
+
 // OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
+// It prioritizes nodes that do not cause partial gang preemption deadlocks, followed by general disruption and priority criteria.
 func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
-	return nil
+	logger := klog.FromContext(ctx)
+
+	gangClusterCounts := make(map[string]int)
+	if pl.fh != nil && pl.fh.MutableSnapshotSharedLister() != nil && pl.fh.MutableSnapshotSharedLister().NodeInfos() != nil {
+		if nodeInfos, err := pl.fh.MutableSnapshotSharedLister().NodeInfos().List(); err == nil {
+			for _, nodeInfo := range nodeInfos {
+				for _, podInfo := range nodeInfo.GetPods() {
+					if key, isGang := pl.getGangKey(podInfo.GetPod()); isGang {
+						gangClusterCounts[key]++
+					}
+				}
+			}
+		}
+	}
+	for _, victims := range nodesToVictims {
+		if victims == nil {
+			continue
+		}
+		for _, p := range victims.Pods {
+			if key, isGang := pl.getGangKey(p); isGang {
+				if gangClusterCounts[key] == 0 {
+					gangClusterCounts[key] = 1
+				}
+			}
+		}
+	}
+
+	minNumPDBViolatingScoreFunc := func(node string) int64 {
+		if victims := nodesToVictims[node]; victims != nil {
+			return -victims.NumPDBViolations
+		}
+		return 0
+	}
+
+	minPartialGangVictimsScoreFunc := func(node string) int64 {
+		if victims := nodesToVictims[node]; victims != nil {
+			return -int64(pl.countPartialGangVictims(victims, gangClusterCounts))
+		}
+		return 0
+	}
+
+	minGangVictimsScoreFunc := func(node string) int64 {
+		if victims := nodesToVictims[node]; victims != nil {
+			return -int64(pl.countGangVictims(victims))
+		}
+		return 0
+	}
+
+	minHighestPriorityScoreFunc := func(node string) int64 {
+		victims := nodesToVictims[node]
+		if victims == nil || len(victims.Pods) == 0 {
+			return 0
+		}
+		highestPodPriority := corev1helpers.PodPriority(victims.Pods[0])
+		return -int64(highestPodPriority)
+	}
+
+	minSumPrioritiesScoreFunc := func(node string) int64 {
+		victims := nodesToVictims[node]
+		if victims == nil {
+			return 0
+		}
+		var sumPriorities int64
+		for _, pod := range victims.Pods {
+			sumPriorities += int64(corev1helpers.PodPriority(pod)) + int64(math.MaxInt32+1)
+		}
+		return -sumPriorities
+	}
+
+	minNumPodsScoreFunc := func(node string) int64 {
+		victims := nodesToVictims[node]
+		if victims == nil {
+			return 0
+		}
+		return -int64(len(victims.Pods))
+	}
+
+	latestStartTimeScoreFunc := func(node string) int64 {
+		victims := nodesToVictims[node]
+		if victims == nil {
+			return 0
+		}
+		earliestStartTimeOnNode := util.GetEarliestPodStartTime(victims)
+		if earliestStartTimeOnNode == nil {
+			utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected nil earliestStartTime for node", "node", node)
+			return int64(math.MinInt64)
+		}
+		return earliestStartTimeOnNode.UnixNano()
+	}
+
+	return []func(string) int64{
+		minNumPDBViolatingScoreFunc,
+		minPartialGangVictimsScoreFunc,
+		minGangVictimsScoreFunc,
+		minHighestPriorityScoreFunc,
+		minSumPrioritiesScoreFunc,
+		minNumPodsScoreFunc,
+		latestStartTimeScoreFunc,
+	}
 }
 
 // isPreemptionAllowedAcrossAllVictimNodes returns whether the victim can be preempted on all its affected nodes.

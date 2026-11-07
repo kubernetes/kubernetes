@@ -5057,3 +5057,314 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes_CustomPreemptionManager(t
 		}
 	})
 }
+
+func TestDefaultGangMembership(t *testing.T) {
+	tests := []struct {
+		name       string
+		pod        *v1.Pod
+		wantGang   string
+		wantIsGang bool
+	}{
+		{
+			name: "pod-group annotation",
+			pod: st.MakePod().Namespace("ns1").Name("p1").
+				Annotation(AnnotationPodGroup, "gang-a").Obj(),
+			wantGang:   "ns1/gang-a",
+			wantIsGang: true,
+		},
+		{
+			name: "gang-scheduling annotation",
+			pod: st.MakePod().Namespace("ns2").Name("p2").
+				Annotation(AnnotationGangScheduling, "gang-b").Obj(),
+			wantGang:   "ns2/gang-b",
+			wantIsGang: true,
+		},
+		{
+			name: "custom pod-group annotation",
+			pod: st.MakePod().Namespace("ns3").Name("p3").
+				Annotation(AnnotationCustomPodGroup, "gang-c").Obj(),
+			wantGang:   "ns3/gang-c",
+			wantIsGang: true,
+		},
+		{
+			name: "group-name annotation",
+			pod: st.MakePod().Namespace("ns4").Name("p4").
+				Annotation(AnnotationGroupName, "gang-d").Obj(),
+			wantGang:   "ns4/gang-d",
+			wantIsGang: true,
+		},
+		{
+			name: "kubeflow training job label",
+			pod: st.MakePod().Namespace("kubeflow").Name("pytorch-worker-0").
+				Label(LabelKubeflowJob, "pytorch-dist").Obj(),
+			wantGang:   "kubeflow/pytorch-dist",
+			wantIsGang: true,
+		},
+		{
+			name: "volcano job label",
+			pod: st.MakePod().Namespace("volcano").Name("vcjob-worker-1").
+				Label(LabelVolcanoJob, "volcano-batch").Obj(),
+			wantGang:   "volcano/volcano-batch",
+			wantIsGang: true,
+		},
+		{
+			name: "scheduling group spec",
+			pod: func() *v1.Pod {
+				pgName := "sched-group-1"
+				p := st.MakePod().Namespace("ns5").Name("p5").Obj()
+				p.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+					PodGroupName: &pgName,
+				}
+				return p
+			}(),
+			wantGang:   "ns5/sched-group-1",
+			wantIsGang: true,
+		},
+		{
+			name:       "standalone pod without gang annotations",
+			pod:        st.MakePod().Namespace("ns").Name("p-normal").Obj(),
+			wantGang:   "",
+			wantIsGang: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotGang, gotIsGang := DefaultGangMembership(tt.pod)
+			if gotIsGang != tt.wantIsGang || gotGang != tt.wantGang {
+				t.Errorf("DefaultGangMembership() = (%q, %v), want (%q, %v)", gotGang, gotIsGang, tt.wantGang, tt.wantIsGang)
+			}
+		})
+	}
+}
+
+func TestSelectBestCandidate_GangAwareness(t *testing.T) {
+	tests := []struct {
+		name           string
+		registerPlugin tf.RegisterPluginFunc
+		nodeNames      []string
+		pod            *v1.Pod
+		pods           []*v1.Pod
+		customGangFunc GangMembershipFunc
+		expected       []string
+	}{
+		{
+			name:           "prefer standalone victim node over partial gang member victim node",
+			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			nodeNames:      []string{"node1", "node2"},
+			pod:            st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				// node1 has a worker of a 2-pod gang with min-available=2, so evicting it causes partial gang disruption
+				st.MakePod().Name("gang-worker-1").UID("gw1").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).
+					Annotation(AnnotationPodGroup, "distributed-job").
+					Annotation("pod-group.scheduling.sigs.k8s.io/min-available", "2").Obj(),
+				// node2 has a standalone pod with identical priority and resources
+				st.MakePod().Name("standalone-pod").UID("sa1").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: []string{"node2"},
+		},
+		{
+			name:           "prefer standalone victim node over Kubeflow gang member victim node spanning multiple nodes",
+			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			nodeNames:      []string{"node1", "node2", "node3"},
+			pod:            st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				// node1 has pytorch-worker-0
+				st.MakePod().Name("pytorch-worker-0").UID("pw0").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).
+					Label(LabelKubeflowJob, "pytorch-dist-job").Obj(),
+				// node3 has pytorch-worker-1 (so pytorch-dist-job total size is 2 in cluster)
+				st.MakePod().Name("pytorch-worker-1").UID("pw1").Node("node3").Priority(midPriority).Req(largeRes).StartTime(epochTime).
+					Label(LabelKubeflowJob, "pytorch-dist-job").Obj(),
+				// node2 has standalone pod
+				st.MakePod().Name("standalone-pod").UID("sa1").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: []string{"node2"},
+		},
+		{
+			name:           "prefer full gang eviction over partial gang eviction to prevent deadlock",
+			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			nodeNames:      []string{"node1", "node2", "node3"},
+			pod:            st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).Req(veryLargeRes).Obj(),
+			pods: []*v1.Pod{
+				// node1 has 1 worker of a 2-pod gang (the other worker is on node3) -> partial eviction!
+				st.MakePod().Name("gangA-worker-0").UID("ga0").Node("node1").Priority(midPriority).Req(veryLargeRes).StartTime(epochTime).
+					Annotation(AnnotationPodGroup, "gang-A").
+					Annotation("pod-group.scheduling.sigs.k8s.io/min-available", "2").Obj(),
+				st.MakePod().Name("gangA-worker-1").UID("ga1").Node("node3").Priority(midPriority).Req(veryLargeRes).StartTime(epochTime).
+					Annotation(AnnotationPodGroup, "gang-A").
+					Annotation("pod-group.scheduling.sigs.k8s.io/min-available", "2").Obj(),
+				// node2 has ALL workers of gang-B (both workers on node2) -> full eviction of gang-B, no orphan sibling on other nodes!
+				st.MakePod().Name("gangB-worker-0").UID("gb0").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).
+					Annotation(AnnotationPodGroup, "gang-B").Obj(),
+				st.MakePod().Name("gangB-worker-1").UID("gb1").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).
+					Annotation(AnnotationPodGroup, "gang-B").Obj(),
+			},
+			expected: []string{"node2"},
+		},
+		{
+			name:           "custom GangMembership function correctly guides candidate node selection",
+			registerPlugin: tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			nodeNames:      []string{"node1", "node2"},
+			pod:            st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("custom-gang-pod").UID("cgp").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).
+					Label("custom.scheduler.gang", "my-gang").Obj(),
+				st.MakePod().Name("plain-pod").UID("pp").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			customGangFunc: func(p *v1.Pod) (string, bool) {
+				if val, ok := p.Labels["custom.scheduler.gang"]; ok && val != "" {
+					return "default/" + val, true
+				}
+				return "", false
+			},
+			expected: []string{"node2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			nodes := make([]*v1.Node, len(tt.nodeNames))
+			for i, nodeName := range tt.nodeNames {
+				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
+			}
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
+			var objs []runtime.Object
+			objs = append(objs, tt.pod)
+			for _, pod := range tt.pods {
+				objs = append(objs, pod)
+			}
+			cs := clientsetfake.NewClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			logger := klog.FromContext(ctx)
+			fwk, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tt.registerPlugin,
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"",
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
+				frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+					return preemption.NewPreemptionManager(fh, feature.Features{})
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodeInfos, err := fwk.SnapshotSharedLister().NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			state := framework.NewCycleState()
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
+			}
+
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.customGangFunc != nil {
+				pl.GangMembership = tt.customGangFunc
+			}
+			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
+			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			s := pl.Evaluator.SelectCandidate(ctx, candidates)
+			if s == nil || len(s.Name()) == 0 {
+				t.Fatalf("expected any node in %v, but candidate is missing", tt.expected)
+			}
+			found := false
+			for _, nodeName := range tt.expected {
+				if nodeName == s.Name() {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expect any node in %v, but got %v", tt.expected, s.Name())
+			}
+		})
+	}
+}
+
+func TestSelectVictimsOnNode_GangAwareness(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	node := st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+		v1.ResourceCPU: "2",
+	}).Obj()
+
+	gangPod := st.MakePod().Name("pod-gang").UID("pod-gang").Node("node1").Priority(midPriority).
+		Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).StartTime(epochTime).
+		Annotation(AnnotationPodGroup, "gang-job-1").Obj()
+	standalonePod := st.MakePod().Name("pod-standalone").UID("pod-standalone").Node("node1").Priority(midPriority).
+		Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).StartTime(epochTime).Obj()
+
+	preemptor := st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).
+		Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+
+	snapshot := internalcache.NewSnapshot([]*v1.Pod{gangPod, standalonePod}, []*v1.Node{node})
+	cs := clientsetfake.NewClientset(preemptor, gangPod, standalonePod)
+	informerFactory := informers.NewSharedInformerFactory(cs, 0)
+	logger := klog.FromContext(ctx)
+	fwk, err := tf.NewFramework(
+		ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		"",
+		frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, feature.Features{})
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nodeInfo, err := fwk.SnapshotSharedLister().NodeInfos().Get("node1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := framework.NewCycleState()
+	if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, preemptor); !status.IsSuccess() {
+		t.Fatalf("Unexpected PreFilter Status: %v", status)
+	}
+
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	victims, err := pl.Evaluator.GetVictimsOnNode(ctx, nodeInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	victimPods, numViolations, status := pl.SelectVictimsOnNode(ctx, state.Clone(), preemptor, nodeInfo.Snapshot(), victims, nil)
+	if !status.IsSuccess() {
+		t.Fatalf("SelectVictimsOnNode failed: %v", status)
+	}
+	if numViolations != 0 {
+		t.Errorf("Expected 0 PDB violations, got %d", numViolations)
+	}
+	if len(victimPods) != 1 {
+		t.Fatalf("Expected 1 victim pod, got %d", len(victimPods))
+	}
+	if victimPods[0].Name != "pod-standalone" {
+		t.Errorf("Expected victim to be pod-standalone (sparing gang pod), got %s", victimPods[0].Name)
+	}
+}
