@@ -3107,24 +3107,20 @@ func testWatchResync(ctx context.Context, t *testing.T, store storage.Interface,
 		}()
 	}
 	time.Sleep(100 * time.Millisecond)
-	if resync != nil {
-		resync()
-	}
-	if stall {
-		<-otherWatchOpened
-		require.NoError(t, otherWatchErr)
-		defer otherWatch.Stop()
-	}
 
 	createPods([]*example.Pod{pod2})
 	if compactBeforeResync != nil {
 		compact(ctx, t, compactBeforeResync.ResourceVersion)
+		*expiredCacherError.Object.(*metav1.Status) = errors.NewResourceExpired(fmt.Sprintf("too old resource version: %s (%s)", pod1.ResourceVersion, compactBeforeResync.ResourceVersion)).ErrStatus
 	}
 	if resync != nil {
 		resync()
 	}
 
 	if stall {
+		<-otherWatchOpened
+		require.NoError(t, otherWatchErr)
+		defer otherWatch.Stop()
 		createPods(stallPods)
 		otherNsPod.Namespace = otherNs
 		otherNsPod.ResourceVersion = ""
