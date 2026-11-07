@@ -317,18 +317,23 @@ func exceedsAllowed(limit, request, ratio resource.Quantity) bool {
 	return limit.Cmp(*allowed) > 0
 }
 
-// minConstraint enforces the min constraint over the specified resource
-func minConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+// minConstraint enforces the min constraint over the specified resource. It
+// reads both the request and the limit, so a caller ratcheting a stored value
+// passes skipRequest/skipLimit independently: each guards only the check that
+// reads that side, since the other side may have changed and still needs it.
+func minConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList, skipRequest, skipLimit bool) error {
 	req, reqExists := request[api.ResourceName(resourceName)]
 	lim, limExists := limit[api.ResourceName(resourceName)]
 
-	if !reqExists {
-		return fmt.Errorf("minimum %s usage per %s is %s.  No request is specified", resourceName, limitType, enforced.String())
+	if !skipRequest {
+		if !reqExists {
+			return fmt.Errorf("minimum %s usage per %s is %s.  No request is specified", resourceName, limitType, enforced.String())
+		}
+		if enforced.Cmp(req) > 0 {
+			return fmt.Errorf("minimum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
+		}
 	}
-	if enforced.Cmp(req) > 0 {
-		return fmt.Errorf("minimum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
-	}
-	if limExists && enforced.Cmp(lim) > 0 {
+	if !skipLimit && limExists && enforced.Cmp(lim) > 0 {
 		return fmt.Errorf("minimum %s usage per %s is %s, but limit is %s", resourceName, limitType, enforced.String(), lim.String())
 	}
 	return nil
@@ -348,18 +353,23 @@ func maxRequestConstraint(limitType string, resourceName string, enforced resour
 	return nil
 }
 
-// maxConstraint enforces the max constraint over the specified resource
-func maxConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+// maxConstraint enforces the max constraint over the specified resource. It
+// reads both the limit and the request, so a caller ratcheting a stored value
+// passes skipRequest/skipLimit independently: each guards only the check that
+// reads that side, since the other side may have changed and still needs it.
+func maxConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList, skipRequest, skipLimit bool) error {
 	req, reqExists := request[api.ResourceName(resourceName)]
 	lim, limExists := limit[api.ResourceName(resourceName)]
 
-	if !limExists {
-		return fmt.Errorf("maximum %s usage per %s is %s.  No limit is specified", resourceName, limitType, enforced.String())
+	if !skipLimit {
+		if !limExists {
+			return fmt.Errorf("maximum %s usage per %s is %s.  No limit is specified", resourceName, limitType, enforced.String())
+		}
+		if lim.Cmp(enforced) > 0 {
+			return fmt.Errorf("maximum %s usage per %s is %s, but limit is %s", resourceName, limitType, enforced.String(), lim.String())
+		}
 	}
-	if lim.Cmp(enforced) > 0 {
-		return fmt.Errorf("maximum %s usage per %s is %s, but limit is %s", resourceName, limitType, enforced.String(), lim.String())
-	}
-	if reqExists && req.Cmp(enforced) > 0 {
+	if !skipRequest && reqExists && req.Cmp(enforced) > 0 {
 		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
@@ -469,8 +479,9 @@ func PersistentVolumeClaimValidateLimitFunc(limitRange *corev1.LimitRange, pvc, 
 				if unchangedRequest(api.ResourceName(k), requests, oldRequests) {
 					continue
 				}
-				// normal usage of minConstraint. pvc.Spec.Resources.Limits is not recognized as user input
-				if err := minConstraint(string(limitType), string(k), v, requests, api.ResourceList{}); err != nil {
+				// normal usage of minConstraint. pvc.Spec.Resources.Limits is not recognized as user input,
+				// and the request-unchanged skip above already decided whether to check it at all.
+				if err := minConstraint(string(limitType), string(k), v, requests, api.ResourceList{}, false, false); err != nil {
 					errs = append(errs, err)
 				}
 			}
@@ -544,27 +555,24 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod, oldPod *api.Pod) e
 			}
 			podRequests := podRequests(pod, opts)
 			podLimits := podLimits(pod, opts)
-			unchanged := func(resourceName corev1.ResourceName) bool {
-				return oldPod != nil && resourceUnchanged(api.ResourceName(resourceName), podRequests, oldPodRequests, podLimits, oldPodLimits)
+			requestUnchanged := func(resourceName corev1.ResourceName) bool {
+				return oldPod != nil && sameQuantity(api.ResourceName(resourceName), podRequests, oldPodRequests)
+			}
+			limitUnchanged := func(resourceName corev1.ResourceName) bool {
+				return oldPod != nil && sameQuantity(api.ResourceName(resourceName), podLimits, oldPodLimits)
 			}
 			for k, v := range limit.Min {
-				if unchanged(k) {
-					continue
-				}
-				if err := minConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
+				if err := minConstraint(string(limitType), string(k), v, podRequests, podLimits, requestUnchanged(k), limitUnchanged(k)); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.Max {
-				if unchanged(k) {
-					continue
-				}
-				if err := maxConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
+				if err := maxConstraint(string(limitType), string(k), v, podRequests, podLimits, requestUnchanged(k), limitUnchanged(k)); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.MaxLimitRequestRatio {
-				if unchanged(k) {
+				if requestUnchanged(k) && limitUnchanged(k) {
 					continue
 				}
 				if err := limitRequestRatioConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
@@ -577,36 +585,38 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod, oldPod *api.Pod) e
 }
 
 // validateContainerLimits enforces the min, max and limit-to-request ratio of a
-// container-type LimitRangeItem on every container in containers. A value is
-// skipped when the container of the same name in oldContainers holds the same
-// request and limit for that resource; oldContainers is nil on create.
+// container-type LimitRangeItem on every container in containers. The request
+// and the limit ratchet independently against the container of the same name
+// in oldContainers: min and max each read one side of a resource unconditionally
+// and the other only if it exists, so skipping both together would let a
+// changed request escape the max-on-limit check (or a changed limit escape the
+// min-on-request check) just because its own side happened to be unchanged.
+// The ratio does read both sides to compute a single value, so it only skips
+// when neither moved. oldContainers is nil on create.
 func validateContainerLimits(limit corev1.LimitRangeItem, containers, oldContainers []api.Container) []error {
 	var errs []error
 	limitType := string(limit.Type)
 	for i := range containers {
 		container := &containers[i]
 		oldContainer := containerByName(oldContainers, container.Name)
-		unchanged := func(resourceName corev1.ResourceName) bool {
-			return oldContainer != nil && resourceUnchanged(api.ResourceName(resourceName), container.Resources.Requests, oldContainer.Resources.Requests, container.Resources.Limits, oldContainer.Resources.Limits)
+		requestUnchanged := func(resourceName corev1.ResourceName) bool {
+			return oldContainer != nil && sameQuantity(api.ResourceName(resourceName), container.Resources.Requests, oldContainer.Resources.Requests)
+		}
+		limitUnchanged := func(resourceName corev1.ResourceName) bool {
+			return oldContainer != nil && sameQuantity(api.ResourceName(resourceName), container.Resources.Limits, oldContainer.Resources.Limits)
 		}
 		for k, v := range limit.Min {
-			if unchanged(k) {
-				continue
-			}
-			if err := minConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+			if err := minConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits, requestUnchanged(k), limitUnchanged(k)); err != nil {
 				errs = append(errs, err)
 			}
 		}
 		for k, v := range limit.Max {
-			if unchanged(k) {
-				continue
-			}
-			if err := maxConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+			if err := maxConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits, requestUnchanged(k), limitUnchanged(k)); err != nil {
 				errs = append(errs, err)
 			}
 		}
 		for k, v := range limit.MaxLimitRequestRatio {
-			if unchanged(k) {
+			if requestUnchanged(k) && limitUnchanged(k) {
 				continue
 			}
 			if err := limitRequestRatioConstraint(limitType, string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
@@ -625,14 +635,6 @@ func containerByName(containers []api.Container, name string) *api.Container {
 		}
 	}
 	return nil
-}
-
-// resourceUnchanged reports whether both the request and the limit for
-// resourceName are the same in the new and the old resource lists. Each of the
-// min, max and ratio constraints reads both the request and the limit, so a
-// value only counts as unchanged when neither moved.
-func resourceUnchanged(resourceName api.ResourceName, requests, oldRequests, limits, oldLimits api.ResourceList) bool {
-	return sameQuantity(resourceName, requests, oldRequests) && sameQuantity(resourceName, limits, oldLimits)
 }
 
 // sameQuantity reports whether resourceName is either absent from both lists or
