@@ -3016,23 +3016,12 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 		}
 
 		recordResizeOperations(oldPod, pod)
-		_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
-		if updatedFromAllocation {
-			if !kl.IsPodTerminatingOrTerminal(pod) {
-				kl.allocationManager.PushPendingAllocation(logger, pod.UID)
-			}
-			// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
-			// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
-			kl.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonPodUpdated)
-		} else {
-			// We can hit this case if a pending resize has been reverted,
-			// so we need to clear the pending resize condition.
-			kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
-		}
-
+		allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && oldPod != nil {
-			oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec, Status: &oldPod.Status}
-			newPodInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
+			// Check only passthrough fields here; gated fields are checked in declaredFeaturesAdmitHandler.
+			oldAllocated, _ := kl.allocationManager.UpdatePodFromAllocation(oldPod)
+			oldPodInfo := &ndf.PodInfo{Spec: &oldAllocated.Spec, Status: &oldAllocated.Status}
+			newPodInfo := &ndf.PodInfo{Spec: &allocatedPod.Spec, Status: &allocatedPod.Status}
 			reqs, err := kl.nodeDeclaredFeaturesFramework.InferForPodUpdate(oldPodInfo, newPodInfo, kl.version)
 			if err != nil {
 				logger.Error(err, "Failed to infer required features for pod update", "pod", klog.KObj(pod))
@@ -3049,6 +3038,19 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedNodeDeclaredFeaturesCheck, "Pod requires node features that are not available: %s", missingNodeDeclaredFeatures)
 				}
 			}
+		}
+
+		if updatedFromAllocation {
+			if !kl.IsPodTerminatingOrTerminal(pod) {
+				kl.allocationManager.PushPendingAllocation(logger, pod.UID)
+			}
+			// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
+			// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
+			kl.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonPodUpdated)
+		} else {
+			// We can hit this case if a pending resize has been reverted,
+			// so we need to clear the pending resize condition.
+			kl.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 		}
 
 		kl.podWorkers.UpdatePod(ctx, UpdatePodOptions{

@@ -255,9 +255,22 @@ func NewDeclaredFeaturesAdmitHandler(nodeDeclaredFeaturesHelper *ndf.Framework, 
 // Admit checks if a pod's feature requirements are met by the node.
 func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	pod := attrs.Pod
-
 	podInfo := &ndf.PodInfo{Spec: &pod.Spec, Status: &pod.Status}
-	reqs, err := c.ndfFramework.InferForPodScheduling(podInfo, c.version)
+
+	var (
+		reqs ndf.FeatureSet
+		err  error
+	)
+	if attrs.Operation == UpdateOperation {
+		// AllocatedPod carries the desired pod's passthrough fields (e.g. ephemeral containers), so
+		// only changes to fields gated on allocation are checked here. Passthrough fields take
+		// effect without allocation, so they aren't rejected in admission.
+		allocatedPod := attrs.Update.AllocatedPod
+		oldPodInfo := &ndf.PodInfo{Spec: &allocatedPod.Spec, Status: &allocatedPod.Status}
+		reqs, err = c.ndfFramework.InferForPodUpdate(oldPodInfo, podInfo, c.version)
+	} else {
+		reqs, err = c.ndfFramework.InferForPodScheduling(podInfo, c.version)
+	}
 	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,
