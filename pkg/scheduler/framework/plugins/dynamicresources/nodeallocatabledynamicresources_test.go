@@ -18,6 +18,7 @@ package dynamicresources
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -1700,109 +1701,135 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 	}
 }
 
-func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
+func TestPatchPodStatus(t *testing.T) {
 	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
+	cpu := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}
+	memory := v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")}
+	cpuAndMemory := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
+	extendedClaim := &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "real-claim-name"}}
+	extendedStatus := &v1.PodExtendedResourceClaimStatus{
+		RequestMappings: []v1.ContainerExtendedResourceRequest{
+			{ContainerName: "c1", ResourceName: "example.com/gpu", RequestName: "container-0-request-0"},
+		},
+		ResourceClaimName: "real-claim-name",
+	}
+	ownEntries := []v1.ExtraNodeAllocatableResource{
+		{ContainerName: "", Requests: cpu, Limits: cpu},
+		{ContainerName: "c1", Limits: cpu},
+	}
+	otherEntries := []v1.ExtraNodeAllocatableResource{
+		{ContainerName: "", Requests: memory, Limits: memory},
+		{ContainerName: "c2", Limits: memory},
+	}
+	// What Get returns for both plugins: DynamicResources sorts before OtherPlugin.
+	allEntries := []v1.ExtraNodeAllocatableResource{
+		{ContainerName: "", Requests: cpuAndMemory, Limits: cpuAndMemory},
+		{ContainerName: "c1", Limits: cpu},
+		{ContainerName: "c2", Limits: memory},
+	}
 
 	tests := []struct {
-		name                                  string
-		assumedPodStatus                      v1.PodStatus
-		finalPodExtraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
-		wantPatch                             bool
-		setPatchError                         error
-		wantStatus                            *fwk.Status
+		name                               string
+		assumedPodStatus                   v1.PodStatus
+		finalExtraNodeAllocatableResources []v1.ExtraNodeAllocatableResource
+		extendedClaim                      *resourceapi.ResourceClaim
+		extendedClaimStatus                *v1.PodExtendedResourceClaimStatus
+		otherPluginEntries                 []v1.ExtraNodeAllocatableResource
+		otherPluginPersisted               bool
+		wantPatch                          bool
+		wantPatchedEntries                 []v1.ExtraNodeAllocatableResource
+		wantExtendedStatusInPatch          bool
+		wantPersisted                      []v1.ExtraNodeAllocatableResource
+		setPatchError                      error
+		wantStatus                         *fwk.Status
 	}{
 		{
-			name:       "no node allocatable resource claims for this pod",
+			name:       "no node allocatable or extended resource claims for this pod",
 			wantPatch:  false,
 			wantStatus: nil,
 		},
 		{
-			name: "assumed pod status same as new status",
-			assumedPodStatus: v1.PodStatus{
-				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
-					{
-						ContainerName: "",
-						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-					{
-						ContainerName: "c1",
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-				},
-			},
-			finalPodExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
-				{
-					ContainerName: "",
-					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-				},
-				{
-					ContainerName: "c1",
-					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-				},
-			},
-			wantPatch:  true,
-			wantStatus: nil,
+			name:                      "extended resource claim status only",
+			extendedClaim:             extendedClaim,
+			extendedClaimStatus:       extendedStatus,
+			wantPatch:                 true,
+			wantExtendedStatusInPatch: true,
+			wantStatus:                nil,
 		},
 		{
-			name: "assumed pod status different from new status",
-			assumedPodStatus: v1.PodStatus{
-				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
-					{
-						ContainerName: "",
-						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-					{
-						ContainerName: "c1",
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-				},
-			},
-			finalPodExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
-				{
-					ContainerName: "",
-					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
-					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
-				},
-				{
-					ContainerName: "c1",
-					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
-				},
+			name:                               "assumed pod status same as new status",
+			assumedPodStatus:                   v1.PodStatus{ExtraNodeAllocatableResources: ownEntries},
+			finalExtraNodeAllocatableResources: ownEntries,
+			wantPatch:                          true,
+			wantPatchedEntries:                 ownEntries,
+			wantPersisted:                      ownEntries,
+			wantStatus:                         nil,
+		},
+		{
+			name:             "assumed pod status different from new status",
+			assumedPodStatus: v1.PodStatus{ExtraNodeAllocatableResources: ownEntries},
+			finalExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{ContainerName: "", Requests: cpuAndMemory, Limits: cpuAndMemory},
+				{ContainerName: "c1", Limits: cpuAndMemory},
 			},
 			wantPatch:  false,
 			wantStatus: statusError(klog.TODO(), errors.New("assumed pod status does not match calculated status to be patched")),
 		},
 		{
-			name: "pod status patch error",
-			assumedPodStatus: v1.PodStatus{
-				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
-					{
-						ContainerName: "",
-						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-					{
-						ContainerName: "c1",
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-				},
+			name:                               "pod status patch error",
+			assumedPodStatus:                   v1.PodStatus{ExtraNodeAllocatableResources: ownEntries},
+			finalExtraNodeAllocatableResources: ownEntries,
+			wantPatch:                          true,
+			setPatchError:                      errors.New("inject patch error"),
+			wantStatus:                         statusError(klog.TODO(), fmt.Errorf("updating pod test-ns/test-pod status: %w", errors.New("inject patch error"))),
+		},
+		{
+			name:                               "extra node allocatable resources and extended resource claim status in a single patch",
+			assumedPodStatus:                   v1.PodStatus{ExtraNodeAllocatableResources: ownEntries},
+			finalExtraNodeAllocatableResources: ownEntries,
+			extendedClaim:                      extendedClaim,
+			extendedClaimStatus:                extendedStatus,
+			wantPatch:                          true,
+			wantPatchedEntries:                 ownEntries,
+			wantExtendedStatusInPatch:          true,
+			wantPersisted:                      ownEntries,
+			wantStatus:                         nil,
+		},
+		{
+			name:             "mismatch still fails when an extended resource claim exists",
+			assumedPodStatus: v1.PodStatus{ExtraNodeAllocatableResources: ownEntries},
+			finalExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{ContainerName: "", Requests: cpuAndMemory, Limits: cpuAndMemory},
+				{ContainerName: "c1", Limits: cpuAndMemory},
 			},
-			finalPodExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
-				{
-					ContainerName: "",
-					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-				},
-				{
-					ContainerName: "c1",
-					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-				},
+			extendedClaim:       extendedClaim,
+			extendedClaimStatus: extendedStatus,
+			wantPatch:           false,
+			wantStatus:          statusError(klog.TODO(), errors.New("assumed pod status does not match calculated status to be patched")),
+		},
+		{
+			name:                               "entries that another plugin persisted are kept",
+			assumedPodStatus:                   v1.PodStatus{ExtraNodeAllocatableResources: allEntries},
+			finalExtraNodeAllocatableResources: ownEntries,
+			otherPluginEntries:                 otherEntries,
+			otherPluginPersisted:               true,
+			wantPatch:                          true,
+			// The pod level entries of both plugins are added up.
+			wantPatchedEntries: []v1.ExtraNodeAllocatableResource{
+				{ContainerName: "", Requests: cpuAndMemory, Limits: cpuAndMemory},
+				{ContainerName: "c2", Limits: memory},
+				{ContainerName: "c1", Limits: cpu},
 			},
-			wantPatch:     true,
-			setPatchError: errors.New("inject patch error"),
-			wantStatus:    statusError(klog.TODO(), fmt.Errorf("updating pod test-ns/test-pod ExtraNodeAllocatableResources: %w", errors.New("inject patch error"))),
+			wantPersisted: allEntries,
+		},
+		{
+			name:                               "entries that another plugin only recorded are left out",
+			assumedPodStatus:                   v1.PodStatus{ExtraNodeAllocatableResources: allEntries},
+			finalExtraNodeAllocatableResources: ownEntries,
+			otherPluginEntries:                 otherEntries,
+			wantPatch:                          true,
+			wantPatchedEntries:                 ownEntries,
+			wantPersisted:                      ownEntries,
 		},
 	}
 
@@ -1814,39 +1841,84 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 			podToUpdate.Status = *tt.assumedPodStatus.DeepCopy()
 
 			fakeClient := fake.NewSimpleClientset(podToUpdate)
+			fts := feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate)
+			fts.EnableDRANodeAllocatableResources = true
 			pl := &DynamicResources{
 				clientset: fakeClient,
-				fts:       feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate),
+				fts:       fts,
 			}
 			if tt.setPatchError != nil {
 				fakeClient.PrependReactor("patch", "pods", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, nil, tt.setPatchError
 				})
 			}
-			status := pl.patchExtraNodeAllocatableResources(ctx, podToUpdate, tt.finalPodExtraNodeAllocatableResources)
+			state := &stateData{
+				claims:                        newClaimStore(nil, tt.extendedClaim, nil),
+				nodeAllocations:               make(map[string]nodeAllocation),
+				extraNodeAllocatableResources: framework.NewExtraNodeAllocatableResourcesState(),
+			}
+			if tt.extendedClaimStatus != nil {
+				state.nodeAllocations["node1"] = nodeAllocation{
+					containerResourceRequestMappings: tt.extendedClaimStatus.RequestMappings,
+				}
+			}
+			if len(tt.finalExtraNodeAllocatableResources) > 0 {
+				state.extraNodeAllocatableResources.Set("node1", Name, tt.finalExtraNodeAllocatableResources)
+			}
+			if len(tt.otherPluginEntries) > 0 {
+				state.extraNodeAllocatableResources.Set("node1", "OtherPlugin", tt.otherPluginEntries)
+				if tt.otherPluginPersisted {
+					if err := state.extraNodeAllocatableResources.UpdatePersisted("node1", "OtherPlugin", func([]v1.ExtraNodeAllocatableResource) error { return nil }); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			status := pl.patchPodStatus(ctx, podToUpdate, "node1", state)
 
 			if tt.wantStatus != nil && status != nil {
 				if tt.wantStatus.Code() != status.Code() {
-					t.Errorf("patchExtraNodeAllocatableResources() status code = %v, want %v", status.Code(), tt.wantStatus.Code())
+					t.Errorf("patchPodStatus() status code = %v, want %v", status.Code(), tt.wantStatus.Code())
 				}
 				if tt.wantStatus.AsError().Error() != status.AsError().Error() {
-					t.Errorf("patchExtraNodeAllocatableResources() status error = %v, want %v", status.AsError().Error(), tt.wantStatus.AsError().Error())
+					t.Errorf("patchPodStatus() status error = %v, want %v", status.AsError().Error(), tt.wantStatus.AsError().Error())
 				}
 			} else if tt.wantStatus != status {
-				t.Errorf("patchExtraNodeAllocatableResources() status = %v, want %v", status, tt.wantStatus)
+				t.Errorf("patchPodStatus() status = %v, want %v", status, tt.wantStatus)
 			}
 
 			actions := fakeClient.Actions()
-			gotPatch := false
+			patchCount := 0
+			var patchBody []byte
 			for _, action := range actions {
 				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
-					gotPatch = true
-					break
+					patchCount++
+					patchBody = action.(clienttesting.PatchAction).GetPatch()
 				}
 			}
+			gotPatch := patchCount > 0
 
 			if gotPatch != tt.wantPatch {
-				t.Errorf("patchExtraNodeAllocatableResources() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
+				t.Errorf("patchPodStatus() gotPatch = %v (count=%d), want %v", gotPatch, patchCount, tt.wantPatch)
+			}
+			if tt.wantPatch && patchCount != 1 {
+				t.Errorf("patchPodStatus() patchCount = %d, want 1", patchCount)
+			}
+			if tt.wantPatch && tt.setPatchError == nil {
+				var patch struct {
+					Status v1.PodStatus `json:"status"`
+				}
+				if err := json.Unmarshal(patchBody, &patch); err != nil {
+					t.Fatalf("decode patch %s: %v", patchBody, err)
+				}
+				if diff := cmp.Diff(tt.wantPatchedEntries, patch.Status.ExtraNodeAllocatableResources); diff != "" {
+					t.Errorf("patched extraNodeAllocatableResources mismatch (-want +got):\n%s", diff)
+				}
+				if got := patch.Status.ExtendedResourceClaimStatus != nil; got != tt.wantExtendedStatusInPatch {
+					t.Errorf("patch %s has extendedResourceClaimStatus = %v, want %v", patchBody, got, tt.wantExtendedStatusInPatch)
+				}
+			}
+			if diff := cmp.Diff(tt.wantPersisted, state.extraNodeAllocatableResources.GetPersisted("node1")); diff != "" {
+				t.Errorf("GetPersisted() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -1854,72 +1926,45 @@ func TestPatchNodeAllocatableResourceClaimStatus(t *testing.T) {
 
 func TestClearNodeAllocatableResourceClaimStatus(t *testing.T) {
 	pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("pod-uid").Obj()
-
-	tests := []struct {
-		name             string
-		initialPodStatus v1.PodStatus
-		wantPatch        bool
-	}{
+	pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 		{
-			name:             "no status to clear",
-			initialPodStatus: v1.PodStatus{},
-			wantPatch:        false,
+			ContainerName: "",
+			Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 		},
 		{
-			name: "status cleared",
-			initialPodStatus: v1.PodStatus{
-				ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
-					{
-						ContainerName: "",
-						Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-					{
-						ContainerName: "c1",
-						Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-					},
-				},
-			},
-			wantPatch: true,
+			ContainerName: "c1",
+			Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
+	fakeClient := fake.NewSimpleClientset(pod)
+	pl := &DynamicResources{
+		clientset: fakeClient,
+		fts:       feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate),
+	}
 
-			podToUpdate := pod.DeepCopy()
-			podToUpdate.Status = *tt.initialPodStatus.DeepCopy()
+	if err := pl.clearExtraNodeAllocatableResources(context.Background(), pod); err != nil {
+		t.Fatalf("clearExtraNodeAllocatableResources() error: %v", err)
+	}
 
-			fakeClient := fake.NewSimpleClientset(podToUpdate)
-			pl := &DynamicResources{
-				clientset: fakeClient,
-				fts:       feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate),
+	gotPatch := false
+	for _, action := range fakeClient.Actions() {
+		if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
+			gotPatch = true
+			patchAction := action.(clienttesting.PatchAction)
+			if patchAction.GetPatchType() != types.MergePatchType {
+				t.Errorf("patch type = %q, want %q", patchAction.GetPatchType(), types.MergePatchType)
 			}
-
-			pl.clearExtraNodeAllocatableResources(ctx, podToUpdate)
-
-			actions := fakeClient.Actions()
-			gotPatch := false
-			for _, action := range actions {
-				if action.Matches("patch", "pods") && action.GetSubresource() == "status" {
-					gotPatch = true
-					patchAction := action.(clienttesting.PatchAction)
-					if patchAction.GetPatchType() != types.MergePatchType {
-						t.Errorf("patch type = %q, want %q", patchAction.GetPatchType(), types.MergePatchType)
-					}
-					wantPatch := `{"metadata":{"uid":"pod-uid"},"status":{"extraNodeAllocatableResources":[]}}`
-					if diff := cmp.Diff(wantPatch, string(patchAction.GetPatch())); diff != "" {
-						t.Errorf("clear patch mismatch (-want +got):\n%s", diff)
-					}
-					break
-				}
+			wantPatch := `{"metadata":{"uid":"pod-uid"},"status":{"extraNodeAllocatableResources":[]}}`
+			if diff := cmp.Diff(wantPatch, string(patchAction.GetPatch())); diff != "" {
+				t.Errorf("clear patch mismatch (-want +got):\n%s", diff)
 			}
-
-			if gotPatch != tt.wantPatch {
-				t.Errorf("clearExtraNodeAllocatableResources() gotPatch = %v, want %v", gotPatch, tt.wantPatch)
-			}
-		})
+			break
+		}
+	}
+	if !gotPatch {
+		t.Error("clearExtraNodeAllocatableResources() sent no pod status patch")
 	}
 }
 

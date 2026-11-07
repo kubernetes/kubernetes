@@ -232,6 +232,22 @@ var (
 		pod.Spec.Containers = append(pod.Spec.Containers, container)
 		return pod
 	}()
+	// podWithStaleExtraNodeAllocatableResources still has the status written by an earlier scheduling attempt.
+	podWithStaleExtraNodeAllocatableResources = func() *v1.Pod {
+		pod := podWithClaimReferenceInContainer.DeepCopy()
+		pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
+			{
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+				Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+			},
+			{
+				ContainerName: "c1",
+				Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+			},
+		}
+		return pod
+	}()
 	groupedPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -3795,7 +3811,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				// ExtraNodeAllocatableResources in the cache before PreBind runs.
 				// Because this plugin unit test skips the Assume phase, we must manually
 				// inject the expected status into the mock Pod to satisfy the equality check
-				// in patchExtraNodeAllocatableResources.
+				// in patchPodStatus.
 				tc.pod = tc.pod.DeepCopy()
 				tc.pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{
 					{
@@ -3871,6 +3887,210 @@ func testPlugin(tCtx ktesting.TContext) {
 							return pod
 						},
 					},
+				},
+			},
+		},
+		"node-allocatable-unreserve-without-prebind": {
+			// Unreserve also undoes simulations in which PreBind never ran, so it sends no request. The pod in
+			// the API server has entries only so that a request would show up as a change.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNodeWithCapacity},
+			pod:              podWithClaimReferenceInContainer,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU:    {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+					v1.ResourceMemory: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1Gi"))}},
+				}
+				return []apiruntime.Object{slice, podWithStaleExtraNodeAllocatableResources}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {
+						extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+							{
+								ContainerName: "",
+								Requests:      v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+							{
+								ContainerName: podWithClaimReferenceInContainer.Spec.Containers[0].Name,
+								Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1"), v1.ResourceMemory: apiresource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				unreserveBeforePreBind: &result{
+					changes: change{
+						pod: func(*v1.Pod) *v1.Pod {
+							return podWithStaleExtraNodeAllocatableResources.DeepCopy()
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-in-prebind": {
+			// No device on the chosen node maps node allocatable resources, so no write
+			// would replace the entries of the earlier attempt.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(allocatedClaim, podWithStaleExtraNodeAllocatableResources)),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status.Allocation = allocationResult
+								claim.Status.ReservedFor = inUseClaim.Status.ReservedFor
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim = addAllocationTimestamp(claim)
+							}
+							return claim
+						},
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-clear-failure": {
+			// Binding with the entries of the earlier attempt would account for them.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			failPatch:        true,
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{workerNodeSlice, podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+				},
+				prebind: result{
+					inFlightClaims: []metav1.Object{allocatedClaim},
+					status:         fwk.NewStatus(fwk.Unschedulable, `clear extraNodeAllocatableResources of pod default/my-pod: patch error`),
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-for-pod-without-claims": {
+			// The pod has no claims in this attempt, for example because its extended resources are
+			// now served by a device plugin, so PreFilter returns Skip and PreBind still clears.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes:            []*v1.Node{workerNode},
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = podWithStaleExtraNodeAllocatableResources.DeepCopy()
+				tc.pod.Spec.ResourceClaims = nil
+				for i := range tc.pod.Spec.Containers {
+					tc.pod.Spec.Containers[i].Resources.Claims = nil
+				}
+				tc.objs = []apiruntime.Object{tc.pod}
+			},
+			want: want{
+				prefilter: result{
+					status: fwk.NewStatus(fwk.Skip),
+				},
+				prebind: result{
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-in-postfilter": {
+			// The pod is unschedulable, so no PreBind would clear the entries of the earlier attempt.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-stale-entries-postfilter-clear-failure": {
+			// Failing to clear does not fail PostFilter, which would also skip preemption.
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			failPatch:        true,
+			pod:              podWithStaleExtraNodeAllocatableResources,
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			objs:             []apiruntime.Object{podWithStaleExtraNodeAllocatableResources},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-stale-entries-cleared-in-podgroup-postfilter": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true, features.GenericWorkload: true},
+			podGroups:        []*schedulingapi.PodGroup{podGroupWithClaimName},
+			claims:           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:          []*resourceapi.DeviceClass{deviceClass},
+			patchTestCase: func(tc *testPluginCase) {
+				tc.pod = groupedPodWithClaimName.DeepCopy()
+				tc.pod.Status.ExtraNodeAllocatableResources = podWithStaleExtraNodeAllocatableResources.Status.ExtraNodeAllocatableResources
+				tc.objs = []apiruntime.Object{tc.pod}
+			},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					changes: change{
+						pod: func(pod *v1.Pod) *v1.Pod {
+							if pod.Name == podName {
+								pod = pod.DeepCopy()
+								pod.Status.ExtraNodeAllocatableResources = []v1.ExtraNodeAllocatableResource{}
+							}
+							return pod
+						},
+					},
+					status: fwk.NewStatus(fwk.Unschedulable, `deallocation and deletion of ResourceClaims completed`),
 				},
 			},
 		},
@@ -4550,6 +4770,22 @@ func testPlugin(tCtx ktesting.TContext) {
 					{
 						ContainerName: tc.pod.Spec.Containers[0].Name,
 						Limits:        v1.ResourceList{v1.ResourceCPU: apiresource.MustParse("1")},
+					},
+				}
+				var podStatusPatches int
+				tc.reactors = []cgotesting.Reactor{
+					&cgotesting.SimpleReactor{
+						Verb:     "patch",
+						Resource: "pods",
+						Reaction: func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
+							if action.GetSubresource() == "status" {
+								podStatusPatches++
+								if podStatusPatches > 1 {
+									return true, nil, fmt.Errorf("expected a single pod status patch, got %d", podStatusPatches)
+								}
+							}
+							return false, nil, nil
+						},
 					},
 				}
 			},

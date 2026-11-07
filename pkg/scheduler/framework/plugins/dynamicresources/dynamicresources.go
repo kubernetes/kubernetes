@@ -102,6 +102,11 @@ type stateData struct {
 	// it records there.
 	extraNodeAllocatableResources *framework.ExtraNodeAllocatableResourcesState
 
+	// staleExtraNodeAllocatableResources is true if the pod status has extra node
+	// allocatable resources in PreFilter. The pod is not bound yet, so a failed attempt left them,
+	// and PreBind must patch the field: with the entries of this attempt, or by clearing it.
+	staleExtraNodeAllocatableResources bool
+
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
 
@@ -630,13 +635,19 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	}
 	claims := newClaimStore(userClaims, extendedResourceClaim, claimBindings)
 
+	// Set before the Skip below, because a pod without claims in this attempt still needs PreBind
+	// to clear stale entries.
+	if pl.fts.EnableDRANodeAllocatableResources {
+		s.extraNodeAllocatableResources = framework.GetOrCreateExtraNodeAllocatableResourcesState(state)
+		// Ideally, the pod status has no entries in PreFilter. But an earlier attempt may have written
+		// them in PreBind and then failed. Such entries are marked as stale and cleared in PreBind(),
+		// or in PostFilter() if the pod is unschedulable. The entries of a bound pod are not stale.
+		s.staleExtraNodeAllocatableResources = (pod.Spec.NodeName == "" && len(pod.Status.ExtraNodeAllocatableResources) > 0)
+	}
+
 	// This check covers user and extended ResourceClaim.
 	if claims.empty() {
 		return nil, fwk.NewStatus(fwk.Skip)
-	}
-
-	if pl.fts.EnableDRANodeAllocatableResources {
-		s.extraNodeAllocatableResources = framework.GetOrCreateExtraNodeAllocatableResourcesState(state)
 	}
 
 	// Counts all claims which the scheduler needs to allocate itself.
@@ -1178,6 +1189,14 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, _ fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
+	// Stale entries are charged to quota while the pod is unschedulable. Clearing them is an API call in the
+	// scheduling cycle, which is undesired but acceptable because only a failed attempt leaves them.
+	if pl.fts.EnableDRANodeAllocatableResources && len(pod.Status.ExtraNodeAllocatableResources) > 0 {
+		if err := pl.clearExtraNodeAllocatableResources(ctx, pod); err != nil {
+			logger.Error(err, "Failed to clear stale ExtraNodeAllocatableResources", "pod", klog.KObj(pod))
+		}
+	}
+
 	state, err := getStateData(cs)
 	if err != nil {
 		return nil, statusError(logger, err)
@@ -1245,6 +1264,14 @@ func (pl *DynamicResources) PodGroupPostFilter(
 	_ fwk.PodGroupSchedulingFunc,
 ) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
+
+	for _, pod := range pgInfo.GetAllUnscheduledPods() {
+		if pl.fts.EnableDRANodeAllocatableResources && len(pod.Status.ExtraNodeAllocatableResources) > 0 {
+			if err := pl.clearExtraNodeAllocatableResources(ctx, pod); err != nil {
+				logger.Error(err, "Failed to clear stale ExtraNodeAllocatableResources", "pod", klog.KObj(pod))
+			}
+		}
+	}
 
 	if pgInfo.GetType() == fwk.CompositePodGroupKeyType {
 		logger.V(5).Info("DRA PodGroupPostFilter is not supporting CompositePodGroups", "podGroup", pgInfo.GetName())
@@ -1654,9 +1681,8 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	}
 	pl.unreserveExtendedResourceClaim(ctx, pod, state)
 
-	if pl.fts.EnableDRANodeAllocatableResources && state.extraNodeAllocatableResources.Has(nodeName) {
-		pl.clearExtraNodeAllocatableResources(ctx, pod)
-	}
+	// Extra node allocatable resources are not cleared here, because the pod may be bound even if Bind
+	// failed. The next scheduling attempt replaces or clears them.
 }
 
 // PreBind gets called in a separate goroutine after it has been determined
@@ -1672,11 +1698,25 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
 	}
-	if state.claims.empty() {
+	if state.claims.empty() && !state.staleExtraNodeAllocatableResources {
 		return nil
 	}
 
 	logger := klog.FromContext(ctx)
+
+	// Stale entries must not stay in the status of the bound pod.
+	if state.staleExtraNodeAllocatableResources && len(state.extraNodeAllocatableResources.GetFromPlugin(nodeName, Name)) == 0 {
+		err := state.extraNodeAllocatableResources.UpdatePersisted(nodeName, Name, func(persisted []v1.ExtraNodeAllocatableResource) error {
+			// Another plugin's write already replaced the stale entries.
+			if len(persisted) > 0 {
+				return nil
+			}
+			return pl.clearExtraNodeAllocatableResources(ctx, pod)
+		})
+		if err != nil {
+			return statusError(logger, err)
+		}
+	}
 
 	for index, claim := range state.claims.all() {
 		if !resourceclaim.IsReservedForPod(pod, claim, pl.fts.EnableDRAWorkloadResourceClaims) {
@@ -1694,12 +1734,8 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 		}
 	}
 
-	if pl.fts.EnableDRANodeAllocatableResources {
-		if extraResources := state.extraNodeAllocatableResources.Get(nodeName); len(extraResources) > 0 {
-			if status := pl.patchExtraNodeAllocatableResources(ctx, pod, extraResources); status != nil {
-				return status
-			}
-		}
+	if status := pl.patchPodStatus(ctx, pod, nodeName, state); status != nil {
+		return status
 	}
 
 	if !pl.fts.EnableDRADeviceBindingConditions || !pl.fts.EnableDRAResourceClaimDeviceStatus {
@@ -1780,6 +1816,60 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	return nil
 }
 
+// patchPodStatus updates the pod's status with ExtendedResourceClaimStatus and/or
+// ExtraNodeAllocatableResources in a single API call.
+func (pl *DynamicResources) patchPodStatus(
+	ctx context.Context,
+	pod *v1.Pod,
+	nodeName string,
+	state *stateData,
+) *fwk.Status {
+	logger := klog.FromContext(ctx)
+	extendedClaimStatus, err := pl.extendedResourceClaimStatus(pod, nodeName, state)
+	if err != nil {
+		return statusError(logger, err)
+	}
+	draExtraNodeAllocatableResources, err := pl.draExtraNodeAllocatableResourcesStatus(ctx, pod, nodeName, state)
+	if err != nil {
+		return statusError(logger, err)
+	}
+	if len(draExtraNodeAllocatableResources) == 0 && extendedClaimStatus == nil {
+		return nil
+	}
+
+	baseStatus := pod.Status.DeepCopy()
+	targetStatus := pod.Status.DeepCopy()
+
+	if extendedClaimStatus != nil {
+		baseStatus.ExtendedResourceClaimStatus = nil
+		targetStatus.ExtendedResourceClaimStatus = extendedClaimStatus
+	}
+
+	if len(draExtraNodeAllocatableResources) == 0 {
+		if err := schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus); err != nil {
+			return statusError(logger, fmt.Errorf("updating pod %s/%s status: %w", pod.Namespace, pod.Name, err))
+		}
+		return nil
+	}
+
+	// The incoming 'pod' is from the scheduler cache and would have ExtraNodeAllocatableResources
+	// pre-populated in the assume phase without persisting to the API server.
+	// schedutil.PatchPodStatus skips patching if the old and new status are identical.
+	// To ensure the status is persisted to the API server we clear it in the baseStatus, forcing a patch.
+	baseStatus.ExtraNodeAllocatableResources = nil
+	// PreBind can run in parallel with other plugins that may write the field too, so the merged list is
+	// built and patched inside UpdatePersisted which serializes the plugin updates.
+	err = state.extraNodeAllocatableResources.UpdatePersisted(nodeName, Name, func(persisted []v1.ExtraNodeAllocatableResource) error {
+		targetStatus.ExtraNodeAllocatableResources = framework.MergeExtraNodeAllocatableResources(persisted, draExtraNodeAllocatableResources)
+		return schedutil.PatchPodStatus(ctx, pl.clientset, pod.Name, pod.Namespace, baseStatus, targetStatus)
+	})
+	if err != nil {
+		return statusError(logger, fmt.Errorf("updating pod %s/%s status: %w", pod.Namespace, pod.Name, err))
+	}
+	logger.V(5).Info("Patched pod status with ExtraNodeAllocatableResources", "pod", klog.KObj(pod), "status", targetStatus.ExtraNodeAllocatableResources)
+	return nil
+}
+
 // PreBindPreFlight is called before PreBind, and determines whether PreBind is going to do something for this pod, or not.
 // It just checks state.claims to determine whether there are any claims and hence the plugin has to handle them at PreBind.
 func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
@@ -1788,7 +1878,7 @@ func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleSt
 	if err != nil {
 		return result, statusError(klog.FromContext(ctx), err)
 	}
-	if state.claims.empty() {
+	if state.claims.empty() && !state.staleExtraNodeAllocatableResources {
 		return result, fwk.NewStatus(fwk.Skip)
 	}
 	return result, nil
@@ -1960,15 +2050,6 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	}
 
 	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", nodeName, "resourceclaim", klog.Format(claim))
-
-	// Patch the pod status with the new information about the generated
-	// special resource claim.
-	if isExtendedResourceClaim {
-		err := pl.patchPodExtendedResourceClaimStatus(ctx, pod, claim, nodeName, state)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
 
 	return claim, prebindSuccessCleanup, nil
 }
