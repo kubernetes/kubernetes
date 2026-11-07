@@ -40,11 +40,27 @@ import (
 // TestProxyRulesInUserNS verifies that the nftables proxier can install real
 // kernel nftables rules inside an unprivileged user+network namespace.
 //
+// The test fails if it is not running in a private network namespace, so that
+// it never installs rules into the host's network namespace.
+//
 // Run via: make test-userns
 // (which uses: unshare --user --map-root-user --net $(MAKE) test)
 //
 // See https://github.com/kubernetes/kubernetes/issues/130926
 func TestProxyRulesInUserNS(t *testing.T) {
+	// Refuse to install rules unless we are in a private network namespace.
+	// A fresh netns created by "unshare --net" only contains the loopback
+	// interface, so any other interface means we share the host network.
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatalf("could not list network interfaces: %v", err)
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback == 0 {
+			t.Fatalf("found non-loopback interface %q, so this is not a private network namespace; run this test with 'make test-userns'", iface.Name)
+		}
+	}
+
 	nft, err := getNFTablesInterface(v1.IPv4Protocol)
 	if err != nil {
 		t.Skipf("nftables not available: %v", err)
