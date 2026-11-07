@@ -1592,10 +1592,10 @@ func TestValidateJobUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Selector = newSelector
 			},
-			err: &field.Error{
+			err: (&field.Error{
 				Type:  field.ErrorTypeInvalid,
 				Field: "spec.selector",
-			},
+			}).WithOrigin("immutable").MarkCoveredByDeclarative(),
 		},
 		"add success policy": {
 			old: batch.Job{
