@@ -716,6 +716,9 @@ const (
 	// update the number of volumes that can be allocated on a node
 	MutableCSINodeAllocatableCount featuregate.Feature = "MutableCSINodeAllocatableCount"
 
+	// Enables kubelet to reconcile probe configuration updates for running containers.
+	MutableContainerProbes featuregate.Feature = "MutableContainerProbes"
+
 	// owner: huww98
 	// kep: https://kep.k8s.io/5381
 	//
@@ -1723,6 +1726,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
 	},
 
+	MutableContainerProbes: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	MutablePVNodeAffinity: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2540,6 +2547,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MemoryQoS: {},
 
 	MutableCSINodeAllocatableCount: {},
+
+	MutableContainerProbes: {},
 
 	MutablePVNodeAffinity: {},
 
