@@ -19,7 +19,8 @@ package hostpath
 import (
 	"fmt"
 	"os"
-	"regexp"
+	"path/filepath"
+	"strings"
 
 	"k8s.io/klog/v2"
 
@@ -348,15 +349,28 @@ func (r *hostPathDeleter) GetPath() string {
 	return r.path
 }
 
-// Delete for hostPath removes the local directory so long as it is beneath /tmp/*.
-// THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY!  This message should scare you away from using
-// this deleter for anything other than development and testing.
+// Delete for hostPath removes the local directory so long as it is strictly
+// beneath /tmp. THIS IS FOR TESTING AND LOCAL DEVELOPMENT ONLY.
+//
+// The previous implementation validated the path with an unanchored regex
+// ("/tmp/.+") matched via MatchString, which only checks for a substring.
+// That allowed bypasses such as "/evil/tmp/../etc" (matched "/tmp/") and led
+// to arbitrary directory deletion. We now clean the path and require it to be
+// a descendant of /tmp, rejecting any traversal, the /tmp root itself, and
+// non-/tmp paths.
 func (r *hostPathDeleter) Delete() error {
-	regexp := regexp.MustCompile("/tmp/.+")
-	if !regexp.MatchString(r.GetPath()) {
-		return fmt.Errorf("host_path deleter only supports /tmp/.+ but received provided %s", r.GetPath())
+	cleaned := filepath.Clean(r.GetPath())
+	if cleaned == "/tmp" || cleaned == "." || cleaned == "/" {
+		return fmt.Errorf("host_path deleter refuses to remove %q", r.GetPath())
 	}
-	return os.RemoveAll(r.GetPath())
+	if !strings.HasPrefix(cleaned, "/tmp/") {
+		return fmt.Errorf("host_path deleter only supports paths beneath /tmp but received %q", r.GetPath())
+	}
+	// Defense in depth: reject any residual traversal segments after cleaning.
+	if strings.Contains(cleaned, "..") {
+		return fmt.Errorf("host_path deleter rejects traversal in %q", r.GetPath())
+	}
+	return os.RemoveAll(cleaned)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) {
