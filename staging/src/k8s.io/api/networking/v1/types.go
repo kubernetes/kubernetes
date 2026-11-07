@@ -78,7 +78,7 @@ type NetworkPolicySpec struct {
 	// solely to ensure that the pods it selects are isolated by default)
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
 	// egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
@@ -90,7 +90,7 @@ type NetworkPolicySpec struct {
 	// This field is beta-level in 1.8
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// policyTypes is a list of rule types that the NetworkPolicy relates to.
@@ -127,7 +127,7 @@ type NetworkPolicyIngressRule struct {
 	// allows traffic only if the traffic matches at least one item in the from list.
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
 }
 
@@ -151,7 +151,7 @@ type NetworkPolicyEgressRule struct {
 	// allows traffic only if the traffic matches at least one item in the to list.
 	// +optional
 	// +listType=atomic
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	To []NetworkPolicyPeer `json:"to,omitempty" protobuf:"bytes,2,rep,name=to"`
 }
 
@@ -184,7 +184,7 @@ type IPBlock struct {
 	// cidr is a string representing the IPBlock
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// +required
-	// +k8s:beta(since: "1.37")=+k8s:required
+	// +k8s:required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 
 	// except is a slice of CIDRs that should not be included within an IPBlock
@@ -219,7 +219,7 @@ type NetworkPolicyPeer struct {
 	// ipBlock defines policy on a particular IPBlock. If this field is set then
 	// neither of the other fields can be.
 	// +optional
-	// +k8s:beta(since: "1.37")=+k8s:optional
+	// +k8s:optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
 
