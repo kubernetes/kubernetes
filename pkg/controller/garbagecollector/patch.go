@@ -32,11 +32,12 @@ import (
 
 // getMetadata tries getting object metadata from local cache, and sends GET request to apiserver when
 // local cache is not available or not latest.
-func (gc *GarbageCollector) getMetadata(apiVersion, kind, namespace, name string) (metav1.Object, error) {
-	apiResource, _, err := gc.apiResource(apiVersion, kind)
+func (gc *GarbageCollector) getMetadata(n *node) (metav1.Object, error) {
+	apiResource, _, err := gc.nodeResource(n)
 	if err != nil {
 		return nil, err
 	}
+	namespace, name := n.identity.Namespace, n.identity.Name
 	gc.dependencyGraphBuilder.monitorLock.RLock()
 	defer gc.dependencyGraphBuilder.monitorLock.RUnlock()
 	m, ok := gc.dependencyGraphBuilder.monitors[apiResource]
@@ -90,7 +91,7 @@ type jsonMergePatchFunc func(*node) ([]byte, error)
 // patch tries strategic merge patch on item first, and if SMP is not supported, it fallbacks to JSON merge
 // patch.
 func (gc *GarbageCollector) patch(item *node, smp []byte, jmp jsonMergePatchFunc) (*metav1.PartialObjectMetadata, error) {
-	smpResult, err := gc.patchObject(item.identity, smp, types.StrategicMergePatchType)
+	smpResult, err := gc.patchObject(item, smp, types.StrategicMergePatchType)
 	if err == nil {
 		return smpResult, nil
 	}
@@ -102,12 +103,12 @@ func (gc *GarbageCollector) patch(item *node, smp []byte, jmp jsonMergePatchFunc
 	if err != nil {
 		return nil, err
 	}
-	return gc.patchObject(item.identity, patch, types.MergePatchType)
+	return gc.patchObject(item, patch, types.MergePatchType)
 }
 
 // Returns JSON merge patch that removes the ownerReferences matching ownerUIDs.
 func (gc *GarbageCollector) deleteOwnerRefJSONMergePatch(item *node, ownerUIDs ...types.UID) ([]byte, error) {
-	accessor, err := gc.getMetadata(item.identity.APIVersion, item.identity.Kind, item.identity.Namespace, item.identity.Name)
+	accessor, err := gc.getMetadata(item)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +144,7 @@ func (n *node) unblockOwnerReferencesStrategicMergePatch() ([]byte, error) {
 // Generate a JSON merge patch that unsets the BlockOwnerDeletion field of all
 // ownerReferences of node.
 func (gc *GarbageCollector) unblockOwnerReferencesJSONMergePatch(n *node) ([]byte, error) {
-	accessor, err := gc.getMetadata(n.identity.APIVersion, n.identity.Kind, n.identity.Namespace, n.identity.Name)
+	accessor, err := gc.getMetadata(n)
 	if err != nil {
 		return nil, err
 	}

@@ -515,7 +515,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 	// TODO: It's only necessary to talk to the API server if this is a
 	// "virtual" node. The local graph could lag behind the real status, but in
 	// practice, the difference is small.
-	latest, err := gc.getObject(item.identity)
+	latest, err := gc.getObject(item)
 	switch {
 	case errors.IsNotFound(err):
 		// the GraphBuilder can add "virtual" node for an owner that doesn't
@@ -622,7 +622,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// FinalizerDeletingDependents from the item, resulting in the final
 		// deletion of the item.
 		policy := metav1.DeletePropagationForeground
-		err := gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
+		err := gc.deleteObject(item, latest.ResourceVersion, latest.OwnerReferences, &policy)
 		if errors.IsNotFound(err) {
 			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 			return enqueuedVirtualDeleteEventErr
@@ -648,7 +648,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 			"item", item.identity,
 			"propagationPolicy", policy,
 		)
-		err := gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
+		err := gc.deleteObject(item, latest.ResourceVersion, latest.OwnerReferences, &policy)
 		if errors.IsNotFound(err) {
 			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 			return enqueuedVirtualDeleteEventErr
