@@ -66,6 +66,33 @@ func init() {
 			"metadata.uid": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
+			"spec.rules[*].subjects": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.rules[*].subjects[*].group": {
+				{ErrorType: "FieldValueForbidden"},
+			},
+			"spec.rules[*].subjects[*].group.name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.rules[*].subjects[*].kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.rules[*].subjects[*].serviceAccount": {
+				{ErrorType: "FieldValueForbidden"},
+			},
+			"spec.rules[*].subjects[*].serviceAccount.name": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.rules[*].subjects[*].serviceAccount.namespace": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.rules[*].subjects[*].user": {
+				{ErrorType: "FieldValueForbidden"},
+			},
+			"spec.rules[*].subjects[*].user.name": {
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }
