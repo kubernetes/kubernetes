@@ -28,6 +28,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1251,6 +1253,98 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 			}
 			if tc.expectSet && result != tc.expectedResult {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
+			}
+		})
+	}
+}
+
+func TestNewWorkerActiveProbeProtocolGauge(t *testing.T) {
+	_ = legacyregistry.Register(ActiveProbeProtocol)
+
+	http2 := v1.HTTPProtocolHTTP2
+
+	tests := []struct {
+		name            string
+		probeSpec       v1.Probe
+		gateEnabled     bool
+		expectedLabels  map[string]string
+		expectUntouched bool
+	}{
+		{
+			name:            "non-HTTP probe does not touch the gauge",
+			probeSpec:       v1.Probe{ProbeHandler: v1.ProbeHandler{Exec: &v1.ExecAction{}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled:     true,
+			expectUntouched: true,
+		},
+		{
+			name:        "HTTP probe without protocol defaults to HTTP1",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: true,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP1),
+			},
+		},
+		{
+			name:        "HTTP2 probe with gate enabled is counted as HTTP2",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{Protocol: &http2}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: true,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP2),
+			},
+		},
+		{
+			name:        "HTTP2 probe with gate disabled falls back to HTTP1",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{Protocol: &http2}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: false,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP1),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ActiveProbeProtocol.Reset()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, test.gateEnabled)
+
+			m := newTestManager()
+			// newTestWorker forces an exec ProbeHandler, so build the pod directly to
+			// keep the HTTP probe spec under test intact.
+			pod := getTestPod()
+			pod.Spec.Containers[0].ReadinessProbe = &test.probeSpec
+			w := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+
+			if test.expectUntouched {
+				if w.activeProbeProtocolLabels != nil {
+					t.Errorf("expected activeProbeProtocolLabels to be nil for a non-HTTP probe, got %v", w.activeProbeProtocolLabels)
+				}
+				return
+			}
+
+			got, err := testutil.GetGaugeMetricValue(ActiveProbeProtocol.With(test.expectedLabels))
+			if err != nil {
+				t.Fatalf("failed to get gauge value: %v", err)
+			}
+			if got != 1 {
+				t.Errorf("expected ActiveProbeProtocol%v to be 1 after worker creation, got %v", test.expectedLabels, got)
+			}
+
+			// Running and stopping the worker should release the gauge again.
+			key := probeKey{testPodUID, testContainerName, readiness}
+			m.workers[key] = w
+			tCtx := ktesting.Init(t)
+			go w.run(tCtx)
+			w.stop()
+			if err := waitForWorkerExit(tCtx.TB(), m, []probeKey{key}); err != nil {
+				t.Fatalf("error waiting for worker exit: %v", err)
+			}
+
+			got, err = testutil.GetGaugeMetricValue(ActiveProbeProtocol.With(test.expectedLabels))
+			if err != nil {
+				t.Fatalf("failed to get gauge value: %v", err)
+			}
+			if got != 0 {
+				t.Errorf("expected ActiveProbeProtocol%v to be 0 after worker exit, got %v", test.expectedLabels, got)
 			}
 		})
 	}

@@ -3473,6 +3473,16 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: active_probe_protocol
+  subsystem: kubelet
+  help: Number of currently active HTTP probes by protocol.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics/probes
 - name: admission_rejections_total
   subsystem: kubelet
   help: Cumulative number pod admission rejections by the Kubelet.
