@@ -729,7 +729,7 @@ func (m *kubeGenericRuntimeManager) containerResourcesFromRequirements(pod *v1.P
 	return resources
 }
 
-func podResourcesFromRequirements(requirements *v1.ResourceRequirements) resourceRequirements {
+func podResourcesFromRequirements(requirements *v1.ResourceRequirements, includeSwap bool) resourceRequirements {
 	if requirements == nil {
 		return resourceRequirements{swapLimit: swapLimitUnset}
 	}
@@ -741,12 +741,31 @@ func podResourcesFromRequirements(requirements *v1.ResourceRequirements) resourc
 		cpuRequest:    requirements.Requests.Cpu().MilliValue(),
 		swapLimit:     swapLimitUnset,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
+	if includeSwap {
 		if q, ok := requirements.Limits[v1.ResourceSwap]; ok {
 			resources.swapLimit = q.Value()
 		}
 	}
 	return resources
+}
+
+// swapManaged reports whether the kubelet actuates swap limits on this node.
+func (m *kubeGenericRuntimeManager) swapManaged() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && m.nodeSwapEnabled()
+}
+
+// podSwapLimitEqual compares pod-level limits.swap. Presence matters because
+// an unset pod-level swap limit means unlimited.
+func podSwapLimitEqual(a, b *v1.ResourceRequirements) bool {
+	var aSwap, bSwap resource.Quantity
+	var aHas, bHas bool
+	if a != nil {
+		aSwap, aHas = a.Limits[v1.ResourceSwap]
+	}
+	if b != nil {
+		bSwap, bHas = b.Limits[v1.ResourceSwap]
+	}
+	return aHas == bHas && aSwap.Equal(bSwap)
 }
 
 // computePodResizeAction determines the actions required (if any) to resize the given container.
@@ -1050,7 +1069,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// memory.swap.max so pod-level increases/decreases can be ordered against
 	// the container writes. swapManaged is false when the node cannot swap, in
 	// which case effectiveSwapLimit already yields no container deltas.
-	swapManaged := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && m.nodeSwapEnabled()
+	swapManaged := m.swapManaged()
 	var currentPodSwapLimit, desiredPodSwapLimit int64
 	var currentPodSwapSet, desiredPodSwapSet bool
 	if swapManaged {
@@ -1435,7 +1454,7 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 
 	// Determine which swap limits are decreasing. "unset" (max) counts as +inf,
 	// so adding a pod-level swap limit is a decrease.
-	swapManaged := utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) && m.nodeSwapEnabled()
+	swapManaged := m.swapManaged()
 	podSwapDecreasing := false
 	var desiredPodSwap int64
 	if swapManaged {
@@ -2037,8 +2056,9 @@ func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx con
 		// For RestartContainer, this may trigger a container restart.
 	}
 
-	desiredPodLevelResources := podResourcesFromRequirements(pod.Spec.Resources)
-	currentPodLevelResources := podResourcesFromRequirements(actuatedPodLevelResources)
+	swapManaged := m.swapManaged()
+	desiredPodLevelResources := podResourcesFromRequirements(pod.Spec.Resources, swapManaged)
+	currentPodLevelResources := podResourcesFromRequirements(actuatedPodLevelResources, swapManaged)
 	return currentPodLevelResources != desiredPodLevelResources
 }
 
@@ -2976,7 +2996,12 @@ func (m *kubeGenericRuntimeManager) isPodLevelResourcesResizeInProgress(allocate
 
 	allocatedPodResources := allocatedPod.Spec.Resources
 
-	return !cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources)
+	if !cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources) {
+		return true
+	}
+	// Pod-level swap is only actuated when the node manages swap; comparing it
+	// otherwise would leave the resize in progress forever.
+	return m.swapManaged() && !podSwapLimitEqual(actuatedPodResources, allocatedPodResources)
 }
 
 func cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources *v1.ResourceRequirements) bool {
@@ -2985,14 +3010,7 @@ func cpuMemoryResourcesEqual(actuatedPodResources, allocatedPodResources *v1.Res
 	}
 
 	cmpResources := func(actuated, allocated v1.ResourceList) bool {
-		equal := actuated[v1.ResourceCPU].Equal(allocated[v1.ResourceCPU]) && actuated[v1.ResourceMemory].Equal(allocated[v1.ResourceMemory])
-		if equal && utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
-			// Pod-level swap is limits-only; presence matters (unset == unlimited).
-			_, actuatedHas := actuated[v1.ResourceSwap]
-			_, allocatedHas := allocated[v1.ResourceSwap]
-			equal = actuatedHas == allocatedHas && actuated[v1.ResourceSwap].Equal(allocated[v1.ResourceSwap])
-		}
-		return equal
+		return actuated[v1.ResourceCPU].Equal(allocated[v1.ResourceCPU]) && actuated[v1.ResourceMemory].Equal(allocated[v1.ResourceMemory])
 	}
 
 	if actuatedPodResources == nil {

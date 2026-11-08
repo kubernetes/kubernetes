@@ -727,3 +727,36 @@ func runningStatusFor(pod *v1.Pod) *kubecontainer.PodStatus {
 	}
 	return ps
 }
+
+// TestPodLevelSwapResizeInProgressFollowsNodeSwap: pod-level swap is only
+// compared when the node manages swap, matching what doPodResizeAction actuates.
+func TestPodLevelSwapResizeInProgressFollowsNodeSwap(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		behavior     kubetypes.SwapBehavior
+		wantProgress bool
+	}{
+		{name: "NoSwap node ignores pod-level swap drift", behavior: kubetypes.NoSwap, wantProgress: false},
+		{name: "WorkloadControlledSwap node tracks pod-level swap drift", behavior: kubetypes.WorkloadControlledSwap, wantProgress: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			m := newSwapTestManager(t, tCtx, tc.behavior)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
+
+			pod := swapTestPod(burstableContainer("c", "1Gi", "2Gi"))
+			pod.Spec.Resources = &v1.ResourceRequirements{Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourceSwap:   resource.MustParse("1Gi"),
+			}}
+			// Actuated cpu/memory match the spec; only pod-level swap differs.
+			require.NoError(t, m.actuatedState.SetPodLevelResources(logger, pod.UID, &v1.ResourceRequirements{Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourceSwap:   resource.MustParse("512Mi"),
+			}}))
+
+			assert.Equal(t, tc.wantProgress, m.isPodLevelResourcesResizeInProgress(pod, runningStatusFor(pod)), "isPodLevelResourcesResizeInProgress")
+			assert.Equal(t, tc.wantProgress, m.computePodLevelResourcesResizeAction(tCtx, pod), "computePodLevelResourcesResizeAction")
+		})
+	}
+}
