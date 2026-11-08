@@ -37,6 +37,7 @@ import (
 //   - Whitespace before '=' is invalid (e.g., VAR = 'value' is rejected)
 //   - Whitespace after '=' followed by nothing or a comment assigns an empty string (e.g., VAR= # comment)
 //   - Any other content after that whitespace is invalid (e.g., VAR= 'value' is rejected)
+//   - If a variable is defined more than once, the last definition wins
 //
 // The returned bool reports whether the key was present, which distinguishes a
 // key with an empty value from a key that is absent.
@@ -49,6 +50,8 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
+	var value string
+	found := false
 
 	for scanner.Scan() {
 		lineNum++
@@ -91,7 +94,7 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 				return "", false, fmt.Errorf("invalid environment variable format at line %d: unexpected content after whitespace following '='", lineNum)
 			}
 			if varName == key {
-				return "", true, nil
+				value, found = "", true
 			}
 			continue
 		}
@@ -120,7 +123,7 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 				}
 
 				if varName == key {
-					return valueBuilder.String(), true, nil
+					value, found = valueBuilder.String(), true
 				}
 				break
 			}
@@ -139,5 +142,5 @@ func ParseEnv(envFilePath, key string) (string, bool, error) {
 		return "", false, fmt.Errorf("error reading environment variable file %q: %w", envFilePath, err)
 	}
 
-	return "", false, nil
+	return value, found, nil
 }
