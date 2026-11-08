@@ -126,12 +126,16 @@ rejection. Conventional spec/status reset controls pass. The complete imported
 Apply body explains installation through the configured filter, whose roots
 omit settings; primitive and REST-envelope refinement remain explicit.
 
-A numeric counterexample refutes unrestricted scalar-intent and non-forced
-foreign-value safety. A owns exact int64 `9223372036854775807`; B asserts
+A numeric counterexample refutes unrestricted scalar-intent, non-forced
+foreign-value safety and forced transfer. A owns exact int64 `9223372036854775807`; B asserts
 binary64 `2^63`, without force. Alone, the assertion is discarded as a false
 no-op while B acquires its claim. Adding unrelated `note: changed` makes the
 different numeric value persist while both managers retain the claim. Real
 HTTP/GET confirms both results; an exact int64 change correctly conflicts.
+With force, the rounded numeric change still retains A's claim. An exact
+integer forced change correctly transfers the claim to B in Lean, Go and HTTP.
+The source primitive instance implements that transfer and empty-owner cleanup;
+the counterexample does not follow from a missing force rule in the model.
 `NumericCounterexamples` proves these concrete imported-Apply executions and
 the contract refutations under explicit scalar primitives. It also proves
 nontransitive numeric equality and the impossibility of a faithful ordinary
@@ -390,7 +394,7 @@ in [ci](ci/README.md) requires a separate test-infra activation.
 In a Kubernetes checkout, `bash ci/verify-apiserver.sh` additionally runs the
 actual HTTP/etcd empty-container counterexamples, Required/CEL rejection,
 ownership bootstrap, Update-owned list-item omission and status reset ownership.
-It also checks all three numeric variants, with exact native numeric types,
+It also checks all five numeric variants, with exact native numeric types,
 retained claims and persisted GET observations.
 The numeric-key test additionally checks a false conflict between distinct
 large integer list keys and successful independent small-key management.

@@ -880,5 +880,23 @@
     "scope": "execution",
     "meaning": "The key 42 round-trips and stays distinct from 41, matching the successful API control.",
     "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCounterexamples.forced_change_retains_foreign_claim": {
+    "title": "Force retains A’s claim on a rounded numeric change",
+    "scope": "execution",
+    "meaning": "B forces a different exact magnitude, but the rounded comparison leaves both amount claims.",
+    "limits": "Complete imported Apply under explicit scalar primitives that implement forced transfer and empty-entry cleanup. Native managedfields and actual CRD HTTP/GET check both the rounded failure and the exact-integer success control; general typed/updater refinement remains separate."
+  },
+  "SSA.NumericCounterexamples.forced_integer_control_transfers": {
+    "title": "An exact forced integer change transfers the claim",
+    "scope": "execution",
+    "meaning": "The same modeled updater transfers a detected int-to-int change to B and removes A’s empty entry.",
+    "limits": "Complete imported Apply under explicit scalar primitives that implement forced transfer and empty-entry cleanup. Native managedfields and actual CRD HTTP/GET check both the rounded failure and the exact-integer success control; general typed/updater refinement remains separate."
+  },
+  "SSA.NumericCounterexamples.forced_transfer_is_false": {
+    "title": "BASE-06: unrestricted numeric force transfer is false",
+    "scope": "execution",
+    "meaning": "A represented forced numeric change succeeds while retaining the old foreign amount claim.",
+    "limits": "Complete imported Apply under explicit scalar primitives that implement forced transfer and empty-entry cleanup. Native managedfields and actual CRD HTTP/GET check both the rounded failure and the exact-integer success control; general typed/updater refinement remains separate."
   }
 }

@@ -13,8 +13,8 @@ reported together with the preceding transition that caused it.
 | SSA-02 | Explicitly empty granular map after releasing an owned child | First Apply produces `null` while retaining the map claim. Optional non-nullable maps cannot be emptied. Nullable maps change on repetition and can cause a conflict for another manager's identical intent. | Lean execution/intent counterexamples and all finite retry counts; source-bound witness; actual managedfields; both pinned SMD revisions; CRD HTTP/etcd. |
 | SSA-03 | Omission after another manager Updates an item child | The item and its foreign-owned child disappear; the list becomes null. A nullable schema accepts this; a non-nullable schema rejects every retry. | Reachable Lean Apply/Update counterexample and source witness; actual managedfields and pinned SMD; nullable/non-nullable CRD HTTP. Existing report: [#134902](https://github.com/kubernetes/kubernetes/issues/134902). |
 | SSA-04 | Status Apply includes an additional non-status root field | The status actor acquires the unchanged field even though the REST strategy resets it. A later main-endpoint change conflicts. | Reachable Lean refutation; complete imported Apply with explicit primitive instances; real CRD HTTP/etcd and conventional spec/status controls. |
-| [SSA-05](https://github.com/kubernetes/kubernetes/issues/143942) | Mixed int64/float64 comparison near `2^63` | Scalar-only intent is lost as a false no-op. Adding an unrelated field instead lets B change A's numeric value without force while both retain ownership. | Lean scalar-intent/foreign-value refutations and imported Apply witnesses; native equality and numeric-key set failure; managedfields; CRD HTTP/etcd/GET with an exact-integer conflict control. |
-| SSA-06 | FieldsV1 numeric-key decoding | Exact integer key `2^53+1` is read as its neighbor `2^53`. B adding that distinct list item falsely conflicts against A. | Lean canonical-trie membership refutation; exact native byte/key round trips in vendored and both pinned SMD revisions; CRD HTTP/GET and small-integer control. |
+| [SSA-05](https://github.com/kubernetes/kubernetes/issues/143942) | Mixed int64/float64 comparison near `2^63` | Scalar-only intent is lost as a false no-op. Adding an unrelated field lets B change A's numeric value while both retain ownership, including with force. | Lean intent/conflict/force refutations and imported Apply witnesses; native equality and numeric-key set failure; managedfields; CRD HTTP/etcd/GET with exact-integer conflict and transfer controls. |
+| [SSA-06](https://github.com/kubernetes/kubernetes/issues/143943) | FieldsV1 numeric-key decoding | Exact integer key `2^53+1` is read as its neighbor `2^53`. B adding that distinct list item falsely conflicts against A. | Lean canonical-trie membership refutation; exact native byte/key round trips in vendored and both pinned SMD revisions; CRD HTTP/GET and small-integer control. |
 | PR336-01 | Fragmented required ownership followed by partial-manager omission | A partial manager can delete another partial manager's required data. | Lean execution; exact pinned head/base comparison. |
 | PR336-02 | Direct required-map membership shortcut | The classifier calls a manager full without ownership of required children. An invalid item can remain after the actual full owner leaves. | General classifier theorem; concrete Lean execution; actual pinned head/base outcomes. |
 | PR336-03 | Required granular-list ownership | A supplier owning all child items is classified partial because Apply generated no direct list-presence claim. Another partial manager can delete its data. | General classifier fact; populated/empty Lean counterexamples; exact pinned head/base comparison. |
@@ -292,6 +292,8 @@ float. Two fresh-resource variants expose different effects:
 | Only the numeric assertion above | False whole-object no-op: the original int64 remains, while B co-claims `amount`. B's scalar intent is lost. |
 | The same numeric assertion plus `note: changed` | The note makes the whole object differ. The new binary64 magnitude persists without conflict, while A and B both retain the `amount` claim. |
 | Exact int64 `9223372036854775806` plus the note | HTTP conflict; all data, claims and resourceVersion remain unchanged. |
+| The rounded `2^63` change plus the note, with force | Accepted with the new magnitude, but A and B both retain `amount`. The foreign claim is not transferred. |
+| Exact int64 `9223372036854775806` plus the note, with force | Accepted; B owns `amount` and A no longer does. |
 
 `TestSSANumericComparison` verifies response types and values, both claims,
 and a persisted GET after every accepted request or conflict. JSON encoders
@@ -299,6 +301,13 @@ may print binary64 `2^63` using a rounded shortest decimal spelling such as
 `9223372036854776000`; the test observes the decoded float's exact native
 magnitude. The initial int64 is checked before B's request, so this is not
 pre-rounding in a client.
+
+The two forced variants refute unrestricted BASE-06 and provide its positive
+control. The source updater instance actually transfers detected conflicts
+and drops empty ownership entries. `forced_integer_control_transfers` checks
+that behavior through imported Apply; native managedfields and HTTP/GET agree.
+Thus `forced_transfer_is_false` is caused by rounded comparison, rather than
+an omitted transfer rule in the model.
 
 ### Source cause and equality boundary
 
@@ -335,6 +344,9 @@ cannot satisfy those premises globally.
   is realized by the imported nil-last-set branch.
 - `exact_scalar_intent_is_false` and
   `nonforce_foreign_value_safety_is_false`, refuting unrestricted BASE-01/04.
+- `forced_change_retains_foreign_claim` and `forced_transfer_is_false`,
+  refuting unrestricted BASE-06, with `forced_integer_control_transfers` as
+  the successful exact-comparison control.
 
 The numeric specification models finite nonnegative integral witnesses and
 nearest-ties-even integer rounding. It does not prove general IEEE conversion
@@ -350,6 +362,8 @@ exact integers before both engines saw them. That adapter defect is fixed and
 regression-tested, not counted as a second production bug.
 
 ## SSA-06: FieldsV1 rounding aliases distinct integer list keys
+
+Tracked in [Kubernetes #143943](https://github.com/kubernetes/kubernetes/issues/143943).
 
 The CRD's `spec.versions[*].schema.openAPIV3Schema` contains:
 

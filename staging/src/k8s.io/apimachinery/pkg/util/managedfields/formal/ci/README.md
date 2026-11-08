@@ -107,13 +107,16 @@ no defaults, validation rule or webhook. A owns MaxInt64; B requests binary64
 unrelated note the different number persists while A retains ownership. A
 different exact int64 correctly conflicts. GET checks every accepted result
 and rejection.
+Two forced variants additionally check the retained foreign claim on the
+rounded change and the successful transfer for an exact integer change. Both
+outcomes also have source-model proofs and native managedfields comparisons.
 
 `TestSSANumericListKeyOwnership` checks an integer-keyed map list. A's exact
 `2^53+1` key survives in stored data and raw FieldsV1, but decoding ownership
 rounds it to `2^53`; B adding that distinct neighbor item falsely conflicts.
 GET verifies unchanged data, claims and resourceVersion. Small independent
 integer keys succeed and preserve both items. These six functions exercise
-seventeen API/schema variants.
+nineteen API/schema variants.
 
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;

@@ -29,17 +29,19 @@ import (
 )
 
 type numericObservation struct {
-	RoundedOriginal           string `json:"roundedOriginal"`
-	RoundedControl            string `json:"roundedControl"`
-	OriginalEqualsDesired     bool   `json:"originalEqualsDesired"`
-	DesiredEqualsControl      bool   `json:"desiredEqualsControl"`
-	OriginalEqualsControl     bool   `json:"originalEqualsControl"`
-	DifferenceRemainder       string `json:"differenceRemainder"`
-	ExcludedContainsRemainder bool   `json:"excludedContainsRemainder"`
-	ScalarOnlyAmount          string `json:"scalarOnlyAmount"`
-	WithNoteAmount            string `json:"withNoteAmount"`
-	IntegerConflict           bool   `json:"integerConflict"`
-	BothCoOwn                 bool   `json:"bothCoOwn"`
+	RoundedOriginal            string `json:"roundedOriginal"`
+	RoundedControl             string `json:"roundedControl"`
+	OriginalEqualsDesired      bool   `json:"originalEqualsDesired"`
+	DesiredEqualsControl       bool   `json:"desiredEqualsControl"`
+	OriginalEqualsControl      bool   `json:"originalEqualsControl"`
+	DifferenceRemainder        string `json:"differenceRemainder"`
+	ExcludedContainsRemainder  bool   `json:"excludedContainsRemainder"`
+	ScalarOnlyAmount           string `json:"scalarOnlyAmount"`
+	WithNoteAmount             string `json:"withNoteAmount"`
+	IntegerConflict            bool   `json:"integerConflict"`
+	BothCoOwn                  bool   `json:"bothCoOwn"`
+	ForcedChangeKeepsForeign   bool   `json:"forcedChangeKeepsForeign"`
+	ForcedExactChangeTransfers bool   `json:"forcedExactChangeTransfers"`
 }
 
 func nativeNumericObservation() (numericObservation, error) {
@@ -92,7 +94,7 @@ types:
       type: {scalar: string}
 `}
 	result.BothCoOwn = true
-	for _, variant := range []string{"scalar-only", "with-note", "integer-control"} {
+	for _, variant := range []string{"scalar-only", "with-note", "integer-control", "forced", "forced-integer-control"} {
 		engine, err := newGoEngine(c)
 		if err != nil {
 			return result, err
@@ -108,10 +110,10 @@ types:
 		if variant != "scalar-only" {
 			intent["note"] = "changed"
 		}
-		if variant == "integer-control" {
+		if variant == "integer-control" || variant == "forced-integer-control" {
 			intent["amount"] = control
 		}
-		after, err := engine.step(Step{Manager: "B", Apply: intent})
+		after, err := engine.step(Step{Manager: "B", Apply: intent, Force: variant == "forced" || variant == "forced-integer-control"})
 		if err != nil {
 			return result, err
 		}
@@ -129,13 +131,22 @@ types:
 		if err != nil {
 			return result, err
 		}
-		if variant == "scalar-only" {
+		switch variant {
+		case "scalar-only":
 			result.ScalarOnlyAmount = amount
-		} else {
+		case "with-note":
 			result.WithNoteAmount = amount
+		case "forced":
+			result.ForcedChangeKeepsForeign = amount == "9223372036854775808" &&
+				slices.Contains(after.Owners["A"], ".amount") && slices.Contains(after.Owners["B"], ".amount")
+		case "forced-integer-control":
+			result.ForcedExactChangeTransfers = amount == "9223372036854775806" &&
+				!slices.Contains(after.Owners["A"], ".amount") && slices.Contains(after.Owners["B"], ".amount")
 		}
-		result.BothCoOwn = result.BothCoOwn &&
-			slices.Contains(after.Owners["A"], ".amount") && slices.Contains(after.Owners["B"], ".amount")
+		if variant == "scalar-only" || variant == "with-note" {
+			result.BothCoOwn = result.BothCoOwn &&
+				slices.Contains(after.Owners["A"], ".amount") && slices.Contains(after.Owners["B"], ".amount")
+		}
 	}
 	return result, nil
 }

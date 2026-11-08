@@ -133,9 +133,12 @@ def sourceOps : Ops Object Unit where
   wrap _ error := error
   mergeObjects live config := .ok (merged live config)
   finishUpdate live object _ owners actor force :=
-    if !force && owners.any (fun owner => owner.1 != actor &&
-        owner.2.fields.contains amountPath && !amountEqual live.amount object.amount) then .error ()
-    else .ok owners
+    let conflicts := fun owner : String × ManagerFields => owner.1 != actor &&
+      owner.2.fields.contains amountPath && !amountEqual live.amount object.amount
+    if !force && owners.any conflicts then .error ()
+    else .ok (owners.filterMap fun owner =>
+      let retained := if conflicts owner then owner.2.fields.filter (· != amountPath) else owner.2.fields
+      if retained.isEmpty then none else some (owner.1,{owner.2 with fields := retained}))
   equalObjects live object := amountEqual live.amount object.amount && (live.note == object.note)
 
 def initial : Object := {amount := some original}
@@ -172,6 +175,27 @@ theorem independent_note_changes_foreign_number :
     (intent true).amount.map magnitude ≠ initial.amount.map magnitude := by
   refine ⟨?_,by simp [ownersAfter,managerSet,ownersA],by decide⟩
   rw [Accepted,ApplySource.imported_apply_matches_spec]
+  rfl
+
+def ForcedAccepted (config : Object) (object : Value Object Unit) (owners : ManagedFields) : Prop :=
+  exec sourceOps 128 GoSource.applyProgram
+    (ApplySource.applyEnv initial config "v1" ownersA "B" true) =
+      .ok (.returned [object,.managed owners,.nil])
+
+/-- Force does not transfer a change that the rounded comparison fails to detect. -/
+theorem forced_change_retains_foreign_claim :
+    ForcedAccepted (intent true) (.object (intent true)) (ownersAfter true) ∧
+    ("A",⟨[amountPath],"v1",true⟩) ∈ ownersAfter true ∧
+    (intent true).amount.map magnitude ≠ initial.amount.map magnitude := by
+  refine ⟨?_,by simp [ownersAfter,managerSet,ownersA],by decide⟩
+  rw [ForcedAccepted,ApplySource.imported_apply_matches_spec]
+  rfl
+
+/-- The same forced updater transfers an exactly detected int-to-int modification. -/
+theorem forced_integer_control_transfers :
+    ForcedAccepted {amount := some control,note := true} (.object {amount := some control,note := true})
+      (managerSet [] "B" ⟨[amountPath,notePath],"v1",true⟩) := by
+  rw [ForcedAccepted,ApplySource.imported_apply_matches_spec]
   rfl
 
 /-- An exact int-to-int change still reaches the conflict error path. -/
@@ -214,6 +238,17 @@ theorem nonforce_foreign_value_safety_is_false : ¬EveryNonforceForeignScalarSur
   have wrong := preserves (intent true) (.object (intent true)) (ownersAfter true) witness.1 witness.2.1
   exact witness.2.2 wrong
 
+def EveryForcedChangeTransfersForeign : Prop :=
+  ∀ config object owners, ForcedAccepted config object owners →
+    (committedObject initial object).amount.map magnitude ≠ initial.amount.map magnitude →
+    ¬ ∃ entry, ("A",entry) ∈ owners ∧ amountPath ∈ entry.fields
+
+theorem forced_transfer_is_false : ¬EveryForcedChangeTransfersForeign := by
+  intro transfers
+  have witness := forced_change_retains_foreign_claim
+  have noClaim := transfers (intent true) (.object (intent true)) (ownersAfter true) witness.1 witness.2.2
+  exact noClaim ⟨⟨[amountPath],"v1",true⟩,witness.2.1,by simp⟩
+
 structure Observation where
   roundedOriginal : String
   roundedControl : String
@@ -226,6 +261,8 @@ structure Observation where
   withNoteAmount : String
   integerConflict : Bool
   bothCoOwn : Bool
+  forcedChangeKeepsForeign : Bool
+  forcedExactChangeTransfers : Bool
   deriving Lean.ToJson
 
 def observedAmount (object : Object) : String :=
@@ -233,9 +270,9 @@ def observedAmount (object : Object) : String :=
   | none => "absent"
   | some number => toString (magnitude number)
 
-def sourceObservation (config : Object) : Except String (Object × ManagedFields) :=
+def sourceObservation (config : Object) (force : Bool := false) : Except String (Object × ManagedFields) :=
   match exec sourceOps 128 GoSource.applyProgram
-      (ApplySource.applyEnv initial config "v1" ownersA "B" false) with
+      (ApplySource.applyEnv initial config "v1" ownersA "B" force) with
   | .ok (.returned [object,.managed owners,.nil]) => .ok (committedObject initial object,owners)
   | _ => .error "Numeric source execution did not return an accepted object"
 
@@ -248,6 +285,8 @@ def coOwns (owners : ManagedFields) : Bool :=
 def observe : Except String Observation := do
   let scalar ← sourceObservation (intent false)
   let note ← sourceObservation (intent true)
+  let forced ← sourceObservation (intent true) true
+  let forcedControl ← sourceObservation {amount := some control,note := true} true
   let remainder ← match ElementSubset.exec numericLess 22 ElementSource.differenceProgram
       {left := [control,original],right := [desired]} with
     | .ok (.returned [.set [number]]) => .ok (toString (magnitude number))
@@ -268,6 +307,11 @@ def observe : Except String Observation := do
     withNoteAmount := observedAmount note.1
     integerConflict := conflict
     bothCoOwn := coOwns scalar.2 && coOwns note.2
+    forcedChangeKeepsForeign := coOwns forced.2 &&
+      forced.1.amount.map magnitude != initial.amount.map magnitude
+    forcedExactChangeTransfers := forcedControl.1.amount.map magnitude == some (magnitude control) &&
+      !(forcedControl.2.any fun entry => entry.1 == "A" && entry.2.fields.contains amountPath) &&
+      forcedControl.2.any (fun entry => entry.1 == "B" && entry.2.fields.contains amountPath)
   }
 
 end SSA.NumericCounterexamples

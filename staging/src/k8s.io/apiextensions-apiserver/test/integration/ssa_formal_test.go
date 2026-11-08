@@ -169,6 +169,10 @@ type ssaFormalResource struct {
 }
 
 func (r ssaFormalResource) apply(t *testing.T, name, manager string, fields map[string]any, subresources ...string) (*unstructured.Unstructured, error) {
+	return r.applyWithOptions(t, name, metav1.PatchOptions{FieldManager: manager}, fields, subresources...)
+}
+
+func (r ssaFormalResource) applyWithOptions(t *testing.T, name string, options metav1.PatchOptions, fields map[string]any, subresources ...string) (*unstructured.Unstructured, error) {
 	t.Helper()
 	object := map[string]any{"apiVersion": r.apiVersion, "kind": r.kind, "metadata": map[string]any{"name": name}}
 	for key, value := range fields {
@@ -178,7 +182,7 @@ func (r ssaFormalResource) apply(t *testing.T, name, manager string, fields map[
 	if err != nil {
 		t.Fatal(err)
 	}
-	return r.Patch(context.Background(), name, types.ApplyPatchType, body, metav1.PatchOptions{FieldManager: manager}, subresources...)
+	return r.Patch(context.Background(), name, types.ApplyPatchType, body, options, subresources...)
 }
 
 // Empty-map intent has a presence claim, but granular pruning can still create null.
@@ -534,7 +538,7 @@ func TestSSANumericComparison(t *testing.T) {
 	defer tearDown()
 
 	const initial = int64(9223372036854775807)
-	for _, variant := range []string{"scalar-only", "with-note", "integer-control"} {
+	for _, variant := range []string{"scalar-only", "with-note", "integer-control", "forced-with-note", "forced-integer-control"} {
 		t.Run(variant, func(t *testing.T) {
 			resource := newSSAFormalResource(t, apiClient, dynamicClient, "numeric-"+variant+".formal.ssa", &apiextensionsv1.JSONSchemaProps{
 				Type: "object",
@@ -554,10 +558,14 @@ func TestSSANumericComparison(t *testing.T) {
 			if variant != "scalar-only" {
 				intent["note"] = "changed"
 			}
-			if variant == "integer-control" {
+			if variant == "integer-control" || variant == "forced-integer-control" {
 				intent["amount"] = initial - 1
 			}
-			after, err := resource.apply(t, variant, "B", intent)
+			options := metav1.PatchOptions{FieldManager: "B"}
+			if strings.HasPrefix(variant, "forced-") {
+				options.Force = ptr.To(true)
+			}
+			after, err := resource.applyWithOptions(t, variant, options, intent)
 			if variant == "integer-control" {
 				if !apierrors.IsConflict(err) {
 					t.Fatalf("exact integer changes must conflict: %v", err)
@@ -586,10 +594,14 @@ func TestSSANumericComparison(t *testing.T) {
 				if got, ok := after.Object["amount"].(int64); !ok || got != initial {
 					t.Fatalf("expected lost numeric intent after false no-op: %v (%T)", after.Object["amount"], after.Object["amount"])
 				}
+			} else if variant == "forced-integer-control" {
+				if got, ok := after.Object["amount"].(int64); !ok || got != initial-1 {
+					t.Fatalf("forced exact integer change was lost: %v (%T)", after.Object["amount"], after.Object["amount"])
+				}
 			} else if got, ok := after.Object["amount"].(float64); !ok || got != float64(9223372036854775808) {
 				t.Fatalf("expected rounded foreign-owned value to change without conflict: %v (%T)", after.Object["amount"], after.Object["amount"])
 			}
-			if variant == "with-note" && after.Object["note"] != "changed" {
+			if variant != "scalar-only" && after.Object["note"] != "changed" {
 				t.Fatalf("the independent note was not applied: %#v", after.Object)
 			}
 			owners := map[string]bool{}
@@ -608,8 +620,12 @@ func TestSSANumericComparison(t *testing.T) {
 					owners[owner.Manager] = true
 				}
 			}
-			if !reflect.DeepEqual(owners, map[string]bool{"A": true, "B": true}) {
-				t.Fatalf("both managers should retain the numeric claim: %#v", after.GetManagedFields())
+			expected := map[string]bool{"A": true, "B": true}
+			if variant == "forced-integer-control" {
+				expected = map[string]bool{"B": true}
+			}
+			if !reflect.DeepEqual(owners, expected) {
+				t.Fatalf("unexpected numeric claims: wanted %v, got %#v", expected, after.GetManagedFields())
 			}
 		})
 	}
