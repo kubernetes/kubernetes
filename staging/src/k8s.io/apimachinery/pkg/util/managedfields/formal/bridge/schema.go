@@ -17,11 +17,10 @@ limitations under the License.
 package bridge
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
-
-	"sigs.k8s.io/yaml"
 )
 
 // The adapter walks an independently decoded schema; it never asks ToFieldSet
@@ -72,11 +71,15 @@ func schemaFor(c Case) (*structuralSchema, error) {
 		root = "Document"
 	}
 	var document schemaDocument
-	if err := yaml.UnmarshalStrict([]byte(text), &document); err != nil {
+	if err := decodeStrictYAML([]byte(text), &document); err != nil {
 		return nil, err
 	}
 	s := &structuralSchema{document: document, types: map[string]schemaNode{}, root: root}
-	for _, t := range document.Types {
+	for index := range document.Types {
+		t := &document.Types[index]
+		if err := normalizeSchemaNumbers(&t.schemaNode); err != nil {
+			return nil, fmt.Errorf("schema type %s: %w", t.Name, err)
+		}
 		if _, exists := s.types[t.Name]; exists {
 			return nil, fmt.Errorf("duplicate type %s", t.Name)
 		}
@@ -111,7 +114,9 @@ func schemaFor(c Case) (*structuralSchema, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(data, &legacy); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&legacy); err != nil {
 		return nil, err
 	}
 	var strip func(*schemaNode)
@@ -135,6 +140,31 @@ func schemaFor(c Case) (*structuralSchema, error) {
 	data, err = json.Marshal(legacy)
 	s.legacy = string(data)
 	return s, err
+}
+
+func normalizeSchemaNumbers(node *schemaNode) error {
+	if node.Map != nil {
+		for index := range node.Map.Fields {
+			field := &node.Map.Fields[index]
+			converted, err := nativeNumbers(field.Default)
+			if err != nil {
+				return err
+			}
+			field.Default = converted
+			if err := normalizeSchemaNumbers(&field.Type); err != nil {
+				return err
+			}
+		}
+		if node.Map.ElementType != nil {
+			if err := normalizeSchemaNumbers(node.Map.ElementType); err != nil {
+				return err
+			}
+		}
+	}
+	if node.List != nil {
+		return normalizeSchemaNumbers(&node.List.ElementType)
+	}
+	return nil
 }
 
 func (s *structuralSchema) resolve(n schemaNode) (schemaNode, error) {

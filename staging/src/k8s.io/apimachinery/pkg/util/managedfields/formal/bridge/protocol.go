@@ -19,6 +19,7 @@ limitations under the License.
 package bridge
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -125,11 +126,59 @@ func (p path) element(text string) path {
 	}{text}})
 }
 func jsonValue(text string) any {
+	if !json.Valid([]byte(text)) {
+		panic(fmt.Errorf("invalid path JSON value: %q", text))
+	}
 	var v any
-	if err := json.Unmarshal([]byte(text), &v); err != nil {
+	decoder := json.NewDecoder(bytes.NewBufferString(text))
+	decoder.UseNumber()
+	if err := decoder.Decode(&v); err != nil {
 		panic(err)
 	}
-	return v
+	converted, err := nativeNumbers(v)
+	if err != nil {
+		panic(err)
+	}
+	return converted
+}
+
+// Keep numeric tokens exact until the declared untyped values are converted to the API's numeric domain.
+func decodeStrictYAML(data []byte, out any) error {
+	return yaml.UnmarshalStrict(data, out, func(decoder *json.Decoder) *json.Decoder {
+		decoder.UseNumber()
+		return decoder
+	})
+}
+
+func nativeNumbers(object any) (any, error) {
+	switch object := object.(type) {
+	case json.Number:
+		if integer, err := object.Int64(); err == nil {
+			return integer, nil
+		}
+		floating, err := object.Float64()
+		if err != nil {
+			return nil, fmt.Errorf("number %q cannot be represented as int64 or float64: %w", object, err)
+		}
+		return floating, nil
+	case map[string]any:
+		for key, value := range object {
+			converted, err := nativeNumbers(value)
+			if err != nil {
+				return nil, err
+			}
+			object[key] = converted
+		}
+	case []any:
+		for index, value := range object {
+			converted, err := nativeNumbers(value)
+			if err != nil {
+				return nil, err
+			}
+			object[index] = converted
+		}
+	}
+	return object, nil
 }
 
 func (p path) smd() fieldpath.Path {
@@ -244,7 +293,7 @@ func ReadReproducer(data []byte) (Corpus, error) {
 
 func readCorpus(data []byte, allowMissingOracles bool) (Corpus, error) {
 	var corpus Corpus
-	if err := yaml.UnmarshalStrict(data, &corpus); err != nil {
+	if err := decodeStrictYAML(data, &corpus); err != nil {
 		return corpus, err
 	}
 	if corpus.Version != 1 || len(corpus.Cases) == 0 {
@@ -272,6 +321,18 @@ func readCorpus(data []byte, allowMissingOracles bool) (Corpus, error) {
 			}
 		}
 		for i, step := range c.Steps {
+			objects := []map[string]any{step.Apply}
+			if step.Expect != nil {
+				objects = append(objects, step.Expect.Object)
+			}
+			if step.GoExpect != nil {
+				objects = append(objects, step.GoExpect.Object)
+			}
+			for _, object := range objects {
+				if _, err := nativeNumbers(object); err != nil {
+					return corpus, fmt.Errorf("%s step %d: %w", c.Name, i+1, err)
+				}
+			}
 			if step.Manager == "" || step.Apply == nil {
 				return corpus, fmt.Errorf("%s step %d needs manager and apply", c.Name, i+1)
 			}

@@ -72,6 +72,10 @@ func run() error {
 			return err
 		}
 		fmt.Printf("Imported element-set algebra: %d exact Go/interpreter/oracle subset pairs.\n", pairs)
+		if err := bridge.CompareNumericCounterexamples(context.Background(), *model); err != nil {
+			return err
+		}
+		fmt.Println("Numeric counterexamples: source model agrees with native equality, element sets and managedfields.")
 	}
 	return nil
 }

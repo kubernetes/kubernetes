@@ -760,5 +760,83 @@
     "scope": "helper",
     "meaning": "Natural rank comparison constructively satisfies every StrictOrder premise used by the executable comparison.",
     "limits": "This witnesses consistency and applicability for the rank domain; it does not prove the actual Go PathElement comparator implementation."
+  },
+  "SSA.NumericCounterexamples.witnesses_are_represented": {
+    "title": "Numeric witnesses are representable",
+    "scope": "execution",
+    "meaning": "Both int64 values and the binary64 2^63 witness lie in the declared represented domain.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.equality_is_not_transitive": {
+    "title": "Mixed numeric equality is nontransitive",
+    "scope": "execution",
+    "meaning": "MaxInt64 and MaxInt64-1 are distinct integers, but each compares equal to binary64 2^63 after mixed conversion.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.incomparability_is_not_transitive": {
+    "title": "Comparator incomparability is nontransitive",
+    "scope": "execution",
+    "meaning": "Each integer is incomparable with the float, while the two integers have a strict order.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.rounded_equality_changes_magnitude": {
+    "title": "Rounded equality misses a real numeric change",
+    "scope": "execution",
+    "meaning": "The mixed comparison reports equality between numbers with different exact magnitudes.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.no_faithful_equality_projection": {
+    "title": "No faithful equality quotient exists",
+    "scope": "general",
+    "meaning": "No encoding into ordinary identity can faithfully realize this numeric equality, even restricted to the represented domain.",
+    "limits": "The impossibility follows from three concrete represented witnesses; it does not assert that every individual numeric comparison is wrong."
+  },
+  "SSA.NumericCounterexamples.difference_retains_an_excluded_member": {
+    "title": "Numeric-key Difference violates the membership law",
+    "scope": "execution",
+    "meaning": "Individually sorted numeric-key inputs return MaxInt64 although the excluded set considers it present.",
+    "limits": "Executes the complete imported element-set body. Real Go Difference and Has independently reproduce the witness; conditional lawful-comparator algebra theorems remain valid."
+  },
+  "SSA.NumericCounterexamples.original_is_source_reachable": {
+    "title": "The A-owned starting state is reachable",
+    "scope": "execution",
+    "meaning": "A creates the exact integer and its claim from an empty object through the imported Apply body.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.scalar_only_is_false_noop": {
+    "title": "Scalar-only intent is lost as a false no-op",
+    "scope": "execution",
+    "meaning": "B asserts a different representable number; imported Apply returns nil while installing co-ownership. The wrapper retains the old integer.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.independent_note_changes_foreign_number": {
+    "title": "An unrelated note exposes the missed conflict",
+    "scope": "execution",
+    "meaning": "With the same number plus a note, B changes A’s numeric magnitude without force, while A keeps its claim.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.integer_change_conflicts": {
+    "title": "Exact integer comparison supplies a conflict control",
+    "scope": "execution",
+    "meaning": "A different int64 value reaches the conflict return. HTTP checks complete storage rollback.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.prune_callback_is_realized": {
+    "title": "Fresh-manager pruning is the imported nil branch",
+    "scope": "execution",
+    "meaning": "The concrete Apply witness’s pruning callback is realized by the imported prune body when B has no last set.",
+    "limits": "This closes that callback for the named history; general typed/update primitive refinement remains separate."
+  },
+  "SSA.NumericCounterexamples.exact_scalar_intent_is_false": {
+    "title": "BASE-01: unrestricted scalar intent is false",
+    "scope": "execution",
+    "meaning": "A represented numeric assertion succeeds but its exact magnitude is absent from the committed object.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCounterexamples.nonforce_foreign_value_safety_is_false": {
+    "title": "BASE-04: unrestricted numeric conflict safety is false",
+    "scope": "execution",
+    "meaning": "A non-forced request changes an A-owned numeric magnitude while retaining A’s claim.",
+    "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
   }
 }

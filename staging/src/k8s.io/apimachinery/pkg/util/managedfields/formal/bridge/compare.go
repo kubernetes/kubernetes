@@ -45,7 +45,11 @@ func equalSnapshot(want, got Snapshot) error {
 }
 
 func runModel(ctx context.Context, model, mode string, input []byte) ([]byte, error) {
-	command := exec.CommandContext(ctx, model, mode, "-")
+	arguments := []string{mode}
+	if input != nil {
+		arguments = append(arguments, "-")
+	}
+	command := exec.CommandContext(ctx, model, arguments...)
 	command.Stdin = bytes.NewReader(input)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr

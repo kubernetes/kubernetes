@@ -38,8 +38,12 @@ The required checks are:
    actual FieldsV1 ownership serialization between requests.
 7. Live Lean/Go comparison of the corpus and deterministic generated sequences.
    The imported element-set interpreter also runs against real Go and an
-   independent membership oracles on all 4,096 subset pairs per operation
+   independent membership oracle on all 4,096 subset pairs per operation
    (12,288 total), covering field, key, value and index selectors.
+   Separate numeric witnesses compare imported Apply/element-set execution
+   with real mixed numeric equality and managedfields, including both false
+   no-op and missed-conflict outcomes. Reader tests preserve exact int64 tokens
+   in requests, independent expectations, paths and schema defaults.
 8. Actual merge tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
@@ -93,7 +97,13 @@ resourceVersion. Empty creation without the optional list is a valid control.
 and conventional spec/status reset behavior. Its additional-root variant
 reproduces a status claim on an unchanged `settings.desired` field that the REST
 strategy resets; the original main manager's next change conflicts atomically.
-These four test functions exercise twelve API/schema variants.
+
+`TestSSANumericComparison` checks a valid optional `type: number` scalar with
+no defaults, validation rule or webhook. A owns MaxInt64; B requests binary64
+`2^63` without force. Scalar-only intent is lost as a false no-op; with an
+unrelated note the different number persists while A retains ownership. A
+different exact int64 correctly conflicts. GET checks every accepted result
+and rejection. These five test functions exercise fifteen API/schema variants.
 
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;

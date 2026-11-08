@@ -19,6 +19,7 @@ package bridge
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -91,6 +92,60 @@ func TestCorpusRejectsMissingOraclesAndBroadExceptions(t *testing.T) {
 		if _, err := ReadCorpus([]byte(data)); err == nil {
 			t.Fatalf("accepted invalid corpus: %s", data)
 		}
+	}
+}
+
+func TestReaderPreservesNativeNumericValues(t *testing.T) {
+	const data = `version: 1
+cases:
+- name: exact numeric tokens
+  steps:
+  - manager: A
+    apply: &object
+      number: 9223372036854775807
+      nested: [{integer: 9007199254740993, floating: 9223372036854775808}]
+    expect:
+      object: *object
+      owners: {}
+`
+	corpus, err := ReadCorpus([]byte(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := map[string]any{
+		"number": int64(9223372036854775807),
+		"nested": []any{map[string]any{"integer": int64(9007199254740993), "floating": float64(9223372036854775808)}},
+	}
+	step := corpus.Cases[0].Steps[0]
+	if !reflect.DeepEqual(step.Apply, expected) || !reflect.DeepEqual(step.Expect.Object, expected) {
+		t.Fatalf("corpus rounded numeric inputs or independent expectations: %+v", step)
+	}
+	pathValue := jsonValue(`{"integer":9223372036854775807,"nested":[9007199254740993,9223372036854775808]}`)
+	if !reflect.DeepEqual(pathValue, map[string]any{
+		"integer": int64(9223372036854775807), "nested": []any{int64(9007199254740993), float64(9223372036854775808)},
+	}) {
+		t.Fatalf("path JSON rounded an integer: %#v", pathValue)
+	}
+	schema, err := schemaFor(Case{Schema: `types:
+- name: Document
+  map:
+    fields:
+    - name: number
+      type: {scalar: numeric}
+      default: 9223372036854775807
+`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := schema.types["Document"].Map.Fields[0].Default; got != int64(9223372036854775807) {
+		t.Fatalf("schema rounded a numeric default: %#v", got)
+	}
+	var legacy schemaDocument
+	if err := decodeStrictYAML([]byte(schema.legacy), &legacy); err != nil {
+		t.Fatal(err)
+	}
+	if got := legacy.Types[0].Map.Fields[0].Default; got != json.Number("9223372036854775807") {
+		t.Fatalf("legacy schema copy rounded a numeric default: %#v", got)
 	}
 }
 

@@ -13,6 +13,7 @@ reported together with the preceding transition that caused it.
 | SSA-02 | Explicitly empty granular map after releasing an owned child | First Apply produces `null` while retaining the map claim. Optional non-nullable maps cannot be emptied. Nullable maps change on repetition and can cause a conflict for another manager's identical intent. | Lean execution/intent counterexamples and all finite retry counts; source-bound witness; actual managedfields; both pinned SMD revisions; CRD HTTP/etcd. |
 | SSA-03 | Omission after another manager Updates an item child | The item and its foreign-owned child disappear; the list becomes null. A nullable schema accepts this; a non-nullable schema rejects every retry. | Reachable Lean Apply/Update counterexample and source witness; actual managedfields and pinned SMD; nullable/non-nullable CRD HTTP. Existing report: [#134902](https://github.com/kubernetes/kubernetes/issues/134902). |
 | SSA-04 | Status Apply includes an additional non-status root field | The status actor acquires the unchanged field even though the REST strategy resets it. A later main-endpoint change conflicts. | Reachable Lean refutation; complete imported Apply with explicit primitive instances; real CRD HTTP/etcd and conventional spec/status controls. |
+| SSA-05 | Mixed int64/float64 comparison near `2^63` | Scalar-only intent is lost as a false no-op. Adding an unrelated field instead lets B change A's numeric value without force while both retain ownership. | Lean scalar-intent/foreign-value refutations and imported Apply witnesses; native equality and numeric-key set failure; managedfields; CRD HTTP/etcd/GET with an exact-integer conflict control. |
 | PR336-01 | Fragmented required ownership followed by partial-manager omission | A partial manager can delete another partial manager's required data. | Lean execution; exact pinned head/base comparison. |
 | PR336-02 | Direct required-map membership shortcut | The classifier calls a manager full without ownership of required children. An invalid item can remain after the actual full owner leaves. | General classifier theorem; concrete Lean execution; actual pinned head/base outcomes. |
 | PR336-03 | Required granular-list ownership | A supplier owning all child items is classified partial because Apply generated no direct list-presence claim. Another partial manager can delete its data. | General classifier fact; populated/empty Lean counterexamples; exact pinned head/base comparison. |
@@ -253,6 +254,98 @@ This is BASE-12b in the catalogue. Conventional spec/status exclusion (BASE-12)
 is a narrower obligation and is not refuted by this example. The mismatch is in
 the CRD status strategy's declared reset scope, independently of PR #336.
 
+## SSA-05: rounded numeric comparison loses intent or misses a conflict
+
+The CRD's `spec.versions[*].schema.openAPIV3Schema` contains:
+
+```yaml
+type: object
+properties:
+  amount:
+    type: number
+  note:
+    type: string
+```
+
+Neither field is required. No default, CEL rule, webhook, conversion or schema
+change is involved. On each fresh resource, A first applies:
+
+```yaml
+amount: 9223372036854775807
+```
+
+The API stores this exact int64. B then applies without force:
+
+```yaml
+amount: 9223372036854775808
+```
+
+That numeric token is represented as binary64 `2^63`. It has a different exact
+magnitude from A's int64, but mixed comparison rounds A's integer to the same
+float. Two fresh-resource variants expose different effects:
+
+| B's request | Persisted result |
+| --- | --- |
+| Only the numeric assertion above | False whole-object no-op: the original int64 remains, while B co-claims `amount`. B's scalar intent is lost. |
+| The same numeric assertion plus `note: changed` | The note makes the whole object differ. The new binary64 magnitude persists without conflict, while A and B both retain the `amount` claim. |
+| Exact int64 `9223372036854775806` plus the note | HTTP conflict; all data, claims and resourceVersion remain unchanged. |
+
+`TestSSANumericComparison` verifies response types and values, both claims,
+and a persisted GET after every accepted request or conflict. JSON encoders
+may print binary64 `2^63` using a rounded shortest decimal spelling such as
+`9223372036854776000`; the test observes the decoded float's exact native
+magnitude. The initial int64 is checked before B's request, so this is not
+pre-rounding in a client.
+
+### Source cause and equality boundary
+
+SMD `value.EqualsUsing` casts the integer to float64 whenever either operand is
+a float; integer/integer comparison remains exact. `CompareUsing` uses the
+same mixed conversion. Both MaxInt64 and MaxInt64-1 round to binary64 `2^63`,
+although they are different integers. Consequently equality and comparator
+incomparability are nontransitive. No faithful quotient into ordinary equality
+can repair that relation on the full represented domain.
+
+The final updater misses the numeric modification, so it neither conflicts nor
+removes A's claim. The complete imported Apply body then uses whole-object
+equality to choose its nil-on-no-op return. The unrelated note changes this
+second decision, explaining the two outcomes without changing the number.
+
+The failure also reaches field-path set algebra: with numeric keys
+`[MaxInt64-1, MaxInt64]` minus `[binary64 2^63]`, real `Difference` retains
+MaxInt64, although the excluded set's real `Has` says it contains that key.
+Both inputs are individually sorted. The usual algebra proofs remain valid
+under their explicit lawful-comparator premises; the current numeric comparator
+cannot satisfy those premises globally.
+
+### Kernel and implementation evidence
+
+[`SSA/NumericCounterexamples.lean`](../SSA/NumericCounterexamples.lean) contains:
+
+- `equality_is_not_transitive`, `incomparability_is_not_transitive` and
+  `no_faithful_equality_projection`.
+- `difference_retains_an_excluded_member`, executing the complete imported
+  element-set body rather than only a replacement algorithm.
+- `original_is_source_reachable`, `scalar_only_is_false_noop`,
+  `independent_note_changes_foreign_number` and `integer_change_conflicts`,
+  executing the complete imported Apply body. The fresh-manager prune callback
+  is realized by the imported nil-last-set branch.
+- `exact_scalar_intent_is_false` and
+  `nonforce_foreign_value_safety_is_false`, refuting unrestricted BASE-01/04.
+
+The numeric specification models finite nonnegative integral witnesses and
+nearest-ties-even integer rounding. It does not prove general IEEE conversion
+or all typed/updater primitives. The executable source report is independently
+compared with native Go equality, element sets and managedfields; the HTTP test
+additionally checks actual request decoding, storage and claims. Those concrete
+agreements establish these witnesses without inventing a universal primitive
+refinement. The ordinary normalized model's positive laws remain separate.
+
+The bridge's corpus/path/default decoder now preserves int64 tokens before
+falling back to float64. Its previous untyped float64 decoding could round away
+exact integers before both engines saw them. That adapter defect is fixed and
+regression-tested, not counted as a second production bug.
+
 ## PR336-01: a partial manager can authorize deletion
 
 An item is keyed by `name`; `host` and `port` are required:
@@ -318,7 +411,7 @@ bash ci/verify-apiserver.sh
 
 The first command runs the kernel checks, independent outcomes and actual
 pinned SMD head/base comparisons. The second starts local etcd and
-apiextensions-apiserver and executes the list and map HTTP tests.
+apiextensions-apiserver and executes the container, handoff, reset and numeric HTTP tests.
 
 API-version conversion, arbitrary webhook implementations, all defaulting
 programs and the complete Go request pipeline do not have universal refinement

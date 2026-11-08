@@ -47,10 +47,10 @@ guarantees.
 
 | ID | Observable contract | Source | Current proof boundary |
 | --- | --- | --- | --- |
-| BASE-01 | Owned scalar intent is retained; empty/null containers need phase-specific treatment. | KEP goals; typed merge/leaf tests linked in its testing plan. | `Contracts.accepted_preserves_intent` proves the proposed core statement. The separate current/PR pruning model preserves actual SMD empty/null behavior; it does not inherit that stronger exact-container conclusion. |
+| BASE-01 | Owned scalar intent is retained; empty/null containers need phase-specific treatment. | KEP goals; typed merge/leaf tests linked in its testing plan. | **Refuted for unrestricted baseline numeric scalars.** `NumericCounterexamples.exact_scalar_intent_is_false` gives an accepted false no-op that discards a valid numeric assertion while granting its claim; actual managedfields and CRD HTTP/GET reproduce it. `Contracts.accepted_preserves_intent` remains the separate proposed-core theorem. Current/PR empty/null handling also does not inherit that stronger exact-container conclusion. |
 | BASE-02 | An omitted exclusively owned scalar disappears. | [Exclusive omission test][exclusive]. | `Contracts.exclusive_omission_removes_value`; applies to non-defaulted scalar cells in the candidate result. It does not claim the final API value stays absent after defaulting. |
 | BASE-03 | An omitted shared scalar survives while another owner remains. | [Shared omission test][shared]. | `Contracts.shared_omission_preserves_value`, with explicit no-overwrite and no-ancestor-deletion assumptions. The latter matters for the proposed extension. |
-| BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | `WireContracts.foreign_change_conflicts` proves the conflict result for current/PR modes, valid initial shape, a normalized non-forced request and a changed foreign-owned final target. `accepted_nonforce_foreign_unchanged` proves the converse safety direction. Go typed comparison and the remaining updater orchestration still need refinement. Update is a separate transition. |
+| BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | **Refuted for unrestricted baseline numeric scalars.** `NumericCounterexamples.nonforce_foreign_value_safety_is_false` changes A's exact numeric magnitude without force while retaining A's claim; managedfields and CRD HTTP/GET reproduce it. `WireContracts.foreign_change_conflicts` and `accepted_nonforce_foreign_unchanged` remain general normalized-model laws, conditional on faithful typed comparison for application to Go. Update is a separate transition. |
 | BASE-05 | Asserting the same values cannot alone cause an ownership conflict. | Shared-ownership cases; KEP cooperative-management goal. | `Contracts.equal_writes_do_not_conflict`. Other guards may still reject the request. |
 | BASE-06 | Force transfers conflicting value claims, while equal-value claims may remain shared. | [Apply/Update/force test][conflict]. | Current/PR `WireContracts.force_transfers_changed_claim`, `unchanged_foreign_claim_preserved` and `accepted_foreign_claim_exact` now characterize claims in the final accepted result. `forced_accepts_valid_candidate` proves progress through the conflict gate while retaining structural checks. Typed comparison/sets and the Go updater remain implementation obligations. The separate proposed-core results concern its own ownership phase. |
 | BASE-07 | Once B has acquired ownership, A's omission must not erase B's retained values. | [Controller handoff test][handoff]. | **Refuted without an item-lifetime premise.** `HandoffCounterexamples.unrestricted_foreign_omission_safety_is_false` gives a reachable Apply/Update history: B owns a scalar child but not its item, and A's non-forced omission removes both. Nullable CRD HTTP accepts that deletion; non-nullable validation rejects the generated null. The conditional `Contracts.shared_omission_preserves_value` / `handoff_preserves_full_successor` retain their explicit lifetime assumptions. General Go refinement of those positive laws remains open. |
@@ -61,12 +61,23 @@ guarantees.
 | BASE-12 | Spec/status reset fields do not acquire claims in the other subresource. | [Reset-fields test][reset]. | `ApplySource.imported_apply_excludes_reset_fields` proves exclusion through the complete imported Apply body, conditional on the configured prefix filter and the final updater's explicit actor-non-growth contract. `ResetFields` proves arbitrary-depth prefix exclusion, idempotence and trie membership refinement. HTTP controls confirm both directions for conventional spec/status fields. The Go filter implementation, updater non-growth and complete subresource envelope remain refinement obligations. |
 | BASE-12b | Every field restored by a subresource's REST strategy is also excluded from that subresource's new claims. | Generalization of BASE-12 to valid CRDs with additional root fields. | **Refuted.** `ResetCounterexamples.broad_status_reset_contract_is_false` gives a reachable co-ownership/conflict witness. The CRD status strategy restores `settings`, but its configured reset roots exclude only spec and metadata. HTTP reproduces a status claim on unchanged `settings.desired`, followed by a conflict on the original main manager's next change. This does not refute the narrower conventional spec/status contract. |
 
-For BASE-04/06, “changed” is the final typed comparison, not merely a different
-request payload. The statements quantify over every foreign manager and both
+For the positive BASE-04/06 wire-model theorems, “changed” compares final model
+values, not merely request payloads. The statements quantify over every foreign manager and both
 Apply/Update ownership flags. Presence of the final target is explicit; a
 removed target instead loses its claim by `removed_foreign_claim_dropped`.
 These general wire-model proofs do not close the Go implementation obligations
-listed in their rows.
+listed in their rows. In particular, defining semantic change by Go's rounded
+comparison would hide the numeric BASE-04 refutation. Observable numeric
+magnitudes differ in that witness; the existing comparator misses the change.
+
+SSA-05 starts with A owning exact int64 `9223372036854775807`. B asserts
+`9223372036854775808`, decoded as binary64 `2^63`, without force. With only
+`amount`, Apply treats the result as a no-op, keeps A's old value and adds B's
+claim. If B also adds unrelated `note: changed`, the numeric change persists,
+with both claims intact. An int64-to-int64 change to `9223372036854775806`
+correctly conflicts. No required rule, default, CEL or webhook is involved.
+This closes the unrestricted BASE-01/04 claims by counterexample, not the
+remaining positive implementation obligations. See [SSA-05](docs/ssa-bugs.md#ssa-05-rounded-numeric-comparison-loses-intent-or-misses-a-conflict).
 
 BASE-07's counterexample starts from an empty object. A applies
 `items: [{name: db, host: old}]`; B uses Update to set `host: new`. B acquires
@@ -277,8 +288,22 @@ The independent Go check additionally covers all 4,096 subset pairs of a fixed
 six-element domain per operation (12,288 cases total), spanning field, key,
 value and index selectors, with input-size and membership preservation checks.
 A mutation of each method's equal-key guard must fail the unchanged shared
-proof. The actual Go comparator laws, `Has`/binary search, recursive Set/SetNodeMap
-operations and complete composition with Apply remain open. These element
+proof. A faithful equality/order realization over the unrestricted mixed Go
+numeric domain is **refuted**, rather than left as an assumed future proof.
+`NumericCounterexamples.equality_is_not_transitive` and
+`no_faithful_equality_projection` show that no ordinary-identity quotient can
+faithfully encode even the represented witness domain. Comparator
+incomparability is also nontransitive. Sorted numeric-key sets yield an imported
+Difference result containing a member that the excluded set's real `Has` finds;
+the native/source comparison checks this exact witness.
+
+The rounding specification covers only finite nonnegative integral witnesses,
+with native Go and HTTP independently checking the concrete results. General
+IEEE conversion, typed comparison, `Has`/binary search, recursive Set/SetNodeMap
+operations and complete composition with Apply still need their own treatment.
+The conditional element-algebra theorems remain valid; their comparator premises
+cannot be universally discharged for the existing mixed numeric implementation.
+These element
 components do not silently discharge the whole reset filter or the normalized
 full-path primitives used by pruning.
 

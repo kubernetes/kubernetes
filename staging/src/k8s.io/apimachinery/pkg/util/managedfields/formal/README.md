@@ -126,6 +126,17 @@ rejection. Conventional spec/status reset controls pass. The complete imported
 Apply body explains installation through the configured filter, whose roots
 omit settings; primitive and REST-envelope refinement remain explicit.
 
+A numeric counterexample refutes unrestricted scalar-intent and non-forced
+foreign-value safety. A owns exact int64 `9223372036854775807`; B asserts
+binary64 `2^63`, without force. Alone, the assertion is discarded as a false
+no-op while B acquires its claim. Adding unrelated `note: changed` makes the
+different numeric value persist while both managers retain the claim. Real
+HTTP/GET confirms both results; an exact int64 change correctly conflicts.
+`NumericCounterexamples` proves these concrete imported-Apply executions and
+the contract refutations under explicit scalar primitives. It also proves
+nontransitive numeric equality and the impossibility of a faithful ordinary
+equality quotient. See [SSA-05](docs/ssa-bugs.md#ssa-05-rounded-numeric-comparison-loses-intent-or-misses-a-conflict).
+
 ## What is checked
 
 - General core laws: scalar conflicts, equal-value co-ownership, force transfer,
@@ -255,6 +266,14 @@ search, recursive Set/SetNodeMap operations and complete filter composition
 remain explicit obligations. These component theorems do not prove the full
 field-path operations used by pruning.
 
+The mixed numeric comparator actually fails the global equality/order premise:
+two distinct int64 values can each compare equal to one float64. A concrete
+numeric-key Difference retains an element that the excluded set's `Has` finds.
+`--numeric-counterexamples` executes the imported source witnesses; the Go
+comparison checks their observations against real equality, element sets and
+managedfields. General IEEE conversion and typed primitives are not thereby
+verified; the witness model represents finite nonnegative integral floats only.
+
 `RawSourceCounterexamples` instantiates this complete pruning chain for both
 empty-list transitions, with all callees realized under every lawful map
 schedule. The actual typed/set implementations are still separate from those
@@ -285,6 +304,13 @@ wrappers with real FieldsV1 round trips. New mismatches fail with a replayable
 request prefix. There is no tolerated `model-gap` category. Intended differences
 between the stronger policy and existing Go require exact independent outcomes
 for both engines.
+
+Corpus, path and schema-default decoding preserve int64 tokens before falling
+back to float64, matching the API's numeric domain. Regression checks retain
+integers above `2^53`, including MaxInt64, in both requests and independent
+expectations. Previously the adapter rounded untyped numbers to float64 before
+either engine could observe them; that comparison defect is fixed rather than
+used to exclude the numeric counterexample.
 
 The adapter keeps operation distinct from the literal manager name. Plain names
 retain readable labels such as `A` and `A@update`; names containing reserved
@@ -350,6 +376,8 @@ in [ci](ci/README.md) requires a separate test-infra activation.
 In a Kubernetes checkout, `bash ci/verify-apiserver.sh` additionally runs the
 actual HTTP/etcd empty-container counterexamples, Required/CEL rejection,
 ownership bootstrap, Update-owned list-item omission and status reset ownership.
+It also checks all three numeric variants, with exact native numeric types,
+retained claims and persisted GET observations.
 The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
 to Kubernetes integration testing and is unavailable in published apimachinery.
 

@@ -523,3 +523,93 @@ func TestSSAStatusResetOwnership(t *testing.T) {
 		})
 	}
 }
+
+// A rounded mixed-number equality can hide a field change from the conflict detector.
+func TestSSANumericComparison(t *testing.T) {
+	tearDown, apiClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	const initial = int64(9223372036854775807)
+	for _, variant := range []string{"scalar-only", "with-note", "integer-control"} {
+		t.Run(variant, func(t *testing.T) {
+			resource := newSSAFormalResource(t, apiClient, dynamicClient, "numeric-"+variant+".formal.ssa", &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"amount": {Type: "number"},
+					"note":   {Type: "string"},
+				},
+			})
+			before, err := resource.apply(t, variant, "A", map[string]any{"amount": initial})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, ok := before.Object["amount"].(int64); !ok || got != initial {
+				t.Fatalf("initial Apply did not preserve the exact int64: %v (%T)", before.Object["amount"], before.Object["amount"])
+			}
+			intent := map[string]any{"amount": json.Number("9223372036854775808")}
+			if variant != "scalar-only" {
+				intent["note"] = "changed"
+			}
+			if variant == "integer-control" {
+				intent["amount"] = initial - 1
+			}
+			after, err := resource.apply(t, variant, "B", intent)
+			if variant == "integer-control" {
+				if !apierrors.IsConflict(err) {
+					t.Fatalf("exact integer changes must conflict: %v", err)
+				}
+				stored, err := resource.Get(context.Background(), variant, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(stored.Object, before.Object) {
+					t.Fatal("rejected integer change modified storage")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			stored, err := resource.Get(context.Background(), variant, metav1.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(stored.Object, after.Object) {
+				t.Fatal("numeric Apply response differs from persisted data, claims or resourceVersion")
+			}
+
+			if variant == "scalar-only" {
+				if got, ok := after.Object["amount"].(int64); !ok || got != initial {
+					t.Fatalf("expected lost numeric intent after false no-op: %v (%T)", after.Object["amount"], after.Object["amount"])
+				}
+			} else if got, ok := after.Object["amount"].(float64); !ok || got != float64(9223372036854775808) {
+				t.Fatalf("expected rounded foreign-owned value to change without conflict: %v (%T)", after.Object["amount"], after.Object["amount"])
+			}
+			if variant == "with-note" && after.Object["note"] != "changed" {
+				t.Fatalf("the independent note was not applied: %#v", after.Object)
+			}
+			owners := map[string]bool{}
+			for _, owner := range after.GetManagedFields() {
+				var fields map[string]any
+				if owner.FieldsV1 == nil {
+					t.Fatal("numeric owner has no FieldsV1")
+				}
+				if err := json.Unmarshal(owner.FieldsV1.Raw, &fields); err != nil {
+					t.Fatal(err)
+				}
+				if _, found := fields["f:amount"]; found {
+					if owner.Operation != metav1.ManagedFieldsOperationApply || owner.Subresource != "" {
+						t.Fatalf("numeric claim has an unexpected manager identity: %+v", owner)
+					}
+					owners[owner.Manager] = true
+				}
+			}
+			if !reflect.DeepEqual(owners, map[string]bool{"A": true, "B": true}) {
+				t.Fatalf("both managers should retain the numeric claim: %#v", after.GetManagedFields())
+			}
+		})
+	}
+}
