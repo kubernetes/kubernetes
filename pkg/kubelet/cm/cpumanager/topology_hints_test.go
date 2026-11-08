@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -278,6 +279,88 @@ func TestGetTopologyHints(t *testing.T) {
 		if !reflect.DeepEqual(tc.expectedHints, hints) {
 			t.Errorf("Test case %q: Expected in result to be %v , got %v", tc.name, tc.expectedHints, hints)
 		}
+	}
+}
+
+func TestGetTopologyHintsReusableInitContainerCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	machineInfo := returnMachineInfo()
+	topo, _ := topology.Discover(logger, &machineInfo)
+
+	numa0, _ := bitmask.NewBitMask(0)
+	numa1, _ := bitmask.NewBitMask(1)
+	bothNUMA, _ := bitmask.NewBitMask(0, 1)
+
+	// placement is a hint without its Score, which these cases do not exercise.
+	placement := func(affinity bitmask.BitMask, preferred bool) string {
+		return fmt.Sprintf("%s preferred=%t", affinity, preferred)
+	}
+
+	testCases := []struct {
+		name string
+		// The init container has run on CPU 0 (NUMA 0), so CPU 0 is reusable.
+		defaultCPUSet cpuset.CPUSet
+		expected      []string
+	}{
+		{
+			// NUMA 0 has CPU 0 plus five free CPUs: the app container fits next
+			// to the reusable CPU, so only hints that keep it in reach are
+			// offered, as before.
+			name:          "app container fits on the NUMA node of the reusable CPUs",
+			defaultCPUSet: cpuset.New(1, 2, 6, 7, 8, 3, 4, 5, 9, 10, 11),
+			expected: []string{
+				placement(numa0, true),
+				placement(bothNUMA, false),
+			},
+		},
+		{
+			// NUMA 0 has CPU 0 plus one free CPU, NUMA 1 has six: the only
+			// single-NUMA placement is NUMA 1. Requiring the reusable CPU left
+			// only the cross-NUMA hint, which single-numa-node rejects.
+			name:          "app container only fits on another NUMA node",
+			defaultCPUSet: cpuset.New(1, 3, 4, 5, 9, 10, 11),
+			expected: []string{
+				placement(numa1, true),
+				placement(bothNUMA, false),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := makePod("fakePod", "app", "4", "4")
+			pod.Spec.InitContainers = []v1.Container{{Name: "init", Resources: pod.Spec.Containers[0].Resources}}
+			container := &pod.Spec.Containers[0]
+
+			m := manager{
+				policy: &staticPolicy{
+					topology:    topo,
+					numaNodes:   topo.CPUDetails.NUMANodes().List(),
+					cpusToReuse: map[string]cpuset.CPUSet{string(pod.UID): cpuset.New(0)},
+				},
+				state: &mockState{
+					assignments: state.ContainerCPUAssignments{
+						string(pod.UID): map[string]cpuset.CPUSet{"init": cpuset.New(0)},
+					},
+					defaultCPUSet: tc.defaultCPUSet,
+				},
+				topology:          topo,
+				activePods:        func() []*v1.Pod { return []*v1.Pod{pod} },
+				podStatusProvider: mockPodStatusProvider{},
+				sourcesReady:      &sourcesReadyStub{},
+			}
+
+			hints := m.GetTopologyHints(logger, pod, container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
+			var got []string
+			for _, hint := range hints {
+				got = append(got, placement(hint.NUMANodeAffinity, hint.Preferred))
+			}
+			sort.Strings(got)
+			sort.Strings(tc.expected)
+			if !reflect.DeepEqual(tc.expected, got) {
+				t.Errorf("expected hints %q, got %q", tc.expected, got)
+			}
+		})
 	}
 }
 

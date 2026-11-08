@@ -1206,11 +1206,32 @@ func (p *staticPolicy) getTopologyHintsForAdd(logger klog.Logger, s state.State,
 	// Generate hints. Outside of regeneration the usable CPUs are exactly the
 	// free ones, so the same set drives both feasibility and the Score.
 	cpuHints := p.generateCPUTopologyHints(available, reusable, available, requested)
+
+	// Only hints that cover the reusable CPUs were generated, so that the CPUs
+	// the init containers hand over get reused. When none of those is
+	// preferred, the container does not fit next to them, and keeping the
+	// reuse would turn a placement that fits elsewhere into a
+	// TopologyAffinityError. The init containers have finished by the time
+	// this container starts, so their CPUs are not a placement constraint:
+	// offer the hints that treat them as one more usable CPU instead.
+	if !reusable.IsEmpty() && !hasPreferredHint(cpuHints) {
+		cpuHints = p.generateCPUTopologyHints(available.Union(reusable), cpuset.New(), available, requested)
+	}
 	logger.Info("TopologyHints generated", "cpuHints", cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
 		string(v1.ResourceCPU): cpuHints,
 	}
+}
+
+// hasPreferredHint reports whether any of the hints is preferred.
+func hasPreferredHint(hints []topologymanager.TopologyHint) bool {
+	for _, hint := range hints {
+		if hint.Preferred {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *staticPolicy) GetPodTopologyHints(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
