@@ -680,7 +680,7 @@ func (claimController *claimControllerSingleton) start(tCtx ktesting.TContext) {
 
 	claimController.informerFactory.Start(claimControllerCtx.Done())
 	claimController.wg.Go(func() {
-		controller.Run(claimControllerCtx, 1 /* one worker to get more readable log output without interleaving */)
+		controller.Run(claimControllerCtx, 50 /* default ConcurrentSyncs in KCM */)
 	})
 	tCtx.Logf("Started the claimController for test %s.", tCtx.Name())
 }
