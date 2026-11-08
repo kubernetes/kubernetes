@@ -37,6 +37,12 @@ func TestKubeFeaturesRegistered(t *testing.T) {
 	}
 }
 
+func TestKubeletWatchdogDiagnosticsDisabledByDefault(t *testing.T) {
+	if utilfeature.DefaultFeatureGate.Enabled(KubeletWatchdogDiagnostics) {
+		t.Fatal("KubeletWatchdogDiagnostics must be disabled by default in Alpha")
+	}
+}
+
 // TestClientFeaturesRegistered tests that all client features are registered.
 func TestClientFeaturesRegistered(t *testing.T) {
 	onlyClientFg := featuregate.NewFeatureGate()
