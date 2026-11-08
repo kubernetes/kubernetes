@@ -346,3 +346,34 @@ func TestReconstructGlobalVolumes(t *testing.T) {
 	})
 
 }
+
+// TestReconstructGlobalMountCountedOnce checks that a staged volume whose pod
+// directory still exists adds one to reconstruct_volume_operations_total: the
+// pod directory walk reconstructs it, and the global mount listing does not
+// count it again.
+func TestReconstructGlobalMountCountedOnce(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIGlobalMountReconstruction, true)
+	logger, _ := ktesting.NewTestContext(t)
+	basemetrics.NewKubeRegistry().MustRegister(volmetrics.ReconstructVolumeOperationsTotal)
+
+	kubeletDir := t.TempDir()
+	podVolumeDir := filepath.Join(kubeletDir, "pods", "pod1", "volumes", "fake-plugin", "fake-device1")
+	if err := os.MkdirAll(podVolumeDir, 0o755); err != nil {
+		t.Fatalf("setup pod volume dir: %v", err)
+	}
+	rc, fakePlugin := getReconciler(kubeletDir, t, []string{podVolumeDir}, nil)
+	fakePlugin.GlobalVolumes = []volume.GlobalVolume{stagedVolume("staged-pv", "fake-device1")}
+
+	before, err := metricstestutil.GetCounterMetricValue(volmetrics.ReconstructVolumeOperationsTotal)
+	if err != nil {
+		t.Fatalf("read metric before: %v", err)
+	}
+	rc.(*reconciler).reconstructVolumes(logger)
+	after, err := metricstestutil.GetCounterMetricValue(volmetrics.ReconstructVolumeOperationsTotal)
+	if err != nil {
+		t.Fatalf("read metric after: %v", err)
+	}
+	if got := after - before; got != 1 {
+		t.Errorf("reconstruct_volume_operations_total rose by %v, want 1", got)
+	}
+}

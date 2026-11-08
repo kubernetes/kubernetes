@@ -59,13 +59,15 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 	// Volumes that are still staged but have no pod directory naming them are
 	// found by asking the plugins, which is independent of the walk below and
 	// runs even when that walk cannot.
+	var globalAttempts []globalAttempt
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIGlobalMountReconstruction) {
-		rc.reconstructGlobalVolumes(logger)
+		globalAttempts = rc.registerGlobalVolumes(logger)
 	}
 
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(logger, rc.kubeletPodsDir)
 	if err != nil {
+		countGlobalAttempts(globalAttempts, nil)
 		logger.Error(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
 		return
 	}
@@ -101,6 +103,8 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 		reconstructedVolumeNames = append(reconstructedVolumeNames, reconstructedVolume.volumeName)
 		reconstructedVolumes[reconstructedVolume.volumeName] = gvl
 	}
+	// A staged volume the walk reconstructed was counted there.
+	countGlobalAttempts(globalAttempts, reconstructedVolumes)
 
 	if len(reconstructedVolumes) > 0 {
 		// Add the volumes to ASW
@@ -160,6 +164,30 @@ func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 // Each plugin reports its own global mounts, so this stays free of any one
 // plugin's on-disk layout.
 func (rc *reconciler) reconstructGlobalVolumes(logger klog.Logger) {
+	countGlobalAttempts(rc.registerGlobalVolumes(logger), nil)
+}
+
+// globalAttempt is a global mount the plugins pass tried to register, counted
+// only after the pod directory walk so that a volume both find counts once.
+type globalAttempt struct {
+	volumeName v1.UniqueVolumeName
+	failed     bool
+}
+
+func countGlobalAttempts(attempts []globalAttempt, walked map[v1.UniqueVolumeName]*globalVolumeInfo) {
+	for _, a := range attempts {
+		if _, ok := walked[a.volumeName]; ok {
+			continue
+		}
+		metrics.ReconstructVolumeOperationsTotal.Inc()
+		if a.failed {
+			metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
+		}
+	}
+}
+
+func (rc *reconciler) registerGlobalVolumes(logger klog.Logger) []globalAttempt {
+	var attempts []globalAttempt
 	for _, plugin := range rc.volumePluginMgr.FindGlobalVolumeListerPlugins() {
 		globalVolumes, err := plugin.ListGlobalVolumes()
 		if err != nil {
@@ -167,12 +195,23 @@ func (rc *reconciler) reconstructGlobalVolumes(logger klog.Logger) {
 			continue
 		}
 		for _, globalVolume := range globalVolumes {
-			rc.reconstructGlobalVolume(logger, plugin, globalVolume)
+			if a, ok := rc.registerGlobalVolume(logger, plugin, globalVolume); ok {
+				attempts = append(attempts, a)
+			}
 		}
 	}
+	return attempts
 }
 
 func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumepkg.GlobalVolumeListerPlugin, globalVolume volumepkg.GlobalVolume) {
+	if a, ok := rc.registerGlobalVolume(logger, plugin, globalVolume); ok {
+		countGlobalAttempts([]globalAttempt{a}, nil)
+	}
+}
+
+// registerGlobalVolume registers one global mount and reports the attempt, if
+// it made one, without counting it.
+func (rc *reconciler) registerGlobalVolume(logger klog.Logger, plugin volumepkg.GlobalVolumeListerPlugin, globalVolume volumepkg.GlobalVolume) (globalAttempt, bool) {
 	// The desired state of world names a volume by device when the plugin can
 	// device mount it, and by pod otherwise. Only the first kind can be matched
 	// against what is found on disk, since there is no pod here to name it
@@ -187,35 +226,32 @@ func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumep
 	if globalVolume.VolumeMode == v1.PersistentVolumeBlock {
 		if _, canMap := plugin.(volumepkg.BlockVolumePlugin); !canMap {
 			logger.V(4).Info("Skipping global mount of a block volume whose plugin has no mapper", "deviceMountPath", globalVolume.DeviceMountPath)
-			return
+			return globalAttempt{}, false
 		}
 	} else if canMount, err := plugin.CanDeviceMount(globalVolume.Spec); err != nil || !canMount {
 		logger.V(4).Info("Skipping global mount of a volume that is not device mountable", "deviceMountPath", globalVolume.DeviceMountPath, "err", err)
-		return
+		return globalAttempt{}, false
 	}
 
 	volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, globalVolume.Spec)
 	if err != nil {
 		logger.Error(err, "Could not determine volume name for global mount", "deviceMountPath", globalVolume.DeviceMountPath)
-		return
+		return globalAttempt{}, false
 	}
 	if rc.actualStateOfWorld.VolumeExists(volumeName) {
 		// Another plugin, or another entry from this one, already reported it.
 		logger.V(4).Info("Global mount is already in actual state, skipping", "volumeName", volumeName)
-		return
+		return globalAttempt{}, false
 	}
 
-	// Counted alongside the pod directory walk in the same metric: both are
-	// reconstruction attempts, and a rollback below shows up as an error.
-	metrics.ReconstructVolumeOperationsTotal.Inc()
-
+	// Counted by the caller, after the pod directory walk, in the same metric:
+	// both are reconstruction attempts, and a rollback below is an error.
 	// devicePath is left empty on purpose: it is filled in later from
 	// node.status.volumesAttached, the same way reconstructed pod volumes are.
 	if err := rc.actualStateOfWorld.AddAttachUncertainReconstructedVolume(
 		logger, volumeName, globalVolume.Spec, rc.nodeName, ""); err != nil {
 		logger.Error(err, "Could not add global mount to actual state of world", "volumeName", volumeName)
-		metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
-		return
+		return globalAttempt{volumeName: volumeName, failed: true}, true
 	}
 	// Marked as found during reconstruction, like the device of a reconstructed
 	// pod volume, so that a pod mounting it later and failing MountDevice does
@@ -230,12 +266,12 @@ func (rc *reconciler) reconstructGlobalVolume(logger klog.Logger, plugin volumep
 		if err := rc.actualStateOfWorld.DeleteVolume(volumeName); err != nil {
 			logger.Error(err, "Could not remove the global mount from the actual state of world", "volumeName", volumeName)
 		}
-		metrics.ReconstructVolumeOperationsErrorsTotal.Inc()
-		return
+		return globalAttempt{volumeName: volumeName, failed: true}, true
 	}
 
 	rc.volumesNeedUpdateFromNodeStatus = append(rc.volumesNeedUpdateFromNodeStatus, volumeName)
 	logger.V(2).Info("Global mount with no pod directory is marked uncertain and added into the actual state", "volumeName", volumeName, "deviceMountPath", globalVolume.DeviceMountPath)
+	return globalAttempt{volumeName: volumeName}, true
 }
 
 func (rc *reconciler) updateStates(logger klog.Logger, reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
