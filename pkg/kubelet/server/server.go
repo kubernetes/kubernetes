@@ -572,6 +572,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
 	p.MustRegister(prober.ProberDuration)
+	p.MustRegister(prober.ActiveProbes)
 	s.restfulCont.Handle(proberMetricsPath,
 		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)

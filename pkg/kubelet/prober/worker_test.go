@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"testing"
@@ -28,6 +29,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -1253,5 +1256,169 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				t.Errorf("Expected result %v, but got: %v", tc.expectedResult, result)
 			}
 		})
+	}
+}
+
+func TestNewWorkerActiveProbesGauge(t *testing.T) {
+	_ = legacyregistry.Register(ActiveProbes)
+
+	http2 := v1.HTTPProtocolHTTP2
+
+	tests := []struct {
+		name            string
+		probeSpec       v1.Probe
+		gateEnabled     bool
+		expectedLabels  map[string]string
+		expectUntouched bool
+	}{
+		{
+			name:            "non-HTTP probe does not touch the gauge",
+			probeSpec:       v1.Probe{ProbeHandler: v1.ProbeHandler{Exec: &v1.ExecAction{}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled:     true,
+			expectUntouched: true,
+		},
+		{
+			name:        "HTTP probe without protocol defaults to HTTP1",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: true,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP1),
+			},
+		},
+		{
+			name:        "HTTP2 probe with gate enabled is counted as HTTP2",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{Protocol: &http2}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: true,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP2),
+			},
+		},
+		{
+			name:        "HTTP2 probe with gate disabled falls back to HTTP1",
+			probeSpec:   v1.Probe{ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{Protocol: &http2}}, PeriodSeconds: 1, TimeoutSeconds: 1, SuccessThreshold: 1, FailureThreshold: 1},
+			gateEnabled: false,
+			expectedLabels: map[string]string{
+				"protocol": string(v1.HTTPProtocolHTTP1),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ActiveProbes.Reset()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, test.gateEnabled)
+
+			m := newTestManager()
+			// newTestWorker forces an exec ProbeHandler, so build the pod directly to
+			// keep the HTTP probe spec under test intact.
+			pod := getTestPod()
+			pod.Spec.Containers[0].ReadinessProbe = &test.probeSpec
+			w := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+
+			key := probeKey{testPodUID, testContainerName, readiness}
+			m.workers[key] = w
+			tCtx := ktesting.Init(t)
+			go w.run(tCtx)
+
+			labels := test.expectedLabels
+			if test.expectUntouched {
+				// Nothing to increment for a non-HTTP probe; use any label
+				// combination to confirm the gauge is never touched.
+				labels = map[string]string{"protocol": string(v1.HTTPProtocolHTTP1)}
+			} else {
+				gaugeIsOne := func(ctx context.Context) (bool, error) {
+					v, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
+					if err != nil {
+						return false, err
+					}
+					return v == 1, nil
+				}
+				if err := wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, gaugeIsOne); err != nil {
+					t.Fatalf("expected ActiveProbes%v to reach 1 after the worker started running: %v", labels, err)
+				}
+			}
+
+			w.stop()
+			if err := waitForWorkerExit(tCtx.TB(), m, []probeKey{key}); err != nil {
+				t.Fatalf("error waiting for worker exit: %v", err)
+			}
+
+			got, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
+			if err != nil {
+				t.Fatalf("failed to get gauge value: %v", err)
+			}
+			if got != 0 {
+				t.Errorf("expected ActiveProbes%v to be 0 after worker exit, got %v", labels, got)
+			}
+		})
+	}
+}
+
+// TestActiveProbesDecrementsWhenReplaced verifies that a worker decrements
+// ActiveProbes on exit even if it was replaced by a new worker (e.g. the
+// container restarted). Only ProberResults/ProberDuration, which are keyed by
+// pod/container labels the replacement worker reuses, should skip cleanup in that
+// case; ActiveProbes is incremented once per worker instance and must
+// always be balanced by exactly one decrement, regardless of replacement.
+func TestActiveProbesDecrementsWhenReplaced(t *testing.T) {
+	_ = legacyregistry.Register(ActiveProbes)
+	ActiveProbes.Reset()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.H2CContainerProbe, true)
+
+	probeSpec := v1.Probe{
+		ProbeHandler:     v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{}},
+		PeriodSeconds:    1,
+		TimeoutSeconds:   1,
+		SuccessThreshold: 1,
+		FailureThreshold: 1,
+	}
+	labels := map[string]string{"protocol": string(v1.HTTPProtocolHTTP1)}
+
+	m := newTestManager()
+	pod := getTestPod()
+	pod.Spec.Containers[0].ReadinessProbe = &probeSpec
+	oldWorker := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+	replacementWorker := newWorker(m, readiness, pod, pod.Spec.Containers[0])
+
+	key := probeKey{testPodUID, testContainerName, readiness}
+	tCtx := ktesting.Init(t)
+
+	gaugeReaches := func(want float64) error {
+		condition := func(context.Context) (bool, error) {
+			v, err := testutil.GetGaugeMetricValue(ActiveProbes.With(labels))
+			if err != nil {
+				return false, err
+			}
+			return v == want, nil
+		}
+		return wait.PollUntilContextTimeout(tCtx, 10*time.Millisecond, wait.ForeverTestTimeout, true, condition)
+	}
+
+	m.workers[key] = oldWorker
+	go oldWorker.run(tCtx)
+	if err := gaugeReaches(1); err != nil {
+		t.Fatalf("expected ActiveProbes to reach 1 after the old worker started running: %v", err)
+	}
+
+	// Simulate the replacement: the manager's worker map now points at the new
+	// worker for this probeKey before the old worker's run loop exits.
+	m.workers[key] = replacementWorker
+	go replacementWorker.run(tCtx)
+	if err := gaugeReaches(2); err != nil {
+		t.Fatalf("expected ActiveProbes to reach 2 once the replacement worker started running: %v", err)
+	}
+
+	oldWorker.stop()
+	if err := gaugeReaches(1); err != nil {
+		t.Fatalf("expected ActiveProbes to settle at 1 (replacement worker's own increment) after the replaced worker exited: %v", err)
+	}
+
+	if _, exists := m.getWorker(testPodUID, testContainerName, readiness); !exists {
+		t.Fatalf("expected the replacement worker to remain registered")
+	}
+
+	replacementWorker.stop()
+	if err := gaugeReaches(0); err != nil {
+		t.Fatalf("expected ActiveProbes to reach 0 after the replacement worker also exited: %v", err)
 	}
 }
