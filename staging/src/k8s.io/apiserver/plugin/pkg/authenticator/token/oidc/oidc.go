@@ -554,11 +554,11 @@ func (m *metricsRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		return resp, fmt.Errorf("error reading JWKS response: %w", err)
 	}
 
-	// This check has been copied from https://github.com/coreos/go-oidc/blob/0fe98873951208147e6d412602432038c91cda54/oidc/jwks.go#L263-L267
-	// to validate the key set before setting the metrics to avoid recording invalid key sets.
-	var keySet jose.JSONWebKeySet
+	// Validate the key set before recording the fetch as a success. A set that
+	// contains a key go-jose does not support still authenticates, because
+	// go-oidc skips that key, so it must not be reported as a failed fetch.
 	if m.shouldRecordMetrics() {
-		if unmarshalErr := unmarshalResp(resp, body, &keySet); unmarshalErr != nil {
+		if validateErr := validateKeySet(resp, body); validateErr != nil {
 			recordJWKSFetchKeySetFailure(m.jwtIssuer, m.apiServerID)
 		} else {
 			recordJWKSFetchKeySetSuccess(m.jwtIssuer, m.apiServerID, string(body))
@@ -572,13 +572,44 @@ func (m *metricsRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	return newResp, nil
 }
 
-// This function is copied from https://github.com/coreos/go-oidc/blob/0fe98873951208147e6d412602432038c91cda54/oidc/oidc.go#L543-L554
-// to validate the key set before setting the metrics to avoid recording invalid key sets.
-func unmarshalResp(r *http.Response, body []byte, v interface{}) error {
-	err := json.Unmarshal(body, &v)
-	if err == nil {
-		return nil
+// validateKeySet reports whether body holds at least one key go-jose can parse.
+// Members that go-jose rejects with ErrUnsupportedKeyType are skipped, the way
+// go-oidc skips them, so one unsupported key does not mark the whole fetch as
+// failed. A non-empty set with no parseable member leaves nothing to
+// authenticate with, so it is a failure; an empty set is not, which matches
+// go-oidc and the behavior before this change. go-oidc also skips members by
+// alg before parsing, which is not mirrored here.
+//
+// The error is only used to decide whether the fetch succeeded.
+// https://github.com/coreos/go-oidc/blob/v3.21.0/oidc/jwks.go#L244-L300
+func validateKeySet(r *http.Response, body []byte) error {
+	var set struct {
+		Keys []json.RawMessage `json:"keys"`
 	}
+	if err := json.Unmarshal(body, &set); err != nil {
+		return unmarshalError(r, err)
+	}
+	var parsed int
+	for _, raw := range set.Keys {
+		var key jose.JSONWebKey
+		if err := json.Unmarshal(raw, &key); err != nil {
+			if errors.Is(err, jose.ErrUnsupportedKeyType) {
+				continue
+			}
+			return err
+		}
+		parsed++
+	}
+	if len(set.Keys) > 0 && parsed == 0 {
+		return errors.New("no supported keys in JWK Set")
+	}
+	return nil
+}
+
+// unmarshalError describes a key set decoding failure. The message matches the
+// one go-oidc returns for the same body.
+// https://github.com/coreos/go-oidc/blob/v3.21.0/oidc/oidc.go#L676-L687
+func unmarshalError(r *http.Response, err error) error {
 	ct := r.Header.Get("Content-Type")
 	mediaType, _, parseErr := mime.ParseMediaType(ct)
 	if parseErr == nil && mediaType == "application/json" {
