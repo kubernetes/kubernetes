@@ -104,6 +104,7 @@ type cacheWatcher struct {
 
 	selector                watchSelector
 	requiredResourceVersion uint64
+	matchedValues           []storage.MatchValue
 }
 
 func newCacheWatcher(
@@ -119,6 +120,7 @@ func newCacheWatcher(
 	identifier string,
 	selector watchSelector,
 	requiredResourceVersion uint64,
+	matchedValues []storage.MatchValue,
 ) *cacheWatcher {
 	if clk == nil {
 		clk = clock.RealClock{}
@@ -140,6 +142,7 @@ func newCacheWatcher(
 		identifier:              identifier,
 		selector:                selector,
 		requiredResourceVersion: requiredResourceVersion,
+		matchedValues:           matchedValues,
 	}
 }
 

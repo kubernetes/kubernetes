@@ -628,6 +628,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		identifier,
 		selector,
 		requiredResourceVersion,
+		opts.Predicate.MatcherIndex(ctx),
 	)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
@@ -654,7 +655,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		watcher.requiredResourceVersion = requiredResourceVersion
 	}
 
-	cacheInterval, err := c.initWatcherIntervalLocked(ctx, watcher)
+	cacheInterval, err := c.initWatcherIntervalLocked(watcher)
 	if err != nil {
 		return nil, err
 	}
@@ -694,9 +695,9 @@ func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, cacheInterval *wat
 	watcher.synced.Notify()
 }
 
-func (c *Cacher) initWatcherIntervalLocked(ctx context.Context, watcher *cacheWatcher) (*watchCacheInterval, error) {
+func (c *Cacher) initWatcherIntervalLocked(watcher *cacheWatcher) (*watchCacheInterval, error) {
 	opts := watcher.filter.opts
-	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(ctx, watcher.requiredResourceVersion, watcher.filter.prefix, opts)
+	cacheInterval, err := c.watchCache.getAllEventsSinceLocked(watcher.requiredResourceVersion, watcher.filter.prefix, opts, watcher.matchedValues)
 	if err != nil {
 		return nil, err
 	}
