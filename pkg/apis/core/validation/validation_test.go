@@ -22298,11 +22298,13 @@ func TestValidatePodResources(t *testing.T) {
 }
 
 func TestValidatePodResourceConsistency(t *testing.T) {
-	path := field.NewPath("resources")
+	path := field.NewPath("spec")
 	tests := []struct {
 		name           string
 		podResources   core.ResourceRequirements
+		initContainers []core.Container
 		containers     []core.Container
+		opts           PodValidationOptions
 		expectedErrors []string
 	}{{
 		name: "aggregate container requests less than pod requests",
@@ -22542,16 +22544,60 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			"must be less than or equal to pod limits",
 			"must be less than or equal to pod limits",
 		},
+	}, {
+		name: "individual init container limits greater than pod limits",
+		podResources: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		initContainers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("11"),
+						core.ResourceMemory: resource.MustParse("12Mi"),
+					},
+				},
+			},
+		},
+		expectedErrors: []string{
+			"spec.initContainers[0].resources.limits[cpu]: Invalid value: \"11\": must be less than or equal to pod limits of 10",
+			"spec.initContainers[0].resources.limits[memory]: Invalid value: \"12Mi\": must be less than or equal to pod limits of 10Mi",
+		},
+	}, {
+		name: "individual init container limits greater than pod limits allowed when ratcheted on update",
+		podResources: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		initContainers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU:    resource.MustParse("11"),
+						core.ResourceMemory: resource.MustParse("12Mi"),
+					},
+				},
+			},
+		},
+		opts: PodValidationOptions{
+			AllowInitContainerLimitsExceedingPodLimits: true,
+		},
 	},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := core.PodSpec{
-				Resources:  &tc.podResources,
-				Containers: tc.containers,
+				Resources:      &tc.podResources,
+				InitContainers: tc.initContainers,
+				Containers:     tc.containers,
 			}
-			errs := validatePodResourceConsistency(&spec, path)
+			errs := validatePodResourceConsistency(&spec, path, tc.opts)
 			if len(errs) != len(tc.expectedErrors) {
 				t.Errorf("expected %d errors, got %d errors, got errors: %v", len(tc.expectedErrors), len(errs), errs)
 			}
@@ -31350,6 +31396,237 @@ func TestValidatePodResize(t *testing.T) {
 			err: "pod level limit for cpu is insufficient to cover the limit and DRA overhead for container container",
 		},
 		{
+			test:                              "pod level limit insufficient to cover init container limit and DRA resources",
+			enableDRANodeAllocatableResources: true,
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetInitContainers(podtest.MakeContainer("init-container",
+						podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("200m", "200Mi", "", ""),
+							Claims: []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("200m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("400m", "400Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"init-container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetInitContainers(podtest.MakeContainer("init-container",
+						podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("250m", "200Mi", "", ""),
+							Claims: []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("200m", "200Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("250m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"init-container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			err: "pod level limit for cpu is insufficient to cover the limit and DRA overhead for init container init-container",
+		},
+		{
+			test:                              "ratcheted on resize when existing pod has init container limit + DRA exceeding pod limit",
+			enableDRANodeAllocatableResources: true,
+			old: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetInitContainers(podtest.MakeContainer("init-container",
+						podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("200m", "200Mi", "", ""),
+							Claims: []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("100m", "100Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"init-container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+			new: func() *core.Pod {
+				p := podtest.MakePod("pod",
+					podtest.SetResourceClaims(core.PodResourceClaim{Name: "claim-1", ResourceClaimName: new("node-allocatable-claim-1")}),
+					podtest.SetInitContainers(podtest.MakeContainer("init-container",
+						podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("200m", "200Mi", "", ""),
+							Claims: []core.ResourceClaim{{Name: "claim-1"}},
+						}))),
+					podtest.SetContainers(podtest.MakeContainer("container",
+						podtest.SetContainerResources(core.ResourceRequirements{
+							Limits: getResources("150m", "100Mi", "", ""),
+						}))),
+					podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+				)
+				p.Status.NodeAllocatableResourceClaimStatuses = []core.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim-1",
+						Containers:        []string{"init-container"},
+						Overhead: []core.NodeAllocatableOverheadResources{{
+							Name:         core.ResourceCPU,
+							PerPod:       new(resource.MustParse("50m")),
+							PerContainer: new(resource.MustParse("50m")),
+						}},
+					},
+				}
+				return p
+			}(),
+		},
+		{
+			test: "resizing sidecar init container limit above pod limit fails",
+			old: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+			new: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("300m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+			err: "spec.initContainers[0].resources.limits[cpu]: Invalid value: \"300m\": must be less than or equal to pod limits of 200m",
+		},
+		{
+			test: "shrinking pod limit below init container limit fails",
+			old: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+			new: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("150m", "200Mi", "", "")}),
+			),
+			err: "spec.initContainers[0].resources.limits[cpu]: Invalid value: \"200m\": must be less than or equal to pod limits of 150m",
+		},
+		{
+			test: "ratcheted on resize when existing pod has init container limit > pod limit (still invalid)",
+			old: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("400m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+			new: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("300m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("150m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+		},
+		{
+			test: "ratcheted on resize when existing pod has init container limit > pod limit (becomes valid)",
+			old: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("300m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+			new: podtest.MakePod("pod",
+				podtest.SetInitContainers(podtest.MakeContainer("init-container",
+					podtest.SetContainerRestartPolicy(core.ContainerRestartPolicyAlways),
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("200m", "100Mi", "", ""),
+					}))),
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerResources(core.ResourceRequirements{
+						Limits: getResources("100m", "100Mi", "", ""),
+					}))),
+				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("200m", "200Mi", "", "")}),
+			),
+		},
+		{
 			test:                              "pod level requests and limits cover container and DRA resources",
 			enableDRANodeAllocatableResources: true,
 			old: func() *core.Pod {
@@ -31464,6 +31741,7 @@ func TestValidatePodResize(t *testing.T) {
 				InPlacePodLevelResourcesVerticalScalingEnabled:      true,
 				PodLevelResourcesEnabled:                            true,
 				InPlacePodVerticalScalingMemoryBackedVolumesEnabled: test.enableMemoryBackedVolumesResize,
+				AllowInitContainerLimitsExceedingPodLimits:          hasInitContainerLimitsExceedingPodLimits(&test.old.Spec),
 			})
 
 			if test.err == "" {

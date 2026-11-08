@@ -2490,6 +2490,57 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			initial:          resources{nil, nil, cReq, cLim},
 			expected:         resources{nil, nil, cReq, cLim},
 		},
+
+		// 6. Init container limits validated against pod-level limits
+		{
+			name:             "PodLevelResourcesFixInitContainerLimits disabled: init container limits exceeding pod limits is allowed",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixInitContainerLimits: false},
+			initial:          resources{cReq, cLim, cReq, cLim},
+			tweakPod: func(pod *v1.Pod) {
+				pod.Spec.InitContainers = []v1.Container{{
+					Name:  "init-1",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: cReq,
+						Limits:   pLim,
+					},
+				}}
+			},
+			expected: resources{cReq, cLim, cReq, cLim},
+		},
+		{
+			name:             "PodLevelResourcesFixInitContainerLimits enabled: init container limits exceeding pod limits is rejected",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixInitContainerLimits: true},
+			initial:          resources{cReq, cLim, cReq, cLim},
+			tweakPod: func(pod *v1.Pod) {
+				pod.Spec.InitContainers = []v1.Container{{
+					Name:  "init-1",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: cReq,
+						Limits:   pLim,
+					},
+				}}
+			},
+			expectError: true,
+		},
+		{
+			name:             "PodLevelResourcesFixInitContainerLimits enabled: init container limits within pod limits is accepted",
+			featureOverrides: featuregatetesting.FeatureOverrides{features.PodLevelResourcesFixInitContainerLimits: true},
+			initial:          resources{pReq, pLim, cReq, cLim},
+			tweakPod: func(pod *v1.Pod) {
+				pod.Spec.InitContainers = []v1.Container{{
+					Name:  "init-1",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: cReq,
+						Limits:   pLim,
+					},
+				}}
+			},
+			expected:    resources{pReq, pLim, cReq, cLim},
+			expectedQOS: v1.PodQOSBurstable,
+		},
 	}
 
 	for i, test := range tests {
@@ -2597,6 +2648,72 @@ func TestPodLevelResourcesValidationAndDefaulting(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("UpdateRatchetingForInitContainerLimitsExceedingPodLimits", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixInitContainerLimits, false)
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "ratcheted-init-limits-pod",
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: cReq,
+					Limits:   cLim,
+				},
+				InitContainers: []v1.Container{{
+					Name:  "init-1",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: cReq,
+						Limits:   pLim,
+					},
+				}},
+				Containers: []v1.Container{{
+					Name:  "c-1",
+					Image: "fakeimage",
+					Resources: v1.ResourceRequirements{
+						Requests: cReq,
+						Limits:   cLim,
+					},
+				}},
+			},
+		}
+
+		created, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create pod with PodLevelResourcesFixInitContainerLimits disabled: %v", err)
+		}
+		defer integration.DeletePodOrErrorf(t, client, ns.Name, created.Name)
+
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixInitContainerLimits, true)
+
+		created.Labels = map[string]string{"updated": "true"}
+		updated, err := client.CoreV1().Pods(ns.Name).Update(t.Context(), created, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("Expected existing pod with init container limits > pod limits to remain updatable after enabling PodLevelResourcesFixInitContainerLimits, got: %v", err)
+		}
+
+		// 1. invalid pod -> allows initContainer resize that is still invalid (3 > pod limit 2)
+		updated.Spec.InitContainers[0].Resources.Limits = pReq
+		resizedStillInvalid, err := client.CoreV1().Pods(ns.Name).UpdateResize(t.Context(), updated.Name, updated, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("Expected invalid pod to allow initContainer resize that is still invalid, got: %v", err)
+		}
+
+		// 2. invalid pod -> allows initContainer resize that makes it valid (2 <= pod limit 2)
+		resizedStillInvalid.Spec.InitContainers[0].Resources.Limits = cLim
+		resizedValid, err := client.CoreV1().Pods(ns.Name).UpdateResize(t.Context(), resizedStillInvalid.Name, resizedStillInvalid, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("Expected invalid pod to allow initContainer resize that makes it valid, got: %v", err)
+		}
+
+		// 3. valid pod -> fails initContainer resize that becomes invalid (4 > pod limit 2)
+		resizedValid.Spec.InitContainers[0].Resources.Limits = pLim
+		if _, err := client.CoreV1().Pods(ns.Name).UpdateResize(t.Context(), resizedValid.Name, resizedValid, metav1.UpdateOptions{}); err == nil {
+			t.Fatalf("Expected valid pod to fail initContainer resize that becomes invalid")
+		}
+	})
 }
 
 // TestDRAStatusPreservedOnStatusUpdate verifies that the apiserver preserves

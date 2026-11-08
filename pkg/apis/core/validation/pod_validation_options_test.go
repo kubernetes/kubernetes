@@ -1411,3 +1411,97 @@ func TestSecurityProfileOCIValidationOption(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateAllowInitContainerLimitsExceedingPodLimitsOption(t *testing.T) {
+	testCases := []struct {
+		name               string
+		featureGateEnabled bool
+		oldPodSpec         *core.PodSpec
+		wantOption         bool
+	}{
+		{
+			name:               "CreateFeatureGateEnabled",
+			featureGateEnabled: true,
+			wantOption:         false,
+		},
+		{
+			name:               "CreateFeatureGateDisabled",
+			featureGateEnabled: false,
+			wantOption:         true,
+		},
+		{
+			name:               "UpdateInitContainerLimitExceedsPodLimitFeatureGateEnabled",
+			featureGateEnabled: true,
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU: resource.MustParse("1"),
+					},
+				},
+				InitContainers: []core.Container{
+					{
+						Resources: core.ResourceRequirements{
+							Limits: core.ResourceList{
+								core.ResourceCPU: resource.MustParse("2"),
+							},
+						},
+					},
+				},
+			},
+			wantOption: true,
+		},
+		{
+			name:               "UpdateInitContainerLimitWithinPodLimitFeatureGateEnabled",
+			featureGateEnabled: true,
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+				InitContainers: []core.Container{
+					{
+						Resources: core.ResourceRequirements{
+							Limits: core.ResourceList{
+								core.ResourceCPU: resource.MustParse("1"),
+							},
+						},
+					},
+				},
+			},
+			wantOption: false,
+		},
+		{
+			name:               "UpdateInitContainerLimitWithinPodLimitFeatureGateDisabled",
+			featureGateEnabled: false,
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU: resource.MustParse("2"),
+					},
+				},
+				InitContainers: []core.Container{
+					{
+						Resources: core.ResourceRequirements{
+							Limits: core.ResourceList{
+								core.ResourceCPU: resource.MustParse("1"),
+							},
+						},
+					},
+				},
+			},
+			wantOption: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixInitContainerLimits, tc.featureGateEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowInitContainerLimitsExceedingPodLimits {
+				t.Errorf("Got AllowInitContainerLimitsExceedingPodLimits=%t, want %t", gotOptions.AllowInitContainerLimitsExceedingPodLimits, tc.wantOption)
+			}
+		})
+	}
+}

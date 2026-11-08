@@ -1894,9 +1894,10 @@ func TestNodeFitsNativeResources(t *testing.T) {
 
 func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 	tests := []struct {
-		name                  string
-		pod                   *v1.Pod
-		nodeAllocatableStatus []v1.NodeAllocatableResourceClaimStatus
+		name                          string
+		pod                           *v1.Pod
+		nodeAllocatableStatus         []v1.NodeAllocatableResourceClaimStatus
+		disableFixInitContainerLimits bool
 
 		wantStatusCode   fwk.Code
 		wantErrorMessage string
@@ -2210,12 +2211,93 @@ func TestValidatePodLevelResourcesCoverDRA(t *testing.T) {
 				Obj(),
 			wantStatusCode: fwk.Success,
 		},
+		{
+			name: "PodLevel limits does not cover init container limit and DRA overhead",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+					InitContainers: []v1.Container{{
+						Name: "init-1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("1.5Gi"),
+							},
+							Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+						},
+					}},
+					Containers: []v1.Container{{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					}},
+				},
+			},
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"init-1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			wantStatusCode:   fwk.UnschedulableAndUnresolvable,
+			wantErrorMessage: "pod level limit for memory is insufficient to cover the limit and DRA overhead for init container init-1",
+		},
+		{
+			name:                          "PodLevel limits does not cover init container limit and DRA overhead when PodLevelResourcesFixInitContainerLimits is disabled",
+			disableFixInitContainerLimits: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: resource.MustParse("2Gi"),
+						},
+					},
+					InitContainers: []v1.Container{{
+						Name: "init-1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("1.5Gi"),
+							},
+							Claims: []v1.ResourceClaim{{Name: "dra-claim"}},
+						},
+					}},
+					Containers: []v1.Container{{
+						Name: "c1",
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					}},
+				},
+			},
+			nodeAllocatableStatus: []v1.NodeAllocatableResourceClaimStatus{{
+				ResourceClaimName: "dra-claim",
+				Containers:        []string{"init-1"},
+				Overhead: []v1.NodeAllocatableOverheadResources{{
+					Name:         v1.ResourceMemory,
+					PerContainer: new(resource.MustParse("1Gi")),
+				}},
+			}},
+			wantStatusCode: fwk.Success,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pl := &DynamicResources{
-				fts: feature.Features{EnablePodLevelResources: true},
+				fts: feature.Features{
+					EnablePodLevelResources:                       true,
+					EnablePodLevelResourcesFixInitContainerLimits: !tt.disableFixInitContainerLimits,
+				},
 			}
 			tt.pod.Status.NodeAllocatableResourceClaimStatuses = tt.nodeAllocatableStatus
 			gotStatus := pl.validatePodLevelResourcesCoverDRA(tt.pod)
