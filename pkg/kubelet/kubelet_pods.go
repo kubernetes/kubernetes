@@ -2334,20 +2334,18 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	}
 
 	// Memory requests are not read from cgroups because cgroups do not track or enforce memory requests.
-	// Preserve existing status memory requests or fall back to aggregating requests from pod spec.
-	if _, found := resources.Requests[v1.ResourceMemory]; found {
-		if !preserveOldStatusValue(v1.ResourceMemory, oldPodStatus.Resources.Requests, resources.Requests) {
-			addOverheadToFallbackValue(v1.ResourceMemory, resources.Requests, false)
-		}
+	// Always aggregate/derive memory requests from pod spec and overhead.
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseStatusResources:                             true,
+		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
+		UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
+	}
+	aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
+	if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
+		resources.Requests[v1.ResourceMemory] = val
 	} else {
-		opts := resourcehelper.PodResourcesOptions{
-			SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-			UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-		}
-		aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
-		if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
-			resources.Requests[v1.ResourceMemory] = val
-		}
+		delete(resources.Requests, v1.ResourceMemory)
 	}
 
 	if cpuLimit != nil {
