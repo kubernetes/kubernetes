@@ -63,6 +63,7 @@ type watcherInput struct {
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
+	id        int
 	input     chan watcherInput
 	result    chan watch.Event
 	done      chan struct{}
