@@ -1122,3 +1122,28 @@ func TestValidateV1Alpha1SyncPeriodPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateConntrackMax(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		perCore    int32
+		floor      int32
+		cap        *int32
+		wantErrors int
+	}{
+		{"omitted", 32768, 131072, nil, 0},
+		{"negative", 32768, 131072, ptr.To[int32](-1), 1},
+		{"below minimum", 32768, 22000000, ptr.To[int32](1048576), 1},
+		{"fixed limit", 32768, 22000000, ptr.To[int32](22000000), 0},
+		{"uncapped", 32768, 22000000, ptr.To[int32](0), 0},
+		{"disabled sizing ignores bounds", 0, 22000000, ptr.To[int32](1048576), 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := kubeproxyconfig.KubeProxyConntrackConfiguration{MaxPerCore: ptr.To(tc.perCore), Min: ptr.To(tc.floor), Max: tc.cap, TCPEstablishedTimeout: &metav1.Duration{}, TCPCloseWaitTimeout: &metav1.Duration{}}
+			errs := validateKubeProxyConntrackConfiguration(config, field.NewPath("conntrack"))
+			if len(errs) != tc.wantErrors {
+				t.Fatalf("got %v, want %d errors", errs, tc.wantErrors)
+			}
+		})
+	}
+}
