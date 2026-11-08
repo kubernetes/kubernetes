@@ -197,6 +197,18 @@ func TestValidateDeviceCapacity(t *testing.T) {
 			capacity:                    testDeviceCapacity(thousandExa, testCapacityRequestPolicy(ptr.To(hundredExa), []apiresource.Quantity{hundredExa, thousandExa}, nil)),
 			fractionalCapacityRangeGate: true,
 		},
+		// An exponent can be up to 2147483647.
+		"large-exponent-valid-value": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1e2147483647"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("1e2147483646")),
+					[]apiresource.Quantity{apiresource.MustParse("1e2147483646")},
+					nil,
+				),
+			),
+			fractionalCapacityRangeGate: true,
+		},
 		"invalid-options-unsort": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&one, []apiresource.Quantity{two, one}, nil)),
 			wantFailures: field.ErrorList{
