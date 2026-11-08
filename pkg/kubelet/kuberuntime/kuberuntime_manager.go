@@ -1065,9 +1065,10 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	} else {
 		podResources.Unified = cm.UnifiedWithoutSwap(podResources.Unified)
 	}
-	// "unset" is +inf: adding a pod-level limit is a decrease, removing one is an increase.
-	podSwapIncreasing := swapManaged && ((currentPodSwapSet && !desiredPodSwapSet) || (currentPodSwapSet && desiredPodSwapSet && desiredPodSwapLimit > currentPodSwapLimit))
-	podSwapDecreasing := swapManaged && ((!currentPodSwapSet && desiredPodSwapSet) || (currentPodSwapSet && desiredPodSwapSet && desiredPodSwapLimit < currentPodSwapLimit))
+	// "unset" is +inf, so adding a pod-level limit is a decrease. API validation
+	// rejects removing a pod-level limit, so there is no unset-after-set case.
+	podSwapIncreasing := swapManaged && currentPodSwapSet && desiredPodSwapSet && desiredPodSwapLimit > currentPodSwapLimit
+	podSwapDecreasing := swapManaged && desiredPodSwapSet && (!currentPodSwapSet || desiredPodSwapLimit < currentPodSwapLimit)
 
 	currentPodResources := podResources
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
@@ -1136,15 +1137,10 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				actuatedPodResources.Limits[v1.ResourceCPU] = allocatedResources.Limits[v1.ResourceCPU]
 			}
 		case v1.ResourceSwap:
-			// Swap is limits-only (KEP-5359). Record presence or absence exactly:
-			// removing the pod-level swap limit is a valid (increase) resize.
-			actuatedPodResources.Limits = defaultResourceListIfNil(actuatedPodResources.Limits)
 			if q, ok := allocatedResources.Limits[v1.ResourceSwap]; ok {
+				actuatedPodResources.Limits = defaultResourceListIfNil(actuatedPodResources.Limits)
 				actuatedPodResources.Limits[v1.ResourceSwap] = q
-			} else {
-				delete(actuatedPodResources.Limits, v1.ResourceSwap)
 			}
-
 		}
 		if err = m.actuatedState.SetPodLevelResources(logger, pod.UID, actuatedPodResources); err != nil {
 			logger.Error(err, "SetPodLevelResources failed", "pod", pod.Name, "UID", pod.UID,
@@ -1175,12 +1171,8 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			// its own ordered pass (2a/2c below) and must not be written here.
 			resizedResources.Unified = cm.UnifiedWithoutSwap(podResources.Unified)
 		case v1.ResourceSwap:
-			// Only memory.swap.max. nil limit writes "max" (pod-level limit removed).
-			if desiredPodSwapSet {
-				cm.SetSwapLimit(resizedResources, &desiredPodSwapLimit)
-			} else {
-				cm.SetSwapLimit(resizedResources, nil)
-			}
+			// Only memory.swap.max. Called only when a pod-level limit is desired.
+			cm.SetSwapLimit(resizedResources, &desiredPodSwapLimit)
 		}
 
 		// Notify the runtime first. If this fails, the runtime has rejected the resize.
