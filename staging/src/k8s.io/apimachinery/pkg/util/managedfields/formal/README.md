@@ -160,6 +160,11 @@ structural FieldsV1 theorem remains true after label decoding. See
   cannot have descendants; composite key names have a canonical strict order.
 - General locality: full classification depends only on claims below that item,
   with recursive required-map coverage at arbitrary finite depth.
+- General key-only lifetime laws: direct deletion is exactly last-membership
+  release; an accepted last release removes the whole subtree, while a retained
+  foreign membership preserves the item if no proper ancestor item is deleted.
+  These cover arbitrary finite manager counts and both force values in the
+  proposed item-core transition. Enclosing object lifetimes remain separate.
 - General progress: unchanged snapshot acquisition by a fresh manager succeeds.
 - Update: complete data replacement, touched-field ownership, preservation of
   untouched claims, distinct Apply/Update manager identities, and invariant preservation for arbitrary finite mixed scoped histories.

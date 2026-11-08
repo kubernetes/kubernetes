@@ -140,7 +140,7 @@ progress witnesses; `Progress.unchanged_snapshot_acquisition` additionally prove
 | FULL-03 | A partial manager cannot directly authorize item deletion. | Definition theorem: `partial_cannot_directly_delete`. Ancestor deletion is an explicit exception. |
 | FULL-04 | Another full manager blocks direct lifetime deletion. | Definition theorem: `surviving_full_blocks_direct_deletion`; full ownership must be checked after transfers. |
 | FULL-05 | A full child does not block deletion of an ancestor item. | General subtree theorem: `ancestor_deletion_dominates`; nested execution proofs. |
-| FULL-06 | Key-only items remain until their last membership claimant leaves. | `key_only_full` is definitional; sharing and final deletion also have execution proofs. |
+| FULL-06 | Within a surviving enclosing lifetime, a key-only item remains until its last membership claimant leaves. | `KeyOnly.direct_deletion_iff_last_membership` characterizes the direct rule for arbitrary finite claim sets, including with force. `accepted_last_membership_prunes_subtree` proves complete subtree removal after the last release. `accepted_foreign_membership_preserves_item` proves survival while a foreign member remains, with an explicit no-proper-ancestor-deletion premise. These are proposed item-core laws; `key_only_full` remains the separate definition theorem. |
 | FULL-07 | Fragmenting the required claims is rejected atomically, even when all required values remain. | General acceptance/commit guarantees and concrete counterexample proofs. Existing malformed states require a separate migration policy. |
 | FULL-08 | Adding claims cannot destroy existing full ownership. | General `owns_monotone`, `covers_monotone`, `full_monotone`; these do not cover arbitrary claim removal or force. |
 | FULL-09 | Required granular collections retain a presence claim even when empty. | Explicit presence is a proposed representation assumption. The current/PR modes retain actual sparse FieldsV1 and prove concrete misclassification counterexamples; the upstream runner confirms them. |
@@ -150,6 +150,17 @@ FULL-03/FULL-05 create a lifetime-based exception to a naive “every shared fie
 always survives omission” statement. The tests for controller contributions to
 list items also depend on whether the contributor used Apply or Update; this
 difference must remain explicit.
+
+FULL-06 is a local lifetime rule, subject to FULL-05. Unconditional survival of
+a nested key-only item while any member remains would contradict the already
+proved ancestor-deletion rule. `KeyOnly` makes that boundary explicit: the
+survival theorem excludes only **proper ancestor** item deletions, and derives
+the absence of direct deletion from retained membership. It does not assume
+that the item survived. Acceptance supplies schema uniqueness and final
+data/claim consistency. The last-release theorem removes all descendants,
+including optional foreign-owned fields. Ordinary object lifetimes belong to
+the separate scoped operation; these new theorems concern the item-core
+transition rather than arbitrary admission or every scoped operation.
 
 ## What the first 23 statements meant
 

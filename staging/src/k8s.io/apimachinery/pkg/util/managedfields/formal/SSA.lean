@@ -17,6 +17,7 @@ import SSA.Model
 import SSA.Apply
 import SSA.Properties
 import SSA.Contracts
+import SSA.KeyOnly
 import SSA.Examples
 import SSA.Semantics
 import SSA.Boundary

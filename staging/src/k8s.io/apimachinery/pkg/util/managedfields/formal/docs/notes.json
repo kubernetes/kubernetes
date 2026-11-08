@@ -898,5 +898,71 @@
     "scope": "execution",
     "meaning": "A represented forced numeric change succeeds while retaining the old foreign amount claim.",
     "limits": "Complete imported Apply under explicit scalar primitives that implement forced transfer and empty-entry cleanup. Native managedfields and actual CRD HTTP/GET check both the rounded failure and the exact-integer success control; general typed/updater refinement remains separate."
+  },
+  "SSA.KeyOnly.has_full_iff_membership": {
+    "title": "Key-only fullness needs a membership claimant",
+    "scope": "definition",
+    "meaning": "With an empty required core, a full-manager witness exists exactly when an item-membership claim exists.",
+    "limits": "Classification fact for arbitrary finite claim sets, including malformed states; not alone a transition-survival theorem."
+  },
+  "SSA.KeyOnly.foreign_membership_survives_merge": {
+    "title": "Foreign membership survives scalar force transfer",
+    "scope": "helper",
+    "meaning": "The proposed merge/claim phase preserves every foreign item-membership claim, for either force value.",
+    "limits": "Membership is a separate claim kind in this stronger item-core model. This does not assert the same representation for raw SMD."
+  },
+  "SSA.KeyOnly.merged_membership_iff_foreign": {
+    "title": "Omission leaves exactly the foreign memberships",
+    "scope": "helper",
+    "meaning": "If the actor omits item membership, the merged result contains membership exactly when an old foreign claimant remains.",
+    "limits": "General finite claim-phase result. Final subtree pruning and accepted-result survival have separate theorems."
+  },
+  "SSA.KeyOnly.direct_deletion_iff_last_membership": {
+    "title": "Direct key-only deletion means last-membership release",
+    "scope": "definition",
+    "meaning": "For an existing key-only item owned by the departing actor, direct deletion is authorized exactly when every old membership claim belonged to that actor.",
+    "limits": "The actor omits membership. Arbitrary finite managers and both force values; this characterizes the direct lifetime predicate, not deletion by an ancestor."
+  },
+  "SSA.KeyOnly.last_membership_prunes_subtree": {
+    "title": "Last membership release prunes the entire subtree",
+    "scope": "general",
+    "meaning": "The proposed candidate contains no cell at or below a key-only item after its last membership claimant leaves.",
+    "limits": "The key-only item is instantiated in the schema, exists before the request and belongs to the departing actor. Does not assume acceptance; descendants can have other optional owners."
+  },
+  "SSA.KeyOnly.accepted_last_membership_prunes_subtree": {
+    "title": "An accepted last release removes every descendant",
+    "scope": "general",
+    "meaning": "The complete accepted item-core result contains no cell beneath a key-only item after the last membership release.",
+    "limits": "General operational law, including both force values and arbitrary finite state/schema sizes. Separate scoped object/admission operations require their own composition boundary."
+  },
+  "SSA.KeyOnly.accepted_foreign_membership_preserves_item": {
+    "title": "A retained membership preserves its key-only item",
+    "scope": "general",
+    "meaning": "Every accepted core transition keeps a key-only item if a foreign member remains and no proper ancestor item lifetime is deleted.",
+    "limits": "Does not assume survival or exclude direct deletion in its premise: that exclusion is derived from membership. Accepted initial validity supplies schema uniqueness; final validity links the retained claim to actual item data. Ordinary object scopes remain separate."
+  },
+  "SSA.Contracts.accepted_candidate": {
+    "title": "Accepted result identifies the candidate",
+    "scope": "helper",
+    "meaning": "Connects phase-level candidate results to the exact state returned on success.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.Contracts.accepted_initial_valid": {
+    "title": "Successful requests start from a valid state",
+    "scope": "helper",
+    "meaning": "Exposes the acceptance-guard fact needed to compose schema and state invariants.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.Contracts.members_equal_of_nodup_map": {
+    "title": "Unique mapped keys identify one member",
+    "scope": "helper",
+    "meaning": "A list with distinct mapped keys cannot contain different members at the same key.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.Contracts.schema_unique_paths": {
+    "title": "A well-formed schema has unique item paths",
+    "scope": "helper",
+    "meaning": "The executable schema uniqueness check yields pairwise distinct instantiated item paths.",
+    "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
   }
 }

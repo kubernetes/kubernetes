@@ -31,7 +31,8 @@ private theorem state_ext (left right : State)
   cases claims
   rfl
 
-private theorem accepted_candidate (schema : Schema) (before after : State) (r : Request)
+/-- Compose candidate-phase guarantees with the result of a successful transition. -/
+theorem accepted_candidate (schema : Schema) (before after : State) (r : Request)
     (accepted : apply schema before r = .ok after) :
     candidate schema before r = after := by
   unfold apply at accepted
@@ -48,7 +49,8 @@ private theorem accepted_candidate (schema : Schema) (before after : State) (r :
           · cases accepted
           · exact Except.ok.inj accepted
 
-private theorem accepted_initial_valid (schema : Schema) (before after : State) (r : Request)
+/-- Successful transitions start from a valid state, including a unique instantiated schema. -/
+theorem accepted_initial_valid (schema : Schema) (before after : State) (r : Request)
     (accepted : apply schema before r = .ok after) : valid schema before = true := by
   unfold apply at accepted
   split at accepted
@@ -449,10 +451,10 @@ theorem nodup_of_eraseDups_length {α : Type} [BEq α] [LawfulBEq α]
       rw [filterSelf] at tailLength
       exact List.nodup_cons.mpr ⟨absent, ih tailLength⟩
 
-theorem cells_unique_by_path (cells : List Cell) (unique : (cells.map (·.path)).Nodup)
-    (left right : Cell) (hl : left ∈ cells) (hr : right ∈ cells)
-    (same : left.path = right.path) : left = right := by
-  induction cells with
+theorem members_equal_of_nodup_map {α β : Type} (items : List α) (key : α → β)
+    (unique : (items.map key).Nodup) (left right : α) (hl : left ∈ items) (hr : right ∈ items)
+    (same : key left = key right) : left = right := by
+  induction items with
   | nil => cases hl
   | cons head tail ih =>
       simp only [List.map_cons, List.nodup_cons] at unique
@@ -462,6 +464,17 @@ theorem cells_unique_by_path (cells : List Cell) (unique : (cells.map (·.path))
       · exact False.elim (unique.1 (List.mem_map.mpr ⟨right, hr, same.symm⟩))
       · exact False.elim (unique.1 (List.mem_map.mpr ⟨left, hl, same⟩))
       · exact ih unique.2 hl hr
+
+theorem cells_unique_by_path (cells : List Cell) (unique : (cells.map (·.path)).Nodup)
+    (left right : Cell) (hl : left ∈ cells) (hr : right ∈ cells)
+    (same : left.path = right.path) : left = right :=
+  members_equal_of_nodup_map cells (·.path) unique left right hl hr same
+
+theorem schema_unique_paths (schema : Schema) (wellformed : schemaValid schema = true) :
+    (schema.map (·.path)).Nodup := by
+  apply nodup_of_eraseDups_length
+  have lengths := beq_iff_eq.mp (Bool.and_eq_true_iff.mp wellformed).1
+  simpa using lengths
 
 theorem valid_unique_paths (schema : Schema) (s : State)
     (validState : valid schema s = true) : (s.cells.map (·.path)).Nodup := by
