@@ -17,7 +17,7 @@ limitations under the License.
 package namer
 
 import (
-	"k8s.io/gengo/v2"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 )
@@ -50,10 +50,10 @@ func NewTagOverrideNamer(tagName string, fallback namer.Namer) namer.Namer {
 // extractTag gets the comment-tags for the key.  If the tag did not exist, it
 // returns the empty string.
 func extractTag(key string, lines []string) string {
-	val, present := gengo.ExtractCommentTags("+", lines)[key]
-	if !present || len(val) < 1 {
+	val, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{key}, lines)
+	if err != nil || len(val) < 1 {
 		return ""
 	}
 
-	return val[0]
+	return val[key][0]
 }
