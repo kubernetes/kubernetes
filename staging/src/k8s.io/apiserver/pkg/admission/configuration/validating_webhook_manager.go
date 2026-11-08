@@ -38,6 +38,11 @@ import (
 // Type for test injection.
 type validatingWebhookAccessorCreator func(uid string, configurationName string, h *v1.ValidatingWebhook) webhook.WebhookAccessor
 
+type configurationCacheEntry struct {
+	resourceVersion string
+	accessors       []webhook.WebhookAccessor
+}
+
 // validatingWebhookConfigurationManager collects the validating webhook objects so that they can be called.
 type validatingWebhookConfigurationManager struct {
 	lister              admissionregistrationlisters.ValidatingWebhookConfigurationLister
@@ -127,11 +132,12 @@ func (v *validatingWebhookConfigurationManager) getValidatingWebhookConfiguratio
 	accessors := make([]webhook.WebhookAccessor, 0, size)
 
 	for _, c := range configurations {
-		cachedConfigurationAccessors, ok := v.configurationsCache.Load(c.Name)
-		if ok {
-			// Pick an already cached webhookAccessor
-			accessors = append(accessors, cachedConfigurationAccessors.([]webhook.WebhookAccessor)...)
-			continue
+		if cached, ok := v.configurationsCache.Load(c.Name); ok {
+			if entry, ok := cached.(configurationCacheEntry); ok && entry.resourceVersion == c.ResourceVersion {
+				// Pick an already cached webhookAccessor
+				accessors = append(accessors, entry.accessors...)
+				continue
+			}
 		}
 
 		logExcludedResourcesForValidatingWebhook(c.Name, c.Webhooks, v.excludedWebhookResources)
@@ -148,7 +154,10 @@ func (v *validatingWebhookConfigurationManager) getValidatingWebhookConfiguratio
 			configurationAccessors = append(configurationAccessors, configurationAccessor)
 		}
 		accessors = append(accessors, configurationAccessors...)
-		v.configurationsCache.Store(c.Name, configurationAccessors)
+		v.configurationsCache.Store(c.Name, configurationCacheEntry{
+			resourceVersion: c.ResourceVersion,
+			accessors:       configurationAccessors,
+		})
 	}
 
 	return accessors
