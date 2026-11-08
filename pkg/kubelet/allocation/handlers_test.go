@@ -84,6 +84,16 @@ func TestDisallowResizeForSwappableContainers(t *testing.T) {
 		}
 		return pod
 	}
+	withInitContainerSwap := func(pod *v1.Pod, swap string, restartable bool) *v1.Pod {
+		ic := v1.Container{Name: "init", Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{v1.ResourceSwap: resource.MustParse(swap)},
+		}}
+		if restartable {
+			ic.RestartPolicy = new(v1.ContainerRestartPolicyAlways)
+		}
+		pod.Spec.InitContainers = []v1.Container{ic}
+		return pod
+	}
 
 	for _, tc := range []struct {
 		name       string
@@ -180,6 +190,20 @@ func TestDisallowResizeForSwappableContainers(t *testing.T) {
 			allocated:  withPodSwap(mkPod("", "1Gi", "4Gi", "", false), "1Gi"),
 			desired:    withPodSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "2Gi"),
 			disallowed: false,
+		},
+		{
+			name: "gate on: init container swap limit resize on NoSwap node is infeasible",
+			gate: true, behavior: noSwapNode,
+			allocated:  withInitContainerSwap(mkPod("", "1Gi", "4Gi", "", false), "256Mi", false),
+			desired:    withInitContainerSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "512Mi", false),
+			disallowed: true,
+		},
+		{
+			name: "gate on: sidecar swap limit resize on NoSwap node is infeasible",
+			gate: true, behavior: noSwapNode,
+			allocated:  withInitContainerSwap(mkPod("", "1Gi", "4Gi", "", false), "256Mi", true),
+			desired:    withInitContainerSwap(mkPod(desiredMarker, "1Gi", "4Gi", "", false), "512Mi", true),
+			disallowed: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

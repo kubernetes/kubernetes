@@ -171,7 +171,7 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 		}
 	}
 	const dynamicContainerSwapMsg = "Adding or removing containers with swap is not supported."
-	for pair := range podutil.ContainerPairs(desiredPod, allocatedPod, podutil.InitContainers|podutil.Containers) {
+	for pair, containerType := range podutil.ContainerPairs(desiredPod, allocatedPod, podutil.InitContainers|podutil.Containers) {
 		desiredContainer, allocatedContainer := pair.New, pair.Old
 		switch {
 		case allocatedContainer == nil:
@@ -183,6 +183,8 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 			if runtime.GetContainerSwapBehavior(allocatedPod, allocatedContainer) != kubetypes.NoSwap {
 				return true, dynamicContainerSwapMsg
 			}
+			continue
+		case !IsResizableContainer(desiredContainer, containerType):
 			continue
 		}
 		if containerSwapLimitChanged(allocatedContainer, desiredContainer) {
