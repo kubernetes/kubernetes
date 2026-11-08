@@ -1816,10 +1816,12 @@ func stringKey(item string) string {
 	return item
 }
 
-// quantityKeyAsDec uses a scaled inf.Dec of the item as itself
+// quantityKeyAsDec uses the canonical DecimalSI form of the item
 // as a key for validateSet.
 func quantityKeyAsDec(item apiresource.Quantity) string {
-	return item.AsDec().String()
+	item.Format = apiresource.DecimalSI
+	number, suffix := item.CanonicalizeBytes(nil)
+	return string(number) + string(suffix)
 }
 
 // quantityKeyInt uses base-10 integer of the item itself
