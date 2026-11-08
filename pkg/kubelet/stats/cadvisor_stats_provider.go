@@ -226,6 +226,11 @@ func (p *cadvisorStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v
 	return podStats, nil
 }
 
+// PodSwapStats returns swap usage for the pod and its containers.
+func (p *cadvisorStatsProvider) PodSwapStats(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	return p.PodCPUAndMemoryStats(ctx, pod, podStatus)
+}
+
 // ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.
 func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error) {
 	logger := klog.FromContext(ctx)

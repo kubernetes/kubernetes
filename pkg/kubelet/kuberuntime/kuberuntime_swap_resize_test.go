@@ -496,6 +496,92 @@ func TestValidateSwapResizeAction(t *testing.T) {
 	}
 }
 
+// TestSwapUsageReadOnlyForSwapDecrease: when CRI stats omit swap, the extra
+// swap stats read happens only for swap decreases, not memory-only downsizes.
+func TestSwapUsageReadOnlyForSwapDecrease(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	miQ := resource.MustParse("1Mi")
+	mi := miQ.Value()
+
+	for _, tc := range []struct {
+		name          string
+		resourceName  v1.ResourceName
+		current       resourceRequirements
+		desired       resourceRequirements
+		swapUsage     *uint64 // returned by PodSwapStats; nil means no swap stats
+		expectErr     bool
+		expectedCalls int
+	}{
+		{
+			name:         "swap decrease above usage from swap stats",
+			resourceName: v1.ResourceSwap,
+			current:      resourceRequirements{memoryRequest: 1, memoryLimit: 2, swapLimit: 200 * mi},
+			desired:      resourceRequirements{memoryRequest: 1, memoryLimit: 2, swapLimit: 100 * mi},
+			swapUsage:    new(uint64(50 * mi)), expectedCalls: 1,
+		},
+		{
+			name:         "swap decrease below usage from swap stats is deferred",
+			resourceName: v1.ResourceSwap,
+			current:      resourceRequirements{memoryRequest: 1, memoryLimit: 2, swapLimit: 200 * mi},
+			desired:      resourceRequirements{memoryRequest: 1, memoryLimit: 2, swapLimit: 100 * mi},
+			swapUsage:    new(uint64(150 * mi)), expectErr: true, expectedCalls: 1,
+		},
+		{
+			name:         "swap decrease with no swap stats anywhere is deferred",
+			resourceName: v1.ResourceSwap,
+			current:      resourceRequirements{memoryRequest: 1, memoryLimit: 2, swapLimit: 200 * mi},
+			desired:      resourceRequirements{memoryRequest: 1, memoryLimit: 2, swapLimit: 100 * mi},
+			expectErr:    true, expectedCalls: 1,
+		},
+		{
+			name:          "memory-only decrease does not read swap stats",
+			resourceName:  v1.ResourceMemory,
+			current:       resourceRequirements{memoryRequest: 1, memoryLimit: 200 * mi},
+			desired:       resourceRequirements{memoryRequest: 1, memoryLimit: 100 * mi},
+			expectedCalls: 0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newSwapTestManager(t, tCtx, kubetypes.WorkloadControlledSwap)
+			pod := swapTestPod(withSwapLimit(burstableContainer("c", "1Gi", "2Gi"), "100Mi"))
+			kps := runningStatusFor(pod)
+
+			current := tc.current
+			actions := podActions{ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{
+				tc.resourceName: {{
+					container: &pod.Spec.Containers[0], kubeContainerID: kps.ContainerStatuses[0].ID,
+					desiredContainerResources: tc.desired, currentContainerResources: &current,
+				}},
+			}}
+
+			// CRI stats without any swap, as containerd reports today.
+			criStats := &statsapi.PodStats{
+				PodRef: statsapi.PodReference{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID)},
+				Memory: &statsapi.MemoryStats{UsageBytes: new(uint64(1))},
+				Containers: []statsapi.ContainerStats{{
+					Name:   "c",
+					Memory: &statsapi.MemoryStats{UsageBytes: new(uint64(1))},
+				}},
+			}
+			helper := &containertest.FakeRuntimeHelper{PodStats: map[types.UID]*statsapi.PodStats{pod.UID: criStats}}
+			if tc.swapUsage != nil {
+				helper.PodSwapStatsByUID = map[types.UID]*statsapi.PodStats{pod.UID: {
+					Containers: []statsapi.ContainerStats{{Name: "c", Swap: &statsapi.SwapStats{SwapUsageBytes: tc.swapUsage}}},
+				}}
+			}
+			m.runtimeHelper = helper
+
+			err := m.validatePodResizeAction(tCtx, pod, kps, &cm.ResourceConfig{}, &cm.ResourceConfig{}, actions)
+			if tc.expectErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.expectedCalls, helper.PodSwapStatsCalls, "PodSwapStats calls")
+		})
+	}
+}
+
 // TestIsPodResizeInProgressSwap: the in-progress condition must track swap.
 func TestIsPodResizeInProgressSwap(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)

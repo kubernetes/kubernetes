@@ -50,6 +50,7 @@ import (
 	crierror "k8s.io/cri-api/pkg/errors"
 	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -1482,6 +1483,13 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	if err != nil {
 		return fmt.Errorf("unable to read memory usage for pod %q", format.Pod(pod))
 	}
+	if missingSwapUsage(podUsageStats, podSwapDecreasing, decreasingContainerSwap) {
+		// Some runtimes leave swap out of CRI stats. Only pay for the extra
+		// stats read when a swap limit is actually being lowered.
+		if swapStats, err := m.runtimeHelper.PodSwapStats(ctx, pod, podStatus); err == nil {
+			mergeSwapUsage(podUsageStats, swapStats)
+		}
+	}
 
 	var errs []error
 	if podLimitDecreasing {
@@ -1526,6 +1534,50 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	}
 
 	return nil
+}
+
+// missingSwapUsage reports whether a swap limit is being lowered for the pod or
+// a container whose swap usage is absent from stats.
+func missingSwapUsage(stats *statsapi.PodStats, podSwapDecreasing bool, decreasingContainerSwap map[string]int64) bool {
+	if podSwapDecreasing && (stats.Swap == nil || stats.Swap.SwapUsageBytes == nil) {
+		return true
+	}
+	if len(decreasingContainerSwap) == 0 {
+		return false
+	}
+	found := map[string]bool{}
+	for _, cs := range stats.Containers {
+		if cs.Swap != nil && cs.Swap.SwapUsageBytes != nil {
+			found[cs.Name] = true
+		}
+	}
+	for name := range decreasingContainerSwap {
+		if !found[name] {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeSwapUsage fills swap usage missing from stats with the values in swapStats.
+func mergeSwapUsage(stats, swapStats *statsapi.PodStats) {
+	if swapStats == nil {
+		return
+	}
+	if stats.Swap == nil || stats.Swap.SwapUsageBytes == nil {
+		stats.Swap = swapStats.Swap
+	}
+	for _, fb := range swapStats.Containers {
+		for i := range stats.Containers {
+			if stats.Containers[i].Name != fb.Name {
+				continue
+			}
+			if stats.Containers[i].Swap == nil || stats.Containers[i].Swap.SwapUsageBytes == nil {
+				stats.Containers[i].Swap = fb.Swap
+			}
+			break
+		}
+	}
 }
 
 func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {

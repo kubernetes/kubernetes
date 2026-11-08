@@ -998,7 +998,7 @@ func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(c1.IO)
 }
 
-func TestCRIPodCPUAndMemoryStatsSwapFallback(t *testing.T) {
+func TestCRIPodSwapStats(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WorkloadControlledSwap, true)
 
@@ -1070,15 +1070,22 @@ func TestCRIPodCPUAndMemoryStatsSwapFallback(t *testing.T) {
 		},
 	}
 
+	// CPU and memory stats come from CRI only; swap is not backfilled here.
 	stats, err := provider.PodCPUAndMemoryStats(tCtx, pod, podStatus)
 	require.NoError(t, err)
-	require.NotNil(t, stats.Swap)
-	require.NotNil(t, stats.Swap.SwapUsageBytes)
-	assert.Equal(t, swapUsage, *stats.Swap.SwapUsageBytes)
 	require.Len(t, stats.Containers, 1)
-	require.NotNil(t, stats.Containers[0].Swap)
-	require.NotNil(t, stats.Containers[0].Swap.SwapUsageBytes)
-	assert.Equal(t, swapUsage, *stats.Containers[0].Swap.SwapUsageBytes)
+	assert.Nil(t, stats.Containers[0].Swap)
+
+	// PodSwapStats reads swap from the cAdvisor fallback.
+	swapStats, err := provider.PodSwapStats(tCtx, pod, podStatus)
+	require.NoError(t, err)
+	require.NotNil(t, swapStats.Swap)
+	require.NotNil(t, swapStats.Swap.SwapUsageBytes)
+	assert.Equal(t, swapUsage, *swapStats.Swap.SwapUsageBytes)
+	require.Len(t, swapStats.Containers, 1)
+	require.NotNil(t, swapStats.Containers[0].Swap)
+	require.NotNil(t, swapStats.Containers[0].Swap.SwapUsageBytes)
+	assert.Equal(t, swapUsage, *swapStats.Containers[0].Swap.SwapUsageBytes)
 }
 
 func TestCRIImagesFsStats(t *testing.T) {
