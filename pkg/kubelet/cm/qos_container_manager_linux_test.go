@@ -481,6 +481,7 @@ type fakeCgroupManager struct {
 	mutex   sync.Mutex
 	created []*CgroupConfig
 	updates []*CgroupConfig
+	exists  bool
 }
 
 // Update() is the observation point for this test.
@@ -507,7 +508,7 @@ func (f *fakeCgroupManager) Create(_ klog.Logger, config *CgroupConfig) error {
 
 func (f *fakeCgroupManager) Destroy(_ klog.Logger, _ *CgroupConfig) error { return nil }
 func (f *fakeCgroupManager) Validate(_ CgroupName) error                  { return nil }
-func (f *fakeCgroupManager) Exists(_ CgroupName) bool                     { return false }
+func (f *fakeCgroupManager) Exists(_ CgroupName) bool                     { return f.exists }
 func (f *fakeCgroupManager) Name(name CgroupName) string                  { return name.ToCgroupfs() }
 func (f *fakeCgroupManager) CgroupName(name string) CgroupName {
 	return ParseCgroupfsToCgroupName(name)

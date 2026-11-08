@@ -22,12 +22,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // for typecheck across platforms
@@ -40,6 +46,83 @@ var _ func(string) ([]int, error) = getCgroupProcs
 var _ func(types.UID) string = GetPodCgroupNameSuffix
 var _ func(string, bool, string) string = NodeAllocatableRoot
 var _ func(klog.Logger, string) (string, error) = GetKubeletContainer
+
+func isBurstableNonCriticalPod(pod *v1.Pod) bool {
+	return pod != nil && !kubetypes.IsCriticalPod(pod) && v1qos.GetPodQOS(pod) == v1.PodQOSBurstable
+}
+
+func isMemoryRangeEligibleForSwap(memRequest, memLimit int64) bool {
+	return memRequest > 0 && memRequest != memLimit
+}
+
+// PodResourcesOptionsExcludingOverhead returns PodResourcesOptions with overhead excluded
+// and PodLevelResources / DRANodeAllocatableResources feature gates applied.
+func PodResourcesOptionsExcludingOverhead() resourcehelper.PodResourcesOptions {
+	return resourcehelper.PodResourcesOptions{
+		ExcludeOverhead:                          true,
+		SkipPodLevelResources:                    !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources),
+		UseDRANodeAllocatableResourceClaimStatus: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
+	}
+}
+
+// IsPodEligibleForSwap reports whether the pod is eligible for swap under LimitedSwap
+// and returns its effective memory request. Pod overhead is excluded so swap is sized
+// from the workload memory request.
+func IsPodEligibleForSwap(pod *v1.Pod) (bool, int64) {
+	if !isBurstableNonCriticalPod(pod) {
+		return false, 0
+	}
+	opts := PodResourcesOptionsExcludingOverhead()
+	reqs := resourcehelper.PodRequests(pod, opts)
+	limits := resourcehelper.PodLimits(pod, opts)
+
+	podMemoryRequest := reqs.Memory().Value()
+	podMemoryLimit := limits.Memory().Value()
+	if !isMemoryRangeEligibleForSwap(podMemoryRequest, podMemoryLimit) {
+		return false, 0
+	}
+	return true, podMemoryRequest
+}
+
+// IsContainerEligibleForSwap reports whether the container's pod/container resource spec
+// is eligible for swap under LimitedSwap (assuming node-level LimitedSwap is enabled).
+func IsContainerEligibleForSwap(pod *v1.Pod, container *v1.Container) bool {
+	if container == nil || !isBurstableNonCriticalPod(pod) {
+		return false
+	}
+
+	plrActive := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
+		pod.Spec.Resources != nil && !pod.Spec.Resources.Requests.Memory().IsZero()
+	if plrActive {
+		// Ephemeral debug containers cannot specify resource requests/limits in the API,
+		// and ephemeralContainerStartSpec casts EphemeralContainerCommon to v1.Container
+		// with empty Resources, so guard against treating them as pod-level unbounded swap.
+		for i := range pod.Spec.EphemeralContainers {
+			if pod.Spec.EphemeralContainers[i].Name == container.Name {
+				return false
+			}
+		}
+		if eligible, _ := IsPodEligibleForSwap(pod); !eligible {
+			return false
+		}
+	}
+
+	memReq := container.Resources.Requests.Memory().Value()
+	memLimit := container.Resources.Limits.Memory().Value()
+	if plrActive && memLimit != 0 {
+		// During in-place pod resize, updatePodContainerResources populates omitted
+		// container memory limits from pod.Spec.Resources.Limits[memory] on a synthetic
+		// v1.Container copy. Ignore that inherited limit when the container in pod.Spec
+		// did not declare a container-level memory limit.
+		if origContainer := kubecontainer.GetContainerSpec(pod, container.Name); origContainer != nil && origContainer.Resources.Limits.Memory().IsZero() {
+			memLimit = 0
+		}
+	}
+	if memReq == 0 && memLimit == 0 {
+		return plrActive
+	}
+	return isMemoryRangeEligibleForSwap(memReq, memLimit)
+}
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
