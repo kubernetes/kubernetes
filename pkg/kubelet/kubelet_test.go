@@ -3911,6 +3911,187 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	require.NotNil(t, kubeDep.TLSConfig.ClientCAs, "ClientCAs should not be nil")
 }
 
+func TestNewMainKubeletEnableNodeLease(t *testing.T) {
+	tests := []struct {
+		name            string
+		featureGate     bool
+		enableNodeLease bool
+		expectLease     bool
+	}{
+		{
+			name:            "enableNodeLease=true creates node lease",
+			featureGate:     true,
+			enableNodeLease: true,
+			expectLease:     true,
+		},
+		{
+			name:            "enableNodeLease=false with feature gate disabled still creates node lease",
+			featureGate:     false,
+			enableNodeLease: false,
+			expectLease:     true,
+		},
+		{
+			name:            "enableNodeLease=false with feature gate enabled disables node lease",
+			featureGate:     true,
+			enableNodeLease: false,
+			expectLease:     false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+			tempDir, err := os.MkdirTemp("", "logs")
+			require.NoError(t, err)
+			containerLogsDir := ContainerLogsDir
+			ContainerLogsDir = tempDir
+			t.Cleanup(func() {
+				cleanUpTempDir(t, tempDir, containerLogsDir)
+			})
+
+			ca, cert, key, err := generateCAAndCertKeyWithOptions(
+				"localhost",
+				[]net.IP{{127, 0, 0, 1}},
+				[]string{"localhost"},
+			)
+			require.NoError(t, err)
+
+			caPath := filepath.Join(tempDir, "kubelet-client-ca.cert")
+			certPath := filepath.Join(tempDir, "kubelet.cert")
+			keyPath := filepath.Join(tempDir, "kubelet.key")
+
+			require.NoError(t, os.WriteFile(caPath, ca, os.FileMode(0644)))
+			require.NoError(t, os.WriteFile(certPath, cert, os.FileMode(0644)))
+			require.NoError(t, os.WriteFile(keyPath, key, os.FileMode(0600)))
+
+			kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+				SyncFrequency:            metav1.Duration{Duration: time.Minute},
+				NodeLeaseDurationSeconds: 40,
+				EnableNodeLease:          tc.enableNodeLease,
+				ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
+				ContainerLogMaxSize:                       "10Mi",
+				ContainerLogMaxFiles:                      5,
+				ImagePullCredentialsVerificationPolicy:    "NeverVerifyPreloadedImages",
+				MemoryThrottlingFactor:                    new(float64),
+				CrashLoopBackOff: kubeletconfiginternal.CrashLoopBackOffConfig{
+					MaxContainerRestartPeriod: &metav1.Duration{Duration: 5 * time.Minute},
+				},
+			}
+			var prober volume.DynamicPluginProber
+			tp := noopoteltrace.NewTracerProvider()
+			cadvisor := cadvisortest.NewMockInterface(t)
+			cadvisor.EXPECT().MachineInfo(logger).Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
+			cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapi.FsInfo{
+				Usage:     400,
+				Capacity:  1000,
+				Available: 600,
+			}, nil).Maybe()
+			tlsOptions := &server.TLSOptions{
+				MinVersion:   0,
+				CertFile:     certPath,
+				KeyFile:      keyPath,
+				ClientCAFile: caPath,
+			}
+			fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+			defer func() {
+				fakeRuntime.Stop()
+			}()
+			fakeRecorder := &record.FakeRecorder{}
+			rtSvc, err := remote.NewRemoteRuntimeServiceBuilder().
+				WithEndpoint(endpoint).
+				WithConnectionTimeout(15 * time.Second).
+				Build(tCtx)
+			require.NoError(t, err)
+
+			heartbeatClient := fake.NewSimpleClientset(&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "hostname",
+					UID:  "node-uid",
+				},
+			})
+
+			kubeDep := &Dependencies{
+				Auth:                 nil,
+				CAdvisorInterface:    cadvisor,
+				ContainerManager:     cm.NewStubContainerManager(),
+				KubeClient:           nil, // standalone mode
+				HeartbeatClient:      heartbeatClient,
+				EventClient:          nil,
+				TracerProvider:       tp,
+				HostUtil:             hostutil.NewFakeHostUtil(nil),
+				Mounter:              mount.NewFakeMounter(nil),
+				Recorder:             fakeRecorder,
+				RemoteRuntimeService: rtSvc,
+				RemoteImageService:   fakeRuntime.ImageService,
+				Subpather:            &subpath.FakeSubpath{},
+				OOMAdjuster:          oom.NewOOMAdjuster(),
+				OSInterface:          kubecontainer.RealOS{},
+				DynamicPluginProber:  prober,
+				TLSOptions:           tlsOptions,
+			}
+			crOptions := &kubeletconfig.ContainerRuntimeOptions{}
+
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletServerCertificateFile, false)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RotateKubeletServerCertificate, false)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletClientCAFile, false)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalNodeLivenessDetection, tc.featureGate)
+
+			testMainKubelet, err := NewMainKubelet(
+				tCtx,
+				kubeCfg,
+				kubeDep,
+				crOptions,
+				"hostname",
+				"hostname",
+				[]net.IP{},
+				"",
+				"external",
+				"/tmp/cert",
+				"/tmp/rootdir",
+				tempDir,
+				"",
+				"",
+				false,
+				[]v1.Taint{},
+				[]string{},
+				"",
+				false,
+				false,
+				metav1.Duration{Duration: time.Minute},
+				1024,
+				110,
+				map[string]string{},
+				1024,
+				false,
+			)
+			require.NoError(t, err, "NewMainKubelet should succeed")
+			require.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
+
+			tCtx = ktesting.Init(t)
+			if tc.expectLease {
+				require.NotNil(t, testMainKubelet.nodeLeaseController, "nodeLeaseController should not be nil")
+				runCtx, cancel := context.WithCancel(tCtx)
+				done := make(chan struct{})
+				defer func() {
+					cancel()
+					<-done
+				}()
+				go func() {
+					defer close(done)
+					testMainKubelet.nodeLeaseController.Run(runCtx)
+				}()
+				require.Eventually(t, func() bool {
+					leaseObj, err := heartbeatClient.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(tCtx, "hostname", metav1.GetOptions{})
+					return err == nil && leaseObj != nil && leaseObj.Name == "hostname"
+				}, 5*time.Second, 50*time.Millisecond, "expected node lease to be created")
+			} else {
+				require.Nil(t, testMainKubelet.nodeLeaseController, "nodeLeaseController should be nil when enableNodeLease is false")
+				require.Empty(t, heartbeatClient.Actions(), "expected no lease client actions when enableNodeLease is false")
+			}
+		})
+	}
+}
+
 func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	tempDir, err := os.MkdirTemp("", "logs")
