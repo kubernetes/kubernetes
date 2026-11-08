@@ -464,6 +464,13 @@ func (s swapLimitSource) String() string {
 }
 
 func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID kubecontainer.ContainerID, containerType podutil.ContainerType) error {
+	return m.updateContainerResourcesAndRecord(ctx, pod, container, container, containerID, containerType)
+}
+
+// updateContainerResourcesAndRecord sends the resources derived from container
+// to the runtime and records actuated in the actuated checkpoint. They differ
+// only when the CRI request carries values that are not part of the spec.
+func (m *kubeGenericRuntimeManager) updateContainerResourcesAndRecord(ctx context.Context, pod *v1.Pod, container, actuated *v1.Container, containerID kubecontainer.ContainerID, containerType podutil.ContainerType) error {
 	logger := klog.FromContext(ctx)
 	containerResources := m.generateContainerResources(ctx, pod, container)
 	if containerResources == nil {
@@ -471,7 +478,7 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 	}
 	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err == nil {
-		err = m.setActuatedContainerResources(logger, pod, container, containerType)
+		err = m.setActuatedContainerResources(logger, pod, actuated, containerType)
 	}
 	return err
 }

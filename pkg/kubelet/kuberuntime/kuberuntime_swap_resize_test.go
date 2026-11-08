@@ -314,6 +314,7 @@ func TestUpdatePodContainerResourcesPinsSwap(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
 		behavior     kubetypes.SwapBehavior
+		declaredSwap string // container limits.swap in the spec; empty means inherited
 		resourceName v1.ResourceName
 		current      resourceRequirements
 		desired      resourceRequirements
@@ -321,6 +322,7 @@ func TestUpdatePodContainerResourcesPinsSwap(t *testing.T) {
 	}{
 		{
 			name: "WorkloadControlledSwap cpu update keeps current swap", behavior: kubetypes.WorkloadControlledSwap,
+			declaredSwap: "512Mi",
 			resourceName: v1.ResourceCPU,
 			current:      resourceRequirements{cpuRequest: 100, cpuLimit: 100, memoryRequest: gi, memoryLimit: 2 * gi, swapLimit: gi / 2},
 			desired:      resourceRequirements{cpuRequest: 200, cpuLimit: 200, memoryRequest: gi, memoryLimit: 2 * gi, swapLimit: gi / 2},
@@ -328,6 +330,7 @@ func TestUpdatePodContainerResourcesPinsSwap(t *testing.T) {
 		},
 		{
 			name: "WorkloadControlledSwap memory update keeps current swap", behavior: kubetypes.WorkloadControlledSwap,
+			declaredSwap: "512Mi",
 			resourceName: v1.ResourceMemory,
 			current:      resourceRequirements{cpuRequest: 100, cpuLimit: 100, memoryRequest: gi, memoryLimit: 2 * gi, swapLimit: gi / 2},
 			desired:      resourceRequirements{cpuRequest: 100, cpuLimit: 100, memoryRequest: gi, memoryLimit: 3 * gi, swapLimit: gi},
@@ -335,10 +338,20 @@ func TestUpdatePodContainerResourcesPinsSwap(t *testing.T) {
 		},
 		{
 			name: "WorkloadControlledSwap swap update sends desired swap", behavior: kubetypes.WorkloadControlledSwap,
+			declaredSwap: "1Gi",
 			resourceName: v1.ResourceSwap,
 			current:      resourceRequirements{cpuRequest: 100, cpuLimit: 100, memoryRequest: gi, memoryLimit: 2 * gi, swapLimit: gi / 2},
 			desired:      resourceRequirements{cpuRequest: 100, cpuLimit: 100, memoryRequest: gi, memoryLimit: 2 * gi, swapLimit: gi},
 			expectedSwap: fmt.Sprintf("%d", gi),
+		},
+		{
+			// The container inherits the pod-level limit: CRI gets the pinned
+			// value, but the checkpoint must not gain an explicit limits.swap.
+			name: "WorkloadControlledSwap cpu update of inheriting container", behavior: kubetypes.WorkloadControlledSwap,
+			resourceName: v1.ResourceCPU,
+			current:      resourceRequirements{cpuRequest: 100, cpuLimit: 100, memoryRequest: gi, memoryLimit: 2 * gi, swapLimit: gi / 4},
+			desired:      resourceRequirements{cpuRequest: 200, cpuLimit: 200, memoryRequest: gi, memoryLimit: 2 * gi, swapLimit: gi / 4},
+			expectedSwap: fmt.Sprintf("%d", gi/4),
 		},
 		{
 			// Without pinning, LimitedSwap would recompute from the synthetic
@@ -354,7 +367,11 @@ func TestUpdatePodContainerResourcesPinsSwap(t *testing.T) {
 			m := newSwapTestManager(t, tCtx, tc.behavior)
 			runtimeSvc := m.runtimeService.(*apitest.FakeRuntimeService)
 
-			pod := swapTestPod(burstableContainer("c", "1Gi", "2Gi"))
+			specContainer := burstableContainer("c", "1Gi", "2Gi")
+			if tc.declaredSwap != "" {
+				specContainer = withSwapLimit(specContainer, tc.declaredSwap)
+			}
+			pod := swapTestPod(specContainer)
 			makeAndSetFakePod(tCtx, m, runtimeSvc, pod)
 
 			var cid kubecontainer.ContainerID
@@ -379,12 +396,17 @@ func TestUpdatePodContainerResourcesPinsSwap(t *testing.T) {
 			require.NotNil(t, c.LinuxResources)
 			assert.Equal(t, tc.expectedSwap, c.LinuxResources.Unified[cm.Cgroup2MaxSwapFilename], "memory.swap.max sent to runtime")
 
-			// The actuated checkpoint must carry the pinned value so effective
-			// comparisons stay stable.
+			// The checkpoint stays faithful to the spec: a declared limits.swap
+			// records the value sent, an inherited one is not recorded.
 			actuated, found := m.actuatedState.GetContainerResources(pod.UID, "c")
 			require.True(t, found)
-			q := actuated.Limits[v1.ResourceSwap]
-			assert.Equal(t, tc.expectedSwap, fmt.Sprintf("%d", q.Value()), "actuated limits.swap")
+			q, hasSwap := actuated.Limits[v1.ResourceSwap]
+			if tc.declaredSwap == "" {
+				assert.False(t, hasSwap, "actuated limits.swap must not be recorded for an inheriting container, got %s", q.String())
+			} else {
+				require.True(t, hasSwap, "actuated limits.swap")
+				assert.Equal(t, tc.expectedSwap, fmt.Sprintf("%d", q.Value()), "actuated limits.swap")
+			}
 		})
 	}
 }

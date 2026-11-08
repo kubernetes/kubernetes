@@ -1566,6 +1566,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
 			}
 		}
+		actuated := container
 		if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
 			// KEP-5359: pin the swap limit explicitly. generateLinuxContainerResources
 			// re-derives memory.swap.max from the container it is handed; without
@@ -1573,14 +1574,22 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 			// WorkloadControlledSwap) or recompute LimitedSwap from the synthetic
 			// memory request. The explicit value takes precedence in
 			// effectiveSwapLimit, so the number written is exactly the one chosen in
-			// computePodResizeAction, and the actuated checkpoint records it.
+			// computePodResizeAction.
 			swapLimit := cInfo.currentContainerResources.swapLimit
 			if resourceName == v1.ResourceSwap {
 				swapLimit = cInfo.desiredContainerResources.swapLimit
 			}
 			container.Resources.Limits[v1.ResourceSwap] = *resource.NewQuantity(swapLimit, resource.BinarySI)
+			// The pin is only for the CRI request. A container that inherits its
+			// swap limit (pod-level, LimitedSwap, or the node default) must not get
+			// an explicit limits.swap in the actuated checkpoint, or it would stop
+			// following later pod-level or LimitedSwap changes.
+			if _, declared := cInfo.container.Resources.Limits[v1.ResourceSwap]; !declared {
+				actuated = container.DeepCopy()
+				delete(actuated.Resources.Limits, v1.ResourceSwap)
+			}
 		}
-		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID, cInfo.containerType); err != nil {
+		if err := m.updateContainerResourcesAndRecord(ctx, pod, container, actuated, cInfo.kubeContainerID, cInfo.containerType); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
 			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
 			logger.Error(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
@@ -2936,9 +2945,8 @@ func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocate
 			}
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
-				// Compare effective swap, not raw map entries: the actuated checkpoint
-				// carries an explicit limits.swap written by the resize path even when
-				// the allocated spec derives its value (pod-level or LimitedSwap).
+				// Compare effective swap, not raw map entries: a container without
+				// limits.swap derives its value from the pod-level limit or LimitedSwap.
 				var actuatedPodResources *v1.ResourceRequirements
 				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 					actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(allocatedPod.UID)
