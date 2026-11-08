@@ -22535,7 +22535,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 				Resources:  &tc.podResources,
 				Containers: tc.containers,
 			}
-			errs := validatePodResourceConsistency(&spec, path)
+			errs := validatePodResourceConsistency(&spec, field.NewPath("spec"), path)
 			if len(errs) != len(tc.expectedErrors) {
 				t.Errorf("expected %d errors, got %d errors, got errors: %v", len(tc.expectedErrors), len(errs), errs)
 			}
@@ -34571,7 +34571,7 @@ func TestValidateSwapResourceRequirements(t *testing.T) {
 			},
 			opts:        PodValidationOptions{AllowWorkloadControlledSwap: true, PodLevelResourcesEnabled: true},
 			wantErr:     true,
-			errContains: "must be less than or equal to pod limits",
+			errContains: "spec.initContainers[0].resources.limits[swap]: Invalid value: \"2Gi\": must be less than or equal to pod limits",
 		},
 		{
 			name: "windows pod with container swap limit rejected",

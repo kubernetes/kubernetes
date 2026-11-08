@@ -4861,14 +4861,14 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 	// validatePodResourceRequirements checks if resource names and quantities are
 	// valid, and requests are less than limits.
 	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts)...)
-	allErrs = append(allErrs, validatePodResourceConsistency(spec, resourcesFldPath)...)
+	allErrs = append(allErrs, validatePodResourceConsistency(spec, fldPath, resourcesFldPath)...)
 	return allErrs
 }
 
 // validatePodResourceConsistency checks if aggregate container-level requests are
 // less than or equal to pod-level requests, and individual container-level limits
 // are less than or equal to pod-level limits.
-func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+func validatePodResourceConsistency(spec *core.PodSpec, specPath, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// Convert the *core.PodSpec to *v1.PodSpec to satisfy the call to
@@ -4952,7 +4952,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 				continue
 			}
 			if ctrLimit.Cmp(podSpecLimits) > 0 {
-				fldPath := fldPath.Child("initContainers").Index(i).Child("resources", "limits").Key(resourceName.String())
+				fldPath := specPath.Child("initContainers").Index(i).Child("resources", "limits").Key(resourceName.String())
 				allErrs = append(allErrs, field.Invalid(fldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
 			}
 		}
