@@ -6988,9 +6988,11 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, specPath *field.P
 }
 
 // resizableResourceSet returns the resources whose values may change on a
-// resize. swap (KEP-5359) joins cpu and memory when the gate is on.
-func resizableResourceSet(opts PodValidationOptions) sets.Set[core.ResourceName] {
-	if opts.AllowWorkloadControlledSwap {
+// resize. swap (KEP-5359) joins cpu and memory when the gate is on. This reads
+// the gate directly rather than the ratcheted AllowWorkloadControlledSwap, so
+// an existing swap limit stays valid but cannot change once the gate is off.
+func resizableResourceSet() sets.Set[core.ResourceName] {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadControlledSwap) {
 		return supportedResizeResources.Clone().Insert(core.ResourceSwap)
 	}
 	return supportedResizeResources
@@ -7006,7 +7008,7 @@ func dropResizableResourceUpdates(resourceList, oldResourceList core.ResourceLis
 	} else {
 		mungedResourceList = resourceList.DeepCopy()
 	}
-	for r := range resizableResourceSet(opts) {
+	for r := range resizableResourceSet() {
 		delete(mungedResourceList, r)
 		if quantity, found := oldResourceList[r]; found {
 			mungedResourceList[r] = quantity
