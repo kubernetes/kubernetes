@@ -454,8 +454,6 @@ func TestIsFractionalQuantity(t *testing.T) {
 	}
 }
 
-// TODO(#141166): A whole value must not be rescaled. The large-exponent case
-// should cost about as much as the integer case.
 func BenchmarkIsFractionalQuantity(b *testing.B) {
 	for _, quantity := range []string{"1", "1.5", "1e100000"} {
 		q := apiresource.MustParse(quantity)
