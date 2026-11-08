@@ -397,7 +397,8 @@ type KubeletConfiguration struct {
 	// Default: "5m"
 	// +optional
 	NodeStatusReportFrequency metav1.Duration `json:"nodeStatusReportFrequency,omitempty"`
-	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
+	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease,
+	// when enableNodeLease is true, and also bounds the heartbeat client timeout.
 	// NodeLease provides an indicator of node health by having the Kubelet create and
 	// periodically renew a lease, named after the node, in the kube-node-lease namespace.
 	// If the lease expires, the node can be considered unhealthy.
@@ -407,6 +408,16 @@ type KubeletConfiguration struct {
 	// Default: 40
 	// +optional
 	NodeLeaseDurationSeconds int32 `json:"nodeLeaseDurationSeconds,omitempty"`
+	// enableNodeLease controls whether the Kubelet creates and periodically renews
+	// its Node Lease in the kube-node-lease namespace.
+	// Setting this field to false requires the ExternalNodeLivenessDetection feature gate
+	// to be enabled, and requires kube-controller-manager to be configured with
+	// --node-liveness-source=external so that an external detector is responsible for
+	// node liveness detection.
+	// Default: true
+	// +featureGate=ExternalNodeLivenessDetection
+	// +optional
+	EnableNodeLease *bool `json:"enableNodeLease,omitempty"`
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	// The field value must be greater than 0.

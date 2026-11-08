@@ -77347,9 +77347,16 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"nodeLeaseDurationSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease. NodeLease provides an indicator of node health by having the Kubelet create and periodically renew a lease, named after the node, in the kube-node-lease namespace. If the lease expires, the node can be considered unhealthy. The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal interval may be set based on the lease duration. The field value must be greater than 0. Default: 40",
+							Description: "nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease, when enableNodeLease is true, and also bounds the heartbeat client timeout. NodeLease provides an indicator of node health by having the Kubelet create and periodically renew a lease, named after the node, in the kube-node-lease namespace. If the lease expires, the node can be considered unhealthy. The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal interval may be set based on the lease duration. The field value must be greater than 0. Default: 40",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"enableNodeLease": {
+						SchemaProps: spec.SchemaProps{
+							Description: "enableNodeLease controls whether the Kubelet creates and periodically renews its Node Lease in the kube-node-lease namespace. Setting this field to false requires the ExternalNodeLivenessDetection feature gate to be enabled, and requires kube-controller-manager to be configured with --node-liveness-source=external so that an external detector is responsible for node liveness detection. Default: true",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 					"imageMinimumGCAge": {
