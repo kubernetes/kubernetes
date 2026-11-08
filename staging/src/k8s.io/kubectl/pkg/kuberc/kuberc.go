@@ -437,7 +437,7 @@ func getExplicitKuberc(args []string) (string, error) {
 				break
 			}
 			return "", fmt.Errorf("kuberc file is not found")
-		} else if strings.Contains(arg, "--kuberc=") {
+		} else if strings.HasPrefix(arg, "--kuberc=") {
 			// Split only on the first "=", since the path itself may contain "=".
 			parg := strings.SplitN(arg, "=", 2)
 			if len(parg) > 1 && parg[1] != "" {
