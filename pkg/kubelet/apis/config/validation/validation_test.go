@@ -66,6 +66,7 @@ var (
 		MaxParallelImagePulls:                  nil,
 		HairpinMode:                            kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:               1,
+		EnableNodeLease:                        true,
 		CPUCFSQuotaPeriod:                      metav1.Duration{Duration: 25 * time.Millisecond},
 		TopologyManagerScope:                   kubeletconfig.PodTopologyManagerScope,
 		TopologyManagerPolicy:                  kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
@@ -125,6 +126,23 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: nodeLeaseDurationSeconds must be greater than 0",
+	}, {
+		name: "EnableNodeLease set to false with feature gate disabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.EnableNodeLease = false
+			return conf
+		},
+		errMsg: "invalid configuration: ExternalNodeLivenessDetection feature gate is required to set enableNodeLease to false",
+	}, {
+		name: "EnableNodeLease set to false with feature gate enabled",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			if conf.FeatureGates == nil {
+				conf.FeatureGates = make(map[string]bool)
+			}
+			conf.FeatureGates[string(features.ExternalNodeLivenessDetection)] = true
+			conf.EnableNodeLease = false
+			return conf
+		},
 	}, {
 		name: "specify EnforceNodeAllocatable without enabling CgroupsPerQOS",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
