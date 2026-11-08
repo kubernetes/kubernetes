@@ -137,6 +137,16 @@ the contract refutations under explicit scalar primitives. It also proves
 nontransitive numeric equality and the impossibility of a faithful ordinary
 equality quotient. See [SSA-05](docs/ssa-bugs.md#ssa-05-rounded-numeric-comparison-loses-intent-or-misses-a-conflict).
 
+A second numeric failure is in FieldsV1 key decoding: exact integer selector
+`id: 9007199254740993` becomes its neighbor `9007199254740992`. A valid CRD
+then rejects B adding that distinct neighbor item with a conflict against A.
+`NumericCodecCounterexamples` refutes exact numeric path round-tripping for a
+canonical starting trie under the concrete numeric-read specification. Complete
+Go byte/key round trips reproduce the witness in vendored and both pinned SMD
+revisions, and HTTP verifies the false conflict and atomic rollback. The
+structural FieldsV1 theorem remains true after label decoding. See
+[SSA-06](docs/ssa-bugs.md#ssa-06-fieldsv1-rounding-aliases-distinct-integer-list-keys).
+
 ## What is checked
 
 - General core laws: scalar conflicts, equal-value co-ownership, force transfer,
@@ -284,6 +294,10 @@ arbitrary finite depth, including leaf `{}` membership and the `"."` marker
 used when membership and descendants coexist. Its canonicality premise excludes
 empty child sets and duplicate edge keys. JSON bytes and path-element string
 parsing remain separate obligations; this does not verify Go's JSON library.
+The unrestricted numeric-key codec obligation is now refuted: the concrete
+reader changes a canonical selector's magnitude. The comparison inspects exact
+decoded key values and bytes, rather than trusting the same mixed-number
+`Has`/`Equals` relation that masks this loss.
 `FieldPathSet` additionally proves exact trie-to-path-set membership at arbitrary
 depth and the correspondence of normalized difference/intersection with trie
 selection. Empty structural nodes in selection still require wire normalization.
@@ -378,6 +392,8 @@ actual HTTP/etcd empty-container counterexamples, Required/CEL rejection,
 ownership bootstrap, Update-owned list-item omission and status reset ownership.
 It also checks all three numeric variants, with exact native numeric types,
 retained claims and persisted GET observations.
+The numeric-key test additionally checks a false conflict between distinct
+large integer list keys and successful independent small-key management.
 The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
 to Kubernetes integration testing and is unavailable in published apimachinery.
 

@@ -41,7 +41,7 @@ private def checkFixtures (fixtures : List Fixture) : IO UInt32 := do
 private def usage : String :=
   "ssa-model --self-test | --list | --fixtures | --trace NAME | --check FILE | --replay FILE\n" ++
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
-  "Use - to read stdin. --numeric-counterexamples reports the source-bound numeric witnesses."
+  "Use - to read stdin. --numeric-counterexamples and --numeric-codec-counterexamples report numeric witnesses."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -110,6 +110,9 @@ def main (args : List String) : IO UInt32 := do
       | .error message =>
           stderr.putStrLn message
           return 1
+  | ["--numeric-codec-counterexamples"] =>
+      stdout.putStrLn (toJson NumericCodecCounterexamples.observe).compress
+      return 0
   | [mode, path] =>
       if mode != "--check" && mode != "--replay" then
         stderr.putStrLn usage

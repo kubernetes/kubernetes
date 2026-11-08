@@ -13,7 +13,8 @@ reported together with the preceding transition that caused it.
 | SSA-02 | Explicitly empty granular map after releasing an owned child | First Apply produces `null` while retaining the map claim. Optional non-nullable maps cannot be emptied. Nullable maps change on repetition and can cause a conflict for another manager's identical intent. | Lean execution/intent counterexamples and all finite retry counts; source-bound witness; actual managedfields; both pinned SMD revisions; CRD HTTP/etcd. |
 | SSA-03 | Omission after another manager Updates an item child | The item and its foreign-owned child disappear; the list becomes null. A nullable schema accepts this; a non-nullable schema rejects every retry. | Reachable Lean Apply/Update counterexample and source witness; actual managedfields and pinned SMD; nullable/non-nullable CRD HTTP. Existing report: [#134902](https://github.com/kubernetes/kubernetes/issues/134902). |
 | SSA-04 | Status Apply includes an additional non-status root field | The status actor acquires the unchanged field even though the REST strategy resets it. A later main-endpoint change conflicts. | Reachable Lean refutation; complete imported Apply with explicit primitive instances; real CRD HTTP/etcd and conventional spec/status controls. |
-| SSA-05 | Mixed int64/float64 comparison near `2^63` | Scalar-only intent is lost as a false no-op. Adding an unrelated field instead lets B change A's numeric value without force while both retain ownership. | Lean scalar-intent/foreign-value refutations and imported Apply witnesses; native equality and numeric-key set failure; managedfields; CRD HTTP/etcd/GET with an exact-integer conflict control. |
+| [SSA-05](https://github.com/kubernetes/kubernetes/issues/143942) | Mixed int64/float64 comparison near `2^63` | Scalar-only intent is lost as a false no-op. Adding an unrelated field instead lets B change A's numeric value without force while both retain ownership. | Lean scalar-intent/foreign-value refutations and imported Apply witnesses; native equality and numeric-key set failure; managedfields; CRD HTTP/etcd/GET with an exact-integer conflict control. |
+| SSA-06 | FieldsV1 numeric-key decoding | Exact integer key `2^53+1` is read as its neighbor `2^53`. B adding that distinct list item falsely conflicts against A. | Lean canonical-trie membership refutation; exact native byte/key round trips in vendored and both pinned SMD revisions; CRD HTTP/GET and small-integer control. |
 | PR336-01 | Fragmented required ownership followed by partial-manager omission | A partial manager can delete another partial manager's required data. | Lean execution; exact pinned head/base comparison. |
 | PR336-02 | Direct required-map membership shortcut | The classifier calls a manager full without ownership of required children. An invalid item can remain after the actual full owner leaves. | General classifier theorem; concrete Lean execution; actual pinned head/base outcomes. |
 | PR336-03 | Required granular-list ownership | A supplier owning all child items is classified partial because Apply generated no direct list-presence claim. Another partial manager can delete its data. | General classifier fact; populated/empty Lean counterexamples; exact pinned head/base comparison. |
@@ -256,6 +257,8 @@ the CRD status strategy's declared reset scope, independently of PR #336.
 
 ## SSA-05: rounded numeric comparison loses intent or misses a conflict
 
+Tracked in [Kubernetes #143942](https://github.com/kubernetes/kubernetes/issues/143942).
+
 The CRD's `spec.versions[*].schema.openAPIV3Schema` contains:
 
 ```yaml
@@ -345,6 +348,87 @@ The bridge's corpus/path/default decoder now preserves int64 tokens before
 falling back to float64. Its previous untyped float64 decoding could round away
 exact integers before both engines saw them. That adapter defect is fixed and
 regression-tested, not counted as a second production bug.
+
+## SSA-06: FieldsV1 rounding aliases distinct integer list keys
+
+The CRD's `spec.versions[*].schema.openAPIV3Schema` contains:
+
+```yaml
+type: object
+properties:
+  endpoints:
+    type: array
+    x-kubernetes-list-type: map
+    x-kubernetes-list-map-keys: [id]
+    items:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+        payload:
+          type: string
+```
+
+Without force, A applies the first document and B applies the second:
+
+```yaml
+# A owns one exact integer-keyed item.
+endpoints:
+- id: 9007199254740993
+  payload: old
+---
+# B adds a different integer-keyed item.
+endpoints:
+- id: 9007199254740992
+  payload: independent
+```
+
+A's stored data and raw FieldsV1 both retain the exact first integer. B's
+request should add an independent item, but returns three conflicts against A:
+item membership, `id` and `payload`. GET confirms atomic rollback, including
+claims and resourceVersion. A control with A's key 42 and B's key 41 succeeds,
+preserving both exact items.
+
+### Decoding changes the selector
+
+The standalone fieldpath round trip exposes the same cause:
+
+```text
+before: {"f:endpoints":{"k:{\"id\":9007199254740993}":{}}}
+after:  {"f:endpoints":{"k:{\"id\":9007199254740992}":{}}}
+```
+
+The embedded JSON numeric selector is read into float64; nearest-ties-even
+rounding moves `2^53+1` to `2^53`. The next Apply therefore treats A as owning
+B's distinct item. This is a different defect from SSA-05's comparison of
+already represented numbers: this codec loses an exact integer during parsing.
+It reproduces in the vendored v6 dependency and both pinned v7 PR revisions.
+
+Ordinary field-set `Has`/`Equals` checks do not reveal the loss: their mixed
+comparison also rounds the original integer. The new bridge check inspects
+the exact decoded magnitude and complete reserialized bytes independently.
+It does not treat harmless formatting differences as lost ownership.
+
+### Formal and API evidence
+
+[`NumericCodecCounterexamples`](../SSA/NumericCodecCounterexamples.lean) proves
+that the starting trie is canonical and encodes the exact original key. Under
+the concrete numeric-read specification, membership leaves the original path
+and appears at the neighbor. `exact_numeric_path_roundtrip_is_false` refutes
+BASE-10 even with that canonical-input premise. The small-key control remains
+lossless.
+
+This does not refute `FieldsV1.root_roundtrip`: that structural theorem begins
+after path labels have been decoded. General JSON/parser refinement is still
+open. The counterexample specifies the known numeric-read callback, rather
+than claiming a verified JSON interpreter. Complete real Go round trips agree
+with its observations in all three selected dependency revisions.
+
+`TestSSANumericListKeyOwnership` checks actual CRD decoding, the exact initial
+wire key, the false conflict, persisted rollback and independent small-key
+success. No default, CEL, webhook, conversion or topology migration is involved.
 
 ## PR336-01: a partial manager can authorize deletion
 

@@ -19,6 +19,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -609,6 +610,94 @@ func TestSSANumericComparison(t *testing.T) {
 			}
 			if !reflect.DeepEqual(owners, map[string]bool{"A": true, "B": true}) {
 				t.Fatalf("both managers should retain the numeric claim: %#v", after.GetManagedFields())
+			}
+		})
+	}
+}
+
+// Ownership decoding must keep distinct integer list keys distinct.
+func TestSSANumericListKeyOwnership(t *testing.T) {
+	tearDown, apiClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	for _, first := range []int64{42, 9007199254740993} {
+		t.Run(fmt.Sprint(first), func(t *testing.T) {
+			resource := newSSAFormalResource(t, apiClient, dynamicClient, "numeric-key-"+fmt.Sprint(first)+".formal.ssa", &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"endpoints": {
+						Type: "array", XListType: ptr.To("map"), XListMapKeys: []string{"id"},
+						Items: &apiextensionsv1.JSONSchemaPropsOrArray{Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object", Required: []string{"id"},
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"id": {Type: "integer", Format: "int64"}, "payload": {Type: "string"},
+							},
+						}},
+					},
+				},
+			})
+			before, err := resource.apply(t, "example", "A", map[string]any{
+				"endpoints": []any{map[string]any{"id": first, "payload": "old"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			items, _, _ := unstructured.NestedSlice(before.Object, "endpoints")
+			if len(items) != 1 || items[0].(map[string]any)["id"] != first {
+				t.Fatalf("initial list key was rounded before storage: %#v", before.Object)
+			}
+			after, err := resource.apply(t, "example", "B", map[string]any{
+				"endpoints": []any{map[string]any{"id": first - 1, "payload": "independent"}},
+			})
+			stored, getErr := resource.Get(context.Background(), "example", metav1.GetOptions{})
+			if getErr != nil {
+				t.Fatal(getErr)
+			}
+			if first == 9007199254740993 {
+				if !apierrors.IsConflict(err) || !strings.Contains(err.Error(), "conflicts with \"A\"") {
+					t.Fatalf("expected a false conflict against A's rounded key: %v", err)
+				}
+				if !reflect.DeepEqual(stored.Object, before.Object) {
+					t.Fatal("false key conflict changed data, claims or resourceVersion")
+				}
+				foundA := false
+				for _, owner := range before.GetManagedFields() {
+					if owner.Manager == "A" {
+						foundA = true
+						if owner.FieldsV1 == nil || !strings.Contains(string(owner.FieldsV1.Raw), "9007199254740993") {
+							t.Fatalf("initial wire ownership already lost the exact key: %+v", owner)
+						}
+					}
+				}
+				if !foundA {
+					t.Fatal("initial wire ownership lost manager A")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("small independent integer keys must succeed: %v", err)
+			}
+			if !reflect.DeepEqual(stored.Object, after.Object) {
+				t.Fatal("independent-key response differs from persisted state")
+			}
+			items, _, _ = unstructured.NestedSlice(after.Object, "endpoints")
+			if len(items) != 2 {
+				t.Fatalf("independent-key creation lost a list item: %#v", after.Object)
+			}
+			actual := map[int64]string{}
+			for _, item := range items {
+				object := item.(map[string]any)
+				key, ok := object["id"].(int64)
+				if !ok {
+					t.Fatalf("list key lost its int64 type: %#v", object)
+				}
+				actual[key] = object["payload"].(string)
+			}
+			if !reflect.DeepEqual(actual, map[int64]string{first: "old", first - 1: "independent"}) {
+				t.Fatalf("independent-key contents changed: %#v", actual)
 			}
 		})
 	}

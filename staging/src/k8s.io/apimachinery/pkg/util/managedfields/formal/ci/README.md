@@ -44,8 +44,11 @@ The required checks are:
    with real mixed numeric equality and managedfields, including both false
    no-op and missed-conflict outcomes. Reader tests preserve exact int64 tokens
    in requests, independent expectations, paths and schema defaults.
+   Numeric FieldsV1 selectors are also compared by exact native magnitude and
+   complete reserialized bytes, independently of the lossy `Has`/`Equals` oracle.
 8. Actual merge tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
+   Each revision also runs the numeric-key round-trip counterexample and control.
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
 10. Eight independent semantic mutations of the selected Go sources; each must
@@ -103,7 +106,14 @@ no defaults, validation rule or webhook. A owns MaxInt64; B requests binary64
 `2^63` without force. Scalar-only intent is lost as a false no-op; with an
 unrelated note the different number persists while A retains ownership. A
 different exact int64 correctly conflicts. GET checks every accepted result
-and rejection. These five test functions exercise fifteen API/schema variants.
+and rejection.
+
+`TestSSANumericListKeyOwnership` checks an integer-keyed map list. A's exact
+`2^53+1` key survives in stored data and raw FieldsV1, but decoding ownership
+rounds it to `2^53`; B adding that distinct neighbor item falsely conflicts.
+GET verifies unchanged data, claims and resourceVersion. Small independent
+integer keys succeed and preserve both items. These six functions exercise
+seventeen API/schema variants.
 
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;

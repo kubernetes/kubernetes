@@ -90,6 +90,7 @@ def build():
         executions = {
             "SSA.Examples", "SSA.Counterexamples", "SSA.RawSourceCounterexamples", "SSA.ContainerCounterexamples",
             "SSA.HandoffCounterexamples", "SSA.ResetCounterexamples", "SSA.NumericCounterexamples",
+            "SSA.NumericCodecCounterexamples",
         }
         default_scope = "execution" if item["module"] in executions else "general"
         if item["private"]:

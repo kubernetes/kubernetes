@@ -838,5 +838,47 @@
     "scope": "execution",
     "meaning": "A non-forced request changes an A-owned numeric magnitude while retaining A’s claim.",
     "limits": "Finite nonnegative integral witness model; native Go primitives and CRD HTTP/GET independently check these values. General IEEE and typed/updater refinement are not claimed."
+  },
+  "SSA.NumericCodecCounterexamples.original_trie_is_canonical": {
+    "title": "The numeric-key witness starts canonical",
+    "scope": "execution",
+    "meaning": "The exact integer-keyed starting trie has unique edges and nonempty canonical children.",
+    "limits": "Discharges the structural round-trip theorem’s input premise; the failure occurs in label decoding."
+  },
+  "SSA.NumericCodecCounterexamples.original_encodes_exact_key": {
+    "title": "The initial wire label retains the exact key",
+    "scope": "execution",
+    "meaning": "Structural encoding contains the exact integer selector; the model does not pre-round the input.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.exact_integer_keys_are_distinct": {
+    "title": "The two integer selectors are distinct",
+    "scope": "execution",
+    "meaning": "2^53+1 and 2^53 identify different exact integer-keyed items.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.reader_collapses_distinct_integer_keys": {
+    "title": "Numeric parsing aliases distinct integer selectors",
+    "scope": "execution",
+    "meaning": "The concrete numeric reader maps both distinct integer keys to the same rounded selector.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.numeric_key_roundtrip_moves_membership": {
+    "title": "Round-tripping moves the ownership path",
+    "scope": "execution",
+    "meaning": "After numeric decoding, the canonical original path loses membership and the neighbor gains it.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
+  },
+  "SSA.NumericCodecCounterexamples.exact_numeric_path_roundtrip_is_false": {
+    "title": "BASE-10: unrestricted numeric path round-tripping is false",
+    "scope": "execution",
+    "meaning": "A canonical represented integer-keyed field set does not preserve exact path membership through its numeric codec.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict. The existing structural FieldsV1 theorem remains valid after label decoding."
+  },
+  "SSA.NumericCodecCounterexamples.small_key_roundtrip_control": {
+    "title": "Small independent integer keys remain distinct",
+    "scope": "execution",
+    "meaning": "The key 42 round-trips and stays distinct from 41, matching the successful API control.",
+    "limits": "The concrete numeric-read callback is specified, not a verified full JSON parser. Exact native key/byte round trips check the witness in vendored and both pinned SMD revisions; CRD HTTP checks the resulting false conflict."
   }
 }

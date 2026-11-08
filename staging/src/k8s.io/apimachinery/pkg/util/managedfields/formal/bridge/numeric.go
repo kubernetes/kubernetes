@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strconv"
 	"time"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
@@ -41,18 +40,6 @@ type numericObservation struct {
 	WithNoteAmount            string `json:"withNoteAmount"`
 	IntegerConflict           bool   `json:"integerConflict"`
 	BothCoOwn                 bool   `json:"bothCoOwn"`
-}
-
-// The witness floats are integral, so fixed decimal formatting preserves their exact mathematical magnitude.
-func numericMagnitude(number any) (string, error) {
-	switch number := number.(type) {
-	case int64:
-		return strconv.FormatInt(number, 10), nil
-	case float64:
-		return strconv.FormatFloat(number, 'f', 0, 64), nil
-	default:
-		return "", fmt.Errorf("numeric witness has unsupported type %T", number)
-	}
 }
 
 func nativeNumericObservation() (numericObservation, error) {

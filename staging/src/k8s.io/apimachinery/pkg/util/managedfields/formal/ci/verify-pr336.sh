@@ -28,7 +28,7 @@ for revision in head base; do
   git -C "$directory" checkout --detach "$sha"
   [[ "$(git -C "$directory" rev-parse HEAD)" == "$sha" ]]
   mkdir -p "$directory/formalbridge/yaml" "$directory/formalcmd"
-  for file in protocol.go schema.go compare.go; do
+  for file in protocol.go schema.go compare.go numeric_codec.go; do
     sed -e 's,structured-merge-diff/v6,structured-merge-diff/v7,g' \
       -e 's,"sigs.k8s.io/yaml","sigs.k8s.io/structured-merge-diff/v7/formalbridge/yaml",g' \
       "$formal_root/bridge/$file" > "$directory/formalbridge/$file"

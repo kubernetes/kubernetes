@@ -57,4 +57,9 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("Pinned upstream comparison: %d cases / %d transitions, exact objects, ownership and errors.\n", summary.Cases, summary.Steps)
+	if err := bridge.CompareNumericCodecCounterexamples(context.Background(), os.Args[1]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("Pinned upstream numeric FieldsV1: exact key round-trip counterexample agrees with Go.")
 }

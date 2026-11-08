@@ -110,6 +110,11 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
     </div>
   </section>
   <section class="view" id="view-gaps" hidden>
+    <div class="card gap"><h2>SSA-06: FieldsV1 rounds one integer item key into another</h2>
+      <p>A owns <code>endpoints: [{id: 9007199254740993, payload: old}]</code>. B adds the distinct item <code>{id: 9007199254740992, payload: independent}</code>. The API falsely conflicts against A: reading the exact stored ownership key into float64 rounds it to B's neighbor. Small independent keys 42 and 41 work.</p>
+      <p>The original trie is canonical. Exact key magnitudes and byte round trips expose the loss; Go's mixed <code>Has</code>/<code>Equals</code> can mask it. The structural theorem after label decoding remains valid. <a href="ssa-bugs.md#ssa-06-fieldsv1-rounding-aliases-distinct-integer-list-keys">Schema, decoding cause and API evidence</a>.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.NumericCodecCounterexamples.exact_numeric_path_roundtrip_is_false">BASE-10 refutation</button><button class="chip" data-proof="SSA.NumericCodecCounterexamples.original_trie_is_canonical">Canonical input</button><button class="chip" data-proof="SSA.NumericCodecCounterexamples.numeric_key_roundtrip_moves_membership">Membership moves</button></div>
+    </div>
     <div class="card gap"><h2>SSA-05: rounded equality loses numeric intent or misses a conflict</h2>
       <p>A owns exact int64 <code>amount: 9223372036854775807</code>. B asserts <code>9223372036854775808</code>, represented as binary64 2<sup>63</sup>, without force. Alone, the assertion is lost as a false no-op while B acquires the claim. With unrelated <code>note: changed</code>, the new numeric magnitude persists while A and B both retain ownership. An exact int64 change correctly conflicts.</p>
       <p>Mixed equality and comparator incomparability are nontransitive. No faithful ordinary-equality quotient exists. Imported source execution, native Go and real HTTP/GET agree on the witnesses; general IEEE and typed/updater refinement remain separate. <a href="ssa-bugs.md#ssa-05-rounded-numeric-comparison-loses-intent-or-misses-a-conflict">Schema, outcomes and proof boundary</a>.</p>

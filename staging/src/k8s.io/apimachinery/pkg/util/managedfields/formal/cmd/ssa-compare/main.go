@@ -76,6 +76,10 @@ func run() error {
 			return err
 		}
 		fmt.Println("Numeric counterexamples: source model agrees with native equality, element sets and managedfields.")
+		if err := bridge.CompareNumericCodecCounterexamples(context.Background(), *model); err != nil {
+			return err
+		}
+		fmt.Println("Numeric FieldsV1: exact key round-trip counterexample agrees with Go.")
 	}
 	return nil
 }
