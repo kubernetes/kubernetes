@@ -1407,11 +1407,11 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	wg.Add(workersNumber)
 	for i := 0; i < workersNumber; i++ {
 		go func() {
+			defer wg.Done()
 			// panics don't cross goroutine boundaries
 			defer utilruntime.HandleCrashWithContext(ctx, func(_ context.Context, panicReason interface{}) {
 				errs <- fmt.Errorf("DeleteCollection goroutine panicked: %v", panicReason)
 			})
-			defer wg.Done()
 
 			for item := range toProcess {
 				accessor, err := meta.Accessor(item)
@@ -1433,11 +1433,11 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	}
 	// In case of all workers exit, notify distributor.
 	go func() {
+		defer close(workersExited)
 		defer utilruntime.HandleCrashWithContext(ctx, func(_ context.Context, panicReason interface{}) {
 			errs <- fmt.Errorf("DeleteCollection workers closer panicked: %v", panicReason)
 		})
 		wg.Wait()
-		close(workersExited)
 	}()
 
 	hasLimit := listOptions.Limit > 0

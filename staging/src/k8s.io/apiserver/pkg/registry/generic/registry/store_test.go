@@ -2573,6 +2573,42 @@ func TestStoreDeleteCollectionWorkDistributorExited(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteCollectionPanic(t *testing.T) {
+	utilruntime.ReallyCrash = false
+	defer func() { utilruntime.ReallyCrash = true }()
+
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	for i := 0; i < 10; i++ {
+		if _, err := registry.Create(
+			testContext,
+			&example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("foo-%d", i),
+				},
+			},
+			rest.ValidateAllObjectFunc,
+			&metav1.CreateOptions{},
+		); err != nil {
+			t.Fatalf("Unexpected error creating pod: %v", err)
+		}
+	}
+
+	panicErr := "deliberate panic in delete validation"
+	_, err := registry.DeleteCollection(testContext, func(ctx context.Context, obj runtime.Object) error {
+		panic(panicErr)
+	}, nil, &metainternalversion.ListOptions{})
+	if err == nil {
+		t.Fatalf("Expected error from panicked DeleteCollection worker, got nil")
+	}
+	if !strings.Contains(err.Error(), panicErr) {
+		t.Fatalf("Expected error to contain %q, got: %v", panicErr, err)
+	}
+}
+
 func TestStoreDeleteCollectionWithContextCancellation(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
