@@ -126,7 +126,7 @@ var ErrStaticPodTriedToUseResourceClaims = errors.New("static pods may not use R
 // it validates fields of disabled features instead of dropping them, since static pods must match
 // the kubelet's feature gates.
 func validateStaticPod(logger klog.Logger, pod *api.Pod) field.ErrorList {
-	opts := podutil.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
+	opts := validation.GetValidationOptionsFromPodSpecAndMeta(&pod.Spec, nil, &pod.ObjectMeta, nil)
 	errs := validation.ValidatePodCreate(pod, opts)
 	ctx := klog.NewContext(context.Background(), logger)
 	// The pod strategy uses the default config; if it gains options, pass the same ones here.
