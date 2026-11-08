@@ -1810,16 +1810,21 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to add a pod: %v", err)
 	}
+	readyGeneration, _, err := cacher.ready.checkAndReadGeneration()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i := 0; i < 1000; i++ {
 		pred := storage.Everything
 		pred.AllowWatchBookmarks = true
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		w, err := cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
+		w, err := cacher.watch(ctx, "/pods/ns", 999, readyGeneration, storage.ListOptions{ResourceVersion: "999", Predicate: pred, Recursive: true})
 		if err != nil {
 			t.Fatalf("Failed to create watch: %v", err)
 		}
+		go w.process(ctx)
 		bookmark := &watchCacheEvent{
 			Type:            watch.Bookmark,
 			ResourceVersion: uint64(i),
