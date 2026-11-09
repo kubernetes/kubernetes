@@ -128,6 +128,10 @@ type mockDriverSetup struct {
 	provisioner string
 	tp          testParameters
 	f           *framework.Framework
+
+	// snapshotDiagnosticsDumped keeps the failure-time snapshot diagnostics to
+	// one collection per spec.
+	snapshotDiagnosticsDumped bool
 }
 
 type volumeType string
@@ -167,6 +171,9 @@ func newMockDriverSetup(f *framework.Framework) *mockDriverSetup {
 func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 	m.cs = m.f.ClientSet
 	m.tp = tp
+	// One mockDriverSetup is shared by every spec of a container, so the
+	// per-spec state has to be reset here rather than at construction.
+	m.snapshotDiagnosticsDumped = false
 
 	var err error
 	driverOpts := drivers.CSIMockDriverOpts{
@@ -234,6 +241,15 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	cs := m.f.ClientSet
 	var errs []error
 
+	// This runs before anything is deleted, and it is the earliest point after
+	// the spec body: this cleanup is registered last, so Ginkgo runs it first,
+	// ahead of the mock driver teardown registered by init and ahead of the
+	// framework's own namespace dump and deletion. The objects are served by
+	// the API server and do not need a running driver, but reading them here
+	// records them as the spec left them, before teardown deletes the snapshot
+	// class and the driver and changes what the state means.
+	m.dumpSnapshotDiagnostics(ginkgo.CurrentSpecReport().Failed(), snapshotDiagnosticsPhaseCleanupEntry)
+
 	for _, pod := range m.pods {
 		ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 		errs = append(errs, e2epod.DeletePodWithWait(ctx, cs, pod))
@@ -277,6 +293,11 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	}
 
 	err := utilerrors.NewAggregate(errs)
+	// A spec that passed and then failed in cleanup has not been dumped yet.
+	// The snapshot objects outlive this function - it deletes the snapshot
+	// class, not the snapshots - so they can still be reported, though by now
+	// the pods, claims and classes above are gone.
+	m.dumpSnapshotDiagnostics(err != nil, snapshotDiagnosticsPhaseCleanupErrors)
 	framework.ExpectNoError(err, "while cleaning up after test")
 }
 
