@@ -15,6 +15,7 @@ limitations under the License.
 -/
 import SSA
 import SSA.SchemaLookupCLI
+import SSA.MapCopyCLI
 
 open Lean SSA
 
@@ -44,7 +45,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields, --atomic-merge and --atomic-remove check typed atomic scope claims, whole replacement and removal/extraction; --atomic-remove-factory additionally runs the source caller; --schema-dispatch checks source atom deduction and handler selection; --schema-lookup checks source type lookup, overrides and cache; --atomic-remove-resolved composes both through the source caller."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields, --atomic-merge and --atomic-remove check typed atomic scope claims, whole replacement and removal/extraction; --atomic-remove-factory additionally runs the source caller; --schema-dispatch checks source atom deduction and handler selection; --schema-lookup checks source type lookup, overrides and cache; --map-copy checks the full source map copy and private cache/Once transfer; --atomic-remove-resolved composes both through the source caller."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -523,6 +524,10 @@ def main (args : List String) : IO UInt32 := do
   | ["--schema-dispatch",path] => runSchemaDispatch path
   | ["--schema-lookup",path] =>
       match SchemaLookupCLI.evaluate (← readInput path) with
+      | .ok result => stdout.putStrLn result; return 0
+      | .error message => stderr.putStrLn message; return 1
+  | ["--map-copy",path] =>
+      match MapCopyCLI.evaluate (← readInput path) with
       | .ok result => stdout.putStrLn result; return 0
       | .error message => stderr.putStrLn message; return 1
   | ["--atomic-remove-resolved",path] => runResolvedFactory path

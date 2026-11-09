@@ -105,6 +105,7 @@ func TestRawFramesRejectGlobalsAndShadowing(t *testing.T) {
 		{`const name = "global"`, "_ = name; return atom"},
 		{"", "{ val := val; _ = val }; return atom"},
 		{"", "nil := val; _ = nil; return atom"},
+		{"", "_ = result; return atom"},
 	} {
 		source := []byte("package typed\n" + test.declaration + "\n" + function.signature + " { " + test.body + " }\n")
 		if _, err := importFunction(source, function); err == nil {

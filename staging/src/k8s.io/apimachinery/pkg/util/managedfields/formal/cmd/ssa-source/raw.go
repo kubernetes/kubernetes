@@ -159,7 +159,7 @@ func validateRawBindings(function *ast.FuncDecl) error {
 		return true
 	})
 	reserved := map[string]bool{}
-	for _, name := range []string{"w", "t", "l", "m", "v", "val", "s", "schema", "value", "tr", "ah", "atom", "a", "ok", "name", "typeName", "toRemove", "typeRef", "shouldExtract"} {
+	for _, name := range []string{"w", "t", "l", "m", "v", "val", "s", "schema", "value", "tr", "ah", "atom", "a", "ok", "name", "typeName", "toRemove", "typeRef", "shouldExtract", "result", "exists", "mapCopy", "listCopy", "dst", "mm"} {
 		reserved[name] = true
 	}
 	builtins := map[string]bool{"nil": true, "true": true, "false": true, "len": true, "append": true, "make": true, "new": true}
@@ -205,4 +205,5 @@ func validateRawBindings(function *ast.FuncDecl) error {
 var schemaLookupFunctions = []functionSpec{
 	{name: "resolveNoOverrides", leanName: "plainProgram", receiver: "*Schema", signature: "func (s *Schema) resolveNoOverrides(tr TypeRef) (Atom, bool)", rawSyntax: true},
 	{name: "Resolve", leanName: "resolveProgram", receiver: "*Schema", signature: "func (s *Schema) Resolve(tr TypeRef) (Atom, bool)", rawSyntax: true},
+	{name: "CopyInto", leanName: "copyProgram", receiver: "*Map", signature: "func (m *Map) CopyInto(dst *Map)", rawSyntax: true},
 }

@@ -300,7 +300,7 @@ func run() error {
 	search := flag.Bool("search", false, "import Go standard-library slices.BinarySearchFunc")
 	has := flag.Bool("has", false, "import PathElementSet.Has and PathElement.Less")
 	atomicFields := flag.Bool("atomic-fields", false, "import the complete typed field-set map/list visitors")
-	schemaLookup := flag.Bool("schema-lookup", false, "import complete Schema.Resolve and no-override lookup bodies")
+	schemaLookup := flag.Bool("schema-lookup", false, "import complete schema resolution and map-copy bodies")
 	schemaDispatch := flag.Bool("schema-dispatch", false, "import complete schema resolution, atom deduction and handler dispatch bodies")
 	atomicRemove := flag.Bool("atomic-remove", false, "import complete structural typed removal/extraction ASTs")
 	atomicMerge := flag.Bool("atomic-merge", false, "import complete typed atomic merge dispatch and leaf replacement")

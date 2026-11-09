@@ -51,7 +51,7 @@ def computed (ops : Ops M S L Rel) (reference : Reference M S L R Rel) (state : 
 set_option maxRecDepth 10000
 set_option maxHeartbeats 2000000
 
-macro "schema_resolve_simp" : tactic =>
+macro "schema_cache_simp" : tactic =>
   `(tactic| simp_all (config := {maxSteps := 1000000}) [SchemaResolveSubset.invoke,
       SchemaLookupSource.resolveProgram,exec,execList,casesList,guards,eval,one,many,
       write,assign,declare,deferCall,unwind,RawGoSyntax.field,RawGoSyntax.find,
@@ -65,35 +65,35 @@ theorem imported_resolve (ops : Ops M S L Rel) (reference : Reference M S L R Re
     (state : Runtime M S L R Rel) (unlocked : state.held = false) :
     SchemaResolveSubset.invoke ops reference state = .ok (computed ops reference state) := by
   cases relationship : reference.relationship with
-  | none => schema_resolve_simp
+  | none => schema_cache_simp
   | some relationship =>
       cases cache : state.cache with
       | none =>
           cases base : baseResult ops reference with
           | mk value found =>
               cases found with
-              | false => schema_resolve_simp
+              | false => schema_cache_simp
               | true =>
                   cases map : value.map with
-                  | some map => schema_resolve_simp
+                  | some map => schema_cache_simp
                   | none =>
                       cases list : value.list with
-                      | some list => schema_resolve_simp
-                      | none => cases scalar : value.scalar <;> schema_resolve_simp
+                      | some list => schema_cache_simp
+                      | none => cases scalar : value.scalar <;> schema_cache_simp
       | some values =>
           cases hit : values reference.original with
-          | some value => schema_resolve_simp
+          | some value => schema_cache_simp
           | none =>
               cases base : baseResult ops reference with
               | mk value found =>
                   cases found with
-                  | false => schema_resolve_simp
+                  | false => schema_cache_simp
                   | true =>
                       cases map : value.map with
-                      | some map => schema_resolve_simp
+                      | some map => schema_cache_simp
                       | none =>
                           cases list : value.list with
-                          | some list => schema_resolve_simp
-                          | none => cases scalar : value.scalar <;> schema_resolve_simp
+                          | some list => schema_cache_simp
+                          | none => cases scalar : value.scalar <;> schema_cache_simp
 
 end SSA.SchemaResolveContracts

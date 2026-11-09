@@ -254,7 +254,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `mergingWalker.doMap`, `doList`, `doLeaf`, `ruleKeepRHS` closure (`typed/merge.go`) | `AtomicMergeContracts.imported_keep_right`, `imported_leaf`, `imported_atomic_merge` (atomic entry only) |
 | `removingWalker.doScalar`, `doMap`, `doList` (`typed/remove.go`) | `AtomicRemoveContracts.imported_scalar`, `imported_atomic_container`, `imported_atomic_remove_fresh`, `imported_atomic_extract_whole` (scalar/atomic entry only) |
 | `resolveSchema`, `deduceAtom`, `handleAtom` (`typed/helpers.go`) | `SchemaDispatchContracts.imported_deduce`, `SchemaDispatchHandler.imported_handle`, `SchemaDispatchResolver.imported_full_dispatch`, `SchemaDispatchFactoryBridge.imported_factory_dispatch` |
-| `Schema.resolveNoOverrides`, `Resolve` (`schema/elements.go`) | `SchemaLookupContracts.imported_plain`, `SchemaResolveContracts.imported_resolve`, `SchemaResolveCache.imported_history`, `SchemaLookupBridge.imported_schema_and_dispatch` |
+| `Schema.resolveNoOverrides`, `Resolve`, `Map.CopyInto` (`schema/elements.go`) | `SchemaLookupContracts.imported_plain`, `SchemaResolveContracts.imported_resolve`, `SchemaResolveCache.imported_history`, `SchemaLookupBridge.imported_schema_and_dispatch` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -624,7 +624,7 @@ cache validity. `SchemaLookupBridge.imported_schema_and_dispatch` composes the
 schema method with actual typed resolver/deduction/handler source.
 
 The value view separates each container's relationship from otherwise arbitrary
-opaque immutable contents. FindNamedType, Map.CopyInto into the fresh destination,
+opaque immutable contents. Map.CopyInto is source-derived below. FindNamedType,
 Go key/heap representation, allocation identity and synchronization primitives
 remain explicit implementation boundaries. The serial mutex model does not
 verify the Go scheduler or race freedom. An independent native overlay compares
@@ -638,8 +638,29 @@ concurrency control. Five mutations cover missing-name failure, the map override
 cache-hit polarity, deferred unlock and mutation through an escaped local copy;
 each must fail the unchanged certificate and independent Go oracle.
 
-CI now checks thirty-two complete ASTs from nine distinct source files and
-thirty-one semantic mutations, twenty-three also native. Source value/coercion/
+`MapCopyContracts.imported_copy` now derives the complete Map.CopyInto body,
+including nil destination, all four exported fields, atomic cache Load/Store,
+Once reset and the complete synchronous callback. Exported contents are arbitrary
+opaque values; cache pointers and serial Once tokens are explicit. The destination
+is disjoint from the immutable source. `imported_resolver_copy` supplies the exact
+opaque value-copy contract used in the resolver. `imported_fresh` and
+`imported_fresh_valid_index` also preserve field-index coherence for a fresh
+cache/Once destination and an initially coherent source.
+
+The fresh-destination condition cannot be removed for index coherence:
+`initialized_destination_can_break_index` formalizes the stale-cache case.
+Actual Go reproduces it with normally initialized maps: source.Fields is `new`,
+destination.Fields and its initialized index are `old`. CopyInto changes Fields
+to `new` but retains the old index when the source index is still nil. FindField
+then finds `old` and misses `new`. Resolve creates a fresh Map, so this component
+defect has no established SSA reachability. It is not counted as a seventh SSA
+bug. Another 252 native/current and pinned comparisons cover nil destinations,
+nil/empty/populated caches, independent Once states, copied exports, shared
+pointer identity and source immutability. Removing Fields assignment or Once
+reset must fail the unchanged proof and independent native oracle.
+
+CI now checks thirty-three complete ASTs from nine distinct source files and
+thirty-three semantic mutations, twenty-five also native. Source value/coercion/
 allocator heap realization, remaining schema primitives, full typed entry,
 complete removal/comparison and full SSA composition remain open; these are
 component proofs for BASE-09.

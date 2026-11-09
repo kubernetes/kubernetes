@@ -22,7 +22,7 @@ Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
 six updater ASTs, three element-set algebra ASTs and five recursive Difference/filter
-ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs, four structural removal/extraction/caller ASTs, three schema-selection ASTs, two schema lookup/cache ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all nine complete
+ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs, four structural removal/extraction/caller ASTs, three schema-selection ASTs, three schema lookup/cache/copy ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all nine complete
 source-file digests.
 
 Native overlays run against the selected vendor source directly. Go rejects
@@ -41,8 +41,14 @@ map field-index initialization and the actual unlocked mutex. Both pinned
 versions run that matrix and a 64-goroutine control; the current dependency also
 runs the control with `-race`. Five mutations check missing-name failure,
 override assignment, cache-hit polarity, deferred unlock and writes through an
-escaped local copy. The whole source suite contains 31 semantic mutations,
-23 also rejected by an independent native oracle.
+escaped local copy. The whole source suite contains 33 semantic mutations,
+25 also rejected by an independent native oracle.
+
+The complete Map.CopyInto AST additionally matches 252 direct native copies,
+including nil destinations, nil/empty/populated cache pointers and independent
+Once tokens. A reused, normally indexed destination reproduces the stale-index
+counterexample; Resolve uses a fresh Map. Two further mutations remove Fields
+assignment and Once reset, requiring both unchanged source and native rejection.
 
 The required checks are:
 

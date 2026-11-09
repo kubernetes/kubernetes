@@ -16,6 +16,7 @@ from pathlib import Path
 overlay, schema, fixtures = map(Path, sys.argv[1:])
 overlay.write_text(json.dumps({"Replace": {
     str(schema / "ssa_formal_schema_lookup_test.go"): str(fixtures / "schema_lookup_test.go.in"),
+    str(schema / "ssa_formal_map_copy_test.go"): str(fixtures / "map_copy_test.go.in"),
 }}))
 PY_OVERLAY
-bash "$formal_root/ci/run-native-go.sh" "$overlay" sigs.k8s.io/structured-merge-diff/v6/schema -run '^TestSSAFormalSchemaLookup$' -v -count=1
+bash "$formal_root/ci/run-native-go.sh" "$overlay" sigs.k8s.io/structured-merge-diff/v6/schema -run '^TestSSAFormal(SchemaLookup|MapCopy)' -v -count=1

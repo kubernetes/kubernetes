@@ -10,8 +10,11 @@ SSA_LAKE="${SSA_LAKE:-lake}"
 lean_binary="$("$SSA_LAKE" env which lean)"
 schema_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/schema)/elements.go"
 export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
-modules=(SchemaLookupSource SchemaLookupSubset SchemaLookupContracts SchemaResolveMachine SchemaResolveSubset SchemaResolveContracts)
-for mutation in missing-name map-relationship cache-hit deferred-unlock alias-after-publish; do
+modules=(SchemaLookupSource SchemaLookupSubset SchemaLookupContracts SchemaResolveMachine SchemaResolveSubset SchemaResolveContracts MapCopySubset MapCopyContracts)
+if [[ $# == 0 ]]; then
+  set -- missing-name map-relationship cache-hit deferred-unlock alias-after-publish copy-fields copy-once-reset
+fi
+for mutation in "$@"; do
   probe="$formal_root/.lake/source-mutation/lookup-$mutation"
   mkdir -p "$probe/SSA"
   cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
@@ -25,6 +28,9 @@ old, new = {
     "cache-hit": ("if result, exists = s.resolvedTypes[tr]; !exists {", "if result, exists = s.resolvedTypes[tr]; exists {"),
     "deferred-unlock": ("\tdefer s.lock.Unlock()\n", ""),
     "alias-after-publish": ("\t\t\t\tresult.Map = &mapCopy\n", "\t\t\t\tresult.Map = &mapCopy\n\t\t\t\tmapCopy = Map{}\n"),
+    "copy-fields": ("\tdst.Fields = m.Fields\n", ""),
+    "copy-once-reset": ("\t\tdst.once = sync.Once{}\n\t\tdst.once.Do(func() {\n\t\t\tdst.m.Store(mm)",
+        "\t\tdst.once.Do(func() {\n\t\t\tdst.m.Store(mm)"),
 }[sys.argv[3]]
 if source.count(old) != 1:
     raise SystemExit("Cannot locate unique schema lookup mutation")
@@ -36,10 +42,21 @@ PY_MUTATION
     rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
   done
   expected=SchemaResolveContracts
+  native_test='^TestSSAFormalSchemaLookup$'
   oracle='source schema lookup violated result, contents, relationship or input immutability'
   if [[ "$mutation" == missing-name ]]; then expected=SchemaLookupContracts; fi
   if [[ "$mutation" == deferred-unlock ]]; then oracle='schema resolver returned with its mutex held'; fi
   if [[ "$mutation" == alias-after-publish ]]; then oracle='schema map copy lost its field index'; fi
+  if [[ "$mutation" == copy-fields ]]; then
+    expected=MapCopyContracts
+    native_test='^TestSSAFormalMapCopy$'
+    oracle='source map copy violated fields, cache or once contract'
+  fi
+  if [[ "$mutation" == copy-once-reset ]]; then
+    expected=MapCopyContracts
+    native_test='^TestSSAFormalMapCopy$'
+    oracle='source map copy changed shared contents or cache pointer identity'
+  fi
   (
     cd "$probe"
     export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
@@ -67,10 +84,11 @@ probe, source, fixture = map(Path, sys.argv[1:])
 (probe / "overlay.json").write_text(json.dumps({"Replace": {
     str(source): str(probe / "elements.go"),
     str(source.parent / "ssa_formal_schema_lookup_test.go"): str(fixture),
+    str(source.parent / "ssa_formal_map_copy_test.go"): str(fixture.parent / "map_copy_test.go.in"),
 }}))
 PY_OVERLAY
   if bash "$formal_root/ci/run-native-go.sh" "$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/schema \
-      -run '^TestSSAFormalSchemaLookup$' -v -count=1 > "$probe/native.log" 2>&1; then
+      -run "$native_test" -v -count=1 > "$probe/native.log" 2>&1; then
     printf 'Native schema lookup mutation unexpectedly preserved its independent oracle.\n' >&2
     exit 1
   fi

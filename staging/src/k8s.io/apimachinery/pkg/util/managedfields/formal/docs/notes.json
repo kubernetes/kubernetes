@@ -1843,7 +1843,7 @@
     "title": "Complete source override-cache execution",
     "scope": "general",
     "meaning": "For arbitrary atoms, relationship values and cache entries, source execution matches the specification of allocation, lookup, copy priority, cache writes, failure exits and captured deferred unlock.",
-    "limits": "Requires an initially unlocked serial mutex. Containers have a value view with arbitrary opaque immutable contents. FindNamedType, fresh-destination Map.CopyInto, physical pointers, key equality and Go synchronization/runtime are not verified here. Invalid cached hits are returned as the source does; validity is not silently assumed."
+    "limits": "Requires an initially unlocked serial mutex. Containers have a value view with arbitrary opaque immutable contents. FindNamedType, physical pointers, key equality and Go synchronization/runtime are not verified here. Invalid cached hits are returned as the source does; validity is not silently assumed. Map.CopyInto has a separate source value/index proof."
   },
   "SSA.SchemaResolveCache.empty_valid": {
     "title": "The empty schema cache is sound",
@@ -1873,6 +1873,48 @@
     "title": "Source schema lookup feeds source typed dispatch",
     "scope": "general",
     "meaning": "The full schema method supplies the actual lookup result to the complete typed resolver, deduction and handler-selection ASTs, preserving the resulting schema cache state.",
-    "limits": "Requires cache validity and stable references. Named lookup, fresh-map copying, value predicates, formatter, handlers, key/pointer/heap representations and synchronization primitives remain explicit. This is not whole SSA correctness."
+    "limits": "Requires cache validity and stable references. Named lookup, value predicates, formatter, handlers, key/pointer/heap representations and synchronization primitives remain explicit. This is not whole SSA correctness."
+  },
+  "SSA.MapCopyContracts.imported_copy": {
+    "title": "Complete source map copy and private cache transfer",
+    "scope": "general",
+    "meaning": "The complete Map.CopyInto AST derives nil-destination behavior, exported-field copies, cache Load/Store, Once reset and the full synchronous callback for arbitrary contents and cache/token states.",
+    "limits": "The source is immutable and non-nil; destination is disjoint. Once and atomic-pointer operations use explicit serial semantics. Physical pointers, heap correspondence and the Go runtime remain separate."
+  },
+  "SSA.MapCopyContracts.imported_fresh": {
+    "title": "A fresh destination receives the available index",
+    "scope": "general",
+    "meaning": "Copying into a destination with nil cache and unused Once token copies every exported field and the available source cache, with the token set exactly when a cache is available.",
+    "limits": "Fresh cache/token premises are explicit. Source-index coherence is a separate premise in the following theorem."
+  },
+  "SSA.MapCopyContracts.imported_value_view": {
+    "title": "Source copy preserves every opaque exported field",
+    "scope": "general",
+    "meaning": "Every non-nil destination receives exactly the source fields, element type, unions and element relationship in the container value view.",
+    "limits": "This value-view theorem does not assert index correctness for reused destinations, nor physical allocation identity."
+  },
+  "SSA.MapCopyContracts.imported_resolver_copy": {
+    "title": "Source CopyInto realizes the resolver primitive",
+    "scope": "general",
+    "meaning": "The complete imported method supplies the exact opaque immutable-contents copy used by the source Schema.Resolve interpreter.",
+    "limits": "The local resolver copy has not escaped. Destination/source heap disjointness and Go representation remain explicit; fresh-index correctness is supplied separately."
+  },
+  "SSA.MapCopyContracts.imported_fresh_valid_index": {
+    "title": "Fresh copies preserve field-index coherence",
+    "scope": "general",
+    "meaning": "Any coherent source index yields a coherent destination after the complete source method when the target cache/token are fresh.",
+    "limits": "The index function is arbitrary and source coherence is an explicit premise. This does not prove Map.FindField itself or the Go synchronization runtime."
+  },
+  "SSA.MapCopyContracts.imported_uninitialized_retains_old_cache": {
+    "title": "An unindexed source retains the old destination cache",
+    "scope": "general",
+    "meaning": "The complete source method copies new exported fields but leaves destination cache/token unchanged when the source cache is nil.",
+    "limits": "This is actual source behavior, not a claim that the public overwrite contract is correct for initialized reused destinations."
+  },
+  "SSA.MapCopyContracts.initialized_destination_can_break_index": {
+    "title": "Reused destination can have a stale field index",
+    "scope": "execution",
+    "meaning": "A finite source-executed witness has new fields and the previous initialized index. Native current/pinned Go reproduces it with normally initialized old/new field maps.",
+    "limits": "This component defect is not counted as an additional SSA bug: Resolve supplies a fresh destination and no SSA reachability is established. The witness uses an explicit index projection; Map.FindField source and runtime/heap refinement remain separate."
   }
 }

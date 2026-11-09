@@ -28,6 +28,7 @@ func TestSchemaLookupRetainsCompleteBodies(t *testing.T) {
 	fragments := [][]string{
 		{"NamedType", "FindNamedType", "StarExpr", "Inlined", "ReturnStmt"},
 		{"ElementRelationship", "resolveNoOverrides", "DeferStmt", "Unlock", "resolvedTypes", "IndexExpr", "SwitchStmt", "CopyInto", "mapCopy", "listCopy", "DeclStmt"},
+		{"Fields", "ElementType", "Unions", "ElementRelationship", "Load", "Store", "Once", "FuncLit", "dst", "mm"},
 	}
 	for index, function := range schemaLookupFunctions {
 		program, err := importFunction(source, function)

@@ -64,3 +64,4 @@ import SSA.RemoveFactoryBridge
 import SSA.SchemaDispatchFactoryBridge
 import SSA.SchemaResolveCache
 import SSA.SchemaLookupBridge
+import SSA.MapCopyContracts
