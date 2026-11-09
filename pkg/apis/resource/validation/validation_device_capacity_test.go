@@ -371,6 +371,28 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Invalid(validRangeField.Child("min"), "10u", "value cannot be represented as a milli value"),
 			},
 		},
+		"large-exponent-default-in-range": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1e2147483647"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("1e2147483646")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("1")), nil, nil),
+				),
+			),
+			fractionalCapacityRangeGate: true,
+		},
+		"zero-default-with-large-exponent": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("1"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("0e2147483647")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("0")), nil, nil),
+				),
+			),
+			fractionalCapacityRangeGate: true,
+		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
@@ -432,8 +454,6 @@ func TestIsFractionalQuantity(t *testing.T) {
 	}
 }
 
-// TODO(#141166): A whole value must not be rescaled. The large-exponent case
-// should cost about as much as the integer case.
 func BenchmarkIsFractionalQuantity(b *testing.B) {
 	for _, quantity := range []string{"1", "1.5", "1e100000"} {
 		q := apiresource.MustParse(quantity)

@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"gopkg.in/inf.v0"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1670,10 +1669,7 @@ func rangeHasFractional(r resource.CapacityRequestPolicyRange) bool {
 
 // isFractionalQuantity reports whether q has sub-integer precision.
 func isFractionalQuantity(q apiresource.Quantity) bool {
-	dec := q.AsDec()
-	infDec := inf.Dec{}
-	rounded := infDec.Round(dec, 0, inf.RoundDown)
-	return dec.Cmp(rounded) != 0
+	return !q.RoundUp(0)
 }
 
 func validateDeviceCounter(counter resource.Counter, fldPath *field.Path) field.ErrorList {
