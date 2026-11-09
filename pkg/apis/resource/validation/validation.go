@@ -1487,7 +1487,9 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 	// supported. When DRAFractionalCapacityRange is enabled, use decimal precision;
 	// otherwise, use integer-based keys.
 	quantityKeyFunc := quantityKeyInt
+	useMilli := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAFractionalCapacityRange) {
+		useMilli = true
 		quantityKeyFunc = quantityKeyAsDec
 	}
 
@@ -1496,6 +1498,12 @@ func validateRequestPolicyValidValues(defaultValue apiresource.Quantity, maxCapa
 			var allErrs field.ErrorList
 			if option.Cmp(maxCapacity) > 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath, option.String(), fmt.Sprintf("option is larger than capacity value: %s", maxCapacity.String())))
+			}
+			if useMilli {
+				milliQuantity := apiresource.NewMilliQuantity(option.MilliValue(), option.Format)
+				if option.Cmp(*milliQuantity) != 0 {
+					allErrs = append(allErrs, field.Invalid(fldPath, option.String(), "option cannot be represented as a milli value"))
+				}
 			}
 			if option.Cmp(defaultValue) == 0 {
 				foundDefault = true

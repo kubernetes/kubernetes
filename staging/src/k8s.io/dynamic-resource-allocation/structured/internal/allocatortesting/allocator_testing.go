@@ -7940,6 +7940,32 @@ func TestAllocator(t *testing.T,
 			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
 		},
 
+		"consumable-capacity-valid-values-sub-milli-request": {
+			// 1.0001 is not a milli-value; validation now rejects such valid values.
+			features: Features{
+				ConsumableCapacity:      true,
+				FractionalCapacityRange: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, resource.MustParse("1.0001"))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withAllowMultipleAllocations().withCapacityRequestPolicyValidValues(one, map[resourceapi.QualifiedName]resource.Quantity{capacity0: four},
+						[]resource.Quantity{resource.MustParse("1.0001"), two}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: resource.MustParse("1.0001")}),
+				),
+			},
+			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+		},
+
 		// Test cases for DRAFractionalCapacityRange feature
 		"consumable-capacity-fractional-range-gate-disabled": {
 			// FractionalCapacityRange is off: step arithmetic uses Value(), which rounds

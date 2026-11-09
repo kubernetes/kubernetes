@@ -183,9 +183,20 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Duplicate(validValuesField.Index(1), "9223372036854775807"),
 			},
 		},
+		"options-too-fine-precision-fractional-gate": {
+			capacity:                    testDeviceCapacity(apiresource.MustParse("100"), testCapacityRequestPolicy(ptr.To(apiresource.MustParse("10")), []apiresource.Quantity{apiresource.MustParse("10"), apiresource.MustParse("10.1"), apiresource.MustParse("10.1001")}, nil)),
+			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(2), "10100100u", "option cannot be represented as a milli value"),
+			},
+		},
 		"options-int64-max-and-plus-one-fractional-gate": {
 			capacity:                    testDeviceCapacity(maxInt64Plus1, testCapacityRequestPolicy(ptr.To(maxInt64Q), []apiresource.Quantity{maxInt64Q, maxInt64Plus1}, nil)),
 			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(0), "9223372036854775807", "option cannot be represented as a milli value"),
+				field.Invalid(validValuesField.Index(1), "9223372036854775808", "option cannot be represented as a milli value"),
+			},
 		},
 		// TODO(#141166): Distinct values above MaxInt64 are not duplicates. Expect no failures.
 		"options-100E-and-1000E": {
@@ -197,6 +208,10 @@ func TestValidateDeviceCapacity(t *testing.T) {
 		"options-100E-and-1000E-fractional-gate": {
 			capacity:                    testDeviceCapacity(thousandExa, testCapacityRequestPolicy(ptr.To(hundredExa), []apiresource.Quantity{hundredExa, thousandExa}, nil)),
 			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(0), "100E", "option cannot be represented as a milli value"),
+				field.Invalid(validValuesField.Index(1), "1e21", "option cannot be represented as a milli value"),
+			},
 		},
 		// An exponent can be up to 2147483647.
 		"large-exponent-valid-value": {
@@ -209,6 +224,9 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				),
 			),
 			fractionalCapacityRangeGate: true,
+			wantFailures: field.ErrorList{
+				field.Invalid(validValuesField.Index(0), "1e2147483646", "option cannot be represented as a milli value"),
+			},
 		},
 		"invalid-options-unsort": {
 			capacity: testDeviceCapacity(maxCapacity, testCapacityRequestPolicy(&one, []apiresource.Quantity{two, one}, nil)),
