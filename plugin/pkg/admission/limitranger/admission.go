@@ -35,13 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/lru"
 
@@ -806,18 +806,11 @@ func podLimits(pod *api.Pod, opts podResourcesOptions) api.ResourceList {
 	return limits
 }
 
-var supportedPodLevelResources = sets.New(api.ResourceCPU, api.ResourceMemory)
-
-// isSupportedPodLevelResources checks if a given resource is supported by pod-level
-// resource management through the PodLevelResources feature. Returns true if
-// the resource is supported.
-// isSupportedPodLevelResource method exists in
-// staging/src/k8s.io/component-helpers/resource/helpers.go.
-// isSupportedPodLevelResource is added here to avoid conversion of v1.
-// Pod to api.Pod.
-// TODO(ndixita): Find alternatives to avoid duplicating the code.
+// isSupportedPodLevelResource reports whether name is managed by pod-level
+// resources. It delegates to component-helpers; the predicate only needs a
+// resource name, so no v1/core conversion is required.
 func isSupportedPodLevelResource(name api.ResourceName) bool {
-	return supportedPodLevelResources.Has(name)
+	return resourcehelper.IsSupportedPodLevelResource(corev1.ResourceName(name))
 }
 
 // addResourceList adds the resources in newList to list.
