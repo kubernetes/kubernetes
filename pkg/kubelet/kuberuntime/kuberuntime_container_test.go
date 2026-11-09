@@ -782,7 +782,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 		}
 
 		// Now try to create a container, which should in turn invoke PostStart Hook
-		_, err := m.startContainer(tCtx, fakeSandBox.Id, fakeSandBoxConfig, containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{}, nil)
+		_, err := m.startContainer(tCtx, fakeSandBox.Id, fakeSandBoxConfig, "", containerStartSpec(testContainer), testPod, fakePodStatus, nil, "", []string{}, nil)
 		if err != nil {
 			t.Errorf("startContainer error =%v", err)
 		}
@@ -1365,7 +1365,7 @@ func TestContainerVolumeMountsActuatedState(t *testing.T) {
 	// Starting the container records its whole spec, including volumeMounts, even when
 	// DynamicNodeLocalEphemeralVolumes is disabled.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
-	msg, err := m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	msg, err := m.startContainer(tCtx, sandboxID, sandboxConfig, "", containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
 	require.NoError(t, err, msg)
 	gotMounts, found := m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
 	require.True(t, found)
@@ -1373,7 +1373,7 @@ func TestContainerVolumeMountsActuatedState(t *testing.T) {
 
 	// When DynamicNodeLocalEphemeralVolumes is enabled, starting the container records its volumeMounts in the actuation checkpoint.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
-	msg, err = m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	msg, err = m.startContainer(tCtx, sandboxID, sandboxConfig, "", containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
 	require.NoError(t, err, msg)
 
 	gotMounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
@@ -1388,7 +1388,7 @@ func TestContainerVolumeMountsActuatedState(t *testing.T) {
 		},
 	}
 	pod.Spec.Containers[0].VolumeMounts = updatedMounts
-	msg, err = m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	msg, err = m.startContainer(tCtx, sandboxID, sandboxConfig, "", containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
 	require.NoError(t, err, msg)
 
 	gotMounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
