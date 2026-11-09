@@ -307,6 +307,33 @@ func TestValidateDeviceCapacity(t *testing.T) {
 				field.Invalid(validRangeField.Child("step"), "10Gi", "one step 11Gi is larger than capacity value: 10Gi"),
 			},
 		},
+		"binary-min-with-large-step": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("2Ki"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("1Ki")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("1Ki")), nil, ptr.To(apiresource.MustParse("1e2147483646"))),
+				),
+			),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "1e2147483646", "one step 1000000000000000000000000000010e2147483616 is larger than capacity value: 2Ki"),
+				field.Invalid(validRangeField.Child("step"), "1e2147483646", boundOverInt64Message),
+			},
+		},
+		"binary-min-with-step-past-int64": {
+			capacity: testDeviceCapacity(
+				apiresource.MustParse("6Ei"),
+				testCapacityRequestPolicy(
+					ptr.To(apiresource.MustParse("4Ei")),
+					nil,
+					testValidRange(ptr.To(apiresource.MustParse("4Ei")), nil, ptr.To(apiresource.MustParse("4Ei"))),
+				),
+			),
+			wantFailures: field.ErrorList{
+				field.Invalid(validRangeField.Child("step"), "4Ei", "one step 8Ei is larger than capacity value: 6Ei"),
+			},
+		},
 		"fractional-range-gate-disabled-valid": {
 			// gate off, fractional values present — no overflow error, no milli-arithmetic alignment
 			capacity: testDeviceCapacity(
