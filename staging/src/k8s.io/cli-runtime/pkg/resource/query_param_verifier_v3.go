@@ -65,7 +65,7 @@ func (v *queryParamVerifierV3) HasSupport(gvk schema.GroupVersionKind) error {
 	}
 	gvSpec, err := v.root.GVSpec(gvk.GroupVersion())
 	if err == nil {
-		return supportsQueryParamV3(gvSpec, gvk, v.queryParam)
+		return v.supportsQueryParam(gvSpec, gvk)
 	}
 	if _, isErr := err.(*openapi3.GroupVersionNotFoundError); !isErr {
 		return err
@@ -78,7 +78,42 @@ func (v *queryParamVerifierV3) HasSupport(gvk schema.GroupVersionKind) error {
 			// If error retrieving Namespace spec, propagate error.
 			return err
 		}
-		return supportsQueryParamV3(namespaceSpec, namespaceGVK, v.queryParam)
+		return v.supportsQueryParam(namespaceSpec, namespaceGVK)
+	}
+	return NewParamUnsupportedError(gvk, v.queryParam)
+}
+
+// supportsQueryParam reports whether the PATCH endpoint for the passed GVK
+// accepts the verifier query parameter.
+//
+// When the Root provides a Group/Version/Kind index it is used instead of
+// scanning the document, so verifying many objects in one GroupVersion costs
+// one map lookup per object rather than one pass over every path. The result
+// matches the scanning behaviour: the first PATCH operation declaring the GVK
+// decides the answer, and the index orders candidates by path so that choice
+// is deterministic.
+func (v *queryParamVerifierV3) supportsQueryParam(doc *spec3.OpenAPI, gvk schema.GroupVersionKind) error {
+	if doc == nil || doc.Paths == nil {
+		return fmt.Errorf("Invalid OpenAPI V3 document")
+	}
+	indexer, ok := v.root.(openapi3.GVKIndexer)
+	if !ok {
+		return supportsQueryParamV3(doc, gvk, v.queryParam)
+	}
+	paths, err := indexer.GVKPatchPaths(gvk)
+	if err != nil {
+		// The document was already retrieved above, so fall back to the
+		// scan rather than failing the verification on an index error.
+		return supportsQueryParamV3(doc, gvk, v.queryParam)
+	}
+	if len(paths) == 0 {
+		// If no PATCH endpoint exists for this GVK in the GroupVersion's OpenAPI V3
+		// document (for example, non-patchable list kinds such as ReplicationControllerList
+		// or ServiceList), the query parameter is not supported for this GVK.
+		return NewParamUnsupportedError(gvk, v.queryParam)
+	}
+	if patchOperationHasQueryParam(doc, paths[0].PathProps.Patch, v.queryParam) {
+		return nil
 	}
 	return NewParamUnsupportedError(gvk, v.queryParam)
 }
@@ -124,20 +159,8 @@ func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, query
 		}
 		// Now look for the query parameter among the parameters
 		// for the PATCH operation.
-		for _, param := range op.OperationProps.Parameters {
-			if param.ParameterProps.Name == string(queryParam) && param.In == "query" {
-				return nil
-			}
-
-			// lookup global parameters
-			if ref := param.Refable.Ref.Ref.String(); strings.HasPrefix(ref, "#/parameters/") && doc.Components != nil {
-				k := strings.TrimPrefix(ref, "#/parameters/")
-				if globalParam, ok := doc.Components.Parameters[k]; ok && globalParam != nil {
-					if globalParam.In == "query" && globalParam.Name == string(queryParam) {
-						return nil
-					}
-				}
-			}
+		if patchOperationHasQueryParam(doc, op, queryParam) {
+			return nil
 		}
 		return NewParamUnsupportedError(gvk, queryParam)
 	}
@@ -145,4 +168,29 @@ func supportsQueryParamV3(doc *spec3.OpenAPI, gvk schema.GroupVersionKind, query
 	// document (for example, non-patchable list kinds such as ReplicationControllerList
 	// or ServiceList), the query parameter is not supported for this GVK.
 	return NewParamUnsupportedError(gvk, queryParam)
+}
+
+// patchOperationHasQueryParam reports whether the passed PATCH operation
+// declares the query parameter, either directly or through a reference to a
+// global parameter in the document components.
+func patchOperationHasQueryParam(doc *spec3.OpenAPI, op *spec3.Operation, queryParam VerifiableQueryParam) bool {
+	if op == nil {
+		return false
+	}
+	for _, param := range op.OperationProps.Parameters {
+		if param.ParameterProps.Name == string(queryParam) && param.In == "query" {
+			return true
+		}
+
+		// lookup global parameters
+		if ref := param.Refable.Ref.Ref.String(); strings.HasPrefix(ref, "#/parameters/") && doc.Components != nil {
+			k := strings.TrimPrefix(ref, "#/parameters/")
+			if globalParam, ok := doc.Components.Parameters[k]; ok && globalParam != nil {
+				if globalParam.In == "query" && globalParam.Name == string(queryParam) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

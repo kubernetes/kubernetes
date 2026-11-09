@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/openapitest"
@@ -315,4 +316,187 @@ func TestOpenAPIV3Root_PathToGroupVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+// countingGroupVersion records how often the schema bytes are read.
+type countingGroupVersion struct {
+	url  string
+	body []byte
+	err  error
+}
+
+func (c *countingGroupVersion) Schema(contentType string) ([]byte, error) {
+	if contentType != runtime.ContentTypeJSON {
+		return nil, fmt.Errorf("unsupported content type %s", contentType)
+	}
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.body, nil
+}
+
+func (c *countingGroupVersion) ServerRelativeURL() string {
+	return c.url
+}
+
+func TestOpenAPIV3Root_GVSpecReusesParseForSameHash(t *testing.T) {
+	gv := schema.GroupVersion{Group: "apps", Version: "v1"}
+	body := []byte(`{"openapi":"3.0.0","info":{"title":"apps","version":"v1"},"paths":{"/apis/apps/v1/deployments":{}}}`)
+	doc := &countingGroupVersion{
+		url:  "/openapi/v3/apis/apps/v1?hash=abc",
+		body: body,
+	}
+	root := NewRoot(openapitest.FakeClient{
+		PathsMap: map[string]openapi.GroupVersion{
+			"apis/apps/v1": doc,
+		},
+	})
+
+	first, err := root.GVSpec(gv)
+	require.NoError(t, err)
+	second, err := root.GVSpec(gv)
+	require.NoError(t, err)
+	if first != second {
+		t.Fatal("GVSpec unmarshaled the GroupVersion document again for the same schema hash")
+	}
+	if _, found := first.Paths.Paths["/apis/apps/v1/deployments"]; !found {
+		t.Fatal("cached spec is missing the deployments path")
+	}
+
+	firstMap, err := root.GVSpecAsMap(gv)
+	require.NoError(t, err)
+	secondMap, err := root.GVSpecAsMap(gv)
+	require.NoError(t, err)
+	if len(firstMap) == 0 {
+		t.Fatal("GVSpecAsMap returned an empty document")
+	}
+	if fmt.Sprintf("%p", firstMap) != fmt.Sprintf("%p", secondMap) {
+		t.Fatal("GVSpecAsMap unmarshaled the GroupVersion document again for the same schema hash")
+	}
+
+	doc.url = "/openapi/v3/apis/apps/v1?hash=def"
+	doc.body = []byte(`{"openapi":"3.0.0","info":{"title":"apps","version":"v1"},"paths":{"/apis/apps/v1/statefulsets":{}}}`)
+	updated, err := root.GVSpec(gv)
+	require.NoError(t, err)
+	if updated == first {
+		t.Fatal("GVSpec reused a parse after ServerRelativeURL changed")
+	}
+	if _, found := updated.Paths.Paths["/apis/apps/v1/statefulsets"]; !found {
+		t.Fatal("refetched spec is missing the statefulsets path")
+	}
+}
+
+func TestOpenAPIV3Root_GVSpecCacheEdges(t *testing.T) {
+	appsGV := schema.GroupVersion{Group: "apps", Version: "v1"}
+	batchGV := schema.GroupVersion{Group: "batch", Version: "v1"}
+	coreGV := schema.GroupVersion{Version: "v1"}
+	appsBody := []byte(`{"openapi":"3.0.0","info":{"title":"apps","version":"v1"},"paths":{"/apis/apps/v1/deployments":{}}}`)
+	batchBody := []byte(`{"openapi":"3.0.0","info":{"title":"batch","version":"v1"},"paths":{"/apis/batch/v1/jobs":{}}}`)
+	coreBody := []byte(`{"openapi":"3.0.0","info":{"title":"core","version":"v1"},"paths":{"/api/v1/pods":{}}}`)
+
+	t.Run("missing groupversion is not cached as a document", func(t *testing.T) {
+		doc := &countingGroupVersion{url: "/openapi/v3/apis/apps/v1?hash=abc", body: appsBody}
+		client := openapitest.FakeClient{PathsMap: map[string]openapi.GroupVersion{}}
+		root := NewRoot(client)
+		_, err := root.GVSpec(appsGV)
+		require.ErrorAs(t, err, new(*GroupVersionNotFoundError))
+
+		client.PathsMap["apis/apps/v1"] = doc
+		parsed, err := root.GVSpec(appsGV)
+		require.NoError(t, err)
+		if _, found := parsed.Paths.Paths["/apis/apps/v1/deployments"]; !found {
+			t.Fatal("lookup after a miss did not parse the document")
+		}
+	})
+
+	t.Run("empty locator keys by document bytes", func(t *testing.T) {
+		doc := &countingGroupVersion{body: appsBody}
+		root := NewRoot(openapitest.FakeClient{
+			PathsMap: map[string]openapi.GroupVersion{"apis/apps/v1": doc},
+		})
+		first, err := root.GVSpec(appsGV)
+		require.NoError(t, err)
+		second, err := root.GVSpec(appsGV)
+		require.NoError(t, err)
+		if first != second {
+			t.Fatal("identical bytes with an empty ServerRelativeURL were parsed twice")
+		}
+
+		doc.body = batchBody
+		updated, err := root.GVSpec(appsGV)
+		require.NoError(t, err)
+		if updated == first {
+			t.Fatal("changed bytes with an empty ServerRelativeURL reused the old parse")
+		}
+		if _, found := updated.Paths.Paths["/apis/batch/v1/jobs"]; !found {
+			t.Fatal("content-hash refresh did not parse the new document")
+		}
+	})
+
+	t.Run("distinct groupversions do not share a parse", func(t *testing.T) {
+		apps := &countingGroupVersion{url: "?hash=same", body: appsBody}
+		batch := &countingGroupVersion{url: "?hash=same", body: batchBody}
+		core := &countingGroupVersion{url: "/openapi/v3/api/v1?hash=core", body: coreBody}
+		root := NewRoot(openapitest.FakeClient{
+			PathsMap: map[string]openapi.GroupVersion{
+				"apis/apps/v1":  apps,
+				"apis/batch/v1": batch,
+				"api/v1":        core,
+			},
+		})
+		appsSpec, err := root.GVSpec(appsGV)
+		require.NoError(t, err)
+		batchSpec, err := root.GVSpec(batchGV)
+		require.NoError(t, err)
+		coreSpec, err := root.GVSpec(coreGV)
+		require.NoError(t, err)
+		if appsSpec == batchSpec || appsSpec == coreSpec || batchSpec == coreSpec {
+			t.Fatal("different GroupVersions returned the same parsed document")
+		}
+		if _, found := appsSpec.Paths.Paths["/apis/apps/v1/deployments"]; !found {
+			t.Fatal("apps spec lost its path")
+		}
+		if _, found := batchSpec.Paths.Paths["/apis/batch/v1/jobs"]; !found {
+			t.Fatal("batch spec was served from the apps cache")
+		}
+		if _, found := coreSpec.Paths.Paths["/api/v1/pods"]; !found {
+			t.Fatal("core v1 spec was not parsed from api/v1")
+		}
+	})
+
+	t.Run("schema fetch error is retried", func(t *testing.T) {
+		doc := &countingGroupVersion{url: "/openapi/v3/apis/apps/v1?hash=abc", err: fmt.Errorf("discovery unavailable")}
+		root := NewRoot(openapitest.FakeClient{
+			PathsMap: map[string]openapi.GroupVersion{"apis/apps/v1": doc},
+		})
+		_, err := root.GVSpec(appsGV)
+		require.EqualError(t, err, "discovery unavailable")
+
+		doc.err = nil
+		doc.body = appsBody
+		parsed, err := root.GVSpec(appsGV)
+		require.NoError(t, err)
+		if _, found := parsed.Paths.Paths["/apis/apps/v1/deployments"]; !found {
+			t.Fatal("a failed schema fetch was cached")
+		}
+	})
+
+	t.Run("invalid json stays cached until the hash changes", func(t *testing.T) {
+		doc := &countingGroupVersion{url: "/openapi/v3/apis/apps/v1?hash=bad", body: []byte(`{`)}
+		root := NewRoot(openapitest.FakeClient{
+			PathsMap: map[string]openapi.GroupVersion{"apis/apps/v1": doc},
+		})
+		_, err := root.GVSpec(appsGV)
+		require.Error(t, err)
+		_, err = root.GVSpec(appsGV)
+		require.Error(t, err)
+
+		doc.url = "/openapi/v3/apis/apps/v1?hash=good"
+		doc.body = appsBody
+		parsed, err := root.GVSpec(appsGV)
+		require.NoError(t, err)
+		if _, found := parsed.Paths.Paths["/apis/apps/v1/deployments"]; !found {
+			t.Fatal("a new schema hash did not replace the invalid parse")
+		}
+	})
 }

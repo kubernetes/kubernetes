@@ -58,6 +58,9 @@ type FakeGroupVersion struct {
 	GVSpec []byte
 	// Hard-coded returned error.
 	ForcedErr error
+	// ServerRelativeURLValue is returned by ServerRelativeURL. The OpenAPI V3
+	// root uses it, including the schema hash, as a parse-cache key.
+	ServerRelativeURLValue string
 }
 
 // FileOpenAPIGroupVersion implements the openapi.GroupVersion interface.
@@ -78,7 +81,7 @@ func (f FakeGroupVersion) Schema(contentType string) ([]byte, error) {
 	return f.GVSpec, nil
 }
 
-// ServerRelativeURL returns an empty string.
+// ServerRelativeURL returns ServerRelativeURLValue.
 func (f FakeGroupVersion) ServerRelativeURL() string {
-	panic("unimplemented")
+	return f.ServerRelativeURLValue
 }

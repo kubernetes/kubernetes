@@ -17,7 +17,8 @@ limitations under the License.
 package openapi3
 
 import (
-	"encoding/json"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/openapi"
 	"k8s.io/kube-openapi/pkg/spec3"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Root interface defines functions implemented against the root
@@ -46,12 +48,48 @@ type Root interface {
 	// GroupVersion as a pointer to a spec3.OpenAPI struct.
 	// Returns an error for problems retrieving or parsing the root
 	// document or GroupVersion OpenAPI V3 document.
+	//
+	// The returned document is cached and shared with every other caller
+	// that asks for the same GroupVersion, so it must be treated as
+	// read-only. Callers that need to modify it must deep copy it first.
 	GVSpec(gv schema.GroupVersion) (*spec3.OpenAPI, error)
 	// GVSpecAsMap returns the specification for all the resources in a
 	// GroupVersion as unstructured bytes. Returns an error for
 	// problems retrieving or parsing the root or GroupVersion
 	// OpenAPI V3 document.
+	//
+	// The returned map is cached and shared with every other caller that
+	// asks for the same GroupVersion, so it must be treated as read-only.
+	// Writing to it races with other readers and corrupts the cache;
+	// callers that need to modify it must deep copy it first.
 	GVSpecAsMap(gv schema.GroupVersion) (map[string]interface{}, error)
+}
+
+// GVKIndexer is implemented by the Root returned from NewRoot and
+// NewRootWithCache. It answers Group/Version/Kind lookups from an index built
+// once per GroupVersion document, so a caller that repeatedly asks about kinds
+// in one GroupVersion neither re-unmarshals the document nor rescans every
+// path and component schema in it.
+//
+// It is a separate interface rather than part of Root so that existing
+// implementations of Root keep compiling. Discover it with a type assertion:
+//
+//	if indexer, ok := root.(openapi3.GVKIndexer); ok {
+//	    paths, err := indexer.GVKPatchPaths(gvk)
+//	}
+//
+// Both methods return slices because a single GroupVersionKind can be declared
+// by several paths (a resource and its subresources) and by several component
+// schemas. An empty result means the document does not declare that kind. The
+// returned slices and the values they point at are shared and must be treated
+// as read-only.
+type GVKIndexer interface {
+	// GVKPatchPaths returns every path in the GroupVersion document whose
+	// PATCH operation declares gvk, ordered by path.
+	GVKPatchPaths(gvk schema.GroupVersionKind) ([]*spec3.Path, error)
+	// GVKSchemas returns every component schema in the GroupVersion
+	// document that declares gvk, ordered by schema name.
+	GVKSchemas(gvk schema.GroupVersionKind) ([]*spec.Schema, error)
 }
 
 // root implements the Root interface, and encapsulates the
@@ -59,15 +97,42 @@ type Root interface {
 type root struct {
 	// OpenAPI client to retrieve the OpenAPI V3 documents.
 	client openapi.Client
+
+	// cache holds the parsed documents and their GVK indexes. It is never
+	// nil and may be shared with other root instances.
+	cache *Cache
 }
 
-// Validate root implements the Root interface.
-var _ Root = &root{}
+// Validate root implements the Root and GVKIndexer interfaces.
+var (
+	_ Root       = &root{}
+	_ GVKIndexer = &root{}
+)
 
 // NewRoot returns a structure implementing the Root interface,
 // created with the passed rest client.
+//
+// Parsed documents are cached, so a caller that reuses one Root unmarshals
+// each GroupVersion document at most once per schema hash. If the passed
+// client implements CacheProvider, the cache it supplies is used, which lets
+// every Root built from one client share a single set of parsed documents.
 func NewRoot(client openapi.Client) Root {
-	return &root{client: client}
+	var cache *Cache
+	if provider, ok := client.(CacheProvider); ok {
+		cache = provider.OpenAPIV3Cache()
+	}
+	return NewRootWithCache(client, cache)
+}
+
+// NewRootWithCache returns a structure implementing the Root interface that
+// stores its parsed documents in the passed cache, which may be shared with
+// other Root instances to avoid parsing the same document more than once
+// across callers. A nil cache gives this Root a private one.
+func NewRootWithCache(client openapi.Client, cache *Cache) Root {
+	if cache == nil {
+		cache = NewCache()
+	}
+	return &root{client: client, cache: cache}
 }
 
 func (r *root) GroupVersions() ([]schema.GroupVersion, error) {
@@ -93,41 +158,68 @@ func (r *root) GroupVersions() ([]schema.GroupVersion, error) {
 }
 
 func (r *root) GVSpec(gv schema.GroupVersion) (*spec3.OpenAPI, error) {
-	openAPISchemaBytes, err := r.retrieveGVBytes(gv)
+	openAPISchemaBytes, locator, err := r.retrieveGVBytes(gv)
 	if err != nil {
 		return nil, err
 	}
-	// Unmarshal the downloaded Group/Version bytes into the spec3.OpenAPI struct.
-	var parsedV3Schema spec3.OpenAPI
-	err = json.Unmarshal(openAPISchemaBytes, &parsedV3Schema)
-	return &parsedV3Schema, err
+	// Unmarshal once per schema hash. The result is shared, so callers must
+	// not mutate it.
+	return r.cache.spec(gv, locator, openAPISchemaBytes)
 }
 
 func (r *root) GVSpecAsMap(gv schema.GroupVersion) (map[string]interface{}, error) {
-	gvOpenAPIBytes, err := r.retrieveGVBytes(gv)
+	gvOpenAPIBytes, locator, err := r.retrieveGVBytes(gv)
 	if err != nil {
 		return nil, err
 	}
-	// GroupVersion bytes into unstructured map[string] -> empty interface.
-	var gvMap map[string]interface{}
-	err = json.Unmarshal(gvOpenAPIBytes, &gvMap)
-	return gvMap, err
+	return r.cache.specAsMap(gv, locator, gvOpenAPIBytes)
+}
+
+// GVKPatchPaths implements GVKIndexer.
+func (r *root) GVKPatchPaths(gvk schema.GroupVersionKind) ([]*spec3.Path, error) {
+	gv := gvk.GroupVersion()
+	openAPISchemaBytes, locator, err := r.retrieveGVBytes(gv)
+	if err != nil {
+		return nil, err
+	}
+	return r.cache.patchPaths(gv, locator, openAPISchemaBytes, gvk)
+}
+
+// GVKSchemas implements GVKIndexer.
+func (r *root) GVKSchemas(gvk schema.GroupVersionKind) ([]*spec.Schema, error) {
+	gv := gvk.GroupVersion()
+	openAPISchemaBytes, locator, err := r.retrieveGVBytes(gv)
+	if err != nil {
+		return nil, err
+	}
+	return r.cache.schemas(gv, locator, openAPISchemaBytes, gvk)
 }
 
 // retrieveGVBytes returns the schema for a passed GroupVersion as an
-// unstructured slice of bytes or an error if there is a problem downloading
-// or if the passed GroupVersion is not supported.
-func (r *root) retrieveGVBytes(gv schema.GroupVersion) ([]byte, error) {
+// unstructured slice of bytes, the cache key for that schema, or an error
+// if there is a problem downloading or if the passed GroupVersion is not
+// supported. The cache key is ServerRelativeURL, which includes the schema
+// hash. An empty locator falls back to a hash of the bytes.
+func (r *root) retrieveGVBytes(gv schema.GroupVersion) ([]byte, string, error) {
 	paths, err := r.client.Paths()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	apiPath := gvToAPIPath(gv)
 	gvOpenAPI, found := paths[apiPath]
 	if !found {
-		return nil, &GroupVersionNotFoundError{gv: gv}
+		return nil, "", &GroupVersionNotFoundError{gv: gv}
 	}
-	return gvOpenAPI.Schema(runtime.ContentTypeJSON)
+	data, err := gvOpenAPI.Schema(runtime.ContentTypeJSON)
+	if err != nil {
+		return nil, "", err
+	}
+	key := gvOpenAPI.ServerRelativeURL()
+	if key == "" {
+		sum := sha256.Sum256(data)
+		key = gv.String() + ":" + hex.EncodeToString(sum[:])
+	}
+	return data, key, nil
 }
 
 // gvToAPIPath maps the passed GroupVersion to a relative api

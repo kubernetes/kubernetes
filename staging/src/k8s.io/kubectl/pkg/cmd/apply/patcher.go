@@ -39,6 +39,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/openapi3"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -220,32 +221,51 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte) ([]byte, e
 // gvkSupportsPatchOpenAPIV3 checks if a particular GVK supports the patch operation.
 // It returns an error if the OpenAPI V3 could not be downloaded.
 func (p *Patcher) gvkSupportsPatchOpenAPIV3(gvk schema.GroupVersionKind) (bool, error) {
-	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
-		Group:   p.Mapping.GroupVersionKind.Group,
-		Version: p.Mapping.GroupVersionKind.Version,
-	})
+	mappedGVK := p.Mapping.GroupVersionKind
+	gvSpec, err := p.OpenAPIV3Root.GVSpec(mappedGVK.GroupVersion())
 	if err != nil {
 		return false, err
 	}
 	if gvSpec == nil || gvSpec.Paths == nil || gvSpec.Paths.Paths == nil {
 		return false, fmt.Errorf("gvk group: %s, version: %s, kind: %s does not exist for OpenAPI V3", gvk.Group, gvk.Version, gvk.Kind)
 	}
+
+	// Prefer the indexed lookup. Applying many objects asks about the same
+	// GroupVersion repeatedly, and the index turns a scan of every path in
+	// the document into a single map lookup.
+	if indexer, ok := p.OpenAPIV3Root.(openapi3.GVKIndexer); ok {
+		paths, err := indexer.GVKPatchPaths(mappedGVK)
+		if err != nil {
+			return false, err
+		}
+		if len(paths) == 0 {
+			return false, nil
+		}
+		return patchPathSupportsStrategicMerge(paths[0]), nil
+	}
+
 	for _, path := range gvSpec.Paths.Paths {
 		if path.Patch != nil {
-			if gvkMatchesSingle(p.Mapping.GroupVersionKind, path.Patch.Extensions) {
-				if path.Patch.RequestBody == nil || path.Patch.RequestBody.Content == nil {
-					// GVK exists but does not support requestBody. Indication of malformed OpenAPI.
-					return false, nil
-				}
-				if _, ok := path.Patch.RequestBody.Content["application/strategic-merge-patch+json"]; ok {
-					return true, nil
-				}
-				// GVK exists but strategic-merge-patch is not supported. Likely to be a CRD or aggregated resource.
-				return false, nil
+			if gvkMatchesSingle(mappedGVK, path.Patch.Extensions) {
+				return patchPathSupportsStrategicMerge(path), nil
 			}
 		}
 	}
 	return false, nil
+}
+
+// patchPathSupportsStrategicMerge reports whether the PATCH operation on the
+// passed path accepts a strategic merge patch body.
+func patchPathSupportsStrategicMerge(path *spec3.Path) bool {
+	if path.Patch.RequestBody == nil || path.Patch.RequestBody.Content == nil {
+		// GVK exists but does not support requestBody. Indication of malformed OpenAPI.
+		return false
+	}
+	if _, ok := path.Patch.RequestBody.Content["application/strategic-merge-patch+json"]; ok {
+		return true
+	}
+	// GVK exists but strategic-merge-patch is not supported. Likely to be a CRD or aggregated resource.
+	return false
 }
 
 func gvkMatchesArray(targetGVK schema.GroupVersionKind, ext spec.Extensions) bool {
@@ -276,20 +296,32 @@ func gvkMatchesSingle(targetGVK schema.GroupVersionKind, ext spec.Extensions) bo
 }
 
 func (p *Patcher) buildStrategicMergePatchFromOpenAPIV3(original, modified, current []byte) ([]byte, error) {
-	gvSpec, err := p.OpenAPIV3Root.GVSpec(schema.GroupVersion{
-		Group:   p.Mapping.GroupVersionKind.Group,
-		Version: p.Mapping.GroupVersionKind.Version,
-	})
+	mappedGVK := p.Mapping.GroupVersionKind
+	gvSpec, err := p.OpenAPIV3Root.GVSpec(mappedGVK.GroupVersion())
 	if err != nil {
 		return nil, err
 	}
 	if gvSpec == nil || gvSpec.Components == nil {
 		return nil, fmt.Errorf("OpenAPI V3 Components is nil")
 	}
-	for _, c := range gvSpec.Components.Schemas {
-		if !gvkMatchesArray(p.Mapping.GroupVersionKind, c.Extensions) {
-			continue
+
+	// Prefer the indexed lookup, which avoids rescanning every component
+	// schema in the document once per object being applied.
+	var candidates []*spec.Schema
+	if indexer, ok := p.OpenAPIV3Root.(openapi3.GVKIndexer); ok {
+		candidates, err = indexer.GVKSchemas(mappedGVK)
+		if err != nil {
+			return nil, err
 		}
+	} else {
+		for _, c := range gvSpec.Components.Schemas {
+			if gvkMatchesArray(mappedGVK, c.Extensions) {
+				candidates = append(candidates, c)
+			}
+		}
+	}
+
+	for _, c := range candidates {
 		lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPIV3{Schema: c, SchemaList: gvSpec.Components.Schemas}
 		if openapiv3Patch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
 			return nil, err

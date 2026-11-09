@@ -19,6 +19,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -32,6 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	openapiclient "k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi/cached"
+	"k8s.io/client-go/openapi3"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/util/openapi"
@@ -46,6 +48,41 @@ type factoryImpl struct {
 	oapi          *openapi.CachedOpenAPIGetter
 	parser        sync.Once
 	getter        sync.Once
+
+	// Caches the OpenAPI V3 client, so that every command sharing this
+	// factory downloads each schema once and parses it once.
+	oapiV3   openapiclient.Client
+	v3Getter sync.Once
+}
+
+// openAPIV3Client is a cached OpenAPI V3 client paired with the parse cache
+// that every openapi3.Root built from it should use. Callers each construct
+// their own Root from the factory client, so carrying the cache on the client
+// is what lets them share parsed documents without changing the Factory
+// interface or any call site.
+type openAPIV3Client struct {
+	openapiclient.Client
+
+	withContext openapiclient.ClientWithContext
+	cache       *openapi3.Cache
+}
+
+var (
+	//nolint:staticcheck // Intentionally using the old interface here.
+	_ openapiclient.Client            = &openAPIV3Client{}
+	_ openapiclient.ClientWithContext = &openAPIV3Client{}
+	_ openapi3.CacheProvider          = &openAPIV3Client{}
+)
+
+// PathsWithContext keeps the delegate contextual logging and cancellation
+// support, which plain embedding of the older interface would hide.
+func (c *openAPIV3Client) PathsWithContext(ctx context.Context) (map[string]openapiclient.GroupVersionWithContext, error) {
+	return c.withContext.PathsWithContext(ctx)
+}
+
+// OpenAPIV3Cache implements openapi3.CacheProvider.
+func (c *openAPIV3Client) OpenAPIV3Cache() *openapi3.Cache {
+	return c.cache
 }
 
 func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
@@ -165,13 +202,15 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 		return nil, err
 	}
 	// Create the FieldValidationVerifier for use in the ParamVerifyingSchema.
-	discoveryClient, err := f.ToDiscoveryClient()
+	// Reuse the factory OpenAPI V3 client rather than building a second one,
+	// so that field validation, apply and diff download each schema once and
+	// unmarshal it once between them. Memory caching of the responses comes
+	// from that client; the disk cache behavior is determined by the
+	// discovery client underneath it.
+	oapiV3Client, err := f.OpenAPIV3Client()
 	if err != nil {
 		return nil, err
 	}
-	// Memory-cache the OpenAPI V3 responses. The disk cache behavior is determined by
-	// the discovery client.
-	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
 	queryParam := resource.QueryParamFieldValidation
 	verifier := newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam))
 	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
@@ -213,5 +252,18 @@ func (f *factoryImpl) OpenAPIV3Client() (openapiclient.Client, error) {
 		return nil, err
 	}
 
-	return cached.NewClient(discovery.OpenAPIV3()), nil
+	// Build the client once per factory. Returning the same client to every
+	// caller means the schema bytes are downloaded once, and the parse cache
+	// it carries means each schema is unmarshaled once, however many
+	// commands build an openapi3.Root from it.
+	f.v3Getter.Do(func() {
+		delegate := cached.NewClient(discovery.OpenAPIV3())
+		f.oapiV3 = &openAPIV3Client{
+			Client:      delegate,
+			withContext: openapiclient.ToClientWithContext(delegate),
+			cache:       openapi3.NewCache(),
+		}
+	})
+
+	return f.oapiV3, nil
 }
