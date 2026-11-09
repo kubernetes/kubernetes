@@ -64,6 +64,55 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("BadEffect"), []resource.DeviceTaintEffect{}).MarkBeta(),
 			},
 		},
+		"valid all: true": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true)})),
+		},
+		"all: false": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(false)})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "").WithOrigin("neq"),
+			},
+		},
+		"all: true with driver": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Driver: new("example.com")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden"),
+			},
+		},
+		"all: true with pool": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Pool: new("pool-a")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "pool"), "").WithOrigin("dependentForbidden"),
+			},
+		},
+		"all: true with device": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Device: new("device-a")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "device"), "").WithOrigin("dependentForbidden"),
+			},
+		},
+		"all: true with driver, pool and device": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Driver: new("example.com"), Pool: new("pool-a"), Device: new("device-a")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden"),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "pool"), "").WithOrigin("dependentForbidden"),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "device"), "").WithOrigin("dependentForbidden"),
+			},
+		},
+		"all: true with empty-string driver": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Driver: new("")})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "deviceSelector", "driver"), "").MarkFromImperative(),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden"),
+			},
+		},
+		"all: false with driver": {
+			input: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(false), Driver: new("example.com")})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "").WithOrigin("neq"),
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 
@@ -125,6 +174,24 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNone}).MarkBeta(),
 			},
 		},
+		"valid update setting all: true": {
+			old:    mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{Driver: new("example.com")})),
+			update: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true)})),
+		},
+		"invalid update setting all: true next to driver": {
+			old:    mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{Driver: new("example.com")})),
+			update: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(true), Driver: new("example.com")})),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "deviceSelector", "driver"), "").WithOrigin("dependentForbidden"),
+			},
+		},
+		"invalid update setting all: false": {
+			old:    mkValidDeviceTaintRule(),
+			update: mkValidDeviceTaintRule(tweakDeviceSelector(&resource.DeviceTaintSelector{All: new(false)})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "deviceSelector", "all"), false, "").WithOrigin("neq"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 
@@ -156,6 +223,12 @@ func mkValidDeviceTaintRule(tweaks ...func(*resource.DeviceTaintRule)) resource.
 		tweak(&rule)
 	}
 	return rule
+}
+
+func tweakDeviceSelector(selector *resource.DeviceTaintSelector) func(*resource.DeviceTaintRule) {
+	return func(r *resource.DeviceTaintRule) {
+		r.Spec.DeviceSelector = selector
+	}
 }
 
 func tweakTaintEffect(effect resource.DeviceTaintEffect) func(*resource.DeviceTaintRule) {
