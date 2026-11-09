@@ -208,6 +208,22 @@ func TestWatchdogDiagnosticsNotifyExhausted(t *testing.T) {
 	}
 }
 
+func TestWatchdogDiagnosticsCancellationDoesNotSummarize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, true)
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
+	client := &mockWatchdogClient{notifyErr: errors.New("socket failed")}
+	hc := &healthChecker{watchdog: client, interval: time.Second, retryBackoff: wait.Backoff{Steps: 2}}
+	ctx, cancel := context.WithCancel(klog.NewContext(context.Background(), logger))
+	cancel()
+
+	hc.runOnce(ctx)
+
+	logs := logger.GetSink().(klogtesting.Underlier).GetBuffer().String()
+	if client.notifyCalls != 0 || strings.Contains(logs, "retry_exhausted") {
+		t.Errorf("cancelled watchdog iteration produced misleading diagnostics: calls=%d logs=%s", client.notifyCalls, logs)
+	}
+}
+
 func TestWatchdogDiagnosticsRateLimit(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, true)
 	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
