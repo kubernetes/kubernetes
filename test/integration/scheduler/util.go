@@ -369,8 +369,9 @@ func InitDisruptionController(t utiltesting.TB, testCtx *testutils.TestContext) 
 		scaleClient,
 		testCtx.ClientSet.Discovery())
 
-	informers.Start(testCtx.Scheduler.StopEverything)
-	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
+	// The controller runs for the lifetime of testCtx.Ctx, so its informers must too.
+	informers.Start(testCtx.Ctx.Done())
+	informers.WaitForCacheSync(testCtx.Ctx.Done())
 	go dc.Run(testCtx.Ctx, 1)
 	return dc
 }
@@ -780,6 +781,9 @@ func NextEntityOrDie(t utiltesting.TB, testCtx *testutils.TestContext) scheduler
 	if err := timeout(testCtx.Ctx, time.Second*5, func() {
 		entity, _ = testCtx.Scheduler.NextEntity(logger)
 	}); err != nil {
+		// NextEntity() has no context and blocks until an entity is enqueued or the
+		// queue is closed.
+		testCtx.Scheduler.SchedulingQueue.Close()
 		t.Fatalf("Timed out waiting for the entity to be popped: %v", err)
 	}
 	return entity
