@@ -1906,7 +1906,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// currently: "container", "init container" or "ephemeral container"
 	// metricLabel is the label used to describe this type of container in monitoring metrics.
 	// currently: "container", "init_container" or "ephemeral_container"
-	startWithInitState := func(ctx context.Context, typeName, metricLabel string, spec *startSpec, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls) error {
+	startWithInitState := func(ctx context.Context, typeName, metricLabel string, spec *startSpec, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, imageVolumePullResults imageVolumePulls) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
 		result.AddSyncResult(startContainerResult)
 
@@ -1930,7 +1930,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
-		msg, err = m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs, imageVolumes)
+		msg, err = m.startContainer(ctx, podSandboxID, podSandboxConfig, podRuntimeHandler, spec, pod, podStatus, pullSecrets, podIP, podIPs, imageVolumes)
 		incrementImageVolumeMetrics(err, msg, spec.container, imageVolumes)
 		if err != nil {
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
@@ -1965,6 +1965,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// State required only if we need to start any containers.
 	var (
 		podSandboxConfig       *runtimeapi.PodSandboxConfig
+		podRuntimeHandler      string
 		imageVolumePullResults imageVolumePulls
 	)
 
@@ -1973,6 +1974,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		var err error
 
 		if podSandboxConfig == nil {
+			podRuntimeHandler, err = m.getPodRuntimeHandler(pod)
+			if err != nil {
+				logger.Error(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
+				result.Fail(err)
+				return nil
+			}
 			podSandboxConfig, err = m.generatePodSandboxConfig(ctx, pod, podContainerChanges.Attempt)
 			if err != nil {
 				logger.Error(err, "GeneratePodSandboxConfig for pod failed", "pod", klog.KObj(pod))
@@ -1982,17 +1989,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 
 		if imageVolumePullResults == nil {
-			imageVolumePullResults, err = m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
-			if err != nil {
-				// Don't start any containers until we have all image volumes.
-				logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
-				result.Fail(err)
-				return nil
-			}
+			imageVolumePullResults = m.getImageVolumes(ctx, pod, podSandboxConfig, podRuntimeHandler, pullSecrets)
 		}
 
 		return func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
-			return startWithInitState(ctx, typeName, metricLabel, spec, podSandboxConfig, imageVolumePullResults)
+			return startWithInitState(ctx, typeName, metricLabel, spec, podSandboxConfig, podRuntimeHandler, imageVolumePullResults)
 		}
 	}
 
@@ -2127,16 +2128,10 @@ func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(ctx context.Cont
 	return imageVolumes, nil
 }
 
-func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret) (imageVolumePulls, error) {
+func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullSecrets []v1.Secret) imageVolumePulls {
 	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
-		return nil, nil
-	}
-
-	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
-	if err != nil {
-		logger.Error(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
-		return nil, err
+		return nil
 	}
 
 	res := make(imageVolumePulls)
@@ -2164,7 +2159,7 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 		}}
 	}
 
-	return res, nil
+	return res
 }
 
 // If a container is still in backoff, the function will return a brief backoff error and

@@ -4488,10 +4488,9 @@ func TestGetImageVolumes(t *testing.T) {
 		},
 	}
 
-	for desc, tc := range map[string]struct {
+	for _, tc := range map[string]struct {
 		pod                      *v1.Pod
 		expectedImageVolumePulls imageVolumePulls
-		expectedError            error
 	}{
 		"empty volumes": {
 			pod:                      &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{}}},
@@ -4525,12 +4524,7 @@ func TestGetImageVolumes(t *testing.T) {
 		},
 	} {
 
-		imageVolumePulls, err := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, nil)
-		if tc.expectedError != nil {
-			require.EqualError(t, err, tc.expectedError.Error())
-		} else {
-			require.NoError(t, err, desc)
-		}
+		imageVolumePulls := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, "", nil)
 		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
 	}
 }

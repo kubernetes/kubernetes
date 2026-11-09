@@ -209,21 +209,16 @@ func (m *kubeGenericRuntimeManager) getPodRuntimeHandler(pod *v1.Pod) (podRuntim
 // * create the container
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
-func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (string, error) {
+func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (string, error) {
 	logger := klog.FromContext(ctx)
 	container := spec.container
-
-	// Step 1: pull the image.
-	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
-	if err != nil {
-		return "", err
-	}
 
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		logger.Error(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 
+	// Step 1: pull the image.
 	imageRef, msg, err := m.imagePuller.EnsureImageExists(ctx, ref, pod, container.Image, pullSecrets, podSandboxConfig, podRuntimeHandler, container.ImagePullPolicy)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
