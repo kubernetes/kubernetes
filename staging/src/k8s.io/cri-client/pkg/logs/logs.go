@@ -302,7 +302,10 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
-	defer f.Close()
+	// Closed through the variable, because the follow loop below replaces f
+	// with a new handle on every log rotation. Ignoring the close error is safe
+	// for a file opened read-only.
+	defer func() { _ = f.Close() }()
 
 	// Search start point based on tail line.
 	var tail int64 = -1
@@ -380,7 +383,6 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
-					defer newF.Close()
 					f.Close()
 					f = newF
 					r = bufio.NewReader(f)
