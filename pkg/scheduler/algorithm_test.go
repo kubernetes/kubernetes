@@ -990,7 +990,7 @@ type rankNodesTestPlugin struct {
 	preFilterResult  *fwk.PreFilterResult
 	rejectedNodes    sets.Set[string]
 	scoresByNode     map[string]int64
-	filterHook       func(nodeName string)
+	filterHook       func(ctx context.Context, nodeName string)
 	rankInputOrder   []string
 	filteredNodes    []string
 	rankNodesInvoked bool
@@ -1047,7 +1047,7 @@ func (p *rankNodesTestPlugin) Filter(ctx context.Context, state fwk.CycleState, 
 	p.filteredNodes = append(p.filteredNodes, nodeName)
 	p.lock.Unlock()
 	if p.filterHook != nil {
-		p.filterHook(nodeName)
+		p.filterHook(ctx, nodeName)
 	}
 	if p.rejectedNodes.Has(nodeName) {
 		return fwk.NewStatus(fwk.Unschedulable, "rejected by rankNodesTestPlugin")
@@ -1081,7 +1081,7 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 		preFilterResult      *fwk.PreFilterResult
 		rejectedNodes        sets.Set[string]
 		scoresByNode         map[string]int64
-		filterHook           func(nodeName string)
+		filterHook           func(ctx context.Context, nodeName string)
 		wantSuggestedHost    string
 		wantFeasibleNodes    int
 		wantFilteredNodes    []string
@@ -1212,10 +1212,10 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				"node3": 100,
 				"node4": 100,
 			},
-			filterHook: func() func(nodeName string) {
+			filterHook: func() func(ctx context.Context, nodeName string) {
 				otherNodeCompleted := make(chan struct{})
 				var otherNodesStarted atomic.Int32
-				return func(nodeName string) {
+				return func(_ context.Context, nodeName string) {
 					if nodeName == "node1" {
 						// Block the rank-0 node until the second worker has completely
 						// finished checkNode for node2 (rank 1) and started node3.
@@ -1232,6 +1232,27 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			wantFilteredNodes:    []string{"node1", "node2", "node3"},
 			wantRankInputOrder:   []string{"node1", "node2", "node3", "node4"},
 			wantRankNodesInvoked: true,
+		},
+		{
+			name:        "unranked parallel Filter commits immediately and cancels without waiting for lagging earlier node",
+			extraNodes:  []*v1.Node{st.MakeNode().Name("node4").Obj()},
+			parallelism: 2,
+			filterHook: func() func(ctx context.Context, nodeName string) {
+				node1Started := make(chan struct{})
+				return func(ctx context.Context, nodeName string) {
+					if nodeName == "node1" {
+						close(node1Started)
+						// Block index 0 until the second worker commits a feasible node and cancels ctx.
+						<-ctx.Done()
+						return
+					}
+					<-node1Started
+				}
+			}(),
+			wantSuggestedHost:    "node3",
+			wantFeasibleNodes:    1,
+			wantFilteredNodes:    []string{"node1", "node3"},
+			wantRankNodesInvoked: false,
 		},
 		{
 			name:          "FindAllNodesThatFitPod skips RankNodes and evaluates all nodes in pod group cycle",
