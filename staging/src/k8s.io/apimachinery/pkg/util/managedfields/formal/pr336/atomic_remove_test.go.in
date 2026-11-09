@@ -1,0 +1,199 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package typed
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"reflect"
+	"testing"
+	"time"
+
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
+)
+
+type ssaFormalRemoveAllocator struct {
+	value.Allocator
+	freed []*int
+}
+
+func (a *ssaFormalRemoveAllocator) Free(resource any) {
+	var handle *int
+	switch resource := resource.(type) {
+	case nil:
+	case value.Map:
+		length := resource.Length() + 1
+		handle = &length
+	case value.List:
+		length := resource.Length() + 1
+		handle = &length
+	default:
+		panic(fmt.Sprintf("unexpected atomic removal resource %T", resource))
+	}
+	a.freed = append(a.freed, handle)
+	a.Allocator.Free(resource)
+}
+
+type ssaFormalRemoveCase struct {
+	Kind    string  `json:"kind"`
+	Value   string  `json:"value"`
+	Output  *string `json:"output"`
+	Extract bool    `json:"extract"`
+	Matches bool    `json:"shape"`
+	Size    *int    `json:"size"`
+	RawNil  bool    `json:"rawNil"`
+}
+
+type ssaFormalRemoveReport struct {
+	Output *string `json:"output"`
+	Freed  []*int  `json:"freed"`
+}
+
+func TestSSAFormalAtomicRemove(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	encode := func(data any) string {
+		t.Helper()
+		result, err := json.Marshal(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(result)
+	}
+	optional := func(data any) *string {
+		if data == nil {
+			return nil
+		}
+		text := encode(data)
+		return &text
+	}
+	setBytes := func(set *fieldpath.Set) []byte {
+		t.Helper()
+		if set == nil {
+			return nil
+		}
+		result, err := set.ToJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	var deep any = "leaf"
+	for level := 0; level < 64; level++ {
+		deep = map[string]any{"nested": deep}
+	}
+	wideMap, wideList := map[string]any{}, []any{}
+	for index := 0; index < 64; index++ {
+		wideMap[fmt.Sprint(index)] = int64(index)
+		wideList = append(wideList, int64(index))
+	}
+	inputs := []any{nil, map[string]any(nil), []any(nil), map[string]any{}, []any{},
+		map[string]any{"n": int64(9007199254740993)}, map[string]any{"n": float64(9007199254740992)},
+		[]any{int64(9007199254740993)}, []any{float64(9007199254740992)},
+		wideMap, wideList, deep, []any{deep}, "scalar", int64(9007199254740993), float64(9007199254740992)}
+	outputs := []any{nil, map[string]any(nil), map[string]any{"prior": "keep"}}
+	sets := []*fieldpath.Set{nil, fieldpath.NewSet(), fieldpath.NewSet(fieldpath.MakePathOrDie("x")),
+		fieldpath.NewSet(fieldpath.MakePathOrDie("x", "nested"))}
+	for _, kind := range []string{"scalar", "map", "list"} {
+		t.Run(kind, func(t *testing.T) {
+			cases, expected := []ssaFormalRemoveCase{}, []ssaFormalRemoveReport{}
+			for _, set := range sets {
+				for _, extract := range []bool{false, true} {
+					for _, prior := range outputs {
+						for _, input := range inputs {
+							matches, size := false, 0
+							switch typed := input.(type) {
+							case map[string]any:
+								matches = kind == "map"
+								size = len(typed)
+							case []any:
+								matches = kind == "list"
+								size = len(typed)
+							}
+							var resource *int
+							if matches {
+								length := size
+								resource = &length
+							}
+							allocator := &ssaFormalRemoveAllocator{Allocator: value.NewFreelistAllocator(), freed: []*int{}}
+							walker := removingWalker{value: value.NewValueInterface(input), out: prior, toRemove: set,
+								allocator: allocator, shouldExtract: extract}
+							beforeInput, beforeSet := encode(input), setBytes(set)
+							var errs ValidationErrors
+							switch kind {
+							case "scalar":
+								errs = walker.doScalar(nil)
+							case "map":
+								errs = walker.doMap(&schema.Map{ElementRelationship: schema.Atomic})
+							case "list":
+								errs = walker.doList(&schema.List{ElementRelationship: schema.Atomic})
+							}
+							if len(errs) != 0 {
+								t.Fatalf("atomic removal returned validation errors: %v", errs)
+							}
+							want, freed := optional(prior), []*int{}
+							if kind == "scalar" || (matches && extract) {
+								want = optional(input)
+							}
+							if matches {
+								handle := size + 1
+								freed = append(freed, &handle)
+							}
+							actual := ssaFormalRemoveReport{optional(walker.out), allocator.freed}
+							oracle := ssaFormalRemoveReport{want, freed}
+							if !reflect.DeepEqual(actual, oracle) {
+								t.Fatalf("atomic removal fragmented a value or changed its call frame: kind=%s case=%d actual=%+v oracle=%+v", kind, len(cases), actual, oracle)
+							}
+							if encode(input) != beforeInput || !bytes.Equal(setBytes(set), beforeSet) {
+								t.Fatal("atomic removal mutated its input or selection set")
+							}
+							cases = append(cases, ssaFormalRemoveCase{kind, beforeInput, optional(prior), extract, matches, resource, input == nil})
+							expected = append(expected, actual)
+						}
+					}
+				}
+			}
+			encoded, err := json.Marshal(cases)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			command := exec.CommandContext(ctx, model, "--atomic-remove", "-")
+			command.Stdin = bytes.NewReader(encoded)
+			var stderr bytes.Buffer
+			command.Stderr = &stderr
+			result, err := command.Output()
+			if err != nil {
+				t.Fatalf("atomic removal model failed: %v: %s", err, stderr.String())
+			}
+			var reports []ssaFormalRemoveReport
+			if err := json.Unmarshal(result, &reports); err != nil || !reflect.DeepEqual(reports, expected) {
+				t.Fatalf("atomic removal source/Go output or cleanup differs: %v", err)
+			}
+			t.Logf("%d source/native atomic %s removals/extractions: exact whole output, typed nil/empty/wide/deep values, prior output and selection/input immutability", len(cases), kind)
+		})
+	}
+}

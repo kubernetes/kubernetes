@@ -22,7 +22,7 @@ Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
 six updater ASTs, three element-set algebra ASTs and five recursive Difference/filter
-ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all six complete
+ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs, three structural removal/extraction ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all seven complete
 source-file digests.
 
 Native overlays run against the selected vendor source directly. Go rejects
@@ -73,12 +73,15 @@ The required checks are:
    Another 2,352 cases compare the complete atomic map/list merge dispatch,
    leaf guard and actual rule closure: exact whole operands, missing/null,
    previous leaf/output, numeric/wide/deep data, scope immutability and LIFO frees.
+   Removal/extraction adds 1,152 complete-helper comparisons: both modes, scalar
+   and atomic map/list dispatch, prior output, raw nil versus typed nil, empty,
+   numeric, wide/deep values, selection-set immutability and captured cleanup.
 8. Actual merge and fieldpath tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
    Each revision also runs the numeric-key round-trip counterexample and control.
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Seventeen independent semantic mutations of the selected Go sources; each must
+10. Twenty independent semantic mutations of the selected Go sources; each must
     invalidate the unchanged theorem in the expected proof module.
     The ownership-growth mutation must additionally fail the native Go witness
     for its demonstrated new B claim, rather than a compile or setup error.
@@ -92,7 +95,10 @@ The required checks are:
     certificate and the native whole-scope claim oracle, including null input.
     Clearing the chosen right output and independently bypassing the map/list
     leaf guard must each fail the unchanged atomic merge certificate and native
-    whole-operand/call-frame oracle. Compile/setup failures do not count.
+    whole-operand/call-frame oracle. Clearing scalar removal output and inverting
+    each atomic extraction guard must fail unchanged structural-source theorems
+    and the independent native whole-output oracle. Twelve mutations have native
+    checks. Compile/setup failures do not count.
 
 No check is optional when invoking this entrypoint. The result establishes the
 documented proof and comparison checks, not correctness of the human-chosen

@@ -43,6 +43,8 @@ typed_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/typed
 go run ./cmd/ssa-source -atomic-fields -source "$typed_source" -check SSA/AtomicFieldSource.lean
 go run ./cmd/ssa-source -atomic-merge -source "$(dirname "$typed_source")/merge.go" -check SSA/AtomicMergeSource.lean
 
+go run ./cmd/ssa-source -atomic-remove -source "$(dirname "$typed_source")/remove.go" -check SSA/AtomicRemoveSource.lean
+
 "${SSA_LAKE}" clean
 "${SSA_LAKE}" build
 "${SSA_LAKE}" env leanchecker --fresh Main
@@ -63,5 +65,6 @@ bash ci/verify-sets.sh
 bash ci/verify-has.sh
 bash ci/verify-atomic-fields.sh
 bash ci/verify-atomic-merge.sh
+bash ci/verify-atomic-remove.sh
 bash ci/verify-pr336.sh
 python3 docs/generate.py --check

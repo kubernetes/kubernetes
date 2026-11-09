@@ -541,3 +541,5 @@ PY_ATOMIC_OVERLAY
   fi
   printf 'Unchanged Lean certificate and native Go oracle both rejected the %s atomic-guard mutation.\n' "$method"
 done
+
+bash "$formal_root/ci/verify-atomic-remove-source.sh"

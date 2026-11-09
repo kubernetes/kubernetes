@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields and --atomic-merge check typed atomic extraction and whole-operand replacement."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields, --atomic-merge and --atomic-remove check typed atomic scope claims, whole replacement and removal/extraction."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -252,6 +252,50 @@ private def runAtomicMerge (path : String) : IO UInt32 := do
   | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
   | .error message => stderr.putStrLn message; return 1
 
+private structure AtomicRemoveCase where
+  kind : String
+  value : String
+  output : Option String := none
+  extract : Bool
+  shape : Bool
+  size : Option Nat
+  rawNil : Bool
+  deriving FromJson
+
+private structure AtomicRemoveReport where
+  output : Option String
+  freed : List (Option Nat)
+  deriving ToJson
+
+private def runAtomicRemove (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List AtomicRemoveReport) := do
+    let cases ← Json.parse input >>= fromJson? (α := List AtomicRemoveCase)
+    if cases.isEmpty then throw "Atomic removal protocol requires nonempty cases"
+    cases.mapM fun request => do
+      discard (Json.parse request.value)
+      match request.output with
+      | none => pure ()
+      | some raw => discard (Json.parse raw)
+      let ops : AtomicRemoveSubset.Ops String := {
+        isKind := fun _ _ => request.shape
+        asContainer := fun _ _ => request.size.map (fun length => {handle := length+1,length})
+        unstructured := fun value => if request.rawNil then none else some value}
+      let initial : AtomicRemoveSubset.Machine String := {
+        input := request.value,output := request.output,extract := request.extract}
+      let program ← match request.kind with
+        | "scalar" => .ok AtomicRemoveSource.scalarProgram
+        | "map" => .ok AtomicRemoveSource.mapProgram
+        | "list" => .ok AtomicRemoveSource.listProgram
+        | _ => .error "Atomic removal kind must be scalar, map or list"
+      let final ← AtomicRemoveSubset.invoke ops program initial
+      pure {output := final.output,freed := final.freed}
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
 private def runAtomicFields (path : String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
@@ -314,6 +358,7 @@ def main (args : List String) : IO UInt32 := do
   | ["--has-search",path] => runSearch path
   | ["--atomic-fields",path] => runAtomicFields path
   | ["--atomic-merge",path] => runAtomicMerge path
+  | ["--atomic-remove",path] => runAtomicRemove path
   | ["--search-midpoints",path] => runMidpoints path
   | ["--root-reset-filter",path] => runSets path true
   | ["--set-difference",path] => runSets path

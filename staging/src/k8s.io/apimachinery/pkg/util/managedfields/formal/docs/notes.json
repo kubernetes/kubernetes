@@ -1712,5 +1712,29 @@
     "title": "A missing right operand retains the whole left value",
     "meaning": "The fresh atomic node falls back to the complete left operand when the right Go interface is absent.",
     "limits": "Missing interface differs from a present JSON null. This is a typed merge-phase corollary."
+  },
+  "SSA.AtomicRemoveContracts.imported_scalar": {
+    "title": "Scalar removal helper copies the complete raw value",
+    "scope": "general",
+    "meaning": "The complete imported scalar helper copies its Unstructured result and returns nil validation errors, preserving caller input/frame/pending frees.",
+    "limits": "Path selection and deletion occur in the caller. Unstructured and allocator/value heap realization remain explicit primitive boundaries."
+  },
+  "SSA.AtomicRemoveContracts.imported_atomic_container": {
+    "title": "Atomic extraction/removal returns before child traversal",
+    "scope": "general",
+    "meaning": "For arbitrary finite sizes and pure shape/resource callbacks, matching atomic extraction copies the whole value; remove preserves old output. Mismatching shapes return unchanged. Captured cleanup and caller frame are preserved.",
+    "limits": "Structural ASTs retain the non-atomic loops/callbacks, whose execution explicitly fails. This theorem proves they are not reached at atomic entry. Dynamic shape, Unstructured, resource/heap and wrapper/schema dispatch remain boundaries; native comparisons are finite evidence."
+  },
+  "SSA.AtomicRemoveContracts.imported_atomic_remove_fresh": {
+    "title": "Atomic removal yields no output from a fresh walker",
+    "scope": "helper",
+    "meaning": "If output is initially absent and extract is false, source atomic dispatch returns absent output.",
+    "limits": "The fresh-output premise is necessary: the private helper preserves prior output. Caller initialization and path selection remain separate implementation obligations."
+  },
+  "SSA.AtomicRemoveContracts.imported_atomic_extract_whole": {
+    "title": "Matching atomic extraction copies a whole operand",
+    "scope": "helper",
+    "meaning": "At atomic entry with matching shape and extraction enabled, the result is exactly the raw Unstructured input and the caller frame/input are preserved.",
+    "limits": "This specializes the general source theorem. Dynamic shape, raw value representation, allocator heap and complete request dispatch remain separate."
   }
 }

@@ -252,6 +252,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `PathElementSet.Has`, `PathElement.Less`, selected Go `slices.BinarySearchFunc` | `SearchContracts.imported_search_matches`, `SearchMembership.imported_search_membership`, `HasBridge.imported_has_membership`, `FilterHasBridge.source_filter_excludes_root` |
 | `toFieldSetWalker.doMap`, `doList` (`typed/tofieldset.go`) | `AtomicFieldContracts.imported_atomic_fields`, `imported_atomic_claims_scope`, `imported_atomic_never_adds_descendant` (atomic entry only) |
 | `mergingWalker.doMap`, `doList`, `doLeaf`, `ruleKeepRHS` closure (`typed/merge.go`) | `AtomicMergeContracts.imported_keep_right`, `imported_leaf`, `imported_atomic_merge` (atomic entry only) |
+| `removingWalker.doScalar`, `doMap`, `doList` (`typed/remove.go`) | `AtomicRemoveContracts.imported_scalar`, `imported_atomic_container`, `imported_atomic_remove_fresh`, `imported_atomic_extract_whole` (scalar/atomic entry only) |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -445,8 +446,8 @@ path is ignored, matching Go's separate top-level ownership exception.
 The interpreter models defer registration and LIFO cleanup explicitly. Unsupported
 non-atomic visitor calls fail, rather than inventing successful traversal.
 Insertion is a membership projection; actual Set.Insert, coercion and allocator
-heap realization remain explicit boundaries. Atomic merge/removal/comparison,
-schema dispatch and complete SSA composition still need their own proofs.
+heap realization remain explicit boundaries. The source merge and removal
+components below do not close schema dispatch or complete SSA composition.
 Exact insertion realization also needs a restricted selector domain: the known
 mixed-numeric identity counterexamples rule out its unrestricted global form.
 This is a source-bound BASE-09 component, not closure of the whole atomic law.
@@ -483,13 +484,48 @@ cross the comparison protocol as exact Go JSON text, so the oracle uses neither
 rounded numeric equality nor a lossy selector comparison. Both pinned versions
 run the same cases. Three further mutations clear the right output or bypass
 the map/list leaf guard; unchanged proofs and independent native oracles reject
-them. CI now checks twenty-three complete ASTs from six distinct source files
-and seventeen semantic mutations, nine also native.
+them. The removal/extraction source component below extends these checks.
 
 These are typed merge-phase claims. Actual Unstructured/coercion/allocator heap
-realization, top-level typed/schema dispatch, removal/comparison and complete
+realization, top-level typed/schema dispatch, general removal/comparison and complete
 SSA composition remain separate. In particular, SSA's later comparison can
 still discard a whole numeric assertion as the already recorded false no-op.
+
+`AtomicRemoveSource` additionally retains all three complete scalar/map/list
+bodies from `typed/remove.go`. A structural AST includes declarations, type
+syntax, loops and callback bodies without erasing the non-atomic tail. This mode
+uses `RawGoSyntax`; numeric tokens remain exact, source positions retain only
+presence, and comments/parser symbol links are omitted. Its specialized
+interpreter explicitly fails on operations outside the interpreted fragment.
+The theorem proves atomic execution returns before those operations. This does
+not assign successful behavior to the retained non-atomic code. The existing
+lexically resolved import profiles retain their rejection rules.
+
+`imported_scalar` copies the whole Unstructured result. For arbitrary pure
+shape/resource/Unstructured callbacks, opaque input, finite resource lengths,
+old output, caller locals and pending frees, `imported_atomic_container` proves
+that matching map/list extraction copies the whole result, removal retains the
+old output, and mismatching shapes return without conversion or cleanup. Empty
+containers follow the same law. A list captures Free even for a nil resource;
+a map defers it only for a non-nil resource. Caller frame/input are preserved.
+`imported_atomic_remove_fresh` therefore states the necessary fresh-output
+premise explicitly; `imported_atomic_extract_whole` requires a matching shape.
+The actual wrapper's initialization and schema dispatch remain to be proved.
+
+The independent Go overlay compares 1,152 helper invocations (384 each scalar,
+map and list), both extract/remove modes, prior output, nil interfaces versus
+typed nil containers, empty/wide/deep/mixed-numeric values, four selection sets,
+exact JSON text and input/selection immutability. The protocol supplies dynamic
+shape/resource descriptors separately because JSON null does not encode Go's
+typed-nil container distinction. This is an explicit representation boundary,
+not a verified JSON codec. Both pinned revisions run the same overlay. Clearing
+the scalar output or inverting either atomic extraction guard must fail both
+the unchanged Lean theorems and the independent native output oracle.
+
+CI now checks twenty-six complete ASTs from seven distinct source files and
+twenty semantic mutations, twelve also native. Source value/coercion/allocator
+heap realization, typed/schema dispatch, complete removal/comparison and full
+SSA composition remain open; these are component proofs for BASE-09.
 
 The mixed numeric comparator actually fails the global equality/order premise:
 two distinct int64 values can each compare equal to one float64. A concrete
