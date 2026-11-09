@@ -29,4 +29,4 @@ fi
 trap kube::etcd::cleanup EXIT
 kube::etcd::start
 go test ./staging/src/k8s.io/apiextensions-apiserver/test/integration \
-  -run '^TestSSA(Empty(AssociativeList|GranularMap)Presence|UpdateOwnedListItemPruning|StatusResetOwnership|Numeric(Comparison|ListKeyOwnership))$' -v -count=1 -timeout=240s
+  -run '^TestSSA(Empty(AssociativeList|GranularMap)Presence|UpdateOwnedListItemPruning|StatusResetOwnership|Numeric(Comparison|ListKey(Ownership|Omission)))$' -v -count=1 -timeout=240s

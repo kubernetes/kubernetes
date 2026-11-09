@@ -14,7 +14,7 @@ reported together with the preceding transition that caused it.
 | SSA-03 | Omission after another manager Updates an item child | The item and its foreign-owned child disappear; the list becomes null. A nullable schema accepts this; a non-nullable schema rejects every retry. | Reachable Lean Apply/Update counterexample and source witness; actual managedfields and pinned SMD; nullable/non-nullable CRD HTTP. Existing report: [#134902](https://github.com/kubernetes/kubernetes/issues/134902). |
 | SSA-04 | Status Apply includes an additional non-status root field | The status actor acquires the unchanged field even though the REST strategy resets it. A later main-endpoint change conflicts. | Reachable Lean refutation; complete imported Apply with explicit primitive instances; real CRD HTTP/etcd and conventional spec/status controls. |
 | [SSA-05](https://github.com/kubernetes/kubernetes/issues/143942) | Mixed int64/float64 comparison near `2^63` | Scalar-only intent is lost as a false no-op. Adding an unrelated field lets B change A's numeric value while both retain ownership, including with force. | Lean intent/conflict/force refutations and imported Apply witnesses; native equality and numeric-key set failure; managedfields; CRD HTTP/etcd/GET with exact-integer conflict and transfer controls. |
-| [SSA-06](https://github.com/kubernetes/kubernetes/issues/143943) | FieldsV1 numeric-key decoding | Exact integer key `2^53+1` is read as its neighbor `2^53`. Adding that distinct item falsely conflicts; forcing it removes A's claims on its unchanged original payload. | Lean codec, granular-progress and ownership-frame refutations; imported Apply/prune witnesses; native data/fieldset checks in vendored and both pinned SMD; CRD HTTP/GET and small-key control. |
+| [SSA-06](https://github.com/kubernetes/kubernetes/issues/143943) | FieldsV1 numeric-key decoding | Exact integer key `2^53+1` is read as its neighbor `2^53`. Adding that distinct item falsely conflicts; force drops unchanged claims. Phantom sharing also prevents an exclusively owned payload's omission. | Lean codec, granular-progress, ownership-frame and exclusive-omission refutations; imported Apply/prune witnesses; native vendored/pinned execution; CRD HTTP/GET and independent controls. |
 | PR336-01 | Fragmented required ownership followed by partial-manager omission | A partial manager can delete another partial manager's required data. | Lean execution; exact pinned head/base comparison. |
 | PR336-02 | Direct required-map membership shortcut | The classifier calls a manager full without ownership of required children. An invalid item can remain after the actual full owner leaves. | General classifier theorem; concrete Lean execution; actual pinned head/base outcomes. |
 | PR336-03 | Required granular-list ownership | A supplier owning all child items is classified partial because Apply generated no direct list-presence claim. Another partial manager can delete its data. | General classifier fact; populated/empty Lean counterexamples; exact pinned head/base comparison. |
@@ -473,6 +473,54 @@ magnitudes directly from the real execution. Normal comparisons retain their
 shape checks. The pinned harness also now installs the decoded fieldsets before
 the next request; it formerly checked their wire form but kept the in-memory
 sets for execution. That harness correction is not another production bug.
+
+### Exclusively owned scalar omission can fail
+
+In the same schema, A first applies both items:
+
+```yaml
+endpoints:
+- id: 9007199254740992
+  payload: low
+- id: 9007199254740993
+  payload: high
+```
+
+B co-applies only the upper item with unchanged `payload: high`. Before A's
+next request, raw FieldsV1 says A exclusively owns the lower payload, and B
+owns the exact upper selector. A retains both keys while omitting the lower
+payload:
+
+```yaml
+endpoints:
+- id: 9007199254740992
+- id: 9007199254740993
+  payload: high
+```
+
+The request succeeds, but the lower `payload: low` remains. B's upper selector
+is decoded as the lower key and its phantom claim restores the omitted value.
+A's lower payload claim disappears, and B now has that lower payload claim.
+Both item keys survive. Small keys 41/42 and the large-key history without B
+remove the omitted value correctly. No default, admission mutation or lifetime
+deletion is involved.
+
+[`NumericOmissionCounterexamples`](../SSA/NumericOmissionCounterexamples.lean)
+proves raw target existence, exclusive ownership before decoding, omission
+without item deletion, the retained payload and the BASE-02 refutation. Its
+source witness links all four imported pruning functions under normalized
+typed/set primitives and every lawful map schedule. It does not establish
+general mixed-comparator or full Apply refinement. Actual vendored/pinned
+managedfields execute the full history, and `TestSSANumericListKeyOmission`
+checks exact raw claims, keys, payloads and persisted GET in all four variants.
+This independently establishes reachability of the raw precondition.
+
+The two-key codec loss can trip the normal adapter's round-trip guard. That
+guard stays mandatory in normal `step` comparisons, with a dedicated regression
+test. Raw observers run the real encode/decode path, record the failed
+round-trip equality observation and inspect exact native results. A broken
+round trip is evidence in this counterexample, rather than an execution error
+returned by the production API. No ordinary consistency check is disabled.
 
 ## PR336-01: a partial manager can authorize deletion
 

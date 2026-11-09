@@ -1013,6 +1013,47 @@
     "meaning": "A’s explicitly established pre-decoding wire claim disappears after the forced request while its original payload stays exactly old.",
     "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
   },
+  "SSA.NumericOmissionCounterexamples.imported_pruning_matches": {
+    "title": "Four imported pruning functions realize the omission candidate",
+    "scope": "general",
+    "meaning": "Every lower key, sharing choice and lawful manager-map schedule realizes the linked normalized pruning expression.",
+    "limits": "Complete imported pruning and realized callees under normalized typed/set and identity-conversion primitives. The mixed comparator and complete Apply/request history are independently exercised by Go/HTTP, not universally refined here."
+  },
+  "SSA.NumericOmissionCounterexamples.lower_payload_is_raw_exclusive": {
+    "title": "The lower payload is exclusively A-owned before decoding",
+    "meaning": "B's raw upper selector does not claim the lower payload. Exclusivity is a wire-input premise, not a claim about already corrupted ownership.",
+    "limits": "Concrete adjacent integer-key history; actual HTTP checks the exact before-decoding FieldsV1 selector and payload claims."
+  },
+  "SSA.NumericOmissionCounterexamples.prior_wire_targets_exist": {
+    "title": "Every raw ownership target exists in the initial data",
+    "meaning": "The counterexample starts with matching exact item, key-leaf and payload targets.",
+    "limits": "Finite exact-label fieldset check for the named structural schema; general JSON/parser correctness remains separate."
+  },
+  "SSA.NumericOmissionCounterexamples.omission_keeps_both_items_and_does_not_assert_lower_payload": {
+    "title": "The request omits one scalar while retaining both items",
+    "meaning": "Both item keys stay asserted, but the lower payload is absent from the new footprint.",
+    "limits": "Concrete request footprint; no ancestor deletion, default or mutation is involved."
+  },
+  "SSA.NumericOmissionCounterexamples.foreign_upper_selector_becomes_lower_claim": {
+    "title": "The upper item's ownership becomes phantom lower sharing",
+    "meaning": "The exact upper selector excludes the lower payload, while the rounded decoded selector includes it.",
+    "limits": "Explicit concrete numeric-read specification; native numeric fieldset decoding and actual HTTP independently reproduce it."
+  },
+  "SSA.NumericOmissionCounterexamples.omitted_exclusive_payload_survives": {
+    "title": "The omitted exclusive payload survives unchanged",
+    "meaning": "Pruning restores the lower payload through the foreign decoded claim, retaining the original complete data.",
+    "limits": "Concrete linked normalized-pruning witness; full Go/API history supplies independent implementation evidence."
+  },
+  "SSA.NumericOmissionCounterexamples.unconditional_exclusive_omission_is_false": {
+    "title": "BASE-02: unrestricted exclusive omission is false",
+    "meaning": "A valid exact-wire exclusive claim and an omitted scalar do not imply scalar deletion after numeric ownership decoding.",
+    "limits": "No defaults or admission mutation. Both keys survive. The real implementation and HTTP agree; this is a counterexample, not a universal typed/codec refinement theorem."
+  },
+  "SSA.NumericOmissionCounterexamples.omission_controls_remove_lower_payload": {
+    "title": "All three independent omission controls delete the scalar",
+    "meaning": "Small shared, small unshared and large unshared keys remove the omitted lower payload.",
+    "limits": "Named controls checked by Lean, native vendored/pinned SMD and HTTP."
+  },
   "SSA.GranularKeyCounterexamples.initial_payload_is_raw_owned": {
     "title": "A owns the unchanged payload before wire decoding",
     "scope": "execution",

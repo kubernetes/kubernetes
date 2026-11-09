@@ -38,6 +38,23 @@ func TestIndependentGoCorpus(t *testing.T) {
 	}
 }
 
+// Raw counterexamples must not make damaged numeric fieldsets acceptable to normal comparisons.
+func TestNormalizedAdapterRejectsNumericCodecDamage(t *testing.T) {
+	engine, err := newGoEngine(Case{Schema: numericKeySchema})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = engine.step(Step{Manager: "A", Apply: map[string]any{
+		"endpoints": []any{
+			map[string]any{"id": int64(9007199254740992), "payload": "low"},
+			map[string]any{"id": int64(9007199254740993), "payload": "high"},
+		},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "FieldsV1 round trip changed ownership") {
+		t.Fatalf("normalized comparison accepted corrupted ownership: %v", err)
+	}
+}
+
 func TestManagerIdentityDoesNotAliasOperationOrEscapedNames(t *testing.T) {
 	names := []string{"A", "A@update", `apply("A@update")`, "A B", "管理者", "A\\B", "", string([]byte{0xff})}
 	seen := map[string]string{}

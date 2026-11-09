@@ -36,9 +36,7 @@ type granularKeyObservation struct {
 	ForceKeepsPayloadButDropsOwner bool `json:"forceKeepsPayloadButDropsOwner"`
 }
 
-func compareGranularKeyCounterexamples(ctx context.Context, model string) error {
-	const original = int64(9007199254740993)
-	const numericKeySchema = `types:
+const numericKeySchema = `types:
 - name: Document
   map:
     fields:
@@ -56,6 +54,9 @@ func compareGranularKeyCounterexamples(ctx context.Context, model string) error 
     - name: payload
       type: {scalar: string}
 `
+
+func compareGranularKeyCounterexamples(ctx context.Context, model string) error {
+	const original = int64(9007199254740993)
 	c := Case{Schema: numericKeySchema}
 	rawPath := fieldpath.MakePathOrDie("endpoints", fieldpath.KeyByFields("id", original))
 	neighborPath := fieldpath.MakePathOrDie("endpoints", fieldpath.KeyByFields("id", original-1))
@@ -214,4 +215,109 @@ func observeNativeKeyState(engine *goEngine) (nativeKeyState, error) {
 		sort.Strings(state.PayloadClaims[actor])
 	}
 	return state, nil
+}
+
+type numericOmissionObservation struct {
+	LargeSharedRetainsLower   bool `json:"largeSharedRetainsLower"`
+	LargeUnsharedRemovesLower bool `json:"largeUnsharedRemovesLower"`
+	SmallSharedRemovesLower   bool `json:"smallSharedRemovesLower"`
+	SmallUnsharedRemovesLower bool `json:"smallUnsharedRemovesLower"`
+}
+
+func compareNumericOmissionCounterexamples(ctx context.Context, model string) error {
+	const large = int64(9007199254740992)
+	actual := numericOmissionObservation{}
+	for _, low := range []int64{41, large} {
+		for _, shared := range []bool{false, true} {
+			engine, err := newGoEngine(Case{Schema: numericKeySchema})
+			if err != nil {
+				return err
+			}
+			high := map[string]any{"id": low + 1, "payload": "high"}
+			steps := []Step{{Manager: "A", Apply: map[string]any{"endpoints": []any{map[string]any{"id": low, "payload": "low"}, high}}}}
+			if shared {
+				steps = append(steps, Step{Manager: "B", Apply: map[string]any{"endpoints": []any{high}}})
+			}
+			for index, step := range steps {
+				if name, err := engine.advance(step); err != nil || name != "" {
+					return fmt.Errorf("numeric omission setup: result=%q error=%v", name, err)
+				}
+				if index == 0 && engine.roundtripEqual != (low != large) {
+					return fmt.Errorf("unexpected exact-vs-rounded two-key fieldset round trip")
+				}
+			}
+			before, err := observeNativeKeyState(engine)
+			if err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(before.Data, map[int64]string{low: "low", low + 1: "high"}) {
+				return fmt.Errorf("numeric omission setup changed exact data: %+v", before)
+			}
+			if name, err := engine.advance(Step{Manager: "A", Apply: map[string]any{"endpoints": []any{map[string]any{"id": low}, high}}}); err != nil || name != "" {
+				return fmt.Errorf("numeric omission request: result=%q error=%v", name, err)
+			}
+			retained, err := nativeOmissionRetained(engine, low)
+			if err != nil {
+				return err
+			}
+			switch {
+			case low == large && shared:
+				actual.LargeSharedRetainsLower = retained
+			case low == large:
+				actual.LargeUnsharedRemovesLower = !retained
+			case shared:
+				actual.SmallSharedRemovesLower = !retained
+			default:
+				actual.SmallUnsharedRemovesLower = !retained
+			}
+		}
+	}
+	output, err := runModel(ctx, model, "--numeric-omission-counterexamples", nil)
+	if err != nil {
+		return err
+	}
+	var lean numericOmissionObservation
+	if err := json.Unmarshal(output, &lean); err != nil {
+		return fmt.Errorf("invalid numeric omission report: %w", err)
+	}
+	if actual != lean {
+		return fmt.Errorf("numeric omission source/Go observations differ: Go=%+v Lean=%+v", actual, lean)
+	}
+	return nil
+}
+
+// This separate observer permits precisely the omitted payload while keeping exact key checks.
+func nativeOmissionRetained(engine *goEngine, low int64) (bool, error) {
+	object, ok := engine.rawObject().(map[string]any)
+	if !ok {
+		return false, fmt.Errorf("numeric omission lost the object envelope")
+	}
+	items, ok := object["endpoints"].([]any)
+	if !ok || len(items) != 2 {
+		return false, fmt.Errorf("numeric omission lost an item: %#v", object)
+	}
+	seen := map[int64]bool{}
+	retained := false
+	for _, value := range items {
+		item, ok := value.(map[string]any)
+		if !ok {
+			return false, fmt.Errorf("numeric omission has a non-object item: %T", value)
+		}
+		key, ok := item["id"].(int64)
+		if !ok || (key != low && key != low+1) || seen[key] {
+			return false, fmt.Errorf("numeric omission has an inexact, unknown or duplicate key: %#v", item)
+		}
+		seen[key] = true
+		if key == low+1 && item["payload"] != "high" {
+			return false, fmt.Errorf("numeric omission changed the upper payload: %#v", item)
+		}
+		if key == low {
+			payload, present := item["payload"]
+			if present && payload != "low" {
+				return false, fmt.Errorf("numeric omission changed the lower payload: %#v", item)
+			}
+			retained = present
+		}
+	}
+	return retained, nil
 }

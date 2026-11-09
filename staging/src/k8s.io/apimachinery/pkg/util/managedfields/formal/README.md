@@ -164,6 +164,17 @@ the preservation proposition receives that fact as a premise. Native observers
 inspect exact data and fieldsets for the inconsistent counterexample, while the
 ordinary reference-model adapter continues to check normalized claim targets.
 
+`NumericOmissionCounterexamples` records another consequence of SSA-06:
+A's exclusively owned payload survives omission because B's different upper
+item selector is decoded as the lower key. Both item keys remain asserted;
+no ancestor deletion, default or mutation explains the retained value.
+The raw ownership and matching data targets are explicit before-decoding
+premises. All four imported pruning functions realize the candidate under
+normalized primitives and every lawful map schedule. Native vendored/pinned
+Go and actual HTTP check the reachable history plus all three controls:
+small shared keys, small unshared keys and large unshared keys. This refutes
+unrestricted BASE-02; general typed/set and request-stage refinement remain open.
+
 ## What is checked
 
 - General core laws: scalar conflicts, equal-value co-ownership, force transfer,
@@ -416,6 +427,9 @@ It also checks all five numeric variants, with exact native numeric types,
 retained claims and persisted GET observations.
 The numeric-key test additionally checks a false conflict between distinct
 large integer list keys and successful independent small-key management.
+Four additional numeric-omission variants verify exact raw exclusive ownership,
+phantom sharing, omitted payload presence, claims and persisted GET equality.
+The seven HTTP test functions cover twenty-three variants.
 The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
 to Kubernetes integration testing and is unavailable in published apimachinery.
 

@@ -641,20 +641,7 @@ func TestSSANumericListKeyOwnership(t *testing.T) {
 
 	for _, first := range []int64{42, 9007199254740993} {
 		t.Run(fmt.Sprint(first), func(t *testing.T) {
-			resource := newSSAFormalResource(t, apiClient, dynamicClient, "numeric-key-"+fmt.Sprint(first)+".formal.ssa", &apiextensionsv1.JSONSchemaProps{
-				Type: "object",
-				Properties: map[string]apiextensionsv1.JSONSchemaProps{
-					"endpoints": {
-						Type: "array", XListType: ptr.To("map"), XListMapKeys: []string{"id"},
-						Items: &apiextensionsv1.JSONSchemaPropsOrArray{Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object", Required: []string{"id"},
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"id": {Type: "integer", Format: "int64"}, "payload": {Type: "string"},
-							},
-						}},
-					},
-				},
-			})
+			resource := newSSAFormalResource(t, apiClient, dynamicClient, "numeric-key-"+fmt.Sprint(first)+".formal.ssa", ssaFormalNumericKeySchema())
 			before, err := resource.apply(t, "example", "A", map[string]any{
 				"endpoints": []any{map[string]any{"id": first, "payload": "old"}},
 			})

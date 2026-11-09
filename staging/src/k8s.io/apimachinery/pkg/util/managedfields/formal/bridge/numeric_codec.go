@@ -116,5 +116,8 @@ func CompareNumericCodecCounterexamples(ctx context.Context, model string) error
 	if actual != lean {
 		return fmt.Errorf("numeric codec/Go observations differ: Go=%+v Lean=%+v", actual, lean)
 	}
-	return compareGranularKeyCounterexamples(ctx, model)
+	if err := compareGranularKeyCounterexamples(ctx, model); err != nil {
+		return err
+	}
+	return compareNumericOmissionCounterexamples(ctx, model)
 }

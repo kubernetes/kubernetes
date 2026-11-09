@@ -61,5 +61,5 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Println("Pinned upstream numeric FieldsV1: round-trip, false-conflict and forced ownership-loss witnesses agree with Go.")
+	fmt.Println("Pinned upstream numeric FieldsV1: round-trip, false-conflict, forced claim-loss and exclusive-omission witnesses agree with Go.")
 }

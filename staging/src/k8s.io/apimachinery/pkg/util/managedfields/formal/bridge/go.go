@@ -83,10 +83,11 @@ func (objectCreator) New(gvk schema.GroupVersionKind) (runtime.Object, error) {
 }
 
 type goEngine struct {
-	manager internal.Manager
-	live    *unstructured.Unstructured
-	fields  internal.Managed
-	schema  *structuralSchema
+	manager        internal.Manager
+	live           *unstructured.Unstructured
+	fields         internal.Managed
+	schema         *structuralSchema
+	roundtripEqual bool
 }
 
 func newGoEngine(cases ...Case) (*goEngine, error) {
@@ -112,7 +113,7 @@ func newGoEngine(cases ...Case) (*goEngine, error) {
 	if c.Bootstrap {
 		manager = internal.NewSkipNonAppliedManager(manager, objectCreator{})
 	}
-	return &goEngine{manager, envelope(map[string]any{}), internal.NewEmptyManaged(), sc}, nil
+	return &goEngine{manager: manager, live: envelope(map[string]any{}), fields: internal.NewEmptyManaged(), schema: sc, roundtripEqual: true}, nil
 }
 
 func envelope(object map[string]any) *unstructured.Unstructured {
@@ -126,6 +127,9 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 	errorName, err := e.advance(step)
 	if err != nil {
 		return Snapshot{}, err
+	}
+	if !e.roundtripEqual {
+		return Snapshot{}, fmt.Errorf("FieldsV1 round trip changed ownership, operation, or API version")
 	}
 	return e.snapshot(errorName)
 }
@@ -165,9 +169,9 @@ func (e *goEngine) advance(step Step) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("decode managed fields: %w", err)
 	}
-	if !decoded.Fields().Equals(e.fields.Fields()) {
-		return "", fmt.Errorf("FieldsV1 round trip changed ownership, operation, or API version")
-	}
+
+	// Keep the strict comparison guard in step; raw observers must see the actual damaged result.
+	e.roundtripEqual = decoded.Fields().Equals(e.fields.Fields())
 	e.fields = decoded
 	return errorName, nil
 }

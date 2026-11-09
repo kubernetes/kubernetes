@@ -117,11 +117,18 @@ outcomes also have source-model proofs and native managedfields comparisons.
 `2^53+1` key survives in stored data and raw FieldsV1, but decoding ownership
 rounds it to `2^53`; B adding that distinct neighbor item falsely conflicts.
 GET verifies unchanged data, claims and resourceVersion. Small independent
-integer keys succeed and preserve both items. These six functions exercise
-nineteen API/schema variants.
+integer keys succeed and preserve both items.
 The large-key branch also forces the rejected request: both items and the old
 payload persist, but A's old claims disappear. Exact B key ownership and GET
 persistence are checked. This adds a transition to the existing variant.
+
+`TestSSANumericListKeyOmission` checks two adjacent keys with and without B
+co-applying the upper payload. A's lower payload is exclusively A-owned in the
+exact raw FieldsV1 before omission. Both item keys stay asserted. Large shared
+keys retain the omitted payload and give its claim to B after decoding; all
+three controls remove it. GET matches the response. These seven functions
+exercise twenty-three API/schema variants. The four omission observations
+also agree with Lean in native vendored and both pinned SMD executions.
 
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;

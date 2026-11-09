@@ -41,11 +41,12 @@ func (identityConverter) Convert(object *typed.TypedValue, _ fieldpath.APIVersio
 func (identityConverter) IsMissingVersionError(error) bool { return false }
 
 type goEngine struct {
-	updater *merge.Updater
-	live    *typed.TypedValue
-	fields  fieldpath.ManagedFields
-	schema  *structuralSchema
-	typ     typed.ParseableType
+	updater        *merge.Updater
+	live           *typed.TypedValue
+	fields         fieldpath.ManagedFields
+	schema         *structuralSchema
+	typ            typed.ParseableType
+	roundtripEqual bool
 }
 
 func newGoEngine(cases ...Case) (*goEngine, error) {
@@ -78,12 +79,15 @@ func newGoEngine(cases ...Case) (*goEngine, error) {
 		return nil, err
 	}
 	updater := (&merge.UpdaterBuilder{Converter: identityConverter{}}).BuildUpdater()
-	return &goEngine{updater, live, fieldpath.ManagedFields{}, sc, typ}, nil
+	return &goEngine{updater: updater, live: live, fields: fieldpath.ManagedFields{}, schema: sc, typ: typ, roundtripEqual: true}, nil
 }
 func (e *goEngine) step(step Step) (Snapshot, error) {
 	errorName, err := e.advance(step)
 	if err != nil {
 		return Snapshot{}, err
+	}
+	if !e.roundtripEqual {
+		return Snapshot{}, fmt.Errorf("FieldsV1 round trip changed ownership")
 	}
 	return e.snapshot(errorName)
 }
@@ -115,6 +119,7 @@ func (e *goEngine) advance(step Step) (string, error) {
 		}
 		e.fields = fields
 	}
+	e.roundtripEqual = true
 	for manager, versioned := range e.fields {
 		// Exercise the exact field-set wire encoding on the pinned upstream implementation.
 		data, err := versioned.Set().ToJSON()
@@ -125,9 +130,7 @@ func (e *goEngine) advance(step Step) (string, error) {
 		if err := decoded.FromJSON(bytes.NewReader(data)); err != nil {
 			return "", err
 		}
-		if !decoded.Equals(versioned.Set()) {
-			return "", fmt.Errorf("FieldsV1 changed %s ownership", manager)
-		}
+		e.roundtripEqual = e.roundtripEqual && decoded.Equals(versioned.Set())
 		e.fields[manager] = fieldpath.NewVersionedSet(decoded, versioned.APIVersion(), versioned.Applied())
 	}
 	return errorName, nil

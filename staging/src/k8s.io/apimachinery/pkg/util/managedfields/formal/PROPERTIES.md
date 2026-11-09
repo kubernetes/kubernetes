@@ -48,7 +48,7 @@ guarantees.
 | ID | Observable contract | Source | Current proof boundary |
 | --- | --- | --- | --- |
 | BASE-01 | Owned scalar intent is retained; empty/null containers need phase-specific treatment. | KEP goals; typed merge/leaf tests linked in its testing plan. | **Refuted for unrestricted baseline numeric scalars.** `NumericCounterexamples.exact_scalar_intent_is_false` gives an accepted false no-op that discards a valid numeric assertion while granting its claim; actual managedfields and CRD HTTP/GET reproduce it. `Contracts.accepted_preserves_intent` remains the separate proposed-core theorem. Current/PR empty/null handling also does not inherit that stronger exact-container conclusion. |
-| BASE-02 | An omitted exclusively owned scalar disappears. | [Exclusive omission test][exclusive]. | `Contracts.exclusive_omission_removes_value`; applies to non-defaulted scalar cells in the candidate result. It does not claim the final API value stays absent after defaulting. |
+| BASE-02 | An omitted exclusively owned scalar disappears. | [Exclusive omission test][exclusive]. | **Refuted for unrestricted numeric-keyed items.** `NumericOmissionCounterexamples.unconditional_exclusive_omission_is_false` establishes raw exclusive ownership before decoding, then the unchanged omitted payload survives through phantom sharing with another item's owner. Four imported pruning functions are linked under normalized primitives; native managedfields and real CRD HTTP reproduce the reachable history, with small-key and no-B controls. `Contracts.exclusive_omission_removes_value` remains the proposed-core theorem. General typed/set refinement remains open; no default or mutation is involved. |
 | BASE-03 | An omitted shared scalar survives while another owner remains. | [Shared omission test][shared]. | `Contracts.shared_omission_preserves_value`, with explicit no-overwrite and no-ancestor-deletion assumptions. The latter matters for the proposed extension. |
 | BASE-04 | A changed foreign-owned scalar conflicts unless force is set. | [Apply/Update/force test][conflict]. | **Refuted for unrestricted baseline numeric scalars.** `NumericCounterexamples.nonforce_foreign_value_safety_is_false` changes A's exact numeric magnitude without force while retaining A's claim; managedfields and CRD HTTP/GET reproduce it. `WireContracts.foreign_change_conflicts` and `accepted_nonforce_foreign_unchanged` remain general normalized-model laws, conditional on faithful typed comparison for application to Go. Update is a separate transition. |
 | BASE-05 | Asserting the same values cannot alone cause an ownership conflict. | Shared-ownership cases; KEP cooperative-management goal. | `Contracts.equal_writes_do_not_conflict`. Other guards may still reject the request. |
@@ -348,6 +348,22 @@ independently check both effects and the successful small-key control.
 The instance remains a concrete structural-schema witness, not general typed
 or codec refinement. BASE-09 was split to retain its still-open atomic part
 while recording the granular-progress refutation precisely.
+
+SSA-06 also refutes BASE-02. A creates two adjacent integer-keyed items with
+payloads `low` and `high`. B co-applies only the upper item with the same value.
+On the wire the lower payload is still exclusively A-owned, and B owns the
+exact upper selector. A retains both item keys but omits only the lower payload.
+With keys `2^53` and `2^53+1`, B's decoded selector becomes the lower key and
+protects the omitted payload. The full HTTP request succeeds and persists it.
+`NumericOmissionCounterexamples` explicitly proves raw target existence,
+exclusive raw ownership, omission without item deletion, and the false
+candidate-level omission law. Its pruning witness links all four complete
+imported functions under normalized primitives and every lawful map schedule;
+it does not prove the general mixed-comparator or complete Apply refinement.
+Native vendored/pinned execution and CRD HTTP agree on the four outcomes:
+large shared keys retain the lower payload; large unshared and both small-key
+controls remove it. The native/API history independently establishes reachability
+of the concrete raw precondition rather than assuming arbitrary initial damage.
 
 [kep]: https://github.com/kubernetes/enhancements/blob/7e841ee17c39a07b3aeea71cc76995b662efdeb8/keps/sig-api-machinery/555-server-side-apply/README.md
 [proposal]: https://github.com/kubernetes/enhancements/blob/7e841ee17c39a07b3aeea71cc76995b662efdeb8/keps/sig-api-machinery/555-server-side-apply/README.md#proposal
