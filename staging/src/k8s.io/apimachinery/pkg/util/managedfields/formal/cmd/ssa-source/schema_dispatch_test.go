@@ -26,13 +26,13 @@ import (
 	"testing"
 )
 
-func selectedSchemaDispatchSource(t *testing.T) []byte {
+func selectedSMDSource(t *testing.T, packageName, filename string) []byte {
 	t.Helper()
-	directory, err := exec.Command("go", "list", "-f", "{{.Dir}}", "sigs.k8s.io/structured-merge-diff/v6/typed").Output()
+	directory, err := exec.Command("go", "list", "-f", "{{.Dir}}", "sigs.k8s.io/structured-merge-diff/v6/"+packageName).Output()
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := os.ReadFile(filepath.Join(strings.TrimSpace(string(directory)), "helpers.go"))
+	source, err := os.ReadFile(filepath.Join(strings.TrimSpace(string(directory)), filename))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func selectedSchemaDispatchSource(t *testing.T) []byte {
 }
 
 func TestSchemaDispatchRetainsCompleteBodies(t *testing.T) {
-	source := selectedSchemaDispatchSource(t)
+	source := selectedSMDSource(t, "typed", "helpers.go")
 	fragments := [][]string{
 		{"Resolve", "deduceAtom", "handleAtom", "errorf", "NamedType", "UnaryExpr"},
 		{"SwitchStmt", "CaseClause", "IsFloat", "IsInt", "IsString", "IsBool", "IsList", "IsMap", "CompositeLit"},
@@ -60,7 +60,7 @@ func TestSchemaDispatchRetainsCompleteBodies(t *testing.T) {
 }
 
 func TestSchemaDispatchChecksStandardAndDependencyBindings(t *testing.T) {
-	source := selectedSchemaDispatchSource(t)
+	source := selectedSMDSource(t, "typed", "helpers.go")
 	if err := validateAtomicFieldImports(source, "errors", "fmt", "strings"); err != nil {
 		t.Fatal(err)
 	}

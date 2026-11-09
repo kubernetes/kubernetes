@@ -1820,5 +1820,59 @@
     "scope": "general",
     "meaning": "A successful map-only atomic lookup drives the complete source chain to whole matching extraction or wrapped null on removal, with fresh output derived from the constructor.",
     "limits": "The lookup result is an explicit precondition until Schema.Resolve and schema/type representation are source-realized. Value/coercion/Unstructured and allocator/wrapping/heap contracts remain separate."
+  },
+  "SSA.SchemaLookupContracts.imported_plain": {
+    "title": "Source named and inline lookup",
+    "scope": "general",
+    "meaning": "The complete no-override method selects FindNamedType for a non-nil name, returns an empty unsuccessful result on a missing name, and otherwise returns the exact inlined atom.",
+    "limits": "FindNamedType remains a pure primitive; this does not verify its sync.Once/atomic-pointer cache."
+  },
+  "SSA.SchemaLookupContracts.imported_fast_path": {
+    "title": "No override bypasses the mutable cache",
+    "scope": "general",
+    "meaning": "The full Resolve AST returns through its first branch before evaluating locks, cache access or copy operations.",
+    "limits": "This theorem retains an explicit no-override callback; the composed theorem supplies its imported body."
+  },
+  "SSA.SchemaLookupContracts.imported_no_override_lookup": {
+    "title": "Both no-override source bodies compose",
+    "scope": "general",
+    "meaning": "The full Resolve AST and source helper realize named/inline lookup without a mutable override-cache premise.",
+    "limits": "Named-type search and Go representation remain explicit boundaries."
+  },
+  "SSA.SchemaResolveContracts.imported_resolve": {
+    "title": "Complete source override-cache execution",
+    "scope": "general",
+    "meaning": "For arbitrary atoms, relationship values and cache entries, source execution matches the specification of allocation, lookup, copy priority, cache writes, failure exits and captured deferred unlock.",
+    "limits": "Requires an initially unlocked serial mutex. Containers have a value view with arbitrary opaque immutable contents. FindNamedType, fresh-destination Map.CopyInto, physical pointers, key equality and Go synchronization/runtime are not verified here. Invalid cached hits are returned as the source does; validity is not silently assumed."
+  },
+  "SSA.SchemaResolveCache.empty_valid": {
+    "title": "The empty schema cache is sound",
+    "scope": "general",
+    "meaning": "Every stored result agrees with cache-free immutable schema resolution, vacuously for the initial empty cache.",
+    "limits": "The named lookup and reference environment are fixed within this definition."
+  },
+  "SSA.SchemaResolveCache.computed_valid": {
+    "title": "A schema lookup preserves cache soundness",
+    "scope": "general",
+    "meaning": "A valid cache remains valid after a hit, successful miss, failed miss or no-override lookup.",
+    "limits": "Reference identity must name the same immutable reference; the named lookup cannot change during the history."
+  },
+  "SSA.SchemaResolveCache.imported_correct": {
+    "title": "Valid source cache realizes cache-free lookup",
+    "scope": "general",
+    "meaning": "The full imported method returns exactly the no-cache specification from a valid unlocked state.",
+    "limits": "Validity and a stable reference environment are explicit premises. This does not assert correctness for a cache whose key-referred contents are mutated."
+  },
+  "SSA.SchemaResolveCache.imported_history": {
+    "title": "Arbitrary finite source lookup histories",
+    "scope": "general",
+    "meaning": "Any finite repeated or mixed-key sequence from a valid unlocked cache matches the immutable cache-free specification and preserves cache soundness and mutex release.",
+    "limits": "The environment and key-referred TypeRef values remain immutable. This is a serial primitive model, not a proof of Go scheduler behavior or race freedom. Native current/pinned and race-enabled concurrency checks are separate evidence."
+  },
+  "SSA.SchemaLookupBridge.imported_schema_and_dispatch": {
+    "title": "Source schema lookup feeds source typed dispatch",
+    "scope": "general",
+    "meaning": "The full schema method supplies the actual lookup result to the complete typed resolver, deduction and handler-selection ASTs, preserving the resulting schema cache state.",
+    "limits": "Requires cache validity and stable references. Named lookup, fresh-map copying, value predicates, formatter, handlers, key/pointer/heap representations and synchronization primitives remain explicit. This is not whole SSA correctness."
   }
 }

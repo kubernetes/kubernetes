@@ -55,6 +55,7 @@ for revision in head base; do
     "$formal_root/pr336/atomic_remove_test.go.in" > "$directory/formalbridge/atomic_remove_test.go.in"
   sed 's,structured-merge-diff/v6,structured-merge-diff/v7,g' \
     "$formal_root/pr336/schema_dispatch_test.go.in" > "$directory/formalbridge/schema_dispatch_test.go.in"
+  cp "$formal_root/pr336/schema_lookup_test.go.in" "$directory/formalbridge/schema_lookup_test.go.in"
   python3 - "$directory" <<'PY_UPDATER'
 import json
 import sys
@@ -68,6 +69,7 @@ overlay = {"Replace": {str(root / "merge/ssa_formal_updater_test.go"): str(root 
     str(root / "typed/ssa_formal_atomic_merge_test.go"): str(root / "formalbridge/atomic_merge_test.go.in"),
     str(root / "typed/ssa_formal_atomic_remove_test.go"): str(root / "formalbridge/atomic_remove_test.go.in"),
     str(root / "typed/ssa_formal_schema_dispatch_test.go"): str(root / "formalbridge/schema_dispatch_test.go.in"),
+    str(root / "schema/ssa_formal_schema_lookup_test.go"): str(root / "formalbridge/schema_lookup_test.go.in"),
 }}
 (root / "formalbridge/updater-overlay.json").write_text(json.dumps(overlay))
 PY_UPDATER
@@ -75,7 +77,7 @@ PY_UPDATER
     cd "$directory"
     export GOWORK=off
     # A caller can share an ordinary Go cache; sandboxed runs can set task-local paths.
-    go test -overlay="$directory/formalbridge/updater-overlay.json" ./merge ./fieldpath ./typed
+    go test -overlay="$directory/formalbridge/updater-overlay.json" ./merge ./fieldpath ./typed ./schema
     go run ./formalcmd "$model" "$formal_root/testdata/pr336.yaml"
   )
 done

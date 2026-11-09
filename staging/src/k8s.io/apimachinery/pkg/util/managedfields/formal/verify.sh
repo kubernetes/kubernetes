@@ -46,6 +46,8 @@ go run ./cmd/ssa-source -atomic-merge -source "$(dirname "$typed_source")/merge.
 go run ./cmd/ssa-source -atomic-remove -source "$(dirname "$typed_source")/remove.go" -check SSA/AtomicRemoveSource.lean
 
 go run ./cmd/ssa-source -schema-dispatch -source "$(dirname "$typed_source")/helpers.go" -check SSA/SchemaDispatchSource.lean
+schema_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/schema)/elements.go"
+go run ./cmd/ssa-source -schema-lookup -source "$schema_source" -check SSA/SchemaLookupSource.lean
 
 "${SSA_LAKE}" clean
 "${SSA_LAKE}" build
@@ -69,5 +71,7 @@ bash ci/verify-atomic-fields.sh
 bash ci/verify-atomic-merge.sh
 bash ci/verify-atomic-remove.sh
 bash ci/verify-schema-dispatch.sh
+bash ci/verify-schema-lookup.sh
+bash ci/run-native-go.sh .lake/schema-lookup-overlay.json sigs.k8s.io/structured-merge-diff/v6/schema -run '^TestSSAFormalSchemaLookupConcurrent$' -race -v -count=1
 bash ci/verify-pr336.sh
 python3 docs/generate.py --check

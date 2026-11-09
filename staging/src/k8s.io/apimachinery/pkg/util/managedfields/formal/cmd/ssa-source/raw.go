@@ -201,3 +201,8 @@ func validateRawBindings(function *ast.FuncDecl) error {
 	})
 	return failure
 }
+
+var schemaLookupFunctions = []functionSpec{
+	{name: "resolveNoOverrides", leanName: "plainProgram", receiver: "*Schema", signature: "func (s *Schema) resolveNoOverrides(tr TypeRef) (Atom, bool)", rawSyntax: true},
+	{name: "Resolve", leanName: "resolveProgram", receiver: "*Schema", signature: "func (s *Schema) Resolve(tr TypeRef) (Atom, bool)", rawSyntax: true},
+}

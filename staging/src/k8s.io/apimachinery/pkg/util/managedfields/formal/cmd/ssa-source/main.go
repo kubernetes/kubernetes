@@ -300,6 +300,7 @@ func run() error {
 	search := flag.Bool("search", false, "import Go standard-library slices.BinarySearchFunc")
 	has := flag.Bool("has", false, "import PathElementSet.Has and PathElement.Less")
 	atomicFields := flag.Bool("atomic-fields", false, "import the complete typed field-set map/list visitors")
+	schemaLookup := flag.Bool("schema-lookup", false, "import complete Schema.Resolve and no-override lookup bodies")
 	schemaDispatch := flag.Bool("schema-dispatch", false, "import complete schema resolution, atom deduction and handler dispatch bodies")
 	atomicRemove := flag.Bool("atomic-remove", false, "import complete structural typed removal/extraction ASTs")
 	atomicMerge := flag.Bool("atomic-merge", false, "import complete typed atomic merge dispatch and leaf replacement")
@@ -308,13 +309,13 @@ func run() error {
 		return fmt.Errorf("supply -source and no positional arguments")
 	}
 	modes := 0
-	for _, active := range []bool{*elements, *updater, *sets, *search, *has, *atomicFields, *atomicMerge, *atomicRemove, *schemaDispatch} {
+	for _, active := range []bool{*elements, *updater, *sets, *search, *has, *atomicFields, *atomicMerge, *atomicRemove, *schemaDispatch, *schemaLookup} {
 		if active {
 			modes++
 		}
 	}
 	if modes > 1 {
-		return fmt.Errorf("select at most one source mode: -elements, -updater, -sets, -search, -has, -atomic-fields, -atomic-merge, -atomic-remove or -schema-dispatch")
+		return fmt.Errorf("select at most one source mode: -elements, -updater, -sets, -search, -has, -atomic-fields, -atomic-merge, -atomic-remove, -schema-dispatch or -schema-lookup")
 	}
 	source, err := os.ReadFile(*sourcePath)
 	if err != nil {
@@ -322,7 +323,7 @@ func run() error {
 	}
 	selected := functions
 	namespace, description := "GoSource", "merge/update.go"
-	if *elements || *sets || *has || *search || *atomicFields || *atomicMerge || *atomicRemove || *schemaDispatch {
+	if *elements || *sets || *has || *search || *atomicFields || *atomicMerge || *atomicRemove || *schemaDispatch || *schemaLookup {
 		file, err := parser.ParseFile(token.NewFileSet(), "element.go", source, parser.PackageClauseOnly)
 		if err != nil {
 			return err
@@ -331,8 +332,11 @@ func run() error {
 		if *search {
 			pkg = "slices"
 		}
-		if *atomicFields || *atomicMerge || *atomicRemove || *schemaDispatch {
+		if *atomicFields || *atomicMerge || *atomicRemove || *schemaDispatch || *schemaLookup {
 			pkg = "typed"
+		}
+		if *schemaLookup {
+			pkg = "schema"
 		}
 		if file.Name.Name != pkg {
 			return fmt.Errorf("unsupported source package %q; expected %q", file.Name.Name, pkg)
@@ -391,8 +395,19 @@ func run() error {
 			return err
 		}
 	}
+	if *schemaLookup {
+		selected = schemaLookupFunctions
+		namespace, description = "SchemaLookupSource", "schema/elements.go"
+		file, err := parser.ParseFile(token.NewFileSet(), "elements.go", source, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		if err := validateImportBindings(file.Imports, map[string]string{"sync": "sync", "atomic": "sync/atomic"}); err != nil {
+			return err
+		}
+	}
 	programType, importModule := "List GoSubset.Stmt", "GoSubset"
-	if *atomicRemove || *schemaDispatch {
+	if *atomicRemove || *schemaDispatch || *schemaLookup {
 		programType, importModule = "RawGoSyntax.Node", "RawGoSyntax"
 	}
 	var programs strings.Builder

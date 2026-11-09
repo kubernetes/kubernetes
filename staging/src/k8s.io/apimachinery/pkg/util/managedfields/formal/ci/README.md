@@ -22,7 +22,7 @@ Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
 six updater ASTs, three element-set algebra ASTs and five recursive Difference/filter
-ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs, four structural removal/extraction/caller ASTs, three schema-selection ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all eight complete
+ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs, four structural removal/extraction/caller ASTs, three schema-selection ASTs, two schema lookup/cache ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all nine complete
 source-file digests.
 
 Native overlays run against the selected vendor source directly. Go rejects
@@ -33,6 +33,16 @@ Only copied directory permissions are changed for cleanup; original cache
 sources and module/workspace files remain untouched. The standard-library
 mutation keeps its separate isolated GOROOT mirror. `GOWORK=off` exercises the
 module-cache selection used by standalone apimachinery.
+
+The source schema overlay additionally compares 5,120 real plain/full lookups
+with the source interpreter, covering cache allocation/hits/misses, repeated
+calls, copied and unchanged pointers, all opaque exported container contents,
+map field-index initialization and the actual unlocked mutex. Both pinned
+versions run that matrix and a 64-goroutine control; the current dependency also
+runs the control with `-race`. Five mutations check missing-name failure,
+override assignment, cache-hit polarity, deferred unlock and writes through an
+escaped local copy. The whole source suite contains 31 semantic mutations,
+23 also rejected by an independent native oracle.
 
 The required checks are:
 

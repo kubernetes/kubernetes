@@ -254,6 +254,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `mergingWalker.doMap`, `doList`, `doLeaf`, `ruleKeepRHS` closure (`typed/merge.go`) | `AtomicMergeContracts.imported_keep_right`, `imported_leaf`, `imported_atomic_merge` (atomic entry only) |
 | `removingWalker.doScalar`, `doMap`, `doList` (`typed/remove.go`) | `AtomicRemoveContracts.imported_scalar`, `imported_atomic_container`, `imported_atomic_remove_fresh`, `imported_atomic_extract_whole` (scalar/atomic entry only) |
 | `resolveSchema`, `deduceAtom`, `handleAtom` (`typed/helpers.go`) | `SchemaDispatchContracts.imported_deduce`, `SchemaDispatchHandler.imported_handle`, `SchemaDispatchResolver.imported_full_dispatch`, `SchemaDispatchFactoryBridge.imported_factory_dispatch` |
+| `Schema.resolveNoOverrides`, `Resolve` (`schema/elements.go`) | `SchemaLookupContracts.imported_plain`, `SchemaResolveContracts.imported_resolve`, `SchemaResolveCache.imported_history`, `SchemaLookupBridge.imported_schema_and_dispatch` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -512,7 +513,7 @@ a map defers it only for a non-nil resource. Caller frame/input are preserved.
 `imported_atomic_remove_fresh` therefore states the necessary fresh-output
 premise explicitly; `imported_atomic_extract_whole` requires a matching shape.
 The complete source caller now derives this initialization, as described below;
-actual lookup/cache behavior remains to be proved.
+the source lookup/cache value proof is separate below, with named lookup/copy/sync and heap primitives still open.
 
 The independent Go overlay compares 1,152 helper invocations (384 each scalar,
 map and list), both extract/remove modes, prior output, nil interfaces versus
@@ -539,7 +540,7 @@ this bridge.
 that callback. Its caller theorems derive fresh-output removal and whole
 extraction from source initialization, with no extra fresh-output assumption.
 The source selection below discharges that handler premise. Actual
-Schema.Resolve lookup/cache behavior and typed method entry remain separate.
+Schema.Resolve has a separate source value/cache proof below; typed method entry remains separate.
 `imported_factory_ignores_reported_errors` also derives null wrapping when a
 resolver reports any normal error without changing the fresh walker.
 
@@ -573,8 +574,9 @@ atomic map behavior from a successful atomic-map lookup, without assuming a
 handler-selection callback. Scalar/list singleton-atom laws also cover
 arbitrary predicate combinations.
 
-`Schema.Resolve` lookup/cache semantics are still an explicit primitive. Value
-kind queries, schema/type representation, error formatting, coercion,
+`SchemaLookupBridge` now realizes the Schema.Resolve callback separately from
+its complete source bodies. Value kind queries, schema/type representation,
+error formatting, coercion,
 Unstructured, allocation/wrapping and heap correspondence remain separate
 implementation obligations. Non-atomic traversal raises an explicit unsupported
 error in this bridge; no successful result is invented.
@@ -600,10 +602,47 @@ complete signatures and the original AST are retained and checked. These checks
 do not replace human review of Go binding/representation correspondence or
 verify the Go type checker/compiler/runtime.
 
-CI now checks thirty complete ASTs from eight distinct source files and
-twenty-six semantic mutations, eighteen also native. Source value/coercion/allocator
-heap realization, typed/schema dispatch, complete removal/comparison and full
-SSA composition remain open; these are component proofs for BASE-09.
+`SchemaLookupContracts.imported_plain` derives named-versus-inline lookup and
+missing-type behavior from the complete `resolveNoOverrides` AST. The complete
+`Schema.Resolve` AST additionally retains and executes the override-cache path.
+`SchemaResolveContracts.imported_resolve` covers nil and allocated caches,
+arbitrary cached values, hits/misses, map-before-list override priority,
+scalar/empty-atom failure, exact opaque non-relationship contents, cache writes,
+normal failure exits and deferred unlock. An unsuccessful lookup allocates the
+cache but never stores a failed result. The interpreter captures deferred
+receiver/arguments and runs them at return; it rejects writes to a local copy
+after its pointer escapes instead of silently forgetting aliases.
+
+`SchemaResolveCache.imported_history` proves arbitrary finite histories from a
+valid unlocked cache: results equal the cache-free specification, cache soundness
+is preserved and the mutex is released after every call. The reference key must
+denote a stable immutable TypeRef, and the named lookup environment must remain
+unchanged. The empty cache is proved valid. The full source execution theorem
+also covers arbitrary invalid initial caches; it correctly returns such a hit
+without revalidation. The correctness/history theorem deliberately requires
+cache validity. `SchemaLookupBridge.imported_schema_and_dispatch` composes the
+schema method with actual typed resolver/deduction/handler source.
+
+The value view separates each container's relationship from otherwise arbitrary
+opaque immutable contents. FindNamedType, Map.CopyInto into the fresh destination,
+Go key/heap representation, allocation identity and synchronization primitives
+remain explicit implementation boundaries. The serial mutex model does not
+verify the Go scheduler or race freedom. An independent native overlay compares
+5,120 plain/full lookups, including all eight atom masks, nil/named/missing/empty/
+Unicode names, four relationships, nil/allocated/hit/unrelated caches, repeated
+calls and warm/cold map field indexes. It checks exported contents independently,
+fresh changed-container pointers, unchanged other pointers, exact cached pointers,
+input immutability and the actual unlocked mutex. A separate 64-goroutine test
+runs with the race detector. Both pinned revisions run the lookup matrix and
+concurrency control. Five mutations cover missing-name failure, the map override,
+cache-hit polarity, deferred unlock and mutation through an escaped local copy;
+each must fail the unchanged certificate and independent Go oracle.
+
+CI now checks thirty-two complete ASTs from nine distinct source files and
+thirty-one semantic mutations, twenty-three also native. Source value/coercion/
+allocator heap realization, remaining schema primitives, full typed entry,
+complete removal/comparison and full SSA composition remain open; these are
+component proofs for BASE-09.
 
 The mixed numeric comparator actually fails the global equality/order premise:
 two distinct int64 values can each compare equal to one float64. A concrete
