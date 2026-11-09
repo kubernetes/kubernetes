@@ -104,7 +104,7 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 							// each time the startup probe runs it creates /state/probe marker.
 							// each time the container runs it removes said /state/probe marker.
 							// this to ensure that existence of "/state/probe" at the end of the test case
-							// neccesarily means the startup probe has run after the pod restarted
+							// necessarily means the startup probe has run after the pod restarted
 							Command:       []string{"/bin/sh", "-c", "if [ ! -f /state/first-run ]; then touch /state/first-run; rm -f /state/probe; exit 42; else touch /state/second-run; rm -f /state/probe; sleep 300; fi;"},
 							RestartPolicy: &containerRestartPolicyNever,
 							RestartPolicyRules: []v1.ContainerRestartRule{
@@ -178,7 +178,7 @@ var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFea
 								PeriodSeconds:       2,
 								FailureThreshold:    10,
 							},
-							Command:       []string{"/bin/sh", "-c", "sleep 10; exit 1"},
+							Command:       []string{"/bin/sh", "-c", "sleep 10; exit 42"},
 							RestartPolicy: &containerRestartPolicyNever,
 							RestartPolicyRules: []v1.ContainerRestartRule{
 								{
