@@ -317,3 +317,86 @@ if ! grep -q 'reset filter retained an excluded prefix' "$probe/native.log"; the
   exit 1
 fi
 printf 'Unchanged Lean certificate and native Go witness both rejected the reset-filter scope mutation.\n'
+
+# The standard-library lookup's final equality is part of Has, rather than a trusted membership oracle.
+probe="$formal_root/.lake/source-mutation/search-membership"
+mkdir -p "$probe/SSA"
+cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
+search_source="$(go list -f '{{.Dir}}' slices)/sort.go"
+python3 - "$search_source" "$probe/sort.go" <<'PY_SEARCH_MUTATION'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+start = source.index("func BinarySearchFunc[")
+end = source.index("\n}\n", start) + 2
+body = source[start:end]
+old = "cmp(x[i], target) == 0"
+if body.count(old) != 1:
+    raise SystemExit("Cannot locate the unique standard-search mutation; update verify-source.sh.")
+Path(sys.argv[2]).write_text(source[:start] + body.replace(old, "cmp(x[i], target) != 0") + source[end:])
+PY_SEARCH_MUTATION
+go run ./cmd/ssa-source -search -source "$probe/sort.go" > "$probe/SSA/SearchSource.lean"
+for module in SearchSubset SearchIndex SearchAlgorithm SearchContracts; do cp "SSA/$module.lean" "$probe/SSA/$module.lean"; done
+for module in SearchSource SearchSubset SearchIndex SearchAlgorithm SearchContracts; do
+  rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
+done
+(
+  cd "$probe"
+  export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
+  for module in SearchSource SearchSubset SearchIndex SearchAlgorithm; do
+    "$lean_binary" -DwarningAsError=true -o "SSA/$module.olean" "SSA/$module.lean"
+  done
+  if "$lean_binary" -DwarningAsError=true -o SSA/SearchContracts.olean SSA/SearchContracts.lean > SearchContracts.log 2>&1; then
+    printf 'Standard-search mutation unexpectedly satisfied the unchanged certificate.\n' >&2
+    exit 1
+  fi
+  if ! grep -Eq 'unsolved goals|Tactic.*failed' SearchContracts.log; then
+    cat SearchContracts.log >&2
+    printf 'Standard-search mutation failed for an unrelated reason.\n' >&2
+    exit 1
+  fi
+)
+fieldpath_dir="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/fieldpath)"
+python3 - "$search_source" "$probe" "$fieldpath_dir" "$formal_root/pr336/has_test.go.in" <<'PY_SEARCH_OVERLAY'
+import json
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+source, probe, fieldpath, witness = map(Path, sys.argv[1:])
+# Go forbids overlays within GOMODCACHE, including downloaded toolchain source.
+# A shallow GOROOT mirror gives slices real local files and leaves the installed toolchain untouched.
+original = source.parents[2]
+mirror = Path(tempfile.mkdtemp(prefix="go-root-", dir=probe))
+for entry in original.iterdir():
+    if entry.name != "src":
+        (mirror / entry.name).symlink_to(entry, target_is_directory=entry.is_dir())
+(mirror / "src").mkdir()
+for entry in (original / "src").iterdir():
+    if entry.name != "slices":
+        (mirror / "src" / entry.name).symlink_to(entry, target_is_directory=entry.is_dir())
+shutil.copytree(source.parent, mirror / "src/slices")
+(probe / "go-root-path").write_text(str(mirror))
+(probe / "go-tool-path").write_text(str(original / "bin/go"))
+overlay = {"Replace": {
+    str(mirror / "src/slices/sort.go"): str(probe / "sort.go"),
+    str(fieldpath / "ssa_formal_has_test.go"): str(witness),
+}}
+(probe / "overlay.json").write_text(json.dumps(overlay))
+PY_SEARCH_OVERLAY
+export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
+search_go_root="$(cat "$probe/go-root-path")"
+search_go_tool="$(cat "$probe/go-tool-path")"
+if GOROOT="$search_go_root" GOTOOLCHAIN=local "$search_go_tool" test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
+    -run '^TestSSAFormalHasSearch$' -v -count=1 > "$probe/native.log" 2>&1; then
+  printf 'Native standard-search mutation unexpectedly preserved exact membership.\n' >&2
+  exit 1
+fi
+if ! grep -q 'Has violated exact membership' "$probe/native.log"; then
+  cat "$probe/native.log" >&2
+  printf 'Native standard-search mutation failed for an unrelated reason.\n' >&2
+  exit 1
+fi
+printf 'Unchanged Lean certificate and native Go witness both rejected the standard-library membership mutation.\n'

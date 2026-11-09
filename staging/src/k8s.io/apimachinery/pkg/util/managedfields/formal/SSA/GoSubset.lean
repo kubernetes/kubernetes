@@ -48,6 +48,9 @@ inductive Expr where
   | emptyNodeMap
   | setRecord (members children : Expr)
   | setNode (label child : Expr)
+  | addNumbers (left right : Expr)
+  | unsignedMidpoint (left right : Expr)
+  | pathComparator
   deriving Repr
 
 inductive Stmt where
@@ -392,6 +395,8 @@ def eval {Obj Err : Type} (ops : Ops Obj Err) : Nat → Expr → Env Obj Err →
           .error "Updater expressions require the updater interpreter"
       | .addressOf _ | .dereference _ | .emptyNodeMap | .setRecord _ _ | .setNode _ _ =>
           .error "Recursive-set expressions require the recursive-set interpreter"
+      | .addNumbers _ _ | .unsignedMidpoint _ _ | .pathComparator =>
+          .error "Search expressions require the search interpreter"
 
 def evalAll {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Expr → Env Obj Err →
     Except String (List (Value Obj Err))

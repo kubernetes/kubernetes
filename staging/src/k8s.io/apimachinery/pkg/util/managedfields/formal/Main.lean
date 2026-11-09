@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -105,9 +105,12 @@ private def runSets (path : String) (reset : Bool := false) : IO UInt32 := do
     cases.pairs.mapM fun (leftJson,rightJson) => do
       let left ← parseSetTree 128 leftJson
       let right ← parseSetTree 128 rightJson
-      let base := SetContracts.recursiveOps (fun a b : Nat => ((cases.less[a]?).bind (·[b]?)).getD false) RecursiveSets.empty
+      let less := fun a b : Nat => ((cases.less[a]?).bind (·[b]?)).getD false
+      let base := SetContracts.recursiveOps less RecursiveSets.empty
+      let search : SearchSubset.Ops Nat := {compare := fun a b => if less a b then -1 else if less b a then 1 else 0}
       if reset && !right.children.isEmpty then throw "Root reset protocol requires a flat exclusion set"
-      let ops := if reset then SetFilterContracts.flatOps {base with has := fun members label => members.contains label} else base
+      if reset && right.members.length > SearchSubset.maxIndex search.wordBits then throw "Reset roots exceed the Go int bound"
+      let ops := if reset then SetFilterContracts.flatOps (FilterHasBridge.setOps search RecursiveSets.empty) else base
       let program := if reset then SetSource.excludeFilterProgram else SetSource.setDifferenceProgram
       let nodeProgram := if reset then SetSource.recursiveNodeProgram else SetSource.nodeDifferenceProgram
       let nodeFuel := if reset then left.children.length+14 else left.children.length+right.children.length+19
@@ -119,6 +122,80 @@ private def runSets (path : String) (reset : Bool := false) : IO UInt32 := do
               else throw "Recursive-set source callbacks disagree"
           | _ => throw "Child-node source did not return a node map"
       | _ => throw "Recursive-set source did not return a set"
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
+private structure SearchCase where
+  members : List Nat
+  target : Nat
+  deriving FromJson
+
+private structure SearchCases where
+  compare : List (List Int)
+  wordBits : Nat := 64
+  cases : List SearchCase
+  deriving FromJson
+
+private structure SearchReport where
+  index : Nat
+  found : Bool
+  has : Bool
+  deriving ToJson
+
+private structure SearchOutput where
+  results : List SearchReport
+  less : List (List Bool)
+  deriving ToJson
+
+private def runSearch (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String SearchOutput := do
+    let cases ← Json.parse input >>= fromJson? (α := SearchCases)
+    if cases.cases.isEmpty || cases.compare.isEmpty then throw "Search input requires a comparator matrix and nonempty cases"
+    if cases.wordBits != 32 && cases.wordBits != 64 then throw "Search protocol supports Go word widths 32 and 64"
+    let size := cases.compare.length
+    if cases.compare.any (fun row => row.length != size) then throw "Search comparator matrix must be square"
+    let compare := fun a b : Nat => ((cases.compare[a]?).bind (·[b]?)).getD 0
+    let ops : SearchSubset.Ops Nat := {compare,wordBits := cases.wordBits}
+    let results ← cases.cases.mapM fun request => do
+      if request.target ≥ size || request.members.any (fun label => label ≥ size) then throw "Search label has no comparator matrix entry"
+      let (index,found) ← HasBridge.sourceSearch ops request.members request.target
+      match ← SearchSubset.exec (HasBridge.withSourceSearch ops) 3 HasSource.hasProgram
+          {members := request.members,target := request.target,other := request.target} with
+      | .returned [.flag has] =>
+          if has != found then throw "Has source and standard search source disagree"
+          pure ({index,found,has} : SearchReport)
+      | _ => throw "Has source did not return a boolean"
+    let less ← (List.range size).mapM fun a => (List.range size).mapM fun b => do
+      match ← SearchSubset.exec ops 2 HasSource.lessProgram {members := [],target := a,other := b} with
+      | .returned [.flag flag] => pure flag
+      | _ => throw "Less source did not return a boolean"
+    pure {results,less}
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
+private structure MidpointCase where
+  bits : Nat
+  left : Nat
+  right : Nat
+  deriving FromJson
+
+private def runMidpoints (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List Nat) := do
+    let cases ← Json.parse input >>= fromJson? (α := List MidpointCase)
+    if cases.isEmpty then throw "Midpoint input is empty"
+    cases.mapM fun request => do
+      if request.bits != 32 && request.bits != 64 then throw "Midpoint protocol supports Go word widths 32 and 64"
+      if request.left > SearchSubset.maxIndex request.bits || request.right > SearchSubset.maxIndex request.bits then
+        throw "Midpoint bounds exceed the Go int range"
+      pure (SearchSubset.unsignedMidpoint request.bits request.left request.right)
   match computation with
   | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
   | .error message => stderr.putStrLn message; return 1
@@ -145,6 +222,8 @@ def main (args : List String) : IO UInt32 := do
       | none =>
           stderr.putStrLn s!"Unknown scenario '{name}'; run --list to see available scenarios."
           return 2
+  | ["--has-search",path] => runSearch path
+  | ["--search-midpoints",path] => runMidpoints path
   | ["--root-reset-filter",path] => runSets path true
   | ["--set-difference",path] => runSets path
   | ["--element-difference",path] => runElements path (some .difference)

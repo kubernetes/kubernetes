@@ -43,6 +43,7 @@ type scope struct {
 	inLoop      bool
 	currentKeys map[string]string
 	sets        bool
+	search      bool
 }
 
 func rootScope(function functionSpec) *scope {
@@ -55,6 +56,12 @@ func rootScope(function functionSpec) *scope {
 	root.elements = function.elements
 	root.updater = function.updater
 	root.sets = function.sets
+	root.search = function.search
+	if function.search {
+		for _, name := range []string{"int", "uint", "slices"} {
+			globals.bindings[name] = binding{name, "builtin"}
+		}
+	}
 	if function.updater {
 		for _, name := range []string{"len", "ConflictsFromManagers"} {
 			globals.bindings[name] = binding{name, "builtin"}
@@ -72,15 +79,17 @@ func rootScope(function functionSpec) *scope {
 	if receiver == "" {
 		receiver = "s"
 	}
-	root.bindings[receiver] = binding{receiver, ""}
-	if function.elements {
-		root.bindings[receiver] = binding{receiver, "element-input"}
+	if !function.standalone {
+		root.bindings[receiver] = binding{receiver, ""}
+		if function.elements {
+			root.bindings[receiver] = binding{receiver, "element-input"}
+		}
 	}
 	return root
 }
 
 func (s *scope) child() *scope {
-	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}, sets: s.sets}
+	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}, sets: s.sets, search: s.search}
 }
 
 func (s *scope) currentKey(mapID string) string {
@@ -193,6 +202,22 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		field, err := quoted(e.Sel.Name)
 		return "(.select " + receiver + " " + field + ")", err
 	case *ast.CallExpr:
+		if name, ok := e.Fun.(*ast.Ident); ok && context.search {
+			if name.Name == "int" {
+				return renderSearchMidpoint(e, context)
+			}
+			if bound, found := context.resolve(name.Name); found && bound.kind == "search-comparator" {
+				if len(e.Args) != 2 || e.Ellipsis.IsValid() {
+					return "", fmt.Errorf("search comparator requires exactly two arguments")
+				}
+				args, err := renderExpressions(e.Args, context)
+				id, quoteErr := quoted(bound.id)
+				if err != nil {
+					return "", err
+				}
+				return "(.call (.var " + id + ") \"Invoke\" " + args + ")", quoteErr
+			}
+		}
 		if name, ok := e.Fun.(*ast.Ident); ok && (context.elements || context.updater) {
 			bound, found := context.resolve(name.Name)
 			if !found || bound.kind != "builtin" {
@@ -235,7 +260,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(method.Sel.Name)
 		return "(.call " + receiver + " " + name + " " + args + ")", err
 	case *ast.BinaryExpr:
-		if context.updater && (e.Op == token.EQL || e.Op == token.NEQ) {
+		if (context.updater || context.search) && (e.Op == token.EQL || e.Op == token.NEQ) {
 			if name, nilComparison := e.Y.(*ast.Ident); !nilComparison || name.Name != "nil" {
 				left, err := renderExpr(e.X, context)
 				if err != nil {
@@ -259,6 +284,14 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 			}
 			right, err := renderExpr(e.Y, context)
 			return "(.less " + left + " " + right + ")", err
+		}
+		if context.search && e.Op == token.ADD {
+			left, err := renderExpr(e.X, context)
+			if err != nil {
+				return "", err
+			}
+			right, err := renderExpr(e.Y, context)
+			return "(.addNumbers " + left + " " + right + ")", err
 		}
 		if e.Op == token.LOR || e.Op == token.LAND {
 			left, err := renderExpr(e.X, context)
@@ -329,6 +362,11 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		}
 		index, err := renderExpr(e.Low, context)
 		return "(.sliceFrom " + value + " " + index + ")", err
+	case *ast.FuncLit:
+		if !context.search {
+			return "", fmt.Errorf("Go comparator callbacks require the search interpreter")
+		}
+		return renderPathComparator(e)
 	case *ast.CompositeLit:
 		var typ bytes.Buffer
 		if err := format.Node(&typ, token.NewFileSet(), e.Type); err != nil {

@@ -56,3 +56,4 @@ import SSA.UpdaterExamples
 import SSA.UpdaterBridge
 import SSA.SetBridge
 import SSA.SetFilterContracts
+import SSA.FilterHasBridge

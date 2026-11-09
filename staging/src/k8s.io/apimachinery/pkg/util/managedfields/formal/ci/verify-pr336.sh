@@ -45,6 +45,8 @@ for revision in head base; do
     "$formal_root/pr336/updater_test.go.in" > "$directory/formalbridge/updater_test.go.in"
   sed 's,structured-merge-diff/v6,structured-merge-diff/v7,g' \
     "$formal_root/pr336/sets_test.go.in" > "$directory/formalbridge/sets_test.go.in"
+  sed 's,structured-merge-diff/v6,structured-merge-diff/v7,g' \
+    "$formal_root/pr336/has_test.go.in" > "$directory/formalbridge/has_test.go.in"
   python3 - "$directory" <<'PY_UPDATER'
 import json
 import sys
@@ -53,6 +55,7 @@ from pathlib import Path
 root = Path(sys.argv[1])
 overlay = {"Replace": {str(root / "merge/ssa_formal_updater_test.go"): str(root / "formalbridge/updater_test.go.in"),
     str(root / "fieldpath/ssa_formal_sets_test.go"): str(root / "formalbridge/sets_test.go.in"),
+    str(root / "fieldpath/ssa_formal_has_test.go"): str(root / "formalbridge/has_test.go.in"),
 }}
 (root / "formalbridge/updater-overlay.json").write_text(json.dumps(overlay))
 PY_UPDATER

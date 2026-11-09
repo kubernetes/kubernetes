@@ -22,7 +22,7 @@ Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
 six updater ASTs, three element-set algebra ASTs and five recursive Difference/filter
-ASTs must match the checked-in Lean input, including all three complete
+ASTs, two Has/Less ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all four complete
 source-file digests.
 
 The required checks are:
@@ -55,20 +55,24 @@ The required checks are:
    The complete recursive Difference source also matches 4,102 native tree
    pairs, including exact large numeric tokens, direct/child overlap, empty
    structural nodes and depth 64. Another 518 pairs check conventional root
-   reset filters and preservation of independent prefixes.
+   reset filters and preservation of independent prefixes. Has/standard-library
+   search add 776 source/native queries, 128 Less results and 16 near-limit
+   32/64-bit unsigned-midpoint controls.
 8. Actual merge and fieldpath tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
    Each revision also runs the numeric-key round-trip counterexample and control.
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Eleven independent semantic mutations of the selected Go sources; each must
+10. Twelve independent semantic mutations of the selected Go sources; each must
     invalidate the unchanged theorem in the expected proof module.
     The ownership-growth mutation must additionally fail the native Go witness
     for its demonstrated new B claim, rather than a compile or setup error.
     A matched-child representative mutation must independently invent an exact
     native path and fail the unchanged recursive source certificate. A reset
     mutation using ordinary Difference must fail both the source filter proof
-    and the native whole-prefix exclusion oracle.
+    and the native whole-prefix exclusion oracle. Flipping the selected
+    standard-library search’s final zero test must fail both its source proof
+    and the independent native membership oracle.
 
 No check is optional when invoking this entrypoint. The result establishes the
 documented proof and comparison checks, not correctness of the human-chosen

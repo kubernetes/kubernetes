@@ -244,6 +244,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `PathElementSet.Difference`, `Union`, `Intersection` (`fieldpath/element.go`) | `ElementAlgebra.imported_matches`, `imported_membership`, `imported_preserves_order`, `imported_preserves_uniqueness` |
 | `Set.Difference`, `SetNodeMap.Difference` (`fieldpath/set.go`) | `SetContracts.imported_node_matches`, `imported_set_matches`, `imported_difference_never_adds_paths` |
 | `Set.RecursiveDifference`, `SetNodeMap.RecursiveDifference`, `excludeFilter.Filter` | `SetFilterContracts.imported_flat_node_matches`, `imported_flat_set_matches`, `imported_flat_filter_matches`, `locally_ordered_filter_excludes_root` (flat root exclusions only) |
+| `PathElementSet.Has`, `PathElement.Less`, selected Go `slices.BinarySearchFunc` | `SearchContracts.imported_search_matches`, `SearchMembership.imported_search_membership`, `HasBridge.imported_has_membership`, `FilterHasBridge.source_filter_excludes_root` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -382,8 +383,9 @@ ownership-path filters; restoring object data is a separate REST strategy phase.
 `ElementLocalOrder` restricts the direct-member algebra premises to the labels
 actually visited. `locally_ordered_filter_excludes_root` therefore requires a
 lawful domain only for direct root members and exclusion roots, not for nested
-numeric item keys. `Has` recognition, sorted/direct-label representation and
-actual field-name comparison remain explicit boundaries. No arbitrary nested
+numeric item keys. `Has` recognition is now derived by the source-backed search bridge under
+word bounds and local comparison/equality laws. Sorted/direct-label representation
+and actual field-name comparison remain explicit boundaries. No arbitrary nested
 exclusion-tree or complete reset/Apply pipeline theorem is claimed. The original
 normalized prefix-filter theorems remain separately available.
 
@@ -393,6 +395,36 @@ numeric collisions inside retained/dropped subtrees, empty structure and depth
 64. Both pinned revisions run it too. An eleventh source mutation replaces
 `RecursiveDifference` with ordinary `Difference`; unchanged source theorems and
 the independent native prefix-exclusion oracle must both reject it.
+
+`HasSource` now imports the complete `PathElementSet.Has` and
+`PathElement.Less` wrappers; `SearchSource` imports the selected Go toolchain's
+complete `slices.BinarySearchFunc` (at the same-label target instantiation used
+by Has). `SearchContracts.imported_search_matches` proves its execution against
+an independent terminating interval algorithm for every pure comparator and
+representable finite input. The word-width model preserves the unsigned-sum
+midpoint; `SearchIndex` proves its arithmetic, safe indices, safe increment and
+strict interval progress even when the intermediate signed sum overflows.
+
+`SearchMembership` proves exact membership under sorted inputs, local ordering
+and faithful comparator-zero equality. `HasBridge` supplies that library source
+execution to the actual Has wrapper and separately binds Less to the negative
+comparison result. `FilterHasBridge.source_filter_excludes_root` composes these
+with the complete flat-root filter and derives the previous Has-recognition
+premise. Nested numeric selectors still need no order laws on this path. Actual
+field-name/string comparison, sorted/root/heap/ownership representation and the
+remaining typed/Apply/API/storage pipeline are explicit boundaries. This does
+not claim a globally faithful mixed-numeric lookup law.
+
+The native overlay compares 776 lookup/Has queries over 32/64-bit model word
+widths, 128 Less results, and 16 typed Go midpoint controls near both signed
+integer limits. Independent rank/membership oracles constrain the lawful cases;
+four mixed-numeric controls per width check exact source fidelity where the
+comparator law fails. The 518 root-filter comparisons now use the source-backed
+Has specification in place of an exact-membership oracle. Both pinned revisions
+run the same overlays. A twelfth source mutation flips the actual library's final
+comparator-zero test: unchanged source proofs and an independent native
+membership oracle must both reject it. The original Go BSD notice is retained
+in the generated translation and standalone HTML; no runtime dependency changes.
 
 The mixed numeric comparator actually fails the global equality/order premise:
 two distinct int64 values can each compare equal to one float64. A concrete

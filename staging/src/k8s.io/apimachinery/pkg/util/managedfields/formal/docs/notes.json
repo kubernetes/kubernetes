@@ -1539,5 +1539,96 @@
     "title": "Only direct field-name order is needed for source reset exclusion",
     "meaning": "Sorted direct labels and reset roots in a locally lawful domain suffice for the actual imported filter to exclude a root and all descendants. Descendant labels may lie outside that domain and may have mixed-numeric comparator collisions.",
     "limits": "Has must recognize the reset root. Actual Go Has/binary search, field-name comparison, root-set representation and whole Apply/API pipeline still need refinement. The source control-flow theorem itself is general at finite width and unbounded child depth."
+  },
+  "SSA.SearchIndex.unsigned_midpoint_eq_half": {
+    "scope": "general",
+    "title": "Go unsigned midpoint equals the mathematical average on valid bounds",
+    "meaning": "At every positive word width, two representable nonnegative Go array bounds have the expected midpoint after signed-sum overflow, unsigned conversion and right shift.",
+    "limits": "The interpreter represents the uint residue explicitly. This proves the arithmetic bridge under the stated bounds, not the Go compiler or arbitrary overflowing integer programs."
+  },
+  "SSA.SearchIndex.unsigned_midpoint_inside": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchIndex.unsigned_midpoint_progress": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchAlgorithm.result_bounds": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchAlgorithm.boundary": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchContracts.imported_search_matches": {
+    "scope": "general",
+    "title": "Complete selected Go binary search matches a terminating interval algorithm",
+    "meaning": "For every pure comparator and finite array below the Go int bound, the complete imported BinarySearchFunc executes without fuel/index failure and returns the independent lower-bound index and comparator-zero flag.",
+    "limits": "Same label/target type instantiation used by Has, positive word width and representable array size. No comparator-order premise is needed for execution; exact membership needs separate local-domain laws."
+  },
+  "SSA.SearchMembership.before_is_prefix": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchMembership.found_iff_member": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.SearchMembership.imported_search_membership": {
+    "scope": "general",
+    "title": "Imported standard-library search has exact local-domain membership",
+    "meaning": "The source result is true exactly for a member of the sorted array, assuming a lawful order and faithful comparator-zero equality on the actual labels and query.",
+    "limits": "The unrestricted mixed-numeric domain does not satisfy these premises. Comparator implementation, label/array representation and universal Go runtime refinement remain separate."
+  },
+  "SSA.HasBridge.source_search_matches": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.HasBridge.imported_has_matches": {
+    "scope": "general",
+    "title": "Actual Has wrapper delegates to complete source-backed library execution",
+    "meaning": "The complete imported PathElementSet.Has body calls the source-backed selected-library search with its exact closed PathElement.Compare callback and returns the independent result.",
+    "limits": "Comparison remains a pure explicit primitive; word width/array bounds are stated. Unsupported callback captures/effects or input shapes are rejected rather than invented successes."
+  },
+  "SSA.HasBridge.imported_less_matches": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.HasBridge.has_iff_member": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.HasBridge.imported_has_membership": {
+    "scope": "general",
+    "title": "Complete imported Has has exact membership on its lawful domain",
+    "meaning": "The actual Has wrapper and imported standard-library execution yield true exactly for membership under sortedness, local order, faithful comparator-zero equality and Go word bounds.",
+    "limits": "This derives membership from source instead of assuming Has. It does not discharge the false global mixed-numeric comparator laws or prove the ownership codec."
+  },
+  "SSA.FilterHasBridge.set_has_is_source": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.FilterHasBridge.set_less_is_source": {
+    "scope": "helper",
+    "meaning": "Finite interval, machine-word, source-callback or local-membership composition lemma.",
+    "limits": "A proof helper rather than another independent SSA guarantee. Pure comparison, supported inputs and the documented runtime/representation boundary apply."
+  },
+  "SSA.FilterHasBridge.source_filter_excludes_root": {
+    "scope": "general",
+    "title": "Source root-filter exclusion without an assumed Has-recognition premise",
+    "meaning": "Complete Filter/RecursiveDifference source now uses Has/Less with their complete source correspondences. Reset-root recognition is derived from the actual Has/library membership theorem, so every root::suffix ownership path is excluded at arbitrary suffix depth.",
+    "limits": "Requires local comparison/equality laws, sorted direct/root labels, positive word width, representable roots and the flat-root input shape. Actual field-name/string comparison, root/heap/ownership representation, typed operations and complete Apply/API/storage composition remain open."
   }
 }

@@ -42,6 +42,28 @@ type functionSpec struct {
 	sets       bool
 	receiver   string
 	receiverID string
+	search     bool
+	standalone bool
+}
+
+var searchFunctions = []functionSpec{{
+	name: "BinarySearchFunc", leanName: "binarySearchProgram", standalone: true,
+	signature:  "func BinarySearchFunc[S ~[]E, E, T any](x S, target T, cmp func(E, T) int) (int, bool)",
+	parameters: []string{"x", "target", "cmp"}, maps: map[string]string{"x": "search-input", "cmp": "search-comparator"},
+	elements: true, search: true,
+}}
+
+var hasFunctions = []functionSpec{
+	{
+		name: "Has", leanName: "hasProgram", receiver: "*PathElementSet",
+		signature: "func (s *PathElementSet) Has(pe PathElement) bool", parameters: []string{"pe"},
+		elements: true, search: true,
+	},
+	{
+		name: "Less", leanName: "lessProgram", receiver: "PathElement", receiverID: "e",
+		signature: "func (e PathElement) Less(rhs PathElement) bool", parameters: []string{"rhs"},
+		elements: true, search: true,
+	},
 }
 
 var setFunctions = []functionSpec{
@@ -146,6 +168,9 @@ func importFunction(source []byte, function functionSpec) (string, error) {
 	var target *ast.FuncDecl
 	for _, declaration := range file.Decls {
 		if candidate, ok := declaration.(*ast.FuncDecl); ok && candidate.Name.Name == function.name {
+			if function.standalone && candidate.Recv != nil {
+				continue
+			}
 			if function.receiver != "" {
 				if candidate.Recv == nil || len(candidate.Recv.List) != 1 {
 					continue
@@ -217,18 +242,55 @@ func validateImports(source []byte) error {
 	return nil
 }
 
+func validateSearchImport(source []byte) error {
+	file, err := parser.ParseFile(token.NewFileSet(), "element.go", source, parser.ImportsOnly)
+	if err != nil {
+		return err
+	}
+	found := false
+	for _, imported := range file.Imports {
+		path, err := strconv.Unquote(imported.Path.Value)
+		if err != nil {
+			return err
+		}
+		name := path[strings.LastIndex(path, "/")+1:]
+		if imported.Name != nil {
+			name = imported.Name.Name
+		}
+		if name != "slices" {
+			continue
+		}
+		if path != "slices" || found {
+			return fmt.Errorf("Has requires exactly one standard-library slices import")
+		}
+		found = true
+	}
+	if !found {
+		return fmt.Errorf("Has is missing the standard-library slices import")
+	}
+	return nil
+}
+
 func run() error {
-	sourcePath := flag.String("source", "", "Go update.go source, element.go with -elements, or set.go with -sets (required)")
+	sourcePath := flag.String("source", "", "selected Go source file (required)")
 	checkPath := flag.String("check", "", "compare generated output with this Lean file")
 	elements := flag.Bool("elements", false, "import fieldpath element.go instead of merge update.go")
 	updater := flag.Bool("updater", false, "import the complete ownership-update function with the updater interpreter")
 	sets := flag.Bool("sets", false, "import field-set Difference, RecursiveDifference and exclude-filter bodies from fieldpath/set.go")
+	search := flag.Bool("search", false, "import Go standard-library slices.BinarySearchFunc")
+	has := flag.Bool("has", false, "import PathElementSet.Has and PathElement.Less")
 	flag.Parse()
 	if *sourcePath == "" || flag.NArg() != 0 {
 		return fmt.Errorf("supply -source and no positional arguments")
 	}
-	if (*elements && *updater) || (*sets && (*elements || *updater)) {
-		return fmt.Errorf("select at most one source mode: -elements, -updater or -sets")
+	modes := 0
+	for _, active := range []bool{*elements, *updater, *sets, *search, *has} {
+		if active {
+			modes++
+		}
+	}
+	if modes > 1 {
+		return fmt.Errorf("select at most one source mode: -elements, -updater, -sets, -search or -has")
 	}
 	source, err := os.ReadFile(*sourcePath)
 	if err != nil {
@@ -236,19 +298,34 @@ func run() error {
 	}
 	selected := functions
 	namespace, description := "GoSource", "merge/update.go"
-	if *elements || *sets {
+	if *elements || *sets || *has || *search {
 		file, err := parser.ParseFile(token.NewFileSet(), "element.go", source, parser.PackageClauseOnly)
 		if err != nil {
 			return err
 		}
-		if file.Name.Name != "fieldpath" {
-			return fmt.Errorf("unsupported element-set source package %q", file.Name.Name)
+		pkg := "fieldpath"
+		if *search {
+			pkg = "slices"
+		}
+		if file.Name.Name != pkg {
+			return fmt.Errorf("unsupported source package %q; expected %q", file.Name.Name, pkg)
 		}
 		selected = elementFunctions
 		namespace, description = "ElementSource", "fieldpath/element.go"
 		if *sets {
 			selected = setFunctions
 			namespace, description = "SetSource", "fieldpath/set.go"
+		}
+		if *has {
+			selected = hasFunctions
+			namespace, description = "HasSource", "fieldpath/element.go"
+			if err := validateSearchImport(source); err != nil {
+				return err
+			}
+		}
+		if *search {
+			selected = searchFunctions
+			namespace, description = "SearchSource", "slices/sort.go"
 		}
 	} else {
 		if err := validateImports(source); err != nil {
@@ -267,12 +344,19 @@ func run() error {
 		}
 		fmt.Fprintf(&programs, "def %s : List GoSubset.Stmt := %s\n\n", function.leanName, program)
 	}
+	licenseID, originNotice := "Apache-2.0", ""
+	sourceLabel := "vendor/sigs.k8s.io/structured-merge-diff/v6/" + description
+	if *search {
+		sourceLabel = "Go standard library " + description
+		licenseID = "Apache-2.0 AND BSD-3-Clause"
+		originNotice = strings.TrimPrefix(strings.SplitN(string(source), "\n", 2)[0], "// ") + "\n\n" + goSourceLicense
+	}
 	generated := fmt.Sprintf(`/-
 Copyright 2026 The Kubernetes Authors.
-SPDX-License-Identifier: Apache-2.0
-
+SPDX-License-Identifier: %s
+%s
 Generated by cmd/ssa-source. Do not edit.
-Source: vendor/sigs.k8s.io/structured-merge-diff/v6/%s
+Source: %s
 SHA-256: %x
 -/
 import SSA.GoSubset
@@ -280,7 +364,7 @@ import SSA.GoSubset
 namespace SSA.%s
 
 %send SSA.%s
-`, description, sha256.Sum256(source), namespace, programs.String(), namespace)
+`, licenseID, originNotice, sourceLabel, sha256.Sum256(source), namespace, programs.String(), namespace)
 	if *checkPath == "" {
 		_, err = fmt.Print(generated)
 		return err

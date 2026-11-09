@@ -34,6 +34,9 @@ go run ./cmd/ssa-source \
 go run ./cmd/ssa-source -updater -source "$updater_source" -check SSA/UpdaterSource.lean
 element_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/fieldpath)/element.go"
 go run ./cmd/ssa-source -elements -source "$element_source" -check SSA/ElementSource.lean
+go run ./cmd/ssa-source -has -source "$element_source" -check SSA/HasSource.lean
+search_source="$(go list -f '{{.Dir}}' slices)/sort.go"
+go run ./cmd/ssa-source -search -source "$search_source" -check SSA/SearchSource.lean
 set_source="$(dirname "$element_source")/set.go"
 go run ./cmd/ssa-source -sets -source "$set_source" -check SSA/SetSource.lean
 
@@ -54,5 +57,6 @@ go test ./bridge ./cmd/ssa-compare ./cmd/ssa-source
 go run ./cmd/ssa-compare -model .lake/build/bin/ssa-model
 bash ci/verify-updater.sh
 bash ci/verify-sets.sh
+bash ci/verify-has.sh
 bash ci/verify-pr336.sh
 python3 docs/generate.py --check

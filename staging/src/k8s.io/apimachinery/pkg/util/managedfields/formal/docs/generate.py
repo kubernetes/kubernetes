@@ -122,7 +122,11 @@ def build():
     template = (ROOT / "docs/proof-explorer.template.html").read_text()
     if template.count("/*@@PROOF_DATA@@*/{}") != 1:
         raise ValueError("The proof explorer template must have exactly one data placeholder.")
-    return template.replace("/*@@PROOF_DATA@@*/{}", serialized)
+    license_text = (ROOT / "cmd/ssa-source/go-source-LICENSE").read_text()
+    if template.count("<!--@@GO_SOURCE_NOTICE@@-->") != 1:
+        raise ValueError("The proof explorer must retain the Go source license notice.")
+    notice = "<!--\nIncluded Go source translation: Copyright 2023 The Go Authors. All rights reserved.\n" + license_text + "-->"
+    return template.replace("/*@@PROOF_DATA@@*/{}", serialized).replace("<!--@@GO_SOURCE_NOTICE@@-->", notice)
 
 
 def main():

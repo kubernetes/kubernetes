@@ -1,5 +1,6 @@
 <!doctype html>
 <!-- Copyright The Kubernetes Authors. Licensed under Apache-2.0. -->
+<!--@@GO_SOURCE_NOTICE@@-->
 <!-- Generated from docs/proof-explorer.template.html, docs/notes.json, and accepted Lean declarations. -->
 <html lang="en">
 <head>
@@ -156,8 +157,13 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
     </div>
     <div class="card gap"><h2>Conventional reset roots exclude complete claim subtrees</h2>
       <p>The actual <code>excludeFilter.Filter</code> wrapper and both <code>RecursiveDifference</code> bodies are imported. For flat reset roots such as <code>spec</code>, <code>status</code> and <code>metadata</code>, the child source only filters whole root subtrees. Descendant keys are never compared; their numeric collisions do not require a global order assumption.</p>
-      <p>The direct-member proof uses order only in its active field-name domain. Has recognition and actual root/heap representation remain explicit. The native overlay checks 518 pairs, independent-prefix preservation and depth 64. Substituting ordinary Difference must fail both the source proof and native prefix-exclusion check. Object-data restoration and complete Apply/API composition remain separate.</p>
+      <p>The direct-member proof uses order only in its active field-name domain. Has recognition is now derived through the selected-library source; actual comparison/root/heap representation remain explicit. The native overlay checks 518 pairs, independent-prefix preservation and depth 64. Substituting ordinary Difference must fail both the source proof and native prefix-exclusion check. Object-data restoration and complete Apply/API composition remain separate.</p>
       <div class="chips"><button class="chip" data-proof="SSA.SetFilterContracts.locally_ordered_filter_excludes_root">Source root exclusion</button><button class="chip" data-proof="SSA.ElementLocalOrder.imported_local_membership">Local-domain algebra</button><button class="chip" data-proof="SSA.SetFilterContracts.imported_flat_node_matches">Complete suffix iteration</button></div>
+    </div>
+    <div class="card gap"><h2>Has and the actual selected-library search are source-bound</h2>
+      <p>The complete Has/Less wrappers and Go BinarySearchFunc are imported. A finite-interval proof covers every representable array size and every pure comparator; exact membership additionally requires local ordering and comparator-zero faithfulness. The unsigned midpoint is modeled with its word residue and proved safe even when the signed intermediate sum overflows.</p>
+      <p>The reset filter’s former Has-recognition premise is now derived. Actual field-name comparison, root/heap/ownership representation and complete request composition remain open. Native checks cover 776 lookup queries, 128 Less results and 16 near-limit 32/64-bit midpoint controls; the final-zero-test mutation must fail both source and native membership checks.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.SearchContracts.imported_search_matches">Complete binary-search execution</button><button class="chip" data-proof="SSA.HasBridge.imported_has_membership">Source Has membership</button><button class="chip" data-proof="SSA.FilterHasBridge.source_filter_excludes_root">Derived root lookup</button><button class="chip" data-proof="SSA.SearchIndex.unsigned_midpoint_eq_half">Go midpoint arithmetic</button></div>
     </div>
     <div class="card"><h2>Boundaries still requiring separate work</h2>
       <p>Theorems quantify over arbitrary finite normalized model inputs. Go comparisons cover supplied structural schemas, recursive types, composite keys, sets, atomics, empty/null containers and Apply/Update. They are bounded evidence, not a universal Go refinement proof.</p>
