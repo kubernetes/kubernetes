@@ -82,6 +82,9 @@ type RuntimeFeatures struct {
 	MountOptions bool
 	// SeccompProfileOCI indicates if the runtime supports seccomp profiles pulled from OCI registries.
 	SeccompProfileOCI bool
+	// CgroupNamespaces indicates if the default runtime handler supports specifying
+	// whether to use the host cgroup namespace.
+	CgroupNamespaces bool
 }
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.
