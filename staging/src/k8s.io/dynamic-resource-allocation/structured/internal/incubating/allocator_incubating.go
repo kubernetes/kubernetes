@@ -873,110 +873,6 @@ type constraint interface {
 	remove(request *requestData, device *draapi.Device, deviceID DeviceID)
 }
 
-// deviceAttributeListAsSet is set-based representation of DeviceAttributeListType.
-// This has the same structure as DeviceAttributeListType, but uses sets.Set instead of slices.
-type deviceAttributeListAsSet struct {
-	intValue     sets.Set[int64]
-	boolValue    sets.Set[bool]
-	stringValue  sets.Set[string]
-	versionValue sets.Set[string]
-}
-
-// intersection returns the new intersection set of two attribute sets as a new set.
-// Returns nil if there is no intersection or if the types do not match.
-func (s *deviceAttributeListAsSet) intersection(other *deviceAttributeListAsSet) *deviceAttributeListAsSet {
-	result := &deviceAttributeListAsSet{}
-
-	switch {
-	case s.intValue != nil && other.intValue != nil:
-		intersection := s.intValue.Intersection(other.intValue)
-		if intersection.Len() == 0 {
-			return nil
-		}
-		result.intValue = intersection
-		return result
-	case s.boolValue != nil && other.boolValue != nil:
-		intersection := s.boolValue.Intersection(other.boolValue)
-		if intersection.Len() == 0 {
-			return nil
-		}
-		result.boolValue = intersection
-		return result
-	case s.stringValue != nil && other.stringValue != nil:
-		intersection := s.stringValue.Intersection(other.stringValue)
-		if intersection.Len() == 0 {
-			return nil
-		}
-		result.stringValue = intersection
-		return result
-	case s.versionValue != nil && other.versionValue != nil:
-		intersection := s.versionValue.Intersection(other.versionValue)
-		if intersection.Len() == 0 {
-			return nil
-		}
-		result.versionValue = intersection
-		return result
-	default:
-		// Type mismatch
-		return nil
-	}
-}
-
-// attributeAsSet creates deviceAttributeListAsSet from DeviceAttribute.
-// Both scalar and list attributes are converted to set representation.
-// For scalar values, creates a single-element set.
-// For list values, creates a set from all elements.
-// Returns nil if the attribute type is unknown.
-func attributeAsSet(attribute any) *deviceAttributeListAsSet {
-	if attribute == nil {
-		return nil
-	}
-
-	result := &deviceAttributeListAsSet{}
-
-	switch attribute := attribute.(type) {
-	case []int64:
-		result.intValue = sets.New(attribute...)
-		return result
-	case []bool:
-		result.boolValue = sets.New(attribute...)
-		return result
-	case []string:
-		result.stringValue = sets.New(attribute...)
-		return result
-	case []semver.Version:
-		result.versionValue = sets.New[string]()
-		for _, ver := range attribute {
-			result.versionValue.Insert(versionWithoutBuild(ver))
-		}
-		return result
-	case int64:
-		result.intValue = sets.New(attribute)
-		return result
-	case bool:
-		result.boolValue = sets.New(attribute)
-		return result
-	case string:
-		result.stringValue = sets.New(attribute)
-		return result
-	case semver.Version:
-		result.versionValue = sets.New(versionWithoutBuild(attribute))
-		return result
-	default:
-		return nil
-	}
-}
-
-// versionWithoutBuild renders a version as a string while ignoring build
-// metadata, matching the precedence semantics of Version.Equals (semver
-// build metadata has no effect on equality). This keeps list-type attribute
-// sets consistent with the scalar comparison in matchAttributeConstraint and
-// distinctAttributeConstraint, which also use Equals.
-func versionWithoutBuild(ver semver.Version) string {
-	ver.Build = nil
-	return ver.String()
-}
-
 // matchAttributeConstraint compares an attribute value across devices.
 // All devices must share the same value. When the set of devices is
 // empty, any device that has the attribute can be added. After that,
@@ -998,7 +894,10 @@ type matchAttributeConstraint struct {
 	// For list values (when DRAListTypeAttributes feature gate is enabled).
 	// intersectionStack[len-1] is the current intersection; each add() pushes and each remove() pops,
 	// so backtracking always restores the intersection to its pre-add state.
-	intersectionStack []*deviceAttributeListAsSet
+	// An entry is an attribute value in the same form that draapi stores one,
+	// which may be a single value once only one is left in common.
+	// Entries may be values owned by the ResourceSlice and must not be modified.
+	intersectionStack []any
 
 	numDevices int
 }
@@ -1024,13 +923,11 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 		return false, nil
 	}
 
-	// Check value and convert to a set if needed.
-	var newSet *deviceAttributeListAsSet
+	// Check the value.
 	if m.features.ListTypeAttributes {
-		newSet = attributeAsSet(attribute)
-		if newSet == nil {
-			// Internal error: attribute was already validated by lookupAttribute, so
-			// attributeAsSet must recognize its type. This should never be reached.
+		if !comparableAttributeValue(attribute) {
+			// Internal error: attribute was already validated by lookupAttribute,
+			// so its type must be one we know. This should never be reached.
 			return false, fmt.Errorf("internal error: unexpected attribute type %T", attribute)
 		}
 	} else {
@@ -1049,10 +946,10 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 	}
 
 	if m.numDevices == 0 {
-		// The first device can always get picked. Validation above ensures that
-		// we have a valid set resp. attribute.
+		// The first device can always get picked. Validation above ensures
+		// that the value is one we can compare.
 		if m.features.ListTypeAttributes {
-			m.intersectionStack = append(m.intersectionStack, newSet)
+			m.intersectionStack = append(m.intersectionStack, attribute)
 		} else {
 			m.attribute = attribute
 		}
@@ -1065,17 +962,17 @@ func (m *matchAttributeConstraint) add(request *requestData, device *draapi.Devi
 
 	// Check if we are matching with set-based logic or scalar-based logic
 	if m.features.ListTypeAttributes {
-		// Set-based matching: check if there is non-empty intersection
+		// Set-based matching: check that something is left in common.
 		current := m.intersectionStack[m.numDevices-1]
-		narrowed := current.intersection(newSet)
-		if narrowed == nil {
+		intersection, ok := intersect(current, attribute)
+		if !ok {
 			if m.loggerV7 != nil {
 				m.loggerV7.Info("Attribute values have no common elements")
 			}
 			return false, nil
 		}
-		// Push a narrowed copy so remove() can pop back to the previous intersection.
-		m.intersectionStack = append(m.intersectionStack, narrowed)
+		// Push it so that remove() can pop back to the previous intersection.
+		m.intersectionStack = append(m.intersectionStack, intersection)
 	} else {
 		switch existing := m.attribute.(type) {
 		case string:
