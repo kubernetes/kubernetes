@@ -5935,8 +5935,7 @@
         "serviceAccountName",
         "serviceAccountUID",
         "nodeName",
-        "nodeUID",
-        "stubPKCS10Request"
+        "nodeUID"
       ],
       "type": "object"
     },

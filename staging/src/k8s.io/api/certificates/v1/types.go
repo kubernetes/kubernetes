@@ -66,6 +66,7 @@ type CertificateSigningRequest struct {
 type CertificateSigningRequestSpec struct {
 	// request contains an x509 certificate signing request encoded in a "CERTIFICATE REQUEST" PEM block.
 	// When serialized as JSON or YAML, the data is additionally base64-encoded.
+	// +required
 	Request []byte `json:"request" protobuf:"bytes,1,opt,name=request"`
 
 	// signerName indicates the requested signer, and is a qualified name.
@@ -89,6 +90,7 @@ type CertificateSigningRequestSpec struct {
 	//  4. Required, permitted, or forbidden key usages / extended key usages.
 	//  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
 	//  6. Whether or not requests for CA certificates are allowed.
+	// +required
 	SignerName string `json:"signerName" protobuf:"bytes,7,opt,name=signerName"`
 
 	// expirationSeconds is the requested duration of validity of the issued
@@ -261,9 +263,11 @@ type CertificateSigningRequestCondition struct {
 	// Approved, Denied, and Failed conditions cannot be removed once added.
 	//
 	// Only one condition of a given type is allowed.
+	// +required
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
 	// status of the condition, one of True, False, Unknown.
 	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// +required
 	Status v1.ConditionStatus `json:"status" protobuf:"bytes,6,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// reason indicates a brief reason for the request state
 	// +optional
@@ -359,6 +363,7 @@ type ClusterTrustBundle struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec contains the signer (if any) and trust anchors.
+	// +required
 	Spec ClusterTrustBundleSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 }
 
@@ -399,6 +404,7 @@ type ClusterTrustBundleSpec struct {
 	// Users of ClusterTrustBundles, including Kubelet, are free to reorder and
 	// deduplicate certificate blocks in this file according to their own logic,
 	// as well as to drop PEM block headers and inter-block data.
+	// +required
 	TrustBundle string `json:"trustBundle" protobuf:"bytes,2,opt,name=trustBundle"`
 }
 
