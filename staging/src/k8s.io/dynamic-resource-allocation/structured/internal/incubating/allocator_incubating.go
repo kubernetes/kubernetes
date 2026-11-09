@@ -319,6 +319,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				}
 				constraints[i] = m
 			case constraint.DistinctAttribute != nil:
+				if !alloc.features.ConsumableCapacity {
+					return nil, fmt.Errorf("claim %s, constraint #%d: has distinctAttribute, but the DRAConsumableCapacity feature is disabled", klog.KObj(claim), i)
+				}
 				distinctAttribute := string(*constraint.DistinctAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
@@ -1540,8 +1543,8 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool, st
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
 	device := &slice.Spec.Devices[deviceIndex]
 	if !alloc.features.DeviceBindingAndStatus &&
-		len(device.BindingConditions) > 0 {
-		// Devices with binding conditions are not supported, feature is off.
+		(len(device.BindingConditions) > 0 || device.BindsToNode) {
+		// Devices with binding conditions or which bind to a node are not supported, feature is off.
 		return false, nil
 	}
 
