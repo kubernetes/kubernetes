@@ -68,6 +68,9 @@ func TestDeclaredFeatureDiscovery(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			if !tc.podLevelResourcesIPPREnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, podLevelResourcesIPPRFeatureGate, tc.podLevelResourcesIPPREnabled)
 
 			cfg := &ndf.NodeConfiguration{

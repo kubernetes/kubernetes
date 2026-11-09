@@ -4921,6 +4921,9 @@ func TestDropDisabledPodStatusFields_InPlacePodLevelResourcesVerticalScaling(t *
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeDeclaredFeatures, true)
 	for _, ippvsEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("InPlacePodLevelResourcesVerticalScaling=%t", ippvsEnabled), func(t *testing.T) {
+			if !ippvsEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, ippvsEnabled)
 			for _, oldPodInfo := range testCases {
 				for _, newPodInfo := range testCases {
