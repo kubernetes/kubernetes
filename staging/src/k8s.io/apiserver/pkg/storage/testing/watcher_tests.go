@@ -2470,7 +2470,7 @@ func testWatchResync(ctx context.Context, t *testing.T, store storage.Interface,
 		rvBeforeWatch  testRV = "beforeWatch"
 		rvBeforeResync testRV = "beforeResync"
 		rvAfterResync  testRV = "afterResync"
-		stallCount            = 25
+		stallCount            = 35
 	)
 
 	ns := fmt.Sprintf("ns-%d-%t", compactIdx, stall)
@@ -3118,7 +3118,7 @@ func testWatchResync(ctx context.Context, t *testing.T, store storage.Interface,
 	if stall {
 		go func() {
 			defer close(otherWatchOpened)
-			otherWatch, otherWatchErr = store.Watch(ctx, fmt.Sprintf("/pods/%s", otherNs), storage.ListOptions{
+			otherWatch, otherWatchErr = store.Watch(genericapirequest.WithNamespace(ctx, otherNs), fmt.Sprintf("/pods/%s", otherNs), storage.ListOptions{
 				ResourceVersion: strconv.FormatUint(beforeWatchRV, 10),
 				Predicate:       storage.Everything,
 				Recursive:       true,
@@ -3166,6 +3166,30 @@ func testWatchResync(ctx context.Context, t *testing.T, store storage.Interface,
 	initialBookmarkWithPod2RV.Object.(*example.Pod).ResourceVersion = pod2.ResourceVersion
 	initialBookmarkWithPod3RV.Object.(*example.Pod).ResourceVersion = pod3.ResourceVersion
 	bookmarkWithPod3RV.Object.(*example.Pod).ResourceVersion = pod3.ResourceVersion
+
+	if stall && syncBackground && compactAfterResync == nil {
+		stopBackgroundResync := make(chan struct{})
+		var backgroundResyncWorkers sync.WaitGroup
+		t.Cleanup(func() {
+			close(stopBackgroundResync)
+			backgroundResyncWorkers.Wait()
+		})
+		backgroundResyncWorkers.Go(func() {
+			for {
+				select {
+				case <-stopBackgroundResync:
+					return
+				default:
+				}
+				if resync != nil {
+					resync()
+				}
+				if triggerBookmarks != nil {
+					triggerBookmarks()
+				}
+			}
+		})
+	}
 }
 
 func makePod(namePrefix string) *example.Pod {
