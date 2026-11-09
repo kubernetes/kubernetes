@@ -77,6 +77,10 @@ const (
 	// defaultBookmarkFrequency defines how frequently watch bookmarks should be send
 	// in addition to sending a bookmark right before watch deadline.
 	defaultBookmarkFrequency = time.Minute
+
+	// watcherResyncPeriod defines how frequently unsynchronized watchers are resynced
+	// with the watch cache.
+	watcherResyncPeriod = 100 * time.Millisecond
 )
 
 // Config contains the configuration for a given Cache.
@@ -333,7 +337,7 @@ type Cacher struct {
 	stopCh   chan struct{}
 	stopWg   sync.WaitGroup
 
-	clock clock.Clock
+	clock clock.WithTicker
 	// timer is used to avoid unnecessary allocations in underlying watchers.
 	timer *time.Timer
 
@@ -343,6 +347,8 @@ type Cacher struct {
 	// watchersBuffer is a list of watchers potentially interested in currently
 	// dispatched event.
 	watchersBuffer []*cacheWatcher
+	// unsyncedWatchers is a map that need to be synchronized before sending events.
+	unsyncedWatchers watchersMap
 	// blockedWatchers is a list of watchers whose buffer is currently full.
 	blockedWatchers []*cacheWatcher
 	// watchersToStop is a list of watchers that were supposed to be stopped
@@ -429,6 +435,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		stopCh:                        stopCh,
 		clock:                         config.Clock,
 		timer:                         time.NewTimer(time.Duration(0)),
+		unsyncedWatchers:              make(watchersMap),
 		bookmarkWatchers:              newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
 		watcherMetrics:                metrics.NewWatcherMetricsObservers(config.GroupResource),
 		disableConsistentGetFromCache: config.DisableConsistentGetFromCache,
@@ -485,6 +492,9 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	go cacher.dispatchEvents()
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		go cacher.startBackgroundResync()
+	}
 	go progressRequester.Run(stopCh)
 	go watchCache.freshness.Run(stopCh)
 
@@ -522,6 +532,62 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	if err != nil {
 		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.groupResource.String(), err)
 		metrics.WatchCacheInitializationErrors.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
+	}
+}
+
+func (c *Cacher) startBackgroundResync() {
+	c.stopWg.Add(1)
+	ticker := c.clock.NewTicker(watcherResyncPeriod)
+	go func() {
+		defer c.stopWg.Done()
+		defer ticker.Stop()
+		for {
+			select {
+			case <-c.stopCh:
+				return
+			case <-ticker.C():
+				c.resyncWatchers()
+			}
+		}
+	}()
+}
+
+func (c *Cacher) resyncWatchers() {
+	c.RLock()
+	hasUnsynced := len(c.unsyncedWatchers) > 0
+	c.RUnlock()
+	if !hasUnsynced {
+		return
+	}
+
+	c.watchCache.RLock()
+	defer c.watchCache.RUnlock()
+
+	c.Lock()
+	defer c.Unlock()
+
+	if !c.Ready() {
+		return
+	}
+
+	for _, watcher := range c.unsyncedWatchers {
+		c.unsyncedWatchers.deleteWatcher(watcher)
+		if watcher.stopped {
+			continue
+		}
+		// TODO: Once stalled watchers are moved back to unsyncedWatchers,
+		// compute and send only catchup events after the last dispatched
+		// resourceVersion instead of re-initializing the watcher interval.
+		cacheInterval, err := c.initWatcherIntervalLocked(watcher)
+		if err != nil {
+			watcher.input <- watcherInput{err: err}
+			// Drain input so watcher.done stays open until process() delivers
+			// the queued watch.Error event; non-draining stop closes watcher.done
+			// immediately, causing sendWatchError to drop the error.
+			c.stopWatcherLocked(watcher, true)
+			continue
+		}
+		c.registerWatcherLocked(watcher, cacheInterval)
 	}
 }
 
@@ -655,9 +721,12 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 		watcher.requiredResourceVersion = requiredResourceVersion
 	}
 
-	cacheInterval, err := c.initWatcherIntervalLocked(watcher)
-	if err != nil {
-		return nil, err
+	var cacheInterval *watchCacheInterval
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		cacheInterval, err = c.initWatcherIntervalLocked(watcher)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	c.Lock()
@@ -681,7 +750,12 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 			originalForget(drainWatcher)
 		}
 	}
-	c.registerWatcherLocked(watcher, cacheInterval)
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		c.unsyncedWatchers.addWatcher(watcher)
+	} else {
+		c.registerWatcherLocked(watcher, cacheInterval)
+	}
+	c.watcherIdx++
 	return watcher, nil
 }
 
@@ -1269,6 +1343,9 @@ func (c *Cacher) terminateAllWatchers() {
 	c.watchers.terminateAll(c.groupResource, func(watcher *cacheWatcher) {
 		c.stopWatcherLocked(watcher, false)
 	})
+	c.unsyncedWatchers.terminateAll(func(watcher *cacheWatcher) {
+		c.stopWatcherLocked(watcher, false)
+	})
 }
 
 // watcherToStop is a stop deferred to the end of a dispatch. It keeps its own
@@ -1335,6 +1412,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher) func(bool) {
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
 		c.watchers.deleteWatcher(w)
+		c.unsyncedWatchers.deleteWatcher(w)
 		c.stopWatcherLocked(w, drainWatcher)
 	}
 }
