@@ -1059,5 +1059,317 @@
     "scope": "execution",
     "meaning": "The exact original payload path belongs to A in the initial serialized ownership meaning.",
     "limits": "This premise is passed explicitly to the ownership-preservation proposition. Initial source reachability and the raw CRD FieldsV1 payload claim independently establish it; the decoder is part of the modeled request, not a silently corrupted initial state."
+  },
+  "SSA.UpdaterContracts.claims_bounded_refl": {
+    "title": "Claims bounded refl",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.claims_bounded_trans": {
+    "title": "Claims bounded trans",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.deleting_claims_is_bounded": {
+    "title": "Deleting claims is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.replacing_with_old_claims_is_bounded": {
+    "title": "Replacing with old claims is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.imported_update_has_only_subtractive_claim_writes": {
+    "title": "The imported update body satisfies the subtractive-write certificate",
+    "scope": "helper",
+    "meaning": "Kernel-checks the complete imported source against the safe-program syntactic premise. Semantic soundness is proved separately and composed in imported_update_never_adds_claims.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.heap_write_reads_back": {
+    "title": "Heap write reads back",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.equal_references_observe_same_filter": {
+    "title": "Equal references observe same filter",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.filter_method_mutates_shared_reference": {
+    "title": "Filter method mutates shared reference",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.filtered_reference_exposes_modified_fields": {
+    "title": "Filtered reference exposes modified fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.expression_preserves_environment": {
+    "title": "Expression preserves environment",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.arguments_preserve_environment": {
+    "title": "Arguments preserve environment",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.read_write_same": {
+    "title": "Read write same",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.read_write_other": {
+    "title": "Read write other",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_of_same_environment": {
+    "title": "Invariant of same environment",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_variable": {
+    "title": "Eval variable",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_call": {
+    "title": "Eval call",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_index": {
+    "title": "Eval index",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_all_empty": {
+    "title": "Eval all empty",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_all_cons": {
+    "title": "Eval all cons",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_current_fields": {
+    "title": "Eval current fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.difference_call_has_single_field_result": {
+    "title": "Difference call has single field result",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_difference_of_current_fields": {
+    "title": "Eval difference of current fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.new_versioned_set_keeps_first_fields": {
+    "title": "New versioned set keeps first fields",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.eval_subtractive_write_cannot_add": {
+    "title": "Eval subtractive write cannot add",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.manager_lookup_is_member": {
+    "title": "Manager lookup is member",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.subtractive_shape": {
+    "title": "Subtractive shape",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_write_unprotected": {
+    "title": "Invariant write unprotected",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_bind_names": {
+    "title": "Invariant bind names",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.successful_subtractive_write_has_current_entry": {
+    "title": "Successful subtractive write has current entry",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.run_eval_has_raw_result": {
+    "title": "Run eval has raw result",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_tracked_not_nil": {
+    "title": "Invariant tracked not nil",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_tracked_not_package": {
+    "title": "Invariant tracked not package",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_store_subtraction": {
+    "title": "Invariant store subtraction",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_store_bounded_map": {
+    "title": "Invariant store bounded map",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.invariant_store_deletion": {
+    "title": "Invariant store deletion",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.run_eval_variable": {
+    "title": "Run eval variable",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.managed_map_assignment_shape": {
+    "title": "Managed map assignment shape",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.run_all_has_raw_result": {
+    "title": "Run all has raw result",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.evaluated_first_variable_is_head": {
+    "title": "Evaluated first variable is head",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.safe_return_is_bounded": {
+    "title": "Safe return is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.range_preserves_invariant": {
+    "title": "Range preserves invariant",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.map_assignment_preserves_invariant": {
+    "title": "Map assignment preserves invariant",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.map_deletion_preserves_invariant": {
+    "title": "Map deletion preserves invariant",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.safe_program_preserves_claim_bound": {
+    "title": "Safe program preserves claim bound",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.initial_ownership_is_bounded": {
+    "title": "Initial ownership is bounded",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterContracts.imported_update_never_adds_claims": {
+    "title": "Imported ownership update never adds a manager claim path",
+    "scope": "general",
+    "meaning": "Every returned exact path already belonged to the same manager at entry to the complete private update phase, for arbitrary finite managers, versions, errors, force and lawful schedules.",
+    "limits": "Requires Difference to select exact paths from its left operand and the explicit typed/set/conversion/filter primitives. Entry is after ownership decoding and actor-field installation. This does not establish whole-request or wire non-growth, interpreter progress for every Go input, or universal runtime/primitive refinement."
+  },
+  "SSA.UpdaterContracts.imported_update_preserves_prefix_exclusion": {
+    "title": "Imported update preserves an excluded ownership prefix",
+    "scope": "general",
+    "meaning": "A manager excluded from a prefix before the private update cannot acquire a path under that prefix through this complete source execution.",
+    "limits": "Corollary of source claim non-growth under exact Difference left-subset preservation. Configuration and the preceding actual filter/request pipeline remain separate obligations."
+  },
+  "SSA.UpdaterBridge.decoded_success_is_source_success": {
+    "title": "Decoded success is source success",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterBridge.source_update_does_not_grow_actor": {
+    "title": "Source update does not grow actor",
+    "scope": "helper",
+    "meaning": "Internal semantic/control-flow or representation lemma used by the source ownership-update proof.",
+    "limits": "A proof-composition helper, not an additional independent SSA guarantee. The private source phase and explicit primitive/runtime boundary apply."
+  },
+  "SSA.UpdaterBridge.source_apply_excludes_reset_fields": {
+    "title": "Imported Apply and update compose to preserve configured reset exclusion",
+    "scope": "general",
+    "meaning": "Complete Apply installs the selected prefix filter and invokes a source-backed update callback whose non-growth is derived from imported update execution.",
+    "limits": "The callback frame is derived rather than assumed. Exact Difference left-subset preservation, configured model prefix filtering, primitive purity/types, and successful interpreter execution remain explicit. Actual recursive set/filter implementation and complete API/subresource/runtime refinement are not proved."
+  },
+  "SSA.UpdaterExamples.imported_update_observes_in_place_filter": {
+    "title": "Uncached-version filtering is visible through shared comparison references",
+    "scope": "execution",
+    "meaning": "A full source execution observes the same filtered comparison through local and version-cache references and preserves B’s v1 Update flag/claim.",
+    "limits": "Named scalar/identity-version primitive fixture. Exact native private-update observations agree in vendored SMD and both pinned revisions. General source non-growth has its separate quantified proof; this is execution evidence."
+  },
+  "SSA.UpdaterExamples.imported_forced_update_does_not_give_B_new_fields": {
+    "title": "Force does not give B the actor’s newly added field",
+    "scope": "execution",
+    "meaning": "With the actor’s new footprint already installed, forced source execution removes B’s conflict claim and leaves B without the new extra field.",
+    "limits": "Named scalar/identity-version primitive fixture. Exact native private-update observations agree in vendored SMD and both pinned revisions. General source non-growth has its separate quantified proof; this is execution evidence."
   }
 }

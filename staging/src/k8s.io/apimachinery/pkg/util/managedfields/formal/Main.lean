@@ -42,7 +42,8 @@ private def usage : String :=
   "ssa-model --self-test | --list | --fixtures | --trace NAME | --check FILE | --replay FILE\n" ++
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
-  "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses."
+  "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
+  "--updater-observations reports source ownership-update observations."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -119,6 +120,9 @@ def main (args : List String) : IO UInt32 := do
       return 0
   | ["--numeric-omission-counterexamples"] =>
       stdout.putStrLn (toJson NumericOmissionCounterexamples.observe).compress
+      return 0
+  | ["--updater-observations"] =>
+      stdout.putStrLn (toJson UpdaterExamples.observe).compress
       return 0
   | [mode, path] =>
       if mode != "--check" && mode != "--replay" then

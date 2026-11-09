@@ -230,8 +230,8 @@ The Go primitive and updater refinement obligations remain open in the catalogue
 ## Binding proofs to source
 
 `cmd/ssa-source` uses Go's parser to import complete bodies and checked signatures
-from the selected updater and element-set sources into `SSA/GoSource.lean` and
-`SSA/ElementSource.lean`:
+from the selected updater and element-set sources into `SSA/GoSource.lean`,
+`SSA/UpdaterSource.lean` and `SSA/ElementSource.lean`:
 
 | Source function | Kernel-checked contract |
 | --- | --- |
@@ -240,14 +240,18 @@ from the selected updater and element-set sources into `SSA/GoSource.lean` and
 | `addBackOwnedItems` | `OwnedSource.imported_owned_items_matches_spec` |
 | `prune` | `PruneSource.imported_prune_matches_spec` |
 | `Apply` | `ApplySource.imported_apply_matches_spec` |
+| internal `update` | `UpdaterContracts.imported_update_never_adds_claims`, `UpdaterBridge.source_apply_excludes_reset_fields` |
 | `PathElementSet.Difference`, `Union`, `Intersection` (`fieldpath/element.go`) | `ElementAlgebra.imported_matches`, `imported_membership`, `imported_preserves_order`, `imported_preserves_uniqueness` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
 finite map traversal. It quantifies over every lawful version-map iteration
 permutation. Statement fuel bounds syntax depth; the loop proofs cover arbitrary
-finite manager/version counts. Unsupported syntax, map aliases, mutations of
-iterated maps, unbound globals and changed import bindings are rejected.
+finite manager/version counts. Unsupported syntax, map aliases, writes to
+iterated maps, unbound globals and changed import bindings are rejected. The
+internal ownership updater may delete its currently visited entry; the importer
+checks that restriction, and its interpreter uses independent lawful schedules
+for the lexical ranges.
 Successful conversion has a non-nil result in the primitive contract; a failed
 conversion retains its optional returned object rather than assuming it is nil.
 
@@ -263,9 +267,36 @@ primitive behavior and unmodeled aliasing side effects remain review obligations
 `ResetFields` proves prefix exclusion, filter idempotence and recursive trie
 membership refinement at arbitrary finite depth. The source-level theorem
 `ApplySource.imported_apply_excludes_reset_fields` composes this filter with an
-explicit non-growth contract for the remaining final updater callback. The Go
-filter and updater implementations still need refinement; the theorem does not
-assume the desired conclusion about the whole Apply result.
+explicit final-updater contract. `UpdaterBridge.source_apply_excludes_reset_fields`
+now realizes that callback with complete imported `update` execution and derives
+its non-growth property. It requires the field-set primitive's exact left-subset
+law for Difference. The Go recursive set/filter implementations and complete
+subresource pipeline still need refinement.
+
+`UpdaterSubset` models comparison objects by heap addresses: filtering a
+comparison mutates the object shared by a local variable and the version cache.
+Expression evaluation keeps its environment immutable while updating that heap.
+`UpdaterContracts` proves a general invariant for finite safe programs, including
+assignment, deletion, branches, returns, `continue` and arbitrary finite ranges.
+The actual complete updater satisfies the source-shape premise. Consequently,
+every returned manager path already belonged to that manager at this phase's
+entry, under the Difference premise. Typed comparison, conversion and filter
+outcomes may otherwise be arbitrary. This private phase runs after ownership
+decoding and actor-field installation; it is not a no-growth law for an entire
+Apply request or for wire decoding.
+
+`UpdaterBridge` decodes successful imported execution into the existing Apply
+callback interface. Primitive, conflict, configuration and interpreter failures
+remain explicit failures. This supplies source-backed non-growth without assuming
+the desired final Apply result. Universal interpreter progress and runtime
+refinement of all primitives remain separate obligations.
+
+Two full-source observations agree with native private `update` in vendored SMD
+and both pinned revisions: filtering an uncached version is visible through
+shared comparison references, and force does not grant B the actor's new field.
+Go's overlay adds the internal-package witness without editing the dependency.
+The ownership-growth mutation is rejected both by the unchanged Lean source
+certificate and by the native force witness.
 
 `PruningRefinement.single_version_pruning_refinement` connects all four imported
 functions to the normalized three-pass model for arbitrary states and field

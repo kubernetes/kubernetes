@@ -119,6 +119,55 @@ func TestUnsupportedSyntaxCannotDisappear(t *testing.T) {
 	}
 }
 
+func TestUpdaterImportsCacheReferencesAndCurrentEntryDeletion(t *testing.T) {
+	source := []byte("package merge\n" + updaterFunctions[0].signature + ` {
+var versions map[fieldpath.APIVersion]*typed.Comparison
+compare, err := oldObject.Compare(newObject)
+if err != nil { return nil, nil, err }
+versions = map[fieldpath.APIVersion]*typed.Comparison{version: compare.FilterFields(s.IgnoreFilter[version])}
+conflicts := fieldpath.ManagedFields{}
+for manager, managerSet := range managers {
+  if manager == workflow { continue }
+  compare, ok := versions[managerSet.APIVersion()]
+  if !ok { delete(managers, manager); continue }
+  conflicts[manager] = fieldpath.NewVersionedSet(compare.Modified, version, false)
+}
+if !force && len(conflicts) != 0 { return nil, nil, ConflictsFromManagers(conflicts) }
+for manager := range managers {
+  if managers[manager].Set().Empty() { delete(managers, manager) }
+}
+return managers, compare, nil
+}`)
+	program, err := importFunction(source, updaterFunctions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"(.singletonComparisonMap", "(.equalScalars", "(.continueLoop)", "(.length", "(.conflictsFromManagers", "(.mapDelete", `(.rangeMap "manager$`} {
+		if !strings.Contains(program, required) {
+			t.Fatalf("updater import dropped %q: %s", required, program)
+		}
+	}
+}
+
+func TestUpdaterRejectsUntrackedMapEffectsAndControlFlow(t *testing.T) {
+	for name, body := range map[string]string{
+		"foreign deletion":      `for manager, entry := range managers { delete(managers, workflow) }; return managers, nil, nil`,
+		"iterated write":        `for manager, entry := range managers { managers[manager] = entry }; return managers, nil, nil`,
+		"map alias":             `alias := managers; return managers, nil, nil`,
+		"continue outside loop": `continue; return managers, nil, nil`,
+		"loop break":            `for manager := range managers { break }; return managers, nil, nil`,
+		"labeled continue":      `for manager := range managers { continue outer }; return managers, nil, nil`,
+		"shadowed conflicts":    `ConflictsFromManagers := oldObject; return nil, nil, ConflictsFromManagers(managers)`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			source := []byte("package merge\n" + updaterFunctions[0].signature + " {\n" + body + "\n}")
+			if _, err := importFunction(source, updaterFunctions[0]); err == nil {
+				t.Fatalf("unsupported updater effect was accepted: %s", body)
+			}
+		})
+	}
+}
+
 func TestApplyImportsFilterBranchAndActorMapWrite(t *testing.T) {
 	source := []byte("package merge\n" + functions[4].signature + ` {
 var ignoreFilter fieldpath.Filter

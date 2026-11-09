@@ -33,12 +33,15 @@ type binding struct {
 
 // Unique lexical identities let the interpreter preserve updates without leaking shadows.
 type scope struct {
-	parent   *scope
-	bindings map[string]binding
-	serial   *int
-	depth    int
-	readOnly map[string]bool
-	elements bool
+	parent      *scope
+	bindings    map[string]binding
+	serial      *int
+	depth       int
+	readOnly    map[string]bool
+	elements    bool
+	updater     bool
+	inLoop      bool
+	currentKeys map[string]string
 }
 
 func rootScope(function functionSpec) *scope {
@@ -49,6 +52,12 @@ func rootScope(function functionSpec) *scope {
 	}
 	root := globals.child()
 	root.elements = function.elements
+	root.updater = function.updater
+	if function.updater {
+		for _, name := range []string{"len", "ConflictsFromManagers"} {
+			globals.bindings[name] = binding{name, "builtin"}
+		}
+	}
 	if function.elements {
 		for _, name := range []string{"len", "append"} {
 			globals.bindings[name] = binding{name, "builtin"}
@@ -65,7 +74,17 @@ func rootScope(function functionSpec) *scope {
 }
 
 func (s *scope) child() *scope {
-	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements}
+	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}}
+}
+
+func (s *scope) currentKey(mapID string) string {
+	if key := s.currentKeys[mapID]; key != "" {
+		return key
+	}
+	if s.parent != nil {
+		return s.parent.currentKey(mapID)
+	}
+	return ""
 }
 
 func (s *scope) resolve(name string) (binding, bool) {
@@ -106,10 +125,10 @@ func mapName(expression ast.Expr, context *scope, writable bool) (binding, error
 		return binding{}, fmt.Errorf("unsupported Go map receiver %T", expression)
 	}
 	value, ok := context.resolve(name.Name)
-	if !ok || (value.kind != "managed" && value.kind != "managed-write" && value.kind != "versions") {
+	if !ok || (value.kind != "managed" && value.kind != "managed-write" && value.kind != "versions" && value.kind != "comparisons") {
 		return binding{}, fmt.Errorf("unsupported Go map %q", name.Name)
 	}
-	if writable && ((value.kind != "versions" && value.kind != "managed-write") || !context.canWrite(value.id)) {
+	if writable && ((value.kind != "versions" && value.kind != "managed-write" && value.kind != "comparisons") || !context.canWrite(value.id)) {
 		return binding{}, fmt.Errorf("mutation of read-only or iterated Go map %q", name.Name)
 	}
 	return value, nil
@@ -141,7 +160,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(value.id)
 		return "(.var " + name + ")", err
 	case *ast.BasicLit:
-		if context.elements && e.Kind == token.INT {
+		if (context.elements || context.updater) && e.Kind == token.INT {
 			if len(e.Value) > 1 && e.Value[0] == '0' {
 				return "", fmt.Errorf("unsupported Go non-decimal integer %q", e.Value)
 			}
@@ -168,7 +187,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		field, err := quoted(e.Sel.Name)
 		return "(.select " + receiver + " " + field + ")", err
 	case *ast.CallExpr:
-		if name, ok := e.Fun.(*ast.Ident); ok && context.elements {
+		if name, ok := e.Fun.(*ast.Ident); ok && (context.elements || context.updater) {
 			bound, found := context.resolve(name.Name)
 			if !found || bound.kind != "builtin" {
 				return "", fmt.Errorf("unsupported or shadowed element-set builtin %q", name.Name)
@@ -177,7 +196,11 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 				value, err := renderExpr(e.Args[0], context)
 				return "(.length " + value + ")", err
 			}
-			if name.Name == "append" && len(e.Args) == 2 {
+			if context.updater && name.Name == "ConflictsFromManagers" && len(e.Args) == 1 && !e.Ellipsis.IsValid() {
+				value, err := renderExpr(e.Args[0], context)
+				return "(.conflictsFromManagers " + value + ")", err
+			}
+			if context.elements && name.Name == "append" && len(e.Args) == 2 {
 				left, err := renderExpr(e.Args[0], context)
 				if err != nil {
 					return "", err
@@ -206,6 +229,23 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(method.Sel.Name)
 		return "(.call " + receiver + " " + name + " " + args + ")", err
 	case *ast.BinaryExpr:
+		if context.updater && (e.Op == token.EQL || e.Op == token.NEQ) {
+			if name, nilComparison := e.Y.(*ast.Ident); !nilComparison || name.Name != "nil" {
+				left, err := renderExpr(e.X, context)
+				if err != nil {
+					return "", err
+				}
+				right, err := renderExpr(e.Y, context)
+				if err != nil {
+					return "", err
+				}
+				comparison := "(.equalScalars " + left + " " + right + ")"
+				if e.Op == token.NEQ {
+					comparison = "(.notFlag " + comparison + ")"
+				}
+				return comparison, nil
+			}
+		}
 		if context.elements && e.Op == token.LSS {
 			left, err := renderExpr(e.X, context)
 			if err != nil {
@@ -278,6 +318,18 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		if err := format.Node(&typ, token.NewFileSet(), e.Type); err != nil {
 			return "", err
 		}
+		if context.updater && typ.String() == "map[fieldpath.APIVersion]*typed.Comparison" && len(e.Elts) == 1 {
+			entry, ok := e.Elts[0].(*ast.KeyValueExpr)
+			if !ok {
+				return "", fmt.Errorf("comparison cache literal requires an explicit key")
+			}
+			key, err := renderExpr(entry.Key, context)
+			if err != nil {
+				return "", err
+			}
+			value, err := renderExpr(entry.Value, context)
+			return "(.singletonComparisonMap " + key + " " + value + ")", err
+		}
 		if len(e.Elts) != 0 {
 			return "", fmt.Errorf("unsupported Go composite literal %s", typ.String())
 		}
@@ -323,19 +375,24 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			if err := format.Node(&typ, token.NewFileSet(), value.Type); err != nil {
 				return "", err
 			}
-			if (typ.String() != "error" && typ.String() != "fieldpath.Filter") || value.Names[0].Name == "_" {
+			comparisonMap := context.updater && typ.String() == "map[fieldpath.APIVersion]*typed.Comparison"
+			if (typ.String() != "error" && typ.String() != "fieldpath.Filter" && !comparisonMap) || value.Names[0].Name == "_" {
 				return "", fmt.Errorf("unsupported Go zero-value type")
 			}
 			name := value.Names[0].Name
 			if _, exists := context.bindings[name]; exists {
 				return "", fmt.Errorf("duplicate Go variable declaration %q", name)
 			}
-			text, err := quoted(context.declare(name, "").id)
+			kind := ""
+			if comparisonMap {
+				kind = "comparisons"
+			}
+			text, err := quoted(context.declare(name, kind).id)
 			if err != nil {
 				return "", err
 			}
 			constructor := "declareError"
-			if typ.String() == "fieldpath.Filter" {
+			if typ.String() == "fieldpath.Filter" || comparisonMap {
 				constructor = "declareNil"
 			}
 			items = append(items, "(."+constructor+" "+text+")")
@@ -423,6 +480,18 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			if len(s.Lhs) == 1 && len(s.Rhs) == 1 {
 				if _, composite := s.Rhs[0].(*ast.CompositeLit); composite {
 					mapKind = "versions"
+					if context.updater {
+						var typ bytes.Buffer
+						if err := format.Node(&typ, token.NewFileSet(), s.Rhs[0].(*ast.CompositeLit).Type); err != nil {
+							return "", err
+						}
+						if typ.String() == "fieldpath.ManagedFields" {
+							mapKind = "managed-write"
+						}
+						if typ.String() == "map[fieldpath.APIVersion]*typed.Comparison" {
+							mapKind = "comparisons"
+						}
+					}
 				}
 				if context.elements {
 					if fresh, ok := s.Rhs[0].(*ast.UnaryExpr); ok && fresh.Op == token.AND {
@@ -444,7 +513,7 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 					} else {
 						var exists bool
 						value, exists = context.resolve(name.Name)
-						if !exists || (value.kind != "" && value.kind != "managed-write") {
+						if !exists || (value.kind != "" && value.kind != "managed-write" && !(context.updater && value.kind == "comparisons" && mapKind == "comparisons")) {
 							return "", fmt.Errorf("unsupported Go variable assignment %q", name.Name)
 						}
 					}
@@ -513,7 +582,7 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				items = append(items, "(.branchElse "+condition+" "+body+" "+other+")")
 			}
 		case *ast.RangeStmt:
-			if s.Tok != token.DEFINE || s.Key == nil || s.Value == nil {
+			if s.Tok != token.DEFINE || s.Key == nil || (s.Value == nil && !context.updater) {
 				return "", fmt.Errorf("unsupported Go range form")
 			}
 			mapVar, err := mapName(s.X, context, false)
@@ -526,8 +595,13 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			}
 			iteration := context.child()
 			iteration.readOnly[mapVar.id] = true
+			iteration.inLoop = true
 			names := []string{}
 			for _, variable := range []ast.Expr{s.Key, s.Value} {
+				if variable == nil {
+					names = append(names, `"_"`)
+					continue
+				}
 				name, ok := variable.(*ast.Ident)
 				if !ok {
 					return "", fmt.Errorf("unsupported Go range variable %T", variable)
@@ -535,6 +609,9 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				id := "_"
 				if name.Name != "_" {
 					id = iteration.declare(name.Name, "").id
+				}
+				if len(names) == 0 && id != "_" {
+					iteration.currentKeys[mapVar.id] = id
 				}
 				text, err := quoted(id)
 				if err != nil {
@@ -547,6 +624,11 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				return "", err
 			}
 			items = append(items, "(.rangeMap "+names[0]+" "+names[1]+" "+collection+" "+body+")")
+		case *ast.BranchStmt:
+			if !context.updater || !context.inLoop || s.Tok != token.CONTINUE || s.Label != nil {
+				return "", fmt.Errorf("unsupported Go branch statement")
+			}
+			items = append(items, "(.continueLoop)")
 		case *ast.ExprStmt:
 			call, ok := s.X.(*ast.CallExpr)
 			if !ok || len(call.Args) != 2 {
@@ -557,9 +639,21 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			if !ok || name.Name != "delete" || !resolved || builtin.kind != "builtin" {
 				return "", fmt.Errorf("unsupported Go expression statement")
 			}
-			mapVar, err := mapName(call.Args[0], context, true)
+			mapVar, err := mapName(call.Args[0], context, false)
 			if err != nil {
 				return "", err
+			}
+			currentDelete := false
+			if context.updater && mapVar.kind == "managed-write" {
+				if name, ok := call.Args[1].(*ast.Ident); ok {
+					key, found := context.resolve(name.Name)
+					currentDelete = found && key.id == context.currentKey(mapVar.id)
+				}
+			}
+			if !currentDelete {
+				if _, err := mapName(call.Args[0], context, true); err != nil {
+					return "", err
+				}
 			}
 			key, err := renderExpr(call.Args[1], context)
 			if err != nil {

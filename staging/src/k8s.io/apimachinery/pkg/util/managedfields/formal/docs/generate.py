@@ -93,6 +93,7 @@ def build():
             "SSA.NumericCodecCounterexamples",
             "SSA.GranularKeyCounterexamples",
             "SSA.NumericOmissionCounterexamples",
+            "SSA.UpdaterExamples",
         }
         default_scope = "execution" if item["module"] in executions else "general"
         if item["private"]:

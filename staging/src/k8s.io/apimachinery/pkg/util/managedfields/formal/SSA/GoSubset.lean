@@ -40,6 +40,9 @@ inductive Expr where
   | appendOne (values value : Expr)
   | concatenate (left right : Expr)
   | emptyElementSet
+  | equalScalars (left right : Expr)
+  | singletonComparisonMap (key value : Expr)
+  | conflictsFromManagers (managers : Expr)
   deriving Repr
 
 inductive Stmt where
@@ -55,6 +58,7 @@ inductive Stmt where
   | whileLoop (condition : Expr) (body : List Stmt)
   | increment (name : String)
   | fieldSet (name field : String) (value : Expr)
+  | continueLoop
   deriving Repr
 
 structure ManagerFields where
@@ -378,6 +382,8 @@ def eval {Obj Err : Type} (ops : Ops Obj Err) : Nat → Expr → Env Obj Err →
       | .number _ | .length _ | .less _ _ | .sliceFrom _ _ | .appendOne _ _ |
         .concatenate _ _ | .emptyElementSet =>
           .error "Element-set expressions require the element-set interpreter"
+      | .equalScalars _ _ | .singletonComparisonMap _ _ | .conflictsFromManagers _ =>
+          .error "Updater expressions require the updater interpreter"
 
 def evalAll {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Expr → Env Obj Err →
     Except String (List (Value Obj Err))
@@ -450,6 +456,7 @@ def exec {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Stmt → Env Obj Er
           | _ => .error "Go conditional is not boolean"
       | .whileLoop _ _ | .increment _ | .fieldSet _ _ _ =>
           .error "Element-set statements require the element-set interpreter"
+      | .continueLoop => .error "Updater continue requires the updater interpreter"
 termination_by fuel _ _ => (fuel, 0, 0)
 
 /-- Statement fuel bounds syntactic nesting, not the number of managers in a finite map. -/

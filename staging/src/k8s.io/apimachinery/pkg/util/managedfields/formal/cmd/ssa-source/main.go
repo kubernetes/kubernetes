@@ -38,7 +38,15 @@ type functionSpec struct {
 	parameters []string
 	maps       map[string]string
 	elements   bool
+	updater    bool
 }
+
+var updaterFunctions = []functionSpec{{
+	name: "update", leanName: "updateProgram",
+	signature:  "func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, workflow string, force bool) (fieldpath.ManagedFields, *typed.Comparison, error)",
+	parameters: []string{"oldObject", "newObject", "version", "managers", "workflow", "force"},
+	maps:       map[string]string{"managers": "managed-write"}, updater: true,
+}}
 
 var elementFunctions = []functionSpec{
 	{
@@ -170,8 +178,9 @@ func run() error {
 	sourcePath := flag.String("source", "", "Go update.go source, or element.go with -elements (required)")
 	checkPath := flag.String("check", "", "compare generated output with this Lean file")
 	elements := flag.Bool("elements", false, "import fieldpath element.go instead of merge update.go")
+	updater := flag.Bool("updater", false, "import the complete ownership-update function with the updater interpreter")
 	flag.Parse()
-	if *sourcePath == "" || flag.NArg() != 0 {
+	if *sourcePath == "" || flag.NArg() != 0 || (*elements && *updater) {
 		return fmt.Errorf("supply -source and no positional arguments")
 	}
 	source, err := os.ReadFile(*sourcePath)
@@ -193,6 +202,10 @@ func run() error {
 	} else {
 		if err := validateImports(source); err != nil {
 			return err
+		}
+		if *updater {
+			selected = updaterFunctions
+			namespace = "UpdaterSource"
 		}
 	}
 	var programs strings.Builder

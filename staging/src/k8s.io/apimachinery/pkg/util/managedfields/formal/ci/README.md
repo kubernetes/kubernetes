@@ -21,7 +21,7 @@ still checked. `ARTIFACTS` selects the log directory, matching Prow conventions.
 Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
-five updater ASTs and the three element-set algebra ASTs must match the checked-in
+six updater ASTs and the three element-set algebra ASTs must match the checked-in
 Lean input, including both complete source-file digests.
 
 The required checks are:
@@ -48,13 +48,18 @@ The required checks are:
    complete reserialized bytes, independently of the lossy `Has`/`Equals` oracle.
    The imported Apply counterexample additionally checks independent-key false
    conflict, unchanged-payload ownership loss with force, and small-key success.
+   An internal-package Go overlay also compares full imported ownership-update
+   observations: shared comparison-cache filtering and forced removal of B's
+   conflicting claim without acquiring the actor's newly added path.
 8. Actual merge tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
    Each revision also runs the numeric-key round-trip counterexample and control.
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Eight independent semantic mutations of the selected Go sources; each must
+10. Nine independent semantic mutations of the selected Go sources; each must
     invalidate the unchanged theorem in the expected proof module.
+    The ownership-growth mutation must additionally fail the native Go witness
+    for its demonstrated new B claim, rather than a compile or setup error.
 
 No check is optional when invoking this entrypoint. The result establishes the
 documented proof and comparison checks, not correctness of the human-chosen
