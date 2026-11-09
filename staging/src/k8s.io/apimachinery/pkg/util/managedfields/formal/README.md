@@ -116,6 +116,11 @@ an optional non-nullable schema rejects every identical retry. The concrete
 and source-bound proofs are in `SSA/HandoffCounterexamples.lean`, with actual
 HTTP checks for both policies and a link to existing
 [Kubernetes #134902](https://github.com/kubernetes/kubernetes/issues/134902).
+One additional unchanged reassertion by A makes the child genuinely A/B-owned
+before omission; the item and shared scalar still disappear. This refutes
+unrestricted BASE-03 as well. B acquiring membership through Apply instead is
+a surviving control. Both nullable policies check the co-owned history through
+HTTP, with exact pre-omission FieldsV1 and persisted GET observations.
 
 A subresource counterexample concerns valid CRDs with an additional root such
 as `settings`: `/status` can claim unchanged `settings.desired`, despite the
@@ -546,7 +551,7 @@ The numeric-key test additionally checks a false conflict between distinct
 large integer list keys and successful independent small-key management.
 Four additional numeric-omission variants verify exact raw exclusive ownership,
 phantom sharing, omitted payload presence, claims and persisted GET equality.
-The seven HTTP test functions cover twenty-three variants.
+The seven HTTP test functions cover twenty-five variants.
 The proposed Kubernetes Prow job runs both entrypoints. The API check belongs
 to Kubernetes integration testing and is unavailable in published apimachinery.
 

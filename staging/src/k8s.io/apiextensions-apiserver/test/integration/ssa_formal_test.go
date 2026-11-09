@@ -309,13 +309,23 @@ func TestSSAUpdateOwnedListItemPruning(t *testing.T) {
 	}
 	defer tearDown()
 
-	for _, policy := range []string{"nonnullable", "nullable"} {
-		t.Run(policy, func(t *testing.T) {
+	for _, scenario := range []struct {
+		name   string
+		policy string
+		shared bool
+	}{
+		{name: "nonnullable", policy: "nonnullable"},
+		{name: "nullable", policy: "nullable"},
+		{name: "shared-nonnullable", policy: "nonnullable", shared: true},
+		{name: "shared-nullable", policy: "nullable", shared: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			policy := scenario.policy
 			crSchema := ssaFormalListSchema()
 			listSchema := crSchema.Properties["endpoints"]
 			listSchema.Nullable = policy == "nullable"
 			crSchema.Properties["endpoints"] = listSchema
-			resource := newSSAFormalResource(t, apiClient, dynamicClient, "updater-"+policy+".formal.ssa", crSchema)
+			resource := newSSAFormalResource(t, apiClient, dynamicClient, "updater-"+scenario.name+".formal.ssa", crSchema)
 
 			// Omitting the optional list is a valid creation intent under both policies.
 			if _, err := resource.apply(t, "created-without-list", "A", map[string]any{}); err != nil {
@@ -337,38 +347,51 @@ func TestSSAUpdateOwnedListItemPruning(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// B acquires host by Update while A retains the item's membership.
-			seen := map[string]bool{}
-			for _, owner := range updated.GetManagedFields() {
-				seen[owner.Manager] = true
-				if owner.FieldsV1 == nil {
-					t.Fatalf("missing fields for owner %s", owner.Manager)
-				}
-				var fields map[string]any
-				if err := json.Unmarshal(owner.FieldsV1.Raw, &fields); err != nil {
-					t.Fatal(err)
-				}
-				itemFields, exists, err := unstructured.NestedMap(fields, "f:endpoints", `k:{"name":"db"}`)
-				if err != nil || !exists {
-					t.Fatalf("missing item fields for owner %s: %s", owner.Manager, owner.FieldsV1.Raw)
-				}
-				_, membership := itemFields["."]
-				_, host := itemFields["f:host"]
-				switch owner.Manager {
-				case "A":
-					if owner.Operation != metav1.ManagedFieldsOperationApply || !membership || host {
-						t.Fatalf("unexpected A ownership: %#v", owner)
+			// Sharing the scalar must not be confused with B acquiring item membership.
+			assertOwnership := func(object *unstructured.Unstructured, shared bool) {
+				t.Helper()
+				seen := map[string]bool{}
+				for _, owner := range object.GetManagedFields() {
+					seen[owner.Manager] = true
+					if owner.FieldsV1 == nil {
+						t.Fatalf("missing fields for owner %s", owner.Manager)
 					}
-				case "B":
-					if owner.Operation != metav1.ManagedFieldsOperationUpdate || membership || !host {
-						t.Fatalf("unexpected B ownership: %#v", owner)
+					var fields map[string]any
+					if err := json.Unmarshal(owner.FieldsV1.Raw, &fields); err != nil {
+						t.Fatal(err)
 					}
-				default:
-					t.Fatalf("unexpected owner: %#v", owner)
+					itemFields, exists, err := unstructured.NestedMap(fields, "f:endpoints", `k:{"name":"db"}`)
+					if err != nil || !exists {
+						t.Fatalf("missing item fields for owner %s: %s", owner.Manager, owner.FieldsV1.Raw)
+					}
+					_, membership := itemFields["."]
+					_, host := itemFields["f:host"]
+					switch owner.Manager {
+					case "A":
+						if owner.Operation != metav1.ManagedFieldsOperationApply || !membership || host != shared {
+							t.Fatalf("unexpected A ownership: %#v", owner)
+						}
+					case "B":
+						if owner.Operation != metav1.ManagedFieldsOperationUpdate || membership || !host {
+							t.Fatalf("unexpected B ownership: %#v", owner)
+						}
+					default:
+						t.Fatalf("unexpected owner: %#v", owner)
+					}
+				}
+				if len(object.GetManagedFields()) != 2 || !seen["A"] || !seen["B"] {
+					t.Fatalf("expected A item membership and B host ownership: %#v", object.GetManagedFields())
 				}
 			}
-			if len(updated.GetManagedFields()) != 2 || !seen["A"] || !seen["B"] {
-				t.Fatalf("expected A item membership and B host ownership: %#v", updated.GetManagedFields())
+			assertOwnership(updated, false)
+			if scenario.shared {
+				updated, err = resource.apply(t, "example", "A", map[string]any{
+					"endpoints": []any{map[string]any{"name": "db", "host": "new"}},
+				})
+				if err != nil {
+					t.Fatalf("unchanged reassertion must acquire the shared host without force: %v", err)
+				}
+				assertOwnership(updated, true)
 			}
 
 			for attempt := 1; attempt <= 3; attempt++ {
@@ -385,6 +408,10 @@ func TestSSAUpdateOwnedListItemPruning(t *testing.T) {
 					}
 					if proposed.GetResourceVersion() == updated.GetResourceVersion() {
 						t.Fatal("accepted deletion must change resourceVersion")
+					}
+					stored, err := resource.Get(context.Background(), "example", metav1.GetOptions{})
+					if err != nil || !reflect.DeepEqual(stored.Object, proposed.Object) {
+						t.Fatalf("accepted deletion was not persisted with its ownership: %v", err)
 					}
 					break
 				}

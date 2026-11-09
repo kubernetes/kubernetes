@@ -338,6 +338,46 @@ cases:
   - manager: A
     apply: {}
     expect: {object: {items: null}, owners: {}}
+- name: shared-update-owned-child-does-not-retain-item
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: old}]}
+    expect:
+      object: {items: [{name: db, host: old}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - operation: update
+    manager: B
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]'], B@update: ['.items[name="db"].host']}
+  - manager: A
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host'], B@update: ['.items[name="db"].host']}
+  - manager: A
+    apply: {}
+    expect: {object: {items: null}, owners: {}}
+- name: shared-apply-owned-child-retains-item
+  semantics: current
+  steps:
+  - manager: A
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: B
+    apply: {items: [{name: db, host: new}]}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {A: ['.items[name="db"]', '.items[name="db"].host'], B: ['.items[name="db"]', '.items[name="db"].host']}
+  - manager: A
+    apply: {}
+    expect:
+      object: {items: [{name: db, host: new}]}
+      owners: {B: ['.items[name="db"]', '.items[name="db"].host']}
 - name: literal-manager-name-does-not-alias-update-identity
   semantics: current
   steps:

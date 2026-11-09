@@ -1630,5 +1630,29 @@
     "title": "Source root-filter exclusion without an assumed Has-recognition premise",
     "meaning": "Complete Filter/RecursiveDifference source now uses Has/Less with their complete source correspondences. Reset-root recognition is derived from the actual Has/library membership theorem, so every root::suffix ownership path is excluded at arbitrary suffix depth.",
     "limits": "Requires local comparison/equality laws, sorted direct/root labels, positive word width, representable roots and the flat-root input shape. Actual field-name/string comparison, root/heap/ownership representation, typed operations and complete Apply/API/storage composition remain open."
+  },
+  "SSA.HandoffCounterexamples.reassertion_shares_update_owned_child": {
+    "scope": "execution",
+    "title": "A and the Update manager genuinely share the scalar before omission",
+    "meaning": "After B Updates host, A reasserts that unchanged value. Both own host; A alone owns the item membership.",
+    "limits": "A reachable concrete history. Native managedfields, both pinned SMD revisions and HTTP independently check the ownership precondition."
+  },
+  "SSA.HandoffCounterexamples.omission_removes_shared_update_child": {
+    "scope": "execution",
+    "title": "Item omission removes the genuinely shared scalar",
+    "meaning": "A omits the item without force. The current raw transition returns a null list, no item or host, and no claims.",
+    "limits": "Enclosing-item deletion is essential. A separate Apply-owned membership control survives in native and pinned comparisons."
+  },
+  "SSA.HandoffCounterexamples.unrestricted_shared_omission_safety_is_false": {
+    "scope": "execution",
+    "title": "Unrestricted shared omission is false in existing SSA (BASE-03)",
+    "meaning": "A concrete reachable history refutes a universal claim that an omitted co-owned scalar survives whenever another manager has not released its intent.",
+    "limits": "The positive proposed-core theorem retains an explicit no-ancestor-deletion premise. Nullable HTTP accepts and persists this deletion; non-nullable HTTP rejects it atomically. This is another consequence of SSA-03."
+  },
+  "SSA.HandoffCounterexamples.imported_pruning_removes_shared_child": {
+    "scope": "execution",
+    "title": "Complete imported pruning realizes the shared-child deletion",
+    "meaning": "All four imported pruning functions have realized callees for the shared-child trace, under every lawful manager-map iteration schedule.",
+    "limits": "Normalized typed/set primitives and one API version. This source witness does not prove universal primitive or codec refinement."
   }
 }

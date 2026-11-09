@@ -111,6 +111,11 @@ pre{font:12px/1.65 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;backg
     </div>
   </section>
   <section class="view" id="view-gaps" hidden>
+    <div class="card gap"><h2>SSA-03 / BASE-03: a shared scalar can disappear with its item</h2>
+      <p>A creates <code>endpoints: [{name: db, host: old}]</code>. B Updates host to <code>new</code>. A then Applies the same <code>host: new</code>, so both managers own that exact scalar, while A alone owns item membership. A omits the item without force: the list becomes null, the item disappears and both claims are lost.</p>
+      <p>If B acquires the item through Apply, A's omission retains it. Nullable CRD HTTP persists the shared-child deletion; non-nullable validation rejects it and leaves data, claims and resourceVersion unchanged. The shared-omission guarantee needs an enclosing-item lifetime premise even in existing SSA. <a href="ssa-bugs.md#shared-scalar-ownership-also-fails-to-preserve-the-item-base-03">Trace, control and source boundary</a>.</p>
+      <div class="chips"><button class="chip" data-proof="SSA.HandoffCounterexamples.reassertion_shares_update_owned_child">Actual scalar co-ownership</button><button class="chip" data-proof="SSA.HandoffCounterexamples.unrestricted_shared_omission_safety_is_false">BASE-03 refutation</button><button class="chip" data-proof="SSA.HandoffCounterexamples.imported_pruning_removes_shared_child">Imported pruning chain</button></div>
+    </div>
     <div class="card gap"><h2>SSA-06: FieldsV1 rounds one integer item key into another</h2>
       <p>A owns <code>endpoints: [{id: 9007199254740993, payload: old}]</code>. B adds the distinct item <code>{id: 9007199254740992, payload: independent}</code>. The API falsely conflicts against A: reading the exact stored ownership key into float64 rounds it to B's neighbor. Small independent keys 42 and 41 work.</p>
       <p>Forcing B's request keeps both items and A's old payload, but removes A's claims. The original raw payload claim is checked before decoding. Exact key magnitudes and bytes expose the codec loss; Go's mixed <code>Has</code>/<code>Equals</code> can mask it. <a href="ssa-bugs.md#ssa-06-fieldsv1-rounding-aliases-distinct-integer-list-keys">Schema, source witnesses and API evidence</a>.</p>

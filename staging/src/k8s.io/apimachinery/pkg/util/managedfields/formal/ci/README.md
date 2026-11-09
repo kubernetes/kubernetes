@@ -115,6 +115,10 @@ B Updates a scalar child without acquiring item membership; A's omission prunes
 the item. A nullable list stores null and loses the claims, while an optional
 non-nullable list rejects every retry with unchanged data, ownership and
 resourceVersion. Empty creation without the optional list is a valid control.
+Both policies also run after A reasserts B's unchanged value, with exact
+FieldsV1 checks proving genuine A/B scalar co-ownership before omission.
+Accepted deletions are checked by GET; the shared-scalar variants reject the
+unrestricted BASE-03 guarantee as well as the original BASE-07 reading.
 
 `TestSSAStatusResetOwnership` checks same-name main/status manager separation
 and conventional spec/status reset behavior. Its additional-root variant
@@ -145,7 +149,7 @@ co-applying the upper payload. A's lower payload is exclusively A-owned in the
 exact raw FieldsV1 before omission. Both item keys stay asserted. Large shared
 keys retain the omitted payload and give its claim to B after decoding; all
 three controls remove it. GET matches the response. These seven functions
-exercise twenty-three API/schema variants. The four omission observations
+exercise twenty-five API/schema variants. The four omission observations
 also agree with Lean in native vendored and both pinned SMD executions.
 
 The standalone apimachinery proof entrypoint has no dependency on this

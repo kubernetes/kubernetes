@@ -168,11 +168,38 @@ Owning a child through Update is different from acquiring the item through
 Apply. This trace concerns baseline SSA and also occurs on both pinned SMD
 revisions without extra required metadata.
 
+### Shared scalar ownership also fails to preserve the item (BASE-03)
+
+Insert one request before A's omission: A Applies B's unchanged value.
+
+```yaml
+# A reasserts the current value, without force.
+endpoints:
+- name: db
+  host: new
+```
+
+A and B now both own the exact `host` scalar. A alone owns the item's direct
+membership; B's operation remains Update. A's next Apply omits `endpoints`.
+The list again becomes null and both scalar claims disappear. Thus the
+unrestricted shared-omission guarantee also needs an enclosing-item lifetime
+premise in existing SSA. The surviving owner did not send an unclaim request.
+
+The control changes B's acquisition to Apply: B then owns item membership as
+well as `host`, and A's omission retains the item, value and B's claims. Exact
+data and claim expectations are authored independently in the current and
+both pinned-upstream corpora. `reassertion_shares_update_owned_child`,
+`unrestricted_shared_omission_safety_is_false` and
+`imported_pruning_removes_shared_child` check the formal precondition,
+refutation and complete four-function pruning chain. This is an additional
+consequence of SSA-03, not a new independent bug report.
+
 For an optional **non-nullable** list, actual HTTP rejects the generated null,
 preserving data, claims and resourceVersion. Every identical retry fails from
 the same state, even though creating an object without that optional list is
 valid. With `nullable: true` on the list schema, HTTP accepts the null and the
-loss of the old claims. These are the two policies checked by
+loss of the old claims. Both policies are checked before and after genuine
+scalar co-ownership is acquired: four variants of
 `TestSSAUpdateOwnedListItemPruning`.
 
 This is the behavior discussed in existing Kubernetes
