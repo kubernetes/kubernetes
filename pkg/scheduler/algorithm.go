@@ -465,15 +465,14 @@ func (a *SchedulingAlgorithm) findNodesThatPassFilters(
 	}
 
 	errCh := parallelize.NewResultChannel[error]()
-	stopOnHigherRank := len(rankedNodes) > 0 && !a.opportunisticBatchingEnabled(schedFramework) && !hasExtenderFilters(schedFramework)
+	ordered := len(rankedNodes) > 0
+	stopOnHigherRank := ordered && !a.opportunisticBatchingEnabled(schedFramework) && !hasExtenderFilters(schedFramework)
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(errors.New("findNodesThatPassFilters has completed"))
 
-	coordinator := newNodeFilterCoordinator(cancel, getRankedNode, numAllNodes, numNodesToFind, stopOnHigherRank, diagnosis)
-	// Parallelizer().Until dispatches work in static chunks, so we ignore its chunked piece
-	// index and claim sequential indices via coordinator.nextNode().
-	checkNode := func(_ int) {
-		i, rankedNode, ok := coordinator.nextNode()
+	coordinator := newNodeFilterCoordinator(cancel, getRankedNode, numAllNodes, numNodesToFind, ordered, stopOnHigherRank, diagnosis)
+	checkNode := func(i int) {
+		i, rankedNode, ok := coordinator.nextNode(i)
 		if !ok {
 			return
 		}
@@ -511,14 +510,17 @@ type nodeFilterResult struct {
 	status *fwk.Status
 }
 
-// nodeFilterCoordinator coordinates parallel node filtering in index and rank order.
-// Workers claim indices sequentially via nextNode and record results out of order,
-// while commitReadyLocked drains completed results in contiguous index order.
+// nodeFilterCoordinator coordinates parallel node filtering.
+// When ordered is true, workers claim indices sequentially via nextNode and record results out of
+// order, while commitReadyLocked drains completed results in contiguous index and rank order.
+// When ordered is false, recordResult commits each node result immediately without waiting for
+// earlier indices.
 type nodeFilterCoordinator struct {
 	cancel           context.CancelCauseFunc
 	getRankedNode    func(int) framework.NodeWithRank
 	numAllNodes      int
 	numNodesToFind   int32
+	ordered          bool
 	stopOnHigherRank bool
 
 	nextNodeIndex   atomic.Int32
@@ -536,16 +538,22 @@ func newNodeFilterCoordinator(
 	getRankedNode func(int) framework.NodeWithRank,
 	numAllNodes int,
 	numNodesToFind int32,
+	ordered bool,
 	stopOnHigherRank bool,
 	diagnosis *framework.Diagnosis,
 ) *nodeFilterCoordinator {
+	var results []nodeFilterResult
+	if ordered {
+		results = make([]nodeFilterResult, numAllNodes)
+	}
 	c := &nodeFilterCoordinator{
 		cancel:           cancel,
 		getRankedNode:    getRankedNode,
 		numAllNodes:      numAllNodes,
 		numNodesToFind:   numNodesToFind,
+		ordered:          ordered,
 		stopOnHigherRank: stopOnHigherRank,
-		results:          make([]nodeFilterResult, numAllNodes),
+		results:          results,
 		feasibleNodes:    make([]framework.NodeWithRank, 0, numNodesToFind),
 		diagnosis:        diagnosis,
 	}
@@ -553,8 +561,13 @@ func newNodeFilterCoordinator(
 	return c
 }
 
-func (c *nodeFilterCoordinator) nextNode() (int, framework.NodeWithRank, bool) {
-	i := int(c.nextNodeIndex.Add(1) - 1)
+func (c *nodeFilterCoordinator) nextNode(i int) (int, framework.NodeWithRank, bool) {
+	if !c.ordered {
+		return i, c.getRankedNode(i), true
+	}
+	// Parallelizer().Until dispatches work in static chunks, so when ordered is true we
+	// ignore its chunked index and claim sequential indices via nextNodeIndex.
+	i = int(c.nextNodeIndex.Add(1) - 1)
 	rankedNode := c.getRankedNode(i)
 	if int64(rankedNode.Rank) > c.minFeasibleRank.Load() {
 		// Do not cancel ctx here: earlier nodes (< i) with lower or equal rank may
@@ -568,6 +581,10 @@ func (c *nodeFilterCoordinator) recordResult(i int, rankedNode framework.NodeWit
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	if !c.ordered {
+		c.commitNodeLocked(rankedNode, status)
+		return
+	}
 	if c.stopOnHigherRank && status.IsSuccess() && int64(rankedNode.Rank) < c.minFeasibleRank.Load() {
 		c.minFeasibleRank.Store(int64(rankedNode.Rank))
 	}
@@ -587,16 +604,21 @@ func (c *nodeFilterCoordinator) commitReadyLocked() {
 			return
 		}
 		c.committedIdx++
-		if res.status.IsSuccess() {
+		c.commitNodeLocked(rankedCandidate, res.status)
+	}
+}
+
+func (c *nodeFilterCoordinator) commitNodeLocked(rankedCandidate framework.NodeWithRank, status *fwk.Status) {
+	if status.IsSuccess() {
+		if int32(len(c.feasibleNodes)) < c.numNodesToFind {
 			c.feasibleNodes = append(c.feasibleNodes, rankedCandidate)
 			if int32(len(c.feasibleNodes)) >= c.numNodesToFind {
 				c.cancel(errors.New("findNodesThatPassFilters has found enough nodes"))
-				return
 			}
-		} else {
-			c.diagnosis.NodeToStatus.Set(rankedCandidate.NodeInfo.Node().Name, res.status)
-			c.diagnosis.AddPluginStatus(res.status)
 		}
+	} else {
+		c.diagnosis.NodeToStatus.Set(rankedCandidate.NodeInfo.Node().Name, status)
+		c.diagnosis.AddPluginStatus(status)
 	}
 }
 
