@@ -44,7 +44,7 @@ func BenchmarkGetPodPodDisruptionBudgets(b *testing.B) {
 		for _, n := range []int{100, 1000, 2000} {
 			b.Run(fmt.Sprintf("selector=%s/pdbs=%d", shape.name, n), func(b *testing.B) {
 				indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-				for i := 0; i < n; i++ {
+				for i := range n {
 					pdb := &policy.PodDisruptionBudget{
 						ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: fmt.Sprintf("pdb-%d", i)},
 						Spec:       policy.PodDisruptionBudgetSpec{Selector: benchSelector(benchMatchLabels(i), shape.exprKeys)},
