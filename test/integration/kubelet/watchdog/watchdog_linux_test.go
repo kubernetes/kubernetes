@@ -43,7 +43,11 @@ func TestSystemdWatchdogSendsHeartbeat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	t.Cleanup(func() {
+		if err := listener.Close(); err != nil {
+			t.Errorf("close watchdog notification socket: %v", err)
+		}
+	})
 	t.Setenv("NOTIFY_SOCKET", socketPath)
 
 	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))

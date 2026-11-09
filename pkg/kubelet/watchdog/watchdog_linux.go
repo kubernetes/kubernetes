@@ -20,6 +20,7 @@ package watchdog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -190,7 +191,7 @@ func (hc *healthChecker) runOnce(ctx context.Context) {
 		return true, nil
 	})
 	if err != nil {
-		if diagnosticsEnabled && err == wait.ErrWaitTimeout {
+		if diagnosticsEnabled && errors.Is(err, wait.ErrWaitTimeout) {
 			if hc.shouldLogDiagnostic("notify-summary") {
 				logger.Error(lastNotifyErr, "Watchdog notification retries exhausted", "operation", "watchdog_notify", "attempts", attempt, "result", "retry_exhausted", "watchdog_interval", hc.interval)
 			}
