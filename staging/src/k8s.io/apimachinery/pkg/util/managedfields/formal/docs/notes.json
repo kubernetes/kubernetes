@@ -964,5 +964,59 @@
     "scope": "helper",
     "meaning": "The executable schema uniqueness check yields pairwise distinct instantiated item paths.",
     "limits": "Internal composition/representation lemma, not an additional independent SSA correctness guarantee."
+  },
+  "SSA.GranularKeyCounterexamples.initial_raw_owner_is_reachable": {
+    "title": "A’s exact raw ownership is source-reachable",
+    "scope": "execution",
+    "meaning": "A creates the original integer-keyed item and payload from empty through imported Apply.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.original_does_not_own_neighbor": {
+    "title": "The distinct neighbor is absent from A’s original footprint",
+    "scope": "execution",
+    "meaning": "Before ownership decoding, the raw exact integer selectors identify different item paths.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.independent_key_conflicts_after_codec": {
+    "title": "Imported Apply rejects the independent neighbor",
+    "scope": "execution",
+    "meaning": "B’s fresh non-forced addition reaches the conflict return after the old ownership selector is decoded.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.small_independent_key_is_accepted": {
+    "title": "Small independent keys supply a successful control",
+    "scope": "execution",
+    "meaning": "Imported Apply accepts key 41 beside A’s key 42 and preserves both ownership contributions.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.fresh_prune_callback_is_realized": {
+    "title": "Fresh B pruning is realized by imported source",
+    "scope": "execution",
+    "meaning": "The concrete pruning callback is exactly the nil-last-set branch of the complete imported prune body.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.unconditional_independent_item_progress_is_false": {
+    "title": "BASE-09b: independent granular-item progress is false",
+    "scope": "execution",
+    "meaning": "A represented distinct neighbor item cannot be added without a false conflict in this valid fixed schema.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.forced_addition_drops_unchanged_foreign_owner": {
+    "title": "Force drops ownership of A’s unchanged original payload",
+    "scope": "execution",
+    "meaning": "The forced retry keeps both items and A’s old payload but removes A’s old field claims.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.unchanged_foreign_payload_ownership_is_false": {
+    "title": "Unchanged foreign payload ownership is not preserved",
+    "scope": "execution",
+    "meaning": "A’s explicitly established pre-decoding wire claim disappears after the forced request while its original payload stays exactly old.",
+    "limits": "Concrete integer-key/string-payload schema, explicit numeric-read and typed/update primitive instances, with complete imported Apply execution. Native current/pinned Go and real CRD HTTP/GET independently check the history; universal typed/codec refinement remains separate."
+  },
+  "SSA.GranularKeyCounterexamples.initial_payload_is_raw_owned": {
+    "title": "A owns the unchanged payload before wire decoding",
+    "scope": "execution",
+    "meaning": "The exact original payload path belongs to A in the initial serialized ownership meaning.",
+    "limits": "This premise is passed explicitly to the ownership-preservation proposition. Initial source reachability and the raw CRD FieldsV1 payload claim independently establish it; the decoder is part of the modeled request, not a silently corrupted initial state."
   }
 }

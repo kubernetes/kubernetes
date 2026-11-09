@@ -79,7 +79,7 @@ func run() error {
 		if err := bridge.CompareNumericCodecCounterexamples(context.Background(), *model); err != nil {
 			return err
 		}
-		fmt.Println("Numeric FieldsV1: exact key round-trip counterexample agrees with Go.")
+		fmt.Println("Numeric FieldsV1: round-trip, false-conflict and forced ownership-loss witnesses agree with Go.")
 	}
 	return nil
 }

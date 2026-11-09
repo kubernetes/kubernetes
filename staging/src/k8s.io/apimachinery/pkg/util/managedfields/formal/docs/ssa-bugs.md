@@ -14,7 +14,7 @@ reported together with the preceding transition that caused it.
 | SSA-03 | Omission after another manager Updates an item child | The item and its foreign-owned child disappear; the list becomes null. A nullable schema accepts this; a non-nullable schema rejects every retry. | Reachable Lean Apply/Update counterexample and source witness; actual managedfields and pinned SMD; nullable/non-nullable CRD HTTP. Existing report: [#134902](https://github.com/kubernetes/kubernetes/issues/134902). |
 | SSA-04 | Status Apply includes an additional non-status root field | The status actor acquires the unchanged field even though the REST strategy resets it. A later main-endpoint change conflicts. | Reachable Lean refutation; complete imported Apply with explicit primitive instances; real CRD HTTP/etcd and conventional spec/status controls. |
 | [SSA-05](https://github.com/kubernetes/kubernetes/issues/143942) | Mixed int64/float64 comparison near `2^63` | Scalar-only intent is lost as a false no-op. Adding an unrelated field lets B change A's numeric value while both retain ownership, including with force. | Lean intent/conflict/force refutations and imported Apply witnesses; native equality and numeric-key set failure; managedfields; CRD HTTP/etcd/GET with exact-integer conflict and transfer controls. |
-| [SSA-06](https://github.com/kubernetes/kubernetes/issues/143943) | FieldsV1 numeric-key decoding | Exact integer key `2^53+1` is read as its neighbor `2^53`. B adding that distinct list item falsely conflicts against A. | Lean canonical-trie membership refutation; exact native byte/key round trips in vendored and both pinned SMD revisions; CRD HTTP/GET and small-integer control. |
+| [SSA-06](https://github.com/kubernetes/kubernetes/issues/143943) | FieldsV1 numeric-key decoding | Exact integer key `2^53+1` is read as its neighbor `2^53`. Adding that distinct item falsely conflicts; forcing it removes A's claims on its unchanged original payload. | Lean codec, granular-progress and ownership-frame refutations; imported Apply/prune witnesses; native data/fieldset checks in vendored and both pinned SMD; CRD HTTP/GET and small-key control. |
 | PR336-01 | Fragmented required ownership followed by partial-manager omission | A partial manager can delete another partial manager's required data. | Lean execution; exact pinned head/base comparison. |
 | PR336-02 | Direct required-map membership shortcut | The classifier calls a manager full without ownership of required children. An invalid item can remain after the actual full owner leaves. | General classifier theorem; concrete Lean execution; actual pinned head/base outcomes. |
 | PR336-03 | Required granular-list ownership | A supplier owning all child items is classified partial because Apply generated no direct list-presence claim. Another partial manager can delete its data. | General classifier fact; populated/empty Lean counterexamples; exact pinned head/base comparison. |
@@ -405,6 +405,12 @@ item membership, `id` and `payload`. GET confirms atomic rollback, including
 claims and resourceVersion. A control with A's key 42 and B's key 41 succeeds,
 preserving both exact items.
 
+If B retries with `force: true`, both items are stored, with A's old payload
+still exactly `old`. A nevertheless loses its claims on that original item;
+B owns the neighbor. This is an ownership change on an unchanged, distinct
+item. The API test checks the exact two int64 keys and payload strings, absence
+of A's endpoint claims, B's exact new selector, and persisted GET equality.
+
 ### Decoding changes the selector
 
 The standalone fieldpath round trip exposes the same cause:
@@ -443,6 +449,30 @@ with its observations in all three selected dependency revisions.
 `TestSSANumericListKeyOwnership` checks actual CRD decoding, the exact initial
 wire key, the false conflict, persisted rollback and independent small-key
 success. No default, CEL, webhook, conversion or topology migration is involved.
+
+[`GranularKeyCounterexamples`](../SSA/GranularKeyCounterexamples.lean) now
+connects the same history to complete imported Apply execution. It proves
+A's raw starting ownership is source-reachable; the neighbor is absent from
+that original footprint; B's different key conflicts after ownership decoding;
+and small independent keys succeed. The fresh-manager prune callback is
+realized by imported `prune`'s nil-last-set branch. Two named refutations are
+`unconditional_independent_item_progress_is_false` (BASE-09b) and
+`unchanged_foreign_payload_ownership_is_false` for the forced retry.
+
+The fixed schema's primitive instance merges exact integer-key/string-payload
+items, compares added and modified fields, and implements forced transfer and
+empty-owner cleanup. General typed comparison, arbitrary schemas and the full
+codec remain separate refinement obligations. The concrete source observations
+agree with actual managedfields on the vendored dependency and both pinned
+upstream revisions, with independent real HTTP/etcd evidence.
+
+The ordinary normalized adapter detects the damaged ownership selector as
+unrepresentable. The counterexample observer therefore reads exact native
+int64 data, serialized fieldsets, operation/version flags and selector
+magnitudes directly from the real execution. Normal comparisons retain their
+shape checks. The pinned harness also now installs the decoded fieldsets before
+the next request; it formerly checked their wire form but kept the in-memory
+sets for execution. That harness correction is not another production bug.
 
 ## PR336-01: a partial manager can authorize deletion
 

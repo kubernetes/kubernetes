@@ -91,6 +91,7 @@ def build():
             "SSA.Examples", "SSA.Counterexamples", "SSA.RawSourceCounterexamples", "SSA.ContainerCounterexamples",
             "SSA.HandoffCounterexamples", "SSA.ResetCounterexamples", "SSA.NumericCounterexamples",
             "SSA.NumericCodecCounterexamples",
+            "SSA.GranularKeyCounterexamples",
         }
         default_scope = "execution" if item["module"] in executions else "general"
         if item["private"]:

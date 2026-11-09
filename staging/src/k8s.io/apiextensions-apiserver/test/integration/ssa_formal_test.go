@@ -665,9 +665,10 @@ func TestSSANumericListKeyOwnership(t *testing.T) {
 			if len(items) != 1 || items[0].(map[string]any)["id"] != first {
 				t.Fatalf("initial list key was rounded before storage: %#v", before.Object)
 			}
-			after, err := resource.apply(t, "example", "B", map[string]any{
+			intent := map[string]any{
 				"endpoints": []any{map[string]any{"id": first - 1, "payload": "independent"}},
-			})
+			}
+			after, err := resource.apply(t, "example", "B", intent)
 			stored, getErr := resource.Get(context.Background(), "example", metav1.GetOptions{})
 			if getErr != nil {
 				t.Fatal(getErr)
@@ -683,18 +684,64 @@ func TestSSANumericListKeyOwnership(t *testing.T) {
 				for _, owner := range before.GetManagedFields() {
 					if owner.Manager == "A" {
 						foundA = true
-						if owner.FieldsV1 == nil || !strings.Contains(string(owner.FieldsV1.Raw), "9007199254740993") {
+						if owner.FieldsV1 == nil || owner.Operation != metav1.ManagedFieldsOperationApply {
 							t.Fatalf("initial wire ownership already lost the exact key: %+v", owner)
+						}
+						var fields map[string]json.RawMessage
+						if err := json.Unmarshal(owner.FieldsV1.Raw, &fields); err != nil {
+							t.Fatal(err)
+						}
+						var endpoints map[string]json.RawMessage
+						if err := json.Unmarshal(fields["f:endpoints"], &endpoints); err != nil {
+							t.Fatal(err)
+						}
+						var originalClaims map[string]json.RawMessage
+						if err := json.Unmarshal(endpoints[`k:{"id":9007199254740993}`], &originalClaims); err != nil {
+							t.Fatalf("initial wire ownership lost the exact integer selector: %v", err)
+						}
+						if _, owned := originalClaims["f:payload"]; !owned {
+							t.Fatal("A did not acquire the original payload claim")
 						}
 					}
 				}
 				if !foundA {
 					t.Fatal("initial wire ownership lost manager A")
 				}
-				return
+				after, err = resource.applyWithOptions(t, "example", metav1.PatchOptions{FieldManager: "B", Force: ptr.To(true)}, intent)
+				if err != nil {
+					t.Fatalf("forced independent-key retry failed: %v", err)
+				}
+				foundB := false
+				for _, owner := range after.GetManagedFields() {
+					if owner.FieldsV1 == nil {
+						t.Fatal("forced key owner has no FieldsV1")
+					}
+					var fields map[string]json.RawMessage
+					if err := json.Unmarshal(owner.FieldsV1.Raw, &fields); err != nil {
+						t.Fatal(err)
+					}
+					endpoints, ownsEndpoints := fields["f:endpoints"]
+					if owner.Manager == "A" && ownsEndpoints {
+						t.Fatalf("expected A's unchanged original-item claims to be lost: %s", owner.FieldsV1.Raw)
+					}
+					if owner.Manager == "B" && ownsEndpoints {
+						var keys map[string]json.RawMessage
+						if err := json.Unmarshal(endpoints, &keys); err != nil {
+							t.Fatal(err)
+						}
+						_, foundB = keys[`k:{"id":9007199254740992}`]
+					}
+				}
+				if !foundB {
+					t.Fatal("forced retry lost B's new item claim")
+				}
+				stored, getErr = resource.Get(context.Background(), "example", metav1.GetOptions{})
+				if getErr != nil {
+					t.Fatal(getErr)
+				}
 			}
 			if err != nil {
-				t.Fatalf("small independent integer keys must succeed: %v", err)
+				t.Fatalf("independent-key control failed: %v", err)
 			}
 			if !reflect.DeepEqual(stored.Object, after.Object) {
 				t.Fatal("independent-key response differs from persisted state")

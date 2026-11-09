@@ -123,6 +123,14 @@ func envelope(object map[string]any) *unstructured.Unstructured {
 }
 
 func (e *goEngine) step(step Step) (Snapshot, error) {
+	errorName, err := e.advance(step)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return e.snapshot(errorName)
+}
+
+func (e *goEngine) advance(step Step) (string, error) {
 	// Updater works on a proposed managed-field map. Commit object and ownership
 	// together only after success, matching the reference model's commit wrapper.
 	working := internal.NewManaged(e.fields.Fields().Copy(), nil)
@@ -138,7 +146,7 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 	if err != nil {
 		var conflicts merge.Conflicts
 		if !errors.As(err, &conflicts) {
-			return Snapshot{}, fmt.Errorf("unexpected managedfields error: %w", err)
+			return "", fmt.Errorf("unexpected managedfields error: %w", err)
 		}
 		errorName = "conflict"
 	} else {
@@ -151,16 +159,45 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 	// assuming that internal field sets retain the same ownership after storage.
 	wireObject := e.live.DeepCopy()
 	if err := internal.EncodeObjectManagedFields(wireObject, e.fields); err != nil {
-		return Snapshot{}, fmt.Errorf("encode managed fields: %w", err)
+		return "", fmt.Errorf("encode managed fields: %w", err)
 	}
 	decoded, err := internal.DecodeManagedFields(wireObject.GetManagedFields())
 	if err != nil {
-		return Snapshot{}, fmt.Errorf("decode managed fields: %w", err)
+		return "", fmt.Errorf("decode managed fields: %w", err)
 	}
 	if !decoded.Fields().Equals(e.fields.Fields()) {
-		return Snapshot{}, fmt.Errorf("FieldsV1 round trip changed ownership, operation, or API version")
+		return "", fmt.Errorf("FieldsV1 round trip changed ownership, operation, or API version")
 	}
 	e.fields = decoded
+	return errorName, nil
+}
+
+func (e *goEngine) rawObject() any { return e.live.Object }
+
+func (e *goEngine) observedFields() (fieldpath.ManagedFields, error) {
+	fields := fieldpath.ManagedFields{}
+	for identifier, versioned := range e.fields.Fields() {
+		var entry metav1.ManagedFieldsEntry
+		if err := json.Unmarshal([]byte(identifier), &entry); err != nil {
+			return nil, fmt.Errorf("invalid managedfields manager identity: %w", err)
+		}
+		if entry.Manager == "" || (entry.Operation != metav1.ManagedFieldsOperationApply && entry.Operation != metav1.ManagedFieldsOperationUpdate) || entry.Subresource != "" {
+			return nil, fmt.Errorf("unrepresentable manager identity %s", identifier)
+		}
+		operation := "apply"
+		if entry.Operation == metav1.ManagedFieldsOperationUpdate {
+			operation = "update"
+		}
+		manager := managerIdentity(entry.Manager, operation)
+		if versioned.Applied() != (entry.Operation == metav1.ManagedFieldsOperationApply) || string(versioned.APIVersion()) != groupVersion.String() {
+			return nil, fmt.Errorf("unexpected manager version/operation for %q", manager)
+		}
+		fields[manager] = versioned
+	}
+	return fields, nil
+}
+
+func (e *goEngine) snapshot(errorName string) (Snapshot, error) {
 	objectValue := runtime.DeepCopyJSON(e.live.Object)
 	delete(objectValue, "apiVersion")
 	delete(objectValue, "kind")
@@ -174,22 +211,11 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	out := Snapshot{errorName, mapped, map[string][]string{}}
-	for identifier, versioned := range e.fields.Fields() {
-		var entry metav1.ManagedFieldsEntry
-		if err := json.Unmarshal([]byte(identifier), &entry); err != nil {
-			return out, fmt.Errorf("invalid managedfields manager identity: %w", err)
-		}
-		if entry.Manager == "" || (entry.Operation != metav1.ManagedFieldsOperationApply && entry.Operation != metav1.ManagedFieldsOperationUpdate) || entry.Subresource != "" {
-			return out, fmt.Errorf("unrepresentable manager identity %s", identifier)
-		}
-		operation := "apply"
-		if entry.Operation == metav1.ManagedFieldsOperationUpdate {
-			operation = "update"
-		}
-		manager := managerIdentity(entry.Manager, operation)
-		if versioned.Applied() != (entry.Operation == metav1.ManagedFieldsOperationApply) || string(versioned.APIVersion()) != groupVersion.String() {
-			return out, fmt.Errorf("unexpected manager version/operation for %q", manager)
-		}
+	fields, err := e.observedFields()
+	if err != nil {
+		return out, err
+	}
+	for manager, versioned := range fields {
 		var invalid error
 		versioned.Set().Iterate(func(p fieldpath.Path) {
 			if len(p) == 0 {

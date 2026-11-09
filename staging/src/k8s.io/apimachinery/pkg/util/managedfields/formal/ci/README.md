@@ -46,6 +46,8 @@ The required checks are:
    in requests, independent expectations, paths and schema defaults.
    Numeric FieldsV1 selectors are also compared by exact native magnitude and
    complete reserialized bytes, independently of the lossy `Has`/`Equals` oracle.
+   The imported Apply counterexample additionally checks independent-key false
+   conflict, unchanged-payload ownership loss with force, and small-key success.
 8. Actual merge tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
    Each revision also runs the numeric-key round-trip counterexample and control.
@@ -117,6 +119,9 @@ rounds it to `2^53`; B adding that distinct neighbor item falsely conflicts.
 GET verifies unchanged data, claims and resourceVersion. Small independent
 integer keys succeed and preserve both items. These six functions exercise
 nineteen API/schema variants.
+The large-key branch also forces the rejected request: both items and the old
+payload persist, but A's old claims disappear. Exact B key ownership and GET
+persistence are checked. This adds a transition to the existing variant.
 
 The standalone apimachinery proof entrypoint has no dependency on this
 Kubernetes-only test. The proposed Kubernetes Prow job requires both checks;

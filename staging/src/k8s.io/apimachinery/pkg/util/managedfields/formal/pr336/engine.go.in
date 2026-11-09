@@ -81,9 +81,17 @@ func newGoEngine(cases ...Case) (*goEngine, error) {
 	return &goEngine{updater, live, fieldpath.ManagedFields{}, sc, typ}, nil
 }
 func (e *goEngine) step(step Step) (Snapshot, error) {
-	config, err := e.typ.FromUnstructured(envelope(step.Apply))
+	errorName, err := e.advance(step)
 	if err != nil {
 		return Snapshot{}, err
+	}
+	return e.snapshot(errorName)
+}
+
+func (e *goEngine) advance(step Step) (string, error) {
+	config, err := e.typ.FromUnstructured(envelope(step.Apply))
+	if err != nil {
+		return "", err
 	}
 	working := e.fields.Copy()
 	manager := managerIdentity(step.Manager, step.Operation)
@@ -98,7 +106,7 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 	if err != nil {
 		var conflicts merge.Conflicts
 		if !errors.As(err, &conflicts) {
-			return Snapshot{}, err
+			return "", err
 		}
 		errorName = "conflict"
 	} else {
@@ -107,6 +115,29 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 		}
 		e.fields = fields
 	}
+	for manager, versioned := range e.fields {
+		// Exercise the exact field-set wire encoding on the pinned upstream implementation.
+		data, err := versioned.Set().ToJSON()
+		if err != nil {
+			return "", err
+		}
+		decoded := fieldpath.NewSet()
+		if err := decoded.FromJSON(bytes.NewReader(data)); err != nil {
+			return "", err
+		}
+		if !decoded.Equals(versioned.Set()) {
+			return "", fmt.Errorf("FieldsV1 changed %s ownership", manager)
+		}
+		e.fields[manager] = fieldpath.NewVersionedSet(decoded, versioned.APIVersion(), versioned.Applied())
+	}
+	return errorName, nil
+}
+
+func (e *goEngine) rawObject() any { return e.live.AsValue().Unstructured() }
+
+func (e *goEngine) observedFields() (fieldpath.ManagedFields, error) { return e.fields, nil }
+
+func (e *goEngine) snapshot(errorName string) (Snapshot, error) {
 	out := Snapshot{Error: errorName, Owners: map[string][]string{}}
 	liveObject, ok := e.live.AsValue().Unstructured().(map[string]any)
 	if !ok {
@@ -127,20 +158,8 @@ func (e *goEngine) step(step Step) (Snapshot, error) {
 		return out, err
 	}
 	for manager, versioned := range e.fields {
-		// Exercise the exact field-set wire encoding on the pinned upstream implementation.
-		data, err := versioned.Set().ToJSON()
-		if err != nil {
-			return out, err
-		}
-		decoded := fieldpath.NewSet()
-		if err := decoded.FromJSON(bytes.NewReader(data)); err != nil {
-			return out, err
-		}
-		if !decoded.Equals(versioned.Set()) {
-			return out, fmt.Errorf("FieldsV1 changed %s ownership", manager)
-		}
 		var invalid error
-		decoded.Iterate(func(p fieldpath.Path) {
+		versioned.Set().Iterate(func(p fieldpath.Path) {
 			if isKeyField(p) {
 				return
 			}

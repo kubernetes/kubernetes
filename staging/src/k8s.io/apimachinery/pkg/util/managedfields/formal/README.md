@@ -151,6 +151,19 @@ revisions, and HTTP verifies the false conflict and atomic rollback. The
 structural FieldsV1 theorem remains true after label decoding. See
 [SSA-06](docs/ssa-bugs.md#ssa-06-fieldsv1-rounding-aliases-distinct-integer-list-keys).
 
+`GranularKeyCounterexamples` additionally executes the complete imported Apply
+body for that history, under explicit integer-key/string-payload primitives.
+It refutes independent new-item progress (BASE-09b). Forcing the false conflict
+adds B's item but drops A's claims on its unchanged original payload; a second
+formal refutation records this ownership-frame failure. The nil-last-set prune
+callback is realized by imported source, and small keys succeed. Native current
+and both pinned SMD versions compare the same observations; real HTTP/GET
+checks rejection atomicity, the forced ownership loss and exact retained data.
+The wire input explicitly establishes A's old payload claim before decoding;
+the preservation proposition receives that fact as a premise. Native observers
+inspect exact data and fieldsets for the inconsistent counterexample, while the
+ordinary reference-model adapter continues to check normalized claim targets.
+
 ## What is checked
 
 - General core laws: scalar conflicts, equal-value co-ownership, force transfer,
