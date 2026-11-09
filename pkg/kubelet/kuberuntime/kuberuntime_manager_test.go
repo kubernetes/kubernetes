@@ -4989,10 +4989,9 @@ func TestGetImageVolumes(t *testing.T) {
 		},
 	}
 
-	for desc, tc := range map[string]struct {
+	for _, tc := range map[string]struct {
 		pod                      *v1.Pod
 		expectedImageVolumePulls imageVolumePulls
-		expectedError            error
 	}{
 		"empty volumes": {
 			pod:                      &v1.Pod{Spec: v1.PodSpec{Volumes: []v1.Volume{}}},
@@ -5026,12 +5025,7 @@ func TestGetImageVolumes(t *testing.T) {
 		},
 	} {
 
-		imageVolumePulls, err := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, nil)
-		if tc.expectedError != nil {
-			require.EqualError(t, err, tc.expectedError.Error())
-		} else {
-			require.NoError(t, err, desc)
-		}
+		imageVolumePulls := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, "", nil)
 		assert.Equal(t, tc.expectedImageVolumePulls, imageVolumePulls)
 	}
 }
@@ -8699,8 +8693,7 @@ func TestComputePodActions_DynamicVolumeContainerStartReadiness(t *testing.T) {
 	assert.Equal(t, []int{0}, readyActions.EphemeralContainersToStart)
 
 	// 4. getImageVolumes skips unreferenced unused-img and records dyn-img in actuatedState once pulled.
-	pulls, err := m.getImageVolumes(tCtx, pod, &runtimeapi.PodSandboxConfig{}, nil)
-	require.NoError(t, err)
+	pulls := m.getImageVolumes(tCtx, pod, &runtimeapi.PodSandboxConfig{}, "", nil)
 	assert.Contains(t, pulls, "dyn-img")
 	assert.NotContains(t, pulls, "unused-img", "unreferenced OCI Image volume must be skipped")
 	actVols, ok := m.actuatedState.GetPodVolumes(pod.UID)
