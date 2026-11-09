@@ -2217,14 +2217,10 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 }
 
 func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, allocatedPod *v1.Pod, oldPodStatus v1.PodStatus) *v1.ResourceRequirements {
-	// Pod-level cgroup values can only be read on platforms that support
-	// in-place pod-level resize (e.g. not on Windows, which uses job objects
-	// rather than cgroups).
-	if resizable, _, _ := allocation.IsInPlacePodLevelResourcesVerticalScalingAllowed(allocatedPod); !resizable {
-		return getEffectiveAllocatedResources(allocatedPod)
-	}
-
-	if allocatedPod.Status.Phase != v1.PodRunning {
+	// Pod-level cgroup values can only be read for running pods on platforms
+	// that support in-place pod-level resize (e.g. not on Windows, which uses
+	// job objects rather than cgroups).
+	if resizable, _, _ := allocation.IsInPlacePodLevelResourcesVerticalScalingAllowed(allocatedPod); !resizable || allocatedPod.Status.Phase != v1.PodRunning {
 		return getEffectiveAllocatedResources(allocatedPod)
 	}
 
