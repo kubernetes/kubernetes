@@ -8938,7 +8938,8 @@
   - component: kubelet
     endpoint: /metrics/resource
 - name: container_memory_working_set_bytes
-  help: Current working set of the container in bytes
+  help: 'Current memory usage of the container in bytes: committed memory on Windows,
+    working set on other platforms'
   type: Custom
   stabilityLevel: STABLE
   labels:
@@ -9138,7 +9139,8 @@
   - component: kubelet
     endpoint: /metrics/resource
 - name: node_memory_working_set_bytes
-  help: Current working set of the node in bytes
+  help: 'Current memory usage of the node in bytes: committed memory on Windows, working
+    set on other platforms'
   type: Custom
   stabilityLevel: STABLE
   componentEndpoints:
@@ -9155,7 +9157,8 @@
   - component: kubelet
     endpoint: /metrics/resource
 - name: pod_memory_working_set_bytes
-  help: Current working set of the pod in bytes
+  help: 'Current memory usage of the pod in bytes: committed memory on Windows, working
+    set on other platforms'
   type: Custom
   stabilityLevel: STABLE
   labels:
