@@ -250,6 +250,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `Set.Difference`, `SetNodeMap.Difference` (`fieldpath/set.go`) | `SetContracts.imported_node_matches`, `imported_set_matches`, `imported_difference_never_adds_paths` |
 | `Set.RecursiveDifference`, `SetNodeMap.RecursiveDifference`, `excludeFilter.Filter` | `SetFilterContracts.imported_flat_node_matches`, `imported_flat_set_matches`, `imported_flat_filter_matches`, `locally_ordered_filter_excludes_root` (flat root exclusions only) |
 | `PathElementSet.Has`, `PathElement.Less`, selected Go `slices.BinarySearchFunc` | `SearchContracts.imported_search_matches`, `SearchMembership.imported_search_membership`, `HasBridge.imported_has_membership`, `FilterHasBridge.source_filter_excludes_root` |
+| `toFieldSetWalker.doMap`, `doList` (`typed/tofieldset.go`) | `AtomicFieldContracts.imported_atomic_fields`, `imported_atomic_claims_scope`, `imported_atomic_never_adds_descendant` (atomic entry only) |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -430,6 +431,33 @@ run the same overlays. A twelfth source mutation flips the actual library's fina
 comparator-zero test: unchanged source proofs and an independent native
 membership oracle must both reject it. The original Go BSD notice is retained
 in the generated translation and standalone HTML; no runtime dependency changes.
+
+The typed field-set walker now has complete source imports for `doMap` and
+`doList`. `AtomicFieldContracts.imported_atomic_fields` covers their atomic
+branch at arbitrary finite scope depth and prior field sets, for opaque input
+values and coercion handles. It adds the whole nonempty scope path, never visits
+the child walker, returns nil validation errors and runs the captured deferred
+Free. Every other field membership stays unchanged. Existing descendant claims
+are preserved; the theorem does not silently assume them absent. The empty root
+path is ignored, matching Go's separate top-level ownership exception.
+
+The interpreter models defer registration and LIFO cleanup explicitly. Unsupported
+non-atomic visitor calls fail, rather than inventing successful traversal.
+Insertion is a membership projection; actual Set.Insert, coercion and allocator
+heap realization remain explicit boundaries. Atomic merge/removal/comparison,
+schema dispatch and complete SSA composition still need their own proofs.
+Exact insertion realization also needs a restricted selector domain: the known
+mixed-numeric identity counterexamples rule out its unrestricted global form.
+This is a source-bound BASE-09 component, not closure of the whole atomic law.
+
+The internal-package Go overlay checks 320 map/list cases: null/empty/singleton,
+width/depth 64, four scope shapes including the empty root, and prior sibling,
+descendant and whole-scope claims. Exact selectors, input/path immutability and
+deferred Free counts are independently checked. Both pinned revisions run the
+same cases and the full typed suite. Two additional source mutations reverse
+the map/list atomic guards independently; unchanged source certificates and
+native scope-claim oracles reject both. CI now checks nineteen complete ASTs
+from five distinct source files and fourteen semantic mutations, six also native.
 
 The mixed numeric comparator actually fails the global equality/order premise:
 two distinct int64 values can each compare equal to one float64. A concrete

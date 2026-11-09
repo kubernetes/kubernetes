@@ -1654,5 +1654,28 @@
     "title": "Complete imported pruning realizes the shared-child deletion",
     "meaning": "All four imported pruning functions have realized callees for the shared-child trace, under every lawful manager-map iteration schedule.",
     "limits": "Normalized typed/set primitives and one API version. This source witness does not prove universal primitive or codec refinement."
+  },
+  "SSA.AtomicFieldContracts.imported_atomic_fields": {
+    "scope": "general",
+    "title": "Complete typed atomic visitors add only the whole scope claim",
+    "meaning": "For either complete doMap/doList AST, atomic entry adds the nonempty current path, preserves prior memberships, returns nil validation errors and frees the resource captured by defer. Input contents, path depth and prior claim-set size are arbitrary finite parameters.",
+    "limits": "Insert is a membership projection and coercion supplies opaque resource handles. Actual Set.Insert/coercion/allocator heap realization, schema dispatch, atomic merge/removal/comparison and complete SSA composition remain open. Non-atomic child calls fail explicitly. The empty root path is not tracked."
+  },
+  "SSA.AtomicFieldContracts.imported_atomic_claims_scope": {
+    "scope": "helper",
+    "title": "Nonempty atomic scope acquires its whole membership",
+    "meaning": "Successful imported atomic extraction includes the current scope path, including null or empty contents.",
+    "limits": "A corollary of the complete visitor certificate, not a separate whole-request ownership guarantee. Empty root insertion is explicitly excluded."
+  },
+  "SSA.AtomicFieldContracts.imported_atomic_never_adds_descendant": {
+    "scope": "general",
+    "title": "Atomic extraction preserves every other field membership",
+    "meaning": "Every path different from the current atomic scope is present afterward exactly when it was already present. Thus no fresh descendant or sibling claim appears.",
+    "limits": "Prior descendant claims can exist and remain; this theorem does not establish their initial absence or post-reconciliation canonicality. The underlying insertion/coercion/allocator/runtime boundary is explicit."
+  },
+  "SSA.AtomicFieldContracts.insert_membership": {
+    "scope": "helper",
+    "meaning": "Membership characterization of the explicit whole-path insertion projection, including the empty-root exception.",
+    "limits": "This does not verify actual Go Set.Insert."
   }
 }

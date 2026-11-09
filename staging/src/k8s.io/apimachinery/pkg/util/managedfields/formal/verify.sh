@@ -39,6 +39,8 @@ search_source="$(go list -f '{{.Dir}}' slices)/sort.go"
 go run ./cmd/ssa-source -search -source "$search_source" -check SSA/SearchSource.lean
 set_source="$(dirname "$element_source")/set.go"
 go run ./cmd/ssa-source -sets -source "$set_source" -check SSA/SetSource.lean
+typed_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/typed)/tofieldset.go"
+go run ./cmd/ssa-source -atomic-fields -source "$typed_source" -check SSA/AtomicFieldSource.lean
 
 "${SSA_LAKE}" clean
 "${SSA_LAKE}" build
@@ -58,5 +60,6 @@ go run ./cmd/ssa-compare -model .lake/build/bin/ssa-model
 bash ci/verify-updater.sh
 bash ci/verify-sets.sh
 bash ci/verify-has.sh
+bash ci/verify-atomic-fields.sh
 bash ci/verify-pr336.sh
 python3 docs/generate.py --check

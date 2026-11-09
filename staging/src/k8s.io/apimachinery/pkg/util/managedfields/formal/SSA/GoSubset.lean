@@ -68,6 +68,8 @@ inductive Stmt where
   | increment (name : String)
   | fieldSet (name field : String) (value : Expr)
   | continueLoop
+  | effect (call : Expr)
+  | deferCall (call : Expr)
   deriving Repr
 
 structure ManagerFields where
@@ -470,6 +472,7 @@ def exec {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Stmt → Env Obj Er
       | .rangeSlice _ _ _ | .whileLoop _ _ | .increment _ | .fieldSet _ _ _ =>
           .error "Set statements require the specialized set interpreter"
       | .continueLoop => .error "Updater continue requires the updater interpreter"
+      | .effect _ | .deferCall _ => .error "Typed walker effects require the typed interpreter"
 termination_by fuel _ _ => (fuel, 0, 0)
 
 /-- Statement fuel bounds syntactic nesting, not the number of managers in a finite map. -/

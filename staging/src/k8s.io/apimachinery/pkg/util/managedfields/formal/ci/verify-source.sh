@@ -400,3 +400,70 @@ if ! grep -q 'Has violated exact membership' "$probe/native.log"; then
   exit 1
 fi
 printf 'Unchanged Lean certificate and native Go witness both rejected the standard-library membership mutation.\n'
+
+# Each atomic guard independently protects whole-scope ownership, even for null values.
+export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
+typed_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/typed)/tofieldset.go"
+for method in doMap doList; do
+  probe="$formal_root/.lake/source-mutation/atomic-fields-$method"
+  mkdir -p "$probe/SSA"
+  cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
+  python3 - "$typed_source" "$probe/tofieldset.go" "$method" <<'PY_ATOMIC_MUTATION'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+start = source.index(f"func (v *toFieldSetWalker) {sys.argv[3]}(")
+end = source.index("\n}\n", start) + 2
+body = source[start:end]
+original = "t.ElementRelationship == schema.Atomic"
+if body.count(original) != 1:
+    raise SystemExit("Cannot locate unique typed atomic guard; update verify-source.sh.")
+Path(sys.argv[2]).write_text(source[:start] + body.replace(original, "t.ElementRelationship != schema.Atomic") + source[end:])
+PY_ATOMIC_MUTATION
+  go run ./cmd/ssa-source -atomic-fields -source "$probe/tofieldset.go" > "$probe/SSA/AtomicFieldSource.lean"
+  for module in AtomicFieldSubset AtomicFieldContracts; do cp "SSA/$module.lean" "$probe/SSA/$module.lean"; done
+  for module in AtomicFieldSource AtomicFieldSubset AtomicFieldContracts; do
+    rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
+  done
+  (
+    cd "$probe"
+    export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
+    for module in AtomicFieldSource AtomicFieldSubset; do
+      "$lean_binary" -DwarningAsError=true -o "SSA/$module.olean" "SSA/$module.lean"
+    done
+    if "$lean_binary" -DwarningAsError=true -o SSA/AtomicFieldContracts.olean SSA/AtomicFieldContracts.lean > AtomicFieldContracts.log 2>&1; then
+      printf 'Typed atomic mutation unexpectedly satisfied its unchanged certificate.\n' >&2
+      exit 1
+    fi
+    if ! grep -q 'unsolved goals' AtomicFieldContracts.log; then
+      cat AtomicFieldContracts.log >&2
+      printf 'Typed atomic mutation failed for an unrelated reason.\n' >&2
+      exit 1
+    fi
+  )
+  python3 - "$probe" "$typed_source" "$formal_root/pr336/atomic_fields_test.go.in" <<'PY_ATOMIC_OVERLAY'
+import json
+import sys
+from pathlib import Path
+
+probe, source, witness = map(Path, sys.argv[1:])
+(probe / "overlay.json").write_text(json.dumps({"Replace": {
+    str(source): str(probe / "tofieldset.go"),
+    str(source.parent / "ssa_formal_atomic_fields_test.go"): str(witness),
+}}))
+PY_ATOMIC_OVERLAY
+  kind=map
+  if [[ "$method" == doList ]]; then kind=list; fi
+  if go test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/typed \
+      -run "^TestSSAFormalAtomicFields$/$kind$" -v -count=1 > "$probe/native.log" 2>&1; then
+    printf 'Native typed atomic mutation unexpectedly preserved scope claims.\n' >&2
+    exit 1
+  fi
+  if ! grep -q 'atomic extraction fieldset mismatch' "$probe/native.log"; then
+    cat "$probe/native.log" >&2
+    printf 'Native typed atomic mutation failed for an unrelated reason.\n' >&2
+    exit 1
+  fi
+  printf 'Unchanged Lean certificate and native Go oracle both rejected the %s atomic-guard mutation.\n' "$method"
+done

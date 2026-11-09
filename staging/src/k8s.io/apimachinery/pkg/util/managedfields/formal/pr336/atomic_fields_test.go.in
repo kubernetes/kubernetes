@@ -1,0 +1,210 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package typed
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"reflect"
+	"slices"
+	"testing"
+	"time"
+
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
+)
+
+type ssaFormalFieldAllocator struct {
+	value.Allocator
+	freed []int
+}
+
+func (a *ssaFormalFieldAllocator) Free(resource any) {
+	a.freed = append(a.freed, 1)
+	a.Allocator.Free(resource)
+}
+
+type ssaFormalAtomicCase struct {
+	Kind     string  `json:"kind"`
+	Resource *int    `json:"resource"`
+	Path     []int   `json:"path"`
+	Fields   [][]int `json:"fields"`
+}
+
+type ssaFormalAtomicReport struct {
+	Fields [][]int `json:"fields"`
+	Freed  []int   `json:"freed"`
+}
+
+func TestSSAFormalAtomicFields(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	domain := []fieldpath.PathElement{
+		fieldpath.FieldNameElement("unrelated"), fieldpath.FieldNameElement("spec"),
+		fieldpath.FieldNameElement("unit"), fieldpath.KeyElementByFields("name", "db"),
+		fieldpath.FieldNameElement("previous"),
+	}
+	decode := func(ranks []int) fieldpath.Path {
+		path := fieldpath.Path{}
+		for _, rank := range ranks {
+			path = append(path, domain[rank])
+		}
+		return path
+	}
+	canonical := func(paths [][]int) []string {
+		seen := map[string]bool{}
+		for _, path := range paths {
+			if len(path) != 0 {
+				seen[fmt.Sprint(path)] = true
+			}
+		}
+		result := []string{}
+		for path := range seen {
+			result = append(result, path)
+		}
+		slices.Sort(result)
+		return result
+	}
+	for _, kind := range []string{"map", "list"} {
+		t.Run(kind, func(t *testing.T) {
+			wideMap, wideList := map[string]any{}, []any{}
+			for i := 0; i < 64; i++ {
+				wideMap[fmt.Sprint(i)] = map[string]any{"nested": int64(i)}
+				wideList = append(wideList, map[string]any{"nested": int64(i)})
+			}
+			var deep any = "leaf"
+			for depth := 0; depth < 64; depth++ {
+				deep = map[string]any{"nested": deep}
+			}
+			payloads := []any{nil, map[string]any{}, map[string]any{"x": "one"}, wideMap, deep}
+			if kind == "list" {
+				payloads = []any{nil, []any{}, []any{"one"}, wideList, []any{deep}}
+			}
+			cases, expected := []ssaFormalAtomicCase{}, []ssaFormalAtomicReport{}
+			for _, scope := range [][]int{{2}, {1, 2}, {1, 3, 2}, {}} {
+				child := append(slices.Clone(scope), 4)
+				for mask := 0; mask < 8; mask++ {
+					prior := [][]int{}
+					for bit, path := range [][]int{{0}, child, scope} {
+						if mask&(1<<bit) != 0 && len(path) != 0 {
+							prior = append(prior, path)
+						}
+					}
+					for _, payload := range payloads {
+						fields := fieldpath.NewSet()
+						for _, path := range prior {
+							fields.Insert(decode(path))
+						}
+						allocator := &ssaFormalFieldAllocator{Allocator: value.NewFreelistAllocator(), freed: []int{}}
+						walker := toFieldSetWalker{value: value.NewValueInterface(payload), path: decode(scope), set: fields, allocator: allocator}
+						before, err := json.Marshal(payload)
+						if err != nil {
+							t.Fatal(err)
+						}
+						var errs ValidationErrors
+						if kind == "map" {
+							errs = walker.doMap(&schema.Map{ElementRelationship: schema.Atomic})
+						} else {
+							errs = walker.doList(&schema.List{ElementRelationship: schema.Atomic})
+						}
+						if len(errs) != 0 {
+							t.Fatalf("atomic visitor rejected its input: %v", errs)
+						}
+						actual := [][]int{}
+						fields.Iterate(func(path fieldpath.Path) {
+							ranks := []int{}
+							for _, element := range path {
+								token, err := fieldpath.SerializePathElement(element)
+								if err != nil {
+									t.Fatal(err)
+								}
+								rank := -1
+								for candidate, member := range domain {
+									known, err := fieldpath.SerializePathElement(member)
+									if err != nil {
+										t.Fatal(err)
+									}
+									if token == known {
+										rank = candidate
+									}
+								}
+								if rank < 0 {
+									t.Fatalf("atomic extraction added descendant or unknown selector: %s", token)
+								}
+								ranks = append(ranks, rank)
+							}
+							actual = append(actual, ranks)
+						})
+						want := append(slices.Clone(prior), scope)
+						if !reflect.DeepEqual(canonical(actual), canonical(want)) {
+							t.Fatalf("atomic extraction fieldset mismatch: kind=%s path=%v mask=%d got=%v want=%v", kind, scope, mask, actual, want)
+						}
+						after, err := json.Marshal(payload)
+						if err != nil || !bytes.Equal(before, after) {
+							t.Fatalf("atomic visitor mutated input: %v", err)
+						}
+						if !reflect.DeepEqual(walker.path, decode(scope)) {
+							t.Fatal("atomic visitor mutated its scope path")
+						}
+						var handle *int
+						freed := []int{}
+						if payload != nil {
+							one := 1
+							handle, freed = &one, []int{1}
+						}
+						if !reflect.DeepEqual(allocator.freed, freed) {
+							t.Fatalf("atomic deferred cleanup mismatch: %v vs %v", allocator.freed, freed)
+						}
+						cases = append(cases, ssaFormalAtomicCase{kind, handle, scope, prior})
+						expected = append(expected, ssaFormalAtomicReport{actual, freed})
+					}
+				}
+			}
+			encoded, err := json.Marshal(cases)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+			command := exec.CommandContext(ctx, model, "--atomic-fields", "-")
+			command.Stdin = bytes.NewReader(encoded)
+			var stderr bytes.Buffer
+			command.Stderr = &stderr
+			output, err := command.Output()
+			if err != nil {
+				t.Fatalf("atomic source model failed: %v: %s", err, stderr.String())
+			}
+			var reports []ssaFormalAtomicReport
+			if err := json.Unmarshal(output, &reports); err != nil || len(reports) != len(expected) {
+				t.Fatalf("invalid atomic source reports: %v", err)
+			}
+			for i, report := range reports {
+				if !reflect.DeepEqual(canonical(report.Fields), canonical(expected[i].Fields)) || !reflect.DeepEqual(report.Freed, expected[i].Freed) {
+					t.Fatalf("atomic source/Go mismatch at case %d: source=%+v Go=%+v", i, report, expected[i])
+				}
+			}
+			t.Logf("%d source/native atomic %s cases; null/empty/wide/deep values, root exception, existing claims and deferred cleanup", len(cases), kind)
+		})
+	}
+}

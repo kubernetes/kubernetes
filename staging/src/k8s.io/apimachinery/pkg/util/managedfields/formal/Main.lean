@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields checks typed atomic field extraction."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -184,6 +184,39 @@ private structure MidpointCase where
   right : Nat
   deriving FromJson
 
+private structure AtomicFieldCase where
+  kind : String
+  resource : Option Nat
+  path : List Nat
+  fields : List (List Nat)
+  deriving FromJson
+
+private structure AtomicFieldReport where
+  fields : List (List Nat)
+  freed : List Nat
+  deriving ToJson
+
+private def runAtomicFields (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List AtomicFieldReport) := do
+    let cases ← Json.parse input >>= fromJson? (α := List AtomicFieldCase)
+    if cases.isEmpty then throw "Atomic field-set protocol requires nonempty cases"
+    cases.mapM fun request => do
+      let kind ← match request.kind with
+        | "list" => .ok AtomicFieldSubset.Kind.list
+        | "map" => .ok AtomicFieldSubset.Kind.map
+        | _ => .error "Atomic field-set kind must be list or map"
+      let ops : AtomicFieldSubset.Ops Unit := {view := fun _ _ => request.resource}
+      match ← AtomicFieldSubset.run ops (AtomicFieldContracts.program kind)
+          {input := (),path := request.path,fields := request.fields} with
+      | .returned [.nil] final => pure {fields := final.fields,freed := final.freed}
+      | _ => throw "Atomic field-set source did not return nil validation errors"
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
 private def runMidpoints (path : String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
@@ -223,6 +256,7 @@ def main (args : List String) : IO UInt32 := do
           stderr.putStrLn s!"Unknown scenario '{name}'; run --list to see available scenarios."
           return 2
   | ["--has-search",path] => runSearch path
+  | ["--atomic-fields",path] => runAtomicFields path
   | ["--search-midpoints",path] => runMidpoints path
   | ["--root-reset-filter",path] => runSets path true
   | ["--set-difference",path] => runSets path

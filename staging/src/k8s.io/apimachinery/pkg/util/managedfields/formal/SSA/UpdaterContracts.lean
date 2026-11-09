@@ -883,6 +883,8 @@ theorem safe_program_preserves_claim_bound {Obj Err : Type} (ops : Ops Obj Err)
           | whileLoop _ _ => simp at nodeSafe
           | increment _ => simp at nodeSafe
           | fieldSet _ _ _ => simp at nodeSafe
+          | effect _ => simp at nodeSafe
+          | deferCall _ => simp at nodeSafe
 
 theorem initial_ownership_is_bounded {Obj Err : Type} (old new : Obj) (version : String)
     (owners : ManagedFields) (actor : String) (force : Bool) :

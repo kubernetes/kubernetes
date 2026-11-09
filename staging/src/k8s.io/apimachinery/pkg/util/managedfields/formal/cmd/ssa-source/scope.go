@@ -33,17 +33,18 @@ type binding struct {
 
 // Unique lexical identities let the interpreter preserve updates without leaking shadows.
 type scope struct {
-	parent      *scope
-	bindings    map[string]binding
-	serial      *int
-	depth       int
-	readOnly    map[string]bool
-	elements    bool
-	updater     bool
-	inLoop      bool
-	currentKeys map[string]string
-	sets        bool
-	search      bool
+	parent       *scope
+	bindings     map[string]binding
+	serial       *int
+	depth        int
+	readOnly     map[string]bool
+	elements     bool
+	updater      bool
+	inLoop       bool
+	currentKeys  map[string]string
+	sets         bool
+	search       bool
+	atomicFields bool
 }
 
 func rootScope(function functionSpec) *scope {
@@ -57,6 +58,13 @@ func rootScope(function functionSpec) *scope {
 	root.updater = function.updater
 	root.sets = function.sets
 	root.search = function.search
+	root.atomicFields = function.atomicFields
+	if function.atomicFields {
+		globals.bindings["schema"] = binding{"schema", "builtin"}
+		for _, name := range []string{"listValue", "mapValue"} {
+			globals.bindings[name] = binding{name, "typed-coercion"}
+		}
+	}
 	if function.search {
 		for _, name := range []string{"int", "uint", "slices"} {
 			globals.bindings[name] = binding{name, "builtin"}
@@ -75,6 +83,9 @@ func rootScope(function functionSpec) *scope {
 	for _, parameter := range function.parameters {
 		root.bindings[parameter] = binding{parameter, function.maps[parameter]}
 	}
+	for _, result := range function.namedResults {
+		root.bindings[result] = binding{result, ""}
+	}
 	receiver := function.receiverID
 	if receiver == "" {
 		receiver = "s"
@@ -84,12 +95,15 @@ func rootScope(function functionSpec) *scope {
 		if function.elements {
 			root.bindings[receiver] = binding{receiver, "element-input"}
 		}
+		if function.atomicFields {
+			root.bindings[receiver] = binding{receiver, "typed-input"}
+		}
 	}
 	return root
 }
 
 func (s *scope) child() *scope {
-	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}, sets: s.sets, search: s.search}
+	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}, sets: s.sets, search: s.search, atomicFields: s.atomicFields}
 }
 
 func (s *scope) currentKey(mapID string) string {
@@ -202,6 +216,19 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		field, err := quoted(e.Sel.Name)
 		return "(.select " + receiver + " " + field + ")", err
 	case *ast.CallExpr:
+		if name, ok := e.Fun.(*ast.Ident); ok && context.atomicFields {
+			if bound, found := context.resolve(name.Name); found && bound.kind == "typed-coercion" {
+				if len(e.Args) != 2 || e.Ellipsis.IsValid() {
+					return "", fmt.Errorf("typed coercion requires allocator and value")
+				}
+				args, err := renderExpressions(e.Args, context)
+				id, quoteErr := quoted(bound.id)
+				if err != nil {
+					return "", err
+				}
+				return "(.call (.var " + id + ") \"Invoke\" " + args + ")", quoteErr
+			}
+		}
 		if name, ok := e.Fun.(*ast.Ident); ok && context.search {
 			if name.Name == "int" {
 				return renderSearchMidpoint(e, context)
@@ -260,7 +287,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(method.Sel.Name)
 		return "(.call " + receiver + " " + name + " " + args + ")", err
 	case *ast.BinaryExpr:
-		if (context.updater || context.search) && (e.Op == token.EQL || e.Op == token.NEQ) {
+		if (context.updater || context.search || context.atomicFields) && (e.Op == token.EQL || e.Op == token.NEQ) {
 			if name, nilComparison := e.Y.(*ast.Ident); !nilComparison || name.Name != "nil" {
 				left, err := renderExpr(e.X, context)
 				if err != nil {
@@ -745,6 +772,17 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			}
 			items = append(items, "(.continueLoop)")
 		case *ast.ExprStmt:
+			if context.atomicFields {
+				if _, call := s.X.(*ast.CallExpr); !call {
+					return "", fmt.Errorf("typed effect statement must be a call")
+				}
+				value, err := renderExpr(s.X, context)
+				if err != nil {
+					return "", err
+				}
+				items = append(items, "(.effect "+value+")")
+				continue
+			}
 			call, ok := s.X.(*ast.CallExpr)
 			if !ok || len(call.Args) != 2 {
 				return "", fmt.Errorf("unsupported Go expression statement")
@@ -776,6 +814,15 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			}
 			id, _ := quoted(mapVar.id)
 			items = append(items, "(.mapDelete "+id+" "+key+")")
+		case *ast.DeferStmt:
+			if !context.atomicFields {
+				return "", fmt.Errorf("Go defer requires the typed walker interpreter")
+			}
+			value, err := renderExpr(s.Call, context)
+			if err != nil {
+				return "", err
+			}
+			items = append(items, "(.deferCall "+value+")")
 		case *ast.ReturnStmt:
 			if len(s.Results) == 0 {
 				return "", fmt.Errorf("unsupported Go named return")

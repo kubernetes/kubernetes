@@ -32,18 +32,20 @@ import (
 )
 
 type functionSpec struct {
-	name       string
-	leanName   string
-	signature  string
-	parameters []string
-	maps       map[string]string
-	elements   bool
-	updater    bool
-	sets       bool
-	receiver   string
-	receiverID string
-	search     bool
-	standalone bool
+	name         string
+	leanName     string
+	signature    string
+	parameters   []string
+	maps         map[string]string
+	elements     bool
+	updater      bool
+	sets         bool
+	receiver     string
+	receiverID   string
+	search       bool
+	standalone   bool
+	atomicFields bool
+	namedResults []string
 }
 
 var searchFunctions = []functionSpec{{
@@ -220,7 +222,11 @@ func validateImports(source []byte) error {
 		"fieldpath": "sigs.k8s.io/structured-merge-diff/v6/fieldpath",
 		"value":     "sigs.k8s.io/structured-merge-diff/v6/value",
 	}
-	for _, imported := range file.Imports {
+	return validateImportBindings(file.Imports, expected)
+}
+
+func validateImportBindings(imports []*ast.ImportSpec, expected map[string]string) error {
+	for _, imported := range imports {
 		path, err := strconv.Unquote(imported.Path.Value)
 		if err != nil {
 			return err
@@ -279,18 +285,19 @@ func run() error {
 	sets := flag.Bool("sets", false, "import field-set Difference, RecursiveDifference and exclude-filter bodies from fieldpath/set.go")
 	search := flag.Bool("search", false, "import Go standard-library slices.BinarySearchFunc")
 	has := flag.Bool("has", false, "import PathElementSet.Has and PathElement.Less")
+	atomicFields := flag.Bool("atomic-fields", false, "import the complete typed field-set map/list visitors")
 	flag.Parse()
 	if *sourcePath == "" || flag.NArg() != 0 {
 		return fmt.Errorf("supply -source and no positional arguments")
 	}
 	modes := 0
-	for _, active := range []bool{*elements, *updater, *sets, *search, *has} {
+	for _, active := range []bool{*elements, *updater, *sets, *search, *has, *atomicFields} {
 		if active {
 			modes++
 		}
 	}
 	if modes > 1 {
-		return fmt.Errorf("select at most one source mode: -elements, -updater, -sets, -search or -has")
+		return fmt.Errorf("select at most one source mode: -elements, -updater, -sets, -search, -has or -atomic-fields")
 	}
 	source, err := os.ReadFile(*sourcePath)
 	if err != nil {
@@ -298,7 +305,7 @@ func run() error {
 	}
 	selected := functions
 	namespace, description := "GoSource", "merge/update.go"
-	if *elements || *sets || *has || *search {
+	if *elements || *sets || *has || *search || *atomicFields {
 		file, err := parser.ParseFile(token.NewFileSet(), "element.go", source, parser.PackageClauseOnly)
 		if err != nil {
 			return err
@@ -306,6 +313,9 @@ func run() error {
 		pkg := "fieldpath"
 		if *search {
 			pkg = "slices"
+		}
+		if *atomicFields {
+			pkg = "typed"
 		}
 		if file.Name.Name != pkg {
 			return fmt.Errorf("unsupported source package %q; expected %q", file.Name.Name, pkg)
@@ -326,6 +336,13 @@ func run() error {
 		if *search {
 			selected = searchFunctions
 			namespace, description = "SearchSource", "slices/sort.go"
+		}
+		if *atomicFields {
+			selected = atomicFieldFunctions
+			namespace, description = "AtomicFieldSource", "typed/tofieldset.go"
+			if err := validateAtomicFieldImports(source); err != nil {
+				return err
+			}
 		}
 	} else {
 		if err := validateImports(source); err != nil {
