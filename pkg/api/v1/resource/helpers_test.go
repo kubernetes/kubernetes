@@ -157,6 +157,46 @@ func TestGetResourceRequest(t *testing.T) {
 			podLevelResourcesEnabled: true,
 		},
 		{
+			// Only cpu is set at pod level, so memory still comes from the containers.
+			cName:                    "pod level resources cpu req, container mem req, read memory",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "5"}, resources{memoryRequest: "50Mi"}),
+			resourceName:             v1.ResourceMemory,
+			expectedValue:            52428800,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			// Only memory is set at pod level, so cpu still comes from the containers.
+			cName:                    "pod level resources mem req, container cpu req, read cpu",
+			pod:                      getPodWithPodLevelResources(containerName, resources{memoryRequest: "100Mi"}, resources{cpuRequest: "8"}),
+			resourceName:             v1.ResourceCPU,
+			expectedValue:            8000,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			// ephemeral-storage is not a pod-level resource, so it always comes from
+			// the containers, whatever is set at pod level.
+			cName:                    "pod level resources cpu req, container ephemeral-storage req",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "5"}, resources{ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceEphemeralStorage,
+			expectedValue:            1073741824,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			cName:                    "pod level resources cpu and mem req, container ephemeral-storage req",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "5", memoryRequest: "100Mi"}, resources{ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceEphemeralStorage,
+			expectedValue:            1073741824,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			// With the feature disabled the pod-level values are not used at all, so
+			// the request is the container aggregate.
+			cName:         "pod level resources set but feature disabled",
+			pod:           getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 8000,
+		},
+		{
 			cName:                    "cpu pod without pod level resources but pod level resources feature enabled",
 			pod:                      getPod(containerName, resources{cpuRequest: "9"}),
 			resourceName:             v1.ResourceCPU,
@@ -336,6 +376,7 @@ func TestExtractResourceValue(t *testing.T) {
 
 type resources struct {
 	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
+	ephemeralStorageRequest                                                       string
 }
 
 func defineResources(resources resources) v1.ResourceRequirements {
@@ -355,6 +396,9 @@ func defineResources(resources resources) v1.ResourceRequirements {
 	}
 	if resources.memoryRequest != "" {
 		r.Requests[v1.ResourceMemory] = resource.MustParse(resources.memoryRequest)
+	}
+	if resources.ephemeralStorageRequest != "" {
+		r.Requests[v1.ResourceEphemeralStorage] = resource.MustParse(resources.ephemeralStorageRequest)
 	}
 
 	return r

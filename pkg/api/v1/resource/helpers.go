@@ -42,11 +42,15 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
 	}
 
-	// Supported pod level resources will be used instead of container level ones when available
-	hasPodLevelResources := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod)
-
+	// PodRequests aggregates the containers and then overwrites, resource by resource,
+	// whatever is set at pod level, so the container aggregate is what the resources
+	// that pod level does not set are requesting. That includes every resource pod-level
+	// resources cannot express at all, such as ephemeral-storage.
 	// TODO(pravk03): considering DRA Node Allocatable resources for eviction ranking.
-	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{SkipContainerLevelResources: hasPodLevelResources, ExcludeOverhead: true})[resourceName]; ok {
+	if rQuantity, ok := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		ExcludeOverhead:       true,
+	})[resourceName]; ok {
 		requestQuantity.Add(rQuantity)
 	}
 
