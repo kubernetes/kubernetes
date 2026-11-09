@@ -1243,7 +1243,7 @@ func TestRunPodGroupPostFilterPlugins(t *testing.T) {
 			}
 			fwkImpl.podGroupPostFilterPlugins = postFilterPlugins
 
-			var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+			var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 				return &fwk.PodGroupAssignments{}, nil
 			}
 
@@ -4999,7 +4999,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PodGroupPostFilter - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 					return &fwk.PodGroupAssignments{}, nil
 				}
 				f.RunPodGroupPostFilterPlugins(ctx, state, newQueuedPodGroupInfoForTest("", ""), pgSchedulingFunc)
@@ -5105,7 +5105,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PodGroupPostFilter - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+				var pgSchedulingFunc fwk.PodGroupSchedulingFunc = func(_ context.Context, _ fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
 					return &fwk.PodGroupAssignments{}, nil
 				}
 				f.RunPodGroupPostFilterPlugins(ctx, state, newQueuedPodGroupInfoForTest("", ""), pgSchedulingFunc)

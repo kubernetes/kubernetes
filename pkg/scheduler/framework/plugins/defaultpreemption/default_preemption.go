@@ -70,7 +70,7 @@ type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim preemption.Victim, pre
 type MoreImportantVictimFunc func(victim1, victim2 preemption.Victim) bool
 
 type podGroupEvaluator interface {
-	Preempt(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
+	Preempt(ctx context.Context, pgInfo fwk.PodGroupInfo, podGroupSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status)
 }
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
@@ -488,7 +488,7 @@ func (pl *DefaultPreemption) isPreemptionAllowedAcrossAllVictimNodes(victim *pre
 }
 
 // PodGroupPostFilter runs a default preemption for the pod group.
-func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (postFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
+func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, _ fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (postFilterResult *fwk.PodGroupPostFilterResult, status *fwk.Status) {
 	defer func() {
 		metrics.WorkloadPreemptionAttempts.WithLabelValues(metrics.EntityTypeToLabel(pgInfo.GetType()), status.Code().String()).Inc()
 	}()
@@ -504,7 +504,7 @@ func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, state fwk.P
 		}
 	}()
 
-	res, status := pl.podGroupEvaluator.Preempt(ctx, state, pgInfo, pgSchedulingFunc)
+	res, status := pl.podGroupEvaluator.Preempt(ctx, pgInfo, pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
