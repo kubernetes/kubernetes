@@ -17,4 +17,4 @@ from pathlib import Path
 
 Path(sys.argv[1]).write_text(json.dumps({"Replace": {sys.argv[2]: sys.argv[3]}}))
 PY
-go test -overlay="$overlay" sigs.k8s.io/structured-merge-diff/v6/fieldpath -run '^TestSSAFormalHasSearch$' -v -count=1
+bash "$formal_root/ci/run-native-go.sh" "$overlay" sigs.k8s.io/structured-merge-diff/v6/fieldpath -run '^TestSSAFormalHasSearch$' -v -count=1

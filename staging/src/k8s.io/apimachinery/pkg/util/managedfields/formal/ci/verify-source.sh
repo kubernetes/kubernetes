@@ -87,6 +87,79 @@ PY
   printf 'The unchanged Lean theorems correctly rejected the %s Go source mutation.\n' "$mutation"
 done
 
+# Whole-operand replacement and the per-scope leaf guard need independent native witnesses.
+merge_typed_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/typed)/merge.go"
+export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
+for mutation in right-output-cleared map-leaf-bypass list-leaf-bypass; do
+  probe="$formal_root/.lake/source-mutation/atomic-merge-$mutation"
+  mkdir -p "$probe/SSA"
+  cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
+  python3 - "$merge_typed_source" "$probe/merge.go" "$mutation" <<'PY_MERGE_MUTATION'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+if sys.argv[3] == "right-output-cleared":
+    start = source.index("ruleKeepRHS = mergeRule(func(w *mergingWalker)")
+    end = source.index("\n\t})", start) + 4
+    old, new = "w.out = &v", "w.out = nil; _ = v"
+else:
+    method = "doMap" if sys.argv[3].startswith("map") else "doList"
+    start = source.index(f"func (w *mergingWalker) {method}(")
+    end = source.index("\n}\n", start) + 2
+    old, new = "w.doLeaf()", "w.rule(w)"
+body = source[start:end]
+if old not in body or (sys.argv[3] != "right-output-cleared" and body.count(old) != 1):
+    raise SystemExit("Cannot locate atomic merge source mutation; update verify-source.sh.")
+Path(sys.argv[2]).write_text(source[:start] + body.replace(old, new, 1) + source[end:])
+PY_MERGE_MUTATION
+  go run ./cmd/ssa-source -atomic-merge -source "$probe/merge.go" > "$probe/SSA/AtomicMergeSource.lean"
+  for module in AtomicMergeMachine AtomicMergeSubset AtomicMergeContracts; do cp "SSA/$module.lean" "$probe/SSA/$module.lean"; done
+  for module in AtomicMergeSource AtomicMergeMachine AtomicMergeSubset AtomicMergeContracts; do
+    rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
+  done
+  (
+    cd "$probe"
+    export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
+    for module in AtomicMergeSource AtomicMergeMachine AtomicMergeSubset; do
+      "$lean_binary" -DwarningAsError=true -o "SSA/$module.olean" "SSA/$module.lean"
+    done
+    if "$lean_binary" -DwarningAsError=true -o SSA/AtomicMergeContracts.olean SSA/AtomicMergeContracts.lean > AtomicMergeContracts.log 2>&1; then
+      printf 'Atomic merge mutation unexpectedly satisfied the unchanged certificate.\n' >&2
+      exit 1
+    fi
+    if ! grep -q 'unsolved goals' AtomicMergeContracts.log; then
+      cat AtomicMergeContracts.log >&2
+      printf 'Atomic merge mutation failed for an unrelated reason.\n' >&2
+      exit 1
+    fi
+  )
+  python3 - "$probe" "$merge_typed_source" "$formal_root/pr336/atomic_merge_test.go.in" <<'PY_MERGE_OVERLAY'
+import json
+import sys
+from pathlib import Path
+
+probe, source, witness = map(Path, sys.argv[1:])
+(probe / "overlay.json").write_text(json.dumps({"Replace": {
+    str(source): str(probe / "merge.go"),
+    str(source.parent / "ssa_formal_atomic_merge_test.go"): str(witness),
+}}))
+PY_MERGE_OVERLAY
+  kind=map
+  if [[ "$mutation" == list-leaf-bypass ]]; then kind=list; fi
+  if bash "$formal_root/ci/run-native-go.sh" "$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/typed \
+      -run "^TestSSAFormalAtomicMerge$/$kind$" -v -count=1 > "$probe/native.log" 2>&1; then
+    printf 'Native atomic merge mutation unexpectedly preserved whole operands and the leaf guard.\n' >&2
+    exit 1
+  fi
+  if ! grep -q 'atomic merge violated whole-operand choice or call frame' "$probe/native.log"; then
+    cat "$probe/native.log" >&2
+    printf 'Native atomic merge mutation failed for an unrelated reason.\n' >&2
+    exit 1
+  fi
+  printf 'Unchanged Lean certificate and native Go oracle both rejected the %s atomic-merge mutation.\n' "$mutation"
+done
+
 # A comparator collision makes the representative label observable: returning the right label invents a path.
 probe="$formal_root/.lake/source-mutation/recursive-set-label"
 mkdir -p "$probe/SSA"
@@ -139,7 +212,7 @@ overlay = {"Replace": {
 (probe / "overlay.json").write_text(json.dumps(overlay))
 PY_SET_OVERLAY
 export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
-if go test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
+if bash "$formal_root/ci/run-native-go.sh" "$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
     -run '^TestSSAFormalRecursiveDifference$' -v -count=1 > "$probe/native.log" 2>&1; then
   printf 'Native recursive-set mutation unexpectedly preserved exact path non-growth.\n' >&2
   exit 1
@@ -202,7 +275,7 @@ overlay = {"Replace": {
 PY_UPDATER_OVERLAY
 SSA_UPDATER_EXPECTED="$("$formal_root/.lake/build/bin/ssa-model" --updater-observations)"
 export SSA_UPDATER_EXPECTED
-if go test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/merge \
+if bash "$formal_root/ci/run-native-go.sh" "$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/merge \
     -run '^TestSSAFormalUpdaterFilteredCache$' -v -count=1 > "$probe/native.log" 2>&1; then
   printf 'Native ownership-growth mutation unexpectedly preserved the foreign claim bound.\n' >&2
   exit 1
@@ -306,7 +379,7 @@ overlay = {"Replace": {
 (probe / "overlay.json").write_text(json.dumps(overlay))
 PY_FILTER_OVERLAY
 export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
-if go test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
+if bash "$formal_root/ci/run-native-go.sh" "$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
     -run '^TestSSAFormalRootResetFilter$' -v -count=1 > "$probe/native.log" 2>&1; then
   printf 'Native reset-filter mutation unexpectedly excluded complete subtrees.\n' >&2
   exit 1
@@ -389,7 +462,8 @@ PY_SEARCH_OVERLAY
 export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
 search_go_root="$(cat "$probe/go-root-path")"
 search_go_tool="$(cat "$probe/go-tool-path")"
-if GOROOT="$search_go_root" GOTOOLCHAIN=local "$search_go_tool" test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
+if GOROOT="$search_go_root" GOTOOLCHAIN=local SSA_NATIVE_GO="$search_go_tool" \
+    bash "$formal_root/ci/run-native-go.sh" "$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
     -run '^TestSSAFormalHasSearch$' -v -count=1 > "$probe/native.log" 2>&1; then
   printf 'Native standard-search mutation unexpectedly preserved exact membership.\n' >&2
   exit 1
@@ -455,7 +529,7 @@ probe, source, witness = map(Path, sys.argv[1:])
 PY_ATOMIC_OVERLAY
   kind=map
   if [[ "$method" == doList ]]; then kind=list; fi
-  if go test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/typed \
+  if bash "$formal_root/ci/run-native-go.sh" "$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/typed \
       -run "^TestSSAFormalAtomicFields$/$kind$" -v -count=1 > "$probe/native.log" 2>&1; then
     printf 'Native typed atomic mutation unexpectedly preserved scope claims.\n' >&2
     exit 1

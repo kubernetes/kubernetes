@@ -45,6 +45,8 @@ type scope struct {
 	sets         bool
 	search       bool
 	atomicFields bool
+	atomicMerge  bool
+	voidResult   bool
 }
 
 func rootScope(function functionSpec) *scope {
@@ -59,8 +61,12 @@ func rootScope(function functionSpec) *scope {
 	root.sets = function.sets
 	root.search = function.search
 	root.atomicFields = function.atomicFields
-	if function.atomicFields {
+	root.atomicMerge = function.atomicMerge
+	root.voidResult = function.voidResult
+	if function.atomicFields || function.atomicMerge {
 		globals.bindings["schema"] = binding{"schema", "builtin"}
+	}
+	if function.atomicFields {
 		for _, name := range []string{"listValue", "mapValue"} {
 			globals.bindings[name] = binding{name, "typed-coercion"}
 		}
@@ -75,7 +81,7 @@ func rootScope(function functionSpec) *scope {
 			globals.bindings[name] = binding{name, "builtin"}
 		}
 	}
-	if function.elements {
+	if function.elements || function.atomicMerge {
 		for _, name := range []string{"len", "append"} {
 			globals.bindings[name] = binding{name, "builtin"}
 		}
@@ -98,12 +104,15 @@ func rootScope(function functionSpec) *scope {
 		if function.atomicFields {
 			root.bindings[receiver] = binding{receiver, "typed-input"}
 		}
+		if function.atomicMerge {
+			root.bindings[receiver] = binding{receiver, "typed-mutable"}
+		}
 	}
 	return root
 }
 
 func (s *scope) child() *scope {
-	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}, sets: s.sets, search: s.search, atomicFields: s.atomicFields}
+	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}, sets: s.sets, search: s.search, atomicFields: s.atomicFields, atomicMerge: s.atomicMerge, voidResult: s.voidResult}
 }
 
 func (s *scope) currentKey(mapID string) string {
@@ -178,6 +187,11 @@ func readableMap(expression ast.Expr, context *scope) error {
 
 func renderExpr(expression ast.Expr, context *scope) (string, error) {
 	switch e := expression.(type) {
+	case *ast.ParenExpr:
+		if !context.atomicMerge {
+			return "", fmt.Errorf("parenthesized expressions require the typed merge interpreter")
+		}
+		return renderExpr(e.X, context)
 	case *ast.Ident:
 		value, ok := context.resolve(e.Name)
 		if !ok {
@@ -189,7 +203,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(value.id)
 		return "(.var " + name + ")", err
 	case *ast.BasicLit:
-		if (context.elements || context.updater) && e.Kind == token.INT {
+		if (context.elements || context.updater || context.atomicMerge) && e.Kind == token.INT {
 			if len(e.Value) > 1 && e.Value[0] == '0' {
 				return "", fmt.Errorf("unsupported Go non-decimal integer %q", e.Value)
 			}
@@ -245,7 +259,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 				return "(.call (.var " + id + ") \"Invoke\" " + args + ")", quoteErr
 			}
 		}
-		if name, ok := e.Fun.(*ast.Ident); ok && (context.elements || context.updater) {
+		if name, ok := e.Fun.(*ast.Ident); ok && (context.elements || context.updater || context.atomicMerge) {
 			bound, found := context.resolve(name.Name)
 			if !found || bound.kind != "builtin" {
 				return "", fmt.Errorf("unsupported or shadowed element-set builtin %q", name.Name)
@@ -258,7 +272,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 				value, err := renderExpr(e.Args[0], context)
 				return "(.conflictsFromManagers " + value + ")", err
 			}
-			if context.elements && name.Name == "append" && len(e.Args) == 2 {
+			if (context.elements || context.atomicMerge) && name.Name == "append" && len(e.Args) == 2 {
 				left, err := renderExpr(e.Args[0], context)
 				if err != nil {
 					return "", err
@@ -287,7 +301,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		name, err := quoted(method.Sel.Name)
 		return "(.call " + receiver + " " + name + " " + args + ")", err
 	case *ast.BinaryExpr:
-		if (context.updater || context.search || context.atomicFields) && (e.Op == token.EQL || e.Op == token.NEQ) {
+		if (context.updater || context.search || context.atomicFields || context.atomicMerge) && (e.Op == token.EQL || e.Op == token.NEQ) {
 			if name, nilComparison := e.Y.(*ast.Ident); !nilComparison || name.Name != "nil" {
 				left, err := renderExpr(e.X, context)
 				if err != nil {
@@ -345,7 +359,7 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		}
 		return "(.neNil " + value + ")", err
 	case *ast.UnaryExpr:
-		if context.sets && e.Op == token.AND {
+		if (context.sets || context.atomicMerge) && e.Op == token.AND {
 			value, err := renderExpr(e.X, context)
 			return "(.addressOf " + value + ")", err
 		}
@@ -517,6 +531,24 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				return "", fmt.Errorf("unsupported Go assignment operator %s", s.Tok)
 			}
 			if len(s.Lhs) == 1 {
+				if field, ok := s.Lhs[0].(*ast.SelectorExpr); ok && context.atomicMerge {
+					name, named := field.X.(*ast.Ident)
+					if !named || s.Tok != token.ASSIGN || len(s.Rhs) != 1 || (field.Sel.Name != "inLeaf" && field.Sel.Name != "out") {
+						return "", fmt.Errorf("typed merge writes require inLeaf or out on the mutable walker")
+					}
+					bound, found := context.resolve(name.Name)
+					if !found || bound.kind != "typed-mutable" {
+						return "", fmt.Errorf("typed merge receiver is not the mutable walker")
+					}
+					value, err := renderExpr(s.Rhs[0], context)
+					if err != nil {
+						return "", err
+					}
+					id, _ := quoted(bound.id)
+					fieldName, _ := quoted(field.Sel.Name)
+					items = append(items, "(.fieldSet "+id+" "+fieldName+" "+value+")")
+					continue
+				}
 				if field, ok := s.Lhs[0].(*ast.SelectorExpr); ok && context.elements {
 					name, ok := field.X.(*ast.Ident)
 					if !ok || s.Tok != token.ASSIGN || len(s.Rhs) != 1 || field.Sel.Name != "members" {
@@ -692,6 +724,14 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			} else {
 				alternative, ok := s.Else.(*ast.BlockStmt)
 				if !ok {
+					if _, nested := s.Else.(*ast.IfStmt); nested && context.atomicMerge {
+						other, err := renderStatements([]ast.Stmt{s.Else}, conditionScope.child())
+						if err != nil {
+							return "", err
+						}
+						items = append(items, "(.branchElse "+condition+" "+body+" "+other+")")
+						continue
+					}
 					return "", fmt.Errorf("unsupported Go else form %T", s.Else)
 				}
 				other, err := renderStatements(alternative.List, conditionScope.child())
@@ -772,7 +812,7 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			}
 			items = append(items, "(.continueLoop)")
 		case *ast.ExprStmt:
-			if context.atomicFields {
+			if context.atomicFields || context.atomicMerge {
 				if _, call := s.X.(*ast.CallExpr); !call {
 					return "", fmt.Errorf("typed effect statement must be a call")
 				}
@@ -815,7 +855,7 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			id, _ := quoted(mapVar.id)
 			items = append(items, "(.mapDelete "+id+" "+key+")")
 		case *ast.DeferStmt:
-			if !context.atomicFields {
+			if !context.atomicFields && !context.atomicMerge {
 				return "", fmt.Errorf("Go defer requires the typed walker interpreter")
 			}
 			value, err := renderExpr(s.Call, context)
@@ -825,6 +865,10 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 			items = append(items, "(.deferCall "+value+")")
 		case *ast.ReturnStmt:
 			if len(s.Results) == 0 {
+				if context.voidResult {
+					items = append(items, "(.ret [])")
+					continue
+				}
 				return "", fmt.Errorf("unsupported Go named return")
 			}
 			values, err := renderExpressions(s.Results, context)

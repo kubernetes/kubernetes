@@ -251,6 +251,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `Set.RecursiveDifference`, `SetNodeMap.RecursiveDifference`, `excludeFilter.Filter` | `SetFilterContracts.imported_flat_node_matches`, `imported_flat_set_matches`, `imported_flat_filter_matches`, `locally_ordered_filter_excludes_root` (flat root exclusions only) |
 | `PathElementSet.Has`, `PathElement.Less`, selected Go `slices.BinarySearchFunc` | `SearchContracts.imported_search_matches`, `SearchMembership.imported_search_membership`, `HasBridge.imported_has_membership`, `FilterHasBridge.source_filter_excludes_root` |
 | `toFieldSetWalker.doMap`, `doList` (`typed/tofieldset.go`) | `AtomicFieldContracts.imported_atomic_fields`, `imported_atomic_claims_scope`, `imported_atomic_never_adds_descendant` (atomic entry only) |
+| `mergingWalker.doMap`, `doList`, `doLeaf`, `ruleKeepRHS` closure (`typed/merge.go`) | `AtomicMergeContracts.imported_keep_right`, `imported_leaf`, `imported_atomic_merge` (atomic entry only) |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -456,8 +457,39 @@ descendant and whole-scope claims. Exact selectors, input/path immutability and
 deferred Free counts are independently checked. Both pinned revisions run the
 same cases and the full typed suite. Two additional source mutations reverse
 the map/list atomic guards independently; unchanged source certificates and
-native scope-claim oracles reject both. CI now checks nineteen complete ASTs
-from five distinct source files and fourteen semantic mutations, six also native.
+native scope-claim oracles reject both.
+
+The atomic merge path additionally imports complete map/list dispatch,
+`doLeaf` and the `ruleKeepRHS` function-literal initializer from `typed/merge.go`.
+The importer checks that `mergeRule` is the actual named function type; a
+same-named wrapper function could otherwise conceal additional effects.
+`AtomicMergeContracts.imported_keep_right` proves whole right-operand selection
+when present, falling back to the whole left operand and then the prior output.
+Optional Go interfaces/pointers are distinct from a present JSON null.
+
+`imported_leaf` derives the real rule callback and suppresses subsequent rule
+calls when a leaf was already selected. `imported_atomic_merge` composes both
+complete dispatch bodies with these source callees for arbitrary opaque input
+values, finite resource sizes and caller state. It executes the explicit
+coercion contracts and empty-container checks before leaf selection. Each call
+has a fresh frame: caller locals and pending frees survive a nested call;
+captured local resources are freed right before left at the outer return.
+Non-atomic child traversal remains an explicit unsupported branch.
+
+The native overlay checks 2,352 combinations of whole operands, missing versus
+explicit null, prior output/leaf state, four scopes, mixed numeric magnitudes,
+width/depth 64, input/path immutability and actual cleanup order. Object values
+cross the comparison protocol as exact Go JSON text, so the oracle uses neither
+rounded numeric equality nor a lossy selector comparison. Both pinned versions
+run the same cases. Three further mutations clear the right output or bypass
+the map/list leaf guard; unchanged proofs and independent native oracles reject
+them. CI now checks twenty-three complete ASTs from six distinct source files
+and seventeen semantic mutations, nine also native.
+
+These are typed merge-phase claims. Actual Unstructured/coercion/allocator heap
+realization, top-level typed/schema dispatch, removal/comparison and complete
+SSA composition remain separate. In particular, SSA's later comparison can
+still discard a whole numeric assertion as the already recorded false no-op.
 
 The mixed numeric comparator actually fails the global equality/order premise:
 two distinct int64 values can each compare equal to one float64. A concrete

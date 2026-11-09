@@ -46,6 +46,9 @@ type functionSpec struct {
 	standalone   bool
 	atomicFields bool
 	namedResults []string
+	atomicMerge  bool
+	voidResult   bool
+	initializer  bool
 }
 
 var searchFunctions = []functionSpec{{
@@ -162,6 +165,9 @@ func quoted(value string) (string, error) {
 }
 
 func importFunction(source []byte, function functionSpec) (string, error) {
+	if function.initializer {
+		return importMergeRule(source, function)
+	}
 	positions := token.NewFileSet()
 	file, err := parser.ParseFile(positions, "update.go", source, 0)
 	if err != nil {
@@ -286,18 +292,19 @@ func run() error {
 	search := flag.Bool("search", false, "import Go standard-library slices.BinarySearchFunc")
 	has := flag.Bool("has", false, "import PathElementSet.Has and PathElement.Less")
 	atomicFields := flag.Bool("atomic-fields", false, "import the complete typed field-set map/list visitors")
+	atomicMerge := flag.Bool("atomic-merge", false, "import complete typed atomic merge dispatch and leaf replacement")
 	flag.Parse()
 	if *sourcePath == "" || flag.NArg() != 0 {
 		return fmt.Errorf("supply -source and no positional arguments")
 	}
 	modes := 0
-	for _, active := range []bool{*elements, *updater, *sets, *search, *has, *atomicFields} {
+	for _, active := range []bool{*elements, *updater, *sets, *search, *has, *atomicFields, *atomicMerge} {
 		if active {
 			modes++
 		}
 	}
 	if modes > 1 {
-		return fmt.Errorf("select at most one source mode: -elements, -updater, -sets, -search, -has or -atomic-fields")
+		return fmt.Errorf("select at most one source mode: -elements, -updater, -sets, -search, -has, -atomic-fields or -atomic-merge")
 	}
 	source, err := os.ReadFile(*sourcePath)
 	if err != nil {
@@ -305,7 +312,7 @@ func run() error {
 	}
 	selected := functions
 	namespace, description := "GoSource", "merge/update.go"
-	if *elements || *sets || *has || *search || *atomicFields {
+	if *elements || *sets || *has || *search || *atomicFields || *atomicMerge {
 		file, err := parser.ParseFile(token.NewFileSet(), "element.go", source, parser.PackageClauseOnly)
 		if err != nil {
 			return err
@@ -314,7 +321,7 @@ func run() error {
 		if *search {
 			pkg = "slices"
 		}
-		if *atomicFields {
+		if *atomicFields || *atomicMerge {
 			pkg = "typed"
 		}
 		if file.Name.Name != pkg {
@@ -340,6 +347,13 @@ func run() error {
 		if *atomicFields {
 			selected = atomicFieldFunctions
 			namespace, description = "AtomicFieldSource", "typed/tofieldset.go"
+			if err := validateAtomicFieldImports(source); err != nil {
+				return err
+			}
+		}
+		if *atomicMerge {
+			selected = atomicMergeFunctions
+			namespace, description = "AtomicMergeSource", "typed/merge.go"
 			if err := validateAtomicFieldImports(source); err != nil {
 				return err
 			}

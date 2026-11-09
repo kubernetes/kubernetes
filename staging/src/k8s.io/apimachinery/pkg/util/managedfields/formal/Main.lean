@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields checks typed atomic field extraction."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields and --atomic-merge check typed atomic extraction and whole-operand replacement."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -196,6 +196,62 @@ private structure AtomicFieldReport where
   freed : List Nat
   deriving ToJson
 
+private structure AtomicMergeCase where
+  kind : String
+  lhs : Option String
+  rhs : Option String
+  output : Option String := none
+  inLeaf : Bool := false
+  deriving FromJson
+
+private structure AtomicMergeReport where
+  output : Option String
+  inLeaf : Bool
+  ruleCalls : Nat
+  freed : List Nat
+  deriving ToJson
+
+private def mergeResource (kind : AtomicMergeMachine.Kind) (_ : String) (raw : Option String) : Option AtomicMergeMachine.Resource := do
+  let source ← raw
+  let parsed ← (Json.parse source).toOption
+  let length ← match parsed with
+    | .arr values => if kind == .list then some values.size else none
+    | .obj fields => if kind == .map then some fields.size else none
+    | _ => none
+  some {handle := length+1,length}
+
+private def runAtomicMerge (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List AtomicMergeReport) := do
+    let cases ← Json.parse input >>= fromJson? (α := List AtomicMergeCase)
+    if cases.isEmpty then throw "Atomic merge protocol requires nonempty cases"
+    cases.mapM fun request => do
+      let kind ← match request.kind with
+        | "list" => .ok AtomicFieldSubset.Kind.list
+        | "map" => .ok AtomicFieldSubset.Kind.map
+        | _ => .error "Atomic merge kind must be list or map"
+      for encoded in [request.lhs,request.rhs,request.output] do
+        match encoded with
+        | none => pure ()
+        | some raw => discard (Json.parse raw)
+      let ops : AtomicMergeMachine.Ops String := {deref := mergeResource}
+      let initial : AtomicMergeMachine.Machine String := {
+        walker := {left := request.lhs,right := request.rhs,output := request.output,inLeaf := request.inLeaf}}
+      match ← AtomicMergeSubset.invoke (AtomicMergeContracts.linkedOps ops)
+          (AtomicMergeContracts.program kind) false initial with
+      | ([.nil],final) =>
+          pure {
+            output := final.walker.output
+            inLeaf := final.walker.inLeaf
+            ruleCalls := (final.events.filter (fun event => event == .rule)).length
+            freed := final.events.filterMap (fun event => match event with | .free handle => some handle | _ => none)}
+      | _ => throw "Atomic merge source returned non-nil validation errors"
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
 private def runAtomicFields (path : String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
@@ -257,6 +313,7 @@ def main (args : List String) : IO UInt32 := do
           return 2
   | ["--has-search",path] => runSearch path
   | ["--atomic-fields",path] => runAtomicFields path
+  | ["--atomic-merge",path] => runAtomicMerge path
   | ["--search-midpoints",path] => runMidpoints path
   | ["--root-reset-filter",path] => runSets path true
   | ["--set-difference",path] => runSets path

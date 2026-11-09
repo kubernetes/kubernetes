@@ -1677,5 +1677,40 @@
     "scope": "helper",
     "meaning": "Membership characterization of the explicit whole-path insertion projection, including the empty-root exception.",
     "limits": "This does not verify actual Go Set.Insert."
+  },
+  "SSA.AtomicMergeMachine.operand_roundtrip": {
+    "scope": "helper",
+    "meaning": "The explicit optional operand representation preserves missing interfaces separately from present opaque values.",
+    "limits": "A representation helper, not a JSON or Go heap theorem."
+  },
+  "SSA.AtomicMergeContracts.imported_keep_right": {
+    "scope": "general",
+    "title": "The complete imported merge-rule closure copies one whole operand",
+    "meaning": "The actual ruleKeepRHS initializer selects the complete right operand when present, otherwise the complete left, otherwise leaves the prior output. Caller locals, pending frees and the leaf flag are preserved. Present JSON null can still have a non-nil output pointer.",
+    "limits": "Opaque operand values and explicit Unstructured/pointer observations. Actual value-interface and heap realization remain separate. The importer checks the named function type so the conversion cannot silently denote an effectful wrapper."
+  },
+  "SSA.AtomicMergeContracts.imported_leaf": {
+    "scope": "general",
+    "title": "Complete leaf source derives its rule callback and protects an existing leaf",
+    "meaning": "A fresh leaf invokes the verified source closure once and marks the whole scope selected. A previously selected leaf does not invoke it or change output. Nested calls use fresh frames and retain their caller's pending cleanup.",
+    "limits": "The rule is fixed to imported ruleKeepRHS. This is the typed merge phase, not validation, comparison, or the entire SSA pipeline."
+  },
+  "SSA.AtomicMergeContracts.imported_atomic_merge": {
+    "scope": "general",
+    "title": "Complete atomic map/list dispatch uses whole operands and source callees",
+    "meaning": "For arbitrary opaque values, pure resource-coercion results, finite resource lengths and caller state, both complete dispatch ASTs execute their coercion/empty checks, call actual leaf/rule source, return nil errors and free captured resources right before left. Caller locals and pending frees remain intact.",
+    "limits": "Requires atomic entry. Non-atomic child traversal fails explicitly. Actual coercion/Unstructured/allocator heap realization, schema/top-level typed dispatch, removal/comparison and full SSA composition remain open. Both missing operands retain prior output here; the complete merge wrapper separately rejects both missing inputs."
+  },
+  "SSA.AtomicMergeContracts.imported_atomic_right_is_whole": {
+    "scope": "helper",
+    "title": "A present right operand replaces the whole fresh atomic unit",
+    "meaning": "Successful imported atomic dispatch with an unselected leaf copies exactly the whole present right value, marks the leaf and restores the caller's frame.",
+    "limits": "A corollary of the complete dispatch certificate. A present JSON null is included; subsequent SSA comparison can still exhibit the documented numeric false no-op."
+  },
+  "SSA.AtomicMergeContracts.imported_atomic_absent_right_keeps_left": {
+    "scope": "helper",
+    "title": "A missing right operand retains the whole left value",
+    "meaning": "The fresh atomic node falls back to the complete left operand when the right Go interface is absent.",
+    "limits": "Missing interface differs from a present JSON null. This is a typed merge-phase corollary."
   }
 }

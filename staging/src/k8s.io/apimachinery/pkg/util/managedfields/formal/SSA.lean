@@ -58,3 +58,4 @@ import SSA.SetBridge
 import SSA.SetFilterContracts
 import SSA.FilterHasBridge
 import SSA.AtomicFieldContracts
+import SSA.AtomicMergeContracts

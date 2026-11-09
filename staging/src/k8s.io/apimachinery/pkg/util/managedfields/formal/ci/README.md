@@ -22,8 +22,17 @@ Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
 six updater ASTs, three element-set algebra ASTs and five recursive Difference/filter
-ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all five complete
+ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all six complete
 source-file digests.
+
+Native overlays run against the selected vendor source directly. Go rejects
+overlays below GOMODCACHE, so `run-native-go.sh` copies a cached SMD module to an
+isolated temporary directory, remaps only that module's overlay targets and
+uses the same selected Go compiler with the copied module graph read-only.
+Only copied directory permissions are changed for cleanup; original cache
+sources and module/workspace files remain untouched. The standard-library
+mutation keeps its separate isolated GOROOT mirror. `GOWORK=off` exercises the
+module-cache selection used by standalone apimachinery.
 
 The required checks are:
 
@@ -61,12 +70,15 @@ The required checks are:
    Typed atomic field extraction adds 320 source/native map/list cases, covering
    null/empty/deep/wide values, empty-root behavior, prior fields and deferred
    cleanup counts. Both pinned versions also run the full typed suite and overlay.
+   Another 2,352 cases compare the complete atomic map/list merge dispatch,
+   leaf guard and actual rule closure: exact whole operands, missing/null,
+   previous leaf/output, numeric/wide/deep data, scope immutability and LIFO frees.
 8. Actual merge and fieldpath tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
    Each revision also runs the numeric-key round-trip counterexample and control.
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Fourteen independent semantic mutations of the selected Go sources; each must
+10. Seventeen independent semantic mutations of the selected Go sources; each must
     invalidate the unchanged theorem in the expected proof module.
     The ownership-growth mutation must additionally fail the native Go witness
     for its demonstrated new B claim, rather than a compile or setup error.
@@ -78,6 +90,9 @@ The required checks are:
     and the independent native membership oracle.
     Independent map/list atomic-guard reversals must fail the typed source
     certificate and the native whole-scope claim oracle, including null input.
+    Clearing the chosen right output and independently bypassing the map/list
+    leaf guard must each fail the unchanged atomic merge certificate and native
+    whole-operand/call-frame oracle. Compile/setup failures do not count.
 
 No check is optional when invoking this entrypoint. The result establishes the
 documented proof and comparison checks, not correctness of the human-chosen
