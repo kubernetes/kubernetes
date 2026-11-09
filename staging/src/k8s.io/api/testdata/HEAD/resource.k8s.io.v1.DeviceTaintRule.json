@@ -47,7 +47,8 @@
     "deviceSelector": {
       "driver": "driverValue",
       "pool": "poolValue",
-      "device": "deviceValue"
+      "device": "deviceValue",
+      "all": true
     },
     "taint": {
       "key": "keyValue",
