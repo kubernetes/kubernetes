@@ -44,11 +44,30 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 		features.InPlacePodLevelResourcesVerticalScaling: true,
 	})
 
-	logger, _ := ktesting.NewTestContext(t)
-
-	pod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Resources: &v1.ResourceRequirements{
+	testCases := []struct {
+		name     string
+		pod      *v1.Pod
+		expected *v1.ResourceRequirements
+	}{
+		{
+			name: "pod-level resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("50m"),
+							v1.ResourceMemory: resource.MustParse("50Mi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+					Containers: []v1.Container{{Name: "pause"}},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			},
+			expected: &v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("50m"),
 					v1.ResourceMemory: resource.MustParse("50Mi"),
@@ -58,12 +77,41 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			},
-			Containers: []v1.Container{{Name: "pause"}},
 		},
-		Status: v1.PodStatus{Phase: v1.PodRunning},
+		{
+			name: "container-level resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("50m"),
+									v1.ResourceMemory: resource.MustParse("50Mi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{Phase: v1.PodRunning},
+			},
+			expected: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("50m"),
+					v1.ResourceMemory: resource.MustParse("50Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
 	}
-
-	mockCM := cmtesting.NewMockContainerManager(t)
 
 	// Synthetic oldPodStatus status whose values deliberately do not match the pod
 	// spec.
@@ -80,13 +128,17 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 		},
 	}
 
-	kl := &Kubelet{containerManager: mockCM}
-	got := kl.convertToAPIPodLevelResourcesStatus(logger, pod, oldPodStatus)
-	require.NotNil(t, got)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			mockCM := cmtesting.NewMockContainerManager(t)
 
-	// Result must be the allocated (spec) resources, **not the stale/synthetic status**.
-	require.Equal(t, getEffectiveAllocatedResources(pod), got)
-	require.Equal(t, int64(50), got.Requests.Cpu().MilliValue(), "stale cpu request leaked from previous status")
-	require.Equal(t, int64(100), got.Limits.Cpu().MilliValue(), "stale cpu limit leaked from previous status")
-	require.Equal(t, int64(100*1024*1024), got.Limits.Memory().Value(), "stale memory limit leaked from previous status")
+			kl := &Kubelet{containerManager: mockCM}
+			got := kl.convertToAPIPodLevelResourcesStatus(logger, tc.pod, oldPodStatus)
+			require.NotNil(t, got)
+
+			// Result must be the allocated (spec) resources, not the stale/synthetic status.
+			require.Equal(t, tc.expected, got)
+		})
+	}
 }
