@@ -231,7 +231,7 @@ The Go primitive and updater refinement obligations remain open in the catalogue
 
 `cmd/ssa-source` uses Go's parser to import complete bodies and checked signatures
 from the selected updater and element-set sources into `SSA/GoSource.lean`,
-`SSA/UpdaterSource.lean` and `SSA/ElementSource.lean`:
+`SSA/UpdaterSource.lean`, `SSA/ElementSource.lean` and `SSA/SetSource.lean`:
 
 | Source function | Kernel-checked contract |
 | --- | --- |
@@ -242,6 +242,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `Apply` | `ApplySource.imported_apply_matches_spec` |
 | internal `update` | `UpdaterContracts.imported_update_never_adds_claims`, `UpdaterBridge.source_apply_excludes_reset_fields` |
 | `PathElementSet.Difference`, `Union`, `Intersection` (`fieldpath/element.go`) | `ElementAlgebra.imported_matches`, `imported_membership`, `imported_preserves_order`, `imported_preserves_uniqueness` |
+| `Set.Difference`, `SetNodeMap.Difference` (`fieldpath/set.go`) | `SetContracts.imported_node_matches`, `imported_set_matches`, `imported_difference_never_adds_paths` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -270,8 +271,10 @@ membership refinement at arbitrary finite depth. The source-level theorem
 explicit final-updater contract. `UpdaterBridge.source_apply_excludes_reset_fields`
 now realizes that callback with complete imported `update` execution and derives
 its non-growth property. It requires the field-set primitive's exact left-subset
-law for Difference. The Go recursive set/filter implementations and complete
-subresource pipeline still need refinement.
+law for Difference. `SetBridge` now derives that law from the complete recursive
+Set/SetNodeMap Difference imports with an explicit finite path representation.
+The actual ownership codec/memory representation, other set/filter operations
+and complete subresource pipeline still need refinement.
 
 `UpdaterSubset` models comparison objects by heap addresses: filtering a
 comparison mutates the object shared by a local variable and the version cache.
@@ -336,9 +339,36 @@ the results; input size and membership are checked after every Go call. Each
 method has a semantic source mutation that its shared proof must reject.
 This bounded evidence supports the interpreter/representation boundary, not a
 universal proof of Go's PathElement comparator. The comparator, `Has`/binary
-search, recursive Set/SetNodeMap operations and complete filter composition
+search, recursive Set/SetNodeMap membership laws and complete filter composition
 remain explicit obligations. These component theorems do not prove the full
 field-path operations used by pruning.
+
+`RecursiveSets` separates direct members from child sets, matching the Go
+representation at every finite depth. `SetSource` imports both complete
+`Difference` bodies; the receiver type distinguishes their identical method
+names. `SetContracts.imported_node_matches` proves the complete child loop equals
+finite recursion, including the left representative on comparator-equal keys.
+`imported_set_matches` composes this with the source-verified direct-member
+algorithm. `imported_difference_never_adds_paths` proves exact left-path origin
+without sorting, comparator laws or even assumptions about `Empty()` results.
+The two mutually recursive definitions terminate by the finite input sizes.
+
+`SetBridge` supplies the updater's Difference primitive with this recursive
+implementation and proves its finite flat-path encoding. The actor frame then
+follows without a supplied `DifferenceShrinks` premise. The connection from
+actual decoded FieldsV1/Go heap objects to that representation remains a
+boundary; this phase proof does not repair the numeric codec counterexamples.
+The interpreter treats address/dereference observationally for immutable inputs
+and fresh output, as enforced by the importer. Arbitrary nil/cyclic pointers,
+other set-operation membership laws and complete runtime refinement stay open.
+
+A native fieldpath-package overlay compares 4,102 exact recursive Difference
+results against the imported interpreter: all 4,096 pairs from six nested paths,
+plus numeric-comparator collisions, an empty structural node and depth-64 cases.
+Exact serialized tokens assign test labels; Go `Has`/`Equals` never decides the
+left-path-origin oracle. Both pinned PR revisions run the same comparison. A
+source mutation that uses the right matched-child label must be rejected by the
+unchanged Lean source certificate and independently fail the native origin law.
 
 The mixed numeric comparator actually fails the global equality/order premise:
 two distinct int64 values can each compare equal to one float64. A concrete

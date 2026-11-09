@@ -1371,5 +1371,85 @@
     "scope": "execution",
     "meaning": "With the actor’s new footprint already installed, forced source execution removes B’s conflict claim and leaves B without the new extra field.",
     "limits": "Named scalar/identity-version primitive fixture. Exact native private-update observations agree in vendored SMD and both pinned revisions. General source non-growth has its separate quantified proof; this is execution evidence."
+  },
+  "SSA.RecursiveSets.node_paths_cons": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.RecursiveSets.nodes_compute_never_adds_paths": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.RecursiveSets.nodes_difference_eq_compute": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.RecursiveSets.difference_never_adds_paths": {
+    "title": "Recursive Difference never invents an exact path",
+    "scope": "general",
+    "meaning": "For every finite direct-members/children tree pair, every label comparator and every Empty callback, every recursive Difference result path occurs in the left tree. Direct membership and child membership remain independent.",
+    "limits": "No sorting, strict-order or faithful numeric-equality premise. This is a finite structural algorithm law; SetContracts separately connects both imported Go bodies. Cyclic/nil pointer structures and arbitrary Go runtime refinement are outside this statement."
+  },
+  "SSA.SetContracts.imported_node_matches": {
+    "title": "Complete imported child-node Difference matches finite recursion",
+    "scope": "general",
+    "meaning": "The full SetNodeMap.Difference AST equals the independent two-pointer algorithm at every finite input size, including matched-child recursion, Empty branches, safe indices, lexical diff local and remaining-left suffix.",
+    "limits": "Arbitrary comparator, Empty and recursive-child callbacks; local statement fuel is derived from input lengths. The child callback is subsequently supplied by the verified finite structural recursion."
+  },
+  "SSA.SetContracts.imported_members_match": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetContracts.imported_set_matches": {
+    "title": "Complete imported Set.Difference matches recursive trees",
+    "scope": "general",
+    "meaning": "The complete Set.Difference AST constructs its direct members with source-verified element subtraction and its child nodes with the verified finite structural implementation.",
+    "limits": "recursive_node_call_is_source connects the child callback; imported_members_match connects the direct-member callback. Observational pointer semantics cover immutable inputs/fresh output, not all Go pointer programs."
+  },
+  "SSA.SetContracts.recursive_node_call_is_source": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetContracts.imported_difference_never_adds_paths": {
+    "title": "Imported recursive Difference preserves exact left-path origin",
+    "scope": "general",
+    "meaning": "Every exact path in the complete imported Set.Difference result was already present in its left finite tree, for arbitrary comparators and Empty callbacks.",
+    "limits": "The two complete method imports and element import are digest-checked. No comparator faithfulness is assumed. The 4,102 native pairs support the runtime/representation boundary but do not universally prove it."
+  },
+  "SSA.SetBridge.paths_one_path": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.combine_membership": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.encode_membership": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.field_difference_shrinks": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.recursive_difference_discharges_updater_premise": {
+    "scope": "helper",
+    "meaning": "Internal finite-tree or source-composition lemma used by recursive Difference non-growth.",
+    "limits": "A representation or source-composition lemma, not an independent whole-request SSA guarantee. Finite non-nil acyclic sets, the explicit pure interpreter semantics, and the Go/runtime representation boundary apply."
+  },
+  "SSA.SetBridge.source_updater_with_recursive_difference_does_not_grow_actor": {
+    "title": "Source updater frame with derived recursive Difference bound",
+    "scope": "general",
+    "meaning": "The source-backed ownership updater satisfies the actor no-growth frame with the explicit recursive-tree Difference adapter; DifferenceShrinks is proved from recursive source algorithms instead of being a supplied premise.",
+    "limits": "The adapter has a proved finite path encoding. Relating it to actual ownership decoding/Go memory remains explicit; it does not repair FieldsV1 numeric aliasing or prove whole-request no-growth. Comparison, conversion, filter and remaining primitives are still parameters."
   }
 }

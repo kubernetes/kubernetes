@@ -21,8 +21,9 @@ still checked. `ARTIFACTS` selects the log directory, matching Prow conventions.
 Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
-six updater ASTs and the three element-set algebra ASTs must match the checked-in
-Lean input, including both complete source-file digests.
+six updater ASTs, three element-set algebra ASTs and two recursive Difference
+ASTs must match the checked-in Lean input, including all three complete
+source-file digests.
 
 The required checks are:
 
@@ -51,15 +52,20 @@ The required checks are:
    An internal-package Go overlay also compares full imported ownership-update
    observations: shared comparison-cache filtering and forced removal of B's
    conflicting claim without acquiring the actor's newly added path.
-8. Actual merge tests and exact Lean/Go comparisons on both pinned SMD PR #336
+   The complete recursive Difference source also matches 4,102 native tree
+   pairs, including exact large numeric tokens, direct/child overlap, empty
+   structural nodes and depth 64.
+8. Actual merge and fieldpath tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
    Each revision also runs the numeric-key round-trip counterexample and control.
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Nine independent semantic mutations of the selected Go sources; each must
+10. Ten independent semantic mutations of the selected Go sources; each must
     invalidate the unchanged theorem in the expected proof module.
     The ownership-growth mutation must additionally fail the native Go witness
     for its demonstrated new B claim, rather than a compile or setup error.
+    A matched-child representative mutation must independently invent an exact
+    native path and fail the unchanged recursive source certificate.
 
 No check is optional when invoking this entrypoint. The result establishes the
 documented proof and comparison checks, not correctness of the human-chosen

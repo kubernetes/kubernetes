@@ -42,6 +42,7 @@ type scope struct {
 	updater     bool
 	inLoop      bool
 	currentKeys map[string]string
+	sets        bool
 }
 
 func rootScope(function functionSpec) *scope {
@@ -53,6 +54,7 @@ func rootScope(function functionSpec) *scope {
 	root := globals.child()
 	root.elements = function.elements
 	root.updater = function.updater
+	root.sets = function.sets
 	if function.updater {
 		for _, name := range []string{"len", "ConflictsFromManagers"} {
 			globals.bindings[name] = binding{name, "builtin"}
@@ -74,7 +76,7 @@ func rootScope(function functionSpec) *scope {
 }
 
 func (s *scope) child() *scope {
-	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}}
+	return &scope{parent: s, bindings: map[string]binding{}, serial: s.serial, depth: s.depth + 1, readOnly: map[string]bool{}, elements: s.elements, updater: s.updater, inLoop: s.inLoop, currentKeys: map[string]string{}, sets: s.sets}
 }
 
 func (s *scope) currentKey(mapID string) string {
@@ -279,6 +281,10 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		}
 		return "(.neNil " + value + ")", err
 	case *ast.UnaryExpr:
+		if context.sets && e.Op == token.AND {
+			value, err := renderExpr(e.X, context)
+			return "(.addressOf " + value + ")", err
+		}
 		if context.elements && e.Op == token.AND {
 			if composite, ok := e.X.(*ast.CompositeLit); ok && len(composite.Elts) == 0 {
 				if name, ok := composite.Type.(*ast.Ident); ok && name.Name == "PathElementSet" {
@@ -291,6 +297,12 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		}
 		value, err := renderExpr(e.X, context)
 		return "(.notFlag " + value + ")", err
+	case *ast.StarExpr:
+		if !context.sets {
+			return "", fmt.Errorf("Go dereference requires the recursive-set interpreter")
+		}
+		value, err := renderExpr(e.X, context)
+		return "(.dereference " + value + ")", err
 	case *ast.IndexExpr:
 		if !context.elements {
 			if err := readableMap(e.X, context); err != nil {
@@ -317,6 +329,41 @@ func renderExpr(expression ast.Expr, context *scope) (string, error) {
 		var typ bytes.Buffer
 		if err := format.Node(&typ, token.NewFileSet(), e.Type); err != nil {
 			return "", err
+		}
+		if context.sets {
+			if typ.String() == "SetNodeMap" && len(e.Elts) == 0 {
+				return "(.emptyNodeMap)", nil
+			}
+			fields := []string{}
+			constructor := ""
+			if typ.String() == "Set" {
+				fields, constructor = []string{"Members", "Children"}, "setRecord"
+			}
+			if typ.String() == "setNode" {
+				fields, constructor = []string{"pathElement", "set"}, "setNode"
+			}
+			if constructor != "" {
+				if len(e.Elts) != len(fields) {
+					return "", fmt.Errorf("%s literal must initialize exactly %v", typ.String(), fields)
+				}
+				values := make([]string, len(fields))
+				for index, field := range fields {
+					entry, ok := e.Elts[index].(*ast.KeyValueExpr)
+					if !ok {
+						return "", fmt.Errorf("%s literal requires named fields in evaluation order", typ.String())
+					}
+					name, ok := entry.Key.(*ast.Ident)
+					if !ok || name.Name != field {
+						return "", fmt.Errorf("%s literal field %d must be %s", typ.String(), index, field)
+					}
+					value, err := renderExpr(entry.Value, context)
+					if err != nil {
+						return "", err
+					}
+					values[index] = value
+				}
+				return "(." + constructor + " " + strings.Join(values, " ") + ")", nil
+			}
 		}
 		if context.updater && typ.String() == "map[fieldpath.APIVersion]*typed.Comparison" && len(e.Elts) == 1 {
 			entry, ok := e.Elts[0].(*ast.KeyValueExpr)
@@ -495,6 +542,9 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				}
 				if context.elements {
 					if fresh, ok := s.Rhs[0].(*ast.UnaryExpr); ok && fresh.Op == token.AND {
+						if _, allocated := fresh.X.(*ast.CompositeLit); !allocated {
+							return "", fmt.Errorf("local set addresses require a fresh composite allocation")
+						}
 						mapKind = "element-fresh"
 					}
 				}

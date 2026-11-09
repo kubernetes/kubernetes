@@ -39,6 +39,21 @@ type functionSpec struct {
 	maps       map[string]string
 	elements   bool
 	updater    bool
+	sets       bool
+	receiver   string
+}
+
+var setFunctions = []functionSpec{
+	{
+		name: "Difference", leanName: "setDifferenceProgram", receiver: "*Set",
+		signature: "func (s *Set) Difference(s2 *Set) *Set", parameters: []string{"s2"},
+		maps: map[string]string{"s2": "set-input"}, elements: true, sets: true,
+	},
+	{
+		name: "Difference", leanName: "nodeDifferenceProgram", receiver: "*SetNodeMap",
+		signature: "func (s *SetNodeMap) Difference(s2 *Set) *SetNodeMap", parameters: []string{"s2"},
+		maps: map[string]string{"s2": "set-input"}, elements: true, sets: true,
+	},
 }
 
 var updaterFunctions = []functionSpec{{
@@ -115,6 +130,18 @@ func importFunction(source []byte, function functionSpec) (string, error) {
 	var target *ast.FuncDecl
 	for _, declaration := range file.Decls {
 		if candidate, ok := declaration.(*ast.FuncDecl); ok && candidate.Name.Name == function.name {
+			if function.receiver != "" {
+				if candidate.Recv == nil || len(candidate.Recv.List) != 1 {
+					continue
+				}
+				var receiver bytes.Buffer
+				if err := format.Node(&receiver, positions, candidate.Recv.List[0].Type); err != nil {
+					return "", err
+				}
+				if receiver.String() != function.receiver {
+					continue
+				}
+			}
 			if target != nil {
 				return "", fmt.Errorf("duplicate source function %s", function.name)
 			}
@@ -179,9 +206,13 @@ func run() error {
 	checkPath := flag.String("check", "", "compare generated output with this Lean file")
 	elements := flag.Bool("elements", false, "import fieldpath element.go instead of merge update.go")
 	updater := flag.Bool("updater", false, "import the complete ownership-update function with the updater interpreter")
+	sets := flag.Bool("sets", false, "import recursive field-set Difference bodies from fieldpath/set.go")
 	flag.Parse()
-	if *sourcePath == "" || flag.NArg() != 0 || (*elements && *updater) {
+	if *sourcePath == "" || flag.NArg() != 0 {
 		return fmt.Errorf("supply -source and no positional arguments")
+	}
+	if (*elements && *updater) || (*sets && (*elements || *updater)) {
+		return fmt.Errorf("select at most one source mode: -elements, -updater or -sets")
 	}
 	source, err := os.ReadFile(*sourcePath)
 	if err != nil {
@@ -189,7 +220,7 @@ func run() error {
 	}
 	selected := functions
 	namespace, description := "GoSource", "merge/update.go"
-	if *elements {
+	if *elements || *sets {
 		file, err := parser.ParseFile(token.NewFileSet(), "element.go", source, parser.PackageClauseOnly)
 		if err != nil {
 			return err
@@ -199,6 +230,10 @@ func run() error {
 		}
 		selected = elementFunctions
 		namespace, description = "ElementSource", "fieldpath/element.go"
+		if *sets {
+			selected = setFunctions
+			namespace, description = "SetSource", "fieldpath/set.go"
+		}
 	} else {
 		if err := validateImports(source); err != nil {
 			return err

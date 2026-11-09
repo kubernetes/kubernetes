@@ -1,0 +1,190 @@
+/*
+Copyright The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package fieldpath
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"reflect"
+	"testing"
+	"time"
+
+	"sigs.k8s.io/structured-merge-diff/v6/value"
+)
+
+type ssaFormalSetTree struct {
+	Members  []int    `json:"members"`
+	Children [][2]any `json:"children"`
+}
+
+func TestSSAFormalRecursiveDifference(t *testing.T) {
+	domain := []PathElement{
+		FieldNameElement("a"), FieldNameElement("b"), KeyElementByFields("name", "db"),
+		ValueElement(value.NewValueInterface("member")), IndexElement(0), IndexElement(1),
+		KeyElementByFields("id", int64(9007199254740993)),
+		KeyElementByFields("id", float64(9007199254740992)),
+	}
+	serialized := map[string]int{}
+	for rank, element := range domain {
+		token, err := SerializePathElement(element)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, duplicate := serialized[token]; duplicate {
+			t.Fatalf("non-exact rank domain: %s", token)
+		}
+		serialized[token] = rank
+	}
+	rank := func(element PathElement) int {
+		token, err := SerializePathElement(element)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, found := serialized[token]
+		if !found {
+			t.Fatalf("unknown exact path token: %s", token)
+		}
+		return result
+	}
+	var tree func(*Set) ssaFormalSetTree
+	tree = func(set *Set) ssaFormalSetTree {
+		result := ssaFormalSetTree{Members: []int{}, Children: [][2]any{}}
+		set.Members.Iterate(func(element PathElement) { result.Members = append(result.Members, rank(element)) })
+		for _, child := range set.Children.members {
+			result.Children = append(result.Children, [2]any{rank(child.pathElement), tree(child.set)})
+		}
+		return result
+	}
+	exactPaths := func(set *Set) [][]int {
+		result := [][]int{}
+		set.Iterate(func(path Path) {
+			encoded := []int{}
+			for _, element := range path {
+				encoded = append(encoded, rank(element))
+			}
+			result = append(result, encoded)
+		})
+		return result
+	}
+	less := make([][]bool, len(domain))
+	for a := range domain {
+		less[a] = make([]bool, len(domain))
+		for b := range domain {
+			less[a][b] = domain[a].Less(domain[b])
+		}
+	}
+	if less[6][7] || less[7][6] {
+		t.Fatal("numeric collision control no longer compares equal in both directions")
+	}
+	paths := [][]int{{0}, {0, 1}, {0, 2, 1}, {1, 3, 4}, {2, 5, 0, 1}, {4, 1}}
+	sets := make([]*Set, 1<<len(paths))
+	for mask := range sets {
+		sets[mask] = NewSet()
+		for index := len(paths) - 1; index >= 0; index-- {
+			if mask&(1<<index) == 0 {
+				continue
+			}
+			path := Path{}
+			for _, key := range paths[index] {
+				path = append(path, domain[key])
+			}
+			sets[mask].Insert(path)
+		}
+	}
+	pairs := [][2]ssaFormalSetTree{}
+	actual := [][][]int{}
+	compare := func(left, right *Set) {
+		beforeLeft, beforeRight := tree(left), tree(right)
+		difference := left.Difference(right)
+		leftPaths := map[string]bool{}
+		for _, path := range exactPaths(left) {
+			leftPaths[fmt.Sprint(path)] = true
+		}
+		observed := exactPaths(difference)
+		for _, path := range observed {
+			if !leftPaths[fmt.Sprint(path)] {
+				t.Fatalf("recursive Difference invented an exact left path: %v; left=%v right=%v", path, beforeLeft, beforeRight)
+			}
+		}
+		if !reflect.DeepEqual(beforeLeft, tree(left)) || !reflect.DeepEqual(beforeRight, tree(right)) {
+			t.Fatal("recursive Difference mutated its inputs")
+		}
+		pairs = append(pairs, [2]ssaFormalSetTree{beforeLeft, beforeRight})
+		actual = append(actual, observed)
+	}
+	for _, left := range sets {
+		for _, right := range sets {
+			compare(left, right)
+		}
+	}
+
+	// Raw structure avoids Insert merging comparator-equal numeric representatives before the operation.
+	low := &Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[6], set: NewSet(Path{domain[0]}, Path{domain[1]})}}}}
+	high := &Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[7], set: NewSet(Path{domain[0]})}}}}
+	compare(low, high)
+	compare(high, low)
+	compare(&Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[0], set: NewSet()}}}}, NewSet())
+	longPath := Path{}
+	for index := 0; index < 64; index++ {
+		longPath = append(longPath, domain[index%2])
+	}
+	deep := NewSet(longPath)
+	compare(deep, deep)
+	compare(deep, NewSet(Path{domain[0], domain[1]}))
+	compare(NewSet(Path{domain[0], domain[1]}), deep)
+
+	input, err := json.Marshal(struct {
+		Less  [][]bool              `json:"less"`
+		Pairs [][2]ssaFormalSetTree `json:"pairs"`
+	}{less, pairs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	command := exec.CommandContext(ctx, model, "--set-difference", "-")
+	command.Stdin = bytes.NewReader(input)
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	output, err := command.Output()
+	if err != nil {
+		t.Fatalf("source set model failed: %v: %s", err, stderr.String())
+	}
+	var expected [][][]int
+	if err := json.Unmarshal(output, &expected); err != nil {
+		t.Fatal(err)
+	}
+	if len(expected) != len(actual) {
+		t.Fatalf("recursive source/Go result count differs: %d/%d", len(expected), len(actual))
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		for index := range actual {
+			if !reflect.DeepEqual(expected[index], actual[index]) {
+				t.Fatalf("recursive source/Go mismatch at pair %d: source=%v Go=%v", index, expected[index], actual[index])
+			}
+		}
+	}
+	t.Logf("%d recursive Difference pairs matched source/Go; exact numeric tokens, direct/child overlap, empty nodes and depth 64", len(pairs))
+}

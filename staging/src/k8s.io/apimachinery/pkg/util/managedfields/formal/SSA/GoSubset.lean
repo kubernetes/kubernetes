@@ -43,6 +43,11 @@ inductive Expr where
   | equalScalars (left right : Expr)
   | singletonComparisonMap (key value : Expr)
   | conflictsFromManagers (managers : Expr)
+  | addressOf (value : Expr)
+  | dereference (value : Expr)
+  | emptyNodeMap
+  | setRecord (members children : Expr)
+  | setNode (label child : Expr)
   deriving Repr
 
 inductive Stmt where
@@ -384,6 +389,8 @@ def eval {Obj Err : Type} (ops : Ops Obj Err) : Nat → Expr → Env Obj Err →
           .error "Element-set expressions require the element-set interpreter"
       | .equalScalars _ _ | .singletonComparisonMap _ _ | .conflictsFromManagers _ =>
           .error "Updater expressions require the updater interpreter"
+      | .addressOf _ | .dereference _ | .emptyNodeMap | .setRecord _ _ | .setNode _ _ =>
+          .error "Recursive-set expressions require the recursive-set interpreter"
 
 def evalAll {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Expr → Env Obj Err →
     Except String (List (Value Obj Err))

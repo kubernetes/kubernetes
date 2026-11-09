@@ -9,6 +9,7 @@ yaml_root="$(cd "$formal_root" && go list -f '{{.Dir}}' sigs.k8s.io/yaml)"
 model="$formal_root/.lake/build/bin/ssa-model"
 SSA_UPDATER_EXPECTED="$("$model" --updater-observations)"
 export SSA_UPDATER_EXPECTED
+export SSA_SET_MODEL="$model"
 # These immutable commits isolate this PR from later upstream behavior.
 for revision in head base; do
   if [[ "$revision" == head ]]; then
@@ -42,20 +43,24 @@ for revision in head base; do
   cp "$formal_root/pr336/main.go.in" "$directory/formalcmd/main.go"
   sed 's,structured-merge-diff/v6,structured-merge-diff/v7,g' \
     "$formal_root/pr336/updater_test.go.in" > "$directory/formalbridge/updater_test.go.in"
+  sed 's,structured-merge-diff/v6,structured-merge-diff/v7,g' \
+    "$formal_root/pr336/sets_test.go.in" > "$directory/formalbridge/sets_test.go.in"
   python3 - "$directory" <<'PY_UPDATER'
 import json
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
-overlay = {"Replace": {str(root / "merge/ssa_formal_updater_test.go"): str(root / "formalbridge/updater_test.go.in")}}
+overlay = {"Replace": {str(root / "merge/ssa_formal_updater_test.go"): str(root / "formalbridge/updater_test.go.in"),
+    str(root / "fieldpath/ssa_formal_sets_test.go"): str(root / "formalbridge/sets_test.go.in"),
+}}
 (root / "formalbridge/updater-overlay.json").write_text(json.dumps(overlay))
 PY_UPDATER
   (
     cd "$directory"
     export GOWORK=off
     # A caller can share an ordinary Go cache; sandboxed runs can set task-local paths.
-    go test -overlay="$directory/formalbridge/updater-overlay.json" ./merge
+    go test -overlay="$directory/formalbridge/updater-overlay.json" ./merge ./fieldpath
     go run ./formalcmd "$model" "$formal_root/testdata/pr336.yaml"
   )
 done

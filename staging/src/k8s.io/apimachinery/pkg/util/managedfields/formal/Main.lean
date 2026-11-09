@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations."
+  "--updater-observations reports source ownership-update observations; --set-difference accepts recursive rank trees."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -80,6 +80,45 @@ private def runElements (path : String) (override : Option ElementAlgebra.Operat
             return 1
       stdout.putStrLn (toJson reports.reverse).compress
       return 0
+private def parseSetTree : Nat → Json → Except String (RecursiveSets.Tree Nat)
+  | 0,_ => .error "Recursive set JSON exceeds the test protocol depth limit"
+  | fuel+1,json => do
+      let members ← json.getObjValAs? (List Nat) "members"
+      let children ← json.getObjValAs? (List (Nat × Json)) "children"
+      let parsed ← children.mapM fun (label,child) => do
+        let tree ← parseSetTree fuel child
+        pure (label,tree)
+      pure (.node members parsed)
+
+private structure SetCases where
+  less : List (List Bool)
+  pairs : List (Json × Json)
+  deriving FromJson
+
+private def runSets (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List (List (List Nat))) := do
+    let cases ← Json.parse input >>= fromJson? (α := SetCases)
+    if cases.pairs.isEmpty then throw "Recursive-set input is empty; supply at least one pair"
+    cases.pairs.mapM fun (leftJson,rightJson) => do
+      let left ← parseSetTree 128 leftJson
+      let right ← parseSetTree 128 rightJson
+      let ops := SetContracts.recursiveOps (fun a b : Nat => ((cases.less[a]?).bind (·[b]?)).getD false) RecursiveSets.empty
+      match ← SetSubset.exec ops 2 SetSource.setDifferenceProgram {left,right,nodeMode := false} with
+      | .returned [.tree result] =>
+          match ← SetSubset.exec ops (left.children.length+right.children.length+19)
+              SetSource.nodeDifferenceProgram {left,right} with
+          | .returned [.nodes nodes] =>
+              if nodes == result.children then pure (RecursiveSets.paths result)
+              else throw "Recursive-set source callbacks disagree"
+          | _ => throw "Child-node source did not return a node map"
+      | _ => throw "Recursive-set source did not return a set"
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
 def main (args : List String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
@@ -102,6 +141,7 @@ def main (args : List String) : IO UInt32 := do
       | none =>
           stderr.putStrLn s!"Unknown scenario '{name}'; run --list to see available scenarios."
           return 2
+  | ["--set-difference",path] => runSets path
   | ["--element-difference",path] => runElements path (some .difference)
   | ["--element-algebra",path] => runElements path none
   | ["--numeric-counterexamples"] =>

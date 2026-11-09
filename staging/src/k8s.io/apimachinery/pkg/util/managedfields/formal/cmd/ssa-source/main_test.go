@@ -168,6 +168,52 @@ func TestUpdaterRejectsUntrackedMapEffectsAndControlFlow(t *testing.T) {
 	}
 }
 
+func TestRecursiveSetImportsDistinguishReceivers(t *testing.T) {
+	source := []byte(`package fieldpath
+func (s *Set) Difference(s2 *Set) *Set {
+  return &Set{Members: *s.Members.Difference(&s2.Members), Children: *s.Children.Difference(s2)}
+}
+func (s *SetNodeMap) Difference(s2 *Set) *SetNodeMap {
+  out := &SetNodeMap{}
+  return out
+}`)
+	set, err := importFunction(source, setFunctions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := importFunction(source, setFunctions[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"(.setRecord", "(.dereference", "(.addressOf", `"Members"`, `"Children"`} {
+		if !strings.Contains(set, required) {
+			t.Fatalf("recursive Set import dropped %q: %s", required, set)
+		}
+	}
+	if !strings.Contains(nodes, "(.emptyNodeMap)") || strings.Contains(nodes, "(.setRecord") {
+		t.Fatalf("SetNodeMap import selected the wrong receiver: %s", nodes)
+	}
+}
+
+func TestRecursiveSetImportsRejectUnmodeledConstruction(t *testing.T) {
+	for name, body := range map[string]string{
+		"incomplete set":   `return &Set{Members: s.Members}`,
+		"reordered fields": `return &Set{Children: s.Children, Members: s.Members}`,
+		"input mutation":   `s.Children = s2.Children; return s`,
+		"input alias":      `out := s; return out`,
+		"child address":    `out := &s.Children; out.members = append(out.members, s2.Children.members[0]); return s`,
+		"second address":   `out := &s2.Children; out.members = append(out.members, s.Children.members[0]); return s`,
+		"second mutation":  `s2.Children = s.Children; return s`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			source := []byte("package fieldpath\n" + setFunctions[0].signature + " {\n" + body + "\n}")
+			if _, err := importFunction(source, setFunctions[0]); err == nil {
+				t.Fatalf("unsupported recursive-set behavior was accepted: %s", body)
+			}
+		})
+	}
+}
+
 func TestApplyImportsFilterBranchAndActorMapWrite(t *testing.T) {
 	source := []byte("package merge\n" + functions[4].signature + ` {
 var ignoreFilter fieldpath.Filter

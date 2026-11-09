@@ -54,3 +54,4 @@ import SSA.GranularKeyCounterexamples
 import SSA.NumericOmissionCounterexamples
 import SSA.UpdaterExamples
 import SSA.UpdaterBridge
+import SSA.SetBridge
