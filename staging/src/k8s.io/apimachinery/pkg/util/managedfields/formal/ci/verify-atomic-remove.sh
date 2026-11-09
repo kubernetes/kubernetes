@@ -15,4 +15,4 @@ import sys
 from pathlib import Path
 Path(sys.argv[1]).write_text(json.dumps({"Replace": {sys.argv[2]: sys.argv[3]}}))
 PY_OVERLAY
-bash "$formal_root/ci/run-native-go.sh" "$overlay" sigs.k8s.io/structured-merge-diff/v6/typed -run '^TestSSAFormalAtomicRemove$' -v -count=1
+bash "$formal_root/ci/run-native-go.sh" "$overlay" sigs.k8s.io/structured-merge-diff/v6/typed -run '^TestSSAFormal(AtomicRemove|RemoveFactory)$' -v -count=1

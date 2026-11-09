@@ -69,6 +69,22 @@ type ssaFormalRemoveReport struct {
 	Freed  []*int  `json:"freed"`
 }
 
+func ssaFormalRemovalInputs() []any {
+	var deep any = "leaf"
+	for level := 0; level < 64; level++ {
+		deep = map[string]any{"nested": deep}
+	}
+	wideMap, wideList := map[string]any{}, []any{}
+	for index := 0; index < 64; index++ {
+		wideMap[fmt.Sprint(index)] = int64(index)
+		wideList = append(wideList, int64(index))
+	}
+	return []any{nil, map[string]any(nil), []any(nil), map[string]any{}, []any{},
+		map[string]any{"n": int64(9007199254740993)}, map[string]any{"n": float64(9007199254740992)},
+		[]any{int64(9007199254740993)}, []any{float64(9007199254740992)},
+		wideMap, wideList, deep, []any{deep}, "scalar", int64(9007199254740993), float64(9007199254740992)}
+}
+
 func TestSSAFormalAtomicRemove(t *testing.T) {
 	model := os.Getenv("SSA_SET_MODEL")
 	if model == "" {
@@ -100,19 +116,7 @@ func TestSSAFormalAtomicRemove(t *testing.T) {
 		}
 		return result
 	}
-	var deep any = "leaf"
-	for level := 0; level < 64; level++ {
-		deep = map[string]any{"nested": deep}
-	}
-	wideMap, wideList := map[string]any{}, []any{}
-	for index := 0; index < 64; index++ {
-		wideMap[fmt.Sprint(index)] = int64(index)
-		wideList = append(wideList, int64(index))
-	}
-	inputs := []any{nil, map[string]any(nil), []any(nil), map[string]any{}, []any{},
-		map[string]any{"n": int64(9007199254740993)}, map[string]any{"n": float64(9007199254740992)},
-		[]any{int64(9007199254740993)}, []any{float64(9007199254740992)},
-		wideMap, wideList, deep, []any{deep}, "scalar", int64(9007199254740993), float64(9007199254740992)}
+	inputs := ssaFormalRemovalInputs()
 	outputs := []any{nil, map[string]any(nil), map[string]any{"prior": "keep"}}
 	sets := []*fieldpath.Set{nil, fieldpath.NewSet(), fieldpath.NewSet(fieldpath.MakePathOrDie("x")),
 		fieldpath.NewSet(fieldpath.MakePathOrDie("x", "nested"))}
@@ -194,6 +198,131 @@ func TestSSAFormalAtomicRemove(t *testing.T) {
 				t.Fatalf("atomic removal source/Go output or cleanup differs: %v", err)
 			}
 			t.Logf("%d source/native atomic %s removals/extractions: exact whole output, typed nil/empty/wide/deep values, prior output and selection/input immutability", len(cases), kind)
+		})
+	}
+}
+
+type ssaFormalRemoveFactoryCase struct {
+	ssaFormalRemoveCase
+	ResolverError bool `json:"resolverError"`
+}
+
+func TestSSAFormalRemoveFactory(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	encode := func(data any) string {
+		t.Helper()
+		result, err := json.Marshal(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(result)
+	}
+	sets := []*fieldpath.Set{nil, fieldpath.NewSet(), fieldpath.NewSet(fieldpath.MakePathOrDie("x")),
+		fieldpath.NewSet(fieldpath.MakePathOrDie("x", "nested"))}
+	for _, kind := range []string{"scalar", "map", "list"} {
+		t.Run(kind, func(t *testing.T) {
+			cases, expected := []ssaFormalRemoveFactoryCase{}, []string{}
+			for _, mode := range []string{"valid", "missing-type", "invalid-atom"} {
+				for _, extract := range []bool{false, true} {
+					for _, set := range sets {
+						for _, input := range ssaFormalRemovalInputs() {
+							atom := schema.Atom{}
+							if mode != "invalid-atom" {
+								switch kind {
+								case "scalar":
+									scalar := schema.Untyped
+									atom.Scalar = &scalar
+								case "map":
+									atom.Map = &schema.Map{ElementRelationship: schema.Atomic}
+								case "list":
+									atom.List = &schema.List{ElementRelationship: schema.Atomic}
+								}
+							}
+							sourceSchema := &schema.Schema{Types: []schema.TypeDef{{Name: "unit", Atom: atom}}}
+							name := "unit"
+							if mode == "missing-type" {
+								name = "missing"
+							}
+							typeRef := schema.TypeRef{NamedType: &name}
+							matches, size := false, 0
+							switch data := input.(type) {
+							case map[string]any:
+								matches = kind == "map"
+								size = len(data)
+							case []any:
+								matches = kind == "list"
+								size = len(data)
+							}
+							var resource *int
+							if matches {
+								length := size
+								resource = &length
+							}
+							before := encode(input)
+							var beforeSet []byte
+							if set != nil {
+								var err error
+								beforeSet, err = set.ToJSON()
+								if err != nil {
+									t.Fatal(err)
+								}
+							}
+							// Observe the real error channel that the enclosing source caller discards.
+							control := removingWalker{value: value.NewValueInterface(input), toRemove: set,
+								allocator: value.NewFreelistAllocator(), shouldExtract: extract}
+							errs := resolveSchema(sourceSchema, typeRef, control.value, &control)
+							failed := mode != "valid"
+							if (len(errs) > 0) != failed {
+								t.Fatalf("unexpected resolver error precondition: %s: %v", mode, errs)
+							}
+							result := removeItemsWithSchema(value.NewValueInterface(input), set, sourceSchema, typeRef, extract)
+							if result == nil {
+								t.Fatal("removal factory returned a nil Value interface")
+							}
+							actual, want := encode(result.Unstructured()), "null"
+							if !failed && (kind == "scalar" || (extract && matches)) {
+								want = before
+							}
+							if actual != want {
+								t.Fatalf("removal factory violated fresh-output or wrapping semantics: kind=%s mode=%s extract=%v case=%d actual=%s want=%s", kind, mode, extract, len(cases), actual, want)
+							}
+							if encode(input) != before {
+								t.Fatal("removal factory mutated its input")
+							}
+							if set != nil {
+								after, err := set.ToJSON()
+								if err != nil || !bytes.Equal(beforeSet, after) {
+									t.Fatalf("removal factory mutated its selection set: %v", err)
+								}
+							}
+							cases = append(cases, ssaFormalRemoveFactoryCase{ssaFormalRemoveCase{kind, before, nil, extract, matches, resource, input == nil}, failed})
+							expected = append(expected, actual)
+						}
+					}
+				}
+			}
+			encoded, err := json.Marshal(cases)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			command := exec.CommandContext(ctx, model, "--atomic-remove-factory", "-")
+			command.Stdin = bytes.NewReader(encoded)
+			var stderr bytes.Buffer
+			command.Stderr = &stderr
+			result, err := command.Output()
+			if err != nil {
+				t.Fatalf("removal factory source model failed: %v: %s", err, stderr.String())
+			}
+			var reports []string
+			if err := json.Unmarshal(result, &reports); err != nil || !reflect.DeepEqual(reports, expected) {
+				t.Fatalf("removal factory source/Go output differs: %v", err)
+			}
+			t.Logf("%d source/native %s caller cases: fresh output, selected source handler, wrapped null, successful and rejected schema resolution, exact values and immutable input/selection", len(cases), kind)
 		})
 	}
 }

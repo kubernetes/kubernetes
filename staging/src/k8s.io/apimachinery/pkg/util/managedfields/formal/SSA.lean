@@ -60,3 +60,4 @@ import SSA.FilterHasBridge
 import SSA.AtomicFieldContracts
 import SSA.AtomicMergeContracts
 import SSA.AtomicRemoveContracts
+import SSA.RemoveFactoryBridge

@@ -38,6 +38,7 @@ func TestRemovalRetainsCompleteStructuralBodies(t *testing.T) {
 		t.Fatal(err)
 	}
 	fragments := [][]string{
+		{"CompositeLit", "removingWalker", "NewFreelistAllocator", "resolveSchema", "NewValueInterface"},
 		{"Unstructured", "ReturnStmt"},
 		{"IsList", "AsListUsing", "DeferStmt", "ForStmt", "continue", "removeItemsWithSchema", "newItems"},
 		{"IsMap", "AsMapUsing", "RangeStmt", "FuncLit", "newMap", "removeItemsWithSchema", "WithPrefix"},

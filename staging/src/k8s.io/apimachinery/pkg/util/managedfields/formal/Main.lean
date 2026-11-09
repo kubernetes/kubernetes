@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields, --atomic-merge and --atomic-remove check typed atomic scope claims, whole replacement and removal/extraction."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields, --atomic-merge and --atomic-remove check typed atomic scope claims, whole replacement and removal/extraction; --atomic-remove-factory additionally runs the source caller."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -296,6 +296,43 @@ private def runAtomicRemove (path : String) : IO UInt32 := do
   | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
   | .error message => stderr.putStrLn message; return 1
 
+private structure RemoveFactoryCase where
+  request : AtomicRemoveCase
+  resolverError : Bool
+
+private instance : FromJson RemoveFactoryCase where
+  fromJson? json := do
+    pure {request := ← fromJson? json,resolverError := ← json.getObjValAs? Bool "resolverError"}
+
+private def runAtomicRemoveFactory (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List String) := do
+    let cases ← Json.parse input >>= fromJson? (α := List RemoveFactoryCase)
+    if cases.isEmpty then throw "Removal factory protocol requires nonempty cases"
+    cases.mapM fun test => do
+      let request := test.request
+      discard (Json.parse request.value)
+      let kind ← match request.kind with
+        | "scalar" => .ok none
+        | "map" => .ok (some AtomicFieldSubset.Kind.map)
+        | "list" => .ok (some AtomicFieldSubset.Kind.list)
+        | _ => .error "Removal factory kind must be scalar, map or list"
+      let typedOps : AtomicRemoveSubset.Ops String := {
+        isKind := fun _ _ => request.shape
+        asContainer := fun _ _ => request.size.map (fun length => {handle := length+1,length})
+        unstructured := fun value => if request.rawNil then none else some value}
+      let sourceRequest : RemoveFactorySubset.Request String Unit Unit Unit := {
+        input := request.value,schema := (),fields := (),typeRef := (),extract := request.extract}
+      let wrap := fun value : Option String => value.getD "null"
+      if test.resolverError then
+        RemoveFactorySubset.invoke {resolve := fun _ _ _ walker => .ok (walker,true),wrap} sourceRequest
+      else RemoveFactorySubset.invoke (RemoveFactoryBridge.linkedOps typedOps kind wrap) sourceRequest
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
 private def runAtomicFields (path : String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
@@ -359,6 +396,7 @@ def main (args : List String) : IO UInt32 := do
   | ["--atomic-fields",path] => runAtomicFields path
   | ["--atomic-merge",path] => runAtomicMerge path
   | ["--atomic-remove",path] => runAtomicRemove path
+  | ["--atomic-remove-factory",path] => runAtomicRemoveFactory path
   | ["--search-midpoints",path] => runMidpoints path
   | ["--root-reset-filter",path] => runSets path true
   | ["--set-difference",path] => runSets path

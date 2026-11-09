@@ -84,6 +84,7 @@ func renderRaw(value reflect.Value) (string, error) {
 }
 
 var atomicRemoveFunctions = []functionSpec{
+	{name: "removeItemsWithSchema", leanName: "factoryProgram", standalone: true, signature: "func removeItemsWithSchema(val value.Value, toRemove *fieldpath.Set, schema *schema.Schema, typeRef schema.TypeRef, shouldExtract bool) value.Value", rawSyntax: true},
 	{name: "doScalar", leanName: "scalarProgram", receiver: "*removingWalker", signature: "func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors", rawSyntax: true},
 	{name: "doList", leanName: "listProgram", receiver: "*removingWalker", signature: "func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors)", rawSyntax: true},
 	{name: "doMap", leanName: "mapProgram", receiver: "*removingWalker", signature: "func (w *removingWalker) doMap(t *schema.Map) ValidationErrors", rawSyntax: true},

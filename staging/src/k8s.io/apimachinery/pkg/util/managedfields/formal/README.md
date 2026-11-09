@@ -510,7 +510,8 @@ containers follow the same law. A list captures Free even for a nil resource;
 a map defers it only for a non-nil resource. Caller frame/input are preserved.
 `imported_atomic_remove_fresh` therefore states the necessary fresh-output
 premise explicitly; `imported_atomic_extract_whole` requires a matching shape.
-The actual wrapper's initialization and schema dispatch remain to be proved.
+The complete source caller now derives this initialization, as described below;
+actual schema dispatch remains to be proved.
 
 The independent Go overlay compares 1,152 helper invocations (384 each scalar,
 map and list), both extract/remove modes, prior output, nil interfaces versus
@@ -522,8 +523,36 @@ not a verified JSON codec. Both pinned revisions run the same overlay. Clearing
 the scalar output or inverting either atomic extraction guard must fail both
 the unchanged Lean theorems and the independent native output oracle.
 
-CI now checks twenty-six complete ASTs from seven distinct source files and
-twenty semantic mutations, twelve also native. Source value/coercion/allocator
+`RemoveFactoryContracts.imported_factory` now imports the fourth complete body,
+`removeItemsWithSchema`. It derives Go struct zero initialization, including
+absent output, and the exact input/schema/selection/allocator/extract fields
+before the resolver callback. The return wraps the resulting raw output.
+Normal ValidationErrors are arbitrary opaque payloads which the source caller
+ignores; interpreter failures remain separate. No successful-resolver premise
+is introduced. Allocation and wrapping use explicit abstract primitives. The bridge represents
+a present Go Value interface whose raw payload may be null. Nil interface
+arguments, pointer/alias identity and allocator heap realization remain outside
+this bridge.
+
+`RemoveFactoryBridge` supplies the already proved scalar or atomic handler to
+that callback. Its caller theorems derive fresh-output removal and whole
+extraction from source initialization, with no extra fresh-output assumption.
+They are conditional on selection of that handler: actual Schema.Resolve,
+deduceAtom/handleAtom and typed method dispatch still need source proofs.
+`imported_factory_ignores_reported_errors` also derives null wrapping when a
+resolver reports any normal error without changing the fresh walker.
+
+An additional 1,152 native caller cases use real schema resolution, both modes,
+all prior value shapes, four selection sets, missing named types and invalid
+atoms. The control checks the actual resolver error channel before invoking
+the real caller. Exact wrapped JSON output and input/selection immutability are
+compared to the source interpreter. Inverting the constructor's extract flag,
+skipping resolution or discarding its raw result must fail both the unchanged
+factory theorem and the independent native caller oracle. Both pinned
+revisions run these cases too.
+
+CI now checks twenty-seven complete ASTs from seven distinct source files and
+twenty-three semantic mutations, fifteen also native. Source value/coercion/allocator
 heap realization, typed/schema dispatch, complete removal/comparison and full
 SSA composition remain open; these are component proofs for BASE-09.
 

@@ -1723,18 +1723,42 @@
     "title": "Atomic extraction/removal returns before child traversal",
     "scope": "general",
     "meaning": "For arbitrary finite sizes and pure shape/resource callbacks, matching atomic extraction copies the whole value; remove preserves old output. Mismatching shapes return unchanged. Captured cleanup and caller frame are preserved.",
-    "limits": "Structural ASTs retain the non-atomic loops/callbacks, whose execution explicitly fails. This theorem proves they are not reached at atomic entry. Dynamic shape, Unstructured, resource/heap and wrapper/schema dispatch remain boundaries; native comparisons are finite evidence."
+    "limits": "Structural ASTs retain the non-atomic loops/callbacks, whose execution explicitly fails. This theorem proves they are not reached at atomic entry. The source caller now discharges fresh initialization. Dynamic shape, Unstructured, resource/heap and actual schema dispatch remain boundaries; native comparisons are finite evidence."
   },
   "SSA.AtomicRemoveContracts.imported_atomic_remove_fresh": {
     "title": "Atomic removal yields no output from a fresh walker",
     "scope": "helper",
     "meaning": "If output is initially absent and extract is false, source atomic dispatch returns absent output.",
-    "limits": "The fresh-output premise is necessary: the private helper preserves prior output. Caller initialization and path selection remain separate implementation obligations."
+    "limits": "The fresh-output premise is necessary for the private helper. The complete source factory now discharges it for selected handlers; actual schema selection and heap/wrapping realization remain separate."
   },
   "SSA.AtomicRemoveContracts.imported_atomic_extract_whole": {
     "title": "Matching atomic extraction copies a whole operand",
     "scope": "helper",
     "meaning": "At atomic entry with matching shape and extraction enabled, the result is exactly the raw Unstructured input and the caller frame/input are preserved.",
     "limits": "This specializes the general source theorem. Dynamic shape, raw value representation, allocator heap and complete request dispatch remain separate."
+  },
+  "SSA.RemoveFactoryContracts.imported_factory": {
+    "title": "The complete source caller initializes a fresh walker",
+    "scope": "general",
+    "meaning": "For arbitrary opaque values/schema/selection/reference types and resolver outcomes, the complete caller sets exact constructor fields and zero output, invokes the resolver and wraps its raw output. Every normal resolver error payload is discarded.",
+    "limits": "Allocation and wrapping are abstract primitive operations. The callback models resolver post-state and a distinct normal error payload; interpreter failure is separate. Actual schema resolver source, heap and full typed/request dispatch remain open."
+  },
+  "SSA.RemoveFactoryBridge.imported_atomic_factory": {
+    "title": "Source initialization discharges the atomic fresh-output premise",
+    "scope": "general",
+    "meaning": "Composing the complete caller with the selected source atomic map/list handler yields a wrapped whole matching value for extraction and wrapped null for removal. Fresh output follows from the constructor AST.",
+    "limits": "Actual schema resolution must select this atomic handler. Pure shape/Unstructured/resource contracts, allocator/wrapping and heap realization remain explicit; this is not a full Schema.Resolve or Apply theorem. Inputs represent a present Go Value interface; raw null is allowed. Nil interfaces, pointer/alias identity and allocator heap realization remain outside this bridge."
+  },
+  "SSA.RemoveFactoryBridge.imported_scalar_factory": {
+    "title": "The source caller and scalar handler compose",
+    "scope": "general",
+    "meaning": "When the selected handler is scalar, the complete caller wraps its entire Unstructured result in either mode.",
+    "limits": "The caller selects list/map items before scalar dispatch. Actual schema selection, primitive representations and complete request refinement remain open."
+  },
+  "SSA.RemoveFactoryBridge.imported_factory_ignores_reported_errors": {
+    "title": "Normal schema errors do not escape the private caller",
+    "scope": "helper",
+    "meaning": "Any normal resolver error payload, with the fresh walker unchanged, still produces the wrapped null output because the complete caller discards the error return.",
+    "limits": "This is a private unvalidated helper fact, not an API-server acceptance claim. Native missing-type and invalid-atom controls observe actual errors and output; the full resolver source remains open."
   }
 }
