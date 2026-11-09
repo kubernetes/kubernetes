@@ -70,6 +70,10 @@ type SchedulingAlgorithm struct {
 	// preventing exhaustive scans in large clusters.
 	percentageOfNodesToScore int32
 
+	// firstFit skips scoring and, when no extender filters are configured, stops
+	// filtering at the first feasible node (ignoring percentageOfNodesToScore).
+	firstFit bool
+
 	// cycleProvider reports the current scheduling cycle counter. It is used by
 	// opportunistic batching to key and reuse scoring state and node hints strictly
 	// across consecutive cycles.
@@ -96,6 +100,17 @@ type AlgorithmOption func(*SchedulingAlgorithm)
 func WithAlgorithmPercentageOfNodesToScore(percentage int32) AlgorithmOption {
 	return func(a *SchedulingAlgorithm) {
 		a.percentageOfNodesToScore = percentage
+	}
+}
+
+// WithFirstFit makes every scheduling attempt skip scoring and, when no extender filters are
+// configured, stop at the first feasible node Filter finds (ignoring percentageOfNodesToScore).
+// When extender filters are configured, Filter still collects candidate nodes according to
+// percentageOfNodesToScore before filtering through extenders. FindAllNodesThatFitPod still
+// evaluates every node.
+func WithFirstFit() AlgorithmOption {
+	return func(a *SchedulingAlgorithm) {
+		a.firstFit = true
 	}
 }
 
@@ -168,16 +183,22 @@ func (a *SchedulingAlgorithm) SchedulePod(ctx context.Context, schedFramework fr
 		}
 	}
 
-	// When only one node after predicate, just use it.
-	if len(feasibleNodes) == 1 {
-		node := feasibleNodes[0].NodeInfo.Node().Name
+	// When only one node after predicate, or when firstFit is enabled, skip scoring.
+	if len(feasibleNodes) == 1 || a.firstFit {
+		bestNode := feasibleNodes[0]
+		for _, n := range feasibleNodes[1:] {
+			if n.Rank < bestNode.Rank {
+				bestNode = n
+			}
+		}
+		node := bestNode.NodeInfo.Node().Name
 		if a.opportunisticBatchingEnabled(schedFramework) {
 			schedFramework.StoreScheduleResults(ctx, podInfo.PodSignature, nodeHint, node, nil, a.cycleProvider())
 		}
 		return ScheduleResult{
 			SuggestedHost:  node,
-			EvaluatedNodes: 1 + diagnosis.NodeToStatus.Len(),
-			FeasibleNodes:  1,
+			EvaluatedNodes: len(feasibleNodes) + diagnosis.NodeToStatus.Len(),
+			FeasibleNodes:  len(feasibleNodes),
 		}, nil
 	}
 
@@ -624,14 +645,14 @@ func (c *nodeFilterCoordinator) commitNodeLocked(rankedCandidate framework.NodeW
 }
 
 // numNodesToFind decides how many feasible nodes Filter should collect, following
-// kube-scheduler's percentageOfNodesToScore policy. A profile that neither filters
-// through extenders nor scores has no use for a second candidate, so one is enough.
+// kube-scheduler's percentageOfNodesToScore policy. When no extenders filter nodes and scoring is
+// either unconfigured or skipped via firstFit, there is no use for a second candidate, so one is enough.
 func (a *SchedulingAlgorithm) numNodesToFind(schedFramework framework.Framework, numAllNodes int32) int32 {
 	if numAllNodes == 0 {
 		return 0
 	}
 
-	if !hasExtenderFilters(schedFramework) && !hasScoring(schedFramework) {
+	if !hasExtenderFilters(schedFramework) && (a.firstFit || !hasScoring(schedFramework)) {
 		return 1
 	}
 	return a.numFeasibleNodesToFind(schedFramework.PercentageOfNodesToScore(), numAllNodes)
