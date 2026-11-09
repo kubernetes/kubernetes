@@ -214,6 +214,61 @@ func TestRecursiveSetImportsRejectUnmodeledConstruction(t *testing.T) {
 	}
 }
 
+func TestRecursiveSetRangeIsLexicalAndReadOnly(t *testing.T) {
+	source := []byte("package fieldpath\n" + setFunctions[3].signature + ` {
+out := &SetNodeMap{}
+for _, child := range s.members[0:] {
+  if !s2.Members.Has(child.pathElement) { out.members = append(out.members, child) }
+}
+return out
+}`)
+	program, err := importFunction(source, setFunctions[3])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{`(.rangeSlice "child$1"`, `(.sliceFrom`, `"Has"`, `(.var "child$1")`} {
+		if !strings.Contains(program, expected) {
+			t.Fatalf("slice import dropped %q: %s", expected, program)
+		}
+	}
+	for _, replacement := range []string{
+		`for index, child := range s.members[0:]`,
+		`for _, child = range s.members[0:]`,
+		`for _, _ := range s.members[0:]`,
+	} {
+		changed := strings.Replace(string(source), "for _, child := range s.members[0:]", replacement, 1)
+		if _, err := importFunction([]byte(changed), setFunctions[3]); err == nil {
+			t.Fatalf("unsupported slice range accepted: %s", replacement)
+		}
+	}
+	for _, body := range []string{
+		`child.members = append(child.members, child)`,
+		`alias := child`,
+	} {
+		changed := strings.Replace(string(source), "if !s2.Members.Has(child.pathElement) { out.members = append(out.members, child) }", body, 1)
+		if _, err := importFunction([]byte(changed), setFunctions[3]); err == nil {
+			t.Fatalf("mutable range input accepted: %s", body)
+		}
+	}
+	changed := strings.Replace(string(source), "return out", "return child", 1)
+	if _, err := importFunction([]byte(changed), setFunctions[3]); err == nil {
+		t.Fatal("slice variable escaped its lexical scope")
+	}
+}
+
+func TestExcludeFilterReceiverIsImported(t *testing.T) {
+	source := []byte("package fieldpath\n" + setFunctions[4].signature + ` {
+return set.RecursiveDifference(t.excludeSet)
+}`)
+	program, err := importFunction(source, setFunctions[4])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(program, `(.select (.var "t") "excludeSet")`) {
+		t.Fatalf("filter receiver was not preserved: %s", program)
+	}
+}
+
 func TestApplyImportsFilterBranchAndActorMapWrite(t *testing.T) {
 	source := []byte("package merge\n" + functions[4].signature + ` {
 var ignoreFilter fieldpath.Filter

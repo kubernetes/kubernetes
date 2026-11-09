@@ -879,6 +879,7 @@ theorem safe_program_preserves_claim_bound {Obj Err : Type} (ops : Ops Obj Err)
                                 | next final =>
                                     apply restSound final rangeBound
                                     simpa only [computed,executed,Bind.bind,Except.bind] using accepted
+          | rangeSlice _ _ _ => simp at nodeSafe
           | whileLoop _ _ => simp at nodeSafe
           | increment _ => simp at nodeSafe
           | fieldSet _ _ _ => simp at nodeSafe

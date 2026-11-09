@@ -60,6 +60,7 @@ inductive Stmt where
   | mapSet (name : String) (key value : Expr)
   | mapDelete (name : String) (key : Expr)
   | rangeMap (key value : String) (collection : Expr) (body : List Stmt)
+  | rangeSlice (value : String) (collection : Expr) (body : List Stmt)
   | whileLoop (condition : Expr) (body : List Stmt)
   | increment (name : String)
   | fieldSet (name field : String) (value : Expr)
@@ -461,8 +462,8 @@ def exec {Obj Err : Type} (ops : Ops Obj Err) : Nat → List Stmt → Env Obj Er
               | .returned values => .ok (.returned values)
               | .next next => exec ops fuel rest next
           | _ => .error "Go conditional is not boolean"
-      | .whileLoop _ _ | .increment _ | .fieldSet _ _ _ =>
-          .error "Element-set statements require the element-set interpreter"
+      | .rangeSlice _ _ _ | .whileLoop _ _ | .increment _ | .fieldSet _ _ _ =>
+          .error "Set statements require the specialized set interpreter"
       | .continueLoop => .error "Updater continue requires the updater interpreter"
 termination_by fuel _ _ => (fuel, 0, 0)
 

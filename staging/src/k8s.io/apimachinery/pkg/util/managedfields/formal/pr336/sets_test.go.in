@@ -35,12 +35,16 @@ type ssaFormalSetTree struct {
 	Children [][2]any `json:"children"`
 }
 
-func TestSSAFormalRecursiveDifference(t *testing.T) {
+func TestSSAFormalRecursiveDifference(t *testing.T) { testSSAFormalSets(t, false) }
+func TestSSAFormalRootResetFilter(t *testing.T)     { testSSAFormalSets(t, true) }
+
+func testSSAFormalSets(t *testing.T, reset bool) {
 	domain := []PathElement{
-		FieldNameElement("a"), FieldNameElement("b"), KeyElementByFields("name", "db"),
+		FieldNameElement("spec"), FieldNameElement("status"), KeyElementByFields("name", "db"),
 		ValueElement(value.NewValueInterface("member")), IndexElement(0), IndexElement(1),
 		KeyElementByFields("id", int64(9007199254740993)),
 		KeyElementByFields("id", float64(9007199254740992)),
+		FieldNameElement("metadata"),
 	}
 	serialized := map[string]int{}
 	for rank, element := range domain {
@@ -95,6 +99,9 @@ func TestSSAFormalRecursiveDifference(t *testing.T) {
 		t.Fatal("numeric collision control no longer compares equal in both directions")
 	}
 	paths := [][]int{{0}, {0, 1}, {0, 2, 1}, {1, 3, 4}, {2, 5, 0, 1}, {4, 1}}
+	if reset {
+		paths = [][]int{{0}, {0, 1}, {0, 2, 1}, {1, 3, 4}, {8, 5, 0, 1}, {8, 1}}
+	}
 	sets := make([]*Set, 1<<len(paths))
 	for mask := range sets {
 		sets[mask] = NewSet()
@@ -114,11 +121,34 @@ func TestSSAFormalRecursiveDifference(t *testing.T) {
 	compare := func(left, right *Set) {
 		beforeLeft, beforeRight := tree(left), tree(right)
 		difference := left.Difference(right)
+		if reset {
+			difference = NewExcludeSetFilter(right).Filter(left)
+		}
 		leftPaths := map[string]bool{}
 		for _, path := range exactPaths(left) {
 			leftPaths[fmt.Sprint(path)] = true
 		}
 		observed := exactPaths(difference)
+		if reset {
+			blocked := map[int]bool{}
+			for _, root := range beforeRight.Members {
+				blocked[root] = true
+			}
+			wanted := [][]int{}
+			for _, path := range exactPaths(left) {
+				if !blocked[path[0]] {
+					wanted = append(wanted, path)
+				}
+			}
+			for _, path := range observed {
+				if blocked[path[0]] {
+					t.Fatalf("reset filter retained an excluded prefix: %v", path)
+				}
+			}
+			if !reflect.DeepEqual(observed, wanted) {
+				t.Fatalf("reset filter lost an independent prefix: got=%v want=%v", observed, wanted)
+			}
+		}
 		for _, path := range observed {
 			if !leftPaths[fmt.Sprint(path)] {
 				t.Fatalf("recursive Difference invented an exact left path: %v; left=%v right=%v", path, beforeLeft, beforeRight)
@@ -130,8 +160,20 @@ func TestSSAFormalRecursiveDifference(t *testing.T) {
 		pairs = append(pairs, [2]ssaFormalSetTree{beforeLeft, beforeRight})
 		actual = append(actual, observed)
 	}
+	rightSets := sets
+	if reset {
+		rightSets = make([]*Set, 8)
+		for mask := range rightSets {
+			rightSets[mask] = NewSet()
+			for bit, label := range []int{0, 1, 8} {
+				if mask&(1<<bit) != 0 {
+					rightSets[mask].Insert(Path{domain[label]})
+				}
+			}
+		}
+	}
 	for _, left := range sets {
-		for _, right := range sets {
+		for _, right := range rightSets {
 			compare(left, right)
 		}
 	}
@@ -139,17 +181,27 @@ func TestSSAFormalRecursiveDifference(t *testing.T) {
 	// Raw structure avoids Insert merging comparator-equal numeric representatives before the operation.
 	low := &Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[6], set: NewSet(Path{domain[0]}, Path{domain[1]})}}}}
 	high := &Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[7], set: NewSet(Path{domain[0]})}}}}
-	compare(low, high)
-	compare(high, low)
-	compare(&Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[0], set: NewSet()}}}}, NewSet())
 	longPath := Path{}
 	for index := 0; index < 64; index++ {
 		longPath = append(longPath, domain[index%2])
 	}
 	deep := NewSet(longPath)
-	compare(deep, deep)
-	compare(deep, NewSet(Path{domain[0], domain[1]}))
-	compare(NewSet(Path{domain[0], domain[1]}), deep)
+	if reset {
+		mixed := &Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[0], set: low}, {pathElement: domain[1], set: high}}}}
+		compare(mixed, NewSet(Path{domain[0]}))
+		compare(mixed, NewSet(Path{domain[1]}))
+		compare(mixed, NewSet(Path{domain[8]}))
+		compare(&Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[0], set: NewSet()}}}}, NewSet(Path{domain[0]}))
+		compare(deep, NewSet(Path{domain[0]}))
+		compare(deep, NewSet(Path{domain[1]}))
+	} else {
+		compare(low, high)
+		compare(high, low)
+		compare(&Set{Children: SetNodeMap{members: []setNode{{pathElement: domain[0], set: NewSet()}}}}, NewSet())
+		compare(deep, deep)
+		compare(deep, NewSet(Path{domain[0], domain[1]}))
+		compare(NewSet(Path{domain[0], domain[1]}), deep)
+	}
 
 	input, err := json.Marshal(struct {
 		Less  [][]bool              `json:"less"`
@@ -164,7 +216,11 @@ func TestSSAFormalRecursiveDifference(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, model, "--set-difference", "-")
+	mode := "--set-difference"
+	if reset {
+		mode = "--root-reset-filter"
+	}
+	command := exec.CommandContext(ctx, model, mode, "-")
 	command.Stdin = bytes.NewReader(input)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
@@ -186,5 +242,5 @@ func TestSSAFormalRecursiveDifference(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("%d recursive Difference pairs matched source/Go; exact numeric tokens, direct/child overlap, empty nodes and depth 64", len(pairs))
+	t.Logf("%d %s pairs matched source/Go; exact numeric tokens, direct/child overlap, empty nodes and depth 64", len(pairs), mode)
 }

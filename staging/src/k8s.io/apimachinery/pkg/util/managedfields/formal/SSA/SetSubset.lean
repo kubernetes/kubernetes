@@ -18,11 +18,14 @@ structure Machine (α : Type) where
   nodeMode : Bool := true
   output : List (α × Tree α) := []
   child : Tree α := .node [] []
+  cursorName : String := ""
+  cursor : Option (α × Tree α) := none
   i : Nat := 0
   j : Nat := 0
 
 inductive Value (α : Type) where
   | tree (value : Tree α)
+  | excluded (value : Tree α)
   | nodes (values : List (α × Tree α))
   | members (values : List (α × Tree α))
   | elements (values : List α)
@@ -36,15 +39,26 @@ structure Ops (α : Type) where
   isEmpty : Tree α → Bool
   difference : Tree α → Tree α → Tree α
   nodesDifference : List (α × Tree α) → List (α × Tree α) → List (α × Tree α)
+  recursiveDifference : Tree α → Tree α → Except String (Tree α) :=
+    fun _ _ => .error "RecursiveDifference callback is not configured"
+  recursiveNodes : List (α × Tree α) → Tree α → Except String (List (α × Tree α)) :=
+    fun _ _ => .error "RecursiveDifference child callback is not configured"
+  has : List α → α → Bool
 
 def read (state : Machine α) : String → Except String (Value α)
   | "s" => .ok (if state.nodeMode then .nodes state.left.children else .tree state.left)
   | "s2" => .ok (.tree state.right)
+  | "set" => .ok (.tree state.left)
+  | "t" => .ok (.excluded state.right)
   | "out" => .ok (.nodes state.output)
   | "diff$1" => .ok (.tree state.child)
   | "i" => .ok (.number state.i)
   | "j" => .ok (.number state.j)
-  | _ => .error "Unsupported recursive-set variable"
+  | name => if name == state.cursorName then
+      match state.cursor with
+      | some child => .ok (.node child)
+      | none => .error "Recursive-set range value is unavailable"
+    else .error "Unsupported recursive-set variable"
 
 def write (state : Machine α) (name : String) (value : Value α) : Except String (Machine α) :=
   match name,value with
@@ -73,6 +87,7 @@ def eval (ops : Ops α) : Nat → Expr → Machine α → Except String (Value �
           | _,_ => .error "Child construction requires a label and set"
       | .select receiver field => do
           match ← eval ops fuel receiver state,field with
+          | .excluded tree,"excludeSet" => .ok (.tree tree)
           | .tree tree,"Members" => .ok (.elements tree.members)
           | .tree tree,"Children" => .ok (.nodes tree.children)
           | .nodes nodes,"members" => .ok (.members nodes)
@@ -118,6 +133,18 @@ def eval (ops : Ops α) : Nat → Expr → Machine α → Except String (Value �
               | .tree left,.tree right => .ok (.tree (ops.difference left right))
               | .nodes left,.tree right => .ok (.nodes (ops.nodesDifference left right.children))
               | _,_ => .error "Unsupported recursive-set Difference receivers"
+          | .tree left,"RecursiveDifference",[argument] =>
+              match ← eval ops fuel argument state with
+              | .tree right => do return .tree (← ops.recursiveDifference left right)
+              | _ => .error "RecursiveDifference requires a set argument"
+          | .nodes left,"RecursiveDifference",[argument] =>
+              match ← eval ops fuel argument state with
+              | .tree right => do return .nodes (← ops.recursiveNodes left right)
+              | _ => .error "RecursiveDifference requires a set argument"
+          | .elements members,"Has",[argument] =>
+              match ← eval ops fuel argument state with
+              | .label label => .ok (.flag (ops.has members label))
+              | _ => .error "Has requires a path label"
           | .label left,"Less",[argument] =>
               match ← eval ops fuel argument state with
               | .label right => .ok (.flag (ops.less left right))
@@ -155,52 +182,70 @@ inductive Result (α : Type) where
   | next (state : Machine α)
   | returned (values : List (Value α))
 
-/-- Fuel bounds executed loop iterations as well as nesting; the source theorem supplies a size bound. -/
-def exec (ops : Ops α) : Nat → List Stmt → Machine α → Except String (Result α)
-  | 0,_,_ => .error "Recursive-set statement fuel exhausted"
-  | _+1,[],state => .ok (.next state)
-  | fuel+1,statement::rest,state =>
-      match statement with
-      | .assign names expressions => do
-          let values ← evalAll ops expressions state
-          let next ← assign names values state
-          exec ops fuel rest next
-      | .fieldSet "out" "members" expression => do
-          match ← eval ops 32 expression state with
-          | .members output => exec ops fuel rest {state with output}
-          | _ => .error "Recursive-set field assignment requires members"
-      | .increment name => do
-          match ← read state name with
-          | .number number =>
-              let next ← write state name (.number (number+1))
-              exec ops fuel rest next
-          | _ => .error "Recursive-set increment requires a number"
-      | .branch condition body => do
-          match ← eval ops 32 condition state with
-          | .flag true =>
-              match ← exec ops fuel body state with
-              | .returned values => .ok (.returned values)
-              | .next next => exec ops fuel rest next
-          | .flag false => exec ops fuel rest state
-          | _ => .error "Recursive-set conditional requires a boolean"
-      | .branchElse condition body alternative => do
-          match ← eval ops 32 condition state with
-          | .flag condition =>
-              match ← exec ops fuel (if condition then body else alternative) state with
-              | .returned values => .ok (.returned values)
-              | .next next => exec ops fuel rest next
-          | _ => .error "Recursive-set conditional requires a boolean"
-      | .whileLoop condition body => do
-          match ← eval ops 32 condition state with
-          | .flag true =>
-              match ← exec ops fuel body state with
-              | .returned values => .ok (.returned values)
-              | .next next => exec ops fuel (.whileLoop condition body::rest) next
-          | .flag false => exec ops fuel rest state
-          | _ => .error "Recursive-set loop requires a boolean"
-      | .ret expressions => do
-          let values ← evalAll ops expressions state
-          .ok (.returned values)
-      | _ => .error "Unsupported recursive-set statement"
+mutual
+  /-- Fuel bounds executed loop iterations as well as nesting; the source theorem supplies a size bound. -/
+  def exec (ops : Ops α) : Nat → List Stmt → Machine α → Except String (Result α)
+    | 0,_,_ => .error "Recursive-set statement fuel exhausted"
+    | _+1,[],state => .ok (.next state)
+    | fuel+1,statement::rest,state =>
+        match statement with
+        | .assign names expressions => do
+            let values ← evalAll ops expressions state
+            let next ← assign names values state
+            exec ops fuel rest next
+        | .fieldSet "out" "members" expression => do
+            match ← eval ops 32 expression state with
+            | .members output => exec ops fuel rest {state with output}
+            | _ => .error "Recursive-set field assignment requires members"
+        | .increment name => do
+            match ← read state name with
+            | .number number =>
+                let next ← write state name (.number (number+1))
+                exec ops fuel rest next
+            | _ => .error "Recursive-set increment requires a number"
+        | .branch condition body => do
+            match ← eval ops 32 condition state with
+            | .flag true =>
+                match ← exec ops fuel body state with
+                | .returned values => .ok (.returned values)
+                | .next next => exec ops fuel rest next
+            | .flag false => exec ops fuel rest state
+            | _ => .error "Recursive-set conditional requires a boolean"
+        | .branchElse condition body alternative => do
+            match ← eval ops 32 condition state with
+            | .flag condition =>
+                match ← exec ops fuel (if condition then body else alternative) state with
+                | .returned values => .ok (.returned values)
+                | .next next => exec ops fuel rest next
+            | _ => .error "Recursive-set conditional requires a boolean"
+        | .whileLoop condition body => do
+            match ← eval ops 32 condition state with
+            | .flag true =>
+                match ← exec ops fuel body state with
+                | .returned values => .ok (.returned values)
+                | .next next => exec ops fuel (.whileLoop condition body::rest) next
+            | .flag false => exec ops fuel rest state
+            | _ => .error "Recursive-set loop requires a boolean"
+        | .rangeSlice name expression body => do
+            match ← eval ops 32 expression state with
+            | .members members =>
+                match ← runSlice ops fuel name members body state with
+                | .returned values => .ok (.returned values)
+                | .next next => exec ops fuel rest {next with cursorName := state.cursorName,cursor := state.cursor}
+            | _ => .error "Recursive-set range requires a slice"
+        | .ret expressions => do
+            let values ← evalAll ops expressions state
+            .ok (.returned values)
+        | _ => .error "Unsupported recursive-set statement"
+
+  /-- Slice iteration snapshots the immutable input view and keeps its loop binding local. -/
+  def runSlice (ops : Ops α) : Nat → String → List (α × Tree α) → List Stmt → Machine α → Except String (Result α)
+    | 0,_,_,_,_ => .error "Recursive-set range fuel exhausted"
+    | _+1,_,[],_,state => .ok (.next state)
+    | fuel+1,name,child::rest,body,state => do
+        match ← exec ops fuel body {state with cursorName := name,cursor := some child} with
+        | .returned values => .ok (.returned values)
+        | .next next => runSlice ops fuel name rest body next
+end
 
 end SSA.SetSubset

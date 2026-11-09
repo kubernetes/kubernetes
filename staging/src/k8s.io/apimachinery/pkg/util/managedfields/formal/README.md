@@ -243,6 +243,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | internal `update` | `UpdaterContracts.imported_update_never_adds_claims`, `UpdaterBridge.source_apply_excludes_reset_fields` |
 | `PathElementSet.Difference`, `Union`, `Intersection` (`fieldpath/element.go`) | `ElementAlgebra.imported_matches`, `imported_membership`, `imported_preserves_order`, `imported_preserves_uniqueness` |
 | `Set.Difference`, `SetNodeMap.Difference` (`fieldpath/set.go`) | `SetContracts.imported_node_matches`, `imported_set_matches`, `imported_difference_never_adds_paths` |
+| `Set.RecursiveDifference`, `SetNodeMap.RecursiveDifference`, `excludeFilter.Filter` | `SetFilterContracts.imported_flat_node_matches`, `imported_flat_set_matches`, `imported_flat_filter_matches`, `locally_ordered_filter_excludes_root` (flat root exclusions only) |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -369,6 +370,29 @@ Exact serialized tokens assign test labels; Go `Has`/`Equals` never decides the
 left-path-origin oracle. Both pinned PR revisions run the same comparison. A
 source mutation that uses the right matched-child label must be rejected by the
 unchanged Lean source certificate and independently fail the native origin law.
+
+`SetSource` also imports both complete `RecursiveDifference` methods and
+`excludeFilter.Filter`. `SetFilterContracts` proves their execution on the
+conventional flat root-exclusion sets, such as `spec`, `status` and `metadata`.
+The child's main while loop is skipped because the exclusion set has no child
+nodes. A finite suffix-range proof shows that a recognized root's entire child
+scope is omitted, without inspecting or comparing descendant keys. These are
+ownership-path filters; restoring object data is a separate REST strategy phase.
+
+`ElementLocalOrder` restricts the direct-member algebra premises to the labels
+actually visited. `locally_ordered_filter_excludes_root` therefore requires a
+lawful domain only for direct root members and exclusion roots, not for nested
+numeric item keys. `Has` recognition, sorted/direct-label representation and
+actual field-name comparison remain explicit boundaries. No arbitrary nested
+exclusion-tree or complete reset/Apply pipeline theorem is claimed. The original
+normalized prefix-filter theorems remain separately available.
+
+The native overlay additionally checks 518 root-filter pairs against imported
+source, including all root-mask combinations, independent-prefix preservation,
+numeric collisions inside retained/dropped subtrees, empty structure and depth
+64. Both pinned revisions run it too. An eleventh source mutation replaces
+`RecursiveDifference` with ordinary `Difference`; unchanged source theorems and
+the independent native prefix-exclusion oracle must both reject it.
 
 The mixed numeric comparator actually fails the global equality/order premise:
 two distinct int64 values can each compare equal to one float64. A concrete

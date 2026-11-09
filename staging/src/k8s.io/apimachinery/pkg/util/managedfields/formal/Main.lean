@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference accepts recursive rank trees."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -95,7 +95,7 @@ private structure SetCases where
   pairs : List (Json × Json)
   deriving FromJson
 
-private def runSets (path : String) : IO UInt32 := do
+private def runSets (path : String) (reset : Bool := false) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
   let input ← readInput path
@@ -105,11 +105,15 @@ private def runSets (path : String) : IO UInt32 := do
     cases.pairs.mapM fun (leftJson,rightJson) => do
       let left ← parseSetTree 128 leftJson
       let right ← parseSetTree 128 rightJson
-      let ops := SetContracts.recursiveOps (fun a b : Nat => ((cases.less[a]?).bind (·[b]?)).getD false) RecursiveSets.empty
-      match ← SetSubset.exec ops 2 SetSource.setDifferenceProgram {left,right,nodeMode := false} with
+      let base := SetContracts.recursiveOps (fun a b : Nat => ((cases.less[a]?).bind (·[b]?)).getD false) RecursiveSets.empty
+      if reset && !right.children.isEmpty then throw "Root reset protocol requires a flat exclusion set"
+      let ops := if reset then SetFilterContracts.flatOps {base with has := fun members label => members.contains label} else base
+      let program := if reset then SetSource.excludeFilterProgram else SetSource.setDifferenceProgram
+      let nodeProgram := if reset then SetSource.recursiveNodeProgram else SetSource.nodeDifferenceProgram
+      let nodeFuel := if reset then left.children.length+14 else left.children.length+right.children.length+19
+      match ← SetSubset.exec ops 2 program {left,right,nodeMode := false} with
       | .returned [.tree result] =>
-          match ← SetSubset.exec ops (left.children.length+right.children.length+19)
-              SetSource.nodeDifferenceProgram {left,right} with
+          match ← SetSubset.exec ops nodeFuel nodeProgram {left,right} with
           | .returned [.nodes nodes] =>
               if nodes == result.children then pure (RecursiveSets.paths result)
               else throw "Recursive-set source callbacks disagree"
@@ -141,6 +145,7 @@ def main (args : List String) : IO UInt32 := do
       | none =>
           stderr.putStrLn s!"Unknown scenario '{name}'; run --list to see available scenarios."
           return 2
+  | ["--root-reset-filter",path] => runSets path true
   | ["--set-difference",path] => runSets path
   | ["--element-difference",path] => runElements path (some .difference)
   | ["--element-algebra",path] => runElements path none

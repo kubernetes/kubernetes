@@ -68,9 +68,13 @@ func rootScope(function functionSpec) *scope {
 	for _, parameter := range function.parameters {
 		root.bindings[parameter] = binding{parameter, function.maps[parameter]}
 	}
-	root.bindings["s"] = binding{"s", ""}
+	receiver := function.receiverID
+	if receiver == "" {
+		receiver = "s"
+	}
+	root.bindings[receiver] = binding{receiver, ""}
 	if function.elements {
-		root.bindings["s"] = binding{"s", "element-input"}
+		root.bindings[receiver] = binding{receiver, "element-input"}
 	}
 	return root
 }
@@ -632,6 +636,29 @@ func renderStatements(input []ast.Stmt, context *scope) (string, error) {
 				items = append(items, "(.branchElse "+condition+" "+body+" "+other+")")
 			}
 		case *ast.RangeStmt:
+			if context.sets {
+				key, keyOK := s.Key.(*ast.Ident)
+				name, valueOK := s.Value.(*ast.Ident)
+				if s.Tok != token.DEFINE || !keyOK || key.Name != "_" || !valueOK || name.Name == "_" {
+					return "", fmt.Errorf("recursive-set range requires an ignored index and a named value")
+				}
+				collection, err := renderExpr(s.X, context)
+				if err != nil {
+					return "", err
+				}
+				iteration := context.child()
+				id := iteration.declare(name.Name, "set-range-input").id
+				body, err := renderStatements(s.Body.List, iteration.child())
+				if err != nil {
+					return "", err
+				}
+				quotedID, err := quoted(id)
+				if err != nil {
+					return "", err
+				}
+				items = append(items, "(.rangeSlice "+quotedID+" "+collection+" "+body+")")
+				continue
+			}
 			if s.Tok != token.DEFINE || s.Key == nil || (s.Value == nil && !context.updater) {
 				return "", fmt.Errorf("unsupported Go range form")
 			}

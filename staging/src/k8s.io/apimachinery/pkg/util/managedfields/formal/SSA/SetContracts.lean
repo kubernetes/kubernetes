@@ -191,7 +191,8 @@ theorem imported_members_match (ops : Ops α) (left right : List α) :
 
 /-- Both recursive callbacks are now fixed to the finite structural implementation. -/
 def recursiveOps (lt : α → α → Bool) (isEmpty : Tree α → Bool) : Ops α :=
-  {less := lt,isEmpty,difference := difference lt isEmpty,nodesDifference := nodesDifference lt isEmpty}
+  {less := lt,isEmpty,difference := difference lt isEmpty,nodesDifference := nodesDifference lt isEmpty,
+    has := fun _ _ => false}
 
 theorem imported_set_matches (lt : α → α → Bool) (isEmpty : Tree α → Bool) (left right : Tree α) :
     exec (recursiveOps lt isEmpty) 2 SetSource.setDifferenceProgram {left,right,nodeMode := false} =

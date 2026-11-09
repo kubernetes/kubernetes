@@ -256,3 +256,64 @@ PY_MUTATION
   )
   printf 'The unchanged Lean theorems correctly rejected the element-%s Go source mutation.\n' "$method"
 done
+
+# Ordinary Difference removes a root member but leaves its descendants; it cannot implement a reset filter.
+probe="$formal_root/.lake/source-mutation/reset-filter-scope"
+mkdir -p "$probe/SSA"
+cp -R "$formal_root/.lake/build/lib/lean/SSA/." "$probe/SSA/"
+set_source="$(go list -f '{{.Dir}}' sigs.k8s.io/structured-merge-diff/v6/fieldpath)/set.go"
+python3 - "$set_source" "$probe/set.go" <<'PY_FILTER_MUTATION'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+old = "return set.RecursiveDifference(t.excludeSet)"
+if source.count(old) != 1:
+    raise SystemExit("Cannot locate the unique reset-filter mutation; update verify-source.sh.")
+Path(sys.argv[2]).write_text(source.replace(old, "return set.Difference(t.excludeSet)"))
+PY_FILTER_MUTATION
+go run ./cmd/ssa-source -sets -source "$probe/set.go" > "$probe/SSA/SetSource.lean"
+for module in SetSubset SetContracts SetFilterContracts; do cp "SSA/$module.lean" "$probe/SSA/$module.lean"; done
+for module in SetSource SetSubset SetContracts SetFilterContracts; do
+  rm -f "$probe/SSA/$module.olean" "$probe/SSA/$module.olean.private" "$probe/SSA/$module.olean.server"
+done
+(
+  cd "$probe"
+  export LEAN_PATH="$probe:$formal_root/.lake/build/lib/lean"
+  for module in SetSource SetSubset SetContracts; do
+    "$lean_binary" -DwarningAsError=true -o "SSA/$module.olean" "SSA/$module.lean"
+  done
+  if "$lean_binary" -DwarningAsError=true -o SSA/SetFilterContracts.olean SSA/SetFilterContracts.lean > SetFilterContracts.log 2>&1; then
+    printf 'Reset-filter mutation unexpectedly satisfied the unchanged certificate.\n' >&2
+    exit 1
+  fi
+  if ! grep -Eq 'unsolved goals|Tactic.*failed' SetFilterContracts.log; then
+    cat SetFilterContracts.log >&2
+    printf 'Reset-filter mutation failed for an unrelated reason.\n' >&2
+    exit 1
+  fi
+)
+python3 - "$set_source" "$probe" "$formal_root/pr336/sets_test.go.in" <<'PY_FILTER_OVERLAY'
+import json
+import sys
+from pathlib import Path
+
+source, probe, witness = map(Path, sys.argv[1:])
+overlay = {"Replace": {
+    str(source): str(probe / "set.go"),
+    str(source.parent / "ssa_formal_sets_test.go"): str(witness),
+}}
+(probe / "overlay.json").write_text(json.dumps(overlay))
+PY_FILTER_OVERLAY
+export SSA_SET_MODEL="$formal_root/.lake/build/bin/ssa-model"
+if go test -overlay="$probe/overlay.json" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
+    -run '^TestSSAFormalRootResetFilter$' -v -count=1 > "$probe/native.log" 2>&1; then
+  printf 'Native reset-filter mutation unexpectedly excluded complete subtrees.\n' >&2
+  exit 1
+fi
+if ! grep -q 'reset filter retained an excluded prefix' "$probe/native.log"; then
+  cat "$probe/native.log" >&2
+  printf 'Native reset-filter mutation failed for an unrelated reason.\n' >&2
+  exit 1
+fi
+printf 'Unchanged Lean certificate and native Go witness both rejected the reset-filter scope mutation.\n'

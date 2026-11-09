@@ -41,6 +41,7 @@ type functionSpec struct {
 	updater    bool
 	sets       bool
 	receiver   string
+	receiverID string
 }
 
 var setFunctions = []functionSpec{
@@ -53,6 +54,21 @@ var setFunctions = []functionSpec{
 		name: "Difference", leanName: "nodeDifferenceProgram", receiver: "*SetNodeMap",
 		signature: "func (s *SetNodeMap) Difference(s2 *Set) *SetNodeMap", parameters: []string{"s2"},
 		maps: map[string]string{"s2": "set-input"}, elements: true, sets: true,
+	},
+	{
+		name: "RecursiveDifference", leanName: "recursiveSetProgram", receiver: "*Set",
+		signature: "func (s *Set) RecursiveDifference(s2 *Set) *Set", parameters: []string{"s2"},
+		maps: map[string]string{"s2": "set-input"}, elements: true, sets: true,
+	},
+	{
+		name: "RecursiveDifference", leanName: "recursiveNodeProgram", receiver: "*SetNodeMap",
+		signature: "func (s *SetNodeMap) RecursiveDifference(s2 *Set) *SetNodeMap", parameters: []string{"s2"},
+		maps: map[string]string{"s2": "set-input"}, elements: true, sets: true,
+	},
+	{
+		name: "Filter", leanName: "excludeFilterProgram", receiver: "excludeFilter", receiverID: "t",
+		signature: "func (t excludeFilter) Filter(set *Set) *Set", parameters: []string{"set"},
+		maps: map[string]string{"set": "set-input"}, elements: true, sets: true,
 	},
 }
 
@@ -202,11 +218,11 @@ func validateImports(source []byte) error {
 }
 
 func run() error {
-	sourcePath := flag.String("source", "", "Go update.go source, or element.go with -elements (required)")
+	sourcePath := flag.String("source", "", "Go update.go source, element.go with -elements, or set.go with -sets (required)")
 	checkPath := flag.String("check", "", "compare generated output with this Lean file")
 	elements := flag.Bool("elements", false, "import fieldpath element.go instead of merge update.go")
 	updater := flag.Bool("updater", false, "import the complete ownership-update function with the updater interpreter")
-	sets := flag.Bool("sets", false, "import recursive field-set Difference bodies from fieldpath/set.go")
+	sets := flag.Bool("sets", false, "import field-set Difference, RecursiveDifference and exclude-filter bodies from fieldpath/set.go")
 	flag.Parse()
 	if *sourcePath == "" || flag.NArg() != 0 {
 		return fmt.Errorf("supply -source and no positional arguments")

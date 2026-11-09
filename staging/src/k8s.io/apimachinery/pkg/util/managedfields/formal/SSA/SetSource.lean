@@ -38,4 +38,44 @@ def nodeDifferenceProgram : List GoSubset.Stmt := [
   (.ret [(.var "out")])
 ]
 
+def recursiveSetProgram : List GoSubset.Stmt := [
+  (.ret [(.addressOf (.setRecord (.dereference (.call (.select (.var "s") "Members") "Difference" [(.addressOf (.select (.var "s2") "Members"))])) (.dereference (.call (.select (.var "s") "Children") "RecursiveDifference" [(.var "s2")]))))])
+]
+
+def recursiveNodeProgram : List GoSubset.Stmt := [
+  (.assign ["out"] [(.addressOf (.emptyNodeMap))]),
+  (.assign ["i", "j"] [(.number 0), (.number 0)]),
+  (.whileLoop (.andAlso (.less (.var "i") (.length (.select (.var "s") "members"))) (.less (.var "j") (.length (.select (.select (.var "s2") "Children") "members")))) [
+  (.branchElse (.call (.select (.index (.select (.var "s") "members") (.var "i")) "pathElement") "Less" [(.select (.index (.select (.select (.var "s2") "Children") "members") (.var "j")) "pathElement")]) [
+  (.branch (.notFlag (.call (.select (.var "s2") "Members") "Has" [(.select (.index (.select (.var "s") "members") (.var "i")) "pathElement")])) [
+  (.fieldSet "out" "members" (.appendOne (.select (.var "out") "members") (.setNode (.select (.index (.select (.var "s") "members") (.var "i")) "pathElement") (.select (.index (.select (.var "s") "members") (.var "i")) "set"))))
+]),
+  (.increment "i")
+] [
+  (.branch (.notFlag (.call (.select (.index (.select (.select (.var "s2") "Children") "members") (.var "j")) "pathElement") "Less" [(.select (.index (.select (.var "s") "members") (.var "i")) "pathElement")])) [
+  (.branch (.notFlag (.call (.select (.var "s2") "Members") "Has" [(.select (.index (.select (.var "s") "members") (.var "i")) "pathElement")])) [
+  (.assign ["diff$1"] [(.call (.select (.index (.select (.var "s") "members") (.var "i")) "set") "RecursiveDifference" [(.select (.index (.select (.select (.var "s2") "Children") "members") (.var "j")) "set")])]),
+  (.branch (.notFlag (.call (.var "diff$1") "Empty" [])) [
+  (.fieldSet "out" "members" (.appendOne (.select (.var "out") "members") (.setNode (.select (.index (.select (.var "s") "members") (.var "i")) "pathElement") (.var "diff$1"))))
+])
+]),
+  (.increment "i")
+]),
+  (.increment "j")
+])
+]),
+  (.branch (.less (.var "i") (.length (.select (.var "s") "members"))) [
+  (.rangeSlice "c$2" (.sliceFrom (.select (.var "s") "members") (.var "i")) [
+  (.branch (.notFlag (.call (.select (.var "s2") "Members") "Has" [(.select (.var "c$2") "pathElement")])) [
+  (.fieldSet "out" "members" (.appendOne (.select (.var "out") "members") (.var "c$2")))
+])
+])
+]),
+  (.ret [(.var "out")])
+]
+
+def excludeFilterProgram : List GoSubset.Stmt := [
+  (.ret [(.call (.var "set") "RecursiveDifference" [(.select (.var "t") "excludeSet")])])
+]
+
 end SSA.SetSource

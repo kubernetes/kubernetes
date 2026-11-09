@@ -1451,5 +1451,93 @@
     "scope": "general",
     "meaning": "The source-backed ownership updater satisfies the actor no-growth frame with the explicit recursive-tree Difference adapter; DifferenceShrinks is proved from recursive source algorithms instead of being a supplied premise.",
     "limits": "The adapter has a proved finite path encoding. Relating it to actual ownership decoding/Go memory remains explicit; it does not repair FieldsV1 numeric aliasing or prove whole-request no-growth. Comparison, conversion, filter and remaining primitives are still parameters."
+  },
+  "SSA.ElementLocalOrder.map_restrict": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.mem_restrict": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.compute_map": {
+    "scope": "general",
+    "title": "Projection commutes with all three element algorithms",
+    "meaning": "At every finite input size and for every comparator, projecting labels before or after Difference, Union or Intersection gives the same result. No global order law or injective projection is required.",
+    "limits": "This is an algorithmic component law; the separately proved source correspondence connects the algorithms to imported Go methods."
+  },
+  "SSA.ElementLocalOrder.restricted_order": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.restrict_preserves_order": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.ElementLocalOrder.compute_local_membership": {
+    "scope": "general",
+    "title": "Element membership needs order only in the active label domain",
+    "meaning": "The three algorithms have their usual exact membership laws when their sorted input labels lie in a domain with a strict total order. Comparator behavior outside that domain is irrelevant.",
+    "limits": "The input-domain, input-sorting and local-order premises remain explicit. No global mixed-numeric order law is assumed."
+  },
+  "SSA.ElementLocalOrder.imported_local_membership": {
+    "scope": "general",
+    "title": "Imported element methods inherit local-domain membership laws",
+    "meaning": "The complete source Difference, Union and Intersection results satisfy exact membership on the lawful active domain, even if unrelated labels violate global comparator laws.",
+    "limits": "Finite source execution is already proved; label domain, local order and sorted input realization in actual Go still need their own connection."
+  },
+  "SSA.SetFilterContracts.imported_range_matches_scan": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.scan_output": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.imported_flat_node_matches": {
+    "scope": "general",
+    "title": "Root exclusion executes the complete child-node source",
+    "meaning": "For a right set with only direct root members, the complete RecursiveDifference child AST returns exactly the left children not matched by Has. The nested while body is bypassed; the suffix range is proved for arbitrary finite width.",
+    "limits": "This theorem is specifically for flat reset roots. Has remains an explicit primitive; arbitrary deeper exclusion trees and universal Go runtime refinement are not covered."
+  },
+  "SSA.SetFilterContracts.flat_node_callback_is_source": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.imported_flat_set_matches": {
+    "scope": "general",
+    "title": "Root-level RecursiveDifference composes its source callbacks",
+    "meaning": "The complete Set.RecursiveDifference AST combines source-verified direct-member subtraction and the source-derived child filter for an exclusion tree without descendants.",
+    "limits": "flat_node_callback_is_source validates the child callback on this input shape. This does not assert correctness for arbitrary nested exclusions or derive the actual Has implementation."
+  },
+  "SSA.SetFilterContracts.imported_flat_filter_matches": {
+    "scope": "general",
+    "title": "Actual excludeFilter.Filter calls the root subtree-exclusion algorithm",
+    "meaning": "The complete imported Filter body returns the source-derived root exclusion result, using the fixed flat-root recursive callbacks.",
+    "limits": "Conventional top-level reset roots only. Direct membership subtraction and Has need the explicit label/representation premises; this is not the complete Apply/subresource pipeline."
+  },
+  "SSA.SetFilterContracts.flat_set_excludes_root": {
+    "scope": "helper",
+    "meaning": "Internal source, finite-tree or restricted-domain order lemma.",
+    "limits": "A finite-list/tree or interpreter-composition helper, not another independent SSA guarantee. The explicit primitive and runtime/representation boundary applies."
+  },
+  "SSA.SetFilterContracts.imported_filter_excludes_root": {
+    "scope": "general",
+    "title": "Imported root filter excludes every descendant claim path",
+    "meaning": "Every root::suffix path is absent from the complete filter result when direct subtraction removes that root and Has recognizes it in the exclusion set. Suffix depth is unbounded and its labels are never compared.",
+    "limits": "Direct-root subtraction and Has recognition are explicit primitive premises; these are narrowed by the local-domain theorem. Ownership codec/heap and complete request refinement remain open."
+  },
+  "SSA.SetFilterContracts.locally_ordered_filter_excludes_root": {
+    "scope": "general",
+    "title": "Only direct field-name order is needed for source reset exclusion",
+    "meaning": "Sorted direct labels and reset roots in a locally lawful domain suffice for the actual imported filter to exclude a root and all descendants. Descendant labels may lie outside that domain and may have mixed-numeric comparator collisions.",
+    "limits": "Has must recognize the reset root. Actual Go Has/binary search, field-name comparison, root-set representation and whole Apply/API pipeline still need refinement. The source control-flow theorem itself is general at finite width and unbounded child depth."
   }
 }

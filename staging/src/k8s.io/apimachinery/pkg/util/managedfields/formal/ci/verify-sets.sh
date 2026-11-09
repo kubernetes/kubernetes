@@ -19,4 +19,4 @@ from pathlib import Path
 Path(sys.argv[1]).write_text(json.dumps({"Replace": {sys.argv[2]: sys.argv[3]}}))
 PY
 go test -overlay="$overlay" sigs.k8s.io/structured-merge-diff/v6/fieldpath \
-  -run '^TestSSAFormalRecursiveDifference$' -v -count=1
+  -run '^TestSSAFormal(RecursiveDifference|RootResetFilter)$' -v -count=1
