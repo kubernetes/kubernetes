@@ -722,7 +722,7 @@
   - default: true
     lockToDefault: true
     preRelease: GA
-    version: "1.38"
+    version: "1.37"
 - name: EtcdRangeStream
   versionedSpecs:
   - default: true
