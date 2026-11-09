@@ -671,185 +671,198 @@ func TestQuantityParse(t *testing.T) {
 	}
 
 	for _, item := range quantityTestcases() {
-		got, err := ParseQuantity(item.input)
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", item.input, err)
-			continue
-		}
-		if !got.s.validFor(got.Format) {
-			t.Errorf("%v: cached string was not set by ParseQuantity for its Format %q as it should have been: %+v", item.input, got.Format, got.s)
-		}
-		gotString := got.String()
-		if gotString != item.expectString {
-			t.Errorf("%v: unexpected String() result after ParseQuantity: want %q, got %q", item.input, item.expectString, gotString)
-		}
+		t.Run("loop1_"+item.input, func(t *testing.T) {
+			got, err := ParseQuantity(item.input)
+			if err != nil {
+				t.Fatalf("%v: unexpected error: %v", item.input, err)
+			}
+			if !got.s.validFor(got.Format) {
+				t.Errorf("%v: cached string was not set by ParseQuantity for its Format %q as it should have been: %+v", item.input, got.Format, got.s)
+			}
+			gotString := got.String()
+			if gotString != item.expectString {
+				t.Errorf("%v: unexpected String() result after ParseQuantity: want %q, got %q", item.input, item.expectString, gotString)
+			}
+		})
 	}
 
 	for _, asDec := range []bool{false, true} {
-		for _, item := range quantityTestcases() {
-			got, err := ParseQuantity(item.input)
-			if err != nil {
-				t.Errorf("%v: unexpected error: %v", item.input, err)
-				continue
-			}
-			intUncached := got.DeepCopy()
-			intUncached.s = cachedString{}
-			cached := got.s
-			// TODO(#141166): uncomment with the inf.Dec parity check below.
-			// wantValue, wantOK := got.AsInt64()
-			if asDec {
-				if got.ToDec() != &got {
-					t.Errorf("%v: ToDec did not return receiver", item.input)
-				}
-				if got.d.Dec == nil || got.i != (int64Amount{}) {
-					t.Errorf("%v: ToDec left quantity in state %#v", item.input, got)
-				}
-				if got.s != cached {
-					t.Errorf("%v: ToDec changed cached string from %q to %q", item.input, cached, got.s)
-				}
-				if got.String() != item.expectString {
-					t.Errorf("%v: unexpected String() result after ToDec: want %q, got %q", item.input, item.expectString, got.String())
-				}
-				uncached := got.DeepCopy()
-				uncached.s = cachedString{}
-				if uncached.String() != intUncached.String() {
-					t.Errorf("%v: unexpected uncached String() after ToDec: want %q, got %q", item.input, intUncached.String(), uncached.String())
-				}
+		t.Run(fmt.Sprintf("asDec=%v", asDec), func(t *testing.T) {
+			for _, item := range quantityTestcases() {
+				t.Run("loop2_"+item.input, func(t *testing.T) {
+					got, err := ParseQuantity(item.input)
+					if err != nil {
+						t.Errorf("%v: unexpected error: %v", item.input, err)
+						return
+					}
+					intUncached := got.DeepCopy()
+					intUncached.s = cachedString{}
+					cached := got.s
+					// TODO(#141166): uncomment with the inf.Dec parity check below.
+					// wantValue, wantOK := got.AsInt64()
+					if asDec {
+						if got.ToDec() != &got {
+							t.Errorf("%v: ToDec did not return receiver", item.input)
+						}
+						if got.d.Dec == nil || got.i != (int64Amount{}) {
+							t.Errorf("%v: ToDec left quantity in state %#v", item.input, got)
+						}
+						if got.s != cached {
+							t.Errorf("%v: ToDec changed cached string from %q to %q", item.input, cached, got.s)
+						}
+						if got.String() != item.expectString {
+							t.Errorf("%v: unexpected String() result after ToDec: want %q, got %q", item.input, item.expectString, got.String())
+						}
+						uncached := got.DeepCopy()
+						uncached.s = cachedString{}
+						if uncached.String() != intUncached.String() {
+							t.Errorf("%v: unexpected uncached String() after ToDec: want %q, got %q", item.input, intUncached.String(), uncached.String())
+						}
+					}
+
+					if e, a := item.expect, got; e.Cmp(a) != 0 {
+						t.Errorf("%v: expected %v, got %v", item.input, e.String(), a.String())
+					}
+					if e, a := item.expect.Format, got.Format; e != a {
+						t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+					}
+
+					if asDec {
+						// TODO(#141166): AsInt64 on the inf.Dec form should match the int64 form.
+						// if i, ok := got.AsInt64(); i != wantValue || ok != wantOK {
+						// 	t.Errorf("%v: AsInt64() on the inf.Dec form = (%d, %t), want (%d, %t)", item.input, i, ok, wantValue, wantOK)
+						// }
+						if i, ok := got.AsInt64(); i != 0 || ok {
+							t.Errorf("%v: expected inf.Dec to return false for AsInt64: %d", item.input, i)
+						}
+						return
+					}
+					i, ok := item.expect.AsInt64()
+					if !ok {
+						return
+					}
+					j, ok := got.AsInt64()
+					if !ok {
+						if got.d.Dec == nil && got.i.scale >= 0 {
+							t.Errorf("%v: is an int64Amount, but can't return AsInt64: %v", item.input, got)
+						}
+						return
+					}
+					if i != j {
+						t.Errorf("%v: expected equivalent representation as int64: %d %d", item.input, i, j)
+					}
+				})
 			}
 
-			if e, a := item.expect, got; e.Cmp(a) != 0 {
-				t.Errorf("%v: expected %v, got %v", item.input, e.String(), a.String())
-			}
-			if e, a := item.expect.Format, got.Format; e != a {
-				t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+			for _, item := range quantityTestcases() {
+				t.Run("loop3_"+item.input, func(t *testing.T) {
+					got, err := ParseQuantity(item.input)
+					if err != nil {
+						t.Errorf("%v: unexpected error: %v", item.input, err)
+						return
+					}
+
+					if asDec {
+						got.ToDec()
+					}
+
+					for _, format := range []Format{DecimalSI, BinarySI, DecimalExponent} {
+						t.Run("format_"+string(format), func(t *testing.T) {
+							// ensure we are not simply checking pointer equality by creating a new inf.Dec
+							// use addDecBoundedScale to avoid hanging tests on large exponents
+							copied := addDecBoundedScale(inf.NewDec(0, inf.Scale(0)), got.AsDec())
+							q := NewDecimalQuantity(*copied, format)
+							if c := q.Cmp(got); c != 0 {
+								t.Errorf("%v: round trip from decimal back to quantity is not comparable: %d: %#v vs %#v", item.input, c, got, q)
+							}
+							copied.UnscaledBig().SetInt64(0x5a5a5a5a)
+							if c := q.Cmp(got); c != 0 {
+								t.Errorf("%v: NewDecimalQuantity returned memory shared with its argument", item.input)
+							}
+						})
+					}
+
+					// verify that we can decompose the input and get the same result by building up from the base.
+					positive, num, denom, suffix, _, err := parseQuantityString(item.input)
+					if err != nil {
+						t.Errorf("%v: unexpected error: %v", item.input, err)
+						return
+					}
+					if got.Sign() >= 0 && !positive || got.Sign() < 0 && positive {
+						t.Errorf("%v: positive was incorrect: %t", item.input, positive)
+						return
+					}
+					var value string
+					if !positive {
+						value = "-"
+					}
+					value += num
+					if len(denom) > 0 {
+						value += "." + denom
+					}
+					value += suffix
+					if len(value) == 0 {
+						t.Errorf("%v: did not parse correctly, %q %q %q", item.input, num, denom, suffix)
+					}
+					expected, err := ParseQuantity(value)
+					if err != nil {
+						t.Errorf("%v: unexpected error for %s: %v", item.input, value, err)
+						return
+					}
+					if expected.Cmp(got) != 0 {
+						t.Errorf("%v: not the same as %s", item.input, value)
+						return
+					}
+				})
 			}
 
-			if asDec {
-				// TODO(#141166): AsInt64 on the inf.Dec form should match the int64 form.
-				// if i, ok := got.AsInt64(); i != wantValue || ok != wantOK {
-				// 	t.Errorf("%v: AsInt64() on the inf.Dec form = (%d, %t), want (%d, %t)", item.input, i, ok, wantValue, wantOK)
-				// }
-				if i, ok := got.AsInt64(); i != 0 || ok {
-					t.Errorf("%v: expected inf.Dec to return false for AsInt64: %d", item.input, i)
-				}
-				continue
-			}
-			i, ok := item.expect.AsInt64()
-			if !ok {
-				continue
-			}
-			j, ok := got.AsInt64()
-			if !ok {
-				if got.d.Dec == nil && got.i.scale >= 0 {
-					t.Errorf("%v: is an int64Amount, but can't return AsInt64: %v", item.input, got)
-				}
-				continue
-			}
-			if i != j {
-				t.Errorf("%v: expected equivalent representation as int64: %d %d", item.input, i, j)
-			}
-		}
+			// Try the negative version of everything
+			desired := &inf.Dec{}
+			expect := Quantity{d: infDecAmount{Dec: desired}}
+			for _, item := range quantityTestcases() {
+				t.Run("loop4_"+item.input, func(t *testing.T) {
+					got, err := ParseQuantity("-" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
+					if err != nil {
+						t.Errorf("-%v: unexpected error: %v", item.input, err)
+						return
+					}
+					if asDec {
+						got.ToDec()
+					}
 
-		for _, item := range quantityTestcases() {
-			got, err := ParseQuantity(item.input)
-			if err != nil {
-				t.Errorf("%v: unexpected error: %v", item.input, err)
-				continue
+					expected := item.expect
+					desired.Neg(expected.AsDec())
+
+					if e, a := expect, got; e.Cmp(a) != 0 {
+						t.Errorf("%v: expected %s, got %s", item.input, e.String(), a.String())
+					}
+					if e, a := expected.Format, got.Format; e != a {
+						t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+					}
+				})
 			}
 
-			if asDec {
-				got.ToDec()
-			}
+			// Try everything with an explicit +
+			for _, item := range quantityTestcases() {
+				t.Run("loop5_"+item.input, func(t *testing.T) {
+					got, err := ParseQuantity("+" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
+					if err != nil {
+						t.Errorf("-%v: unexpected error: %v", item.input, err)
+						return
+					}
+					if asDec {
+						got.ToDec()
+					}
 
-			for _, format := range []Format{DecimalSI, BinarySI, DecimalExponent} {
-				// ensure we are not simply checking pointer equality by creating a new inf.Dec
-				var copied inf.Dec
-				copied.Add(inf.NewDec(0, inf.Scale(0)), got.AsDec())
-				q := NewDecimalQuantity(copied, format)
-				if c := q.Cmp(got); c != 0 {
-					t.Errorf("%v: round trip from decimal back to quantity is not comparable: %d: %#v vs %#v", item.input, c, got, q)
-				}
-				copied.UnscaledBig().SetInt64(0x5a5a5a5a)
-				if c := q.Cmp(got); c != 0 {
-					t.Errorf("%v: NewDecimalQuantity returned memory shared with its argument", item.input)
-				}
+					if e, a := item.expect, got; e.Cmp(a) != 0 {
+						t.Errorf("%v(%t): expected %s, got %s", item.input, asDec, e.String(), a.String())
+					}
+					if e, a := item.expect.Format, got.Format; e != a {
+						t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
+					}
+				})
 			}
-
-			// verify that we can decompose the input and get the same result by building up from the base.
-			positive, num, denom, suffix, _, err := parseQuantityString(item.input)
-			if err != nil {
-				t.Errorf("%v: unexpected error: %v", item.input, err)
-				continue
-			}
-			if got.Sign() >= 0 && !positive || got.Sign() < 0 && positive {
-				t.Errorf("%v: positive was incorrect: %t", item.input, positive)
-				continue
-			}
-			var value string
-			if !positive {
-				value = "-"
-			}
-			value += num
-			if len(denom) > 0 {
-				value += "." + denom
-			}
-			value += suffix
-			if len(value) == 0 {
-				t.Errorf("%v: did not parse correctly, %q %q %q", item.input, num, denom, suffix)
-			}
-			expected, err := ParseQuantity(value)
-			if err != nil {
-				t.Errorf("%v: unexpected error for %s: %v", item.input, value, err)
-				continue
-			}
-			if expected.Cmp(got) != 0 {
-				t.Errorf("%v: not the same as %s", item.input, value)
-				continue
-			}
-		}
-
-		// Try the negative version of everything
-		desired := &inf.Dec{}
-		expect := Quantity{d: infDecAmount{Dec: desired}}
-		for _, item := range quantityTestcases() {
-			got, err := ParseQuantity("-" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
-			if err != nil {
-				t.Errorf("-%v: unexpected error: %v", item.input, err)
-				continue
-			}
-			if asDec {
-				got.ToDec()
-			}
-
-			expected := item.expect
-			desired.Neg(expected.AsDec())
-
-			if e, a := expect, got; e.Cmp(a) != 0 {
-				t.Errorf("%v: expected %s, got %s", item.input, e.String(), a.String())
-			}
-			if e, a := expected.Format, got.Format; e != a {
-				t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
-			}
-		}
-
-		// Try everything with an explicit +
-		for _, item := range quantityTestcases() {
-			got, err := ParseQuantity("+" + strings.TrimLeftFunc(item.input, unicode.IsSpace))
-			if err != nil {
-				t.Errorf("-%v: unexpected error: %v", item.input, err)
-				continue
-			}
-			if asDec {
-				got.ToDec()
-			}
-
-			if e, a := item.expect, got; e.Cmp(a) != 0 {
-				t.Errorf("%v(%t): expected %s, got %s", item.input, asDec, e.String(), a.String())
-			}
-			if e, a := item.expect.Format, got.Format; e != a {
-				t.Errorf("%v: expected %#v, got %#v", item.input, e, a)
-			}
-		}
+		})
 	}
 
 	invalid := []string{
