@@ -1,0 +1,317 @@
+/*
+Copyright 2026 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package typed
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"reflect"
+	"testing"
+	"time"
+
+	"sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
+)
+
+type ssaFormalKindValue struct {
+	value.Value
+	flags [6]bool
+}
+
+func (v ssaFormalKindValue) IsFloat() bool  { return v.flags[0] }
+func (v ssaFormalKindValue) IsInt() bool    { return v.flags[1] }
+func (v ssaFormalKindValue) IsString() bool { return v.flags[2] }
+func (v ssaFormalKindValue) IsBool() bool   { return v.flags[3] }
+func (v ssaFormalKindValue) IsList() bool   { return v.flags[4] }
+func (v ssaFormalKindValue) IsMap() bool    { return v.flags[5] }
+
+type ssaFormalDispatchAtom struct {
+	Map    *string `json:"map"`
+	Scalar *string `json:"scalar"`
+	List   *string `json:"list"`
+}
+
+type ssaFormalDispatchCase struct {
+	Operation     string                `json:"operation"`
+	Atom          ssaFormalDispatchAtom `json:"atom"`
+	Value         *string               `json:"value"`
+	Kinds         [6]bool               `json:"kinds"`
+	Named         *string               `json:"named"`
+	Found         bool                  `json:"found"`
+	CallbackError bool                  `json:"callbackError"`
+	Initial       []string              `json:"initial"`
+}
+
+type ssaFormalDispatchReport struct {
+	Atom  *ssaFormalDispatchAtom `json:"atom"`
+	Error string                 `json:"error"`
+	Calls []string               `json:"calls"`
+}
+
+type ssaFormalDispatchObserver struct {
+	mapPointer    *schema.Map
+	scalarPointer *schema.Scalar
+	listPointer   *schema.List
+	callbackError bool
+	calls         []string
+}
+
+func (o *ssaFormalDispatchObserver) invoke(kind, tag string) ValidationErrors {
+	entry := kind + "=" + tag
+	o.calls = append(o.calls, entry)
+	if o.callbackError {
+		return ValidationErrors{{Path: entry, ErrorMessage: "callback"}}
+	}
+	return nil
+}
+func (o *ssaFormalDispatchObserver) doMap(pointer *schema.Map) ValidationErrors {
+	tag := "unknown"
+	if pointer == nil {
+		tag = "nil"
+	} else if pointer == o.mapPointer {
+		tag = "m"
+	}
+	return o.invoke("map", tag)
+}
+func (o *ssaFormalDispatchObserver) doScalar(pointer *schema.Scalar) ValidationErrors {
+	tag := "unknown"
+	if pointer == nil {
+		tag = "nil"
+	} else if pointer == o.scalarPointer {
+		tag = "s"
+	}
+	return o.invoke("scalar", tag)
+}
+func (o *ssaFormalDispatchObserver) doList(pointer *schema.List) ValidationErrors {
+	tag := "unknown"
+	if pointer == nil {
+		tag = "nil"
+	} else if pointer == o.listPointer {
+		tag = "l"
+	}
+	return o.invoke("list", tag)
+}
+
+func TestSSAFormalSchemaDispatch(t *testing.T) {
+	model := os.Getenv("SSA_SET_MODEL")
+	if model == "" {
+		t.Fatal("set SSA_SET_MODEL to the built ssa-model executable")
+	}
+	encode := func(data any) string {
+		t.Helper()
+		encoded, err := json.Marshal(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(encoded)
+	}
+	pointer := func(text string) *string { return &text }
+	mapPointer, scalarPointer, listPointer := &schema.Map{ElementRelationship: schema.Atomic}, schema.Untyped, &schema.List{ElementRelationship: schema.Atomic}
+	atomForMask := func(mask int) schema.Atom {
+		atom := schema.Atom{}
+		if mask&1 != 0 {
+			atom.Map = mapPointer
+		}
+		if mask&2 != 0 {
+			atom.Scalar = &scalarPointer
+		}
+		if mask&4 != 0 {
+			atom.List = listPointer
+		}
+		return atom
+	}
+	atomReport := func(atom schema.Atom) ssaFormalDispatchAtom {
+		t.Helper()
+		result := ssaFormalDispatchAtom{}
+		if atom.Map != nil {
+			if atom.Map != mapPointer {
+				t.Fatal("deduction changed the map pointer")
+			}
+			result.Map = pointer("m")
+		}
+		if atom.Scalar != nil {
+			if atom.Scalar != &scalarPointer {
+				t.Fatal("deduction changed the scalar pointer")
+			}
+			result.Scalar = pointer("s")
+		}
+		if atom.List != nil {
+			if atom.List != listPointer {
+				t.Fatal("deduction changed the list pointer")
+			}
+			result.List = pointer("l")
+		}
+		return result
+	}
+	type input struct {
+		value   value.Value
+		encoded *string
+		flags   [6]bool
+	}
+	inputs := []input{{}}
+	for _, data := range ssaFormalRemovalInputs() {
+		wrapped := value.NewValueInterface(data)
+		inputs = append(inputs, input{wrapped, pointer(encode(data)), [6]bool{
+			wrapped.IsFloat(), wrapped.IsInt(), wrapped.IsString(), wrapped.IsBool(), wrapped.IsList(), wrapped.IsMap()}})
+	}
+	for mask := 0; mask < 64; mask++ {
+		flags := [6]bool{}
+		for index := range flags {
+			flags[index] = mask&(1<<index) != 0
+		}
+		inputs = append(inputs, input{ssaFormalKindValue{value.NewValueInterface("query"), flags}, pointer(encode("query")), flags})
+	}
+	// Bits represent allowed type pointers; choosing a category either narrows to its bit or leaves the mask intact.
+	expectedMask := func(mask int, input input) int {
+		candidates := [3]bool{input.flags[0] || input.flags[1] || input.flags[2] || input.flags[3], input.flags[4], input.flags[5]}
+		bits := [3]int{2, 4, 1}
+		if input.value != nil {
+			for index, active := range candidates {
+				if active {
+					if mask&bits[index] != 0 {
+						return bits[index]
+					}
+					break
+				}
+			}
+		}
+		return mask
+	}
+	normalError := func(errs ValidationErrors) string {
+		if len(errs) == 0 {
+			return ""
+		}
+		return errs.Error()
+	}
+	expectedHandler := func(mask int, named *string, callbackError bool, initial []string) ssaFormalDispatchReport {
+		result := ssaFormalDispatchReport{Calls: append([]string{}, initial...)}
+		entries := []string{"map=m", "scalar=s", "list=l"}
+		for index, bit := range []int{1, 2, 4} {
+			if mask&bit != 0 {
+				result.Calls = append(result.Calls, entries[index])
+				if callbackError {
+					result.Error = entries[index] + ": callback"
+				}
+				return result
+			}
+		}
+		name := "inlined"
+		if named != nil {
+			name = "named type: " + *named
+		}
+		result.Error = fmt.Sprintf("schema error: invalid atom: %v", name)
+		return result
+	}
+	cases, expected := []ssaFormalDispatchCase{}, []ssaFormalDispatchReport{}
+	for _, operation := range []string{"deduce", "handle", "resolve"} {
+		t.Run(operation, func(t *testing.T) {
+			cases, expected = cases[:0], expected[:0]
+			for mask := 0; mask < 8; mask++ {
+				atom := atomForMask(mask)
+				for _, initial := range [][]string{{}, {"prior"}} {
+					if operation == "deduce" {
+						for _, input := range inputs {
+							result := deduceAtom(atom, input.value)
+							actual := ssaFormalDispatchReport{Atom: new(ssaFormalDispatchAtom), Calls: append([]string{}, initial...)}
+							*actual.Atom = atomReport(result)
+							wantAtom := atomReport(atomForMask(expectedMask(mask, input)))
+							want := ssaFormalDispatchReport{Atom: &wantAtom, Calls: append([]string{}, initial...)}
+							if !reflect.DeepEqual(actual, want) {
+								t.Fatalf("source deduction violated pointer/category semantics: mask=%d flags=%v got=%+v want=%+v", mask, input.flags, actual, want)
+							}
+							cases = append(cases, ssaFormalDispatchCase{operation, atomReport(atom), input.encoded, input.flags, nil, true, false, initial})
+							expected = append(expected, actual)
+						}
+						continue
+					}
+					for _, callbackError := range []bool{false, true} {
+						for _, referenceName := range []*string{nil, pointer("unit"), pointer("missing")} {
+							sourceSchema := &schema.Schema{Types: []schema.TypeDef{{Name: "unit", Atom: atom}}}
+							reference := schema.TypeRef{Inlined: atom}
+							if referenceName != nil {
+								reference = schema.TypeRef{NamedType: referenceName}
+							}
+							resolved, found := sourceSchema.Resolve(reference)
+							if found != (referenceName == nil || *referenceName == "unit") {
+								t.Fatal("unexpected native lookup precondition")
+							}
+							for _, input := range inputs {
+								observer := &ssaFormalDispatchObserver{mapPointer, &scalarPointer, listPointer, callbackError, append([]string{}, initial...)}
+								var errs ValidationErrors
+								want := expectedHandler(mask, referenceName, callbackError, initial)
+								if operation == "handle" {
+									errs = handleAtom(atom, reference, observer)
+								} else {
+									errs = resolveSchema(sourceSchema, reference, input.value, observer)
+									if !found {
+										name := "inlined type"
+										if referenceName != nil {
+											name = *referenceName
+										}
+										want = ssaFormalDispatchReport{Error: fmt.Sprintf("schema error: no type found matching: %v", name), Calls: append([]string{}, initial...)}
+									} else {
+										want = expectedHandler(expectedMask(mask, input), referenceName, callbackError, initial)
+									}
+								}
+								actual := ssaFormalDispatchReport{Error: normalError(errs), Calls: observer.calls}
+								if !reflect.DeepEqual(actual, want) {
+									t.Fatalf("source schema dispatch changed handler, pointer, errors or state: operation=%s mask=%d flags=%v got=%+v want=%+v", operation, mask, input.flags, actual, want)
+								}
+								suppliedAtom, suppliedFound := atomReport(atom), true
+								if operation == "resolve" {
+									suppliedAtom, suppliedFound = atomReport(resolved), found
+								}
+								cases = append(cases, ssaFormalDispatchCase{operation, suppliedAtom, input.encoded, input.flags, referenceName, suppliedFound, callbackError, initial})
+								expected = append(expected, actual)
+								if operation == "handle" {
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+			encoded, err := json.Marshal(cases)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			command := exec.CommandContext(ctx, model, "--schema-dispatch", "-")
+			command.Stdin = bytes.NewReader(encoded)
+			var stderr bytes.Buffer
+			command.Stderr = &stderr
+			output, err := command.Output()
+			if err != nil {
+				t.Fatalf("schema source interpreter failed: %v: %s", err, stderr.String())
+			}
+			var reports []ssaFormalDispatchReport
+			if err := json.Unmarshal(output, &reports); err != nil || !reflect.DeepEqual(reports, expected) {
+				t.Fatalf("schema source/Go atom, callback, error or handler state differs: %v", err)
+			}
+			if operation == "handle" {
+				t.Logf("%d source/native handler cases: eight pointer masks, exact pointer identity, inline/named errors, callback errors and prior state", len(cases))
+			} else {
+				t.Logf("%d source/native %s cases: eight pointer masks, exact type pointers, nil versus null, all 64 predicate combinations, real values and prior state", len(cases), operation)
+			}
+		})
+	}
+}

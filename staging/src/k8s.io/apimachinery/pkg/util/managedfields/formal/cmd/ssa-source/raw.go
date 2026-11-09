@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"go/ast"
 	"go/token"
 	"reflect"
 	"strconv"
@@ -76,6 +77,18 @@ func renderRaw(value reflect.Value) (string, error) {
 			field, _ := quoted(name)
 			fields = append(fields, "("+field+","+item+")")
 		}
+		// Keep the original token alongside Go's decoded constant for expression evaluation.
+		if literal, ok := value.Interface().(ast.BasicLit); ok && literal.Kind == token.STRING {
+			decoded, err := strconv.Unquote(literal.Value)
+			if err != nil {
+				return "", err
+			}
+			text, err := quoted(decoded)
+			if err != nil {
+				return "", err
+			}
+			fields = append(fields, "(\"DecodedString\",(.atom "+text+"))")
+		}
 		tag, _ := quoted(value.Type().Name())
 		return "(.record " + tag + " [" + strings.Join(fields, ",") + "])", nil
 	default:
@@ -88,4 +101,103 @@ var atomicRemoveFunctions = []functionSpec{
 	{name: "doScalar", leanName: "scalarProgram", receiver: "*removingWalker", signature: "func (w *removingWalker) doScalar(t *schema.Scalar) ValidationErrors", rawSyntax: true},
 	{name: "doList", leanName: "listProgram", receiver: "*removingWalker", signature: "func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors)", rawSyntax: true},
 	{name: "doMap", leanName: "mapProgram", receiver: "*removingWalker", signature: "func (w *removingWalker) doMap(t *schema.Map) ValidationErrors", rawSyntax: true},
+}
+
+var schemaDispatchFunctions = []functionSpec{
+	{name: "resolveSchema", leanName: "resolveProgram", standalone: true, signature: "func resolveSchema(s *schema.Schema, tr schema.TypeRef, v value.Value, ah atomHandler) ValidationErrors", rawSyntax: true},
+	{name: "deduceAtom", leanName: "deduceProgram", standalone: true, signature: "func deduceAtom(atom schema.Atom, val value.Value) schema.Atom", rawSyntax: true},
+	{name: "handleAtom", leanName: "handleProgram", standalone: true, signature: "func handleAtom(a schema.Atom, tr schema.TypeRef, ah atomHandler) ValidationErrors", rawSyntax: true},
+}
+
+// A raw tree must not hide variable aliases behind the interpreter's finite frame slots.
+func validateRawBindings(function *ast.FuncDecl) error {
+	localNodes := map[ast.Node]bool{}
+	ast.Inspect(function.Body, func(node ast.Node) bool {
+		if node != nil {
+			localNodes[node] = true
+		}
+		return true
+	})
+	parameters := map[*ast.Object]bool{}
+	for _, fields := range []*ast.FieldList{function.Recv, function.Type.Params, function.Type.Results} {
+		if fields == nil {
+			continue
+		}
+		for _, field := range fields.List {
+			for _, name := range field.Names {
+				parameters[name.Obj] = true
+			}
+		}
+	}
+	bindings := map[string]*ast.Object{}
+	for object := range parameters {
+		if object != nil {
+			bindings[object.Name] = object
+		}
+	}
+	// Go's parser represents range declarations with synthetic assignment nodes.
+	ast.Inspect(function.Body, func(node ast.Node) bool {
+		if loop, ok := node.(*ast.RangeStmt); ok && loop.Tok == token.DEFINE {
+			for _, expression := range []ast.Expr{loop.Key, loop.Value} {
+				if name, ok := expression.(*ast.Ident); ok && name.Obj != nil {
+					parameters[name.Obj] = true
+				}
+			}
+		}
+		return true
+	})
+	fieldNames := map[*ast.Ident]bool{}
+	ast.Inspect(function.Body, func(node ast.Node) bool {
+		switch node := node.(type) {
+		case *ast.SelectorExpr:
+			fieldNames[node.Sel] = true
+		case *ast.KeyValueExpr:
+			if name, ok := node.Key.(*ast.Ident); ok {
+				fieldNames[name] = true
+			}
+		}
+		return true
+	})
+	reserved := map[string]bool{}
+	for _, name := range []string{"w", "t", "l", "m", "v", "val", "s", "schema", "value", "tr", "ah", "atom", "a", "ok", "name", "typeName", "toRemove", "typeRef", "shouldExtract"} {
+		reserved[name] = true
+	}
+	builtins := map[string]bool{"nil": true, "true": true, "false": true, "len": true, "append": true, "make": true, "new": true}
+	packages := map[string]bool{"schema": true, "value": true, "fieldpath": true, "fmt": true, "errors": true, "strings": true}
+	var failure error
+	ast.Inspect(function.Body, func(node ast.Node) bool {
+		if failure != nil {
+			return false
+		}
+		name, ok := node.(*ast.Ident)
+		if !ok || fieldNames[name] || name.Name == "_" {
+			return true
+		}
+		object := name.Obj
+		if object == nil {
+			if reserved[name.Name] && !packages[name.Name] {
+				failure = fmt.Errorf("raw frame variable %q is not locally bound", name.Name)
+			}
+			return true
+		}
+		if builtins[name.Name] {
+			failure = fmt.Errorf("raw syntax cannot shadow builtin %q", name.Name)
+			return false
+		}
+		if object.Kind != ast.Var && object.Kind != ast.Con {
+			return true
+		}
+		declaration, ok := object.Decl.(ast.Node)
+		if !parameters[object] && (!ok || !localNodes[declaration]) {
+			failure = fmt.Errorf("raw syntax cannot read global variable or constant %q", name.Name)
+			return false
+		}
+		if previous, found := bindings[name.Name]; found && previous != object {
+			failure = fmt.Errorf("raw syntax cannot shadow variable %q", name.Name)
+			return false
+		}
+		bindings[name.Name] = object
+		return true
+	})
+	return failure
 }

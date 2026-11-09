@@ -43,7 +43,7 @@ private def usage : String :=
   "--check and --replay accept normalized fixture arrays; --element-algebra accepts operation/rank-list pairs. " ++
   "Use - to read stdin. --numeric-counterexamples, --numeric-codec-counterexamples, " ++
   "--granular-key-counterexamples and --numeric-omission-counterexamples report numeric witnesses. " ++
-  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields, --atomic-merge and --atomic-remove check typed atomic scope claims, whole replacement and removal/extraction; --atomic-remove-factory additionally runs the source caller."
+  "--updater-observations reports source ownership-update observations; --set-difference and --root-reset-filter accept recursive rank trees; --has-search and --search-midpoints check selected Go search source; --atomic-fields, --atomic-merge and --atomic-remove check typed atomic scope claims, whole replacement and removal/extraction; --atomic-remove-factory additionally runs the source caller; --schema-dispatch checks source atom deduction and handler selection; --atomic-remove-resolved composes both through the source caller."
 
 private structure ElementCase where
   operation : Option ElementAlgebra.Operation := none
@@ -333,6 +333,128 @@ private def runAtomicRemoveFactory (path : String) : IO UInt32 := do
   | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
   | .error message => stderr.putStrLn message; return 1
 
+private structure DispatchAtom where
+  map : Option String
+  scalar : Option String
+  list : Option String
+  deriving FromJson, ToJson
+
+private structure DispatchCase where
+  operation : String
+  atom : DispatchAtom
+  value : Option String
+  kinds : Array Bool
+  named : Option String
+  found : Bool
+  callbackError : Bool
+  initial : List String
+  deriving FromJson
+
+private structure DispatchReport where
+  atom : Option DispatchAtom
+  error : String
+  calls : List String
+  deriving ToJson
+
+private def dispatchKindIndex : SchemaDispatchMachine.Kind → Nat
+  | .floating => 0
+  | .integer => 1
+  | .string => 2
+  | .boolean => 3
+  | .list => 4
+  | .map => 5
+
+private def runSchemaDispatch (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List DispatchReport) := do
+    let cases ← Json.parse input >>= fromJson? (α := List DispatchCase)
+    if cases.isEmpty then throw "Schema dispatch protocol requires nonempty cases"
+    cases.mapM fun request => do
+      if request.kinds.size != 6 then throw "Schema dispatch requires six value-kind flags"
+      match request.value with
+      | none => pure ()
+      | some raw => discard (Json.parse raw)
+      let input : SchemaDispatchMachine.Atom String String String := {
+        map := request.atom.map,scalar := request.atom.scalar,list := request.atom.list}
+      let reference : SchemaDispatchMachine.Reference Unit := {original := (),named := request.named}
+      let callback := fun (kind pointer : String) (calls : List String) =>
+        let entry := kind ++ "=" ++ pointer
+        Except.ok ((if request.callbackError then entry ++ ": callback" else ""),calls ++ [entry])
+      let ops : SchemaDispatchMachine.Ops String String String String Unit (List String) String := {
+        resolve := fun _ => (input,request.found)
+        isKind := fun kind _ => request.kinds[dispatchKindIndex kind]!
+        errorf := fun format name => format.replace "%v" name
+        nilErrors := ""
+        map := callback "map"
+        scalar := callback "scalar"
+        list := callback "list"}
+      match request.operation with
+      | "deduce" =>
+          let (after,calls) ← SchemaDispatchSubset.invokeDeduce ops input request.value request.initial
+          pure {atom := some {map := after.map,scalar := after.scalar,list := after.list},error := "",calls}
+      | "handle" =>
+          let (error,calls) ← SchemaDispatchSubset.invokeHandle ops input reference request.initial
+          pure {atom := none,error,calls}
+      | "resolve" =>
+          let (error,calls) ← SchemaDispatchSubset.invokeResolve (SchemaDispatchResolver.linkedOps ops)
+            reference request.value request.initial
+          pure {atom := none,error,calls}
+      | _ => throw "Schema operation must be deduce, handle or resolve"
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
+private structure ResolvedFactoryCase where
+  request : AtomicRemoveCase
+  mode : String
+  kinds : Array Bool
+
+private instance : FromJson ResolvedFactoryCase where
+  fromJson? json := do
+    pure {
+      request := ← fromJson? json
+      mode := ← json.getObjValAs? String "resolverMode"
+      kinds := ← json.getObjValAs? (Array Bool) "kinds"}
+
+private def runResolvedFactory (path : String) : IO UInt32 := do
+  let stdout ← IO.getStdout
+  let stderr ← IO.getStderr
+  let input ← readInput path
+  let computation : Except String (List String) := do
+    let cases ← Json.parse input >>= fromJson? (α := List ResolvedFactoryCase)
+    if cases.isEmpty then throw "Resolved factory protocol requires nonempty cases"
+    cases.mapM fun test => do
+      let request := test.request
+      discard (Json.parse request.value)
+      if test.kinds.size != 6 then throw "Resolved factory requires six value-kind flags"
+      let typed : AtomicRemoveSubset.Ops String := {
+        isKind := fun kind _ => test.kinds[if kind == .map then 5 else 4]!
+        asContainer := fun _ _ => request.size.map (fun length => {handle := length+1,length})
+        unstructured := fun value => if request.rawNil then none else some value}
+      let atom : SchemaDispatchMachine.Atom Bool Unit Bool ← match request.kind with
+        | "map" => .ok {map := some true}
+        | "list" => .ok {list := some true}
+        | "scalar" => .ok {scalar := some ()}
+        | _ => .error "Resolved factory kind must be scalar, map or list"
+      let lookup ← match test.mode with
+        | "valid" => .ok (atom,true)
+        | "missing-type" => .ok ({},false)
+        | "invalid-atom" => .ok ({},true)
+        | _ => .error "Resolved factory mode must be valid, missing-type or invalid-atom"
+      let reference : SchemaDispatchMachine.Reference Unit := {
+        original := (),named := some (if test.mode == "missing-type" then "missing" else "unit")}
+      let sourceRequest : RemoveFactorySubset.Request String Unit Unit (SchemaDispatchMachine.Reference Unit) := {
+        input := request.value,schema := (),fields := (),typeRef := reference,extract := request.extract}
+      let ops := SchemaDispatchFactoryBridge.linkedFactoryOps typed (fun _ _ => lookup)
+        (fun kind _ => test.kinds[dispatchKindIndex kind]!)
+        (fun format name => format.replace "%v" name) "" (fun value => value.getD "null")
+      RemoveFactorySubset.invoke ops sourceRequest
+  match computation with
+  | .ok reports => stdout.putStrLn (toJson reports).compress; return 0
+  | .error message => stderr.putStrLn message; return 1
+
 private def runAtomicFields (path : String) : IO UInt32 := do
   let stdout ← IO.getStdout
   let stderr ← IO.getStderr
@@ -397,6 +519,8 @@ def main (args : List String) : IO UInt32 := do
   | ["--atomic-merge",path] => runAtomicMerge path
   | ["--atomic-remove",path] => runAtomicRemove path
   | ["--atomic-remove-factory",path] => runAtomicRemoveFactory path
+  | ["--schema-dispatch",path] => runSchemaDispatch path
+  | ["--atomic-remove-resolved",path] => runResolvedFactory path
   | ["--search-midpoints",path] => runMidpoints path
   | ["--root-reset-filter",path] => runSets path true
   | ["--set-difference",path] => runSets path

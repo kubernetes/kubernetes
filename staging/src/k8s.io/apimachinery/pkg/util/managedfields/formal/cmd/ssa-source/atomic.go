@@ -34,7 +34,7 @@ var atomicFieldFunctions = []functionSpec{
 	},
 }
 
-func validateAtomicFieldImports(source []byte) error {
+func validateAtomicFieldImports(source []byte, standard ...string) error {
 	file, err := parser.ParseFile(token.NewFileSet(), "tofieldset.go", source, parser.ImportsOnly)
 	if err != nil {
 		return err
@@ -42,6 +42,9 @@ func validateAtomicFieldImports(source []byte) error {
 	expected := map[string]string{}
 	for _, name := range []string{"fieldpath", "schema", "value"} {
 		expected[name] = "sigs.k8s.io/structured-merge-diff/v6/" + name
+	}
+	for _, name := range standard {
+		expected[name] = name
 	}
 	return validateImportBindings(file.Imports, expected)
 }

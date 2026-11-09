@@ -22,7 +22,7 @@ Without it, a process-specific directory under the temporary directory is used.
 Go locates the selected SMD dependency's source, whether it is in Kubernetes'
 vendor directory or a standalone module cache. Its full source digest and all
 six updater ASTs, three element-set algebra ASTs and five recursive Difference/filter
-ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs, four structural removal/extraction/caller ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all seven complete
+ASTs, two Has/Less ASTs, two typed map/list field-extraction ASTs, four atomic merge/leaf/rule ASTs, four structural removal/extraction/caller ASTs, three schema-selection ASTs and the selected Go standard-library search AST must match the checked-in Lean input, including all eight complete
 source-file digests.
 
 Native overlays run against the selected vendor source directly. Go rejects
@@ -79,12 +79,17 @@ The required checks are:
    Another 1,152 complete-caller comparisons derive fresh initialization, selected
    handler composition, actual valid/missing/invalid schema resolution and null
    wrapping after normal resolver errors; exact input/selection state is checked.
+   These caller cases also run the full source-derived schema-selection chain.
+   Schema helpers additionally compare 1,296 deductions, 96 exact handler calls
+   and 7,776 complete resolver calls: all pointer masks and predicate combinations,
+   nil/null, real typed values, actual lookup boundaries, callback errors and prior
+   state. Independent bit-mask/priority and pointer-identity oracles check results.
 8. Actual merge and fieldpath tests and exact Lean/Go comparisons on both pinned SMD PR #336
    head and base revisions (Go may install the upstream-required toolchain).
    Each revision also runs the numeric-key round-trip counterexample and control.
 9. Reproducibility of the self-contained HTML proof explorer against the Lean
    environment export and source snapshots.
-10. Twenty-three independent semantic mutations of the selected Go sources; each must
+10. Twenty-six independent semantic mutations of the selected Go sources; each must
     invalidate the unchanged theorem in the expected proof module.
     The ownership-growth mutation must additionally fail the native Go witness
     for its demonstrated new B claim, rather than a compile or setup error.
@@ -102,8 +107,10 @@ The required checks are:
     each atomic extraction guard must fail unchanged structural-source theorems
     and the independent native whole-output oracle. The constructor extract flag,
     skipped schema call and discarded caller result must likewise fail the source
-    caller theorem and its independent native output oracle. Fifteen mutations have native
-    checks. Compile/setup failures do not count.
+    caller theorem and its independent native output oracle. Eighteen mutations have native
+    checks. Whole-atom scalar deduction, swapped handler priority and skipped
+    deduction must fail their unchanged source certificate and independent native
+    deduction/handler/error oracle. Compile/setup failures do not count.
 
 No check is optional when invoking this entrypoint. The result establishes the
 documented proof and comparison checks, not correctness of the human-chosen

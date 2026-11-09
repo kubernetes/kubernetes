@@ -543,3 +543,5 @@ PY_ATOMIC_OVERLAY
 done
 
 bash "$formal_root/ci/verify-atomic-remove-source.sh"
+
+bash "$formal_root/ci/verify-schema-source.sh"

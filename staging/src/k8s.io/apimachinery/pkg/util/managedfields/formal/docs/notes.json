@@ -1741,24 +1741,84 @@
     "title": "The complete source caller initializes a fresh walker",
     "scope": "general",
     "meaning": "For arbitrary opaque values/schema/selection/reference types and resolver outcomes, the complete caller sets exact constructor fields and zero output, invokes the resolver and wraps its raw output. Every normal resolver error payload is discarded.",
-    "limits": "Allocation and wrapping are abstract primitive operations. The callback models resolver post-state and a distinct normal error payload; interpreter failure is separate. Actual schema resolver source, heap and full typed/request dispatch remain open."
+    "limits": "Allocation and wrapping are abstract primitive operations. The callback models resolver post-state and a distinct normal error payload; interpreter failure is separate. Actual Schema.Resolve lookup/cache, primitives/heap and full typed/request dispatch remain open. Source helper selection is derived separately."
   },
   "SSA.RemoveFactoryBridge.imported_atomic_factory": {
     "title": "Source initialization discharges the atomic fresh-output premise",
     "scope": "general",
     "meaning": "Composing the complete caller with the selected source atomic map/list handler yields a wrapped whole matching value for extraction and wrapped null for removal. Fresh output follows from the constructor AST.",
-    "limits": "Actual schema resolution must select this atomic handler. Pure shape/Unstructured/resource contracts, allocator/wrapping and heap realization remain explicit; this is not a full Schema.Resolve or Apply theorem. Inputs represent a present Go Value interface; raw null is allowed. Nil interfaces, pointer/alias identity and allocator heap realization remain outside this bridge."
+    "limits": "The full source helper chain now derives selection from resolved type pointers. Schema.Resolve lookup/cache remains a primitive. Pure shape/Unstructured/resource contracts, allocator/wrapping and heap realization remain explicit; this is not a full Schema.Resolve or Apply theorem. Inputs represent a present Go Value interface; raw null is allowed. Nil interfaces, pointer/alias identity and allocator heap realization remain outside this bridge."
   },
   "SSA.RemoveFactoryBridge.imported_scalar_factory": {
     "title": "The source caller and scalar handler compose",
     "scope": "general",
     "meaning": "When the selected handler is scalar, the complete caller wraps its entire Unstructured result in either mode.",
-    "limits": "The caller selects list/map items before scalar dispatch. Actual schema selection, primitive representations and complete request refinement remain open."
+    "limits": "The caller selects list/map items before scalar dispatch. Source helper selection is derived separately; Schema.Resolve lookup/cache, primitive representations and complete request refinement remain open."
   },
   "SSA.RemoveFactoryBridge.imported_factory_ignores_reported_errors": {
     "title": "Normal schema errors do not escape the private caller",
     "scope": "helper",
     "meaning": "Any normal resolver error payload, with the fresh walker unchanged, still produces the wrapped null output because the complete caller discards the error return.",
-    "limits": "This is a private unvalidated helper fact, not an API-server acceptance claim. Native missing-type and invalid-atom controls observe actual errors and output; the full resolver source remains open."
+    "limits": "This is a private unvalidated helper fact, not an API-server acceptance claim. Native missing-type and invalid-atom controls observe actual errors and output; Schema.Resolve lookup/cache remains open; the helper resolver source is derived separately."
+  },
+  "SSA.SchemaDispatchMachine.optional_roundtrip": {
+    "title": "Optional Value-interface representation round trip",
+    "scope": "helper",
+    "meaning": "Missing Go Value and a present value remain distinct through the invocation boundary.",
+    "limits": "This is the explicit representation helper, not a Go heap/JSON codec theorem."
+  },
+  "SSA.SchemaDispatchContracts.imported_deduce": {
+    "title": "Source deduction preserves exact selected type pointers",
+    "scope": "general",
+    "meaning": "The full source function selects only an allowed matching scalar/list/map pointer or returns the original atom, with handler state unchanged. A matched switch case stops even if its inner if does not return.",
+    "limits": "Pure kind queries may be arbitrary, including contradictory flags. No exclusive-kind assumption is required. Actual value-query/heap realization remains separate."
+  },
+  "SSA.SchemaDispatchContracts.deduced_map_only": {
+    "title": "A map-only atom is unchanged by deduction",
+    "scope": "helper",
+    "meaning": "A singleton map type pointer is preserved for every optional input and every predicate combination.",
+    "limits": "This specializes the source deduction specification; lookup and actual value realization are separate."
+  },
+  "SSA.SchemaDispatchContracts.deduced_scalar_only": {
+    "title": "A scalar-only atom is unchanged by deduction",
+    "scope": "helper",
+    "meaning": "A singleton scalar type pointer is preserved for every optional input and every predicate combination.",
+    "limits": "This is a specification specialization, not a complete schema or API theorem."
+  },
+  "SSA.SchemaDispatchContracts.deduced_list_only": {
+    "title": "A list-only atom is unchanged by deduction",
+    "scope": "helper",
+    "meaning": "A singleton list type pointer is preserved for every optional input and every predicate combination.",
+    "limits": "This is a specification specialization; lookup and representation correspondence remain separate."
+  },
+  "SSA.SchemaDispatchHandler.imported_handle": {
+    "title": "Source handler priority and error/state propagation",
+    "scope": "general",
+    "meaning": "The complete handler body chooses map, then scalar, then list, preserving the exact type pointer and callback post-state/error payload. Missing atoms use the source error arguments.",
+    "limits": "Handlers and the formatter remain explicit callbacks here. Source removal handlers are supplied by the factory bridge; actual formatting/heap realization remain open."
+  },
+  "SSA.SchemaDispatchResolver.imported_resolve": {
+    "title": "The complete resolver preserves callee order and state",
+    "scope": "general",
+    "meaning": "Lookup failure returns the source error; success passes the exact resolved atom through deduction and then handler selection, propagating normal errors and post-state.",
+    "limits": "Deduction and handler callbacks are explicit at this theorem; the following composition realizes them from source. Schema.Resolve lookup/cache and formatting remain primitives."
+  },
+  "SSA.SchemaDispatchResolver.imported_full_dispatch": {
+    "title": "Source-derived deduction and handler selection compose",
+    "scope": "general",
+    "meaning": "Both helper callback contracts are realized by their complete imported bodies, deriving the full resolver outcome from lookup, type predicates, formatter and leaf handlers.",
+    "limits": "Actual Schema.Resolve cache/lookup, type representation, value queries and leaf/runtime/heap realization remain separate."
+  },
+  "SSA.SchemaDispatchFactoryBridge.imported_factory_dispatch": {
+    "title": "Complete source selection reaches the removal caller",
+    "scope": "general",
+    "meaning": "The complete constructor, resolver, deduction and priority selection compose with source scalar/atomic removal handlers and wrapping. The manual kind-selection callback is removed.",
+    "limits": "Lookup/cache and value/coercion/Unstructured/formatter/allocation/wrapping/heap contracts remain explicit. Non-atomic traversal is unsupported; this is not complete typed/SSA entry refinement."
+  },
+  "SSA.SchemaDispatchFactoryBridge.imported_atomic_map": {
+    "title": "Atomic-map lookup derives the whole caller result",
+    "scope": "general",
+    "meaning": "A successful map-only atomic lookup drives the complete source chain to whole matching extraction or wrapped null on removal, with fresh output derived from the constructor.",
+    "limits": "The lookup result is an explicit precondition until Schema.Resolve and schema/type representation are source-realized. Value/coercion/Unstructured and allocator/wrapping/heap contracts remain separate."
   }
 }

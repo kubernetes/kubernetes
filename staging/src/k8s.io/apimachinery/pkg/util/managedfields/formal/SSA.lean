@@ -61,3 +61,4 @@ import SSA.AtomicFieldContracts
 import SSA.AtomicMergeContracts
 import SSA.AtomicRemoveContracts
 import SSA.RemoveFactoryBridge
+import SSA.SchemaDispatchFactoryBridge

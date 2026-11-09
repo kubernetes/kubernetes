@@ -204,7 +204,9 @@ func TestSSAFormalAtomicRemove(t *testing.T) {
 
 type ssaFormalRemoveFactoryCase struct {
 	ssaFormalRemoveCase
-	ResolverError bool `json:"resolverError"`
+	ResolverError bool    `json:"resolverError"`
+	ResolverMode  string  `json:"resolverMode"`
+	Kinds         [6]bool `json:"kinds"`
 }
 
 func TestSSAFormalRemoveFactory(t *testing.T) {
@@ -298,7 +300,11 @@ func TestSSAFormalRemoveFactory(t *testing.T) {
 									t.Fatalf("removal factory mutated its selection set: %v", err)
 								}
 							}
-							cases = append(cases, ssaFormalRemoveFactoryCase{ssaFormalRemoveCase{kind, before, nil, extract, matches, resource, input == nil}, failed})
+							cases = append(cases, ssaFormalRemoveFactoryCase{
+								ssaFormalRemoveCase: ssaFormalRemoveCase{kind, before, nil, extract, matches, resource, input == nil},
+								ResolverError:       failed, ResolverMode: mode, Kinds: [6]bool{
+									control.value.IsFloat(), control.value.IsInt(), control.value.IsString(), control.value.IsBool(), control.value.IsList(), control.value.IsMap()},
+							})
 							expected = append(expected, actual)
 						}
 					}
@@ -308,20 +314,23 @@ func TestSSAFormalRemoveFactory(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-			defer cancel()
-			command := exec.CommandContext(ctx, model, "--atomic-remove-factory", "-")
-			command.Stdin = bytes.NewReader(encoded)
-			var stderr bytes.Buffer
-			command.Stderr = &stderr
-			result, err := command.Output()
-			if err != nil {
-				t.Fatalf("removal factory source model failed: %v: %s", err, stderr.String())
+			for _, flag := range []string{"--atomic-remove-factory", "--atomic-remove-resolved"} {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				defer cancel()
+				command := exec.CommandContext(ctx, model, flag, "-")
+				command.Stdin = bytes.NewReader(encoded)
+				var stderr bytes.Buffer
+				command.Stderr = &stderr
+				result, err := command.Output()
+				if err != nil {
+					t.Fatalf("removal factory source model failed: %v: %s", err, stderr.String())
+				}
+				var reports []string
+				if err := json.Unmarshal(result, &reports); err != nil || !reflect.DeepEqual(reports, expected) {
+					t.Fatalf("removal factory source/Go output differs: %v", err)
+				}
 			}
-			var reports []string
-			if err := json.Unmarshal(result, &reports); err != nil || !reflect.DeepEqual(reports, expected) {
-				t.Fatalf("removal factory source/Go output differs: %v", err)
-			}
+
 			t.Logf("%d source/native %s caller cases: fresh output, selected source handler, wrapped null, successful and rejected schema resolution, exact values and immutable input/selection", len(cases), kind)
 		})
 	}

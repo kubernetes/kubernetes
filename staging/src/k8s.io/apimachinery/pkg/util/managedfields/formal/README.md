@@ -253,6 +253,7 @@ from the selected updater and element-set sources into `SSA/GoSource.lean`,
 | `toFieldSetWalker.doMap`, `doList` (`typed/tofieldset.go`) | `AtomicFieldContracts.imported_atomic_fields`, `imported_atomic_claims_scope`, `imported_atomic_never_adds_descendant` (atomic entry only) |
 | `mergingWalker.doMap`, `doList`, `doLeaf`, `ruleKeepRHS` closure (`typed/merge.go`) | `AtomicMergeContracts.imported_keep_right`, `imported_leaf`, `imported_atomic_merge` (atomic entry only) |
 | `removingWalker.doScalar`, `doMap`, `doList` (`typed/remove.go`) | `AtomicRemoveContracts.imported_scalar`, `imported_atomic_container`, `imported_atomic_remove_fresh`, `imported_atomic_extract_whole` (scalar/atomic entry only) |
+| `resolveSchema`, `deduceAtom`, `handleAtom` (`typed/helpers.go`) | `SchemaDispatchContracts.imported_deduce`, `SchemaDispatchHandler.imported_handle`, `SchemaDispatchResolver.imported_full_dispatch`, `SchemaDispatchFactoryBridge.imported_factory_dispatch` |
 
 The interpreter handles lexical variable identity, tuple assignment, error
 zero values, short-circuit nil checks, map presence, local version maps and
@@ -511,7 +512,7 @@ a map defers it only for a non-nil resource. Caller frame/input are preserved.
 `imported_atomic_remove_fresh` therefore states the necessary fresh-output
 premise explicitly; `imported_atomic_extract_whole` requires a matching shape.
 The complete source caller now derives this initialization, as described below;
-actual schema dispatch remains to be proved.
+actual lookup/cache behavior remains to be proved.
 
 The independent Go overlay compares 1,152 helper invocations (384 each scalar,
 map and list), both extract/remove modes, prior output, nil interfaces versus
@@ -537,8 +538,8 @@ this bridge.
 `RemoveFactoryBridge` supplies the already proved scalar or atomic handler to
 that callback. Its caller theorems derive fresh-output removal and whole
 extraction from source initialization, with no extra fresh-output assumption.
-They are conditional on selection of that handler: actual Schema.Resolve,
-deduceAtom/handleAtom and typed method dispatch still need source proofs.
+The source selection below discharges that handler premise. Actual
+Schema.Resolve lookup/cache behavior and typed method entry remain separate.
 `imported_factory_ignores_reported_errors` also derives null wrapping when a
 resolver reports any normal error without changing the fresh walker.
 
@@ -551,8 +552,56 @@ skipping resolution or discarding its raw result must fail both the unchanged
 factory theorem and the independent native caller oracle. Both pinned
 revisions run these cases too.
 
-CI now checks twenty-seven complete ASTs from seven distinct source files and
-twenty-three semantic mutations, fifteen also native. Source value/coercion/allocator
+The complete `typed/helpers.go` bodies now derive selection itself.
+`SchemaDispatchContracts.imported_deduce` preserves exact map/scalar/list type
+pointers, returns the original atom when the matched category is unavailable,
+and does not change handler state. This includes nil Go interfaces and arbitrary
+pure kind predicates; no mutually exclusive predicate premise is needed.
+A selected Go switch case ends even when its inner if does not return.
+`SchemaDispatchHandler.imported_handle` derives map-before-scalar-before-list
+priority, exact callback arguments, normal validation errors and post-state.
+
+`SchemaDispatchResolver.imported_full_dispatch` composes actual deduction and
+selection source with the complete resolver orchestration. Lookup failure and
+invalid atoms retain their distinct error arguments. Stateful expression
+semantics preserve callback effects inside return statements. Normal validation
+errors remain separate from interpreter failures. Source function frames keep
+callee locals separate. `SchemaDispatchFactoryBridge.imported_factory_dispatch`
+connects that chain to the source constructor, selected source removal handlers
+and wrapped output. Its `imported_atomic_map` corollary derives whole-value
+atomic map behavior from a successful atomic-map lookup, without assuming a
+handler-selection callback. Scalar/list singleton-atom laws also cover
+arbitrary predicate combinations.
+
+`Schema.Resolve` lookup/cache semantics are still an explicit primitive. Value
+kind queries, schema/type representation, error formatting, coercion,
+Unstructured, allocation/wrapping and heap correspondence remain separate
+implementation obligations. Non-atomic traversal raises an explicit unsupported
+error in this bridge; no successful result is invented.
+
+The new independent Go overlay checks 1,296 deductions, 96 handler calls and
+7,776 complete resolver calls. It spans all eight pointer-presence masks,
+actual pointer identity, missing Go Value versus present null, real numeric and
+typed-nil/wide/deep values, all 64 synthetic predicate combinations, named and
+inline references, missing lookups, callback errors and prior handler state.
+Independent bit-mask/priority oracles supply expected pointer/callback outcomes.
+Actual Schema.Resolve results are an explicit lookup boundary, with independent
+found/handler expectations. The existing 1,152 complete-caller cases now compare
+both the older selected-handler adapter and the new full source-selection chain.
+Both pinned revisions run the same overlays. Returning the whole scalar atom,
+reordering map/scalar priority or skipping deduction must fail unchanged source
+certificates and independent native oracles.
+
+The structural importer retains original string tokens plus Go-decoded constant
+annotations; selected constants are printable ASCII. It rejects shadowed frame
+variables, unresolved frame names and global variable/constant reads. Range
+variables account for Go parser synthetic declaration nodes. Import bindings,
+complete signatures and the original AST are retained and checked. These checks
+do not replace human review of Go binding/representation correspondence or
+verify the Go type checker/compiler/runtime.
+
+CI now checks thirty complete ASTs from eight distinct source files and
+twenty-six semantic mutations, eighteen also native. Source value/coercion/allocator
 heap realization, typed/schema dispatch, complete removal/comparison and full
 SSA composition remain open; these are component proofs for BASE-09.
 
