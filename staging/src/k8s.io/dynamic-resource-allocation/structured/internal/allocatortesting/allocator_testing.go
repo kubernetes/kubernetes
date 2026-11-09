@@ -19,8 +19,11 @@ package allocatortesting
 import (
 	"context"
 	"fmt"
+	"iter"
+	"maps"
 	"math"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -1000,6 +1003,13 @@ type AllocatorTestCase struct {
 	expectErrorWithoutFeatures   types.GomegaMatcher
 	expectErrorIsWithoutFeatures error
 
+	// expectWithFeatures is a more flexible alternative to using
+	// *WithoutFeatures above: if non-nil, it gets called both when a test
+	// case is executed with more and with less features. Because it is
+	// a callback, it can inspect the currently active features
+	// and adapt the expected result accordingly.
+	expectWithFeatures func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error)
+
 	// Expected allocateOne invocations, asserted for every variant. A variant
 	// that searches differently overrides this through the map below.
 	expectNumAllocateOneInvocations int64
@@ -1160,6 +1170,18 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PartitionableDevices || !features.CompatibilityGroups:
+					return nil, nil, nil
+				case !features.DeviceTaints:
+					return []any{allocationResult(
+						localNodeSelector(node1),
+						deviceAllocationResult(req0, driverA, pool1, device1, false),
+					)}, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		// An incompatible device is already allocated on the counter set; its groups
 		// are read live from the slice. The only remaining candidate shares no
@@ -1251,6 +1273,18 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool2, device2, false),
 			)},
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				if !features.CompatibilityGroups {
+					return expectResults, expectError, expectErrorIs
+				}
+				return []any{allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+				)}, nil, nil
+			},
 		},
 		// With the feature disabled, a candidate that declares no groups is not
 		// allocatable either when another device of the same pool declares them:
@@ -1280,6 +1314,15 @@ func TestAllocator(t *testing.T,
 			),
 			node:          node(node1, region1),
 			expectResults: nil,
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.CompatibilityGroups {
+					return nil, nil, nil
+				}
+				return []any{allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+				)}, nil, nil
+			},
 		},
 		// Groups are tracked per counter set: two devices whose groups are
 		// disjoint can still be co-allocated when they draw from different
@@ -1379,7 +1422,15 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req1SubReq1, driverA, pool1, device2, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.PartitionableDevices || !features.CompatibilityGroups:
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		// Compatibility groups steer allocation among shareable devices: req1
 		// does not fit on device1 (req0's share exhausted its capacity) and is
@@ -1414,7 +1465,15 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
 				deviceRequestAllocationResult(req1, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.ConsumableCapacity:
+					return nil, g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")), nil
+				case !features.PartitionableDevices || !features.CompatibilityGroups:
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		// Two claims allocated in a single call must satisfy the constraint
 		// jointly: the second claim's device is checked against the rolling
@@ -1504,8 +1563,7 @@ func TestAllocator(t *testing.T,
 			slices:           unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA).withSkipNodeOperations(resourceapi.SkipNodeOperationAll)),
 			node:             node(node1, region1),
 
-			expectResults:                []any{},
-			expectResultsWithoutFeatures: []any{},
+			expectResults: []any{},
 		},
 		"other-node": {
 			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
@@ -2425,22 +2483,6 @@ func TestAllocator(t *testing.T,
 			node:    node(node1, region1),
 
 			expectResults: nil,
-		},
-		"admin-access-disabled": {
-			features: Features{
-				AdminAccess: false,
-			},
-			claimsToAllocate: func() []wrapResourceClaim {
-				c := claimWithRequest(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
-				return []wrapResourceClaim{c}
-			}(),
-			classes: objects(class(classA, driverA)),
-			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
-			node:    node(node1, region1),
-
-			expectResults: nil,
-			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: admin access is requested, but the feature is disabled")),
 		},
 		"admin-access-enabled": {
 			features: Features{
@@ -3481,27 +3523,6 @@ func TestAllocator(t *testing.T,
 			)},
 			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
 		},
-		"prioritized-list-disabled": {
-			features: Features{
-				PrioritizedList: false,
-			},
-			claimsToAllocate: objects(
-				func() wrapResourceClaim {
-					claim := claim(claim0).withRequests(
-						requestWithPrioritizedList(req0,
-							subRequest(subReq0, classA, 1),
-						),
-					)
-					return claim
-				}(),
-			),
-			classes: objects(class(classA, driverA)),
-			slices:  unwrapResourceSlices(sliceWithOneDevice(slice1, node1, pool1, driverA)),
-			node:    node(node1, region1),
-
-			expectResults: nil,
-			expectError:   g.MatchError(g.ContainSubstring("claim claim-0, request req-0: has subrequests, but the DRAPrioritizedList feature is disabled")),
-		},
 		"prioritized-list-multi-request": {
 			features: Features{
 				PrioritizedList: true,
@@ -3822,6 +3843,18 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PartitionableDevices:
+					return nil, nil, nil
+				case !features.DeviceTaints:
+					return []any{allocationResult(
+						localNodeSelector(node1),
+						deviceAllocationResult(req0, driverA, pool1, device1, false),
+					)}, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"partitionable-devices-constraint-releases-counter": {
 			features: Features{
@@ -3922,6 +3955,12 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 				deviceAllocationResult(req1, driverA, pool1, device3, false),
 			)},
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"consumable-capacity-rejection-rolls-back-constraints": {
 			features: Features{
@@ -3982,7 +4021,15 @@ func TestAllocator(t *testing.T,
 				allocationResult(localNodeSelector(node1),
 					deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false)),
 			},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.ConsumableCapacity:
+					return nil, g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")), nil
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"partitionable-empty-capacity-multiple-share-backtrack-keeps-counter-ownership": {
 			features: Features{
@@ -4121,7 +4168,15 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req1SubReq1, driverA, pool1, device3, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.PartitionableDevices:
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"partitionable-devices-multiple-devices": {
 			features: Features{
@@ -4254,7 +4309,15 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req1SubReq1, driverA, pool1, device3, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.PartitionableDevices:
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"partitionable-devices-multiple-counters": {
 			features: Features{
@@ -4557,40 +4620,9 @@ func TestAllocator(t *testing.T,
 			node:          node(node1, region1),
 			expectResults: nil,
 		},
-		"partitionable-devices-disabled-device-consumes-counters": {
+		"partitionable-devices-other-device-do-not-consume-counters": {
 			features: Features{
-				PartitionableDevices: false,
-			},
-			claimsToAllocate: objects(
-				claimWithRequests(claim0, nil,
-					request(req0, classA, 1),
-				),
-			),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, pool1, driverA,
-					device(device1).withDeviceCounterConsumption(
-						deviceCounterConsumption(counterSet1,
-							map[string]resource.Quantity{
-								"memory": resource.MustParse("4Gi"),
-							},
-						),
-					),
-				),
-				sliceWithCounterSets(slice2, node1, pool1, driverA,
-					counterSet(counterSet1,
-						map[string]resource.Quantity{
-							"memory": resource.MustParse("18Gi"),
-						},
-					),
-				),
-			),
-			node:          node(node1, region1),
-			expectResults: nil,
-		},
-		"partitionable-devices-disabled-other-device-do-not-consume-counters": {
-			features: Features{
-				PartitionableDevices: false,
+				PartitionableDevices: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -4620,12 +4652,17 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+			// Without the feature, device1 is ignored because it consumes counters.
+			expectResultsWithoutFeatures: []any{allocationResult(
+				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
 		},
-		"partitionable-devices-disabled-per-device-node-selection": {
+		"partitionable-devices-per-device-node-selection": {
 			features: Features{
-				PartitionableDevices: false,
+				PartitionableDevices: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -4638,8 +4675,11 @@ func TestAllocator(t *testing.T,
 					device(device2).withNodeSelection(node1),
 				),
 			),
-			node:          node(node1, region1),
-			expectResults: nil,
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
 		},
 		"partitionable-devices-per-device-node-selection-nodename": {
 			features: Features{
@@ -4693,12 +4733,19 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.PartitionableDevices:
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"partitionable-devices-per-device-node-selection-node-selector": {
 			features: Features{
 				PartitionableDevices: true,
-				PrioritizedList:      true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1)),
@@ -4737,7 +4784,6 @@ func TestAllocator(t *testing.T,
 		"partitionable-devices-per-device-node-selection-node-selector-multiple-devices": {
 			features: Features{
 				PartitionableDevices: true,
-				PrioritizedList:      true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
@@ -4899,7 +4945,18 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false, tolerationNoExecute), // Only second device's taints are tolerated.
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.DeviceTaints:
+					return []any{allocationResult(
+						localNodeSelector(node1),
+						deviceAllocationResult(req0SubReq0, driverA, pool1, device1, false),
+					)}, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"tainted-no-effect": {
 			features: Features{
@@ -4941,21 +4998,6 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false, tolerationNoSchedule, tolerationNoExecute),
 			)},
 		},
-		"tainted-disabled": {
-			features: Features{
-				DeviceTaints: false,
-			},
-			claimsToAllocate: objects(claimWithRequest(claim0, req0, classA)),
-			classes:          objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withTaints(taintNoSchedule, taintNoExecute),
-			)),
-			node: node(node1, region1),
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, false),
-			)},
-		},
 		"tainted-prioritized-list": {
 			features: Features{
 				DeviceTaints:    true,
@@ -4971,31 +5013,19 @@ func TestAllocator(t *testing.T,
 			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
 				device(device1).withTaints(taintNoSchedule),
 			)),
-			node:                       node(node1, region1),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
-		},
-		"tainted-prioritized-list-disabled": {
-			features: Features{
-				DeviceTaints:    false,
-				PrioritizedList: true,
-			},
-			claimsToAllocate: objects(
-				claim(claim0).withRequests(
-					requestWithPrioritizedList(req0,
-						subRequest(subReq0, classB, 1),
-						subRequest(subReq1, classA, 1),
-					))),
-			classes: objects(class(classA, driverA), class(classB, driverB)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withTaints(taintNoSchedule),
-			)),
 			node: node(node1, region1),
-
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
-			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.DeviceTaints:
+					return []any{allocationResult(
+						localNodeSelector(node1),
+						deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+					)}, nil, nil
+				}
+				return nil, nil, nil
+			},
 		},
 		"tainted-admin-access": {
 			features: Features{
@@ -5015,34 +5045,19 @@ func TestAllocator(t *testing.T,
 			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
 				device(device1).withTaints(taintNoSchedule),
 			)),
-			node:                       node(node1, region1),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")),
-		},
-		"tainted-admin-access-disabled": {
-			features: Features{
-				DeviceTaints: false,
-				AdminAccess:  true,
-			},
-			claimsToAllocate: func() []wrapResourceClaim {
-				c := claimWithRequest(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
-				return []wrapResourceClaim{c}
-			}(),
-			allocatedDevices: []DeviceID{
-				MakeDeviceID(driverA, pool1, device1),
-				MakeDeviceID(driverA, pool1, device2),
-			},
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withTaints(taintNoSchedule),
-			)),
 			node: node(node1, region1),
-
-			expectResults: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, true),
-			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.AdminAccess:
+					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
+				case !features.DeviceTaints:
+					return []any{allocationResult(
+						localNodeSelector(node1),
+						deviceAllocationResult(req0, driverA, pool1, device1, true),
+					)}, nil, nil
+				}
+				return nil, nil, nil
+			},
 		},
 		"tainted-all-devices-single": {
 			features: Features{
@@ -5062,28 +5077,6 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 			// Without the feature, taints are ignored.
 			expectResultsWithoutFeatures: []any{allocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, false),
-			)},
-		},
-		"tainted-all-devices-single-disabled": {
-			features: Features{
-				DeviceTaints: false,
-			},
-			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name: req0,
-				Exactly: &resourceapi.ExactDeviceRequest{
-					AllocationMode:  resourceapi.DeviceAllocationModeAll,
-					DeviceClassName: classA,
-				},
-			})),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withTaints(taintNoSchedule),
-			)),
-			node: node(node1, region1),
-
-			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
@@ -5529,18 +5522,6 @@ func TestAllocator(t *testing.T,
 				},
 			},
 		},
-		"binding-conditions-without-feature-gate": {
-			features: Features{
-				DeviceBindingAndStatus: false,
-			},
-			claimsToAllocate: objects(
-				claimWithRequests(claim0, nil, request(req0, classA, 1))),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}))),
-			node:          node(node1, region1),
-			expectResults: nil,
-		},
 		"node-restriction": {
 			features: Features{
 				DeviceBindingAndStatus: true,
@@ -5833,41 +5814,12 @@ func TestAllocator(t *testing.T,
 					NodeSelector: localNodeSelector(node1),
 				},
 			},
-		},
-		"consumable-capacity-disabled-feature": {
-			features: Features{
-				DeviceBindingAndStatus: true, // add to forcefully use experimenting allocator
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.PartitionableDevices || !features.DeviceBindingAndStatus {
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
 			},
-			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one)),
-			),
-			classes:                    objects(class(classA, driverA)),
-			slices:                     unwrap(sliceWithOneDevice(slice1, node1, pool1, driverA)),
-			node:                       node(node1, region1),
-			expectResults:              nil,
-			expectError:                g.MatchError(g.ContainSubstring("claim claim-0, request req-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
-		},
-		"consumable-capacity-disabled-feature-with-prioritized-list": {
-			features: Features{
-				PrioritizedList:        true,
-				DeviceBindingAndStatus: true, // add to forcefully use experimenting allocator
-			},
-			claimsToAllocate: objects(
-				claim(claim0).withRequests(
-					requestWithPrioritizedList(
-						req0,
-						subRequest(subReq0, classA, 1).withCapacityRequest(capacity0, one),
-						subRequest(subReq1, classA, 1).withCapacityRequest(capacity0, one),
-					),
-				),
-			),
-			classes:                    objects(class(classA, driverA)),
-			slices:                     unwrap(sliceWithOneDevice(slice1, node1, pool1, driverA)),
-			node:                       node(node1, region1),
-			expectResults:              nil,
-			expectError:                g.MatchError(g.ContainSubstring("claim claim-0, subrequest subReq-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
 		},
 		"consumable-capacity-multi-allocatable-device-with-missing-capacity-request": {
 			features: Features{
@@ -6885,7 +6837,15 @@ func TestAllocator(t *testing.T,
 					deviceRequestAllocationResult(req0SubReq1, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.ConsumableCapacity:
+					return nil, g.MatchError(g.ContainSubstring("claim claim-0, subrequest subReq-0: has capacity requests, but the DRAConsumableCapacity feature is disabled")), nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"consumable-capacity-multi-allocatable-device-with-no-available-consumable-capacity": {
 			features: Features{
@@ -7260,7 +7220,22 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{"memory": resource.MustParse("4Gi")}),
 				deviceRequestAllocationResult(req1SubReq1, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{"memory": resource.MustParse("4Gi")}),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.PartitionableDevices:
+					return nil, nil, nil
+				case !features.ConsumableCapacity:
+					// Devices are then treated as not allowing multiple allocations.
+					return []any{allocationResult(
+						localNodeSelector(node1),
+						deviceAllocationResult(req0, driverA, pool1, device1, false),
+						deviceAllocationResult(req1SubReq1, driverA, pool1, device3, false),
+					)}, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"allow-multiple-allocations-with-shared-device-counter-cross-cycle": {
 			features: Features{
@@ -7310,9 +7285,14 @@ func TestAllocator(t *testing.T,
 					}),
 				),
 			),
-			node:                       node(node1, region1),
-			expectResults:              []any{},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+			node:          node(node1, region1),
+			expectResults: []any{},
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")), nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"partitionable-consumable-capacity-shared-device-counter-not-recharged": {
 			features: Features{
@@ -7441,7 +7421,12 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, true),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"consumable-capacity-with-partitionable-device-multiple-capacity-pools": {
 			// This test case combines integration of PrioritizedList, PartitionableDevices, and ConsumableCapacity features.
@@ -7544,7 +7529,17 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req2, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two, capacity1: two}),
 				deviceRequestAllocationResult(req1SubReq1, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one, capacity1: two}),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.ConsumableCapacity:
+					return nil, g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")), nil
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.PartitionableDevices:
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"with-distinct-constraints": {
 			features: Features{
@@ -7781,7 +7776,15 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req1SubReq1, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, nil),
 				deviceRequestAllocationResult(req2SubReq0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, nil),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.ConsumableCapacity:
+					return nil, g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")), nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"with-distinct-constraints-mixed-types": {
 			features: Features{
@@ -7941,38 +7944,6 @@ func TestAllocator(t *testing.T,
 		},
 
 		// Test cases for DRAFractionalCapacityRange feature
-		"consumable-capacity-fractional-range-gate-disabled": {
-			// FractionalCapacityRange is off: step arithmetic uses Value(), which rounds
-			// sub-integer quantities up to 1.  With min=1, step=1, request=1:
-			// added=0, n=0 → consumed = min + step*0 = 1 (DecimalSI, from step's format).
-			features: Features{
-				ConsumableCapacity: true,
-				// FractionalCapacityRange intentionally not set
-			},
-			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, pointTwo)),
-			),
-			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
-			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, pool1, driverA,
-					device(device1).withAllowMultipleAllocations().withFractionalCapacityRequestPolicyRange(
-						map[resourceapi.QualifiedName]resource.Quantity{capacity0: one},
-					),
-				),
-			),
-			node: node(node1, region1),
-			expectResults: []any{
-				allocationResult(
-					localNodeSelector(node1),
-					// Integer path: Value() of 200m and 100m both round up to 1,
-					// so min=1, step=1, added=0 → result = NewQuantity(1, DecimalSI).
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{
-						capacity0: *resource.NewQuantity(1, resource.DecimalSI),
-					}),
-				),
-			},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
-		},
 		"consumable-capacity-fractional-range-gate-enabled-round-up": {
 			// FractionalCapacityRange on: 250m is between min=200m and next step=300m,
 			// so it is rounded up to 300m (milli-arithmetic: (250-200)/100 rounds up to 1 step).
@@ -8001,7 +7972,22 @@ func TestAllocator(t *testing.T,
 					}),
 				),
 			},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.ConsumableCapacity:
+					return nil, g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")), nil
+				case !features.FractionalCapacityRange:
+					// Integer path: Value() of 250m, 200m and 100m all round up to 1,
+					// so min=1, step=1, added=0 → result = NewQuantity(1, DecimalSI).
+					return []any{allocationResult(
+						localNodeSelector(node1),
+						deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{
+							capacity0: *resource.NewQuantity(1, resource.DecimalSI),
+						}),
+					)}, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 
 		// Test cases for DRAListTypeAttributes features (matchAttributes/distinctAttributes)
@@ -8198,47 +8184,6 @@ func TestAllocator(t *testing.T,
 			)},
 			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
-		"list-attributes-disabled-distinct-constraint-single-device-with-list": {
-			features: Features{
-				ListTypeAttributes: false,
-				ConsumableCapacity: true,
-			},
-			claimsToAllocate: objects(claimWithRequests(
-				claim0,
-				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
-				request(req0, classA, 1)),
-			),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withAttribute("stringAttribute", []string{"value1", "value2"}),
-			)),
-			node: node(node1, region1),
-
-			expectResults:              nil,
-			expectError:                g.MatchError(g.ContainSubstring("unsupported attribute value")),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
-		},
-		"list-attributes-disabled-distinct-constraint-scalar-and-list": {
-			features: Features{
-				ListTypeAttributes: false,
-				ConsumableCapacity: true,
-			},
-			claimsToAllocate: objects(claimWithRequests(
-				claim0,
-				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
-				request(req0, classA, 2)),
-			),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withAttribute("stringAttribute", "value1"),
-				device(device2).withAttribute("stringAttribute", []string{"value1", "value2"}),
-			)),
-			node: node(node1, region1),
-
-			expectResults:              nil,
-			expectError:                g.MatchError(g.ContainSubstring("unsupported attribute value")),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
-		},
 		// KEP-6072: standardized numaNode attribute, list form. Two devices whose
 		// numaNode lists share an element (physical node + same-socket equidistant
 		// nodes) are co-placed by matchAttribute set intersection.
@@ -8399,26 +8344,6 @@ func TestAllocator(t *testing.T,
 			expectError:                g.MatchError(g.ContainSubstring("unsupported attribute value")),
 			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("unsupported attribute value")),
 		},
-		"list-attributes-disabled-match-constraint-with-lists": {
-			features: Features{
-				ListTypeAttributes: false,
-			},
-			claimsToAllocate: objects(claimWithRequests(
-				claim0,
-				[]resourceapi.DeviceConstraint{{MatchAttribute: &stringAttribute}},
-				request(req0, classA, 2)),
-			),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withAttribute("stringAttribute", []string{"value1", "value2", "value3"}),
-				device(device2).withAttribute("stringAttribute", []string{"value2", "value3", "value4"}),
-			)),
-			node: node(node1, region1),
-
-			expectResults:              nil,
-			expectError:                g.MatchError(g.ContainSubstring("unsupported attribute value")),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("unsupported attribute value")),
-		},
 		"list-attributes-distinct-constraint-scalar-string-values-all-distinct": {
 			features: Features{
 				ConsumableCapacity: true,
@@ -8541,7 +8466,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-list-of-string-values-with-common-elements": {
 			features: Features{
@@ -8560,8 +8485,8 @@ func TestAllocator(t *testing.T,
 			)),
 			node: node(node1, region1),
 
-			expectResults:              nil,
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectResults:      nil,
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-mixed-scalar-and-list-all-distinct": {
 			features: Features{
@@ -8586,7 +8511,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-mixed-scalar-and-list-with-common-elements": {
 			features: Features{
@@ -8605,8 +8530,8 @@ func TestAllocator(t *testing.T,
 			)),
 			node: node(node1, region1),
 
-			expectResults:              nil,
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectResults:      nil,
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-list-of-int-values-all-distinct": {
 			features: Features{
@@ -8631,7 +8556,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-list-of-bool-values-all-distinct": {
 			features: Features{
@@ -8656,7 +8581,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-list-of-version-values-all-distinct": {
 			features: Features{
@@ -8681,7 +8606,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		// Mirror of the MatchAttribute list case: the overlapping element
 		// ("1.0.0+build1" vs "1.0.0+build2") is the same version once build
@@ -8704,8 +8629,8 @@ func TestAllocator(t *testing.T,
 			)),
 			node: node(node1, region1),
 
-			expectResults:              nil,
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectResults:      nil,
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		// Control case: lists differ even ignoring build metadata, so the
 		// two devices are pairwise disjoint and can both be allocated.
@@ -8731,7 +8656,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-with-empty-or-unknown-type": {
 			features: Features{
@@ -8750,30 +8675,9 @@ func TestAllocator(t *testing.T,
 			)),
 			node: node(node1, region1),
 
-			expectResults:              nil,
-			expectError:                g.MatchError(g.ContainSubstring("unsupported attribute value")),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
-		},
-		"list-attributes-disabled-distinct-constraint-with-lists": {
-			features: Features{
-				ListTypeAttributes: false,
-				ConsumableCapacity: true,
-			},
-			claimsToAllocate: objects(claimWithRequests(
-				claim0,
-				[]resourceapi.DeviceConstraint{{DistinctAttribute: &stringAttribute}},
-				request(req0, classA, 2)),
-			),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(sliceWithDevices(slice1, node1, pool1, driverA,
-				device(device1).withAttribute("stringAttribute", []string{"value1", "value2", "value3"}),
-				device(device2).withAttribute("stringAttribute", []string{"value2", "value3", "value4"}),
-			)),
-			node: node(node1, region1),
-
-			expectResults:              nil,
-			expectError:                g.MatchError(g.ContainSubstring("unsupported attribute value")),
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectResults:      nil,
+			expectError:        g.MatchError(g.ContainSubstring("unsupported attribute value")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 		"list-attributes-distinct-constraint-backtrack-needs-remove": {
 			features: Features{
@@ -8808,7 +8712,7 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req1, driverA, pool1, device4, false),
 				deviceAllocationResult(req2, driverA, pool1, device0, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")),
+			expectWithFeatures: expectDistinctAttributeWithLists,
 		},
 
 		"allocation-mode-all-with-multi-host-resource-pool": {
@@ -9221,7 +9125,15 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false),
 			)},
-			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")),
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				switch {
+				case !features.PrioritizedList:
+					return nil, g.MatchError(g.ContainSubstring("has subrequests, but the DRAPrioritizedList feature is disabled")), nil
+				case !features.PartitionableDevices:
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
 		},
 		"partitionable-devices-devices-consume-counter-set-in-different-nodes": {
 			features: Features{
@@ -9912,6 +9824,18 @@ func TestAllocator(t *testing.T,
 	})
 }
 
+// expectDistinctAttributeWithLists covers test cases with a distinctAttribute
+// constraint on list attributes.
+func expectDistinctAttributeWithLists(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+	switch {
+	case !features.ConsumableCapacity:
+		return nil, g.MatchError(g.ContainSubstring("has distinctAttribute, but the DRAConsumableCapacity feature is disabled")), nil
+	case !features.ListTypeAttributes:
+		return nil, g.MatchError(g.ContainSubstring("unsupported attribute value")), nil
+	}
+	return expectResults, expectError, expectErrorIs
+}
+
 func runTestAllocator(tCtx ktesting.TContext,
 	supportedFeatures Features,
 	newAllocator func(
@@ -9924,7 +9848,9 @@ func runTestAllocator(tCtx ktesting.TContext,
 	) (Allocator, error),
 	testcases map[string]AllocatorTestCase) {
 	for name, tc := range testcases {
-		run := func(tCtx ktesting.TContext, features Features, withoutFeatures bool) {
+		run := func(tCtx ktesting.TContext, features Features) {
+			withoutFeatures := len(tc.features.Set().Difference(features.Set())) > 0
+
 			// Listing objects is deterministic and returns them in the same
 			// order as in the test case. That makes the allocation result
 			// also deterministic.
@@ -9973,7 +9899,12 @@ func runTestAllocator(tCtx ktesting.TContext,
 			expectResults := tc.expectResults
 			matchError := tc.expectError
 			expectErrorIs := tc.expectErrorIs
-			if withoutFeatures {
+			if tc.expectWithFeatures != nil {
+				expectResults, matchError, expectErrorIs = tc.expectWithFeatures(tc.expectResults, tc.expectError, tc.expectErrorIs, features)
+				if tc.expectResultsWithoutFeatures != nil || tc.expectErrorWithoutFeatures != nil || tc.expectErrorIsWithoutFeatures != nil {
+					tCtx.Fatal("expectWithAdditionalFeatures is mutually exclusive with *WithoutFeatures fields")
+				}
+			} else if withoutFeatures {
 				expectResults = tc.expectResultsWithoutFeatures
 				matchError = tc.expectErrorWithoutFeatures
 				expectErrorIs = tc.expectErrorIsWithoutFeatures
@@ -9986,7 +9917,6 @@ func runTestAllocator(tCtx ktesting.TContext,
 				tCtx.Require(err).To(g.MatchError(expectErrorIs))
 			}
 
-			tCtx.Logf("name: %s", name)
 			// replace any share id with fixed value for testing
 			for ri, result := range results {
 				for ai, allocation := range result.Devices.Results {
@@ -10013,20 +9943,94 @@ func runTestAllocator(tCtx ktesting.TContext,
 			}
 		}
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
-			// With unsupported features, the allocator behaves as if they
-			// were disabled, which is covered by the sub-test.
-			if tc.features.Set().Difference(supportedFeatures.Set()).Len() == 0 {
-				run(tCtx, tc.features, false)
-			}
-			// Objects with fields of a disabled feature must be handled gracefully
-			// by all allocators, not just those which lack the code for the feature.
-			if tc.features.Set().Len() > 0 {
-				tCtx.Run("without-features", func(tCtx ktesting.TContext) {
-					run(tCtx, Features{}, true)
+			// Parallelize at the level of test cases: that gives enough
+			// concurrency and avoids data races when Gomega matchers
+			// associated with a test case are used more than once
+			// (valid, just not concurrently).
+			tCtx.Parallel()
+
+			// Run with different permutations of features.
+			// Each configuration is one sub-test.
+			//
+			// The "exactly-required-features" and "without-features"
+			// names can be used to select exactly those configurations
+			// across different test cases:
+			//
+			//    go test -run=TestAllocator/.*/exactly-required-features <package>
+			//
+			// All enabled features are part of the name, so one can
+			// run all test cases with a certain feature enabled with:
+			//
+			//    go test -run=TestAllocator/.*/DRAPartitionableDevices <package>
+			//
+			// Features which are disabled are not included in the name to keep it shorter.
+			// Configurations with no enabled features contain the word "none" instead of the feature list.
+			for name, features := range allFeaturePermutations(tc.features, supportedFeatures.Set()) {
+				tCtx.Run(name, func(tCtx ktesting.TContext) {
+					run(tCtx, features)
 				})
 			}
 		})
 	}
+}
+
+func allFeaturePermutations(requiredFeatures Features, supportedFeatures sets.Set[string]) iter.Seq2[string, Features] {
+	return func(yield func(string, Features) bool) {
+		// Test with required features first, if supported.
+		name := "exactly-required-features"
+		if enabled := enabledFeatures(requiredFeatures); enabled != "" {
+			name = name + "=" + enabled
+		} else {
+			name = name + "=none"
+		}
+		if len(requiredFeatures.Set().Difference(supportedFeatures)) == 0 {
+			if !yield(name, requiredFeatures) {
+				return
+			}
+		}
+		// Then with everything off, if different.
+		var emptyFeatures Features
+		if emptyFeatures != requiredFeatures {
+			if !yield("without-features=none", emptyFeatures) {
+				return
+			}
+		}
+		// Now all other feature combinations.
+		features := slices.Sorted(maps.Keys(internal.FeaturesAll.Set()))
+		doFeaturePermutations(yield, requiredFeatures, supportedFeatures, emptyFeatures, features)
+	}
+}
+
+func doFeaturePermutations(yield func(string, Features) bool, requiredFeatures Features, supportedFeatures sets.Set[string], currentFeatures Features, features []string) bool {
+	if len(features) == 0 {
+		// Full set of features permutated, test with that unless it's one of the two special cases.
+		var emptyFeatures Features
+		if currentFeatures == emptyFeatures || currentFeatures == requiredFeatures {
+			return true
+		}
+		// Sub-test name consists of all enabled features concatenated by hyphen.
+		// This is shorter than explicitly listing all features and their on/off state.
+		return yield(enabledFeatures(currentFeatures), currentFeatures)
+	}
+	feature := features[0]
+	for _, enabled := range []bool{false, true} {
+		if enabled && !supportedFeatures.Has(feature) {
+			// Don't test with unsupported feature enabled.
+			continue
+		}
+		nextFeatures := currentFeatures
+		if enabled {
+			nextFeatures = internal.FeaturesFromSet(currentFeatures.Set().Union(sets.New(feature)))
+		}
+		if !doFeaturePermutations(yield, requiredFeatures, supportedFeatures, nextFeatures, features[1:]) {
+			return false
+		}
+	}
+	return true
+}
+
+func enabledFeatures(features Features) string {
+	return strings.Join(slices.Sorted(maps.Keys(features.Set())), "-")
 }
 
 type informerLister[T any] struct {
