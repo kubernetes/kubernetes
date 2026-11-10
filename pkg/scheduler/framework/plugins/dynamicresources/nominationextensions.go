@@ -40,8 +40,8 @@ var _ framework.NominationExtensions = &DynamicResources{}
 
 // PrepareNomination returns the nomination of the pod to the node with what
 // the scheduling cycle selected for it: the devices which the preemption
-// simulation found for it with its victims removed, and the victims with
-// claims. It returns nil if preemption cannot release devices for the pod.
+// simulation found for it with its victims removed, and the victims. It
+// returns nil if preemption cannot release devices for the pod.
 func (pl *DynamicResources) PrepareNomination(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) any {
 	if pl.nominations == nil {
 		return nil

@@ -225,6 +225,7 @@ func testPrepareNominationAfterReprieve(tCtx ktesting.TContext) {
 	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
 	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
 	victim2 := preemptionPod("victim2", "victim-claim-2").Node(nodeName).Obj()
+	plainVictim := preemptionPod("plain-victim").Node(nodeName).Obj()
 	claims := []*resourceapi.ResourceClaim{
 		preemptionClaim("preemptor-claim").Obj(),
 		reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("instance-1")).Obj(), victim),
@@ -245,32 +246,39 @@ func testPrepareNominationAfterReprieve(tCtx ktesting.TContext) {
 	}
 
 	for name, tc := range map[string]struct {
-		reprieved   bool
+		reprieved   []*v1.Pod
 		wantVictims []string
 	}{
-		"not-reprieved": {wantVictims: []string{victim.Name, victim2.Name}},
-		"reprieved":     {reprieved: true, wantVictims: []string{victim.Name}},
+		"not-reprieved": {
+			wantVictims: []string{plainVictim.Name, victim.Name, victim2.Name},
+		},
+		"reprieved": {
+			reprieved:   []*v1.Pod{victim2, plainVictim},
+			wantVictims: []string{victim.Name},
+		},
 	} {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
-			testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, preemptor, victim, victim2})
+			testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, preemptor, victim, victim2, plainVictim})
 			nodeInfo := testCtx.nodeInfos[0]
 			state := framework.NewCycleState()
 			_, status := testCtx.p.PreFilter(tCtx, state, preemptor, testCtx.nodeInfos)
 			require.True(tCtx, status.IsSuccess(), "PreFilter: %v", status)
 
 			sim := state.Clone()
-			for _, pod := range []*v1.Pod{victim, victim2} {
+			for _, pod := range []*v1.Pod{victim, victim2, plainVictim} {
 				require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo(pod), nodeInfo).IsSuccess(), "RemovePod")
 			}
 			require.True(tCtx, testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo).IsSuccess(), "Filter without victims")
-			// Reprieve victim2: the first pass of
+			// Reprieve candidate victims: the first pass of
 			// RunFilterPluginsWithNominatedPods runs on a copy.
-			require.True(tCtx, testCtx.p.AddPod(tCtx, sim, preemptor, podInfo(victim2), nodeInfo).IsSuccess(), "AddPod")
-			_ = testCtx.p.Filter(tCtx, sim.Clone(), preemptor, nodeInfo)
-			if tc.reprieved {
-				_ = testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo)
-			} else {
-				require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo(victim2), nodeInfo).IsSuccess(), "RemovePod")
+			for _, pod := range []*v1.Pod{victim2, plainVictim} {
+				require.True(tCtx, testCtx.p.AddPod(tCtx, sim, preemptor, podInfo(pod), nodeInfo).IsSuccess(), "AddPod")
+				_ = testCtx.p.Filter(tCtx, sim.Clone(), preemptor, nodeInfo)
+				if slices.Contains(tc.reprieved, pod) {
+					_ = testCtx.p.Filter(tCtx, sim, preemptor, nodeInfo)
+				} else {
+					require.True(tCtx, testCtx.p.RemovePod(tCtx, sim, preemptor, podInfo(pod), nodeInfo).IsSuccess(), "RemovePod")
+				}
 			}
 
 			testCtx.p.AddNomination(tCtx, preemptor, nodeName, testCtx.p.PrepareNomination(tCtx, state, preemptor, nodeName))
@@ -331,6 +339,7 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
 	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
 	victim2 := preemptionPod("victim2", "victim-claim-2").Node(nodeName).Obj()
+	plainVictim := preemptionPod("plain-victim").Node(nodeName).Obj()
 	waiting := preemptionPod("waiting", "waiting-claim").Obj()
 	claims := []*resourceapi.ResourceClaim{
 		preemptionClaim("preemptor-claim").Obj(),
@@ -339,8 +348,8 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 		reserve(preemptionClaim("victim-claim-2").Allocation(preemptionAllocation("instance-2")).Obj(), victim2),
 		preemptionClaim("unallocated-claim").Obj(),
 	}
-	testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, preemptor, victim, victim2})
-	nominate(tCtx, testCtx, preemptor, nodeName, victim, victim2)
+	testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, preemptor, victim, victim2, plainVictim})
+	nominate(tCtx, testCtx, preemptor, nodeName, victim, victim2, plainVictim)
 	logger := klog.FromContext(tCtx)
 	hint := func(pod, deleted *v1.Pod) fwk.QueueingHint {
 		hint, err := testCtx.p.isSchedulableAfterAssignedPodDeleted(logger, pod, deleted, nil)
@@ -348,7 +357,7 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 		return hint
 	}
 
-	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, victim), "first victim deleted, second one still bound")
+	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, victim), "first victim deleted, others still bound")
 	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, victim), "victim of another pod with allocated claim")
 	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, preemptionPod("unrelated").Node(nodeName).Obj()), "unrelated pod without claims")
 	require.Equal(tCtx, fwk.Queue, hint(waiting, preemptionPod("forgotten", "unallocated-claim").Node(nodeName).Obj()), "pod without its pending allocation")
@@ -357,7 +366,9 @@ func testIsSchedulableAfterAssignedPodDeleted(tCtx ktesting.TContext) {
 	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, completed), "completed pod whose claim got deallocated")
 	require.Equal(tCtx, fwk.QueueSkip, hint(waiting, preemptionPod("unassigned", "unallocated-claim").Obj()), "unassigned pod which lost its nomination")
 	deletePod(tCtx, testCtx, victim2)
-	require.Equal(tCtx, fwk.Queue, hint(preemptor, victim), "last victim deleted")
+	require.Equal(tCtx, fwk.QueueSkip, hint(preemptor, victim), "claim-bearing victims deleted, victim without claims still bound")
+	deletePod(tCtx, testCtx, victim)
+	require.Equal(tCtx, fwk.Queue, hint(preemptor, plainVictim), "last victim without claims deleted")
 }
 
 func TestEventsToRegisterWithPreemption(t *testing.T) {

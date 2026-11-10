@@ -43,8 +43,7 @@ type claimNominations struct {
 type podNomination struct {
 	nodeName string
 	priority int32
-	// victims are the pods with claims which got preempted for the
-	// nomination.
+	// victims are the pods which got preempted for the nomination.
 	victims map[types.UID]types.NamespacedName
 	// holds are the devices which other pods with lower or equal priority
 	// must not get, by UID of the claim of the preemptor.

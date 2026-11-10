@@ -112,7 +112,7 @@ type heldResult struct {
 // simulation records what RemovePod and AddPod changed in one copy of the
 // CycleState.
 type simulation struct {
-	// removedPods are the pods with claims which were removed and not added back.
+	// removedPods are the pods which were removed and not added back.
 	removedPods map[types.UID]types.NamespacedName
 	// released maps the UIDs of claims which removing pods released to
 	// what got released. Entries are never modified, only replaced, because
@@ -268,17 +268,20 @@ func (pl *DynamicResources) RemovePod(ctx context.Context, cs fwk.CycleState, po
 
 // removePod updates the simulation like RemovePod.
 func (pl *DynamicResources) removePod(logger klog.Logger, p *preemptionState, pod *v1.Pod, nodeName string) {
-	if _, removed := p.sim.removedPods[pod.UID]; len(pod.Spec.ResourceClaims) == 0 || removed {
+	if _, removed := p.sim.removedPods[pod.UID]; removed {
 		return
 	}
 	if p.sim.removedPods == nil {
 		p.sim.removedPods = make(map[types.UID]types.NamespacedName)
 	}
+	p.sim.removedPods[pod.UID] = types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	p.version++
+	if len(pod.Spec.ResourceClaims) == 0 {
+		return
+	}
 	if p.sim.released == nil {
 		p.sim.released = make(map[types.UID]*releasedClaim)
 	}
-	p.sim.removedPods[pod.UID] = types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-	p.version++
 	for _, claim := range pl.claimsOfPod(pod) {
 		if released := p.sim.released[claim.UID]; released != nil {
 			// Released because of other removed pods, now this one
