@@ -648,9 +648,15 @@ func TestValidateCustomResource(t *testing.T) {
 					},
 				},
 			},
+			objects: []interface{}{
+				map[string]interface{}{"fieldX": "日本"},
+			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"fieldX": "abc"}, expectErrs: []string{
-					`fieldX: Too long: may not be more than 2 bytes`,
+					`fieldX: Too long: may not be more than 2 characters`,
+				}},
+				{object: map[string]interface{}{"fieldX": "日本語"}, expectErrs: []string{
+					`fieldX: Too long: may not be more than 2 characters`,
 				}},
 			},
 		},
