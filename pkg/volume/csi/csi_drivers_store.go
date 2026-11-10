@@ -25,7 +25,9 @@ import (
 // Driver is a description of a CSI Driver, defined by an endpoint and the
 // highest CSI version supported
 type Driver struct {
-	endpoint                string
+	endpoint string
+	// whether CSIControllerGetNodeInfo feature is in effect for this driver
+	infoFromController      bool
 	highestSupportedVersion *utilversion.Version
 }
 

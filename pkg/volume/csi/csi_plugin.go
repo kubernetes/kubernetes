@@ -27,6 +27,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
@@ -114,6 +115,26 @@ func (h *RegistrationHandler) ValidatePlugin(ctx context.Context, pluginName str
 	return err
 }
 
+// when CSIControllerGetNodeInfo is NOT in effective
+func installDriver(ctx context.Context, csi *csiDriverClient, pluginName string) error {
+	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nim.InstallCSIDriver(ctx, pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+}
+
+// when CSIControllerGetNodeInfo is in effective
+func registerDriver(ctx context.Context, csi *csiDriverClient, pluginName string) error {
+	driverNodeID, err := csi.NodeGetInfoForController(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nim.RegisterCSIDriver(ctx, pluginName, driverNodeID)
+}
+
 // RegisterPlugin is called when a plugin can be registered
 func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	klog.Info(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
@@ -123,18 +144,8 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 		return err
 	}
 
-	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
-	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
-	csiDrivers.Set(pluginName, Driver{
-		endpoint:                endpoint,
-		highestSupportedVersion: highestSupportedVersion,
-	})
-
 	// Get node info from the driver.
-	csi, err := newCsiDriverClient(csiDriverName(pluginName))
-	if err != nil {
-		return err
-	}
+	csi := newCsiDriverClientFromAddr(csiDriverName(pluginName), csiAddr(endpoint))
 
 	var timeout time.Duration
 	if pluginClientTimeout == nil {
@@ -146,7 +157,16 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 	newCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(newCtx)
+	nodeInfoFromController, err := h.csiPlugin.nodeInfoFromController(newCtx, csi, pluginName)
+	if err != nil {
+		return err
+	}
+
+	if nodeInfoFromController {
+		err = registerDriver(newCtx, csi, pluginName)
+	} else {
+		err = installDriver(newCtx, csi, pluginName)
+	}
 	if err != nil {
 		if unregErr := unregisterDriver(ctx, pluginName); unregErr != nil {
 			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
@@ -154,13 +174,13 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 		return err
 	}
 
-	err = nim.InstallCSIDriver(newCtx, pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
-	if err != nil {
-		if unregErr := unregisterDriver(ctx, pluginName); unregErr != nil {
-			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
-		}
-		return err
-	}
+	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
+	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
+	csiDrivers.Set(pluginName, Driver{
+		endpoint:                endpoint,
+		infoFromController:      nodeInfoFromController,
+		highestSupportedVersion: highestSupportedVersion,
+	})
 
 	if csiNodeUpdaterVar != nil {
 		csiNodeUpdaterVar.syncDriverUpdater(pluginName)
@@ -170,6 +190,15 @@ func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName str
 }
 
 func updateCSIDriver(pluginName string) error {
+	driver, driverExists := csiDrivers.Get(pluginName)
+	if !driverExists {
+		return fmt.Errorf("driver name %s not found in the list of registered CSI drivers", pluginName)
+	}
+
+	if driver.infoFromController {
+		return nil // external-attacher should have updated CSINode
+	}
+
 	csi, err := newCsiDriverClient(csiDriverName(pluginName))
 	if err != nil {
 		return fmt.Errorf("failed to create CSI client for driver %q: %w", pluginName, err)
@@ -187,6 +216,23 @@ func updateCSIDriver(pluginName string) error {
 		return fmt.Errorf("failed to update driver %q: %w", pluginName, err)
 	}
 	return nil
+}
+
+func (p *csiPlugin) nodeInfoFromController(ctx context.Context, csi *csiDriverClient, pluginName string) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIControllerGetNodeInfo) {
+		return false, nil
+	}
+
+	supported, err := csi.NodeSupportsNodeInfoFromController(ctx)
+	if err != nil || !supported {
+		return false, err
+	}
+
+	skip, err := p.skipAttach(pluginName)
+	if err != nil {
+		return false, err
+	}
+	return !skip, nil // Defer to controller only if plugin have external-attacher deployed.
 }
 
 func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
@@ -896,10 +942,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 		}
 		return false, err
 	}
-	if csiDriver.Spec.AttachRequired != nil && *csiDriver.Spec.AttachRequired == false {
-		return true, nil
-	}
-	return false, nil
+	return !ptr.Deref(csiDriver.Spec.AttachRequired, true), nil
 }
 
 func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {

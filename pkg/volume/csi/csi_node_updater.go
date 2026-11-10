@@ -110,9 +110,8 @@ func (u *csiNodeUpdater) onDriverDelete(obj interface{}) {
 // syncDriverUpdater re-evaluates whether the periodic updater for a given driver should run.
 // It is invoked from informer events (Add/Update/Delete) and from plugin registration/deregistration.
 func (u *csiNodeUpdater) syncDriverUpdater(driverName string) {
-	// Check if the CSI plugin is installed on this node.
-	if !isDriverInstalled(driverName) {
-		klog.V(4).InfoS("Driver not installed; stopping csiNodeUpdater", "driver", driverName)
+	if !needsNodeInfoUpdate(driverName) {
+		klog.V(4).InfoS("Driver does not need update; stopping csiNodeUpdater", "driver", driverName)
 		u.unregisterDriver(driverName)
 		return
 	}
@@ -184,10 +183,9 @@ func (u *csiNodeUpdater) runPeriodicUpdate(driverName string, period time.Durati
 	}
 }
 
-// isDriverInstalled checks if the CSI driver is installed on the node by checking the global csiDrivers map
-func isDriverInstalled(driverName string) bool {
-	_, ok := csiDrivers.Get(driverName)
-	return ok
+func needsNodeInfoUpdate(driverName string) bool {
+	d, ok := csiDrivers.Get(driverName)
+	return ok && !d.infoFromController
 }
 
 // getNodeAllocatableUpdatePeriod returns the NodeAllocatableUpdatePeriodSeconds value from the CSIDriver
