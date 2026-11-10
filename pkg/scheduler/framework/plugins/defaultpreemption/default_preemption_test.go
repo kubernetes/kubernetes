@@ -3267,6 +3267,7 @@ func TestPreemptNominatedInMemory(t *testing.T) {
 
 	for name, tc := range map[string]struct {
 		draPreemption     bool
+		notPersisted      bool
 		victim            *v1.Pod
 		notEligibleReason string
 		// wantMessage is why the pod must not preempt, empty if it may.
@@ -3275,6 +3276,12 @@ func TestPreemptNominatedInMemory(t *testing.T) {
 	}{
 		"victim-terminating": {
 			draPreemption: true,
+			victim:        terminatingVictim,
+			wantMessage:   "not eligible due to a terminating pod on the nominated node.",
+		},
+		"victim-terminating-nomination-not-persisted": {
+			draPreemption: true,
+			notPersisted:  true,
 			victim:        terminatingVictim,
 			wantMessage:   "not eligible due to a terminating pod on the nominated node.",
 		},
@@ -3345,6 +3352,9 @@ func TestPreemptNominatedInMemory(t *testing.T) {
 				t.Fatal(err)
 			}
 			queue.AddNominatedPod(logger, preemptorInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: node.Name})
+			if tc.notPersisted {
+				queue.NominationNotPersisted(preemptor, node.Name)
+			}
 
 			cycleState := framework.NewCycleState()
 			if _, s, _ := schedFramework.RunPreFilterPlugins(ctx, cycleState, preemptor); !s.IsSuccess() {

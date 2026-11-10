@@ -331,11 +331,10 @@ type VictimExtensionsRunner interface {
 //
 // The interface is internal to kube-scheduler.
 type NominatedNodeNameGetter interface {
-	// NominatedNodeName returns the node which the pod is nominated to.
-	// The scheduler nominates a pod in memory before it sets the nominated
-	// node name in the API, so the pod object may not show it yet. Until
-	// it does, the result is what the scheduler set, also when it cleared
-	// the nomination, otherwise what the pod object shows.
+	// NominatedNodeName returns the node which the pod is nominated to: its
+	// nomination in memory if there is one, empty if the scheduler cleared
+	// the nomination and pod objects don't show that yet, otherwise what the
+	// pod object shows.
 	NominatedNodeName(pod *v1.Pod) string
 }
 

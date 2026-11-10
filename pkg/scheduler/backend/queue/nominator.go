@@ -176,17 +176,22 @@ func (npm *nominator) expectedNodeName(uid types.UID) (string, bool) {
 	return expected, ok
 }
 
-// NominatedNodeName returns the node which the pod is nominated to: the
-// nominated node name which the scheduler set, also by clearing it, as long
-// as the pod object does not show it yet, otherwise the one of the pod
-// object.
+// NominatedNodeName returns the node which the pod is nominated to: its
+// nomination in memory if there is one, empty if the scheduler cleared the
+// nomination and pod objects don't show that yet, and what the pod object
+// shows otherwise. It does not modify expected nominations, because podLister
+// may already show a newer pod object while an older update is still queued
+// for the event handlers.
 func (npm *nominator) NominatedNodeName(pod *v1.Pod) string {
 	if !npm.draPreemption {
 		return nominatedNodeName(pod)
 	}
-	npm.nLock.Lock()
-	defer npm.nLock.Unlock()
-	if expected, pending := npm.pendingUnlocked(pod); pending {
+	npm.nLock.RLock()
+	defer npm.nLock.RUnlock()
+	if nodeName, ok := npm.nominatedPodToNode[pod.UID]; ok {
+		return nodeName
+	}
+	if expected, ok := npm.expected[pod.UID]; ok {
 		return expected
 	}
 	return nominatedNodeName(pod)

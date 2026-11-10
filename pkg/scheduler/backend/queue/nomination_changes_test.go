@@ -398,7 +398,9 @@ func TestNominatedNodeName(t *testing.T) {
 	for name, tc := range map[string]struct {
 		// nominations is what the scheduler set, in this order.
 		nominations []nomination
-		pod         *v1.Pod
+		// notPersisted, if set, calls NominationNotPersisted for that node.
+		notPersisted *string
+		pod          *v1.Pod
 		// want and wantWithoutDRAPreemption are the nominated node for pod.
 		want, wantWithoutDRAPreemption string
 	}{
@@ -414,6 +416,12 @@ func TestNominatedNodeName(t *testing.T) {
 			nominations: []nomination{{pod, "node1"}},
 			pod:         pod,
 			want:        "node1",
+		},
+		"nominated-not-persisted": {
+			nominations:  []nomination{{pod, "node1"}},
+			notPersisted: new("node1"),
+			pod:          pod,
+			want:         "node1",
 		},
 		"nominated-with-up-to-date-pod": {
 			nominations:              []nomination{{pod, "node1"}},
@@ -441,6 +449,9 @@ func TestNominatedNodeName(t *testing.T) {
 				for _, nomination := range tc.nominations {
 					q.AddNominatedPod(logger, mustPodInfo(t, nomination.pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nomination.nodeName})
 				}
+				if tc.notPersisted != nil {
+					q.NominationNotPersisted(pod, *tc.notPersisted)
+				}
 				want := tc.want
 				if !draPreemption {
 					want = tc.wantWithoutDRAPreemption
@@ -450,6 +461,41 @@ func TestNominatedNodeName(t *testing.T) {
 				}
 			})
 		}
+	}
+
+	// Reading NominatedNodeName with a podLister object that already reflects
+	// the new nomination must not consume the expected nomination before an
+	// earlier stale update queued for the event handlers runs.
+	for _, targetNode := range []string{"node2", ""} {
+		t.Run(fmt.Sprintf("preserves-expected-for-queued-updates/target=%q", targetNode), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+			logger, ctx := ktesting.NewTestContext(t)
+			oldPod := withNomination("node1")
+			var changes []string
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{oldPod},
+				WithNominationChangeHandler(func(_ klog.Logger, p *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent {
+					changes = append(changes, fmt.Sprintf("%s %s->%s", p.Name, oldNodeName, newNodeName))
+					return nil
+				}))
+			q.Add(ctx, oldPod)
+			q.AddNominatedPod(logger, mustPodInfo(t, oldPod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: targetNode})
+			changes = nil
+
+			// podLister already shows targetNode, while an earlier update with
+			// node1 is still queued for the event handler.
+			if got := q.NominatedNodeName(withNomination(targetNode)); got != targetNode {
+				t.Fatalf("NominatedNodeName = %q, want %q", got, targetNode)
+			}
+			staleUpdate := oldPod.DeepCopy()
+			staleUpdate.Labels = map[string]string{"unrelated": "true"}
+			q.Update(ctx, oldPod, staleUpdate)
+			if !q.IsNominatedTo(pod, targetNode) {
+				t.Errorf("Stale queued update reverted nomination in memory after NominatedNodeName read")
+			}
+			if len(changes) != 0 {
+				t.Errorf("Unexpected nomination changes from stale update: %v", changes)
+			}
+		})
 	}
 }
 
