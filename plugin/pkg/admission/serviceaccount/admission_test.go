@@ -717,7 +717,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -736,7 +736,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envFrom") {
+	if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -765,7 +765,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		t.Errorf("admit only enforces restrictions on secret mounts when operation==create. Unexpected error: %v", err)
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
 	}
 
@@ -789,7 +789,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		t.Errorf("admit only enforces restrictions on secret mounts when operation==create. Unexpected error: %v", err)
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envFrom") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
 	}
 
@@ -820,7 +820,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		t.Errorf("admit only enforces restrictions on secret mounts when operation==create and subresource==''. Unexpected error: %v", err)
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envVar") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate enforces restrictions on secret mounts when operation==update and subresource==ephemeralcontainers. Unexpected error: %v", err)
 	}
 
@@ -841,7 +841,7 @@ func TestRejectsUnreferencedSecretVolumes(t *testing.T) {
 		},
 	}
 	attrs = admission.NewAttributesRecord(pod2, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
-	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), "with envFrom") {
+	if err := admit.Validate(context.TODO(), attrs, nil); err == nil || !strings.Contains(err.Error(), `secrets ["foo"]`) {
 		t.Errorf("validate enforces restrictions on secret mounts when operation==update and subresource==ephemeralcontainers. Unexpected error: %v", err)
 	}
 }
@@ -1018,3 +1018,135 @@ func testGenerateName(n string) string {
 }
 
 var generatedVolumeName = testGenerateName(ServiceAccountVolumeName + "-")
+
+func TestEnforceMountableSecrets(t *testing.T) {
+	ns := "myns"
+
+	secretVolume := func(name string) api.Volume {
+		return api.Volume{Name: name, VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: name}}}
+	}
+	projectedSecretVolume := func(name string) api.Volume {
+		return api.Volume{Name: name, VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{
+			Sources: []api.VolumeProjection{{Secret: &api.SecretProjection{LocalObjectReference: api.LocalObjectReference{Name: name}}}},
+		}}}
+	}
+	secretEnv := func(name string) []api.EnvVar {
+		return []api.EnvVar{{Name: "env", ValueFrom: &api.EnvVarSource{
+			SecretKeyRef: &api.SecretKeySelector{LocalObjectReference: api.LocalObjectReference{Name: name}},
+		}}}
+	}
+	ephemeralContainer := func(secretName string) api.EphemeralContainer {
+		return api.EphemeralContainer{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debug", Env: secretEnv(secretName)}}
+	}
+	podWithVolumes := func(volumes ...api.Volume) *api.Pod {
+		return &api.Pod{Spec: api.PodSpec{ServiceAccountName: DefaultServiceAccountName, Volumes: volumes}}
+	}
+	withEphemeral := func(pod *api.Pod, ec api.EphemeralContainer) *api.Pod {
+		pod = pod.DeepCopy()
+		pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, ec)
+		return pod
+	}
+
+	tests := []struct {
+		name string
+		pod  *api.Pod
+		// oldPod is set for ephemeralcontainers updates; otherwise the request is a create.
+		oldPod      *api.Pod
+		expectedErr string
+	}{
+		{
+			name: "projected secret allowed",
+			pod:  podWithVolumes(projectedSecretVolume("allowed")),
+		},
+		{
+			name:        "projected secret rejected",
+			pod:         podWithVolumes(projectedSecretVolume("denied")),
+			expectedErr: `secrets ["denied"]`,
+		},
+		{
+			name: "csi nodePublishSecretRef rejected",
+			pod: podWithVolumes(api.Volume{Name: "csi", VolumeSource: api.VolumeSource{CSI: &api.CSIVolumeSource{
+				Driver:               "example.com/driver",
+				NodePublishSecretRef: &api.LocalObjectReference{Name: "denied"},
+			}}}),
+			expectedErr: `secrets ["denied"]`,
+		},
+		{
+			name: "multiple disallowed secrets listed sorted",
+			pod: &api.Pod{Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				Volumes:            []api.Volume{secretVolume("zzz"), projectedSecretVolume("mmm"), secretVolume("allowed")},
+				Containers:         []api.Container{{Name: "c", Env: secretEnv("aaa")}},
+			}},
+			expectedErr: `secrets ["aaa" "mmm" "zzz"] which are not allowed because service account default does not reference them`,
+		},
+		{
+			name: "pull secret allowed by imagePullSecrets only",
+			pod: &api.Pod{Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				ImagePullSecrets:   []api.LocalObjectReference{{Name: "pull"}},
+			}},
+		},
+		{
+			name: "pull secret also mounted as a volume rejected",
+			pod: &api.Pod{Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				ImagePullSecrets:   []api.LocalObjectReference{{Name: "pull"}},
+				Volumes:            []api.Volume{secretVolume("pull")},
+			}},
+			expectedErr: `secrets ["pull"]`,
+		},
+		{
+			name:        "ephemeral container adding a disallowed secret rejected",
+			oldPod:      podWithVolumes(secretVolume("allowed")),
+			pod:         withEphemeral(podWithVolumes(secretVolume("allowed")), ephemeralContainer("denied")),
+			expectedErr: `secrets ["denied"]`,
+		},
+		{
+			name:   "ephemeral container update allowed when old pod already referenced a disallowed secret",
+			oldPod: podWithVolumes(secretVolume("legacy")),
+			pod:    withEphemeral(podWithVolumes(secretVolume("legacy")), ephemeralContainer("legacy")),
+		},
+		{
+			name:        "ephemeral container update only reports newly referenced secrets",
+			oldPod:      podWithVolumes(secretVolume("legacy")),
+			pod:         withEphemeral(podWithVolumes(secretVolume("legacy")), ephemeralContainer("denied")),
+			expectedErr: `pod references secrets ["denied"] which`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			admit := NewServiceAccount()
+			informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+			admit.SetExternalKubeInformerFactory(informerFactory)
+			err := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        DefaultServiceAccountName,
+					Namespace:   ns,
+					Annotations: map[string]string{EnforceMountableSecretsAnnotation: "true"},
+				},
+				Secrets:          []corev1.ObjectReference{{Name: "allowed"}},
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: "pull"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var attrs admission.Attributes
+			if tc.oldPod == nil {
+				attrs = admission.NewAttributesRecord(tc.pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil)
+			} else {
+				attrs = admission.NewAttributesRecord(tc.pod, tc.oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "ephemeralcontainers", admission.Update, &metav1.UpdateOptions{}, false, nil)
+			}
+			err = admit.Validate(context.TODO(), attrs, nil)
+			if tc.expectedErr == "" {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("Expected error containing %q, got: %v", tc.expectedErr, err)
+			}
+		})
+	}
+}
