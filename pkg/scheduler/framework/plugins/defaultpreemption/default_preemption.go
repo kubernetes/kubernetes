@@ -618,7 +618,7 @@ func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState
 }
 
 // computeDeltaVictimsOnNode returns the surviving victims on nodeName that would be
-// newly condemned if a preemptor pod is placed on it, sorted from most to least important.
+// newly condemned if a preemptor pod is placed on it, sorted from least to most preferred for preemption.
 //
 // TODO(#142718): Currently, this returns all surviving victims on nodeName without checking
 // whether the preemptor pod already fits alongside some or all of them (because all potential
@@ -626,7 +626,7 @@ func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState
 // While selectVictimsOnDomain still reprieves unnecessary victims after the inner cycle finishes,
 // returning all surviving victims here can overestimate a partially occupied node's victim cost
 // during RankNodes and Reserve. In a follow-up, we should greedily reprieve surviving
-// victims on nodeName from most to least important (re-adding each victim to a cloned NodeInfo
+// victims on nodeName from least to most preferred for preemption (re-adding each victim to a cloned NodeInfo
 // and running Filter plugins via RunFilterPluginsWithNominatedPods) and return only the minimal
 // subset of surviving victims whose removal is actually required for the preemptor pod to fit.
 func (pl *DefaultPreemption) computeDeltaVictimsOnNode(nodeName string, preemptionState *preemption.PodGroupPreemptionState) []fwk.PreemptionVictim {
