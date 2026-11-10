@@ -22517,6 +22517,31 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			"must be greater than or equal to aggregate container limits",
 		},
 	}, {
+		name: "aggregate container requests of a binary value and a large exponent greater than pod requests",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceMemory: resource.MustParse("1e2147483646"),
+					},
+				},
+			},
+		},
+		expectedErrors: []string{
+			"must be greater than or equal to aggregate container requests of 1000000000000000000000000000010e2147483616",
+		},
+	}, {
 		name: "individual container limits greater than pod limits",
 		podResources: core.ResourceRequirements{
 			Limits: core.ResourceList{

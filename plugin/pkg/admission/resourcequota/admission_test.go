@@ -673,6 +673,40 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	}
 }
 
+func TestAdmitExceedQuotaLimitWithLargeExponent(t *testing.T) {
+	resourceQuota := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("10Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("0"),
+			},
+		},
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
+	}
+
+	if err := informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota); err != nil {
+		t.Fatal(err)
+	}
+	newPod := validPod("not-allowed-pod", 2, getResourceRequirements(getResourceList("", "1Gi"), getResourceList("", "")))
+	newPod.Spec.Containers[1].Resources = getResourceRequirements(getResourceList("", "1e2147483646"), getResourceList("", ""))
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	if want := "exceeded quota: quota, requested: memory=1000000000000000000000000000010e2147483616"; err == nil || !strings.Contains(err.Error(), want) {
+		t.Errorf("Validate() error = %v, want an error containing %q", err, want)
+	}
+}
+
 // TestAdmitEnforceQuotaConstraints verifies that if a quota tracks a particular resource that that resource is
 // specified on the pod.  In this case, we create a quota that tracks cpu request, memory request, and memory limit.
 // We ensure that a pod that does not specify a memory limit that it fails in admission.

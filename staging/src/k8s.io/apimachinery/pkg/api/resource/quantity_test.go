@@ -2432,12 +2432,22 @@ func TestBinarySIPastEiArithmeticRoundTrip(t *testing.T) {
 	}
 }
 
+func binarySISum(a, b string) Quantity {
+	q := MustParse(a)
+	q.Add(MustParse(b))
+	return q
+}
+
 func TestBinarySIStringAtLargeScales(t *testing.T) {
 	for _, tc := range []struct {
 		in   Quantity
 		want string
 	}{
 		{intQuantity(1, 69, BinarySI), "867361737988403547205962240695953369140625000000000Ei"}, // 2^9 * 5^69
+		{intQuantity(1, 70, BinarySI), "10e69"},                                                 // a multiple of 1024Ei
+		{intQuantity(1, 71, BinarySI), "100e69"},
+		{intQuantity(-1, 70, BinarySI), "-10e69"},
+		{binarySISum("1Ki", "1e2147483646"), "1000000000000000000000000000010e2147483616"},
 	} {
 		for _, asDec := range []bool{false, true} {
 			q := tc.in

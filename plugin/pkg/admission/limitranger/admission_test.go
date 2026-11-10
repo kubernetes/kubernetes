@@ -688,6 +688,14 @@ func TestPodLimitFunc(t *testing.T) {
 			podLevelResourcesEnabled: true,
 		},
 		{
+			pod: func() api.Pod {
+				pod := validPod("pod-max-memory-binary-and-large-exponent", 2, getResourceRequirements(getComputeResourceList("", "1Gi"), getComputeResourceList("", "1Gi")))
+				pod.Spec.Containers[1].Resources = getResourceRequirements(getComputeResourceList("", "1e2147483646"), getComputeResourceList("", "1e2147483646"))
+				return pod
+			}(),
+			limitRange: createLimitRange(api.LimitTypePod, api.ResourceList{}, getComputeResourceList("", "10Gi"), api.ResourceList{}, api.ResourceList{}, api.ResourceList{}),
+		},
+		{
 			pod: validPodWithPodLevelResources("pod-level-limits-exceeding-max", 3, getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("50m", "60Mi")),
 				getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("160m", "300Mi")),
 			),
