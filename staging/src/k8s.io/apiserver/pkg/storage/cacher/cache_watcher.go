@@ -102,9 +102,10 @@ type cacheWatcher struct {
 	// state holds a numeric value indicating the current state of the watcher
 	state int
 
-	selector                watchSelector
-	requiredResourceVersion uint64
-	matchedValues           []storage.MatchValue
+	selector                  watchSelector
+	requiredResourceVersion   uint64
+	matchedValues             []storage.MatchValue
+	dispatchedResourceVersion uint64
 }
 
 func newCacheWatcher(

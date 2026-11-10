@@ -761,6 +761,7 @@ func (c *Cacher) watch(ctx context.Context, key string, requestedWatchRV uint64,
 }
 
 func (c *Cacher) registerWatcherLocked(watcher *cacheWatcher, cacheInterval *watchCacheInterval) {
+	watcher.dispatchedResourceVersion = cacheInterval.resourceVersion
 	c.watchers.addWatcher(watcher)
 	// Add it to the queue only when the client support watch bookmarks.
 	if watcher.allowWatchBookmarks {
@@ -1155,6 +1156,9 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	// not be blocked by slower ones.
 	if event.Type == watch.Bookmark {
 		for _, watcher := range c.watchersBuffer {
+			if event.ResourceVersion < watcher.dispatchedResourceVersion {
+				continue
+			}
 			watcher.nonblockingAdd(event)
 		}
 	} else {
@@ -1178,7 +1182,13 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
-			if !watcher.nonblockingAdd(event) {
+			if event.ResourceVersion <= watcher.dispatchedResourceVersion {
+				continue
+			}
+			if watcher.nonblockingAdd(event) {
+				watcher.dispatchedResourceVersion = event.ResourceVersion
+			} else {
+				watcher.dispatchedResourceVersion = event.ResourceVersion - 1
 				c.blockedWatchers = append(c.blockedWatchers, watcher)
 			}
 		}
@@ -1197,7 +1207,9 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// is running, not only the first ones in the list.
 			timer := c.timer
 			for _, watcher := range c.blockedWatchers {
-				if !watcher.add(event, timer) {
+				if watcher.add(event, timer) {
+					watcher.dispatchedResourceVersion = event.ResourceVersion
+				} else {
 					// fired, clean the timer by set it to nil.
 					timer = nil
 				}
