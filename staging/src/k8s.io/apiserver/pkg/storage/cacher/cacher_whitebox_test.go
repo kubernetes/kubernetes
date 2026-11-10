@@ -1027,6 +1027,71 @@ apiserver_storage_list_total{group="",index="f:spec.nodeName",resource="pods",st
 	}
 }
 
+type sizeEstimationFailingStorage struct {
+	*cachertesting.MockStorage
+}
+
+func (sizeEstimationFailingStorage) EnableResourceSizeEstimation(storage.KeysFunc) error {
+	return errDummy
+}
+
+// watchCacheCapacityReported returns whether gatherer reports the watch cache capacity of groupResource.
+func watchCacheCapacityReported(t *testing.T, gatherer k8smetrics.Gatherer, groupResource schema.GroupResource) bool {
+	t.Helper()
+
+	families, err := gatherer.Gather()
+	require.NoError(t, err)
+	labels := map[string]string{"group": groupResource.Group, "resource": groupResource.Resource}
+	for _, family := range families {
+		for _, metric := range family.GetMetric() {
+			if testutil.LabelsMatch(metric, labels) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestWatchCacheGaugesDeleted(t *testing.T) {
+	registry := k8smetrics.NewKubeRegistry()
+	require.NoError(t, registry.Register(metrics.WatchCacheCapacity))
+
+	// No other test uses these resource types, so only the cachers below report their gauges.
+	t.Run("with the last cacher", func(t *testing.T) {
+		groupResource := schema.GroupResource{Group: "example.com", Resource: "widgets"}
+		config := newTestCacherConfig(&cachertesting.MockStorage{})
+		config.GroupResource = groupResource
+
+		// A custom resource with two versions has two cachers.
+		first, err := NewCacherFromConfig(config)
+		require.NoError(t, err)
+		defer first.Stop()
+		second, err := NewCacherFromConfig(config)
+		require.NoError(t, err)
+		defer second.Stop()
+		require.True(t, watchCacheCapacityReported(t, registry, groupResource))
+
+		// Stopping a cacher twice must not count as stopping two of them.
+		first.Stop()
+		first.Stop()
+		require.True(t, watchCacheCapacityReported(t, registry, groupResource), "after stopping one of two cachers")
+
+		second.Stop()
+		require.False(t, watchCacheCapacityReported(t, registry, groupResource), "after stopping the last cacher")
+	})
+
+	t.Run("when cacher creation fails", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, true)
+		groupResource := schema.GroupResource{Group: "example.com", Resource: "gadgets"}
+		config := newTestCacherConfig(sizeEstimationFailingStorage{&cachertesting.MockStorage{}})
+		config.GroupResource = groupResource
+
+		_, err := NewCacherFromConfig(config)
+		require.ErrorIs(t, err, errDummy)
+		require.False(t, watchCacheCapacityReported(t, registry, groupResource))
+	})
+}
+
 func TestWatchCacheBypass(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
