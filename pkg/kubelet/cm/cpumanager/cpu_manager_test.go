@@ -206,6 +206,9 @@ func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ life
 	return p.err
 }
 
+func (p *mockPolicy) ResizeCommitted(_ klog.Logger, _ state.State, _ state.PendingResize) {
+}
+
 func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
 	return cpuset.New()
 }

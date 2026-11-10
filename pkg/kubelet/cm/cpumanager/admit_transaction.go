@@ -125,6 +125,7 @@ func (m *manager) CompleteAdmit(ctx context.Context, pod *v1.Pod, operation life
 		return
 	}
 	m.state.CommitPendingResize(pending)
+	m.policy.ResizeCommitted(logger, m.state, pending)
 }
 
 // checkCPUsFree fails if a CPU the pending resize takes from the default CPU

@@ -47,6 +47,10 @@ type Policy interface {
 	// AllocatePod is called to trigger the allocation of CPUs to a pod.
 	// For a resize, the same rules as for Allocate apply.
 	AllocatePod(logger klog.Logger, s state.State, pod *v1.Pod, operation lifecycle.Operation) error
+	// ResizeCommitted is called after a resize, prepared by Allocate or
+	// AllocatePod on a scratch copy of the state, was committed to s. The policy
+	// can update there the metrics derived from the resize.
+	ResizeCommitted(logger klog.Logger, s state.State, pending state.PendingResize)
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
 	// CanAllocateExclusively reports whether this policy supports exclusive CPU

@@ -1073,7 +1073,7 @@ func (p *staticPolicy) Allocate(logger klog.Logger, s state.State, pod *v1.Pod, 
 	case lifecycle.AddOperation:
 		return p.allocateForAdd(logger, s, pod, container)
 	case lifecycle.ResizeOperation:
-		return p.allocateForResize(logger, s, pod, container)
+		return p.allocateForResize(logger, s, pod, container, operation)
 	default:
 		logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy")
 		return nil
@@ -1124,7 +1124,7 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 			// Handle it as a resize, which aligns the assignment if possible;
 			// see resizeTransaction for when it may not be possible.
 			logger.Info("Static policy: container already present in state with a different number of CPUs, resizing", "cpuset", cset, "requestedSize", numCPUs)
-			return p.allocateForResize(logger, s, pod, container)
+			return p.allocateForResize(logger, s, pod, container, lifecycle.AddOperation)
 		}
 		logger.Info("Static policy: container already present in state, skipping")
 		return nil
@@ -1155,7 +1155,15 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 	return nil
 }
 
-func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+// allocateForResize changes the exclusive CPUs of a container to its allocated
+// resources. The operation tells who calls it:
+//   - lifecycle.ResizeOperation: the admission of a resize, on its scratch state.
+//     The metrics derived from the result are published once the resize is
+//     committed, see ResizeCommitted;
+//   - lifecycle.AddOperation: allocateForAdd, for a pod admitted again with a
+//     resize that was not applied, on the state. allocateForAdd counts the
+//     attempt, so only the metrics derived from the result are published here.
+func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) (rerr error) {
 	logger = klog.LoggerWithValues(logger, "podUID", pod.UID, "containerName", container.Name)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		logger.V(2).Info("CPU Manager container-level resource allocation skipped, operation not supported by the static CPU manager policy, InPlacePodVerticalScaling and/or InPlacePodVerticalScalingExclusiveCPUs are not enabled")
@@ -1184,23 +1192,29 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 		return nil
 	}
 
+	// The exclusive CPUs of the container do not change, e.g. only memory is
+	// resized or another container of the pod is. The topology manager calls
+	// Allocate for every container on every resize attempt, so return before
+	// touching the counters: they track allocations, not admission attempts.
+	if requestedCPUsByPodContainer == cpusInUseByPodContainer.Size() {
+		p.updateCPUsToReuse(pod, container, cpusInUseByPodContainer)
+		logger.V(4).Info("Static policy: exclusive CPUs unchanged, skipping resize allocation", "cpuset", cpusInUseByPodContainer.String())
+		return nil
+	}
+
 	// container belongs in an exclusively allocated pool
-	metrics.CPUManagerPinningRequestsTotal.Inc()
-	defer func() {
-		if rerr != nil {
-			metrics.CPUManagerPinningErrorsTotal.Inc()
-			metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
-			if p.options.FullPhysicalCPUsOnly {
-				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+	if operation == lifecycle.ResizeOperation {
+		metrics.CPUManagerPinningRequestsTotal.Inc()
+		defer func() {
+			if rerr != nil {
+				metrics.CPUManagerPinningErrorsTotal.Inc()
+				metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
+				if p.options.FullPhysicalCPUsOnly {
+					metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+				}
 			}
-			return
-		}
-		// TODO: move in updateMetricsOnAllocate
-		if p.options.FullPhysicalCPUsOnly {
-			// increment only if we know we allocate aligned resources
-			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
-		}
-	}()
+		}()
+	}
 
 	if err := p.enforceSMTAlignment(s, requestedCPUsByPodContainer, cpusInUseByPodContainer.Size(), lifecycle.ResizeOperation); err != nil {
 		return err
@@ -1223,14 +1237,37 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 
 	s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
 	p.updateCPUsToReuse(pod, container, newallocatedcpuset.CPUs)
-	p.updateMetricsOnAllocate(logger, s, newallocatedcpuset)
-	metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
-	metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusiveNode).Inc()
+	if operation == lifecycle.AddOperation {
+		p.updateMetricsOnAllocate(logger, s, newallocatedcpuset)
+		metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
+	}
 	logger.V(4).Info("Allocated exclusive CPUs for resize", "cpuset", newallocatedcpuset.CPUs.String())
 	// For a resize, s is the scratch state of the admission. The CPU manager
 	// commits it to the state once every admit handler admitted the pod and
 	// the pod allocation is persisted, see CompleteAdmit.
 	return nil
+}
+
+// ResizeCommitted publishes the metrics of a resize allocated by
+// allocateForResize, once the CPU manager committed it to the state.
+// A resize changes the assignment of a container, but does not add one, so
+// the count of container assignments does not change.
+func (p *staticPolicy) ResizeCommitted(logger klog.Logger, s state.State, pending state.PendingResize) {
+	for containerName, cset := range pending.ContainerCPUSets {
+		if cset.IsEmpty() {
+			continue
+		}
+		logger.V(4).Info("Static policy: resize committed", "podUID", pending.PodUID, "containerName", containerName, "cpuset", cset)
+		metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
+		if p.options.FullPhysicalCPUsOnly {
+			// allocateForResize enforces the SMT alignment.
+			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+		}
+		if p.topology.CheckAlignment(cset).UncoreCache {
+			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
+		}
+	}
+	p.updateMetricsFromState(logger, s)
 }
 
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
