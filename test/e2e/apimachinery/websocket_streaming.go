@@ -52,7 +52,12 @@ var _ = SIGDescribe("WebSocket streaming", func() {
 	f := framework.NewDefaultFramework("websocket-streaming")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	ginkgo.It("should exec over the WebSocket v5.channel.k8s.io subprotocol with stdin close and exit code", func(ctx context.Context) {
+	/*
+		Release: v1.38
+		Testname: WebSocket streaming, exec over v5.channel.k8s.io
+		Description: Executing a command in a Pod container over the WebSocket v5.channel.k8s.io subprotocol MUST deliver stdin, signal EOF on stdin when a CLOSE message is sent, and return the command exit status on the status channel.
+	*/
+	framework.ConformanceIt("should exec over the WebSocket v5.channel.k8s.io subprotocol with stdin close and exit code", func(ctx context.Context) {
 		ginkgo.By("creating a pod to exec into")
 		pod := e2epod.NewPodClient(f).CreateSync(ctx, e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "websocket-exec"},
@@ -98,7 +103,12 @@ var _ = SIGDescribe("WebSocket streaming", func() {
 		gomega.Expect(stdout.String()).To(gomega.ContainSubstring("stdin closed"), "the CLOSE signal ended the command's stdin")
 	})
 
-	ginkgo.It("should attach over the WebSocket v5.channel.k8s.io subprotocol", func(ctx context.Context) {
+	/*
+		Release: v1.38
+		Testname: WebSocket streaming, attach over v5.channel.k8s.io
+		Description: Attaching to a Pod container over the WebSocket v5.channel.k8s.io subprotocol MUST deliver stdin and signal EOF on stdin when a CLOSE message is sent.
+	*/
+	framework.ConformanceIt("should attach over the WebSocket v5.channel.k8s.io subprotocol", func(ctx context.Context) {
 		ginkgo.By("creating a pod whose container waits on stdin")
 		pod := e2epod.NewPodClient(f).CreateSync(ctx, e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "websocket-attach"},
@@ -150,10 +160,20 @@ var _ = SIGDescribe("WebSocket streaming", func() {
 	})
 
 	ginkgo.Describe("port forwarding over the WebSocket tunnel", func() {
-		ginkgo.It("should forward to a server listening on 0.0.0.0", func(ctx context.Context) {
+		/*
+			Release: v1.38
+			Testname: WebSocket streaming, port-forward over tunnel to 0.0.0.0
+			Description: Port forwarding to a Pod container listening on 0.0.0.0 over the SPDY/3.1+portforward.k8s.io WebSocket tunnel subprotocol MUST forward client data and return the server response with an empty error stream.
+		*/
+		framework.ConformanceIt("should forward to a server listening on 0.0.0.0", func(ctx context.Context) {
 			testPortForwardOverWebSocketTunnel(ctx, f, "0.0.0.0")
 		})
-		ginkgo.It("should forward to a server listening on localhost", func(ctx context.Context) {
+		/*
+			Release: v1.38
+			Testname: WebSocket streaming, port-forward over tunnel to localhost
+			Description: Port forwarding to a Pod container listening on localhost over the SPDY/3.1+portforward.k8s.io WebSocket tunnel subprotocol MUST forward client data and return the server response with an empty error stream.
+		*/
+		framework.ConformanceIt("should forward to a server listening on localhost", func(ctx context.Context) {
 			testPortForwardOverWebSocketTunnel(ctx, f, "localhost")
 		})
 	})
