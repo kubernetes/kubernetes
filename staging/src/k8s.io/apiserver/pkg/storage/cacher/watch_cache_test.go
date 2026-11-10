@@ -1355,8 +1355,78 @@ func TestOldestServableLocked(t *testing.T) {
 			if err == nil || err.Error() != expectedErr {
 				t.Errorf("expected GetIntervalLocked to return the error %q, got: %v", expectedErr, err)
 			}
+			if checkErr := store.history.checkResourceVersionLocked(5); checkErr == nil || checkErr.Error() != expectedErr {
+				t.Errorf("expected checkResourceVersionLocked to return the error %q, got: %v", expectedErr, checkErr)
+			}
+			if test.expectedOK {
+				require.NoError(t, store.history.checkResourceVersionLocked(test.expected-1))
+			}
 		})
 	}
+}
+
+func TestEventsAfterLocked(t *testing.T) {
+	testCases := []struct {
+		name        string
+		eventRVs    []uint64
+		afterRV     uint64
+		stopAfter   int
+		expectedRVs []uint64
+	}{
+		{
+			name:    "empty buffer",
+			afterRV: 0,
+		},
+		{
+			name:        "all buffered events after resourceVersion",
+			eventRVs:    []uint64{15, 16},
+			afterRV:     10,
+			expectedRVs: []uint64{15, 16},
+		},
+		{
+			name:        "wrapped cyclic buffer filters older and equal resourceVersions",
+			eventRVs:    []uint64{15, 16, 17, 18, 19},
+			afterRV:     17,
+			expectedRVs: []uint64{18, 19},
+		},
+		{
+			name:     "no buffered events strictly newer than resourceVersion",
+			eventRVs: []uint64{15, 16, 17, 18, 19},
+			afterRV:  19,
+		},
+		{
+			name:        "early break stops iteration",
+			eventRVs:    []uint64{15, 16, 17, 18, 19},
+			afterRV:     10,
+			stopAfter:   2,
+			expectedRVs: []uint64{17, 18},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testEventsAfterLocked(t, 3, tc.eventRVs, tc.afterRV, tc.stopAfter, tc.expectedRVs)
+		})
+	}
+}
+
+func testEventsAfterLocked(t *testing.T, capacity int, eventRVs []uint64, afterRV uint64, stopAfter int, expectedRVs []uint64) {
+	store := newTestWatchCache(capacity, DefaultEventFreshDuration, &cache.Indexers{})
+	defer store.Stop()
+	store.history.lowerBoundCapacity = capacity
+	store.history.upperBoundCapacity = capacity
+	for _, rv := range eventRVs {
+		store.history.updateCache(&watchCacheEvent{ResourceVersion: rv, RecordTime: store.config.clock.Now()})
+	}
+
+	var gotRVs []uint64
+	for event := range store.history.eventsAfterLocked(afterRV) {
+		gotRVs = append(gotRVs, event.ResourceVersion)
+		if stopAfter > 0 && len(gotRVs) == stopAfter {
+			break
+		}
+	}
+	require.Equal(t, expectedRVs, gotRVs)
 }
 
 func BenchmarkWatchCache_updateCache(b *testing.B) {
