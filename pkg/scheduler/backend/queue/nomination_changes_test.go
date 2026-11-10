@@ -643,6 +643,78 @@ func TestDeleteNominatedPodIfExistsWithoutNomination(t *testing.T) {
 	}
 }
 
+// TestNominationChangeOfInFlightPod checks that the events for the end of a
+// nomination which the scheduling cycle of the pod itself caused, while the
+// pod is in flight, don't make that pod retry when it comes back to the
+// queue, for example after a rejection in WaitOnPermit. Other in-flight pods
+// need them.
+func TestNominationChangeOfInFlightPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj()
+	lowPod := st.MakePod().Name("low").Namespace("ns").UID("low").Priority(lowPriority).Obj()
+	claimUpdate := fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}
+
+	for name, tc := range map[string]struct {
+		// assumedNode is where the nominated pod got assumed.
+		assumedNode string
+		// event is the event for the end of the nomination which plugins
+		// have a queueing hint for.
+		event fwk.ClusterEvent
+	}{
+		// The generic event, because the pod does not use its nominated node.
+		"assumed-on-other-node": {
+			assumedNode: "node2",
+			event:       framework.EventAssignedPodDelete,
+		},
+		// Only the event from the handler.
+		"assumed-on-nominated-node": {
+			assumedNode: "node1",
+			event:       claimUpdate,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			m := makeEmptyQueueingHintMapPerProfile()
+			m[""][tc.event] = []*QueueingHintFunction{{PluginName: "fooPlugin", QueueingHintFn: queueHintReturnQueue}}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod, lowPod},
+				WithQueueingHintMapPerProfile(m),
+				WithNominationChangeHandler(func(_ klog.Logger, _ *v1.Pod, oldNodeName, _ string) []framework.NominationEvent {
+					if oldNodeName == "" {
+						return nil
+					}
+					return []framework.NominationEvent{{Event: claimUpdate}}
+				}))
+			for _, p := range []*v1.Pod{pod, lowPod} {
+				q.Add(ctx, p)
+			}
+			for range 2 {
+				if _, err := q.Pop(logger); err != nil {
+					t.Fatalf("Pop: %v", err)
+				}
+			}
+
+			// The nomination ends once Permit let the pod through.
+			assumed := pod.DeepCopy()
+			assumed.Spec.NodeName = tc.assumedNode
+			q.DeleteNominatedPodIfExists(assumed)
+
+			// Both pods come back, the nominated one after a rejection in
+			// WaitOnPermit.
+			for _, p := range []*v1.Pod{pod, lowPod} {
+				if err := q.AddUnschedulablePodIfNotPresent(ctx, q.newQueuedPodInfo(ctx, p, "fooPlugin"), q.SchedulingCycle()); err != nil {
+					t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+				}
+			}
+			if getUnschedulablePod(q, pod) == nil {
+				t.Error("Pod retries because of the end of its own nomination")
+			}
+			if getUnschedulablePod(q, lowPod) != nil {
+				t.Error("Lower priority pod does not retry although the nomination ended while it was in flight")
+			}
+		})
+	}
+}
+
 // TestNominationChangeOfPodItself checks that a pod whose nomination got
 // changed by something else than its own scheduling cycle, for example
 // preemption for another pod, retries.
