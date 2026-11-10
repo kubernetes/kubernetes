@@ -219,11 +219,12 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newDeviceTaintEvictionControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
+	register(newImperativeEvictionResponderControllerDescriptor())
 	register(newTaintEvictionControllerDescriptor())
 	register(newServiceCIDRsControllerDescriptor())
 	register(newStorageVersionMigratorControllerDescriptor())
 	register(newSELinuxWarningControllerDescriptor())
-
+	register(newEvictionRequestControllerDescriptor())
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))

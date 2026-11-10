@@ -232,3 +232,42 @@ func TestMinBackoffExpiration(t *testing.T) {
 		})
 	}
 }
+
+func TestIsBackoffError(t *testing.T) {
+	backoffErr := NewBackoffError(errors.New("backoff"), time.Now())
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{name: "nil error", err: nil},
+		{name: "generic error", err: errors.New("generic error")},
+		{name: "BackoffError", err: backoffErr, expected: true},
+		{name: "crash loop backoff", err: ErrCrashLoopBackOff, expected: true},
+		{name: "image pull backoff", err: ErrImagePullBackOff, expected: true},
+		{name: "wrapped image pull backoff", err: fmt.Errorf("wrapped: %w", ErrImagePullBackOff), expected: true},
+		{name: "empty aggregate", err: utilerrors.NewAggregate([]error{nil})},
+		{
+			name:     "aggregate of backoff errors",
+			err:      utilerrors.NewAggregate([]error{backoffErr, fmt.Errorf("wrapped: %w", ErrImagePullBackOff)}),
+			expected: true,
+		},
+		{
+			name: "aggregate with non-backoff error",
+			err:  utilerrors.NewAggregate([]error{backoffErr, errors.New("generic error")}),
+		},
+		{
+			name:     "wrapped nested aggregate of backoff errors",
+			err:      fmt.Errorf("wrapped: %w", utilerrors.NewAggregate([]error{utilerrors.NewAggregate([]error{backoffErr}), ErrCrashLoopBackOff})),
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsBackoffError(tc.err); got != tc.expected {
+				t.Errorf("expected %t, got %t", tc.expected, got)
+			}
+		})
+	}
+}

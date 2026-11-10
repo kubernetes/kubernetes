@@ -21,6 +21,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
@@ -37,6 +38,8 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
@@ -75,6 +78,14 @@ func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, erro
 		if err != nil {
 			return nil, fmt.Errorf("could not generate signer for ECDSA keypair: %v", err)
 		}
+	case *mldsa.PrivateKey:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenMLDSA) {
+			return nil, fmt.Errorf("*mldsa.PrivateKey support is not enabled, must be *rsa.PrivateKey, *ecdsa.PrivateKey, or jose.OpaqueSigner")
+		}
+		signer, err = signerFromMLDSAPrivateKey(pk)
+		if err != nil {
+			return nil, fmt.Errorf("could not generate signer for ML-DSA keypair: %w", err)
+		}
 	case jose.OpaqueSigner:
 		signer, err = signerFromOpaqueSigner(pk)
 		if err != nil {
@@ -88,6 +99,52 @@ func JWTTokenGenerator(iss string, privateKey interface{}) (TokenGenerator, erro
 		iss:    iss,
 		signer: signer,
 	}, nil
+}
+
+func signerFromMLDSAPrivateKey(pk *mldsa.PrivateKey) (jose.Signer, error) {
+	keyID, err := keyIDFromPublicKey(pk.PublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("getting key ID from public key: %w", err)
+	}
+
+	alg := ""
+	var joseAlg jose.SignatureAlgorithm
+
+	switch pk.PublicKey().Parameters() {
+	case mldsa.MLDSA44():
+		alg = string(jose.MLDSA44)
+		joseAlg = jose.MLDSA44
+	case mldsa.MLDSA65():
+		alg = string(jose.MLDSA65)
+		joseAlg = jose.MLDSA65
+	case mldsa.MLDSA87():
+		alg = string(jose.MLDSA87)
+		joseAlg = jose.MLDSA87
+	default:
+		return nil, fmt.Errorf("unknown ML-DSA key parameter: %v", pk.PublicKey().Parameters().String())
+	}
+
+	privateJWK := &jose.JSONWebKey{
+		Algorithm: alg,
+		Key:       pk,
+		KeyID:     keyID,
+		Use:       "sig",
+	}
+
+	signer, err := jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: joseAlg,
+			Key:       privateJWK,
+		},
+		nil,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %w", err)
+	}
+
+	return signer, nil
+
 }
 
 // keyIDFromPublicKey derives a key ID non-reversibly from a public key.
@@ -124,6 +181,7 @@ func signerFromRSAPrivateKey(keyPair *rsa.PrivateKey) (jose.Signer, error) {
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	// Wrap the RSA keypair in a JOSE JWK with the designated key ID.
@@ -156,6 +214,7 @@ func signerFromECDSAPrivateKey(keyPair *ecdsa.PrivateKey) (jose.Signer, error) {
 	// - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 	// - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 	// - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+	// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
 	// - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 
 	switch keyPair.Curve {
@@ -341,6 +400,7 @@ type Validator[PrivateClaims any] interface {
 // - pkg/serviceaccount/externaljwt/plugin/plugin.go validateJWTHeader
 // - pkg/serviceaccount/jwt.go signerFromRSAPrivateKey
 // - pkg/serviceaccount/jwt.go signerFromECDSAPrivateKey
+// - pkg/serviceaccount/jwt.go signerFromMLDSAPrivateKey
 // - pkg/serviceaccount/jwt.go AcceptableServiceAccountSignatureAlgorithms
 // - test/images/agnhost/openidmetadata/openidmetadata.go validate SupportedSigningAlgs
 var AcceptableServiceAccountSignatureAlgorithms = []jose.SignatureAlgorithm{
@@ -348,6 +408,9 @@ var AcceptableServiceAccountSignatureAlgorithms = []jose.SignatureAlgorithm{
 	jose.ES384,
 	jose.ES512,
 	jose.RS256,
+	jose.MLDSA44,
+	jose.MLDSA65,
+	jose.MLDSA87,
 }
 
 func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {

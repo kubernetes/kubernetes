@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,8 +67,12 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 	}
 
 	// Executes getKubeConfigSpecs
-	if _, err := getKubeConfigSpecs(cfg); err == nil {
-		t.Error("getKubeConfigSpecs didnt failed when expected")
+	_, err := getKubeConfigSpecs(cfg)
+	if err == nil {
+		t.Fatal("getKubeConfigSpecs didn't fail as expected")
+	}
+	if !strings.Contains(err.Error(), "kubeadm init phase certs ca") {
+		t.Errorf("expected the error to suggest generating the CA, got: %v", err)
 	}
 }
 

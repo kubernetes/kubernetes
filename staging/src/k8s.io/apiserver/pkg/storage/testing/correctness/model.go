@@ -81,6 +81,7 @@ type Model struct {
 	Versioner              storage.Versioner
 	NewFunc                func() runtime.Object
 	NewListFunc            func() runtime.Object
+	ReverseKeyFunc         storage.ReverseKeyFunc
 }
 
 func (s *Model) Clone() *Model {
@@ -92,6 +93,7 @@ func (s *Model) Clone() *Model {
 		NewFunc:                s.NewFunc,
 		NewListFunc:            s.NewListFunc,
 		Versioner:              s.Versioner,
+		ReverseKeyFunc:         s.ReverseKeyFunc,
 	}
 	for k, v := range s.Items {
 		if v != nil {
@@ -123,11 +125,25 @@ func (s *Model) Step(input Request, output Response) (ok bool, next *Model, chan
 	case OpList:
 		return s.validateList(input.Key, input.List.Options, expected, output), s, nil
 	default:
-		if !reflect.DeepEqual(expected, output) {
+		if !s.equalResponse(expected, output) {
 			return false, s, nil
 		}
 		return true, next, change
 	}
+}
+
+func (s *Model) equalResponse(expected, output Response) bool {
+	if reflect.DeepEqual(expected, output) {
+		return true
+	}
+	expErr, ok := expected.Err.(*storage.StorageError)
+	if !ok || expected.Object != nil || s.Prefix == "" || !strings.HasPrefix(expErr.Key, s.Prefix+"/") {
+		return false
+	}
+	// CacheDelegator returns storage errors keyed without etcd3's path prefix.
+	unprefixed := *expErr
+	unprefixed.Key = strings.TrimPrefix(expErr.Key, s.Prefix)
+	return reflect.DeepEqual(Response{Err: &unprefixed}, output)
 }
 
 // execute returns the response storage gives for input served from this
@@ -174,7 +190,7 @@ func (s *Model) validateGet(opts storage.GetOptions, expected, output Response) 
 	reqRV, _ := s.Versioner.ParseResourceVersion(opts.ResourceVersion)
 	switch GetReadConsistency(opts) {
 	case ConsistencyConsistent:
-		return reflect.DeepEqual(expected, output)
+		return s.equalResponse(expected, output)
 	case ConsistencyNotOlderThan:
 		if _, retry := apierrors.SuggestsClientDelay(output.Err); retry && reqRV > 0 && storage.IsTooLargeResourceVersion(output.Err) {
 			return true
@@ -234,16 +250,12 @@ func (s *Model) equalListResponse(key string, opts storage.ListOptions, expected
 	if opts.Predicate.Limit <= 0 || expected.Err != nil || output.Err != nil || expected.Object == nil || output.Object == nil {
 		return false
 	}
-	expAccessor, err := meta.ListAccessor(expected.Object)
-	if err != nil || expAccessor.GetContinue() == "" {
-		return false
-	}
 	outAccessor, err := meta.ListAccessor(output.Object)
 	if err != nil {
 		return false
 	}
 	outContinue := outAccessor.GetContinue()
-	if !s.validCacherContinue(key, opts, expAccessor.GetContinue(), outContinue) {
+	if !s.validContinue(key, opts, outContinue) {
 		return false
 	}
 	expectedWithOutContinue := expected.Object.DeepCopyObject()
@@ -255,19 +267,35 @@ func (s *Model) equalListResponse(key string, opts storage.ListOptions, expected
 	return reflect.DeepEqual(expectedWithOutContinue, output.Object)
 }
 
-func (s *Model) validCacherContinue(key string, opts storage.ListOptions, expContinue, outContinue string) bool {
-	if outContinue == "" {
-		// When filtering with a limit and the number of matching items equals the limit,
-		// full-range scans (etcd3, cacher without index) return a continue token if
-		// non-matching items follow the last match, whereas index-backed cacher scans
-		// only the matching index bucket and returns an empty continue token.
-		if opts.Predicate.Empty() {
-			return false
-		}
-		items, err := s.listItems(key, opts)
-		return err == nil && int64(len(items)) == opts.Predicate.Limit
+func (s *Model) validContinue(key string, opts storage.ListOptions, outContinue string) bool {
+	if !opts.Recursive {
+		return outContinue == ""
 	}
-	return false
+	preparedKey, res, err := s.readList(key, opts)
+	if err != nil {
+		return false
+	}
+	if int64(len(res.items)) < opts.Predicate.Limit {
+		return outContinue == ""
+	}
+	lastElemContinue, err := storage.EncodeContinue(res.lastKey+"\x00", preparedKey, int64(s.ResourceVersion))
+	if err != nil {
+		return false
+	}
+	if res.hasMoreMatches {
+		// The model returns all elements after filtering, which allows us to know that there are
+		// remaining items passing the filter, so the continue token must not be empty.
+		return outContinue == lastElemContinue
+	}
+	if opts.Predicate.Empty() {
+		// If we don't filter, then we know there are no remaining items.
+		return outContinue == ""
+	}
+	// When filtering and len(res.items) == Limit, knowing if there are remaining items requires fetching elements beyond limit.
+	// We accept both empty and non-empty continue token values as both are semantically correct.
+	// For indexed selectors, we already know all elements after filtering so we return a more
+	// accurate empty continue, while in other cases it's not worth checking elements beyond the limit.
+	return outContinue == "" || outContinue == lastElemContinue
 }
 
 func (s *Model) listResponseRV(output Response) (uint64, bool) {
@@ -391,21 +419,48 @@ func (s *Model) get(key string, opts storage.GetOptions) Response {
 	return Response{Object: stored.DeepCopyObject(), Err: nil}
 }
 
+type listResponse struct {
+	items          []runtime.Object
+	lastKey        string
+	totalCount     int64
+	hasMoreKeys    bool
+	hasMoreMatches bool
+}
+
 func (s *Model) list(key string, opts storage.ListOptions) Response {
-	preparedKey, err := storage.PrepareKey("", key, opts.Recursive)
+	preparedKey, res, err := s.readList(key, opts)
 	if err != nil {
 		return Response{Err: err}
 	}
-	consistency, rv, _, err := ListReadConsistency("", s.Versioner, opts)
+	continueValue, remainingItemCount, err := storage.PrepareContinueToken(res.lastKey, preparedKey, int64(s.ResourceVersion), res.totalCount, res.hasMoreKeys, opts)
 	if err != nil {
 		return Response{Err: err}
+	}
+	list := s.NewListFunc()
+	if err := meta.SetList(list, res.items); err != nil {
+		return Response{Object: nil, Err: err}
+	}
+	if err := s.Versioner.UpdateList(list, s.ResourceVersion, continueValue, remainingItemCount); err != nil {
+		return Response{Object: nil, Err: err}
+	}
+	return Response{Object: list, Err: nil}
+}
+
+func (s *Model) readList(key string, opts storage.ListOptions) (string, listResponse, error) {
+	preparedKey, err := storage.PrepareKey("", key, opts.Recursive)
+	if err != nil {
+		return "", listResponse{}, err
+	}
+	consistency, rv, continueKey, err := ListReadConsistency(preparedKey, s.Versioner, opts)
+	if err != nil {
+		return "", listResponse{}, err
 	}
 	if opts.Predicate.Label == nil || opts.Predicate.Field == nil {
 		// etcd3 and the cacher call methods on both selectors.
 		panic("nil label or field selector is not supported, use storage.Everything to match everything")
 	}
-	if opts.Predicate.Limit < 0 || opts.Predicate.Continue != "" {
-		panic("negative limit or continue is not supported")
+	if opts.Predicate.Limit < 0 {
+		panic("negative limit is not supported")
 	}
 	if opts.Predicate.Limit > 0 && opts.ResourceVersion == "0" {
 		panic("limit with resourceVersion 0 is not supported (#108003)")
@@ -417,47 +472,66 @@ func (s *Model) list(key string, opts storage.ListOptions) Response {
 		panic("recordTimestamps is not supported, it wraps objects in storage-internal types")
 	}
 	if rv > s.ResourceVersion {
-		return Response{Err: storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)}
+		return "", listResponse{}, storage.NewTooLargeResourceVersionError(rv, s.ResourceVersion, 0)
 	}
 	if consistency == ConsistencyExact && rv < s.CompactResourceVersion {
-		return Response{Err: apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")}
+		if continueKey != "" {
+			return "", listResponse{}, compactedContinueError(continueKey, preparedKey)
+		}
+		return "", listResponse{}, apierrors.NewResourceExpired("The resourceVersion for the provided list is too old.")
 	}
-	var items []runtime.Object
-	var lastKey string
-	var hasMore bool
-	var totalCount int64
+	res, err := s.readItems(key, continueKey, opts)
+	return preparedKey, res, err
+}
+
+func (s *Model) readItems(key, continueKey string, opts storage.ListOptions) (listResponse, error) {
+	var res listResponse
 	limit := opts.Predicate.Limit
 	for _, k := range slices.Sorted(maps.Keys(s.Items)) {
 		if !keyInScope(key, opts.Recursive, k) {
 			continue
 		}
-		totalCount++
-		if limit > 0 && int64(len(items)) >= limit {
-			hasMore = true
+		if continueKey != "" && k < continueKey {
 			continue
+		}
+		res.totalCount++
+		if limit > 0 && int64(len(res.items)) >= limit {
+			res.hasMoreKeys = true
+			if res.hasMoreMatches {
+				continue
+			}
 		}
 		obj := s.Items[k]
 		matches, err := opts.Predicate.Matches(obj)
 		if err != nil {
-			return Response{Err: err}
+			return listResponse{}, err
 		}
 		if matches {
-			items = append(items, obj.DeepCopyObject())
-			lastKey = k
+			if limit > 0 && int64(len(res.items)) >= limit {
+				res.hasMoreMatches = true
+				continue
+			}
+			res.items = append(res.items, obj.DeepCopyObject())
+			res.lastKey = k
 		}
 	}
-	continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastKey, preparedKey, int64(s.ResourceVersion), totalCount, hasMore, opts)
+	return res, nil
+}
+
+func compactedContinueError(continueKey, keyPrefix string) error {
+	newToken, err := storage.EncodeContinue(continueKey, keyPrefix, -1)
 	if err != nil {
-		return Response{Err: err}
+		return apierrors.NewResourceExpired(
+			"The provided continue parameter is too old to display a consistent list result. " +
+				"You can start a new list without the continue parameter.")
 	}
-	list := s.NewListFunc()
-	if err := meta.SetList(list, items); err != nil {
-		return Response{Object: nil, Err: err}
-	}
-	if err := s.Versioner.UpdateList(list, s.ResourceVersion, continueValue, remainingItemCount); err != nil {
-		return Response{Object: nil, Err: err}
-	}
-	return Response{Object: list, Err: nil}
+	statusError := apierrors.NewResourceExpired(
+		"The provided continue parameter is too old to display a consistent list result. " +
+			"You can start a new list without the continue parameter, or use the continue token in this response " +
+			"to retrieve the remainder of the results. Continuing with the provided token results in an inconsistent list - " +
+			"objects that were created, modified, or deleted between the time the first chunk was returned and now may show up in the list.")
+	statusError.ErrStatus.ListMeta.Continue = newToken
+	return statusError
 }
 
 func (s *Model) compact(rvStr string) Response {
@@ -476,24 +550,6 @@ func (s *Model) compact(rvStr string) Response {
 	return Response{}
 }
 
-func (s *Model) listItems(key string, opts storage.ListOptions) ([]runtime.Object, error) {
-	var items []runtime.Object
-	for _, k := range slices.Sorted(maps.Keys(s.Items)) {
-		if !keyInScope(key, opts.Recursive, k) {
-			continue
-		}
-		obj := s.Items[k]
-		matches, err := opts.Predicate.Matches(obj)
-		if err != nil {
-			return nil, err
-		}
-		if matches {
-			items = append(items, obj.DeepCopyObject())
-		}
-	}
-	return items, nil
-}
-
 // keyInScope reports whether k is selected by a list or watch on key.
 func keyInScope(key string, recursive bool, k string) bool {
 	if !recursive {
@@ -509,12 +565,12 @@ func checkKey(key string, recursive bool) error {
 }
 
 func (s *Model) initialEvents(request WatchRequest) ([]watch.Event, error) {
-	items, err := s.listItems(request.Key, request.Options)
+	res, err := s.readItems(request.Key, "", request.Options)
 	if err != nil {
 		return nil, err
 	}
 	var events []watch.Event
-	for _, obj := range items {
+	for _, obj := range res.items {
 		events = append(events, watch.Event{
 			Type:   watch.Added,
 			Object: obj,

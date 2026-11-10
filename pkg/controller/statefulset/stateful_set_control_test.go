@@ -1279,8 +1279,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 		{[]int{5, 3}},
 		{[]int{4, 3}},
 		{[]int{5, 4, 3}},
-		{[]int{2}}, // note this is an ordinal greater than partition(3)
-		{[]int{1}}, // note this is an ordinal greater than partition(3)
+		{[]int{2}}, // ordinal below partition(3): must not consume the update budget
+		{[]int{1}}, // ordinal below partition(3): must not consume the update budget
 	}
 	for _, tc := range testCases {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)
@@ -1288,6 +1288,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 		t.Run(fmt.Sprintf("terminating pod at ordinal %d", tc.ordinalOfPodToTerminate), func(t *testing.T) {
 			status := apps.StatefulSetStatus{Replicas: int32(totalPods)}
 			updateRevision := &apps.ControllerRevision{}
+			partition := int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 
 			for i := 0; i < len(tc.ordinalOfPodToTerminate); i++ {
 				// Ensure at least one pod is unavailable before trying to update
@@ -1324,12 +1325,16 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 
 			sort.Sort(ascendingOrdinal(pods))
 
-			expecteddPodsToBeDeleted := maxUnavailable.IntValue() - len(tc.ordinalOfPodToTerminate)
-			if expecteddPodsToBeDeleted < 0 {
-				expecteddPodsToBeDeleted = 0
+			// Only unavailable pods in the update range (>= partition) consume maxUnavailable.
+			unavailableInUpdateRange := 0
+			for _, ordinal := range tc.ordinalOfPodToTerminate {
+				if ordinal >= partition {
+					unavailableInUpdateRange++
+				}
 			}
+			expectedPodsToBeDeleted := max(0, maxUnavailable.IntValue()-unavailableInUpdateRange)
 
-			expectedPodsAfterUpdate := int(totalPods) - expecteddPodsToBeDeleted
+			expectedPodsAfterUpdate := int(totalPods) - expectedPodsToBeDeleted
 
 			if len(pods) != expectedPodsAfterUpdate {
 				t.Errorf("Expected pods %v, got pods %v", expectedPodsAfterUpdate, len(pods))
@@ -1590,7 +1595,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			expectedRemainingOrdinals: []int{0, 1, 3, 4},
 		},
 		{
-			name:                "Parallel/5 replicas partition=2: unavailable pod below partition (#1) consumes budget, no update",
+			name:                "Parallel/5 replicas partition=2: unavailable pod below partition (#1) does not consume budget, update proceeds",
 			podManagementPolicy: apps.ParallelPodManagement,
 			replicas:            5,
 			partition:           2,
@@ -1600,7 +1605,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
-			expectedRemainingOrdinals: []int{0, 1, 2, 3, 4},
+			// Budget ignores pod #1 (below partition); phase 2 deletes highest update-range pod (#4).
+			expectedRemainingOrdinals: []int{0, 1, 2, 3},
 		},
 		{
 			name:                "OrderedReady/5 replicas partition=2: unavailable pod in update range (#4) blocks update",
@@ -1629,7 +1635,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			expectedRemainingOrdinals: []int{0, 1, 2},
 		},
 		{
-			name:                "Parallel/5 replicas partition=3 maxUnavailable=2: pod below partition (#1) + pod in range (#4) unavailable, one pod deleted",
+			name:                "Parallel/5 replicas partition=3 maxUnavailable=2: pod below partition (#1) + pod in range (#4) unavailable, below-partition ignored for budget",
 			podManagementPolicy: apps.ParallelPodManagement,
 			replicas:            5,
 			partition:           3,
@@ -1639,7 +1645,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
-			expectedRemainingOrdinals: []int{0, 1, 2, 3},
+			// Only #4 counts toward budget (1); phase 1 deletes #4, remaining budget 1 deletes #3.
+			expectedRemainingOrdinals: []int{0, 1, 2},
 		},
 		{
 			name:                "Parallel/4 replicas maxUnavailable=2: lower-ordinal unavailable pods get deleted, higher-ordinal good pods must stay",
@@ -4620,6 +4627,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 	tests := []struct {
 		name                             string
 		totalPods                        int32
+		partition                        int32
 		maxUnavailable                   *intstr.IntOrString
 		updateStrategy                   apps.StatefulSetUpdateStrategyType
 		podManagementPolicy              apps.PodManagementPolicyType
@@ -4635,6 +4643,19 @@ func TestStatefulSetMetrics(t *testing.T) {
 			podManagementPolicy:              apps.OrderedReadyPodManagement,
 			unavailablePodCount:              1,
 			expectedMaxUnavailableValue:      2,
+			expectedUnavailableReplicasValue: 1,
+		},
+		{
+			// unavailablePodCount makes ordinals [0, count) unavailable; with partition=2 that
+			// is only below the update range. Budget ignores them, but the metric must still report 1.
+			name:                             "partition nonzero: unavailable below partition still counted in UnavailableReplicas",
+			totalPods:                        5,
+			partition:                        2,
+			maxUnavailable:                   &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			updateStrategy:                   apps.RollingUpdateStatefulSetStrategyType,
+			podManagementPolicy:              apps.OrderedReadyPodManagement,
+			unavailablePodCount:              1,
+			expectedMaxUnavailableValue:      1,
 			expectedUnavailableReplicasValue: 1,
 		},
 		{
@@ -4756,7 +4777,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			// Create StatefulSet
 			set := newStatefulSet(test.totalPods)
 			if test.updateStrategy == apps.RollingUpdateStatefulSetStrategyType {
-				var partition int32 = 0
+				partition := test.partition
 				set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 					Type: apps.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{

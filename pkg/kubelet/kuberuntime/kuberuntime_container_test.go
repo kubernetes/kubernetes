@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
@@ -57,7 +56,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	// Swap in real ContainerLogManager for the stub.
-	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	logManager, err := logs.NewContainerLogManager(tCtx.Logger(), m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
 	require.NoError(t, err)
 	m.logManager = logManager
 
@@ -117,7 +116,7 @@ func TestRemoveContainer_keepLogs(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	// Swap in real ContainerLogManager for the stub.
-	logManager, err := logs.NewContainerLogManager(m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
+	logManager, err := logs.NewContainerLogManager(tCtx.Logger(), m.runtimeService, m.osInterface, "1", 2, 10, metav1.Duration{Duration: 10 * time.Second})
 	require.NoError(t, err)
 	m.logManager = logManager
 
@@ -317,7 +316,6 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported on Windows.")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	const (
@@ -520,32 +518,10 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 	_, _, m, _ := createTestRuntimeManager(tCtx)
 
 	for desc, test := range map[string]struct {
-		input          *runtimeapi.ContainerUser
-		expected       *kubecontainer.ContainerUser
-		featureEnabled bool
+		input    *runtimeapi.ContainerUser
+		expected *kubecontainer.ContainerUser
 	}{
-		"non nil user, SupplementalGroupsPolicy is disabled": {
-			input: &runtimeapi.ContainerUser{
-				Linux: &runtimeapi.LinuxContainerUser{
-					Uid:                0,
-					Gid:                0,
-					SupplementalGroups: []int64{10},
-				},
-			},
-			expected:       nil,
-			featureEnabled: false,
-		},
-		"empty user, SupplementalGroupsPolicy is disabled": {
-			input:          &runtimeapi.ContainerUser{},
-			expected:       nil,
-			featureEnabled: false,
-		},
-		"nil user, SupplementalGroupsPolicy is disabled": {
-			input:          nil,
-			expected:       nil,
-			featureEnabled: false,
-		},
-		"non nil user, SupplementalGroupsPolicy is enabled": {
+		"non nil user": {
 			input: &runtimeapi.ContainerUser{
 				Linux: &runtimeapi.LinuxContainerUser{
 					Uid:                0,
@@ -560,23 +536,17 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 					SupplementalGroups: []int64{10},
 				},
 			},
-			featureEnabled: true,
 		},
-		"empty user, SupplementalGroupsPolicy is enabled": {
-			input:          &runtimeapi.ContainerUser{},
-			expected:       &kubecontainer.ContainerUser{},
-			featureEnabled: true,
+		"empty user": {
+			input:    &runtimeapi.ContainerUser{},
+			expected: &kubecontainer.ContainerUser{},
 		},
-		"nil user, SupplementalGroupsPolicy is enabled": {
-			input:          nil,
-			expected:       nil,
-			featureEnabled: true,
+		"nil user": {
+			input:    nil,
+			expected: nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			// Set emulation version so that the feature gate can be disabled in the test
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, test.featureEnabled)
 			cStatus := &runtimeapi.ContainerStatus{
 				Id:        cid.ID,
 				Metadata:  meta,
@@ -1251,4 +1221,78 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	assert.Len(t, result, 2)
 	assert.Equal(t, []string{"noexec", "nosuid"}, result[0].MountOptions)
 	assert.Empty(t, result[1].MountOptions)
+}
+
+func TestContainerVolumeMountsActuatedState(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	volumeMounts := []v1.VolumeMount{
+		{
+			Name:      "vol1",
+			MountPath: "/mnt/vol1",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "vol2",
+			MountPath: "/mnt/vol2",
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-uid-1",
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "c1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					VolumeMounts:    volumeMounts,
+				},
+			},
+		},
+	}
+
+	sandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 0)
+	require.NoError(t, err)
+	sandboxID, err := fakeRuntime.RunPodSandbox(tCtx, sandboxConfig, "")
+	require.NoError(t, err)
+
+	podStatus := &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
+
+	// When DynamicNodeLocalEphemeralVolumes is disabled, starting the container does not record volumeMounts.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+	msg, err := m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	require.NoError(t, err, msg)
+	gotMounts, found := m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Empty(t, gotMounts)
+
+	// When DynamicNodeLocalEphemeralVolumes is enabled, starting the container records its volumeMounts in the actuation checkpoint.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	msg, err = m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	require.NoError(t, err, msg)
+
+	gotMounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, volumeMounts, gotMounts)
+
+	// Restarting the container with updated volumeMounts overwrites the actuation checkpoint.
+	updatedMounts := []v1.VolumeMount{
+		{
+			Name:      "vol3",
+			MountPath: "/mnt/vol3",
+		},
+	}
+	pod.Spec.Containers[0].VolumeMounts = updatedMounts
+	msg, err = m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
+	require.NoError(t, err, msg)
+
+	gotMounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, updatedMounts, gotMounts)
 }

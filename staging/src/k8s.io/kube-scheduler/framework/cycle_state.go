@@ -162,4 +162,13 @@ type PodGroupCycleState interface {
 	// GetParentPlacementCycleState returns PlacementCycleState of the parent composite pod group.
 	// If there is no parent, returns nil.
 	GetParentPlacementCycleState() PlacementCycleState
+	// PlacementState returns the PlacementCycleState for the given placement.
+	// If no state exists for the placement, the method initializes and returns a new one.
+	// If placement is nil, the method returns nil.
+	// A PlacementGeneratePlugin can write per-placement data to this state during
+	// GeneratePlacements and read it from PlacementCycleState in later phases. The plugin
+	// must return the same Placement pointer that it passes to this method.
+	// State attached to an unchanged parent placement returned alone is ignored.
+	// Store group-wide data directly in PodGroupCycleState instead.
+	PlacementState(placement *Placement) PlacementCycleState
 }

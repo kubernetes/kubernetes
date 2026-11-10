@@ -38,8 +38,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
 )
 
 type keyTestEntry struct {
@@ -287,6 +287,87 @@ func TestRefValMapKey(t *testing.T) {
 				celMapKey := refValMapKey(types.DefaultTypeAdapter.NativeToValue(tc.equivalentCELMap), tc.escapedKeyProps)
 				if got != celMapKey {
 					t.Errorf("typed element key %#v differs from equivalent CEL map key %#v", got, celMapKey)
+				}
+			}
+		})
+	}
+}
+
+// propertyOnlySchema implements just the Schema methods TypedToVal needs for
+// structs. Any other call panics on the nil embedded interface, which also
+// guards against regressing to Properties() on the struct field lookup path.
+type propertyOnlySchema struct {
+	Schema
+	props map[string]Schema
+}
+
+func (s *propertyOnlySchema) HasProperties() bool { return s.props != nil }
+
+func (s *propertyOnlySchema) Property(key string) (Schema, bool) {
+	p, ok := s.props[key]
+	return p, ok
+}
+
+func TestTypedToValStructPropertyLookup(t *testing.T) {
+	leaf := &propertyOnlySchema{}
+	value := keyTestEntry{Name: "a", If: "b"}
+
+	cases := []struct {
+		name     string
+		props    map[string]Schema
+		wantErr  bool
+		found    map[string]string // escaped key -> value
+		notFound []string
+	}{
+		{
+			name:    "nil properties is an invalid struct schema",
+			wantErr: true,
+		},
+		{
+			name:     "empty non-nil properties is a valid struct schema with no fields",
+			props:    map[string]Schema{},
+			notFound: []string{"name", "__if__"},
+		},
+		{
+			name:     "only declared properties are exposed",
+			props:    map[string]Schema{"if": leaf},
+			found:    map[string]string{"__if__": "b"},
+			notFound: []string{"name"},
+		},
+		{
+			name:  "all declared properties are exposed",
+			props: map[string]Schema{"name": leaf, "if": leaf},
+			found: map[string]string{"name": "a", "__if__": "b"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := TypedToVal(value, &propertyOnlySchema{props: tc.props})
+			if tc.wantErr {
+				if !types.IsError(v) {
+					t.Fatalf("TypedToVal() = %v (%T), want error", v, v)
+				}
+				return
+			}
+			s, ok := v.(*typedStruct)
+			if !ok {
+				t.Fatalf("TypedToVal() = %v (%T), want *typedStruct", v, v)
+			}
+			for k, want := range tc.found {
+				if got := s.Get(types.String(k)); got != types.String(want) {
+					t.Errorf("Get(%q) = %v, want %q", k, got, want)
+				}
+				if got := s.IsSet(types.String(k)); got != types.True {
+					t.Errorf("IsSet(%q) = %v, want true", k, got)
+				}
+			}
+			for _, k := range tc.notFound {
+				if got := s.Get(types.String(k)); !types.IsError(got) {
+					t.Errorf("Get(%q) = %v, want no such key error", k, got)
+				}
+				if got := s.IsSet(types.String(k)); got != types.False {
+					t.Errorf("IsSet(%q) = %v, want false", k, got)
 				}
 			}
 		})

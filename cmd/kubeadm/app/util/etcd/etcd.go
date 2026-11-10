@@ -322,12 +322,15 @@ func (c *Client) listMembers(timeout time.Duration) (*clientv3.MemberListRespons
 			resp, err = c.listMembersOnce()
 			if err != nil {
 				lastError = err
-				return false, err
+				return false, nil
 			}
 			return true, nil
 		})
 	if err != nil {
-		return nil, lastError
+		if lastError != nil {
+			err = lastError
+		}
+		return nil, errors.Wrapf(err, "timed out after %v waiting for the etcd member list", timeout)
 	}
 	return resp, nil
 }

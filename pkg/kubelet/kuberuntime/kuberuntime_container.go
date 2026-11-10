@@ -273,8 +273,8 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	// When creating a container, mark the resources as actuated.
-	if err := m.setActuatedContainerResources(logger, pod, container, spec.containerType); err != nil {
+	// When creating a container, mark the resources and volume mounts as actuated.
+	if err := m.setActuatedContainer(logger, pod, container, spec.containerType); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
 	}
@@ -430,6 +430,18 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 		err = m.setActuatedContainerResources(logger, pod, container, containerType)
 	}
 	return err
+}
+
+func (m *kubeGenericRuntimeManager) setActuatedContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		return m.setActuatedContainerResources(logger, pod, container, containerType)
+	}
+	actuatedContainer := *container
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		actuatedContainer.Resources = *container.Resources.DeepCopy()
+		actuatedContainer.Resources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
+	}
+	return m.actuatedState.SetContainer(logger, pod.UID, containerType, actuatedContainer)
 }
 
 func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
@@ -701,25 +713,22 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(ctx, status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(ctx, status.Labels)
-	var cStatusResources *kubecontainer.ContainerResources
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// If runtime reports cpu & memory resources info, add it to container status
-		cStatusResources = toKubeContainerResources(status.Resources)
+	// If runtime reports cpu & memory resources info, add it to container status
+	cStatusResources := toKubeContainerResources(status.Resources)
 
-		// Fill missing resource values from the actuated resources.
-		if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
-			if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
-				if cStatusResources == nil {
-					cStatusResources = &kubecontainer.ContainerResources{
-						CPURequest:    actuatedResources.Requests.Cpu(),
-						CPULimit:      actuatedResources.Limits.Cpu(),
-						MemoryRequest: actuatedResources.Requests.Memory(),
-						MemoryLimit:   actuatedResources.Limits.Memory(),
-					}
-				} else if cStatusResources.MemoryRequest == nil {
-					if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
-						cStatusResources.MemoryRequest = &memReq
-					}
+	// Fill missing resource values from the actuated resources.
+	if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
+		if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
+			if cStatusResources == nil {
+				cStatusResources = &kubecontainer.ContainerResources{
+					CPURequest:    actuatedResources.Requests.Cpu(),
+					CPULimit:      actuatedResources.Limits.Cpu(),
+					MemoryRequest: actuatedResources.Requests.Memory(),
+					MemoryLimit:   actuatedResources.Limits.Memory(),
+				}
+			} else if cStatusResources.MemoryRequest == nil {
+				if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
+					cStatusResources.MemoryRequest = &memReq
 				}
 			}
 		}
@@ -731,10 +740,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 		imageID = status.ImageId
 	}
 
-	var cStatusUser *kubecontainer.ContainerUser
-	if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-		cStatusUser = toKubeContainerUser(status.User)
-	}
+	cStatusUser := toKubeContainerUser(status.User)
 
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
@@ -940,13 +946,15 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 	return nil
 }
 
-// killContainersWithSyncResult kills all pod's containers with sync results.
-func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
-	logger := klog.FromContext(ctx)
-	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
-	wg := sync.WaitGroup{}
-
-	wg.Add(len(runningPod.Containers))
+// killRunningPodContainers kills all running pod's containers.
+func (m *kubeGenericRuntimeManager) killRunningPodContainers(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) []*kubecontainer.SyncResult {
+	containersToKill := make(map[kubecontainer.ContainerID]containerToKillInfo, len(runningPod.Containers))
+	for _, container := range runningPod.Containers {
+		containersToKill[container.ID] = containerToKillInfo{
+			name:   container.Name,
+			reason: reasonUnknown,
+		}
+	}
 	var termOrdering *terminationOrdering
 	if types.HasRestartableInitContainer(pod) {
 		var runningContainerNames []string
@@ -955,28 +963,39 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 		}
 		termOrdering = newTerminationOrdering(pod, runningContainerNames)
 	}
-	for _, container := range runningPod.Containers {
-		go func(container *kubecontainer.Container) {
-			defer utilruntime.HandleCrashWithContext(ctx)
-			defer wg.Done()
+	return m.killContainers(ctx, pod, containersToKill, gracePeriodOverride, termOrdering)
+}
 
-			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
-			if err := m.killContainer(ctx, pod, container.ID, container.Name, "", reasonUnknown, gracePeriodOverride, termOrdering); err != nil {
+// killContainers kills the given containers concurrently and blocks until all of
+// them have been stopped. It returns one sync result per container, in no
+// particular order. If ordering is non-nil, it is used to enforce termination
+// ordering.
+func (m *kubeGenericRuntimeManager) killContainers(ctx context.Context, pod *v1.Pod, containersToKill map[kubecontainer.ContainerID]containerToKillInfo, gracePeriodOverride *int64, ordering *terminationOrdering) []*kubecontainer.SyncResult {
+	logger := klog.FromContext(ctx)
+	containerResults := make(chan *kubecontainer.SyncResult, len(containersToKill))
+	var wg sync.WaitGroup
+
+	for containerID, containerInfo := range containersToKill {
+		wg.Go(func() {
+			defer utilruntime.HandleCrashWithContext(ctx)
+
+			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
+			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, gracePeriodOverride, ordering); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				// Use runningPod for logging as the pod passed in could be *nil*.
-				logger.Error(err, "Kill container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name), "podUID", runningPod.ID,
-					"containerName", container.Name, "containerID", container.ID)
+				logger.Error(err, "Kill container failed", "pod", klog.KObj(pod), "podUID", pod.UID,
+					"containerName", containerInfo.name, "containerID", containerID)
 			}
 			containerResults <- killContainerResult
-		}(container)
+		})
 	}
 	wg.Wait()
 	close(containerResults)
 
+	syncResults := make([]*kubecontainer.SyncResult, 0, len(containersToKill))
 	for containerResult := range containerResults {
 		syncResults = append(syncResults, containerResult)
 	}
-	return
+	return syncResults
 }
 
 // pruneInitContainersBeforeStart ensures that before we begin creating init

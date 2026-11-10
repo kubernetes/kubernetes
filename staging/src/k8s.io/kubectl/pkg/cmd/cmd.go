@@ -456,7 +456,7 @@ func GetLogVerbosity(args []string) string {
 			if i+1 < len(args) {
 				return args[i+1]
 			}
-		} else if strings.Contains(arg, "--v=") || strings.Contains(arg, "-v=") {
+		} else if strings.HasPrefix(arg, "--v=") || strings.HasPrefix(arg, "-v=") {
 			parg := strings.Split(arg, "=")
 			if len(parg) > 1 && parg[1] != "" {
 				return parg[1]

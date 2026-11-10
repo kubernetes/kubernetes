@@ -109,6 +109,12 @@ func init() {
 			"spec.devices.requests[*].exactly.allocationMode": {
 				{ErrorType: "FieldValueNotSupported"},
 			},
+			"spec.devices.requests[*].exactly.capacity.requests": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"spec.devices.requests[*].exactly.capacity.requests[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
 			"spec.devices.requests[*].exactly.derivedAttributes": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
@@ -141,6 +147,12 @@ func init() {
 			},
 			"spec.devices.requests[*].firstAvailable[*].allocationMode": {
 				{ErrorType: "FieldValueNotSupported"},
+			},
+			"spec.devices.requests[*].firstAvailable[*].capacity.requests": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"spec.devices.requests[*].firstAvailable[*].capacity.requests[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"spec.devices.requests[*].firstAvailable[*].derivedAttributes": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
@@ -199,6 +211,12 @@ func init() {
 			},
 			"status.allocation.devices.results[*].bindingFailureConditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+			"status.allocation.devices.results[*].consumedCapacity": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxProperties"},
+			},
+			"status.allocation.devices.results[*].consumedCapacity[*]": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
 			"status.allocation.devices.results[*].driver": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name-caseless"},

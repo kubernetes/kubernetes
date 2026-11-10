@@ -1297,7 +1297,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err, "update StatefulSet %q in namespace %q", ssName, ns)
 
 			ginkgo.By("Creating a new revision")
-			ss = waitForStatus(ctx, c, ss)
+			ss = waitForUpdatedRevision(ctx, c, ss)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err, "list pods belonging to StatefulSet %q in namespace %q", ss.Name, ss.Namespace)
 
@@ -1373,7 +1373,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err, "update StatefulSet %q in namespace %q", ssName, ns)
 
 			ginkgo.By("Creating a new revision")
-			ss = waitForStatus(ctx, c, ss)
+			ss = waitForUpdatedRevision(ctx, c, ss)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err, "list pods belonging to StatefulSet %q in namespace %q", ss.Name, ss.Namespace)
 
@@ -1450,7 +1450,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			framework.ExpectNoError(err, "update StatefulSet %q in namespace %q", ssName, ns)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
-			ss = waitForStatus(ctx, c, ss)
+			ss = waitForUpdatedRevision(ctx, c, ss)
 			pods, err = e2estatefulset.GetPodList(ctx, c, ss)
 			framework.ExpectNoError(err, "list pods belonging to StatefulSet %q in namespace %q", ss.Name, ss.Namespace)
 

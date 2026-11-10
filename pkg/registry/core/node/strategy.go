@@ -106,14 +106,6 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 		node.Spec.ConfigSource = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
-		node.Status.RuntimeHandlers = nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) && !supplementalGroupsPolicyInUse(oldNode) {
-		node.Status.Features = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) && !nodeDeclaredFeaturesInUse(oldNode) {
 		node.Status.DeclaredFeatures = nil
 	}
@@ -329,14 +321,6 @@ func nodeWarnings(obj runtime.Object) []string {
 	}
 
 	return warnings
-}
-
-// supplementalGroupsPolicyInUse returns true if the node.status has NodeFeature
-func supplementalGroupsPolicyInUse(node *api.Node) bool {
-	if node == nil {
-		return false
-	}
-	return node.Status.Features != nil
 }
 
 // nodeDeclaredFeaturesInUse returns true if the node.status has DeclaredFeatures

@@ -159,9 +159,9 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		encoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
 	}
 
-	var serverShuttingDownCh <-chan struct{}
+	var drainWatchCh <-chan struct{}
 	if signals := apirequest.ServerShutdownSignalFrom(req.Context()); signals != nil {
-		serverShuttingDownCh = signals.ShuttingDown()
+		drainWatchCh = signals.DrainingWatches()
 	}
 
 	server := &WatchServer{
@@ -174,9 +174,9 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
 
-		MemoryAllocator:      memoryAllocator,
-		TimeoutFactory:       &realTimeoutFactory{timeout},
-		ServerShuttingDownCh: serverShuttingDownCh,
+		MemoryAllocator: memoryAllocator,
+		TimeoutFactory:  &realTimeoutFactory{timeout},
+		DrainWatchCh:    drainWatchCh,
 
 		metricsScope:          metricsScope,
 		isWatchListRequest:    isWatchListRequest,
@@ -206,9 +206,9 @@ type WatchServer struct {
 	// used to encode the nested object in the watch stream
 	EmbeddedEncoder runtime.Encoder
 
-	MemoryAllocator      runtime.MemoryAllocator
-	TimeoutFactory       TimeoutFactory
-	ServerShuttingDownCh <-chan struct{}
+	MemoryAllocator runtime.MemoryAllocator
+	TimeoutFactory  TimeoutFactory
+	DrainWatchCh    <-chan struct{}
 
 	metricsScope          string
 	isWatchListRequest    bool
@@ -422,14 +422,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	span.AddEvent("About to start writing response")
 	for {
 		select {
-		case <-s.ServerShuttingDownCh:
-			// the server has signaled that it is shutting down (not accepting
-			// any new request), all active watch request(s) should return
-			// immediately here. The WithWatchTerminationDuringShutdown server
-			// filter will ensure that the response to the client is rate
-			// limited in order to avoid any thundering herd issue when the
-			// client(s) try to reestablish the WATCH on the other
-			// available apiserver instance(s).
+		case <-s.DrainWatchCh:
+			// The server has signaled that active watch requests should start
+			// draining. Return now so WithWatchTerminationDuringShutdown can
+			// rate limit response completion and avoid a thundering herd when
+			// clients reestablish watches on other apiserver instances.
 			return
 		case <-done:
 			return

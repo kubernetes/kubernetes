@@ -204,6 +204,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	}
 
 	clientConfig.DisableCompression = configClusterInfo.DisableCompression
+	clientConfig.MinConnectionPoolSize = int(configClusterInfo.MinConnectionPoolSize)
 
 	if config.overrides != nil && len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)

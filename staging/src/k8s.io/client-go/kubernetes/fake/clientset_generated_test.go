@@ -169,7 +169,7 @@ func TestShardedSharedInformerFactory(t *testing.T) {
 
 		factories[shard] = informers.NewSharedInformerFactoryWithOptions(client, 0, informers.WithShardSelector(sel))
 		_ = factories[shard].Core().V1().Pods().Informer()
-		factories[shard].Start(ctx.Done())
+		factories[shard].StartWithContext(ctx)
 		t.Cleanup(factories[shard].Shutdown)
 		require.NoError(t, factories[shard].WaitForCacheSyncWithContext(ctx).AsError())
 

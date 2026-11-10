@@ -531,3 +531,33 @@ func TestGetStaticPodPriorityWarning(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodeStaticPodRunsDeclarativeValidation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EvictionRequestAPI, true)
+	logger, _ := ktesting.NewTestContext(t)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "mynamespace"},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "image", Image: "test/image"}},
+			// Only declarative validation enforces the priority bounds.
+			EvictionResponders: []v1.EvictionResponder{{Name: "acme.io/foo", Priority: new(int32(100001))}},
+		},
+	}
+	const wantErr = "spec.evictionResponders[0].priority"
+
+	single, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, _, err := tryDecodeSinglePod(logger, single, noDefault); err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("tryDecodeSinglePod: got error %v, want one containing %q", err, wantErr)
+	}
+
+	list, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.PodList{Items: []v1.Pod{*pod}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, _, err := tryDecodePodList(logger, list, noDefault); err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("tryDecodePodList: got error %v, want one containing %q", err, wantErr)
+	}
+}

@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
-	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
@@ -240,8 +240,11 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					WaitForPodsScheduled: []string{"p1", "p2", "p3"},
 				},
 				{
-					Name:               "Verify that low prio pods are removed",
-					WaitForPodsRemoved: []string{"existing1", "existing2"},
+					Name: "Verify that one low prio pod is removed",
+					WaitForAnyPodsRemoved: &stepsframework.WaitForAnyPodsRemoved{
+						Pods:       []string{"existing1", "existing2"},
+						NumRemoved: 1,
+					},
 				},
 			},
 		},
@@ -1734,7 +1737,7 @@ func runTestScenario(t *testing.T, tt scenario, cpgEnabled bool) {
 		features.TopologyAwareWorkloadScheduling: true,
 	})
 
-	testCtx := testutils.InitTestSchedulerWithNS(t, "tas",
+	testCtx := schedulerutils.InitTestSchedulerWithNS(t, "tas",
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0))
 	ns := testCtx.NS.Name
@@ -1853,7 +1856,7 @@ func TestTopologyAwareSchedulingWithPlacementLimit(t *testing.T) {
 				features.TopologyAwareWorkloadScheduling: true,
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "tas-placement-limit",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "tas-placement-limit",
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0),
 				scheduler.WithPercentageOfPlacementsToScore(new(percentageLimit)))

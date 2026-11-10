@@ -60,7 +60,9 @@ type CapacityRequirementsApplyConfiguration struct {
 	// If the device allows multiple allocation,
 	// the aggregated amount across all requests must not exceed the capacity value.
 	// The consumed capacity, which may be adjusted based on the requestPolicy if defined,
-	// is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+	// is recorded in the resource claim's status.devices[*].consumedCapacity field.
+	//
+	// Requests may have at most 32 entries. The values must not be negative.
 	Requests map[resourcev1.QualifiedName]resource.Quantity `json:"requests,omitempty"`
 }
 

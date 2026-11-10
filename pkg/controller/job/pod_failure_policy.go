@@ -22,6 +22,8 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // matchPodFailurePolicy returns information about matching a given failed pod
@@ -52,6 +54,9 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionFailJob:
 					msg := fmt.Sprintf("Container %s for pod %s/%s failed with exit code %v matching %v rule at index %d",
 						containerStatus.Name, failedPod.Namespace, failedPod.Name, containerStatus.State.Terminated.ExitCode, podFailurePolicyRule.Action, index)
+					if feature.DefaultFeatureGate.Enabled(features.PodFailurePolicyName) && podFailurePolicyRule.Name != nil {
+						msg += fmt.Sprintf(" (%s)", *podFailurePolicyRule.Name)
+					}
 					return &msg, true, &failJob
 				}
 			}
@@ -67,6 +72,9 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionFailJob:
 					msg := fmt.Sprintf("Pod %s/%s has condition %v matching %v rule at index %d",
 						failedPod.Namespace, failedPod.Name, podCondition.Type, podFailurePolicyRule.Action, index)
+					if feature.DefaultFeatureGate.Enabled(features.PodFailurePolicyName) && podFailurePolicyRule.Name != nil {
+						msg += fmt.Sprintf(" (%s)", *podFailurePolicyRule.Name)
+					}
 					return &msg, true, &failJob
 				}
 			}

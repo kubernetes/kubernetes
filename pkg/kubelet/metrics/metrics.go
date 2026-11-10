@@ -43,6 +43,7 @@ const (
 	NodeStartupPostRegistrationKey     = "node_startup_post_registration_duration_seconds"
 	NodeStartupKey                     = "node_startup_duration_seconds"
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
+	PodWorkerErrorsTotalKey            = "pod_worker_errors_total"
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
 	PodStartTotalDurationKey           = "pod_start_total_duration_seconds"
@@ -86,6 +87,7 @@ const (
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
+	DevicePluginDevicesKey            = "device_plugin_devices"
 	// Metrics keys of pod resources operations
 	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
 	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list"
@@ -105,6 +107,7 @@ const (
 	StartedContainersTotalKey       = "started_containers_total"
 	TerminatedContainersTotalKey    = "terminated_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
+	SyncResultErrorsTotalKey        = "sync_result_errors_total"
 
 	// Metrics to track HostProcess container usage by this kubelet
 	StartedHostProcessContainersTotalKey       = "started_host_process_containers_total"
@@ -196,6 +199,7 @@ const (
 
 	// Metric keys for in-place pod resize operations.
 	ContainerRequestedResizesKey        = "container_requested_resizes_total"
+	VolumeRequestedResizesKey           = "volume_requested_resizes_total"
 	PodResizeDurationMillisecondsKey    = "pod_resize_duration_milliseconds"
 	PodPendingResizesKey                = "pod_pending_resizes"
 	PodInfeasibleResizesKey             = "pod_infeasible_resizes_total"
@@ -238,6 +242,11 @@ const (
 	DeferredResizeResolutionAccepted   DeferredResizeResolution = "accepted"
 	DeferredResizeResolutionReverted   DeferredResizeResolution = "reverted"
 	DeferredResizeResolutionTerminated DeferredResizeResolution = "terminated"
+)
+
+const (
+	// SyncResultActionSyncPod is the action label value for top-level PodSyncResult.SyncError errors.
+	SyncResultActionSyncPod = "SyncPod"
 )
 
 type imageSizeBucket struct {
@@ -306,6 +315,17 @@ var (
 			Name:           PodWorkerDurationKey,
 			Help:           "Duration in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
 			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// PodWorkerErrorsTotal is a Counter that tracks the number of errors in pod worker sync operations.
+	// Broken down by the operation type.
+	PodWorkerErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodWorkerErrorsTotalKey,
+			Help:           "Cumulative number of errors in pod worker sync operations. Broken down by operation type: create, update, sync, terminating, terminated",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
@@ -586,6 +606,17 @@ var (
 		},
 		[]string{"resource_name"},
 	)
+	// DevicePluginDevices is a Gauge that tracks the number of devices the device manager
+	// currently knows about, broken down by resource name and health state.
+	DevicePluginDevices = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DevicePluginDevicesKey,
+			Help:           "Number of devices currently known to the device manager. Broken down by resource name and health state.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource_name", "health_state"},
+	)
 
 	// PodResourcesEndpointRequestsTotalCount is a Counter that tracks the cumulative number of requests to the PodResource endpoints.
 	// Broken down by server API version.
@@ -821,6 +852,17 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"container_type", "code"},
+	)
+	// SyncResultErrorsTotal is a Counter that tracks the number of SyncResult errors during pod sync.
+	// Broken down by the sync action.
+	SyncResultErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           SyncResultErrorsTotalKey,
+			Help:           "Cumulative number of SyncResult errors during pod sync. Broken down by action",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"action"},
 	)
 	// StartedHostProcessContainersTotal is a counter that tracks the number of hostprocess container creation operations
 	StartedHostProcessContainersTotal = metrics.NewCounterVec(
@@ -1262,6 +1304,17 @@ var (
 		[]string{"resource", "requirement", "operation"},
 	)
 
+	// VolumeRequestedResizes tracks the cumulative number of requested resizes at the volume level.
+	VolumeRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           VolumeRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the volume level. The 'medium' label refers to the volume storage medium (e.g. 'memory'); the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"medium", "operation"},
+	)
+
 	// PodResizeDurationMilliseconds tracks the duration (in milliseconds) it takes to resize a pod.
 	PodResizeDurationMilliseconds = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -1451,6 +1504,7 @@ func Register() {
 		legacyregistry.MustRegister(FirstNetworkPodStartSLIDuration)
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
+		legacyregistry.MustRegister(PodWorkerErrorsTotal)
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(PodStartSLIDuration)
 		legacyregistry.MustRegister(PodStartTotalDuration)
@@ -1481,6 +1535,7 @@ func Register() {
 		legacyregistry.MustRegister(Preemptions)
 		legacyregistry.MustRegister(DevicePluginRegistrationCount)
 		legacyregistry.MustRegister(DevicePluginAllocationDuration)
+		legacyregistry.MustRegister(DevicePluginDevices)
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
 		legacyregistry.MustRegister(DesiredPodCount)
@@ -1506,6 +1561,7 @@ func Register() {
 		legacyregistry.MustRegister(StartedContainersTotal)
 		legacyregistry.MustRegister(TerminatedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
+		legacyregistry.MustRegister(SyncResultErrorsTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
@@ -1554,14 +1610,16 @@ func Register() {
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			legacyregistry.MustRegister(ContainerRequestedResizes)
-			legacyregistry.MustRegister(PodResizeDurationMilliseconds)
-			legacyregistry.MustRegister(PodPendingResizes)
-			legacyregistry.MustRegister(PodInfeasibleResizes)
-			legacyregistry.MustRegister(PodInProgressResizes)
-			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
-			legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
+		legacyregistry.MustRegister(ContainerRequestedResizes)
+		legacyregistry.MustRegister(PodResizeDurationMilliseconds)
+		legacyregistry.MustRegister(PodPendingResizes)
+		legacyregistry.MustRegister(PodInfeasibleResizes)
+		legacyregistry.MustRegister(PodInProgressResizes)
+		legacyregistry.MustRegister(PodDeferredAcceptedResizes)
+		legacyregistry.MustRegister(PodDeferredResizeDurationSeconds)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+			legacyregistry.MustRegister(VolumeRequestedResizes)
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {

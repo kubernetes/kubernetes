@@ -18,8 +18,9 @@ package fuzzer
 
 import (
 	"math"
+	"strconv"
 
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -73,14 +74,20 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// minCount must be a positive integer.
 			if j.Scheduling != nil && j.Scheduling.SchedulingPolicy != nil {
 				if c.Bool() {
-					j.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Basic: &schedulingv1alpha3.WorkloadPodGroupBasicSchedulingPolicy{},
+					j.Scheduling.SchedulingPolicy = &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Basic: &schedulingv1.WorkloadPodGroupBasicSchedulingPolicy{},
 					}
 				} else {
 					minCount := max(c.Int31(), 1)
-					j.Scheduling.SchedulingPolicy = &schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy{
-						Gang: &schedulingv1alpha3.WorkloadPodGroupGangSchedulingPolicy{MinCount: &minCount},
+					j.Scheduling.SchedulingPolicy = &schedulingv1.WorkloadPodGroupSchedulingPolicy{
+						Gang: &schedulingv1.WorkloadPodGroupGangSchedulingPolicy{MinCount: &minCount},
 					}
+				}
+			}
+			if j.PodFailurePolicy != nil {
+				for i, rule := range j.PodFailurePolicy.Rules {
+					name := strconv.Itoa(i)
+					rule.Name = &name
 				}
 			}
 		},

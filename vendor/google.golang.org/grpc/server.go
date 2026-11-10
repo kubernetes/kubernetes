@@ -1400,7 +1400,7 @@ func (s *Server) processRPC(ctx context.Context, stream *transport.ServerStream,
 		ss.decompressorV1 = encoding.GetCompressor(rc)
 		if ss.decompressorV1 == nil {
 			st := status.Newf(codes.Unimplemented, "grpc: Decompressor is not installed for grpc-encoding %q", rc)
-			ss.writeStatus(st)
+			ss.s.WriteStatus(st)
 			return st.Err()
 		}
 	}
@@ -1491,7 +1491,7 @@ func (s *Server) processRPC(ctx context.Context, stream *transport.ServerStream,
 				binlog.Log(ctx, st)
 			}
 		}
-		if err := ss.writeStatus(appStatus); err != nil {
+		if err := ss.s.WriteStatus(appStatus); err != nil {
 			channelz.Warningf(logger, s.channelz, "grpc: Server.processRPC failed to write status: %v", err)
 		}
 		return appErr
@@ -1510,7 +1510,7 @@ func (s *Server) processRPC(ctx context.Context, stream *transport.ServerStream,
 			binlog.Log(ctx, st)
 		}
 	}
-	if err := ss.writeStatus(statusOK); err != nil {
+	if err := ss.s.WriteStatus(statusOK); err != nil {
 		channelz.Warningf(logger, s.channelz, "grpc: Server.processRPC failed to write status: %v", err)
 	}
 	return err
@@ -1719,7 +1719,13 @@ func (s *Server) stop(graceful bool) {
 	}
 
 	if graceful || s.opts.waitForHandlers {
+		// Release the lock while waiting for handlers to finish. Holding it
+		// here would deadlock a concurrent Stop() (the recommended way to abort
+		// a GracefulStop that is taking too long), because Stop() must acquire
+		// s.mu before it can force the server to shut down.
+		s.mu.Unlock()
 		s.handlersWG.Wait()
+		s.mu.Lock()
 	}
 
 	if s.events != nil {

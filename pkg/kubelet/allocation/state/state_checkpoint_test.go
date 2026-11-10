@@ -159,6 +159,16 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 				args: args{podMap: PodMap{"pod1": newTestPod("pod1", qStr, false, true)}},
 			})
 
+			// Test case 3b: Container resources and volume limits populated with nil limit
+			podWithNilVolLimit := newTestPod("pod1", qStr, false, false)
+			podWithNilVolLimit.Spec.Volumes = []v1.Volume{
+				{Name: "volume1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: nil}}},
+			}
+			tests = append(tests, testCase{
+				name: fmt.Sprintf("resource - %s - container and nil volume limits", qStr),
+				args: args{podMap: PodMap{"pod1": podWithNilVolLimit}},
+			})
+
 			// Test case 4: Container resources and pod level resources populated (volume limits is nil)
 			tests = append(tests, testCase{
 				name: fmt.Sprintf("resource - %s - container and pod-level", qStr),
@@ -450,7 +460,7 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 				assert.NoError(t, sc.SetContainerResources(logger, podUID, "container1", podutil.Containers, v1.ResourceRequirements{Requests: requests}))
 				assert.NoError(t, sc.SetPodLevelResources(logger, podUID, &v1.ResourceRequirements{Requests: requests}))
 				limit := resource.MustParse(fmt.Sprintf("%dMi", j+1))
-				assert.NoError(t, sc.SetEmptyDirVolumeLimit(podUID, "volume1", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
+				assert.NoError(t, sc.SetEmptyDirVolumeLimit(logger, podUID, "volume1", &v1.EmptyDirVolumeSource{Medium: v1.StorageMediumMemory, SizeLimit: &limit}))
 			}
 		})
 		readers.Go(func() {

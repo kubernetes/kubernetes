@@ -125,11 +125,17 @@ type KubeControllerManagerConfiguration struct {
 	// EphemeralVolumeControllerConfiguration holds configuration for EphemeralVolumeController
 	// related features.
 	EphemeralVolumeController EphemeralVolumeControllerConfiguration
+	// EvictionRequestControllerConfiguration holds configuration for
+	// EvictionRequestController related features.
+	EvictionRequestController EvictionRequestControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
 	// HPAControllerConfiguration holds configuration for HPAController related features.
 	HPAController HPAControllerConfiguration
+	// ImperativeEvictionResponderControllerConfiguration holds configuration for
+	// ImperativeEvictionResponderController related features.
+	ImperativeEvictionResponderController ImperativeEvictionResponderControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController JobControllerConfiguration
 	// CronJobControllerConfiguration holds configuration for CronJobController related features.
@@ -322,6 +328,13 @@ type EphemeralVolumeControllerConfiguration struct {
 	ConcurrentEphemeralVolumeSyncs int32
 }
 
+// EvictionRequestControllerConfiguration contains elements describing EvictionRequestController.
+type EvictionRequestControllerConfiguration struct {
+	// ConcurrentEvictionRequestSyncs is the number of eviction requests and evictions that are
+	// allowed to sync concurrently.
+	ConcurrentEvictionRequestSyncs int32
+}
+
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
 type GarbageCollectorControllerConfiguration struct {
 	// enables the generic garbage collector. MUST be synced with the
@@ -357,6 +370,15 @@ type HPAControllerConfiguration struct {
 	// HPA will disregard CPU samples from unready pods that had last readiness change during that
 	// period.
 	HorizontalPodAutoscalerInitialReadinessDelay metav1.Duration
+}
+
+// ImperativeEvictionResponderControllerConfiguration contains elements configuring
+// the imperative eviction responder controller.
+type ImperativeEvictionResponderControllerConfiguration struct {
+	// ConcurrentImperativeEvictionResponderSyncs is the number of eviction object syncing and imperative
+	// eviction operations that will be done concurrently. Larger number = bigger throughput of imperative eviction
+	// calls (pods/<name>/eviction subresource) and faster Eviction status updating, but more CPU (and network) load.
+	ConcurrentImperativeEvictionResponderSyncs int32
 }
 
 // JobControllerConfiguration contains elements describing JobController.

@@ -18,6 +18,9 @@ package scheduler
 
 import (
 	"context"
+	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,6 +42,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -400,7 +404,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 		filterStatus         *fwk.Status
 		postFilterStatus     *fwk.Status
 		postFilterResult     *fwk.PostFilterResult
-		podGroupCycle        bool
 		wantStatusCode       fwk.Code
 		wantNominatingInfo   *fwk.NominatingInfo
 		wantPostFilterCalled bool
@@ -411,15 +414,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			postFilterStatus:     fwk.NewStatus(fwk.Unschedulable),
 			wantStatusCode:       fwk.Unschedulable,
 			wantPostFilterCalled: true,
-		},
-		{
-			name:                 "pod group cycle: per-pod PostFilter is not run (PodGroupPostFilter handles it)",
-			filterStatus:         fwk.NewStatus(fwk.Unschedulable, "no fit"),
-			postFilterStatus:     fwk.NewStatus(fwk.Success),
-			postFilterResult:     &fwk.PostFilterResult{NominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
-			podGroupCycle:        true,
-			wantStatusCode:       fwk.Unschedulable,
-			wantPostFilterCalled: false,
 		},
 		{
 			name:             "failure: algorithm fails but PostFilter nominates a node",
@@ -504,9 +498,6 @@ func TestSchedulingAlgorithmDriver(t *testing.T) {
 			sched.applyDefaultHandlers()
 
 			state := framework.NewCycleState()
-			if tt.podGroupCycle {
-				state.SetPodGroupCycleState(framework.NewCycleState())
-			}
 
 			scheduleResult, status := sched.schedulingAlgorithm(ctx, state, schedFwk, queuedPodInfo, time.Now())
 
@@ -815,7 +806,7 @@ func TestFindNodesThatPassFiltersBudget(t *testing.T) {
 			}
 
 			got, err := algo.findNodesThatPassFilters(
-				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind)
+				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind, true /* allowRankNodes */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned error: %v", err)
 			}
@@ -874,7 +865,7 @@ func TestFindNodesThatPassFiltersEmptyNodes(t *testing.T) {
 			diagnosis := framework.Diagnosis{
 				NodeToStatus: framework.NewDefaultNodeToStatus(),
 			}
-			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1)
+			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1, true /* allowRankNodes */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned unexpected error: %v", err)
 			}
@@ -990,4 +981,414 @@ func newPodGroupCycleState() *framework.CycleState {
 	state := framework.NewCycleState()
 	state.SetPodGroupCycleState(framework.NewCycleState())
 	return state
+}
+
+type rankNodesTestPlugin struct {
+	lock             sync.Mutex
+	name             string
+	ranksByNode      map[string]int
+	preFilterResult  *fwk.PreFilterResult
+	rejectedNodes    sets.Set[string]
+	scoresByNode     map[string]int64
+	filterHook       func(ctx context.Context, nodeName string)
+	rankInputOrder   []string
+	filteredNodes    []string
+	rankNodesInvoked bool
+}
+
+var _ fwk.PodGroupPostFilterPlugin = &rankNodesTestPlugin{}
+var _ fwk.ReservePlugin = &rankNodesTestPlugin{}
+var _ framework.RankNodesPlugin = &rankNodesTestPlugin{}
+var _ fwk.PreFilterPlugin = &rankNodesTestPlugin{}
+var _ fwk.FilterPlugin = &rankNodesTestPlugin{}
+var _ fwk.ScorePlugin = &rankNodesTestPlugin{}
+
+func (p *rankNodesTestPlugin) Name() string { return p.name }
+
+func (p *rankNodesTestPlugin) PodGroupPostFilter(ctx context.Context, state fwk.PodGroupCycleState, pgInfo fwk.PodGroupInfo, pgSchedulingFunc fwk.PodGroupSchedulingFunc) (*fwk.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, nil
+}
+
+func (p *rankNodesTestPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
+func (p *rankNodesTestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+}
+
+func (p *rankNodesTestPlugin) RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]framework.NodeWithRank, *fwk.Status) {
+	p.rankNodesInvoked = true
+	p.rankInputOrder = make([]string, len(nodes))
+	for i, n := range nodes {
+		p.rankInputOrder[i] = n.Node().Name
+	}
+	ranked := make([]framework.NodeWithRank, len(nodes))
+	for i, n := range nodes {
+		ranked[i] = framework.NodeWithRank{
+			NodeInfo: n,
+			Rank:     p.ranksByNode[n.Node().Name],
+		}
+	}
+	slices.SortStableFunc(ranked, func(a, b framework.NodeWithRank) int {
+		return a.Rank - b.Rank
+	})
+	return ranked, nil
+}
+
+func (p *rankNodesTestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	return p.preFilterResult, nil
+}
+
+func (p *rankNodesTestPlugin) PreFilterExtensions() fwk.PreFilterExtensions { return nil }
+
+func (p *rankNodesTestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	nodeName := nodeInfo.Node().Name
+	p.lock.Lock()
+	p.filteredNodes = append(p.filteredNodes, nodeName)
+	p.lock.Unlock()
+	if p.filterHook != nil {
+		p.filterHook(ctx, nodeName)
+	}
+	if p.rejectedNodes.Has(nodeName) {
+		return fwk.NewStatus(fwk.Unschedulable, "rejected by rankNodesTestPlugin")
+	}
+	return nil
+}
+
+func (p *rankNodesTestPlugin) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	return p.scoresByNode[nodeInfo.Node().Name], nil
+}
+
+func (p *rankNodesTestPlugin) ScoreExtensions() fwk.ScoreExtensions { return nil }
+
+func TestSchedulePodWithRankNodes(t *testing.T) {
+	allNodes := []*v1.Node{
+		st.MakeNode().Name("node1").Obj(),
+		st.MakeNode().Name("node2").Obj(),
+		st.MakeNode().Name("node3").Obj(),
+	}
+	pod := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
+
+	tests := []struct {
+		name                 string
+		extraNodes           []*v1.Node
+		podGroupCycle        bool
+		findAllNodes         bool
+		parallelism          int
+		nominatedNodeName    string
+		initialStartNodeIdx  int
+		ranksByNode          map[string]int
+		preFilterResult      *fwk.PreFilterResult
+		rejectedNodes        sets.Set[string]
+		scoresByNode         map[string]int64
+		filterHook           func(ctx context.Context, nodeName string)
+		wantSuggestedHost    string
+		wantFeasibleNodes    int
+		wantFilteredNodes    []string
+		wantRankInputOrder   []string
+		wantRankInputSet     sets.Set[string]
+		wantRankNodesInvoked bool
+	}{
+		{
+			name:          "nodes are evaluated in RankNodes order and only lowest rank is scored",
+			podGroupCycle: true,
+			ranksByNode: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 0,
+			},
+			scoresByNode: map[string]int64{
+				"node1": 100,
+				"node2": 90,
+				"node3": 10,
+			},
+			wantSuggestedHost:    "node3",
+			wantFilteredNodes:    []string{"node3"},
+			wantRankInputOrder:   []string{"node1", "node2", "node3"},
+			wantRankNodesInvoked: true,
+		},
+		{
+			name:          "rank 0 fails Filter, continues to rank 1 nodes in order",
+			podGroupCycle: true,
+			ranksByNode: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 0,
+			},
+			rejectedNodes: sets.New("node3"),
+			scoresByNode: map[string]int64{
+				"node1": 40,
+				"node2": 80,
+				"node3": 100,
+			},
+			wantSuggestedHost:    "node2",
+			wantFilteredNodes:    []string{"node3", "node1", "node2"},
+			wantRankInputOrder:   []string{"node1", "node2", "node3"},
+			wantRankNodesInvoked: true,
+		},
+		{
+			name:          "PreFilter narrows candidate nodes before RankNodes",
+			podGroupCycle: true,
+			ranksByNode: map[string]int{
+				"node1": 1,
+				"node2": 0,
+				"node3": 0,
+			},
+			preFilterResult: &fwk.PreFilterResult{
+				NodeNames: sets.New("node1", "node2"),
+			},
+			scoresByNode: map[string]int64{
+				"node1": 100,
+				"node2": 10,
+			},
+			wantSuggestedHost:    "node2",
+			wantFilteredNodes:    []string{"node2"},
+			wantRankInputSet:     sets.New("node1", "node2"),
+			wantRankNodesInvoked: true,
+		},
+		{
+			name:                "nextStartNodeIndex rotates input slice before RankNodes",
+			podGroupCycle:       true,
+			initialStartNodeIdx: 1,
+			ranksByNode: map[string]int{
+				"node1": 0,
+				"node2": 0,
+				"node3": 1,
+			},
+			scoresByNode: map[string]int64{
+				"node1": 50,
+				"node2": 50,
+				"node3": 10,
+			},
+			wantSuggestedHost:    "node2",
+			wantFilteredNodes:    []string{"node2", "node1"},
+			wantRankInputOrder:   []string{"node2", "node3", "node1"},
+			wantRankNodesInvoked: true,
+		},
+		{
+			name:          "ordinary cycle does not invoke RankNodes",
+			podGroupCycle: false,
+			ranksByNode: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 0,
+			},
+			scoresByNode: map[string]int64{
+				"node1": 100,
+				"node2": 50,
+				"node3": 10,
+			},
+			wantSuggestedHost:    "node1",
+			wantFilteredNodes:    []string{"node1", "node2", "node3"},
+			wantRankNodesInvoked: false,
+		},
+		{
+			name:              "nominated node evaluation (single node) does not invoke RankNodes",
+			podGroupCycle:     true,
+			nominatedNodeName: "node2",
+			ranksByNode: map[string]int{
+				"node1": 0,
+				"node2": 1,
+				"node3": 0,
+			},
+			wantSuggestedHost:    "node2",
+			wantFilteredNodes:    []string{"node2"},
+			wantRankNodesInvoked: false,
+		},
+		{
+			name:          "parallel Filter commits lower-rank node even when higher-rank node finishes Filter first",
+			extraNodes:    []*v1.Node{st.MakeNode().Name("node4").Obj()},
+			podGroupCycle: true,
+			parallelism:   2,
+			ranksByNode: map[string]int{
+				"node1": 0,
+				"node2": 1,
+				"node3": 1,
+				"node4": 2,
+			},
+			scoresByNode: map[string]int64{
+				"node1": 10,
+				"node2": 100,
+				"node3": 100,
+				"node4": 100,
+			},
+			filterHook: func() func(ctx context.Context, nodeName string) {
+				otherNodeCompleted := make(chan struct{})
+				var otherNodesStarted atomic.Int32
+				return func(_ context.Context, nodeName string) {
+					if nodeName == "node1" {
+						// Block the rank-0 node until the second worker has completely
+						// finished checkNode for node2 (rank 1) and started node3.
+						<-otherNodeCompleted
+						return
+					}
+					if otherNodesStarted.Add(1) == 2 {
+						close(otherNodeCompleted)
+					}
+				}
+			}(),
+			wantSuggestedHost:    "node1",
+			wantFeasibleNodes:    1,
+			wantFilteredNodes:    []string{"node1", "node2", "node3"},
+			wantRankInputOrder:   []string{"node1", "node2", "node3", "node4"},
+			wantRankNodesInvoked: true,
+		},
+		{
+			name:        "unranked parallel Filter commits immediately and cancels without waiting for lagging earlier node",
+			extraNodes:  []*v1.Node{st.MakeNode().Name("node4").Obj()},
+			parallelism: 2,
+			filterHook: func() func(ctx context.Context, nodeName string) {
+				node1Started := make(chan struct{})
+				return func(ctx context.Context, nodeName string) {
+					if nodeName == "node1" {
+						close(node1Started)
+						// Block index 0 until the second worker commits a feasible node and cancels ctx.
+						<-ctx.Done()
+						return
+					}
+					<-node1Started
+				}
+			}(),
+			wantSuggestedHost:    "node3",
+			wantFeasibleNodes:    1,
+			wantFilteredNodes:    []string{"node1", "node3"},
+			wantRankNodesInvoked: false,
+		},
+		{
+			name:          "FindAllNodesThatFitPod skips RankNodes and evaluates all nodes in pod group cycle",
+			podGroupCycle: true,
+			findAllNodes:  true,
+			ranksByNode: map[string]int{
+				"node1": 1,
+				"node2": 1,
+				"node3": 0,
+			},
+			wantFilteredNodes:    []string{"node1", "node2", "node3"},
+			wantRankNodesInvoked: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.GenericWorkload, true)
+			logger, ctx := ktesting.NewTestContext(t)
+
+			plugin := &rankNodesTestPlugin{
+				name:            names.DefaultPreemption,
+				ranksByNode:     tt.ranksByNode,
+				preFilterResult: tt.preFilterResult,
+				rejectedNodes:   tt.rejectedNodes,
+				scoresByNode:    tt.scoresByNode,
+				filterHook:      tt.filterHook,
+			}
+
+			cache := internalcache.New(ctx, nil, true, false)
+			for _, node := range slices.Concat(allNodes, tt.extraNodes) {
+				cache.AddNode(logger, node)
+			}
+			snapshot := internalcache.NewEmptySnapshot()
+			if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+			registry := frameworkruntime.Registry{
+				queuesort.Name:     queuesort.New,
+				defaultbinder.Name: defaultbinder.New,
+				plugin.name: func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+					return plugin, nil
+				},
+			}
+			var scorePlugins []schedulerapi.Plugin
+			if tt.scoresByNode != nil {
+				scorePlugins = []schedulerapi.Plugin{{Name: plugin.name, Weight: 1}}
+			}
+			profileCfg := schedulerapi.KubeSchedulerProfile{
+				SchedulerName: "default-scheduler",
+				Plugins: &schedulerapi.Plugins{
+					QueueSort:          schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
+					PreFilter:          schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: plugin.name}}},
+					Filter:             schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: plugin.name}}},
+					Score:              schedulerapi.PluginSet{Enabled: scorePlugins},
+					Reserve:            schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: plugin.name}}},
+					PodGroupPostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: plugin.name}}},
+					Bind:               schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
+				},
+			}
+
+			parallelism := 1
+			if tt.parallelism > 0 {
+				parallelism = tt.parallelism
+			}
+			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+				frameworkruntime.WithParallelism(parallelism),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+			schedFwk.SetBatchingDisabled(true)
+
+			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false), WithCurrentCycleProvider(func() int64 { return 1 }))
+			if err != nil {
+				t.Fatalf("Failed to create algorithm: %v", err)
+			}
+			algo.nextStartNodeIndex = tt.initialStartNodeIdx
+
+			testPod := pod.DeepCopy()
+			testPod.Status.NominatedNodeName = tt.nominatedNodeName
+			podInfo, err := framework.NewPodInfo(testPod)
+			if err != nil {
+				t.Fatalf("Failed to create PodInfo: %v", err)
+			}
+			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+
+			state := framework.NewCycleState()
+			if tt.podGroupCycle {
+				state = newPodGroupCycleState()
+			}
+
+			if tt.findAllNodes {
+				feasibleNodes, _, err := algo.FindAllNodesThatFitPod(ctx, state, schedFwk, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("FindAllNodesThatFitPod failed: %v", err)
+				}
+				if len(feasibleNodes) != len(tt.wantFilteredNodes) {
+					t.Errorf("len(feasibleNodes) = %d, want %d", len(feasibleNodes), len(tt.wantFilteredNodes))
+				}
+			} else {
+				res, err := algo.SchedulePod(ctx, schedFwk, state, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod failed: %v", err)
+				}
+				if res.SuggestedHost != tt.wantSuggestedHost {
+					t.Errorf("SuggestedHost = %q, want %q", res.SuggestedHost, tt.wantSuggestedHost)
+				}
+				if tt.wantFeasibleNodes > 0 && res.FeasibleNodes != tt.wantFeasibleNodes {
+					t.Errorf("FeasibleNodes = %d, want %d", res.FeasibleNodes, tt.wantFeasibleNodes)
+				}
+			}
+			if plugin.rankNodesInvoked != tt.wantRankNodesInvoked {
+				t.Errorf("rankNodesInvoked = %v, want %v", plugin.rankNodesInvoked, tt.wantRankNodesInvoked)
+			}
+			if tt.wantRankInputOrder != nil {
+				if diff := cmp.Diff(tt.wantRankInputOrder, plugin.rankInputOrder); diff != "" {
+					t.Errorf("Unexpected rankInputOrder (-want, +got):\n%s", diff)
+				}
+			}
+			if tt.wantRankInputSet != nil {
+				if diff := cmp.Diff(tt.wantRankInputSet, sets.New(plugin.rankInputOrder...)); diff != "" {
+					t.Errorf("Unexpected rankInputSet (-want, +got):\n%s", diff)
+				}
+			}
+			if tt.wantFilteredNodes != nil {
+				if tt.parallelism > 1 {
+					if diff := cmp.Diff(sets.New(tt.wantFilteredNodes...), sets.New(plugin.filteredNodes...)); diff != "" {
+						t.Errorf("Unexpected filteredNodes set (-want, +got):\n%s", diff)
+					}
+				} else if diff := cmp.Diff(tt.wantFilteredNodes, plugin.filteredNodes); diff != "" {
+					t.Errorf("Unexpected filteredNodes (-want, +got):\n%s", diff)
+				}
+			}
+		})
+	}
 }

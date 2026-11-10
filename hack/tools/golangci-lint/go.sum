@@ -570,7 +570,7 @@ mvdan.cc/unparam v0.0.0-20260823230713-2fa3d841b0c8 h1:Re1NRyLpiAt9kB+ImaaoapwWi
 mvdan.cc/unparam v0.0.0-20260823230713-2fa3d841b0c8/go.mod h1:MrS/+zJ1M2xvGXhKktiHbNQeQPyg3Qel+KkzT+f7/i4=
 sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997 h1:u5/qbXZq7YIrurEE6HiJKtjQ9ILcFPJJSHNY0Q1ZRhU=
 sigs.k8s.io/kube-api-linter v0.0.0-20260716143926-092fe0c72997/go.mod h1:5mP60UakkCye+eOcZ5p98VnV2O49qreW1gq9TdsUf7Q=
-sigs.k8s.io/logtools v0.10.1 h1:uerGjWqOnlFXjNARkbrWjSYsjC6RSKDvhwcN2rEMdaM=
-sigs.k8s.io/logtools v0.10.1/go.mod h1:nkFoZEUa/k2zgFzO0CNNgl86ufV69OXqLbuWHpv0ZnA=
+sigs.k8s.io/logtools v0.11.0 h1:3yLZ0MoKTwSGZuhzQO5eRLY5Db3elsBd7h64DM3VikQ=
+sigs.k8s.io/logtools v0.11.0/go.mod h1:nkFoZEUa/k2zgFzO0CNNgl86ufV69OXqLbuWHpv0ZnA=
 sigs.k8s.io/yaml v1.4.0 h1:Mk1wCc2gy/F0THH0TAp1QYyJNzRm2KCLy3o5ASXVI5E=
 sigs.k8s.io/yaml v1.4.0/go.mod h1:Ejl7/uTz7PSA4eKMyQCUTnhZYNmLIl+5c2lQPGR2BPY=

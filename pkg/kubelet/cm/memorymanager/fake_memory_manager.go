@@ -85,6 +85,10 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
+func (m *fakeManager) CanAllocateExclusively(res v1.ResourceName) bool {
+	return false
+}
+
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 func (m *fakeManager) GetAllocatableMemory(logger klog.Logger) []state.Block {
 	logger.Info("Get Allocatable Memory")
@@ -99,8 +103,8 @@ func (m *fakeManager) GetMemory(logger klog.Logger, podUID, containerName string
 }
 
 // GetPodMemory returns the memory allocated by a pod from NUMA nodes
-func (m *fakeManager) GetPodMemory(podUID string) []state.Block {
-	logger := klog.LoggerWithValues(klog.TODO(), "podUID", podUID)
+func (m *fakeManager) GetPodMemory(logger klog.Logger, podUID string) []state.Block {
+	logger = klog.LoggerWithValues(logger, "podUID", podUID)
 	logger.Info("Get Pod Memory")
 	return []state.Block{}
 }

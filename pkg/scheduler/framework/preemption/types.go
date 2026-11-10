@@ -84,21 +84,10 @@ func (v *victim) Type() fwk.EntityKeyType {
 
 // NewPodVictim creates a new Victim representing a single Pod.
 // It ignores the error from NewVictim internally as it is guaranteed to succeed for a single valid pod.
-// TODO: what we do below is not ideal:
-//   - From the victim's importance POV, individual Pods should always have the PodKeyType.
-//   - On the other hand, we need to store the information that the Pod victim belongs to the "single"
-//     disruption mode PodGroup due to WAP-related metrics bookkeeping.
-//   - Ideally, we should store another bit of information denoting the type of top-level group the victim
-//     Pod belongs to.
-//
-// We should fix this on the occasion of adding support for CompositePodGroup WAP-related metrics.
+// The victim is always of PodKeyType, even if the pod belongs to a PodGroup or CompositePodGroup with
+// disruption mode Single: it is evicted alone, so it ranks and is reported in metrics as an individual pod.
 func NewPodVictim(podInfo fwk.PodInfo) Victim {
-	pod := podInfo.GetPod()
-	keyType := fwk.PodKeyType
-	if pod.Spec.SchedulingGroup != nil {
-		keyType = fwk.PodGroupKeyType
-	}
-	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, corev1helpers.PodPriority(pod), keyType)
+	vi, _ := NewVictim([]fwk.PodInfo{podInfo}, corev1helpers.PodPriority(podInfo.GetPod()), fwk.PodKeyType)
 	return vi
 }
 
@@ -180,9 +169,8 @@ type candidate struct {
 	victims *extenderv1.Victims
 	// name returns the target domain(for pod group)/node name where the preemptor gets nominated to run.
 	name string
-	// numPodGroupDisruptions returns the number of preemption units that affect pod groups.
-	// A single preemption unit can be all pods in a pod group or composite pod group hierarchy (for DisruptionMode=all) or a single pod (for DisruptionMode=single).
-	numPodGroupDisruptions int
+	// disruptions is the number of preemption units per victim type. Used only for metrics.
+	disruptions map[fwk.EntityKeyType]int
 	// nodes returns a list of nodes where the preemptor pods get nominated to run.
 	// For a single pod preemption it's equal Name but for pod group preemption
 	// it contains a set of nodes for all preemptor pods.
@@ -191,12 +179,12 @@ type candidate struct {
 
 var _ fwk.PreemptionCandidate = &candidate{}
 
-func newCandidate(victims *extenderv1.Victims, name string, numPodGroupDisruptions int, nodes ...string) *candidate {
+func newCandidate(victims *extenderv1.Victims, name string, disruptions map[fwk.EntityKeyType]int, nodes ...string) *candidate {
 	return &candidate{
-		victims:                victims,
-		name:                   name,
-		numPodGroupDisruptions: numPodGroupDisruptions,
-		nodes:                  nodes,
+		victims:     victims,
+		name:        name,
+		disruptions: disruptions,
+		nodes:       nodes,
 	}
 }
 
@@ -210,9 +198,9 @@ func (s *candidate) Name() string {
 	return s.name
 }
 
-// NumPodGroupDisruptions returns s.numPodGroupDisruptions.
-func (s *candidate) NumPodGroupDisruptions() int {
-	return s.numPodGroupDisruptions
+// NumDisruptionsByVictimType returns s.disruptions.
+func (s *candidate) NumDisruptionsByVictimType() map[fwk.EntityKeyType]int {
+	return s.disruptions
 }
 
 // Nodes returns a list of nodes where the preemptor pods get nominated to run.

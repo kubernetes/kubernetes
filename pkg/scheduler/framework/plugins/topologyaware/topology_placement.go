@@ -37,16 +37,14 @@ const (
 // TopologyPlacement is a plugin that generates placements for a pod group based on its topology constraints.
 type TopologyPlacement struct {
 	handle fwk.Handle
-	fts    feature.Features
 }
 
 var _ fwk.PlacementGeneratePlugin = &TopologyPlacement{}
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (*TopologyPlacement, error) {
+func New(_ context.Context, _ runtime.Object, fh fwk.Handle, _ feature.Features) (*TopologyPlacement, error) {
 	return &TopologyPlacement{
 		handle: fh,
-		fts:    fts,
 	}, nil
 }
 
@@ -139,20 +137,12 @@ func (pl *TopologyPlacement) getTopologyKey(pgi fwk.PodGroupInfo) (string, bool)
 }
 
 func (pl *TopologyPlacement) getScheduledPods(podGroup fwk.PodGroupInfo) ([]*v1.Pod, error) {
-	if pl.fts.EnableCompositePodGroup {
-		var results []*v1.Pod
-		for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
-			if err != nil {
-				return nil, err
-			}
-			results = append(results, podGroupState.ScheduledPods()...)
+	var results []*v1.Pod
+	for podGroupState, err := range helper.GetPodGroupStates(pl.handle.SnapshotSharedLister(), podGroup.GetKey()) {
+		if err != nil {
+			return nil, err
 		}
-		return results, nil
+		results = append(results, podGroupState.ScheduledPods()...)
 	}
-	name := podGroup.GetName()
-	podGroupState, err := pl.handle.SnapshotSharedLister().PodGroupStates().Get(podGroup.GetNamespace(), name)
-	if err != nil {
-		return nil, err
-	}
-	return podGroupState.ScheduledPods(), nil
+	return results, nil
 }

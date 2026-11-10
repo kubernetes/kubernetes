@@ -241,8 +241,8 @@ func (o WardleServerOptions) RunWardleServer(ctx context.Context) error {
 	}
 
 	server.GenericAPIServer.AddPostStartHookOrDie("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
-		config.GenericConfig.SharedInformerFactory.Start(context.Done())
-		o.SharedInformerFactory.Start(context.Done())
+		config.GenericConfig.SharedInformerFactory.StartWithContext(context)
+		o.SharedInformerFactory.StartWithContext(context)
 		return nil
 	})
 

@@ -20,24 +20,29 @@ import (
 	"context"
 	"testing"
 
-	resourceapi "k8s.io/api/resource/v1"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/allocatortesting"
 )
 
 func TestAllocator(t *testing.T) {
+	newAllocator := func(
+		ctx context.Context,
+		features Features,
+		allocatedState AllocatedState,
+		classLister DeviceClassLister,
+		slices []*draapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (internal.Allocator, error) {
+		return NewAllocator(ctx, features, allocatedState, classLister, slices, celCache)
+	}
 	allocatortesting.TestAllocator(t,
 		SupportedFeatures,
-		func(
-			ctx context.Context,
-			features Features,
-			allocatedState internal.AllocatedState,
-			classLister DeviceClassLister,
-			slices []*resourceapi.ResourceSlice,
-			celCache *cel.Cache,
-		) (internal.Allocator, error) {
-			return NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
-		},
+		newAllocator,
+	)
+	allocatortesting.TestLexicographicalAllocator(t,
+		SupportedFeatures,
+		newAllocator,
 	)
 }

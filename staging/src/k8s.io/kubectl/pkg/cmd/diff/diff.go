@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
-	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/exec"
@@ -111,7 +110,6 @@ type DiffOptions struct {
 
 	Concurrency      int
 	Selector         string
-	OpenAPIGetter    openapi.OpenAPIResourcesGetter
 	OpenAPIV3Root    openapi3.Root
 	DynamicClient    dynamic.Interface
 	CmdNamespace     string
@@ -327,7 +325,6 @@ type InfoObject struct {
 	LocalObj        runtime.Object
 	Info            *resource.Info
 	Encoder         runtime.Encoder
-	OpenAPIGetter   openapi.OpenAPIResourcesGetter
 	OpenAPIV3Root   openapi3.Root
 	Force           bool
 	ServerSideApply bool
@@ -400,7 +397,6 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		Helper:          helper,
 		Overwrite:       true,
 		BackOff:         clockwork.NewRealClock(),
-		OpenAPIGetter:   obj.OpenAPIGetter,
 		OpenAPIV3Root:   obj.OpenAPIV3Root,
 		ResourceVersion: resourceVersion,
 	}
@@ -643,12 +639,11 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 
 	if !o.ServerSideApply {
-		o.OpenAPIGetter = f
 		openAPIV3Client, err := f.OpenAPIV3Client()
 		if err == nil {
 			o.OpenAPIV3Root = openapi3.NewRoot(openAPIV3Client)
 		} else {
-			klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded. Will fall back to OpenAPI V2")
+			klog.V(4).Infof("warning: OpenAPI V3 Patch is enabled but is unable to be loaded")
 		}
 	}
 
@@ -730,7 +725,6 @@ func (o *DiffOptions) Run() error {
 				LocalObj:        local,
 				Info:            info,
 				Encoder:         scheme.DefaultJSONEncoder(),
-				OpenAPIGetter:   o.OpenAPIGetter,
 				OpenAPIV3Root:   o.OpenAPIV3Root,
 				Force:           force,
 				ServerSideApply: o.ServerSideApply,

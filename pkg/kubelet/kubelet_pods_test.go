@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
@@ -54,6 +53,7 @@ import (
 	"k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	"k8s.io/ktesting"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -4456,6 +4456,252 @@ func TestConvertToAPIContainerStatusesWithImageVolumeDigest(t *testing.T) {
 	}
 }
 
+func TestConvertToAPIContainerStatusesVolumeMounts(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	rroDisabled := v1.RecursiveReadOnlyDisabled
+
+	volMount1 := v1.VolumeMount{
+		Name:      "vol1",
+		MountPath: "/mnt/vol1",
+	}
+	volMount2 := v1.VolumeMount{
+		Name:      "vol2",
+		MountPath: "/mnt/vol2",
+		ReadOnly:  true,
+	}
+	volMountStatus1 := v1.VolumeMountStatus{
+		Name:      "vol1",
+		MountPath: "/mnt/vol1",
+	}
+	volMountStatus2 := v1.VolumeMountStatus{
+		Name:              "vol2",
+		MountPath:         "/mnt/vol2",
+		ReadOnly:          true,
+		RecursiveReadOnly: &rroDisabled,
+	}
+
+	makePod := func(mounts []v1.VolumeMount) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "my-pod", UID: "pod-uid"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:         "containerA",
+						Image:        "busybox",
+						VolumeMounts: mounts,
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                string
+		featureGateDisabled bool
+		pod                 *v1.Pod
+		setActuated         bool
+		actuatedMounts      []v1.VolumeMount
+		currentStatus       *kubecontainer.PodStatus
+		previousStatus      []v1.ContainerStatus
+		expectedMounts      []v1.VolumeMountStatus
+	}{
+		{
+			name:           "waiting container uses spec volumeMounts",
+			pod:            makePod([]v1.VolumeMount{volMount1}),
+			currentStatus:  &kubecontainer.PodStatus{},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1},
+		},
+		{
+			name:           "running container without previousStatus uses actuated volumeMounts",
+			pod:            makePod([]v1.VolumeMount{volMount1, volMount2}),
+			setActuated:    true,
+			actuatedMounts: []v1.VolumeMount{volMount1, volMount2},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c1"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1, volMountStatus2},
+		},
+		{
+			name:           "running container before restart reports actuated volumeMounts instead of updated spec",
+			pod:            makePod([]v1.VolumeMount{volMount1, volMount2}),
+			setActuated:    true,
+			actuatedMounts: []v1.VolumeMount{volMount1},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c1"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1},
+		},
+		{
+			name:           "restarted container with added volumeMount updates status from actuated state",
+			pod:            makePod([]v1.VolumeMount{volMount1, volMount2}),
+			setActuated:    true,
+			actuatedMounts: []v1.VolumeMount{volMount1, volMount2},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c2"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1, volMountStatus2},
+		},
+		{
+			name:           "restarted container with all volumeMounts removed clears old volumeMounts",
+			pod:            makePod(nil),
+			setActuated:    true,
+			actuatedMounts: nil,
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c2"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: nil,
+		},
+		{
+			name: "container without actuated volumeMounts preserves previousStatus volumeMounts for same container ID",
+			pod:  makePod([]v1.VolumeMount{volMount1}),
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c1"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1},
+		},
+		{
+			name:           "container starting with no volumeMounts after waiting with volumeMounts clears waiting volumeMounts",
+			pod:            makePod(nil),
+			setActuated:    true,
+			actuatedMounts: nil,
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c1"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "",
+					State:        v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: PodInitializing}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: nil,
+		},
+		{
+			name:                "feature gate disabled preserves previousStatus volumeMounts as immutable",
+			featureGateDisabled: true,
+			pod:                 makePod([]v1.VolumeMount{volMount1, volMount2}),
+			setActuated:         true,
+			actuatedMounts:      []v1.VolumeMount{volMount1, volMount2},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:    kubecontainer.ContainerID{Type: "test", ID: "c2"},
+						Name:  "containerA",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{
+				{
+					Name:         "containerA",
+					ContainerID:  "test://c1",
+					State:        v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+					VolumeMounts: []v1.VolumeMountStatus{volMountStatus1},
+				},
+			},
+			expectedMounts: []v1.VolumeMountStatus{volMountStatus1},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, !test.featureGateDisabled)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			if test.setActuated {
+				require.NoError(t, kl.actuatedState.SetContainer(tCtx.Logger(), test.pod.UID, podutil.Containers, v1.Container{
+					Name:         "containerA",
+					VolumeMounts: test.actuatedMounts,
+				}))
+			}
+
+			statuses := kl.convertToAPIContainerStatuses(
+				tCtx,
+				test.pod,
+				test.currentStatus,
+				test.previousStatus,
+				test.pod.Spec.Containers,
+				nil,
+				false,
+				false,
+				false,
+			)
+			require.Len(t, statuses, 1)
+			assert.Equal(t, test.expectedMounts, statuses[0].VolumeMounts)
+		})
+	}
+}
+
 func Test_generateAPIPodStatus(t *testing.T) {
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
@@ -5148,6 +5394,176 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				AllocatedResources: v1.ResourceList{
 					v1.ResourceCPU:    resource.MustParse("100m"),
 					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+			inPlacePodLevelResourcesVerticalScalingEnabled: true,
+		},
+		{
+			name: "InPlacePodLevelResourcesVerticalScaling enabled, partial limits omitted from status",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("100m"),
+									v1.ResourceMemory:           resource.MustParse("100Mi"),
+									v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("200m"),
+									v1.ResourceMemory:           resource.MustParse("200Mi"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("50m"),
+									v1.ResourceMemory: resource.MustParse("50Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+				},
+			},
+			currentStatus: sandboxReadyStatus,
+			expected: v1.PodStatus{
+				Phase:    v1.PodPending,
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBurstable,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:  "containerA",
+						State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: ContainerCreating}},
+						Ready: true,
+					},
+					{
+						Name:  "containerB",
+						State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: ContainerCreating}},
+						Ready: true,
+					},
+				},
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("150m"),
+						v1.ResourceMemory:           resource.MustParse("150Mi"),
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+					// cpu and memory limits are declared by only some containers, so they are omitted in status
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+				AllocatedResources: v1.ResourceList{
+					v1.ResourceCPU:              resource.MustParse("150m"),
+					v1.ResourceMemory:           resource.MustParse("150Mi"),
+					v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+			inPlacePodLevelResourcesVerticalScalingEnabled: true,
+		},
+		{
+			name: "InPlacePodLevelResourcesVerticalScaling enabled, partial container limits not omitted with pod level limits",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("4"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "containerA",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200Mi"),
+								},
+							},
+						},
+						{
+							Name: "containerB",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("50m"),
+									v1.ResourceMemory: resource.MustParse("50Mi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodPending,
+				},
+			},
+			currentStatus: sandboxReadyStatus,
+			expected: v1.PodStatus{
+				Phase:    v1.PodPending,
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBurstable,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:  "containerA",
+						State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: ContainerCreating}},
+						Ready: true,
+					},
+					{
+						Name:  "containerB",
+						State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: ContainerCreating}},
+						Ready: true,
+					},
+				},
+				// The pod-level cpu limit covers the container that omits one; the memory
+				// limit is not declared by every container and is not reported.
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("150m"),
+						v1.ResourceMemory: resource.MustParse("150Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+				AllocatedResources: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("150m"),
+					v1.ResourceMemory: resource.MustParse("150Mi"),
 				},
 				InitContainerStatuses:      []v1.ContainerStatus{},
 				EphemeralContainerStatuses: []v1.ContainerStatus{},
@@ -5870,7 +6286,11 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 			}
 			expected := test.expected.DeepCopy()
-			actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, test.isPodTerminal)
+			podState := SyncPod
+			if test.isPodTerminal {
+				podState = TerminatedPod
+			}
+			actual := kl.generateAPIPodStatus(tCtx, test.pod, test.currentStatus, podState)
 			expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
 			if test.expectedPodDisruptionCondition != nil {
 				expected.Conditions = append([]v1.PodCondition{*test.expectedPodDisruptionCondition}, expected.Conditions...)
@@ -6015,7 +6435,7 @@ func Test_generateAPIPodStatusOnKubeletRestart(t *testing.T) {
 				}},
 			}
 
-			actual := kl.generateAPIPodStatus(tCtx, pod, criStatus, false /* podIsTerminal */)
+			actual := kl.generateAPIPodStatus(tCtx, pod, criStatus, SyncPod)
 
 			require.Len(t, actual.ContainerStatuses, 1)
 			cStatus := actual.ContainerStatuses[0]
@@ -6029,7 +6449,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
 
@@ -6129,7 +6548,7 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 
 			oldStatus := test.pod.Status
 			kl.statusManager.SetPodStatus(logger, test.pod, oldStatus)
-			actual := kl.generateAPIPodStatus(tCtx, test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
+			actual := kl.generateAPIPodStatus(tCtx, test.pod, &testKubecontainerPodStatus /* criStatus */, SyncPod)
 			for _, c := range actual.Conditions {
 				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
 					t.Fatalf("unexpected resize status: %v", c)
@@ -6448,7 +6867,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, false)
+			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, SyncPod)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -6573,7 +6992,7 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			}
 			podStatus.IPs = tc.nodeIPs
 
-			status := kl.generateAPIPodStatus(tCtx, pod, podStatus, false)
+			status := kl.generateAPIPodStatus(tCtx, pod, podStatus, SyncPod)
 			if !reflect.DeepEqual(status.PodIPs, tc.expectedPodIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.expectedPodIPs, status.PodIPs)
 			}
@@ -6707,7 +7126,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, false)
+			status := kl.generateAPIPodStatus(tCtx, pod, criStatus, SyncPod)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -6851,7 +7270,6 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("InPlacePodVerticalScaling cgroup resource reporting is only supported on Linux")
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	nowTime := time.Now()
 	testContainerName := "ctr0"
@@ -7478,41 +7896,17 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 
 	for tdesc, tc := range map[string]struct {
 		testPodStatus           *kubecontainer.PodStatus
-		featureEnabled          bool
 		expectedContainerStatus []v1.ContainerStatus
 	}{
-		"nil user, SupplementalGroupsPolicy is disabled": {
+		"nil user": {
 			testPodStaus(nil),
-			false,
 			expectedContainerStatuses(nil),
 		},
-		"empty user, SupplementalGroupsPolicy is disabled": {
+		"empty user": {
 			testPodStaus(&kubecontainer.ContainerUser{}),
-			false,
-			expectedContainerStatuses(nil),
-		},
-		"linux user, SupplementalGroupsPolicy is disabled": {
-			testPodStaus(&kubecontainer.ContainerUser{
-				Linux: &kubecontainer.LinuxContainerUser{
-					UID:                0,
-					GID:                0,
-					SupplementalGroups: []int64{10},
-				},
-			}),
-			false,
-			expectedContainerStatuses(nil),
-		},
-		"nil user, SupplementalGroupsPolicy is enabled": {
-			testPodStaus(nil),
-			true,
-			expectedContainerStatuses(nil),
-		},
-		"empty user, SupplementalGroupsPolicy is enabled": {
-			testPodStaus(&kubecontainer.ContainerUser{}),
-			true,
 			expectedContainerStatuses(&v1.ContainerUser{}),
 		},
-		"linux user, SupplementalGroupsPolicy is enabled": {
+		"linux user": {
 			testPodStaus(&kubecontainer.ContainerUser{
 				Linux: &kubecontainer.LinuxContainerUser{
 					UID:                0,
@@ -7520,7 +7914,6 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 					SupplementalGroups: []int64{10},
 				},
 			}),
-			true,
 			expectedContainerStatuses(&v1.ContainerUser{
 				Linux: &v1.LinuxContainerUser{
 					UID:                0,
@@ -7530,9 +7923,6 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 			}),
 		},
 	} {
-		// Set emulation version so that the feature gate can be disabled in the test
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, tc.featureEnabled)
 		tPod := testPod.DeepCopy()
 		t.Logf("TestCase: %q", tdesc)
 
@@ -9110,7 +9500,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 		return filePath
 	}
 
-	// Test cases for FileKeyRef
+	// Test cases for FileKeyRef feature gate
 	testCases := []struct {
 		name          string
 		container     *v1.Container
@@ -9570,6 +9960,8 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, true)
+
 			if tc.setupFiles != nil {
 				tc.setupFiles()
 			}
@@ -10027,4 +10419,92 @@ func TestMakeMountsBindMountOptions(t *testing.T) {
 	require.Len(t, mounts, 3) // 2 volume mounts + /etc/hosts
 	assert.Equal(t, []string{"noexec", "nosuid"}, mounts[0].BindMountOptions)
 	assert.Empty(t, mounts[1].BindMountOptions)
+}
+
+func TestGenerateAPIPodStatusResizeConditionsByPodWorkerState(t *testing.T) {
+	tests := []struct {
+		name             string
+		podState         PodWorkerState
+		expectPending    bool
+		expectInProgress bool
+	}{
+		{
+			name:             "SyncPod preserves both PodResizePending and PodResizeInProgress",
+			podState:         SyncPod,
+			expectPending:    true,
+			expectInProgress: true,
+		},
+		{
+			name:             "TerminatingPod clears PodResizePending but preserves PodResizeInProgress",
+			podState:         TerminatingPod,
+			expectPending:    false,
+			expectInProgress: true,
+		},
+		{
+			name:             "TerminatedPod clears both PodResizePending and PodResizeInProgress",
+			podState:         TerminatedPod,
+			expectPending:    false,
+			expectInProgress: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:        "resize-state-pod",
+					Name:       "resize-state-pod",
+					Namespace:  "default",
+					Generation: 3,
+				},
+				Spec: v1.PodSpec{
+					NodeName:      "machine",
+					RestartPolicy: v1.RestartPolicyAlways,
+					Containers: []v1.Container{{
+						Name:  "c1",
+						Image: "img",
+					}},
+				},
+			}
+			criStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			}
+
+			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", 2)
+			kl.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "insufficient cpu", 3)
+
+			apiStatus := kl.generateAPIPodStatus(tCtx, pod, criStatus, tc.podState)
+
+			var gotPending, gotInProgress bool
+			for _, c := range apiStatus.Conditions {
+				switch c.Type {
+				case v1.PodResizePending:
+					gotPending = true
+				case v1.PodResizeInProgress:
+					gotInProgress = true
+				}
+			}
+			assert.Equal(t, tc.expectPending, gotPending, "PodResizePending in generated status")
+			assert.Equal(t, tc.expectInProgress, gotInProgress, "PodResizeInProgress in generated status")
+
+			var cachedPending, cachedInProgress bool
+			for _, c := range kl.statusManager.GetPodResizeConditions(pod.UID) {
+				switch c.Type {
+				case v1.PodResizePending:
+					cachedPending = true
+				case v1.PodResizeInProgress:
+					cachedInProgress = true
+				}
+			}
+			assert.Equal(t, tc.expectPending, cachedPending, "PodResizePending in statusManager")
+			assert.Equal(t, tc.expectInProgress, cachedInProgress, "PodResizeInProgress in statusManager")
+		})
+	}
 }

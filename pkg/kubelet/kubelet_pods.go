@@ -245,10 +245,6 @@ func (kl *Kubelet) GetActivePods() []*v1.Pod {
 // allocated state.
 func (kl *Kubelet) getAllocatedPods() []*v1.Pod {
 	activePods := kl.GetActivePods()
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return activePods
-	}
-
 	allocatedPods := make([]*v1.Pod, len(activePods))
 	for i, pod := range activePods {
 		allocatedPods[i], _ = kl.allocationManager.UpdatePodFromAllocation(pod)
@@ -439,9 +435,6 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 		rro, err := resolveRecursiveReadOnly(mount, supportsRRO)
 		if err != nil {
 			return nil, cleanupAction, fmt.Errorf("failed to resolve recursive read-only mode: %w", err)
-		}
-		if rro && !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-			return nil, cleanupAction, fmt.Errorf("recursive read-only mount needs feature gate %q to be enabled", features.RecursiveReadOnlyMounts)
 		}
 
 		mounts = append(mounts, kubecontainer.Mount{
@@ -669,8 +662,13 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 }
 
 // ResizeEphemeralVolume directly triggers a resize of the specified volume.
-func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *apiresource.Quantity) error {
-	return kl.volumeManager.ResizeEphemeralVolume(pod, volumeName, newSize)
+func (kl *Kubelet) ResizeEphemeralVolume(pod *v1.Pod, volumeName string) error {
+	return kl.volumeManager.ResizeEphemeralVolume(pod, volumeName)
+}
+
+// EffectiveEphemeralVolumeLimit returns the effective size limit for the specified volume.
+func (kl *Kubelet) EffectiveEphemeralVolumeLimit(pod *v1.Pod, volumeName string) (*apiresource.Quantity, error) {
+	return kl.volumeManager.EffectiveEphemeralVolumeLimit(pod, volumeName)
 }
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
@@ -833,7 +831,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 				}
 				optional := cm.Optional != nil && *cm.Optional
-				configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+				configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 				if err != nil {
 					if errors.IsNotFound(err) && optional {
 						// ignore error when marked optional
@@ -927,7 +925,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 					if kl.kubeClient == nil {
 						return result, fmt.Errorf("couldn't get configMap %v/%v, no kubeClient defined", pod.Namespace, name)
 					}
-					configMap, err = kl.configMapManager.GetConfigMap(pod.Namespace, name)
+					configMap, err = kl.configMapManager.GetConfigMap(ctx, pod.Namespace, name)
 					if err != nil {
 						if errors.IsNotFound(err) && optional {
 							// ignore error when marked optional
@@ -973,7 +971,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 				}
 				// TODO: validate no NUL bytes
 				runtimeVal = string(runtimeValBytes)
-			case envVar.ValueFrom.FileKeyRef != nil:
+			case utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) && envVar.ValueFrom.FileKeyRef != nil:
 				f := envVar.ValueFrom.FileKeyRef
 				key := f.Key
 				volume := f.VolumeName
@@ -1203,6 +1201,15 @@ func (kl *Kubelet) isPodInactive(p *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// IsPodTerminatingOrTerminal returns true if the pod is currently terminating
+// or has already reached a terminal state.
+func (kl *Kubelet) IsPodTerminatingOrTerminal(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil ||
+		kl.podWorkers.IsPodTerminationRequested(pod.UID) ||
+		kl.podWorkers.IsPodKnownTerminated(pod.UID) ||
+		kl.isAdmittedPodTerminal(pod)
 }
 
 // isAdmittedPodTerminal returns true if the provided config source pod is in
@@ -1915,12 +1922,16 @@ func getPhase(logger klog.Logger, pod *v1.Pod, info []v1.ContainerStatus, podIsT
 	}
 }
 
-func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal bool) []*v1.PodCondition {
-	// If pod is terminal, clear the resize status.
-	if podIsTerminal {
+func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podState PodWorkerState) []*v1.PodCondition {
+	switch podState {
+	case TerminatedPod:
+		// If pod is terminal, clear the resize status.
 		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
 		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 		return nil
+	case TerminatingPod:
+		// PodResizeInProgress is cleared once the pod reaches TerminatedPod.
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID, metrics.DeferredResizeResolutionTerminated)
 	}
 
 	resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
@@ -1929,9 +1940,10 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal 
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status. This method should only be called from within sync*Pod methods.
-func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodStatus {
+func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podState PodWorkerState) v1.PodStatus {
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Generating pod status", "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
+	podIsTerminal := podState == TerminatedPod
+	logger.V(3).Info("Generating pod status", "podState", podState, "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
 	// use the previous pod status, or the api status, as the basis for this pod
 	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
@@ -1945,14 +1957,22 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// Perform a three-way merge between the statuses from the status manager,
 	// runtime, and generated status to ensure terminal status is correctly set.
-	if s.Phase != v1.PodFailed && s.Phase != v1.PodSucceeded {
+	// A phase already recorded as Failed is kept even when the container exit
+	// codes alone would compute Succeeded: the kubelet may have failed the pod
+	// for a reason the containers cannot see, such as an eviction whose
+	// SIGTERM the container handled by exiting 0.
+	if s.Phase != v1.PodFailed {
 		switch {
 		case oldPodStatus.Phase == v1.PodFailed || oldPodStatus.Phase == v1.PodSucceeded:
-			logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
-			s.Phase = oldPodStatus.Phase
+			if s.Phase != oldPodStatus.Phase {
+				logger.V(4).Info("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
+				s.Phase = oldPodStatus.Phase
+			}
 		case pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded:
-			logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
-			s.Phase = pod.Status.Phase
+			if s.Phase != pod.Status.Phase {
+				logger.V(4).Info("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
+				s.Phase = pod.Status.Phase
+			}
 		}
 	}
 
@@ -2002,18 +2022,16 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 			s.Conditions = append(s.Conditions, c)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		resizeStatus := kl.determinePodResizeStatus(pod, podIsTerminal)
-		for _, c := range resizeStatus {
-			// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
-			// observed generation is not already set. We avoid overwriting the condition's observedGeneration
-			// in other cases, because the condition may be reflecting an older podspec.
-			gen := podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
-			if gen == 0 {
-				c.ObservedGeneration = 0
-			}
-			s.Conditions = append(s.Conditions, *c)
+	resizeStatus := kl.determinePodResizeStatus(pod, podState)
+	for _, c := range resizeStatus {
+		// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
+		// observed generation is not already set. We avoid overwriting the condition's observedGeneration
+		// in other cases, because the condition may be reflecting an older podspec.
+		gen := podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
+		if gen == 0 {
+			c.ObservedGeneration = 0
 		}
+		s.Conditions = append(s.Conditions, *c)
 	}
 
 	// copy over the pod disruption conditions from state which is already
@@ -2027,7 +2045,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// set all Kubelet-owned conditions
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
-		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(pod, &oldPodStatus, podStatus))
+		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(logger, pod, &oldPodStatus, podStatus))
 	}
 	allContainerStatuses := append(s.InitContainerStatuses, s.ContainerStatuses...)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(pod, &oldPodStatus, allContainerStatuses, s.Phase))
@@ -2328,10 +2346,34 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	return resources
 }
 
+func makeVolumeMountStatuses(logger klog.Logger, volumeMounts []v1.VolumeMount, supportsRRO bool) []v1.VolumeMountStatus {
+	var mountStatuses []v1.VolumeMountStatus
+	for _, vol := range volumeMounts {
+		volStatus := v1.VolumeMountStatus{
+			Name:      vol.Name,
+			MountPath: vol.MountPath,
+			ReadOnly:  vol.ReadOnly,
+		}
+		if vol.ReadOnly {
+			rroMode := v1.RecursiveReadOnlyDisabled
+			if b, err := resolveRecursiveReadOnly(vol, supportsRRO); err != nil {
+				logger.Error(err, "failed to resolve recursive read-only mode", "mode", *vol.RecursiveReadOnly)
+			} else if b {
+				rroMode = v1.RecursiveReadOnlyEnabled
+			}
+			volStatus.RecursiveReadOnly = &rroMode
+		}
+		mountStatuses = append(mountStatuses, volStatus)
+	}
+	return mountStatuses
+}
+
 // convertToAPIContainerStatuses converts the given internal container
 // statuses into API container statuses.
 func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, previousStatus []v1.ContainerStatus, containers []v1.Container, imageVolumeNames sets.Set[string], hasInitContainers, isInitContainer bool, podRestarting bool) []v1.ContainerStatus {
 	logger := klog.FromContext(ctx)
+	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
+
 	convertContainerStatus := func(cs *kubecontainer.Status, oldStatus *v1.ContainerStatus) *v1.ContainerStatus {
 		cid := cs.ID.String()
 		status := &v1.ContainerStatus{
@@ -2344,8 +2386,22 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			ImageID:     cs.ImageRef,
 			ContainerID: cid,
 		}
-		if oldStatus != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+			var actuatedVolumeMounts []v1.VolumeMount
+			if kl.actuatedState != nil {
+				actuatedVolumeMounts, _ = kl.actuatedState.GetContainerVolumeMounts(pod.UID, cs.Name)
+			}
+			if len(actuatedVolumeMounts) > 0 {
+				status.VolumeMounts = makeVolumeMountStatuses(logger, actuatedVolumeMounts, supportsRRO)
+			} else if oldStatus != nil && ((status.ContainerID != "" && oldStatus.ContainerID == status.ContainerID) || (oldStatus.ContainerID == "" && oldStatus.State.Waiting == nil)) {
+				// Preserve previously reported VolumeMounts for the same container instance if
+				// actuatedState does not have an entry (e.g., on the first sync after a kubelet upgrade).
+				status.VolumeMounts = oldStatus.VolumeMounts
+			}
+		} else if oldStatus != nil {
 			status.VolumeMounts = oldStatus.VolumeMounts // immutable
+		}
+		if oldStatus != nil {
 			if utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits) {
 				if oldStatus.RestartCount > status.RestartCount {
 					status.RestartCount = oldStatus.RestartCount
@@ -2561,39 +2617,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: PodInitializing}}
 	}
 
-	supportsRRO := kl.runtimeClassSupportsRecursiveReadOnlyMounts(logger, pod)
-
 	for _, container := range containers {
 		status := &v1.ContainerStatus{
-			Name:  container.Name,
-			Image: container.Image,
-			State: defaultWaitingState,
-		}
-		// status.VolumeMounts cannot be propagated from kubecontainer.Status
-		// because the CRI API is unaware of the volume names.
-		if utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-			for _, vol := range container.VolumeMounts {
-				volStatus := v1.VolumeMountStatus{
-					Name:      vol.Name,
-					MountPath: vol.MountPath,
-					ReadOnly:  vol.ReadOnly,
-				}
-				if vol.ReadOnly {
-					rroMode := v1.RecursiveReadOnlyDisabled
-					if b, err := resolveRecursiveReadOnly(vol, supportsRRO); err != nil {
-						logger.Error(err, "failed to resolve recursive read-only mode", "mode", *vol.RecursiveReadOnly)
-					} else if b {
-						if utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
-							rroMode = v1.RecursiveReadOnlyEnabled
-						} else {
-							logger.Error(nil, "recursive read-only mount needs feature gate to be enabled",
-								"featureGate", features.RecursiveReadOnlyMounts)
-						}
-					}
-					volStatus.RecursiveReadOnly = &rroMode // Disabled or Enabled
-				}
-				status.VolumeMounts = append(status.VolumeMounts, volStatus)
-			}
+			Name:         container.Name,
+			Image:        container.Image,
+			State:        defaultWaitingState,
+			VolumeMounts: makeVolumeMountStatuses(logger, container.VolumeMounts, supportsRRO),
 		}
 		oldStatus, found := oldStatuses[container.Name]
 		if found {
@@ -2730,24 +2759,20 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
-			if allocatedContainer != nil {
-				// status.Resources reflects cgroup-actuated resources. If the container is running,
-				// it is populated from CRI status.
-				status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
-				// status.AllocatedResources represents the desired cgroup resource state for resize,
-				// and is strictly based on the uninflated standard cgroup resources requested in the spec.
-				// DRA based allocations are not included in AllocatedResources at the container level.
-				// This is because the claims can be shared across containers in the pod and can be
-				// shared unevenly (enforced by the DRA driver).
-				status.AllocatedResources = allocatedContainer.Resources.Requests
-			}
+		allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
+		if allocatedContainer != nil {
+			// status.Resources reflects cgroup-actuated resources. If the container is running,
+			// it is populated from CRI status.
+			status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
+			// status.AllocatedResources represents the desired cgroup resource state for resize,
+			// and is strictly based on the uninflated standard cgroup resources requested in the spec.
+			// DRA based allocations are not included in AllocatedResources at the container level.
+			// This is because the claims can be shared across containers in the pod and can be
+			// shared unevenly (enforced by the DRA driver).
+			status.AllocatedResources = allocatedContainer.Resources.Requests
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
-			status.User = convertContainerStatusUser(cStatus)
-		}
+		status.User = convertContainerStatusUser(cStatus)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 			status.StopSignal = cStatus.StopSignal
 		}
@@ -2974,7 +2999,6 @@ func (kl *Kubelet) runtimeClassSupportsRecursiveReadOnlyMounts(logger klog.Logge
 }
 
 // runtimeHandlerSupportsRecursiveReadOnlyMounts checks whether the runtime handler supports recursive read-only mounts.
-// The kubelet feature gate is not checked here.
 func runtimeHandlerSupportsRecursiveReadOnlyMounts(logger klog.Logger, runtimeHandlerName string, runtimeHandlers []kubecontainer.RuntimeHandler) bool {
 	if len(runtimeHandlers) == 0 {
 		// The runtime does not support returning the handler list.

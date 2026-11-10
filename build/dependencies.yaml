@@ -1,20 +1,8 @@
 dependencies:
-  # zeitgeist (https://github.com/kubernetes-sigs/zeitgeist) was inspired by
-  # (and now replaces) the cmd/verifydependencies tool to verify external
-  # dependencies across the repo.
-  #
-  # The zeitgeist dependencies.yaml file format is intended to be
-  # backwards-compatible with the original tooling.
-  #
-  # In instances where the file format may change across versions, this meta
-  # dependency check exists to ensure we're pinned to a known good version.
-  #
-  # ref: https://github.com/kubernetes/kubernetes/pull/98845
-  - name: "zeitgeist"
-    version: "v0.5.4"
-    refPaths:
-    - path: hack/verify-external-dependencies-version.sh
-      match: sigs.k8s.io/zeitgeist@v.*
+  # This file specifies dependencies that zeitgeist must check.
+  # The zeitgeist version in use is determined by hack/tools/go.mod.
+  # Bumping that may require changes to this file (in particular if
+  # the file format changes).
 
   # CNI plugins
   - name: "cni"
@@ -31,7 +19,7 @@ dependencies:
 
   # CoreDNS
   - name: "coredns-kube-up"
-    version: 1.14.7
+    version: 1.15.0
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: registry.k8s.io/coredns
@@ -41,7 +29,7 @@ dependencies:
       match: registry.k8s.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.14.7
+    version: 1.15.0
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
@@ -133,7 +121,7 @@ dependencies:
   # should also be updated, but go-runner is much harder to exploit and has
   # far less relevancy to go updates for Kubernetes more generally.
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.38.0-go1.27.2-trixie.0
+    version: v1.38.0-go1.27.3-trixie.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -171,15 +159,13 @@ dependencies:
       match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "registry.k8s.io/distroless-iptables: dependents"
-    version: v0.11.1
+    version: v0.11.2
     refPaths:
     - path: build/common.sh
       match: __default_distroless_iptables_version=
-    - path: test/utils/image/manifest.go
-      match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.4.0-go1.27.2-trixie.0
+    version: v2.4.0-go1.27.3-trixie.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=

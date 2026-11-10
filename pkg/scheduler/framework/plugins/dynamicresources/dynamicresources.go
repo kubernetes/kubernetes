@@ -177,21 +177,20 @@ type nodeAllocation struct {
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type DynamicResources struct {
-	fts                   feature.Features
-	filterTimeout         time.Duration
-	bindingTimeout        time.Duration
-	fh                    fwk.Handle
-	clientset             kubernetes.Interface
-	celCache              *cel.Cache
-	draManager            fwk.SharedDRAManager
-	podIndexer            cache.Indexer
-	podResourceClaimIndex string
+	fts            feature.Features
+	filterTimeout  time.Duration
+	bindingTimeout time.Duration
+	fh             fwk.Handle
+	clientset      kubernetes.Interface
+	celCache       *cel.Cache
+	draManager     fwk.SharedDRAManager
+	podIndexer     cache.Indexer
 }
 
 const (
-	// podResourceClaimIndexPrefix is the prefix for the index function which indexes pods by
+	// podResourceClaimIndex is the name of the index function which indexes pods by
 	// the ResourceClaims that they reference. The key for looking up pods is "<namespace>/<name>".
-	podResourceClaimIndexPrefix = "schedulerPodResourceClaim"
+	podResourceClaimIndex = "schedulerPodResourceClaim"
 )
 
 var (
@@ -228,14 +227,18 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		draManager: fh.SharedDRAManager(),
 	}
 
-	// Set up pod indexer for PreQueueingHint to look up pods by claim.
-	podInformer := fh.SharedInformerFactory().Core().V1().Pods()
-	podResourceClaimIndex := podResourceClaimIndexPrefix + "-" + fh.ProfileName()
-	if err := podInformer.Informer().AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
-		return nil, fmt.Errorf("failed to add pod resource claim indexer: %w", err)
+	if fts.EnableSchedulerPreQueueingHints {
+		// Set up pod indexer for PreQueueingHint to look up pods by claim.
+		// Profiles share the pod informer, so they also share one index:
+		// AddIndexers fails for the later profiles because it already exists.
+		podInformer := fh.SharedInformerFactory().Core().V1().Pods().Informer()
+		if err := podInformer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
+			if _, exists := podInformer.GetIndexer().GetIndexers()[podResourceClaimIndex]; !exists {
+				return nil, fmt.Errorf("failed to add pod resource claim indexer: %w", err)
+			}
+		}
+		pl.podIndexer = podInformer.GetIndexer()
 	}
-	pl.podIndexer = podInformer.Informer().GetIndexer()
-	pl.podResourceClaimIndex = podResourceClaimIndex
 
 	return pl, nil
 }
@@ -269,12 +272,17 @@ func (pl *DynamicResources) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Sig
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	// preQueueingHint needs the pod index, which only exists with SchedulerPreQueueingHints.
+	var claimPreQueueingHint fwk.PreQueueingHintFn
+	if pl.fts.EnableSchedulerPreQueueingHints {
+		claimPreQueueingHint = pl.preQueueingHint
+	}
 	events := []fwk.ClusterEventWithHint{
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: pl.preQueueingHint},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterClaimChange, PreQueueingHintFn: claimPreQueueingHint},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
@@ -303,18 +311,24 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 // and never waits for their creation.
 func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	pod, ok := obj.(*v1.Pod)
-	if !ok {
+	if !ok || len(pod.Spec.ResourceClaims) == 0 {
+		// An index function that returns an error panics the informer, so we
+		// tolerate an unexpected object type by indexing it under no keys.
+		//
+		// Return early without allocating the slice when there are no
+		// resource claims.
 		return nil, nil
 	}
-	keySet := sets.New[string]()
+	keys := make([]string, 0, len(pod.Spec.ResourceClaims))
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &podClaim)
 		if err != nil || claimName == nil {
 			continue
 		}
-		keySet.Insert(pod.Namespace + "/" + *claimName)
+		// Duplicates are fine for the indexer.
+		keys = append(keys, pod.Namespace+"/"+*claimName)
 	}
-	return keySet.UnsortedList(), nil
+	return keys, nil
 }
 
 // preQueueingHint returns the pods affected by a ResourceClaim event.
@@ -345,14 +359,18 @@ func (pl *DynamicResources) preQueueingHint(logger klog.Logger, oldObj, newObj i
 	}
 	claim, ok := obj.(*resourceapi.ResourceClaim)
 	if !ok {
+		// Unexpected object type: we can't identify the affected pods, so
+		// conservatively evaluate all of them rather than returning an error.
 		return fwk.PreQueueingHintResult{AllPods: true}, nil
 	}
-	objs, err := pl.podIndexer.ByIndex(pl.podResourceClaimIndex, claim.Namespace+"/"+claim.Name)
+	objs, err := pl.podIndexer.ByIndex(podResourceClaimIndex, claim.Namespace+"/"+claim.Name)
 	if err != nil {
 		return fwk.PreQueueingHintResult{}, fmt.Errorf("failed to look up pods by claim %s/%s: %w", claim.Namespace, claim.Name, err)
 	}
 	pods := make([]types.NamespacedName, 0, len(objs))
 	for _, obj := range objs {
+		// The indexer only ever stores *v1.Pod, so the cast always succeeds;
+		// the check is defensive.
 		if pod, ok := obj.(*v1.Pod); ok {
 			pods = append(pods, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace})
 		}
@@ -1565,13 +1583,17 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs fwk.CycleState, po
 	// we process user claims here first, extendedResourceClaim if any is handled below.
 	for _, claim := range state.claims.allUserClaims() {
 		// If allocation was in-flight, then it might not be anymore if no pods
-		// still need the pending allocation. If the allocation was removed from
-		// in-flight, we need to revert the claim object in the assume cache to
-		// what it was before. The allocation is not removed until the last Pod
-		// sharing it is Bound or Unreserved.
+		// still need the pending allocation. The allocation is not removed
+		// until the last Pod sharing it is Bound or Unreserved.
+		//
+		// The assume cache is not restored. Reserve does not modify it and
+		// PreBind only assumes claims returned by the API server. The informer
+		// copy can be older than such a claim because the assume cache ignores
+		// informer events whose ResourceVersion is not newer than the assumed
+		// claim, so restoring could drop an allocation stored by PreBind of
+		// this or another Pod sharing the claim and make its devices look free.
 		if deleted := pl.draManager.ResourceClaims().MaybeRemoveClaimPendingAllocation(claim.UID, false); deleted {
 			logger.V(5).Info("Released resource in allocation result", "claim", klog.KObj(claim), "uid", claim.UID, "resourceVersion", claim.ResourceVersion, "allocation", klog.Format(claim.Status.Allocation))
-			pl.draManager.ResourceClaims().AssumedClaimRestore(claim.Namespace, claim.Name)
 
 			// If we are currently asynchronously Binding Pods in a PodGroup,
 			// then the pendingAllocations set does not need to be updated. New
@@ -1839,8 +1861,11 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	// We may run into a ResourceVersion conflict because there may be some
 	// benign concurrent changes. In that case we get the latest claim and
 	// try again.
+	//
+	// claim is never modified in place and only gets replaced by objects
+	// returned by the API server, so the deferred assume only stores what
+	// was actually written.
 	refreshClaim := false
-	claim = claim.DeepCopy()
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		if refreshClaim {
 			updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
@@ -1867,33 +1892,37 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			// The finalizer needs to be added in a normal update.
 			// If we were interrupted in the past, it might already be set and we simply continue.
 			if !slices.Contains(claim.Finalizers, resourceapi.Finalizer) {
-				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
-				updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+				withFinalizer := claim.DeepCopy()
+				withFinalizer.Finalizers = append(withFinalizer.Finalizers, resourceapi.Finalizer)
+				updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, withFinalizer, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("add finalizer to claim %s: %w", klog.KObj(claim), err)
 				}
 				claim = updatedClaim
 			}
-			claim.Status.Allocation = allocation
 		}
 
+		update := claim.DeepCopy()
+		if allocation != nil {
+			update.Status.Allocation = allocation
+		}
 		// We can simply try to add the pod here without checking
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
-		claim.Status.ReservedFor = append(claim.Status.ReservedFor, binding)
+		update.Status.ReservedFor = append(update.Status.ReservedFor, binding)
 		if pl.fts.EnableDRADeviceBindingConditions &&
 			pl.fts.EnableDRAResourceClaimDeviceStatus {
 			// Once the feature gate checks get removed, this code can be moved into an else branch
 			// for `if allocation != nil` above. For now it is kept here to avoid changing normal
 			// behavior.
-			if claim.Status.Allocation == nil {
+			if update.Status.Allocation == nil {
 				return fmt.Errorf("claim %s got deallocated elsewhere in the meantime", klog.KObj(claim))
 			}
-			if claim.Status.Allocation.AllocationTimestamp == nil {
-				claim.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
+			if update.Status.Allocation.AllocationTimestamp == nil {
+				update.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
 			}
 		}
-		updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, update, metav1.UpdateOptions{})
 		if err != nil {
 			if allocation != nil {
 				return fmt.Errorf("add allocation and reservation to claim %s: %w", klog.KObj(claim), err)

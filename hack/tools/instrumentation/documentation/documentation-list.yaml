@@ -188,58 +188,6 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
-- name: webhook_fail_open_count
-  subsystem: admission
-  namespace: apiserver
-  help: Admission webhook fail open count, identified by name and broken out for each
-    admission type (validating or admit).
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - name
-  - type
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: webhook_rejection_count
-  subsystem: admission
-  namespace: apiserver
-  help: Admission webhook rejection count, identified by name and broken out for each
-    admission type (validating or admit) and operation. Additional labels specify
-    an error type (calling_webhook_error or apiserver_internal_error if an error occurred;
-    no_error otherwise) and optionally a non-zero rejection code if the webhook rejects
-    the request with an HTTP status code (honored by the apiserver when the code is
-    greater or equal to 400). Codes greater than 600 are truncated to 600, to keep
-    the metrics cardinality bounded.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - error_type
-  - name
-  - operation
-  - rejection_code
-  - type
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
-- name: webhook_request_total
-  subsystem: admission
-  namespace: apiserver
-  help: Admission webhook request total, identified by name and broken out for each
-    admission type (validating or admit) and operation. Additional labels specify
-    whether the request was rejected or not and an HTTP status code. Codes greater
-    than 600 are truncated to 600, to keep the metrics cardinality bounded.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - code
-  - name
-  - operation
-  - rejected
-  - type
-  componentEndpoints:
-  - component: kube-apiserver
-    endpoint: /metrics
 - name: error_total
   subsystem: apiserver_audit
   help: Counter of audit events that failed to be audited properly. Plugin identifies
@@ -1802,6 +1750,116 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: compression_duration_seconds
+  subsystem: storage
+  namespace: apiserver
+  help: Time spent compressing and decompressing storage values, not counting any
+    encryption at rest or the wait for a decompression slot.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  buckets:
+  - 5e-06
+  - 1e-05
+  - 2e-05
+  - 4e-05
+  - 8e-05
+  - 0.00016
+  - 0.00032
+  - 0.00064
+  - 0.00128
+  - 0.00256
+  - 0.00512
+  - 0.01024
+  - 0.02048
+  - 0.04096
+  - 0.08192
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_format_errors_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of storage compression frames that failed their checksum or did not
+    parse, by resource.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_inflation_wait_seconds
+  subsystem: storage
+  namespace: apiserver
+  help: Time spent waiting for a decompression slot.
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 1e-05
+  - 4e-05
+  - 0.00016
+  - 0.00064
+  - 0.00256
+  - 0.01024
+  - 0.04096
+  - 0.16384
+  - 0.65536
+  - 2.62144
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: apiserver_storage_compression_last_config_info
+  help: Information about the last loaded storage compression configuration, with
+    its hash as a label, split by apiserver identity.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - apiserver_id_hash
+  - hash
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_operations_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of storage compression operations by resource, operation and outcome.
+    The outcome tells compressed, stored verbatim and unframed values apart.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation
+  - outcome
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_rewrites_needed_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of reads that reported a value stale because its compression framing
+    disagreed with the storage compression configuration, by resource and direction.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - direction
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: compression_unsupported_algorithm_total
+  subsystem: storage
+  namespace: apiserver
+  help: Number of storage values read whose compression algorithm this apiserver does
+    not implement, by resource. Usually a newer apiserver wrote them.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: storage_consistency_checks_total
   namespace: apiserver
   help: Counter for status of consistency checks between etcd and watch cache
@@ -2333,7 +2391,7 @@
     endpoint: /metrics
 - name: authorization_attempts_total
   help: Counter of authorization attempts broken down by result. It can be either
-    'allowed', 'denied', 'no-opinion' or 'error'.
+    'allowed', 'denied', 'no-opinion', 'conditional' or 'error'.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -3647,6 +3705,18 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: device_plugin_devices
+  subsystem: kubelet
+  help: Number of devices currently known to the device manager. Broken down by resource
+    name and health state.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - health_state
+  - resource_name
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: device_plugin_registration_total
   subsystem: kubelet
   help: Cumulative number of device plugin registrations. Broken down by resource
@@ -4513,6 +4583,17 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_worker_errors_total
+  subsystem: kubelet
+  help: 'Cumulative number of errors in pod worker sync operations. Broken down by
+    operation type: create, update, sync, terminating, terminated'
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - operation_type
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_worker_start_duration_seconds
   subsystem: kubelet
   help: Duration in seconds from kubelet seeing a pod to starting a worker.
@@ -4788,6 +4869,16 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: sync_result_errors_total
+  subsystem: kubelet
+  help: Cumulative number of SyncResult errors during pod sync. Broken down by action
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - action
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: terminated_containers_total
   subsystem: kubelet
   help: Cumulative number of container terminations.
@@ -4859,6 +4950,19 @@
   - 2.5
   - 5
   - 10
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: volume_requested_resizes_total
+  subsystem: kubelet
+  help: Number of requested resizes, counted at the volume level. The 'medium' label
+    refers to the volume storage medium (e.g. 'memory'); the 'operation' label can
+    be one of 'add', 'remove', 'increase' or 'decrease'.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - medium
+  - operation
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
@@ -6332,7 +6436,10 @@
     endpoint: /metrics
 - name: batch_attempts_total
   subsystem: scheduler
-  help: Counts of results when we attempt to use batching, by scheduler profile.
+  help: Counts of results when we attempt to use batching, by scheduler profile. 'no_hint'
+    covers every pod that asked for a hint and got none, including pods that later
+    fail to schedule. 'hint_used' and 'hint_not_used' are recorded only when a node
+    is selected, and say whether it was the hinted one.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6343,7 +6450,14 @@
     endpoint: /metrics
 - name: batch_cache_flushed_total
   subsystem: scheduler
-  help: Counts of cache flushes by reason and scheduler profile.
+  help: Counts of batch cache flushes by reason and scheduler profile. A flush is
+    counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped'
+    means the previous pod was handled by another profile or failed to schedule, 'pod_nominated'
+    means the pod has a nominated node, 'pod_incompatible' means the pod's signature
+    is missing or differs from the batch's, 'expired' means the state is older than
+    the maximum batch age, 'node_missing' means a node needed to reuse the state is
+    no longer in the snapshot, and 'filter_error', 'prescore_error', 'rescore_error'
+    and 'normalize_error' mean that phase failed while rescoring.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6577,12 +6691,13 @@
     endpoint: /metrics
 - name: podgroup_schedule_attempts_total
   subsystem: scheduler
-  help: Number of attempts to schedule pod group, by the result and scheduler profile.
-    'unschedulable' means a pod group could not be scheduled, while 'error' means
-    an internal scheduler problem.
+  help: Number of attempts to schedule pod group, by the result, scheduler profile
+    and entity type ('podgroup' or 'compositepodgroup'). 'unschedulable' means a pod
+    group could not be scheduled, while 'error' means an internal scheduler problem.
   type: Counter
   stabilityLevel: ALPHA
   labels:
+  - entity
   - profile
   - result
   componentEndpoints:
@@ -6590,9 +6705,13 @@
     endpoint: /metrics
 - name: podgroup_scheduling_algorithm_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling algorithm latency in seconds
+  help: Pod group scheduling algorithm latency in seconds, by scheduler profile and
+    entity type ('podgroup' or 'compositepodgroup').
   type: Histogram
   stabilityLevel: ALPHA
+  labels:
+  - entity
+  - profile
   buckets:
   - 0.001
   - 0.002
@@ -6614,10 +6733,12 @@
     endpoint: /metrics
 - name: podgroup_scheduling_attempt_duration_seconds
   subsystem: scheduler
-  help: Pod group scheduling attempt latency in seconds, by scheduler profile.
+  help: Pod group scheduling attempt latency in seconds, by result, scheduler profile
+    and entity type ('podgroup' or 'compositepodgroup').
   type: Histogram
   stabilityLevel: ALPHA
   labels:
+  - entity
   - profile
   - result
   buckets:
@@ -6641,8 +6762,8 @@
     endpoint: /metrics
 - name: pre_queueing_hint_evaluations_total
   subsystem: scheduler
-  help: Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods
-    or narrowed).
+  help: Number of PreQueueingHint evaluations by plugin and result (narrowed, all_pods,
+    or prequeueing_hint_fn_error).
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -6763,13 +6884,17 @@
     endpoint: /metrics
 - name: preemption_workload_disruptions
   subsystem: scheduler
-  help: Number of workload preemption units being preempted. A single preemption unit
-    can be all pods in a pod group or composite pod group hierarchy (in case of DisruptionMode=all),
-    or a single pod (in case of DisruptionMode=single).
+  help: Number of preemption units evicted by a single workload preemption (either
+    pod groups or composite pod groups), by victim type. A unit is either all pods
+    of a pod group or composite pod group hierarchy with DisruptionMode=all (victim
+    is the type of its topmost group with DisruptionMode=all), or a single pod evicted
+    on its own (victim=pod), which covers pods outside of any group and pods of groups
+    with DisruptionMode=single.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
   - preemptor
+  - victim
   buckets:
   - 1
   - 2
@@ -6870,6 +6995,20 @@
   - 0.00512
   - 0.01024
   - 0.02048
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: store_schedule_results_total
+  subsystem: scheduler
+  help: Counts of the outcomes of storing scheduling results for batching, by scheduler
+    profile. 'stored' means the pod seeded a batch, 'pod_not_batchable' means the
+    pod has no signature, and 'empty_list' means no other feasible nodes were left
+    to cache. Pods that used the hinted node store nothing.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  - result
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -7295,6 +7434,96 @@
   labels:
   - group
   - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_fail_open_count
+  subsystem: admission
+  namespace: apiserver
+  help: Admission webhook fail open count, identified by name and broken out for each
+    admission type (validating or admit). Use apiserver_admission_webhook_fail_open_total
+    instead.
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: BETA
+  labels:
+  - name
+  - type
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_fail_open_total
+  subsystem: admission
+  namespace: apiserver
+  help: Total number of admission webhook calls that failed open, identified by name
+    and broken out for each admission type (validating or admit).
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - name
+  - type
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_rejection_count
+  subsystem: admission
+  namespace: apiserver
+  help: Admission webhook rejection count, identified by name and broken out for each
+    admission type (validating or admit) and operation. Additional labels specify
+    an error type (calling_webhook_error or apiserver_internal_error if an error occurred;
+    no_error otherwise) and optionally a non-zero rejection code if the webhook rejects
+    the request with an HTTP status code (honored by the apiserver when the code is
+    greater or equal to 400). Codes greater than 600 are truncated to 600, to keep
+    the metrics cardinality bounded. Use apiserver_admission_webhook_rejection_total
+    instead.
+  type: Counter
+  deprecatedVersion: 1.38.0
+  stabilityLevel: BETA
+  labels:
+  - error_type
+  - name
+  - operation
+  - rejection_code
+  - type
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_rejection_total
+  subsystem: admission
+  namespace: apiserver
+  help: Total number of admission webhook rejections, identified by name and broken
+    out for each admission type (validating or admit) and operation. Additional labels
+    specify an error type (calling_webhook_error or apiserver_internal_error if an
+    error occurred; no_error otherwise) and optionally a non-zero rejection code if
+    the webhook rejects the request with an HTTP status code (honored by the apiserver
+    when the code is greater or equal to 400). Codes greater than 600 are truncated
+    to 600, to keep the metrics cardinality bounded.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - error_type
+  - name
+  - operation
+  - rejection_code
+  - type
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: webhook_request_total
+  subsystem: admission
+  namespace: apiserver
+  help: Admission webhook request total, identified by name and broken out for each
+    admission type (validating or admit) and operation. Additional labels specify
+    whether the request was rejected or not and an HTTP status code. Codes greater
+    than 600 are truncated to 600, to keep the metrics cardinality bounded.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - code
+  - name
+  - operation
+  - rejected
+  - type
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics

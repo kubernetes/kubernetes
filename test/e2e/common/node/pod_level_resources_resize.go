@@ -48,19 +48,6 @@ import (
 func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 	ginkgo.DescribeTableSubtree("PLR guaranteed qos - 1 container with resize policy", environment.NotInUserNS, func(cpuPolicy, memPolicy v1.ResourceResizeRestartPolicy, resizeInitCtrs bool) {
 		ginkgo.DescribeTable("resizing", func(ctx context.Context, desiredCtrCPU, desiredCtrMem, desiredPodCPU, desiredPodMem string) {
-
-			// The tests for guaranteed pods include extended resources.
-			nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
-			framework.ExpectNoError(err, "list ready schedulable nodes")
-			for _, node := range nodes.Items {
-				e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
-			}
-			defer func() {
-				for _, node := range nodes.Items {
-					e2enode.RemoveExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource)
-				}
-			}()
-
 			originalCtrCPU := originalCPU
 			if desiredCtrCPU == "" {
 				originalCtrCPU = ""
@@ -70,8 +57,8 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 				originalCtrMem = ""
 			}
 
-			originalContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, originalCtrCPU, originalCtrMem)
-			expectedContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, true, desiredCtrCPU, desiredCtrMem)
+			originalContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, originalCtrCPU, originalCtrMem)
+			expectedContainers := makeGuaranteedContainers(1, cpuPolicy, memPolicy, true, desiredCtrCPU, desiredCtrMem)
 			for i, c := range expectedContainers {
 				// If the pod has init containers, but we are not resizing them, keep the original resources.
 				podLevelOnly := (desiredCtrCPU == "" && desiredPodCPU != originalCPU) || (desiredCtrMem == "" && desiredPodMem != originalMem)
@@ -135,7 +122,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a guaranteed pod with 3 containers with a net increase MUST result in the Pod resources being updated as expected.
 		*/
 		framework.It("3 containers - increase cpu & mem on c1, c2, decrease cpu & mem on c3 - net increase [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
-			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
 				originalContainers[i].MemPolicy = nil
@@ -165,7 +152,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with a net decrease MUST result in the Pod resources being updated as expected.
 		*/
 		framework.It("3 containers - increase cpu & mem on c1, decrease cpu & mem on c2, c3 - net decrease [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
-			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
 				originalContainers[i].MemPolicy = nil
@@ -195,7 +182,7 @@ func doGuaranteedPodLevelResizeTests(f *framework.Framework) {
 			Description: Issuing an in-place Pod Resize request via the Pod Resize subresource patch endpoint to modify CPU and memory requests and limits for a pod with 3 containers with various operations MUST result in the Pod resources being updated as expected.
 		*/
 		framework.It("3 containers - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2) [MinimumKubeletVersion:1.34]", func(ctx context.Context) {
-			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, false, originalCPU, originalMem)
+			originalContainers := makeGuaranteedContainers(3, v1.NotRequired, v1.NotRequired, false, originalCPU, originalMem)
 			for i := range originalContainers {
 				originalContainers[i].CPUPolicy = nil
 				originalContainers[i].MemPolicy = nil

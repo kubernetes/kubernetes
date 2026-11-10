@@ -154,7 +154,7 @@ func (i *Info) ObjectName() string {
 	if len(gvk.Group) == 0 {
 		return fmt.Sprintf("%s/%s", strings.ToLower(gvk.Kind), i.Name)
 	}
-	return fmt.Sprintf("%s.%s/%s\n", strings.ToLower(gvk.Kind), gvk.Group, i.Name)
+	return fmt.Sprintf("%s.%s/%s", strings.ToLower(gvk.Kind), gvk.Group, i.Name)
 }
 
 // String returns the general purpose string representation
@@ -163,7 +163,7 @@ func (i *Info) String() string {
 	if i.Mapping != nil {
 		mappingInfo := fmt.Sprintf("Resource: %q, GroupVersionKind: %q", i.Mapping.Resource.String(),
 			i.Mapping.GroupVersionKind.String())
-		return fmt.Sprint(mappingInfo, "\n", basicInfo)
+		return fmt.Sprintf("%s, %s", mappingInfo, basicInfo)
 	}
 	return basicInfo
 }

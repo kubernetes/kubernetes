@@ -68,6 +68,7 @@ var ExtensionPoints = []string{
 	PlacementGenerate,
 	PlacementFeasible,
 	PodGroupPostFilter,
+	RankNodes,
 }
 
 const (
@@ -93,6 +94,7 @@ const (
 	PlacementScore                   = "PlacementScore"
 	PlacementScoreExtensionNormalize = "PlacementScoreExtensionNormalize"
 	PodGroupPostFilter               = "PodGroupPostFilter"
+	RankNodes                        = "RankNodes"
 )
 
 const (
@@ -119,20 +121,31 @@ const (
 	BatchAttemptHintNotUsed = "hint_not_used"
 )
 
+// Possible results of storing the scheduling results of a pod
+const (
+	StoreResultStored          = "stored"
+	StoreResultPodNotBatchable = "pod_not_batchable"
+	StoreResultEmptyList       = "empty_list"
+)
+
 // Possible batch cache flush reasons
 const (
-	BatchFlushPodFailed       = "pod_failed"
 	BatchFlushPodSkipped      = "pod_skipped"
 	BatchFlushPodNominated    = "pod_nominated"
 	BatchFlushNodeMissing     = "node_missing"
-	BatchFlushEmptyList       = "empty_list"
 	BatchFlushExpired         = "expired"
 	BatchFlushPodIncompatible = "pod_incompatible"
-	BatchFlushPodNotBatchable = "pod_not_batchable"
 	BatchFlushFilterError     = "filter_error"
 	BatchFlushPreScoreError   = "prescore_error"
 	BatchFlushRescoreError    = "rescore_error"
 	BatchFlushNormalizeError  = "normalize_error"
+)
+
+// Values of the "result" label on the PreQueueingHintEvaluations metric.
+const (
+	PreQueueingHintResultAllPods     = "all_pods"
+	PreQueueingHintResultNarrowed    = "narrowed"
+	PreQueueingHintResultPreQFnError = "prequeueing_hint_fn_error"
 )
 
 // DRADeviceBindingConditions status labels
@@ -157,6 +170,7 @@ var (
 	Goroutines                   *metrics.GaugeVec
 	BatchAttemptStats            *metrics.CounterVec
 	BatchCacheFlushed            *metrics.CounterVec
+	StoreScheduleResultsTotal    *metrics.CounterVec
 	BatchRescoreAttempts         *metrics.CounterVec
 	BatchRescoreDuration         *metrics.HistogramVec
 	GetNodeHintDuration          *metrics.HistogramVec
@@ -191,9 +205,9 @@ var (
 	// This is the same metric that also gets recorded in the kube-controller-manager.
 	ResourceClaimCreatesTotal = resourceclaimmetrics.ResourceClaimCreate
 
-	podGroupScheduleAttempts           *metrics.CounterVec
-	podGroupSchedulingLatency          *metrics.HistogramVec
-	PodGroupSchedulingAlgorithmLatency *metrics.Histogram
+	PodGroupScheduleAttempts           *metrics.CounterVec
+	PodGroupSchedulingLatency          *metrics.HistogramVec
+	PodGroupSchedulingAlgorithmLatency *metrics.HistogramVec
 
 	// The below are only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
 	GeneratedPlacementsTotal    *metrics.CounterVec
@@ -240,8 +254,8 @@ func Register() {
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 			RegisterMetrics(
-				podGroupScheduleAttempts,
-				podGroupSchedulingLatency,
+				PodGroupScheduleAttempts,
+				PodGroupSchedulingLatency,
 				PodGroupSchedulingAlgorithmLatency,
 				WorkloadPreemptionAttempts,
 				WorkloadPreemptionVictims,
@@ -267,6 +281,9 @@ func Register() {
 	})
 }
 
+// InitMetrics replaces the package-level metric globals with fresh instances.
+// It is called once by Register(); tests should call Register() instead, since
+// re-initializing the globals orphans the metrics already registered by Register().
 func InitMetrics() {
 	scheduleAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -351,16 +368,23 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "batch_attempts_total",
-			Help:           "Counts of results when we attempt to use batching, by scheduler profile.",
+			Help:           "Counts of results when we attempt to use batching, by scheduler profile. 'no_hint' covers every pod that asked for a hint and got none, including pods that later fail to schedule. 'hint_used' and 'hint_not_used' are recorded only when a node is selected, and say whether it was the hinted one.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"profile", "result"})
 	BatchCacheFlushed = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "batch_cache_flushed_total",
-			Help:           "Counts of cache flushes by reason and scheduler profile.",
+			Help:           "Counts of batch cache flushes by reason and scheduler profile. A flush is counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'pod_nominated' means the pod has a nominated node, 'pod_incompatible' means the pod's signature is missing or differs from the batch's, 'expired' means the state is older than the maximum batch age, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, and 'filter_error', 'prescore_error', 'rescore_error' and 'normalize_error' mean that phase failed while rescoring.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"profile", "reason"})
+	StoreScheduleResultsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "store_schedule_results_total",
+			Help:           "Counts of the outcomes of storing scheduling results for batching, by scheduler profile. 'stored' means the pod seeded a batch, 'pod_not_batchable' means the pod has no signature, and 'empty_list' means no other feasible nodes were left to cache. Pods that used the hinted node store nothing.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"profile", "result"})
 	BatchRescoreAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -401,7 +425,7 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pre_queueing_hint_evaluations_total",
-			Help:           "Number of PreQueueingHint evaluations, labeled by plugin and result (all_pods or narrowed).",
+			Help:           "Number of PreQueueingHint evaluations by plugin and result (narrowed, all_pods, or prequeueing_hint_fn_error).",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "result"})
@@ -594,30 +618,30 @@ func InitMetrics() {
 		},
 		[]string{"profile"})
 
-	// The below (podGroupScheduleAttempts, podGroupSchedulingLatency and PodGroupSchedulingAlgorithmLatency) are only available when the GenericWorkload feature gate is enabled.
-	podGroupScheduleAttempts = metrics.NewCounterVec(
+	// The below (PodGroupScheduleAttempts, PodGroupSchedulingLatency and PodGroupSchedulingAlgorithmLatency) are only available when the GenericWorkload feature gate is enabled.
+	PodGroupScheduleAttempts = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_schedule_attempts_total",
-			Help:           "Number of attempts to schedule pod group, by the result and scheduler profile. 'unschedulable' means a pod group could not be scheduled, while 'error' means an internal scheduler problem.",
+			Help:           "Number of attempts to schedule pod group, by the result, scheduler profile and entity type ('podgroup' or 'compositepodgroup'). 'unschedulable' means a pod group could not be scheduled, while 'error' means an internal scheduler problem.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile"})
-	podGroupSchedulingLatency = metrics.NewHistogramVec(
+		}, []string{"result", "profile", "entity"})
+	PodGroupSchedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_scheduling_attempt_duration_seconds",
-			Help:           "Pod group scheduling attempt latency in seconds, by scheduler profile.",
+			Help:           "Pod group scheduling attempt latency in seconds, by result, scheduler profile and entity type ('podgroup' or 'compositepodgroup').",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"result", "profile"})
-	PodGroupSchedulingAlgorithmLatency = metrics.NewHistogram(
+		}, []string{"result", "profile", "entity"})
+	PodGroupSchedulingAlgorithmLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "podgroup_scheduling_algorithm_duration_seconds",
-			Help:           "Pod group scheduling algorithm latency in seconds",
+			Help:           "Pod group scheduling algorithm latency in seconds, by scheduler profile and entity type ('podgroup' or 'compositepodgroup').",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
-		})
+		}, []string{"profile", "entity"})
 
 	// Workload preemption
 	WorkloadPreemptionAttempts = metrics.NewCounterVec(
@@ -640,11 +664,11 @@ func InitMetrics() {
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "preemption_workload_disruptions",
-			Help:      "Number of workload preemption units being preempted. A single preemption unit can be all pods in a pod group or composite pod group hierarchy (in case of DisruptionMode=all), or a single pod (in case of DisruptionMode=single).",
+			Help:      "Number of preemption units evicted by a single workload preemption (either pod groups or composite pod groups), by victim type. A unit is either all pods of a pod group or composite pod group hierarchy with DisruptionMode=all (victim is the type of its topmost group with DisruptionMode=all), or a single pod evicted on its own (victim=pod), which covers pods outside of any group and pods of groups with DisruptionMode=single.",
 			// Start with 1 with the last bucket being [1024, Inf)
 			Buckets:        metrics.ExponentialBuckets(1, 2, 11),
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"preemptor"})
+		}, []string{"preemptor", "victim"})
 	PreemptionEvaluationDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -719,6 +743,7 @@ func InitMetrics() {
 		PluginEvaluationTotal,
 		BatchAttemptStats,
 		BatchCacheFlushed,
+		StoreScheduleResultsTotal,
 		BatchRescoreAttempts,
 		BatchRescoreDuration,
 		GetNodeHintDuration,

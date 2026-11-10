@@ -18,7 +18,7 @@ limitations under the License.
 
 package kubelet
 
-import "k8s.io/klog/v2"
+import "context"
 
 // Do nothing.
-func (kl *Kubelet) initNetworkUtil(logger klog.Logger) {}
+func (kl *Kubelet) initNetworkUtil(_ context.Context) {}

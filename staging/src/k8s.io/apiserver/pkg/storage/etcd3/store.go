@@ -108,14 +108,6 @@ func (s *store) RequestWatchProgress(ctx context.Context) error {
 	return s.client.RequestProgress(s.watchContext(ctx))
 }
 
-type objState struct {
-	obj   runtime.Object
-	meta  *storage.ResponseMeta
-	rev   int64
-	data  []byte
-	stale bool
-}
-
 // listItemErrors stores a slice of item storage errors during LIST operations.
 // They are iteratively added, and eventually returned as an aggregated error. On
 // each Append, it signals whether it considers itself full or the error to be fatal.
@@ -382,97 +374,40 @@ func (s *store) Delete(
 	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
 		expectTransformOrDecodeError = opts.ExpectTransformOrDecodeError
 	}
-	return s.conditionalDelete(ctx, preparedKey, out, v, preconditions, validateDeletion, cachedExistingObject, expectTransformOrDecodeError)
-}
-
-func (s *store) conditionalDelete(
-	ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions,
-	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, expectTransformOrDecodeError bool) error {
-	getCurrentState := s.getCurrentState(ctx, "deleteGet", key, v, false, expectTransformOrDecodeError)
-
-	var origState *objState
-	var err error
-	var origStateIsCurrent bool
-	if cachedExistingObject != nil && !expectTransformOrDecodeError {
-		origState, err = s.getStateFromObject(cachedExistingObject)
+	if expectTransformOrDecodeError {
+		cachedExistingObject = nil
+	}
+	d := newStoreTxnDelegator(s, preparedKey, v, "deleteGet", expectTransformOrDecodeError)
+	var origState *storage.ObjState
+	if cachedExistingObject != nil {
+		origState, err = storage.GetStateFromObject(s.versioner, s.codec, cachedExistingObject, false)
 	} else {
-		origState, err = getCurrentState()
-		origStateIsCurrent = true
+		origState, err = d.GetCurrentState(ctx, false)
 	}
 	if err != nil {
 		return err
 	}
-
-	for {
-		if preconditions != nil {
-			if err := preconditions.Check(key, origState.obj); err != nil {
-				if origStateIsCurrent {
-					return err
-				}
-
-				// It's possible we're working with stale data.
-				// Remember the revision of the potentially stale data and the resulting update error
-				cachedRev := origState.rev
-				cachedUpdateErr := err
-
-				// Actually fetch
-				origState, err = getCurrentState()
-				if err != nil {
-					return err
-				}
-				origStateIsCurrent = true
-
-				// it turns out our cached data was not stale, return the error
-				if cachedRev == origState.rev {
-					return cachedUpdateErr
-				}
-
-				// Retry
-				continue
-			}
-		}
-		if err := validateDeletion(ctx, origState.obj); err != nil {
-			if origStateIsCurrent {
-				return err
-			}
-
-			// It's possible we're working with stale data.
-			// Remember the revision of the potentially stale data and the resulting update error
-			cachedRev := origState.rev
-			cachedUpdateErr := err
-
-			// Actually fetch
-			origState, err = getCurrentState()
-			if err != nil {
-				return err
-			}
-			origStateIsCurrent = true
-
-			// it turns out our cached data was not stale, return the error
-			if cachedRev == origState.rev {
-				return cachedUpdateErr
-			}
-
-			// Retry
-			continue
-		}
-
-		var success bool
-		origState, success, err = s.deleteOnce(ctx, key, out, origState, v, expectTransformOrDecodeError)
-		if err != nil {
-			return err
-		}
-		if success {
-			return nil
-		}
-		origStateIsCurrent = true
-	}
+	return storage.ConditionalDelete(ctx, d, preparedKey, out, preconditions, validateDeletion, origState)
 }
 
-func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, origState *objState, v reflect.Value, expectTransformOrDecodeError bool) (state *objState, success bool, err error) {
+// DeleteOnce implements storage.Interface.
+func (s *store) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
+	preparedKey, err := s.prepareKey(key, false)
+	if err != nil {
+		return err
+	}
+	v, err := conversion.EnforcePtr(out)
+	if err != nil {
+		return fmt.Errorf("unable to convert output object to pointer: %v", err)
+	}
+	_, _, err = s.deleteOnce(ctx, preparedKey, out, origState, v, false, false)
+	return err
+}
+
+func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, origState *storage.ObjState, v reflect.Value, getOnFailure, expectTransformOrDecodeError bool) (state *storage.ObjState, success bool, err error) {
 	startTime := time.Now()
-	txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.rev, kubernetes.DeleteOptions{
-		GetOnFailure: true,
+	txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.Rev, kubernetes.DeleteOptions{
+		GetOnFailure: getOnFailure,
 	})
 	metrics.RecordEtcdRequest("delete", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
 	if err != nil {
@@ -481,12 +416,15 @@ func (s *store) deleteOnce(ctx context.Context, key string, out runtime.Object, 
 	success = txnResp.Succeeded
 	if !success {
 		klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-		origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
+		if !getOnFailure {
+			return nil, false, storage.NewResourceVersionConflictsError(key, txnResp.Revision)
+		}
+		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
 		return origState, success, err
 	}
 
 	if !expectTransformOrDecodeError {
-		err = s.decoder.Decode(origState.data, out, txnResp.Revision)
+		err = s.decoder.Decode(origState.Data, out, txnResp.Revision)
 		if err != nil {
 			recordDecodeError(s.groupResource, key)
 			return origState, success, err
@@ -515,114 +453,77 @@ func (s *store) GuaranteedUpdate(
 	if err != nil {
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
-
-	getCurrentState := s.getCurrentState(ctx, "updateGet", preparedKey, v, ignoreNotFound, false)
-
-	var origState *objState
-	var origStateIsCurrent bool
+	d := newStoreTxnDelegator(s, preparedKey, v, "updateGet", false)
+	var origState *storage.ObjState
 	if cachedExistingObject != nil {
-		origState, err = s.getStateFromObject(cachedExistingObject)
+		origState, err = storage.GetStateFromObject(s.versioner, s.codec, cachedExistingObject, false)
 	} else {
-		origState, err = getCurrentState()
-		origStateIsCurrent = true
+		origState, err = d.GetCurrentState(ctx, ignoreNotFound)
 	}
 	if err != nil {
 		return err
 	}
 	span.AddEvent("initial value restored")
 
-	for {
-		if err := preconditions.Check(preparedKey, origState.obj); err != nil {
-			// If our data is already up to date, return the error
-			if origStateIsCurrent {
-				return err
-			}
-
-			// It's possible we were working with stale data
-			// Actually fetch
-			origState, err = getCurrentState()
-			if err != nil {
-				return err
-			}
-			origStateIsCurrent = true
-			// Retry
-			continue
-		}
-
-		ret, ttl, err := s.updateState(origState, tryUpdate)
-		if err != nil {
-			// If our data is already up to date, return the error
-			if origStateIsCurrent {
-				return err
-			}
-
-			// It's possible we were working with stale data
-			// Remember the revision of the potentially stale data and the resulting update error
-			cachedRev := origState.rev
-			cachedUpdateErr := err
-
-			// Actually fetch
-			origState, err = getCurrentState()
-			if err != nil {
-				return err
-			}
-			origStateIsCurrent = true
-
-			// it turns out our cached data was not stale, return the error
-			if cachedRev == origState.rev {
-				return cachedUpdateErr
-			}
-
-			// Retry
-			continue
-		}
-
-		span.AddEvent("About to Encode")
-		data, err := runtime.Encode(s.codec, ret)
-		if err != nil {
-			span.AddEvent("Encode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-			return err
-		}
-		span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
-		if !origState.stale && bytes.Equal(data, origState.data) {
-			// if we skipped the original Get in this loop, we must refresh from
-			// etcd in order to be sure the data in the store is equivalent to
-			// our desired serialization
-			if !origStateIsCurrent {
-				origState, err = getCurrentState()
-				if err != nil {
-					return err
-				}
-				origStateIsCurrent = true
-				if !bytes.Equal(data, origState.data) {
-					// original data changed, restart loop
-					continue
-				}
-			}
-			// recheck that the data from etcd is not stale before short-circuiting a write
-			if !origState.stale {
-				err = s.decoder.Decode(origState.data, destination, origState.rev)
-				if err != nil {
-					recordDecodeError(s.groupResource, preparedKey)
-					return err
-				}
-				return nil
-			}
-		}
-
-		var success bool
-		origState, success, err = s.updateOnce(ctx, span, preparedKey, destination, origState, data, ttl, v, ignoreNotFound)
-		if err != nil {
-			return err
-		}
-		if success {
-			return nil
-		}
-		origStateIsCurrent = true
-	}
+	return storage.GuaranteedUpdate(ctx, d, preparedKey, destination, ignoreNotFound, preconditions, tryUpdate, origState)
 }
 
-func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey string, destination runtime.Object, origState *objState, data []byte, ttl uint64, v reflect.Value, ignoreNotFound bool) (state *objState, success bool, err error) {
+// UpdateOnce implements storage.Interface.
+func (s *store) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, error) {
+	preparedKey, err := s.prepareKey(key, false)
+	if err != nil {
+		return nil, err
+	}
+	v, err := conversion.EnforcePtr(destination)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert output object to pointer: %v", err)
+	}
+	state, _, err := s.updateOnce(ctx, preparedKey, destination, origState, obj, ttl, v, ignoreNotFound, false)
+	return state, err
+}
+
+func (s *store) updateOnce(ctx context.Context, preparedKey string, destination runtime.Object, origState *storage.ObjState, ret runtime.Object, ttl uint64, v reflect.Value, ignoreNotFound, getOnFailure bool) (state *storage.ObjState, success bool, err error) {
+	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
+		return origState, false, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
+	}
+
+	span := tracing.SpanFromContext(ctx)
+	span.AddEvent("About to Encode")
+	data, err := runtime.Encode(s.codec, ret)
+	if err != nil {
+		span.AddEvent("Encode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+		return origState, false, err
+	}
+	span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
+
+	if !origState.Stale && bytes.Equal(data, origState.Data) {
+		// If we skipped the original Get in this loop, we must refresh from
+		// etcd in order to be sure the data in the store is equivalent to
+		// our desired serialization before short-circuiting a write.
+		if !origState.FromStorage {
+			origState, err = s.getCurrentState(ctx, "updateGet", preparedKey, v, ignoreNotFound, false)
+			if err != nil {
+				return origState, false, err
+			}
+			if !bytes.Equal(data, origState.Data) {
+				// original data changed, restart loop
+				if !getOnFailure {
+					return origState, false, storage.NewResourceVersionConflictsError(preparedKey, origState.Rev)
+				}
+				return origState, false, nil
+			}
+		}
+		// recheck that the data from etcd is not stale before short-circuiting a write
+		if !origState.Stale {
+			err = s.decoder.Decode(origState.Data, destination, origState.Rev)
+			if err != nil {
+				recordDecodeError(s.groupResource, preparedKey)
+				return origState, false, err
+			}
+			return origState, true, nil
+		}
+	}
+
 	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(preparedKey))
 	if err != nil {
 		span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
@@ -641,8 +542,8 @@ func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey 
 
 	startTime := time.Now()
 
-	txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, origState.rev, kubernetes.PutOptions{
-		GetOnFailure: true,
+	txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, origState.Rev, kubernetes.PutOptions{
+		GetOnFailure: getOnFailure,
 		LeaseID:      lease,
 	})
 	metrics.RecordEtcdRequest("update", s.groupResource, txnError(txnResp.Succeeded, err), startTime)
@@ -655,7 +556,10 @@ func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey 
 	span.AddEvent("Transaction committed")
 	if !success {
 		klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
-		origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
+		if !getOnFailure {
+			return nil, false, storage.NewResourceVersionConflictsError(preparedKey, txnResp.Revision)
+		}
+		origState, err = s.stateFromEtcdResponse(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
 		if err != nil {
 			return origState, success, err
 		}
@@ -671,6 +575,38 @@ func (s *store) updateOnce(ctx context.Context, span *tracing.Span, preparedKey 
 	}
 	span.AddEvent("Decode succeeded", attribute.Int("len", len(data)))
 	return origState, success, nil
+}
+
+type storeTxnDelegator struct {
+	store                        *store
+	key                          string
+	v                            reflect.Value
+	getVerb                      string
+	expectTransformOrDecodeError bool
+}
+
+var _ storage.TxnDelegator = (*storeTxnDelegator)(nil)
+
+func newStoreTxnDelegator(s *store, key string, v reflect.Value, getVerb string, expectTransformOrDecodeError bool) *storeTxnDelegator {
+	return &storeTxnDelegator{
+		store:                        s,
+		key:                          key,
+		v:                            v,
+		getVerb:                      getVerb,
+		expectTransformOrDecodeError: expectTransformOrDecodeError,
+	}
+}
+
+func (d *storeTxnDelegator) GetCurrentState(ctx context.Context, ignoreNotFound bool) (*storage.ObjState, error) {
+	return d.store.getCurrentState(ctx, d.getVerb, d.key, d.v, ignoreNotFound, d.expectTransformOrDecodeError)
+}
+
+func (d *storeTxnDelegator) DeleteOnce(ctx context.Context, origState *storage.ObjState, out runtime.Object) (*storage.ObjState, bool, error) {
+	return d.store.deleteOnce(ctx, d.key, out, origState, d.v, true, d.expectTransformOrDecodeError)
+}
+
+func (d *storeTxnDelegator) UpdateOnce(ctx context.Context, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, bool, error) {
+	return d.store.updateOnce(ctx, d.key, destination, origState, obj, ttl, d.v, ignoreNotFound, true)
 }
 
 func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Object {
@@ -1199,69 +1135,72 @@ func (s *store) watchContext(ctx context.Context) context.Context {
 	return clientv3.WithRequireLeader(ctx)
 }
 
-func (s *store) getCurrentState(ctx context.Context, verb, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) func() (*objState, error) {
-	return func() (*objState, error) {
-		startTime := time.Now()
-		getResp, err := s.client.Kubernetes.Get(ctx, key, kubernetes.GetOptions{})
-		metrics.RecordEtcdRequest(verb, s.groupResource, err, startTime)
-		if err != nil {
-			return nil, err
-		}
-		return s.getState(ctx, getResp.KV, getResp.Revision, key, v, ignoreNotFound, expectTransformOrDecodeError)
+func (s *store) getCurrentState(ctx context.Context, verb, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*storage.ObjState, error) {
+	startTime := time.Now()
+	getResp, err := s.client.Kubernetes.Get(ctx, key, kubernetes.GetOptions{})
+	metrics.RecordEtcdRequest(verb, s.groupResource, err, startTime)
+	if err != nil {
+		return nil, err
 	}
+	return s.stateFromEtcdResponse(ctx, getResp.KV, getResp.Revision, key, v, ignoreNotFound, expectTransformOrDecodeError)
 }
 
-// getState constructs a new objState from the given response from the storage. If
+// stateFromEtcdResponse constructs a new storage.ObjState from the given response from the storage. If
 // expectTransformOrDecodeError is true and neither transformation nor decode fails, returns an
-// InvalidObj error; if either fails, the returned error and the 'obj' field of the returned
-// objState will both be nil.
-func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, rev int64, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*objState, error) {
-	state := &objState{
-		meta: &storage.ResponseMeta{},
+// InvalidObj error; if either fails, the returned error and the 'Obj' field of the returned
+// storage.ObjState will both be nil.
+func (s *store) stateFromEtcdResponse(ctx context.Context, kv *mvccpb.KeyValue, rev int64, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*storage.ObjState, error) {
+	state := &storage.ObjState{
+		Meta:        &storage.ResponseMeta{},
+		Current:     true,
+		FromStorage: true,
 	}
 
 	if u, ok := v.Addr().Interface().(runtime.Unstructured); ok {
-		state.obj = u.NewEmptyInstance()
+		state.Obj = u.NewEmptyInstance()
 	} else {
-		state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
+		state.Obj = reflect.New(v.Type()).Interface().(runtime.Object)
 	}
 
 	if kv == nil {
 		if !ignoreNotFound {
 			return nil, storage.NewKeyNotFoundError(key, rev)
 		}
-		if err := runtime.SetZeroValue(state.obj); err != nil {
+		if err := runtime.SetZeroValue(state.Obj); err != nil {
 			return nil, err
 		}
 		return state, nil
 	}
 
-	state.rev = kv.ModRevision
-	state.meta.ResourceVersion = uint64(state.rev)
+	state.Rev = kv.ModRevision
+	state.Meta.ResourceVersion = uint64(state.Rev)
 
 	data, stale, err := s.transformer.TransformFromStorage(ctx, kv.Value, authenticatedDataString(key))
 	if err != nil {
-		if !expectTransformOrDecodeError {
+		// Unsafe deletion sets expectTransformOrDecodeError without first checking for a
+		// corrupt object error, so the read has to fail here when the error isn't data
+		// corruption.
+		if !expectTransformOrDecodeError || !value.IsDataCorruption(err) {
 			return nil, storage.NewInternalError(err)
 		}
 
 		// be explicit that we don't have the object
-		state.obj = nil
-		state.stale = true // this seems a more sane value here
+		state.Obj = nil
+		state.Stale = true // this seems a more sane value here
 		return state, nil
 	}
 
-	state.data = data
-	state.stale = stale
+	state.Data = data
+	state.Stale = stale
 
-	if err := s.decoder.Decode(state.data, state.obj, state.rev); err != nil {
+	if err := s.decoder.Decode(state.Data, state.Obj, state.Rev); err != nil {
 		if !expectTransformOrDecodeError {
 			recordDecodeError(s.groupResource, key)
 			return nil, err
 		}
 
 		// be explicit that we don't have the object
-		state.obj = nil
+		state.Obj = nil
 		return state, nil
 	}
 
@@ -1270,50 +1209,6 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, rev int64, ke
 	}
 
 	return state, nil
-}
-
-func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
-	state := &objState{
-		obj:  obj,
-		meta: &storage.ResponseMeta{},
-	}
-
-	rv, err := s.versioner.ObjectResourceVersion(obj)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get resource version: %v", err)
-	}
-	state.rev = int64(rv)
-	state.meta.ResourceVersion = uint64(state.rev)
-
-	// Compute the serialized form - for that we need to temporarily clean
-	// its resource version field (those are not stored in etcd).
-	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
-		return nil, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
-	}
-	state.data, err = runtime.Encode(s.codec, obj)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.versioner.UpdateObject(state.obj, uint64(rv)); err != nil {
-		klog.Errorf("failed to update object version: %v", err)
-	}
-	return state, nil
-}
-
-func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtime.Object, uint64, error) {
-	ret, ttlPtr, err := userUpdate(st.obj, *st.meta)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
-		return nil, 0, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
-	}
-	var ttl uint64
-	if ttlPtr != nil {
-		ttl = *ttlPtr
-	}
-	return ret, ttl, nil
 }
 
 // validateMinimumResourceVersion returns a 'too large resource' version error when the provided minimumResourceVersion is

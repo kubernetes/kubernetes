@@ -78,9 +78,9 @@ message AllocatedDeviceStatus {
   // +optional
   // +listType=map
   // +listMapKey=type
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 4;
 
   // Data contains arbitrary driver-specific data.
@@ -112,9 +112,6 @@ message AllocationResult {
 
   // allocationTimestamp stores the time when the resources were allocated.
   // This field is not guaranteed to be set, in which case that time is unknown.
-  //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gate.
   //
   // +optional
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
@@ -318,9 +315,14 @@ message CapacityRequirements {
   // If the device allows multiple allocation,
   // the aggregated amount across all requests must not exceed the capacity value.
   // The consumed capacity, which may be adjusted based on the requestPolicy if defined,
-  // is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+  // is recorded in the resource claim's status.devices[*].consumedCapacity field.
+  //
+  // Requests may have at most 32 entries. The values must not be negative.
   //
   // +optional
+  // +k8s:optional
+  // +k8s:maxProperties=32
+  // +k8s:eachVal=+k8s:minimum=0
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> requests = 1;
 }
 
@@ -457,9 +459,6 @@ message Device {
   // If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
   // to match the node where the allocation was made.
   //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
-  //
   // +optional
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   optional bool bindsToNode = 9;
@@ -472,9 +471,6 @@ message Device {
   // The maximum number of binding conditions is 4.
   //
   // The conditions must be a valid condition type string.
-  //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
   //
   // +optional
   // +listType=atomic
@@ -490,9 +486,6 @@ message Device {
   // The maximum number of binding failure conditions is 4.
   //
   // The conditions must be a valid condition type string.
-  //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
   //
   // +optional
   // +listType=atomic
@@ -643,7 +636,7 @@ message DeviceAttribute {
   // +k8s:listType=atomic
   // +k8s:beta(since: "1.37")=+k8s:optional
   // +k8s:beta(since: "1.37")=+k8s:unionMember
-  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:maxBytes=64
+  // +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:maxBytes=64
   // +featureGate=DRAListTypeAttributes
   repeated string strings = 8;
 
@@ -1130,9 +1123,6 @@ message DeviceRequestAllocationResult {
   // bindingConditions contains a copy of the BindingConditions
   // from the corresponding ResourceSlice at the time of allocation.
   //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
-  //
   // +optional
   // +listType=atomic
   // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
@@ -1142,9 +1132,6 @@ message DeviceRequestAllocationResult {
 
   // bindingFailureConditions contains a copy of the BindingFailureConditions
   // from the corresponding ResourceSlice at the time of allocation.
-  //
-  // This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-  // feature gates.
   //
   // +optional
   // +listType=atomic
@@ -1175,8 +1162,13 @@ message DeviceRequestAllocationResult {
   // The domain prefix in the capacity name may be omitted if it is
   // the same as the driver name.
   //
+  // ConsumedCapacity may have at most 32 entries. The values must not be negative.
+  //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
+  // +k8s:maxProperties=32
+  // +k8s:eachVal=+k8s:minimum=0
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> consumedCapacity = 10;
 
   // skipNodeOperations lists node-local resource operations (gRPC calls)
@@ -1316,6 +1308,7 @@ message DeviceSubRequest {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
   optional CapacityRequirements capacity = 7;
 
   // derivedAttributes defines a set of virtual attributes computed via CEL expressions
@@ -1431,6 +1424,7 @@ message DeviceTaintRuleSpec {
   // a selector, no devices are matches.
   //
   // +optional
+  // +k8s:optional
   optional DeviceTaintSelector deviceSelector = 1;
 
   // taint is the taint that gets applied to matching devices.
@@ -1467,9 +1461,9 @@ message DeviceTaintRuleStatus {
   // +listMapKey=type
   // +patchStrategy=merge
   // +patchMergeKey=type
-  // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:listType=map
-  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+  // +k8s:beta(since: "1.38")=+k8s:optional
+  // +k8s:beta(since: "1.38")=+k8s:listType=map
+  // +k8s:beta(since: "1.38")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
@@ -1503,6 +1497,23 @@ message DeviceTaintSelector {
   //
   // +optional
   optional string device = 4;
+
+  // all explicitly selects every device from every driver in the
+  // cluster when set to true. It must not be combined with driver, pool,
+  // or device: those must all be unset when all is true.
+  //
+  // Leaving driver, pool, and device all unset also selects every
+  // device, for historical reasons, but doing so without setting all
+  // is deprecated and may be rejected in a future release. Set all
+  // explicitly instead.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:neq=false
+  // +k8s:dependentForbidden("driver")
+  // +k8s:dependentForbidden("pool")
+  // +k8s:dependentForbidden("device")
+  optional bool all = 6;
 }
 
 // The ResourceClaim this DeviceToleration is attached to tolerates any taint that matches
@@ -1662,6 +1673,7 @@ message ExactDeviceRequest {
   //
   // +optional
   // +featureGate=DRAConsumableCapacity
+  // +k8s:optional
   optional CapacityRequirements capacity = 7;
 
   // derivedAttributes defines a set of virtual attributes computed via CEL expressions
@@ -1757,7 +1769,7 @@ message NodeAllocatableMapping {
   // +optional
   // +k8s:optional
   // +k8s:unionMember
-  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityMultiplier")
+  // +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityMultiplier")
   optional string capacityKey = 1;
 
   // capacityMultiplier is used as a multiplier for the allocated capacity consumed.
@@ -1769,7 +1781,7 @@ message NodeAllocatableMapping {
   // If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
   // +optional
   // +k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityKey")
+  // +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityKey")
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity capacityMultiplier = 2;
 
   // deviceMultiplier is used as a multiplier for the allocated device count in the claim.
@@ -1803,6 +1815,8 @@ message NodeAllocatableOverhead {
   // - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
   // - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
   // This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+  // PerContainer overhead of a claim referenced by a non-restartable init container is counted towards
+  // the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.
   // +optional
   // +k8s:optional
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity perContainer = 2;

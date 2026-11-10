@@ -468,9 +468,6 @@ type BasicDevice struct {
 	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
 	// to match the node where the allocation was made.
 	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
-	//
 	// +optional
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindsToNode *bool `json:"bindsToNode,omitempty" protobuf:"varint,8,opt,name=bindsToNode"`
@@ -483,9 +480,6 @@ type BasicDevice struct {
 	// The maximum number of binding conditions is 4.
 	//
 	// The conditions must be a valid condition type string.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
@@ -501,9 +495,6 @@ type BasicDevice struct {
 	// The maximum number of binding failure conditions is 4.
 	//
 	// The conditions must be a valid condition type string.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
@@ -592,7 +583,7 @@ type NodeAllocatableMapping struct {
 	// +optional
 	// +k8s:optional
 	// +k8s:unionMember
-	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityMultiplier")
+	// +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityMultiplier")
 	CapacityKey *QualifiedName `json:"capacityKey,omitempty" protobuf:"bytes,1,opt,name=capacityKey"`
 
 	// capacityMultiplier is used as a multiplier for the allocated capacity consumed.
@@ -604,7 +595,7 @@ type NodeAllocatableMapping struct {
 	// If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
 	// +optional
 	// +k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:dependentRequired("capacityKey")
+	// +k8s:beta(since: "1.38")=+k8s:dependentRequired("capacityKey")
 	CapacityMultiplier *resource.Quantity `json:"capacityMultiplier,omitempty" protobuf:"bytes,2,opt,name=capacityMultiplier"`
 
 	// deviceMultiplier is used as a multiplier for the allocated device count in the claim.
@@ -638,6 +629,8 @@ type NodeAllocatableOverhead struct {
 	// - Pod-level cgroup (requests and limits): Kubelet adds PerPod + (PerContainer * NumReferences).
 	// - Container-level cgroup (limits only): Kubelet adds PerPod + PerContainer for each referencing container.
 	// This allows any single container to access the pod-level overhead, while the parent cgroup caps the total usage to account for PerPod exactly once.
+	// PerContainer overhead of a claim referenced by a non-restartable init container is counted towards
+	// the pod's peak resource calculation (see Pod `spec.initContainers`), not for the pod's entire duration.
 	// +optional
 	// +k8s:optional
 	PerContainer *resource.Quantity `json:"perContainer,omitempty" protobuf:"bytes,2,opt,name=perContainer"`
@@ -908,7 +901,7 @@ type DeviceAttribute struct {
 	// +listType=atomic
 	// +k8s:beta(since: "1.37")=+k8s:optional
 	// +k8s:beta(since: "1.37")=+k8s:unionMember
-	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:maxBytes=64
+	// +k8s:beta(since: "1.38")=+k8s:eachVal=+k8s:maxBytes=64
 	// +featureGate=DRAListTypeAttributes
 	StringValues []string `json:"strings,omitempty" protobuf:"bytes,8,opt,name=strings"`
 
@@ -1289,6 +1282,7 @@ type DeviceRequest struct {
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
+	// +k8s:optional
 	Capacity *CapacityRequirements `json:"capacity,omitempty" protobuf:"bytes,9,opt,name=capacity"`
 
 	// derivedAttributes defines a set of virtual attributes computed via CEL expressions
@@ -1435,6 +1429,7 @@ type DeviceSubRequest struct {
 	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
+	// +k8s:optional
 	Capacity *CapacityRequirements `json:"capacity,omitempty" protobuf:"bytes,8,opt,name=capacity"`
 
 	// derivedAttributes defines a set of virtual attributes computed via CEL expressions
@@ -1500,9 +1495,14 @@ type CapacityRequirements struct {
 	// If the device allows multiple allocation,
 	// the aggregated amount across all requests must not exceed the capacity value.
 	// The consumed capacity, which may be adjusted based on the requestPolicy if defined,
-	// is recorded in the resource claim’s status.devices[*].consumedCapacity field.
+	// is recorded in the resource claim's status.devices[*].consumedCapacity field.
+	//
+	// Requests may have at most 32 entries. The values must not be negative.
 	//
 	// +optional
+	// +k8s:optional
+	// +k8s:maxProperties=32
+	// +k8s:eachVal=+k8s:minimum=0
 	Requests map[QualifiedName]resource.Quantity `json:"requests,omitempty" protobuf:"bytes,1,rep,name=requests,castkey=QualifiedName"`
 }
 
@@ -1566,6 +1566,9 @@ const (
 	FirstAvailableDeviceRequestMaxSize = 8
 	DeviceTolerationsMaxLength         = 16
 	DeviceDerivedAttributesMaxSize     = 32
+	// MaxCapacityRequirements is the maximum number of entries allowed in
+	// CapacityRequirements.Requests.
+	MaxCapacityRequirements = 32
 )
 
 // +enum
@@ -2022,9 +2025,6 @@ type AllocationResult struct {
 	// allocationTimestamp stores the time when the resources were allocated.
 	// This field is not guaranteed to be set, in which case that time is unknown.
 	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gate.
-	//
 	// +optional
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	AllocationTimestamp *metav1.Time `json:"allocationTimestamp,omitempty" protobuf:"bytes,5,opt,name=allocationTimestamp"`
@@ -2131,9 +2131,6 @@ type DeviceRequestAllocationResult struct {
 	// bindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
-	//
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
@@ -2143,9 +2140,6 @@ type DeviceRequestAllocationResult struct {
 
 	// bindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
-	//
-	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
-	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
@@ -2176,8 +2170,13 @@ type DeviceRequestAllocationResult struct {
 	// The domain prefix in the capacity name may be omitted if it is
 	// the same as the driver name.
 	//
+	// ConsumedCapacity may have at most 32 entries. The values must not be negative.
+	//
 	// +optional
 	// +featureGate=DRAConsumableCapacity
+	// +k8s:optional
+	// +k8s:maxProperties=32
+	// +k8s:eachVal=+k8s:minimum=0
 	ConsumedCapacity map[QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty" protobuf:"bytes,10,rep,name=consumedCapacity"`
 
 	// skipNodeOperations lists node-local resource operations (gRPC calls)
@@ -2454,9 +2453,9 @@ type AllocatedDeviceStatus struct {
 	// +optional
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:listType=map
-	// +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
+	// +k8s:beta(since: "1.38")=+k8s:optional
+	// +k8s:beta(since: "1.38")=+k8s:listType=map
+	// +k8s:beta(since: "1.38")=+k8s:listMapKey=type
 	Conditions []metav1.Condition `json:"conditions" protobuf:"bytes,4,opt,name=conditions"`
 
 	// Data contains arbitrary driver-specific data.

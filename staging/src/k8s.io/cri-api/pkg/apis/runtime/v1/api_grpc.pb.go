@@ -1845,12 +1845,15 @@ var RuntimeService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ImageService_ListImages_FullMethodName   = "/runtime.v1.ImageService/ListImages"
-	ImageService_StreamImages_FullMethodName = "/runtime.v1.ImageService/StreamImages"
-	ImageService_ImageStatus_FullMethodName  = "/runtime.v1.ImageService/ImageStatus"
-	ImageService_PullImage_FullMethodName    = "/runtime.v1.ImageService/PullImage"
-	ImageService_RemoveImage_FullMethodName  = "/runtime.v1.ImageService/RemoveImage"
-	ImageService_ImageFsInfo_FullMethodName  = "/runtime.v1.ImageService/ImageFsInfo"
+	ImageService_ListImages_FullMethodName            = "/runtime.v1.ImageService/ListImages"
+	ImageService_StreamImages_FullMethodName          = "/runtime.v1.ImageService/StreamImages"
+	ImageService_ImageStatus_FullMethodName           = "/runtime.v1.ImageService/ImageStatus"
+	ImageService_PullImage_FullMethodName             = "/runtime.v1.ImageService/PullImage"
+	ImageService_PullSecurityProfile_FullMethodName   = "/runtime.v1.ImageService/PullSecurityProfile"
+	ImageService_ListSecurityProfiles_FullMethodName  = "/runtime.v1.ImageService/ListSecurityProfiles"
+	ImageService_RemoveSecurityProfile_FullMethodName = "/runtime.v1.ImageService/RemoveSecurityProfile"
+	ImageService_RemoveImage_FullMethodName           = "/runtime.v1.ImageService/RemoveImage"
+	ImageService_ImageFsInfo_FullMethodName           = "/runtime.v1.ImageService/ImageFsInfo"
 )
 
 // ImageServiceClient is the client API for ImageService service.
@@ -1880,6 +1883,34 @@ type ImageServiceClient interface {
 	ImageStatus(ctx context.Context, in *ImageStatusRequest, opts ...grpc.CallOption) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(ctx context.Context, in *PullImageRequest, opts ...grpc.CallOption) (*PullImageResponse, error)
+	// PullSecurityProfile pulls a security profile with authentication config
+	// into the runtime's storage. If the profile is already present, the
+	// runtime must not contact the registry, unless a signature policy that
+	// did not apply to the earlier pull requires it. The profile is applied by
+	// passing its reference in SecurityProfile.oci_ref. Accepted artifact
+	// formats and their validation are up to the runtime.
+	// Pulled profiles are not images: they must only be returned by
+	// ListSecurityProfiles, and the kubelet manages their lifecycle with
+	// RemoveSecurityProfile.
+	// Errors use the well-known messages RegistryUnavailable,
+	// SignatureValidationFailed, or, for permanent rejections of the request
+	// or the artifact, SecurityProfileInvalid as the prefix of the gRPC status
+	// message. The kubelet retries all errors with backoff except
+	// SecurityProfileInvalid and the gRPC code Unimplemented.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	PullSecurityProfile(ctx context.Context, in *PullSecurityProfileRequest, opts ...grpc.CallOption) (*PullSecurityProfileResponse, error)
+	// ListSecurityProfiles lists the profiles pulled with PullSecurityProfile.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	ListSecurityProfiles(ctx context.Context, in *ListSecurityProfilesRequest, opts ...grpc.CallOption) (*ListSecurityProfilesResponse, error)
+	// RemoveSecurityProfile removes a profile pulled with PullSecurityProfile.
+	// This call is idempotent, and must not return an error if the profile has
+	// already been removed. Containers already running with the profile are
+	// not affected.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	RemoveSecurityProfile(ctx context.Context, in *RemoveSecurityProfileRequest, opts ...grpc.CallOption) (*RemoveSecurityProfileResponse, error)
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
@@ -1953,6 +1984,36 @@ func (c *imageServiceClient) PullImage(ctx context.Context, in *PullImageRequest
 	return out, nil
 }
 
+func (c *imageServiceClient) PullSecurityProfile(ctx context.Context, in *PullSecurityProfileRequest, opts ...grpc.CallOption) (*PullSecurityProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PullSecurityProfileResponse)
+	err := c.cc.Invoke(ctx, ImageService_PullSecurityProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *imageServiceClient) ListSecurityProfiles(ctx context.Context, in *ListSecurityProfilesRequest, opts ...grpc.CallOption) (*ListSecurityProfilesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSecurityProfilesResponse)
+	err := c.cc.Invoke(ctx, ImageService_ListSecurityProfiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *imageServiceClient) RemoveSecurityProfile(ctx context.Context, in *RemoveSecurityProfileRequest, opts ...grpc.CallOption) (*RemoveSecurityProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveSecurityProfileResponse)
+	err := c.cc.Invoke(ctx, ImageService_RemoveSecurityProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *imageServiceClient) RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoveImageResponse)
@@ -2000,6 +2061,34 @@ type ImageServiceServer interface {
 	ImageStatus(context.Context, *ImageStatusRequest) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error)
+	// PullSecurityProfile pulls a security profile with authentication config
+	// into the runtime's storage. If the profile is already present, the
+	// runtime must not contact the registry, unless a signature policy that
+	// did not apply to the earlier pull requires it. The profile is applied by
+	// passing its reference in SecurityProfile.oci_ref. Accepted artifact
+	// formats and their validation are up to the runtime.
+	// Pulled profiles are not images: they must only be returned by
+	// ListSecurityProfiles, and the kubelet manages their lifecycle with
+	// RemoveSecurityProfile.
+	// Errors use the well-known messages RegistryUnavailable,
+	// SignatureValidationFailed, or, for permanent rejections of the request
+	// or the artifact, SecurityProfileInvalid as the prefix of the gRPC status
+	// message. The kubelet retries all errors with backoff except
+	// SecurityProfileInvalid and the gRPC code Unimplemented.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	PullSecurityProfile(context.Context, *PullSecurityProfileRequest) (*PullSecurityProfileResponse, error)
+	// ListSecurityProfiles lists the profiles pulled with PullSecurityProfile.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	ListSecurityProfiles(context.Context, *ListSecurityProfilesRequest) (*ListSecurityProfilesResponse, error)
+	// RemoveSecurityProfile removes a profile pulled with PullSecurityProfile.
+	// This call is idempotent, and must not return an error if the profile has
+	// already been removed. Containers already running with the profile are
+	// not affected.
+	// Feature gate: SecurityProfileOCI
+	// See https://kep.k8s.io/6061 for more details.
+	RemoveSecurityProfile(context.Context, *RemoveSecurityProfileRequest) (*RemoveSecurityProfileResponse, error)
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
@@ -2035,6 +2124,15 @@ func (UnimplementedImageServiceServer) ImageStatus(context.Context, *ImageStatus
 }
 func (UnimplementedImageServiceServer) PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PullImage not implemented")
+}
+func (UnimplementedImageServiceServer) PullSecurityProfile(context.Context, *PullSecurityProfileRequest) (*PullSecurityProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PullSecurityProfile not implemented")
+}
+func (UnimplementedImageServiceServer) ListSecurityProfiles(context.Context, *ListSecurityProfilesRequest) (*ListSecurityProfilesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSecurityProfiles not implemented")
+}
+func (UnimplementedImageServiceServer) RemoveSecurityProfile(context.Context, *RemoveSecurityProfileRequest) (*RemoveSecurityProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveSecurityProfile not implemented")
 }
 func (UnimplementedImageServiceServer) RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveImage not implemented")
@@ -2128,6 +2226,60 @@ func _ImageService_PullImage_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ImageService_PullSecurityProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullSecurityProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageServiceServer).PullSecurityProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageService_PullSecurityProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageServiceServer).PullSecurityProfile(ctx, req.(*PullSecurityProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ImageService_ListSecurityProfiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSecurityProfilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageServiceServer).ListSecurityProfiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageService_ListSecurityProfiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageServiceServer).ListSecurityProfiles(ctx, req.(*ListSecurityProfilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ImageService_RemoveSecurityProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSecurityProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageServiceServer).RemoveSecurityProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageService_RemoveSecurityProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageServiceServer).RemoveSecurityProfile(ctx, req.(*RemoveSecurityProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ImageService_RemoveImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoveImageRequest)
 	if err := dec(in); err != nil {
@@ -2182,6 +2334,18 @@ var ImageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PullImage",
 			Handler:    _ImageService_PullImage_Handler,
+		},
+		{
+			MethodName: "PullSecurityProfile",
+			Handler:    _ImageService_PullSecurityProfile_Handler,
+		},
+		{
+			MethodName: "ListSecurityProfiles",
+			Handler:    _ImageService_ListSecurityProfiles_Handler,
+		},
+		{
+			MethodName: "RemoveSecurityProfile",
+			Handler:    _ImageService_RemoveSecurityProfile_Handler,
 		},
 		{
 			MethodName: "RemoveImage",

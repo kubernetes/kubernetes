@@ -24,7 +24,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,7 +75,7 @@ func setup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, cl
 	flags := append(framework.DefaultTestServerFlags(),
 		"--enable-admission-plugins=PodGroupProtection",
 		"--feature-gates=GenericWorkload=true,TopologyAwareWorkloadScheduling=true,CompositePodGroup=true",
-		fmt.Sprintf("--runtime-config=%s=true,%s=true", schedulingv1alpha3.SchemeGroupVersion, schedulingv1beta1.SchemeGroupVersion),
+		fmt.Sprintf("--runtime-config=%s=true", schedulingv1beta1.SchemeGroupVersion),
 	)
 
 	// Start test server with admission plugin enabled
@@ -91,7 +90,7 @@ func setup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, cl
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	pgInformer := informerFactory.Scheduling().V1beta1().PodGroups()
-	cpgInformer := informerFactory.Scheduling().V1alpha3().CompositePodGroups()
+	cpgInformer := informerFactory.Scheduling().V1beta1().CompositePodGroups()
 	podInformer := informerFactory.Core().V1().Pods()
 
 	ctrl, err := podgroupprotection.NewPodGroupProtectionController(
@@ -132,7 +131,7 @@ type testStep struct {
 
 type gcTestCase struct {
 	name        string
-	initialCPGs []*schedulingv1alpha3.CompositePodGroup
+	initialCPGs []*schedulingv1beta1.CompositePodGroup
 	initialPGs  []*schedulingv1beta1.PodGroup
 	initialPods []*v1.Pod
 	steps       []testStep
@@ -142,7 +141,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 	tests := []gcTestCase{
 		{
 			name: "CPG with no children gets deleted immediately upon deletion request",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("standalone-cpg").WorkloadRef("test-wl", "test-tpl").BasicPolicy().Obj(),
 			},
 			steps: []testStep{
@@ -155,7 +154,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 		},
 		{
 			name: "CPG with child CPG and child PG: deletion blocked until all children are deleted",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").WorkloadRef("test-wl", "test-tpl").BasicPolicy().Obj(),
 				st.MakeCompositePodGroup().Name("child-cpg").ParentCompositePodGroup("root-cpg").WorkloadRef("test-wl", "test-tpl").BasicPolicy().Obj(),
 			},
@@ -182,7 +181,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 		},
 		{
 			name: "Multi-level CPG hierarchy: grandparent -> parent -> child PG",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("grandparent-cpg").WorkloadRef("test-wl", "test-tpl").BasicPolicy().Obj(),
 				st.MakeCompositePodGroup().Name("parent-cpg").ParentCompositePodGroup("grandparent-cpg").WorkloadRef("test-wl", "test-tpl").BasicPolicy().Obj(),
 			},
@@ -209,7 +208,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 		},
 		{
 			name: "CPG with child PG containing active Pod: Pod protects PG, PG protects CPG",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").WorkloadRef("test-wl", "test-tpl").BasicPolicy().Obj(),
 			},
 			initialPGs: []*schedulingv1beta1.PodGroup{
@@ -238,7 +237,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 		},
 		{
 			name: "CPG with multiple sibling child PGs: partial child deletion keeps parent protected",
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{
 				st.MakeCompositePodGroup().Name("root-cpg").WorkloadRef("test-wl", "test-tpl").BasicPolicy().Obj(),
 			},
 			initialPGs: []*schedulingv1beta1.PodGroup{
@@ -292,7 +291,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 			for _, cpg := range tc.initialCPGs {
 				cpgCopy := cpg.DeepCopy()
 				cpgCopy.Namespace = ns
-				if _, err := clientSet.SchedulingV1alpha3().CompositePodGroups(ns).Create(ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
+				if _, err := clientSet.SchedulingV1beta1().CompositePodGroups(ns).Create(ctx, cpgCopy, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create CPG %s: %v", cpgCopy.Name, err)
 				}
 			}
@@ -340,7 +339,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 				switch step.action {
 				case deleteCPG:
 					deletedObjects.Insert(cpgKey(step.targetName))
-					if err := clientSet.SchedulingV1alpha3().CompositePodGroups(ns).Delete(ctx, step.targetName, metav1.DeleteOptions{}); err != nil {
+					if err := clientSet.SchedulingV1beta1().CompositePodGroups(ns).Delete(ctx, step.targetName, metav1.DeleteOptions{}); err != nil {
 						t.Fatalf("Step %d: failed to delete CPG %s: %v", i, step.targetName, err)
 					}
 				case deletePG:
@@ -381,7 +380,7 @@ func TestCompositePodGroupGarbageCollection(t *testing.T) {
 func getObject(ctx context.Context, clientSet clientset.Interface, ns string, key objectKey) (metav1.Object, error) {
 	switch key.kind {
 	case compositePodGroupKind:
-		return clientSet.SchedulingV1alpha3().CompositePodGroups(ns).Get(ctx, key.name, metav1.GetOptions{})
+		return clientSet.SchedulingV1beta1().CompositePodGroups(ns).Get(ctx, key.name, metav1.GetOptions{})
 	case podGroupKind:
 		return clientSet.SchedulingV1beta1().PodGroups(ns).Get(ctx, key.name, metav1.GetOptions{})
 	default:

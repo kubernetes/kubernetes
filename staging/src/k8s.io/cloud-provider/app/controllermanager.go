@@ -49,7 +49,7 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	"k8s.io/component-base/metrics/features"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
@@ -66,7 +66,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
@@ -97,6 +97,10 @@ the cloud specific control loops shipped with Kubernetes.`,
 				return err
 			}
 			cliflag.PrintFlags(cmd.Flags())
+
+			// Propagate feature gate state to the metrics subsystem. This must be called
+			// after feature gates are set and before any histogram metrics are registered.
+			metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 
 			c, err := s.Config(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List(), controllerAliases, AllWebhooks, DisabledByDefaultWebhooks)
 			if err != nil {
@@ -476,7 +480,10 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 	versionedClient := clientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
-	metadataClient := metadata.NewForConfigOrDie(clientBuilder.ConfigOrDie("metadata-informers"))
+	metadataClient, err := newMetadataClient(clientBuilder, "metadata-informers")
+	if err != nil {
+		return genericcontrollermanager.ControllerContext{}, fmt.Errorf("failed to create metadata client: %w", err)
+	}
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
@@ -505,6 +512,20 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 	}
 	controllersmetrics.Register()
 	return ctx, nil
+}
+
+// newMetadataClient builds a metadata client through the builder. Builders
+// from outside the tree may predate TypedClientBuilder, in which case the
+// deprecated config path is the only option.
+func newMetadataClient(clientBuilder clientbuilder.ControllerClientBuilder, name string) (metadata.Interface, error) {
+	if typed, ok := clientBuilder.(clientbuilder.TypedClientBuilder); ok {
+		return typed.MetadataClient(name)
+	}
+	config, err := clientBuilder.Config(name) //nolint:forbidigo,staticcheck // deprecated on purpose, see above
+	if err != nil {
+		return nil, err
+	}
+	return metadata.NewForConfig(config)
 }
 
 // ResyncPeriod returns a function which generates a duration each time it is

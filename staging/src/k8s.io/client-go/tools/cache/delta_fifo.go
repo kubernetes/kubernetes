@@ -264,6 +264,7 @@ type Deltas []Delta
 //
 // Deprecated: Equivalent to NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: keyFunc, KnownObjects: knownObjects})
 func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
+	//nolint:logcheck // Cannot provide Logger here.
 	return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KeyFunction:  keyFunc,
 		KnownObjects: knownObjects,

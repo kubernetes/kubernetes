@@ -25,7 +25,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -69,9 +68,10 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, err
 	}
 
-	// Ensure the user is root
+	// Ensure the user is root before doing anything else.
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, printer); err != nil {
+	_, _ = printer.Printf("[preflight] Running pre-flight checks.\n")
+	if err := preflight.RunRootCheckOnly(ignorePreflightErrorsSet); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -81,6 +81,12 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", getNodeRegistration, getAPIEndpoint, getComponentConfigs, false)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
+	}
+
+	// The CoreDNS migration check needs the target version, which honors any
+	// ClusterConfiguration.dns.imageTag override, so it runs after fetching initCfg.
+	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrorsSet, &initCfg.ClusterConfiguration); err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	newK8sVersion := upgradeCfg.Plan.KubernetesVersion
@@ -129,16 +135,6 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 			printer.Fprintf(w, "\t%s\n", scanner.Text())
 		}
 	}
-}
-
-// runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
-	printer.Printf("[preflight] Running pre-flight checks.\n")
-	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
-	if err != nil {
-		return err
-	}
-	return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not

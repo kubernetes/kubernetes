@@ -254,7 +254,18 @@ func (m *ManagerImpl) PluginConnected(ctx context.Context, resourceName string, 
 	if m.endpointStore[resourceName] == nil {
 		m.endpointStore[resourceName] = make(map[string]*endpointInfo)
 	}
-	if _, exists := m.endpointStore[resourceName][e.socketPath()]; exists {
+	// Identity for an endpoint is (resourceName, socketPath); the socket path
+	// alone disambiguates plugin instances for the same resource. Reusing a
+	// socket path requires a prior PluginDisconnected for that same path.
+	// In practice, the old endpoint must disconnect from ListAndWatch (e.g.
+	// because its process exited) for the kubelet to detect it is gone and
+	// fire the PluginDisconnected callback that clears this entry. The new
+	// plugin must re-register after the old one is gone; plugins are
+	// expected to retry registration on failure.
+	if existing, exists := m.endpointStore[resourceName][e.socketPath()]; exists {
+		logger.Info("Device plugin registration rejected: socket already in use by a connected endpoint; possible same-socket race",
+			"resourceName", resourceName, "socketPath", e.socketPath(),
+			"incumbentStopped", existing.e.isStopped())
 		return fmt.Errorf("device plugin already connected: %s", e.socketPath())
 	}
 	m.endpoints[resourceName] = endpointInfo{e, options}
@@ -270,6 +281,15 @@ func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	// Eviction is keyed on (resourceName, socketPath) alone.
+	// We avoid unregistering the wrong client by not allowing two endpoints with the same socket
+	// in PluginConnected — a new endpoint cannot silently replace an
+	// existing one, so the old endpoint must disconnect first.
+	//
+	// A late callback for an old endpoint at
+	// socketPath may however evict whichever endpoint currently sits at that path,
+	// even if it is a freshly-registered instance. So the extremely fast takeover may result
+	// in a race condition and in temporarily unregistering the device.
 	endpoints, ok := m.endpointStore[resourceName]
 	if !ok {
 		return
@@ -470,6 +490,12 @@ func (m *ManagerImpl) markResourceUnhealthy(logger klog.Logger, resourceName str
 	m.unhealthyDevices[resourceName] = m.unhealthyDevices[resourceName].Union(healthyDevices)
 }
 
+// Values reported in the health_state label of metrics.DevicePluginDevices.
+const (
+	healthStateHealthy   = "healthy"
+	healthStateUnhealthy = "unhealthy"
+)
+
 // GetCapacity is expected to be called when Kubelet updates its node status.
 // The first returned variable contains the registered device plugin resource capacity.
 // The second returned variable contains the registered device plugin resource allocatable.
@@ -500,6 +526,7 @@ func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.Resou
 		} else {
 			capacity[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 			allocatable[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
+			metrics.DevicePluginDevices.WithLabelValues(resourceName, healthStateHealthy).Set(float64(devices.Len()))
 		}
 	}
 	for resourceName, devices := range m.unhealthyDevices {
@@ -514,6 +541,7 @@ func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.Resou
 			unhealthyCount := *resource.NewQuantity(int64(devices.Len()), resource.DecimalSI)
 			capacityCount.Add(unhealthyCount)
 			capacity[v1.ResourceName(resourceName)] = capacityCount
+			metrics.DevicePluginDevices.WithLabelValues(resourceName, healthStateUnhealthy).Set(float64(devices.Len()))
 		}
 	}
 
@@ -521,6 +549,10 @@ func (m *ManagerImpl) GetCapacity(logger klog.Logger) (v1.ResourceList, v1.Resou
 		delete(m.endpoints, resourceName)
 		delete(m.healthyDevices, resourceName)
 		delete(m.unhealthyDevices, resourceName)
+		// Drop the series as well, otherwise the last observed counts are
+		// reported forever for a resource that no longer exists.
+		metrics.DevicePluginDevices.DeleteLabelValues(resourceName, healthStateHealthy)
+		metrics.DevicePluginDevices.DeleteLabelValues(resourceName, healthStateUnhealthy)
 	}
 
 	m.mutex.Unlock()
@@ -1351,4 +1383,18 @@ func (m *ManagerImpl) isContainerAlreadyRunning(logger klog.Logger, podUID, cntN
 	}
 
 	return true
+}
+
+func (m *ManagerImpl) CanAllocateExclusively(res v1.ResourceName) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	// CanAllocateExclusively reports a capability, not a reflection of runtime state.
+	// If there are device plugin for resources at all, then these resource can, if
+	// other runtime conditions are met, be exclusively allocated, the reason being
+	// device-plugins-backed resources cannot be shared.
+	// The capability is however a function of configuration, in this case
+	// device plugins being deployed on the node, not on their runtime state
+	// which maps to healthy/unhealthy state
+	_, ok := m.allDevices[string(res)]
+	return ok
 }

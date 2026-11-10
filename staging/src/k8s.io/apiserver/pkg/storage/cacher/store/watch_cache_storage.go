@@ -59,15 +59,20 @@ func (w *WatchCacheStorage) SnapshottingEnabled() bool {
 }
 
 func (w *WatchCacheStorage) CanServeExactRV(rv uint64) bool {
+	oldest, ok := w.oldestExactRV()
+	return ok && rv >= oldest
+}
+
+func (w *WatchCacheStorage) oldestExactRV() (uint64, bool) {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
-	return w.snapshots.HasSnapshot(rv)
+	return w.snapshots.OldestResourceVersion()
 }
 
 func (w *WatchCacheStorage) Compact(rev uint64) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
-	w.snapshots.RemoveLess(rev)
+	w.snapshots.Compact(rev)
 }
 
 func (w *WatchCacheStorage) MarkConsistent(consistent bool) {

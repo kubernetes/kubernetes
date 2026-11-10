@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	celgo "github.com/google/cel-go/cel"
-	celtypes "github.com/google/cel-go/common/types"
+	celgo "cel.dev/cel-go/cel"
+	celtypes "cel.dev/cel-go/common/types"
 
 	"sigs.k8s.io/structured-merge-diff/v7/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v7/schema"

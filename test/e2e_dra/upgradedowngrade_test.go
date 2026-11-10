@@ -89,7 +89,7 @@ func waitForSlices(tCtx ktesting.TContext, name string, b *drautils.Builder, dri
 var repoRoot = repoRootDefault()
 
 const (
-	localUpClusterRuntimeConfig = "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3"
+	localUpClusterRuntimeConfig = "resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3"
 )
 
 func currentBinDir() (envName, content string) {

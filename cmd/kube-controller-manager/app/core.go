@@ -31,9 +31,6 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	"k8s.io/client-go/discovery"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/metadata"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
@@ -528,27 +525,15 @@ func newNamespaceController(ctx context.Context, controllerContext ControllerCon
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
-	nsKubeconfig, err := controllerContext.NewClientConfig("namespace-controller")
+	clientConnection := controllerContext.ComponentConfig.Generic.ClientConnection
+	nsClientBuilder := controllerContext.ClientBuilder.WithRateLimits(clientConnection.QPS*20, int(clientConnection.Burst)*100)
+
+	namespaceKubeClient, err := nsClientBuilder.Client("namespace-controller")
 	if err != nil {
 		return nil, err
 	}
 
-	nsKubeconfig.QPS *= 20
-	nsKubeconfig.Burst *= 100
-
-	namespaceKubeClient, err := clientset.NewForConfig(nsKubeconfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return newModifiedNamespaceController(ctx, controllerContext, controllerName, namespaceKubeClient, nsKubeconfig)
-}
-
-func newModifiedNamespaceController(
-	ctx context.Context, controllerContext ControllerContext, controllerName string,
-	namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config,
-) (Controller, error) {
-	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
+	metadataClient, err := nsClientBuilder.MetadataClient("namespace-controller")
 	if err != nil {
 		return nil, err
 	}
@@ -656,15 +641,10 @@ func newGarbageCollectorController(ctx context.Context, controllerContext Contro
 		return nil, fmt.Errorf("failed to create the discovery client: %w", err)
 	}
 
-	config, err := controllerContext.NewClientConfig("generic-garbage-collector")
-	if err != nil {
-		return nil, err
-	}
-
 	// Increase garbage collector controller's throughput: each object deletion takes two API calls,
 	// so to get |config.QPS| deletion rate we need to allow 2x more requests for this controller.
-	config.QPS *= 2
-	metadataClient, err := metadata.NewForConfig(config)
+	clientConnection := controllerContext.ComponentConfig.Generic.ClientConnection
+	metadataClient, err := controllerContext.ClientBuilder.WithRateLimits(clientConnection.QPS*2, int(clientConnection.Burst)).MetadataClient("generic-garbage-collector")
 	if err != nil {
 		return nil, err
 	}

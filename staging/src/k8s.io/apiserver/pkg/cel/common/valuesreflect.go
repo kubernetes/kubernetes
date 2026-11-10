@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/cel"
 
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
+	"cel.dev/cel-go/common/types"
+	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/common/types/traits"
 )
 
 // TypedToVal wraps "typed" Go value as CEL ref.Val types using reflection.
@@ -124,17 +124,12 @@ func TypedToVal(val interface{}, schema Schema) ref.Val {
 		}
 		return &typedMap{value: v, valuesSchema: schema.AdditionalProperties().Schema()}
 	case reflect.Struct:
-		if schema.Properties() == nil {
+		if !schema.HasProperties() {
 			return types.NewErr("invalid schema for struct type: %v", schema)
 		}
 		return &typedStruct{
-			value: v,
-			propSchema: func(key string) (Schema, bool) {
-				if schema, ok := schema.Properties()[key]; ok {
-					return schema, true
-				}
-				return nil, false
-			},
+			value:      v,
+			propSchema: schema.Property,
 		}
 	// Match type aliases to primitives by kind
 	case reflect.Bool:

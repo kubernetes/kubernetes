@@ -75,7 +75,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Run CoreDNS migration check.
-	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors); err != nil {
+	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, &initCfg.ClusterConfiguration); err != nil {
 		return err
 	}
 

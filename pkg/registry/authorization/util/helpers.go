@@ -17,17 +17,23 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	apiserverauthorizationv1 "k8s.io/apiserver/pkg/apis/authorization/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationv1internal "k8s.io/kubernetes/pkg/apis/authorization/v1"
 )
 
 // ResourceAttributesFrom combines the API object information and the user.Info from the context to build a full authorizer.AttributesRecord for resource access
@@ -237,4 +243,48 @@ func BuildEvaluationError(evaluationError error, attrs authorizer.AttributesReco
 		}
 	}
 	return strings.Join(evaluationErrors, "; ")
+}
+
+// ResolveAuthorizationOptions returns the versioned form of the client's AuthorizationOptions, and whether conditional and
+// unconditional authorization are supported. Conditional authorization is only supported if both the server (feature gate)
+// and the client (authorizationOptions) support it. A nil versionedAO means the client only handles unconditional decisions.
+func ResolveAuthorizationOptions(authorizationOptions *authorizationapi.AuthorizationOptions) (versionedAO *authorizationv1.AuthorizationOptions, supportsConditionalAuthorization, supportsUnconditionalAuthorization bool, err error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) || authorizationOptions == nil {
+		return nil, false, true, nil
+	}
+	versionedAO = &authorizationv1.AuthorizationOptions{}
+	// Call the conversion function directly, as we know it exactly. It is known to be fast as the internal package and v1 is byte-identical.
+	// conversion.Scope is known to be unused in this specific case and thus left nil. We know it in practice never errors.
+	if err := authorizationv1internal.Convert_authorization_AuthorizationOptions_To_v1_AuthorizationOptions(authorizationOptions, versionedAO, nil); err != nil {
+		return nil, false, false, fmt.Errorf("unexpected, could not convert internal AuthorizationOptions to v1: %w", err)
+	}
+	return versionedAO, authorizationv1.SupportsConditionalAuthorization(versionedAO), authorizationv1.SupportsUnconditionalAuthorization(versionedAO), nil
+}
+
+// ConditionsAwareDecisionToSARStatus encodes a ConditionsAwareDecision into SAR status.
+func ConditionsAwareDecisionToSARStatus(ctx context.Context, attrs authorizer.AttributesRecord, decision authorizer.ConditionsAwareDecision) authorizationapi.SubjectAccessReviewStatus {
+	// Allow/Deny/NoOpinion decisions should be serialized as before, on the top-level SAR status.
+	if decision.IsUnconditional() {
+		return authorizationapi.SubjectAccessReviewStatus{
+			Allowed:         decision.IsAllow(),
+			Denied:          decision.IsDeny(),
+			Reason:          decision.Reason(),
+			EvaluationError: BuildEvaluationError(decision.Error(), attrs),
+		}
+	}
+	// ConditionsMap or Union decision should be put under status.conditionalDecision.
+	versionedConditionsAwareDecision := apiserverauthorizationv1.FromAuthorizerConditionsAwareDecision(decision)
+	internalConditionsAwareDecision := &authorizationapi.ConditionsAwareDecision{}
+	if err := authorizationv1internal.Convert_v1_ConditionsAwareDecision_To_authorization_ConditionsAwareDecision(&versionedConditionsAwareDecision, internalConditionsAwareDecision, nil); err != nil {
+		// This conversion should never fail, but handle the case to be safe.
+		return authorizationapi.SubjectAccessReviewStatus{
+			Allowed:         false,
+			Denied:          decision.FailureDecision() == authorizer.DecisionDeny,
+			Reason:          "failed closed",
+			EvaluationError: BuildEvaluationError(err, attrs),
+		}
+	}
+	return authorizationapi.SubjectAccessReviewStatus{
+		ConditionalDecision: internalConditionsAwareDecision,
+	}
 }

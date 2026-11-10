@@ -35,7 +35,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -83,9 +82,7 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 		NotBefore: jwt.NewNumericDate(now),
 		Expiry:    jwt.NewNumericDate(now.Add(time.Duration(expirationSeconds) * time.Second)),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) {
-		sc.ID = newUUID()
-	}
+	sc.ID = newUUID()
 	pc := &privateClaims{
 		Kubernetes: kubernetes{
 			Namespace: sa.Namespace,
@@ -119,9 +116,6 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 			UID:  string(secret.UID),
 		}
 	case node != nil:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBinding) {
-			return nil, nil, fmt.Errorf("token bound to Node object requested, but %q feature gate is disabled", features.ServiceAccountTokenNodeBinding)
-		}
 		pc.Kubernetes.Node = &ref{
 			Name: node.Name,
 			UID:  string(node.UID),
@@ -255,11 +249,6 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 			nodeName = noderef.Name
 			nodeUID = noderef.UID
 		case podref == nil:
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
-				klog.V(4).Infof("ServiceAccount token is bound to a Node object, but the node bound token validation feature is disabled")
-				return nil, fmt.Errorf("token is bound to a Node object but the %s feature gate is disabled", features.ServiceAccountTokenNodeBindingValidation)
-			}
-
 			node, err := v.getter.GetNode(ctx, noderef.Name)
 			if err != nil {
 				klog.V(4).Infof("Could not retrieve node object %q for service account %s/%s: %v", noderef.Name, namespace, saref.Name, err)
@@ -320,10 +309,6 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		}
 	}
 
-	var jti string
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) {
-		jti = public.ID
-	}
 	return &apiserverserviceaccount.ServiceAccountInfo{
 		Namespace:                           private.Kubernetes.Namespace,
 		Name:                                private.Kubernetes.Svcacct.Name,
@@ -337,7 +322,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		ValidatingWebhookConfigurationUID:   validatingUID,
 		MutatingWebhookConfigurationName:    mutatingName,
 		MutatingWebhookConfigurationUID:     mutatingUID,
-		CredentialID:                        authenticationtokenjwt.CredentialIDForJTI(jti),
+		CredentialID:                        authenticationtokenjwt.CredentialIDForJTI(public.ID),
 	}, nil
 }
 

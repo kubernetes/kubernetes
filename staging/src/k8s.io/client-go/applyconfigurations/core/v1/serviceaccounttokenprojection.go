@@ -43,7 +43,7 @@ type ServiceAccountTokenProjectionApplyConfiguration struct {
 	Path *string `json:"path,omitempty"`
 	// user is Optional: The owner UID of the created file.
 	// If specified, the item-level user field takes precedence over defaultUser.
-	// (Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
+	// (Beta) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.
 	User *int64 `json:"user,omitempty"`
 }
 

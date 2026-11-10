@@ -18,8 +18,10 @@ package storage
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -30,9 +32,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -92,16 +97,24 @@ var (
 				{Choice: false, Weight: 30},
 			},
 			FieldSelector: []ChoiceWeight[FieldSelector]{
-				{Choice: FieldEverything, Weight: 25},
-				{Choice: FieldByName, Weight: 15},
-				{Choice: FieldByNamespace, Weight: 15},
-				{Choice: FieldByNode, Weight: 20},
-				{Choice: FieldByEmptyNode, Weight: 15},
+				{Choice: FieldEverything, Weight: 20},
+				{Choice: FieldByName, Weight: 10},
+				{Choice: FieldNotByName, Weight: 10},
+				{Choice: FieldByNamespace, Weight: 10},
+				{Choice: FieldNotByNamespace, Weight: 10},
+				{Choice: FieldByNode, Weight: 10},
+				{Choice: FieldNotByNode, Weight: 10},
+				{Choice: FieldByEmptyNode, Weight: 10},
 				{Choice: FieldCombined, Weight: 10},
 			},
 			LabelSelector: []ChoiceWeight[LabelSelector]{
-				{Choice: LabelEverything, Weight: 60},
-				{Choice: LabelByApp, Weight: 40},
+				{Choice: LabelEverything, Weight: 40},
+				{Choice: LabelByApp, Weight: 15},
+				{Choice: LabelNotByApp, Weight: 15},
+				{Choice: LabelAppIn, Weight: 10},
+				{Choice: LabelAppNotIn, Weight: 10},
+				{Choice: LabelAppExists, Weight: 5},
+				{Choice: LabelAppDoesNotExist, Weight: 5},
 			},
 			ResourceVersion: []ChoiceWeight[RVType]{
 				{Choice: RVEmpty, Weight: 30},
@@ -121,6 +134,31 @@ var (
 				{Choice: 0, Weight: 70},
 				{Choice: 1, Weight: 15},
 				{Choice: 2, Weight: 15},
+			},
+			Continue: ContinueDistribution{
+				Enabled: []ChoiceWeight[bool]{
+					{Choice: false, Weight: 70},
+					{Choice: true, Weight: 30},
+				},
+				Start: []ChoiceWeight[ContinueStart]{
+					{Choice: ContinueStartFirst, Weight: 15},
+					{Choice: ContinueStartAtKey, Weight: 35},
+					{Choice: ContinueStartAfterKey, Weight: 35},
+					{Choice: ContinueStartEnd, Weight: 15},
+				},
+				KeyTarget: []ChoiceWeight[KeyTarget]{
+					{Choice: KeyExisting, Weight: 80},
+					{Choice: KeyNonExistingNS, Weight: 10},
+					{Choice: KeyNonExistingObject, Weight: 10},
+				},
+				ResourceVersion: []ChoiceWeight[RVType]{
+					{Choice: RVNegative, Weight: 25},
+					{Choice: RVOne, Weight: 15},
+					{Choice: RVCached, Weight: 20},
+					{Choice: RVCurrent, Weight: 18},
+					{Choice: RVPast, Weight: 20},
+					{Choice: RVFuture, Weight: 2},
+				},
 			},
 		},
 		Update: UpdateDistribution{
@@ -155,7 +193,7 @@ var (
 
 	unaryCfg = UnaryConfig{
 		Concurrency:         8,
-		MaxOperations:       10000,
+		SucceededOperations: 5000,
 		RequestDistribution: requestDistribution,
 	}
 
@@ -175,16 +213,24 @@ var (
 			{Choice: false, Weight: 30},
 		},
 		FieldSelector: []ChoiceWeight[FieldSelector]{
-			{Choice: FieldEverything, Weight: 25},
-			{Choice: FieldByName, Weight: 15},
-			{Choice: FieldByNamespace, Weight: 15},
-			{Choice: FieldByNode, Weight: 20},
-			{Choice: FieldByEmptyNode, Weight: 15},
+			{Choice: FieldEverything, Weight: 20},
+			{Choice: FieldByName, Weight: 10},
+			{Choice: FieldNotByName, Weight: 10},
+			{Choice: FieldByNamespace, Weight: 10},
+			{Choice: FieldNotByNamespace, Weight: 10},
+			{Choice: FieldByNode, Weight: 10},
+			{Choice: FieldNotByNode, Weight: 10},
+			{Choice: FieldByEmptyNode, Weight: 10},
 			{Choice: FieldCombined, Weight: 10},
 		},
 		LabelSelector: []ChoiceWeight[LabelSelector]{
-			{Choice: LabelEverything, Weight: 60},
-			{Choice: LabelByApp, Weight: 40},
+			{Choice: LabelEverything, Weight: 40},
+			{Choice: LabelByApp, Weight: 15},
+			{Choice: LabelNotByApp, Weight: 15},
+			{Choice: LabelAppIn, Weight: 10},
+			{Choice: LabelAppNotIn, Weight: 10},
+			{Choice: LabelAppExists, Weight: 5},
+			{Choice: LabelAppDoesNotExist, Weight: 5},
 		},
 		SendInitialEvents: []ChoiceWeight[bool]{
 			{Choice: false, Weight: 70},
@@ -230,13 +276,42 @@ func TestCorrectness(t *testing.T) {
 		{
 			name: "etcd3",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				return setupStore(tCtx)
+				return setupStore(tCtx, nil)
+			},
+		},
+		{
+			name: "etcd3 with prefix transformer",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				return setupStore(tCtx, prefixTransformer{})
 			},
 		},
 		{
 			name: "cacher",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher with ConsistentGetFromCache",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.ConsistentGetFromCache, true)
+				store, prefix := setupStore(tCtx, nil)
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher with prefix transformer",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				store, prefix := setupStore(tCtx, prefixTransformer{})
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher without WatchFromStorageWithoutPrevKV",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, false)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, store), prefix
 			},
 		},
@@ -248,7 +323,7 @@ func TestCorrectness(t *testing.T) {
 			// - Cacher 429 TooManyRequests rejection on non-delegated GetList and Watch when !cacher.Ready()
 			name: "cacher with watch-breaking etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, &watchBreakingStore{Interface: store, expireAfter: 200 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
@@ -264,7 +339,7 @@ func TestCorrectness(t *testing.T) {
 			// - Cacher.Watch (SendInitialEvents=true) timing out in waitUntilWatchCacheFreshAndForceAllEvents and returning errWatcher
 			name: "cacher with watch-delaying etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, &watchDelayingStore{Interface: store, delay: 3600 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
@@ -279,7 +354,7 @@ func TestCorrectness(t *testing.T) {
 			//   causing waitUntilFreshLocked timeouts on GetList (falling back to etcd on consistent reads) and WatchList
 			name: "cacher with bookmark-dropping etcd",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, &bookmarkDroppingStore{Interface: store, stallDuration: 4700 * time.Millisecond}), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, ops []correctness.Operation, watches []correctness.WatchOperation) {
@@ -300,7 +375,7 @@ func TestCorrectness(t *testing.T) {
 				tCtx.Cleanup(func() {
 					cacher.DefaultEventFreshDuration = origFreshDuration
 				})
-				store, prefix := setupStore(tCtx)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, store), prefix
 			},
 			validateFaultInjection: func(tCtx ktesting.TContext, _ []correctness.Operation, watches []correctness.WatchOperation) {
@@ -351,12 +426,14 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 	})
 	wg.Wait()
 	require.NoError(t, err)
-	watchEvents := 0
-	for _, w := range watches {
-		watchEvents += len(w.Response.Events)
+	unaryTotal, unaryByOp := summarizeUnaryOperations(operations)
+	watchTotal, watchEvents := summarizeWatchOperations(watches)
+	t.Logf("Unary operations: %s", unaryTotal)
+	for _, op := range slices.Sorted(maps.Keys(unaryByOp)) {
+		t.Logf("  %-7s %s", op+":", *unaryByOp[op])
 	}
-	t.Logf("Collected %d unary operations and %d watches with %d events",
-		len(operations), len(watches), watchEvents)
+	t.Logf("Watches: %s events=%d", watchTotal, watchEvents)
+	require.GreaterOrEqual(t, unaryTotal.succeeded, unaryCfg.SucceededOperations, "expected at least %d succeeded unary operations", unaryCfg.SucceededOperations)
 
 	model := ToPorcupineModel(initialState)
 	res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)

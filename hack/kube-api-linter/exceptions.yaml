@@ -112,7 +112,7 @@
 # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
 # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
 - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-  path: "staging/src/k8s.io/api/(admissionregistration|certificates|core)"
+  path: "staging/src/k8s.io/api/(admissionregistration|core)"
 
 # nonpointerstructs/optionalorrequired - IngressBackend and ServiceBackendPort are "oneOf"-shaped
 # structs (validation requires exactly one of Resource/Service, or Name/Number, to be set) but
@@ -191,3 +191,20 @@
   path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
 - text: "nonpointerstructs: field ExternalMetricStatus.Metric is a non-pointer struct with required fields. It must be marked as required."
   path: "staging/src/k8s.io/api/autoscaling/v2/types.go"
+
+# forbiddenmarkers: approved uses of +k8s:customValidation, where no declarative tag fits.
+# EvictionResponder.Name rejects the reserved *.k8s.io and *.kubernetes.io domains.
+- text: 'forbiddenmarkers: field EvictionResponder.Name has forbidden marker "k8s:customValidation"'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+# EvictionResponder.Priority reserves priorities 0-999 for *.k8s.io responders.
+- text: 'forbiddenmarkers: field EvictionResponder.Priority has forbidden marker "k8s:customValidation"'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+# SecurityProfileOCI.Ref must be a canonical, digest-pinned OCI reference without a tag.
+- text: 'forbiddenmarkers: field SecurityProfileOCI.Ref has forbidden marker "k8s:customValidation"'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+# SecurityProfileOCIBase.LocalhostProfile must be a relative path without ".." elements.
+- text: 'forbiddenmarkers: field SecurityProfileOCIBase.LocalhostProfile has forbidden marker "k8s:customValidation"'
+  path: "staging/src/k8s.io/api/core/v1/types.go"
+# EvictionRequestSpec.Requester has the same reserved-domain rule as EvictionResponder.Name.
+- text: 'forbiddenmarkers: field EvictionRequestSpec.Requester has forbidden marker "k8s:customValidation"'
+  path: "staging/src/k8s.io/api/lifecycle/v1alpha1/types.go"

@@ -209,6 +209,15 @@ func TestValidateDeviceTaint(t *testing.T) {
 				return taintRule
 			}(),
 		},
+		"all-true": {
+			taintRule: func() *resourceapi.DeviceTaintRule {
+				taintRule := testDeviceTaintRule(goodName, validDeviceTaintRuleSpec)
+				taintRule.Spec.DeviceSelector = &resourceapi.DeviceTaintSelector{
+					All: ptr.To(true),
+				}
+				return taintRule
+			}(),
+		},
 		// Minimal tests for DeviceTaint. Full coverage of validateDeviceTaint is in ResourceSlice test.
 		"valid-taint": {
 			taintRule: func() *resourceapi.DeviceTaintRule {

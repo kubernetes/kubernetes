@@ -28,7 +28,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -984,7 +983,7 @@ func Test_AddPodGroup(t *testing.T) {
 		name                     string
 		compositePodGroupEnabled bool
 		initPod                  *v1.Pod // From old tests
-		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs              []*schedulingv1beta1.CompositePodGroup
 		podGroupsToAdd           []*schedulingv1beta1.PodGroup
 		wantPodGroups            map[fwk.EntityKey]*schedulingv1beta1.PodGroup
 		wantChildren             map[fwk.EntityKey]sets.Set[fwk.EntityKey]
@@ -1056,7 +1055,7 @@ func Test_AddPodGroup(t *testing.T) {
 		{
 			name:                     "add pod group with parent, parent already has composite pod group child",
 			compositePodGroupEnabled: true,
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
+			initialCPGs:              []*schedulingv1beta1.CompositePodGroup{cpgChild},
 			podGroupsToAdd:           []*schedulingv1beta1.PodGroup{pg3WithParent},
 			wantPodGroups: map[fwk.EntityKey]*schedulingv1beta1.PodGroup{
 				fwk.PodGroupKey("ns1", "pg3"): pg3WithParent,
@@ -1175,7 +1174,7 @@ func Test_RemovePodGroup(t *testing.T) {
 		compositePodGroupEnabled bool
 		initPod                  *v1.Pod // From old tests
 		initialPodGroups         []*schedulingv1beta1.PodGroup
-		initialCPGs              []*schedulingv1alpha3.CompositePodGroup
+		initialCPGs              []*schedulingv1beta1.CompositePodGroup
 		podGroupToDelete         *schedulingv1beta1.PodGroup
 		expectStateExists        string // "true", "false", or "" to skip
 		expectPodsCount          int
@@ -1214,7 +1213,7 @@ func Test_RemovePodGroup(t *testing.T) {
 			name:                     "delete pod group with parent, parent has other composite pod group children",
 			compositePodGroupEnabled: true,
 			initialPodGroups:         []*schedulingv1beta1.PodGroup{pg3WithParent},
-			initialCPGs:              []*schedulingv1alpha3.CompositePodGroup{cpgChild},
+			initialCPGs:              []*schedulingv1beta1.CompositePodGroup{cpgChild},
 			podGroupToDelete:         pg3WithParent,
 			wantPodGroups:            map[fwk.EntityKey]*schedulingv1beta1.PodGroup{},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
@@ -1811,6 +1810,195 @@ func TestAssumePodGroupMember(t *testing.T) {
 				}
 				if inAssumed := pgs.AssumedPods().Has(tt.pod.UID); inAssumed != tt.expectInAssumed {
 					t.Errorf("pod in assumedPods: got %v, want %v", inAssumed, tt.expectInAssumed)
+				}
+			})
+		}
+	}
+}
+
+// initiallyScheduledUID returns the initiallyScheduledUID of the group state with the given key, and whether the state exists.
+func initiallyScheduledUID(cache *cacheImpl, key fwk.EntityKey) (types.UID, bool) {
+	if key.Type == fwk.CompositePodGroupKeyType {
+		cpgs, exists := cache.compositePodGroupStates[key]
+		if !exists {
+			return "", false
+		}
+		return cpgs.initiallyScheduledUID, true
+	}
+	pgs, exists := cache.podGroupStates[key]
+	if !exists {
+		return "", false
+	}
+	return pgs.initiallyScheduledUID, true
+}
+
+func TestAssumeGroupInitiallyScheduled(t *testing.T) {
+	groups := []struct {
+		group *fwk.GenericPodGroup
+		// updatedGroup is the group as observed from the informer, without the True condition set by the scheduler.
+		updatedGroup *fwk.GenericPodGroup
+	}{
+		{
+			group: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Obj()),
+			updatedGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.PodGroupInitiallyScheduled,
+				Status: metav1.ConditionFalse,
+				Reason: schedulingv1beta1.PodGroupReasonUnschedulable,
+			}).Obj()),
+		},
+		{
+			group: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Obj()),
+			updatedGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.CompositePodGroupInitiallyScheduled,
+				Status: metav1.ConditionFalse,
+				Reason: schedulingv1beta1.CompositePodGroupReasonUnschedulable,
+			}).Obj()),
+		},
+	}
+
+	tests := []struct {
+		name    string
+		inCache bool
+		// updated updates the group in the cache after AssumeGroupInitiallyScheduled.
+		updated    bool
+		wantExists bool
+		wantUID    types.UID
+	}{
+		{
+			name:       "group in the cache",
+			inCache:    true,
+			wantExists: true,
+			wantUID:    "uid",
+		},
+		{
+			name:       "group updated by the informer afterwards",
+			inCache:    true,
+			updated:    true,
+			wantExists: true,
+			wantUID:    "uid",
+		},
+		{
+			name: "group not in the cache",
+		},
+	}
+
+	for _, g := range groups {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%v, %v", g.group.GetType(), tt.name), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := newCache(ctx, time.Second, nil, true, true)
+				if tt.inCache {
+					cache.AddGenericPodGroup(g.group)
+				}
+
+				cache.AssumeGroupInitiallyScheduled(logger, g.group.GetKey(), "uid")
+
+				if tt.updated {
+					cache.UpdateGenericPodGroup(logger, g.updatedGroup)
+				}
+				uid, exists := initiallyScheduledUID(cache, g.group.GetKey())
+				if exists != tt.wantExists {
+					t.Fatalf("Expected group state to exist: %v, got %v", tt.wantExists, exists)
+				}
+				if uid != tt.wantUID {
+					t.Errorf("Expected initiallyScheduledUID %q, got %q", tt.wantUID, uid)
+				}
+			})
+		}
+	}
+}
+
+func TestIsGroupInitiallyScheduled(t *testing.T) {
+	groups := []struct {
+		group *fwk.GenericPodGroup
+		// groupWithoutUID is the group without a UID, as in test objects.
+		groupWithoutUID *fwk.GenericPodGroup
+		// scheduledGroup is the group with the True condition.
+		scheduledGroup *fwk.GenericPodGroup
+	}{
+		{
+			group:           fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Obj()),
+			groupWithoutUID: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").Obj()),
+			scheduledGroup: fwk.NewGenericPodGroup(st.MakePodGroup().Namespace("ns").Name("pg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.PodGroupInitiallyScheduled,
+				Status: metav1.ConditionTrue,
+				Reason: schedulingv1beta1.PodGroupReasonScheduled,
+			}).Obj()),
+		},
+		{
+			group:           fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Obj()),
+			groupWithoutUID: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").Obj()),
+			scheduledGroup: fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Namespace("ns").Name("cpg").UID("uid").Conditions(metav1.Condition{
+				Type:   schedulingv1beta1.CompositePodGroupInitiallyScheduled,
+				Status: metav1.ConditionTrue,
+				Reason: schedulingv1beta1.CompositePodGroupReasonScheduled,
+			}).Obj()),
+		},
+	}
+
+	tests := []struct {
+		name string
+		// cachedGroup returns the group object stored in the cache, or nil to store none.
+		cachedGroup           func(group, groupWithoutUID, scheduledGroup *fwk.GenericPodGroup) *fwk.GenericPodGroup
+		initiallyScheduledUID types.UID
+		wantGroup             bool
+		want                  bool
+	}{
+		{
+			name:        "not set",
+			cachedGroup: func(group, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return group },
+			wantGroup:   true,
+		},
+		{
+			name:                  "set for the group UID",
+			cachedGroup:           func(group, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return group },
+			initiallyScheduledUID: "uid",
+			wantGroup:             true,
+			want:                  true,
+		},
+		{
+			name:                  "set for another UID",
+			cachedGroup:           func(group, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return group },
+			initiallyScheduledUID: "recreated-uid",
+			wantGroup:             true,
+		},
+		{
+			name:        "not set for a group without a UID",
+			cachedGroup: func(_, groupWithoutUID, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return groupWithoutUID },
+			wantGroup:   true,
+		},
+		{
+			name:        "True condition in the cached group",
+			cachedGroup: func(_, _, scheduledGroup *fwk.GenericPodGroup) *fwk.GenericPodGroup { return scheduledGroup },
+			wantGroup:   true,
+			want:        true,
+		},
+		{
+			name:        "group not in the cache",
+			cachedGroup: func(_, _, _ *fwk.GenericPodGroup) *fwk.GenericPodGroup { return nil },
+		},
+	}
+
+	for _, g := range groups {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%v, %v", g.group.GetType(), tt.name), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				cache := newCache(ctx, time.Second, nil, true, true)
+				if cached := tt.cachedGroup(g.group, g.groupWithoutUID, g.scheduledGroup); cached != nil {
+					cache.AddGenericPodGroup(cached)
+					if cached.GetType() == fwk.CompositePodGroupKeyType {
+						cache.compositePodGroupStates[cached.GetKey()].initiallyScheduledUID = tt.initiallyScheduledUID
+					} else {
+						cache.podGroupStates[cached.GetKey()].initiallyScheduledUID = tt.initiallyScheduledUID
+					}
+				}
+
+				gpg, got := cache.IsGroupInitiallyScheduled(logger, g.group.GetKey())
+				if (gpg != nil) != tt.wantGroup {
+					t.Fatalf("IsGroupInitiallyScheduled(%v) returned group %v, want a group: %v", g.group.GetKey(), gpg, tt.wantGroup)
+				}
+				if got != tt.want {
+					t.Errorf("IsGroupInitiallyScheduled(%v) = %v, want %v", g.group.GetKey(), got, tt.want)
 				}
 			})
 		}
@@ -3278,14 +3466,14 @@ func Test_AddCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name         string
 		initialPGs   []*schedulingv1beta1.PodGroup
-		cpgsToAdd    []*schedulingv1alpha3.CompositePodGroup
-		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		cpgsToAdd    []*schedulingv1beta1.CompositePodGroup
+		wantCPGs     map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup
 		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:      "add multiple composite pod groups",
-			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpg2},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+			cpgsToAdd: []*schedulingv1beta1.CompositePodGroup{cpg1, cpg2},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
 				fwk.CompositePodGroupKey("ns1", "cpg1"): cpg1,
 				fwk.CompositePodGroupKey("ns1", "cpg2"): cpg2,
 			},
@@ -3293,8 +3481,8 @@ func Test_AddCompositePodGroup(t *testing.T) {
 		},
 		{
 			name:      "add composite pod group with parent, parent already has other composite pod group child",
-			cpgsToAdd: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+			cpgsToAdd: []*schedulingv1beta1.CompositePodGroup{cpg3WithParent, cpg4WithParent},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
 				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
 				fwk.CompositePodGroupKey("ns1", "cpg4"): cpg4WithParent,
 			},
@@ -3308,8 +3496,8 @@ func Test_AddCompositePodGroup(t *testing.T) {
 		{
 			name:       "add composite pod group with parent, parent already has pod group child",
 			initialPGs: []*schedulingv1beta1.PodGroup{pgChild},
-			cpgsToAdd:  []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+			cpgsToAdd:  []*schedulingv1beta1.CompositePodGroup{cpg3WithParent},
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
 				fwk.CompositePodGroupKey("ns1", "cpg3"): cpg3WithParent,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
@@ -3332,7 +3520,7 @@ func Test_AddCompositePodGroup(t *testing.T) {
 				cache.AddGenericPodGroup(fwk.NewGenericCompositePodGroup(cpg))
 			}
 
-			gotCPGs := make(map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup)
+			gotCPGs := make(map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup)
 			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
 
 			for k, cpgs := range cache.compositePodGroupStates {
@@ -3370,24 +3558,24 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name         string
 		initialPGs   []*schedulingv1beta1.PodGroup
-		initialCPGs  []*schedulingv1alpha3.CompositePodGroup
-		cpgToDelete  *schedulingv1alpha3.CompositePodGroup
-		wantCPGs     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup
+		initialCPGs  []*schedulingv1beta1.CompositePodGroup
+		cpgToDelete  *schedulingv1beta1.CompositePodGroup
+		wantCPGs     map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup
 		wantChildren map[fwk.EntityKey]sets.Set[fwk.EntityKey]
 	}{
 		{
 			name:         "delete composite pod group with parent, cleans up children map",
-			initialCPGs:  []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent},
+			initialCPGs:  []*schedulingv1beta1.CompositePodGroup{cpg3WithParent},
 			cpgToDelete:  cpg3WithParent,
-			wantCPGs:     map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{},
+			wantCPGs:     map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{},
 		},
 		{
 			name:        "delete composite pod group with parent, parent has both other pg and cpg children",
 			initialPGs:  []*schedulingv1beta1.PodGroup{pgChild},
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg3WithParent, cpg4WithParent},
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{cpg3WithParent, cpg4WithParent},
 			cpgToDelete: cpg3WithParent,
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
 				fwk.CompositePodGroupKey("ns1", "cpg4"): cpg4WithParent,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
@@ -3400,9 +3588,9 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 		{
 			name:        "delete mid cpg from root-mid-leaf hierarchy",
 			initialPGs:  []*schedulingv1beta1.PodGroup{pgLeaf},
-			initialCPGs: []*schedulingv1alpha3.CompositePodGroup{cpg1, cpgMid},
+			initialCPGs: []*schedulingv1beta1.CompositePodGroup{cpg1, cpgMid},
 			cpgToDelete: cpgMid,
-			wantCPGs: map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup{
+			wantCPGs: map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup{
 				cpg1Key: cpg1,
 			},
 			wantChildren: map[fwk.EntityKey]sets.Set[fwk.EntityKey]{
@@ -3424,7 +3612,7 @@ func Test_RemoveCompositePodGroup(t *testing.T) {
 
 			cache.RemoveGenericPodGroup(klog.FromContext(ctx), fwk.NewGenericCompositePodGroup(tt.cpgToDelete))
 
-			gotCPGs := make(map[fwk.EntityKey]*schedulingv1alpha3.CompositePodGroup)
+			gotCPGs := make(map[fwk.EntityKey]*schedulingv1beta1.CompositePodGroup)
 			gotChildren := make(map[fwk.EntityKey]sets.Set[fwk.EntityKey])
 
 			for k, cpgs := range cache.compositePodGroupStates {

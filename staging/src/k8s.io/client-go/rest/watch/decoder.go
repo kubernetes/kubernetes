@@ -45,18 +45,9 @@ func NewDecoder(decoder streaming.Decoder, embeddedDecoder runtime.Decoder) *Dec
 // Decode blocks until it can return the next object in the reader. Returns an error
 // if the reader is closed or an object can't be decoded.
 func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
-	var got metav1.WatchEvent
-	res, _, err := d.decoder.Decode(nil, &got)
+	got, err := readEvent(d.decoder)
 	if err != nil {
 		return "", nil, err
-	}
-	if res != &got {
-		return "", nil, fmt.Errorf("unable to decode to metav1.WatchEvent")
-	}
-	switch got.Type {
-	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error), string(watch.Bookmark):
-	default:
-		return "", nil, fmt.Errorf("got invalid watch event type: %v", got.Type)
 	}
 
 	obj, err := runtime.Decode(d.embeddedDecoder, got.Object.Raw)
@@ -69,4 +60,21 @@ func (d *Decoder) Decode() (watch.EventType, runtime.Object, error) {
 // Close closes the underlying r.
 func (d *Decoder) Close() {
 	d.decoder.Close()
+}
+
+func readEvent(decoder streaming.Decoder) (metav1.WatchEvent, error) {
+	var got metav1.WatchEvent
+	res, _, err := decoder.Decode(nil, &got)
+	if err != nil {
+		return metav1.WatchEvent{}, err
+	}
+	if res != &got {
+		return metav1.WatchEvent{}, fmt.Errorf("unable to decode to metav1.WatchEvent")
+	}
+	switch got.Type {
+	case string(watch.Added), string(watch.Modified), string(watch.Deleted), string(watch.Error), string(watch.Bookmark):
+	default:
+		return metav1.WatchEvent{}, fmt.Errorf("got invalid watch event type: %v", got.Type)
+	}
+	return got, nil
 }

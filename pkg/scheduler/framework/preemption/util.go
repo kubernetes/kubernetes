@@ -17,14 +17,12 @@ limitations under the License.
 package preemption
 
 import (
-	"iter"
+	"cmp"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 )
@@ -65,19 +63,8 @@ func PodTerminatingByPreemption(p *v1.Pod) bool {
 //     If group types and sizes are equal, the group that started earlier (has the oldest pod)
 //     is more important.
 func MoreImportantVictim(vi1, vi2 Victim) bool {
-	if vi1.Priority() != vi2.Priority() {
-		return vi1.Priority() > vi2.Priority()
-	}
-
-	rank1 := victimRank(vi1)
-	rank2 := victimRank(vi2)
-
-	if rank1 != rank2 {
-		return rank1 > rank2
-	}
-
-	if len(vi1.Pods()) != len(vi2.Pods()) {
-		return len(vi1.Pods()) > len(vi2.Pods())
+	if c := compareVictimStructuralImportance(vi1, vi2); c != 0 {
+		return c > 0
 	}
 
 	t1, t2 := vi1.EarliestStartTime(), vi2.EarliestStartTime()
@@ -106,57 +93,17 @@ func victimRank(vi Victim) int {
 	}
 }
 
-// traverseHierarchyUp traverses the hierarchy of PodGroups/CompositePodGroups upward from startKey.
-// If the next parent is missing, or cannot be listed, the traversal stops.
-// Feature gating is left to the listers: when GenericWorkload or CompositePodGroup is disabled,
-// the corresponding lister rejects lookups, so the traversal ends there.
-// TODO: log/return an error if there is a gap in the hierarchy.
-func traverseHierarchyUp(
-	namespace string,
-	startKey fwk.EntityKey,
-	pgLister fwk.PodGroupLister,
-	cpgLister fwk.CompositePodGroupLister,
-) iter.Seq[*fwk.GenericPodGroup] {
-	return func(yield func(*fwk.GenericPodGroup) bool) {
-		currentKey := startKey
-		visited := sets.New[fwk.EntityKey]()
-		for range schedulingv1beta1.WorkloadMaxTreeDepth {
-			if visited.Has(currentKey) {
-				break
-			}
-			visited.Insert(currentKey)
-
-			var gpg *fwk.GenericPodGroup
-			switch currentKey.Type {
-			case fwk.PodGroupKeyType:
-				pg, err := pgLister.Get(namespace, currentKey.Name)
-				if err != nil {
-					return
-				}
-				gpg = fwk.NewGenericPodGroup(pg)
-
-			case fwk.CompositePodGroupKeyType:
-				cpg, err := cpgLister.Get(namespace, currentKey.Name)
-				if err != nil {
-					return
-				}
-				gpg = fwk.NewGenericCompositePodGroup(cpg)
-
-			default:
-				return
-			}
-
-			if !yield(gpg) {
-				return
-			}
-
-			parentKey, hasParent := gpg.GetParentKey()
-			if !hasParent {
-				return
-			}
-			currentKey = parentKey
-		}
+// compareVictimStructuralImportance compares two victims on structural importance:
+// Priority, Workload Type Rank (CompositePodGroup > PodGroup > Pod), and Group Size.
+// Returns > 0 if vi1 is more important, < 0 if vi2 is more important, and 0 if equal.
+func compareVictimStructuralImportance(vi1, vi2 Victim) int {
+	if c := cmp.Compare(vi1.Priority(), vi2.Priority()); c != 0 {
+		return c
 	}
+	if c := cmp.Compare(victimRank(vi1), victimRank(vi2)); c != 0 {
+		return c
+	}
+	return cmp.Compare(len(vi1.Pods()), len(vi2.Pods()))
 }
 
 // FilterVictimsWithPDBViolation groups "victims" into "violatingVictims"

@@ -59,6 +59,44 @@ var (
 		kubectl api-resources --api-group=rbac.authorization.k8s.io`)
 )
 
+// APIResourceFlags directly reflect the information that CLI is gathering via flags. They will be converted to
+// Options, which reflect the runtime requirements for the command.
+type APIResourceFlags struct {
+	SortBy     string
+	APIGroup   string
+	Namespaced bool
+	Verbs      []string
+	Cached     bool
+	Categories []string
+
+	PrintFlags *PrintFlags
+
+	RESTClientGetter genericclioptions.RESTClientGetter
+	genericiooptions.IOStreams
+}
+
+// NewAPIResourceFlags returns a default APIResourceFlags
+func NewAPIResourceFlags(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *APIResourceFlags {
+	return &APIResourceFlags{
+		RESTClientGetter: restClientGetter,
+		IOStreams:        ioStreams,
+		Namespaced:       true,
+		PrintFlags:       NewPrintFlags(),
+	}
+}
+
+// AddFlags registers flags for a cli
+func (flags *APIResourceFlags) AddFlags(cmd *cobra.Command) {
+	flags.PrintFlags.AddFlags(cmd)
+
+	cmd.Flags().StringVar(&flags.APIGroup, "api-group", flags.APIGroup, "Limit to resources in the specified API group.")
+	cmd.Flags().BoolVar(&flags.Namespaced, "namespaced", flags.Namespaced, "If false, non-namespaced resources will be returned, otherwise returning namespaced resources by default.")
+	cmd.Flags().StringSliceVar(&flags.Verbs, "verbs", flags.Verbs, "Limit to resources that support the specified verbs.")
+	cmd.Flags().StringVar(&flags.SortBy, "sort-by", flags.SortBy, "If non-empty, sort list of resources using specified field. The field can be either 'name' or 'kind'.")
+	cmd.Flags().BoolVar(&flags.Cached, "cached", flags.Cached, "Use the cached list of resources if available.")
+	cmd.Flags().StringSliceVar(&flags.Categories, "categories", flags.Categories, "Limit to resources that belong to the specified categories.")
+}
+
 // APIResourceOptions is the start of the data required to perform the operation.
 // As new fields are added, add them here instead of referencing the cmd.Flags()
 type APIResourceOptions struct {
@@ -75,22 +113,12 @@ type APIResourceOptions struct {
 	discoveryClient discovery.CachedDiscoveryInterface
 
 	genericiooptions.IOStreams
-	PrintFlags *PrintFlags
-	PrintObj   printers.ResourcePrinterFunc
-}
-
-// NewAPIResourceOptions creates the options for APIResource
-func NewAPIResourceOptions(ioStreams genericiooptions.IOStreams) *APIResourceOptions {
-	return &APIResourceOptions{
-		IOStreams:  ioStreams,
-		Namespaced: true,
-		PrintFlags: NewPrintFlags(),
-	}
+	PrintObj printers.ResourcePrinterFunc
 }
 
 // NewCmdAPIResources creates the `api-resources` command
 func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
-	o := NewAPIResourceOptions(ioStreams)
+	flags := NewAPIResourceFlags(restClientGetter, ioStreams)
 
 	cmd := &cobra.Command{
 		Use:     "api-resources",
@@ -98,20 +126,14 @@ func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioS
 		Long:    i18n.T("Print the supported API resources on the server."),
 		Example: apiresourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
+			o, err := flags.ToOptions(cmd, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunAPIResources())
 		},
 	}
 
-	o.PrintFlags.AddFlags(cmd)
-
-	cmd.Flags().StringVar(&o.APIGroup, "api-group", o.APIGroup, "Limit to resources in the specified API group.")
-	cmd.Flags().BoolVar(&o.Namespaced, "namespaced", o.Namespaced, "If false, non-namespaced resources will be returned, otherwise returning namespaced resources by default.")
-	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
-	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort list of resources using specified field. The field can be either 'name' or 'kind'.")
-	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
-	cmd.Flags().StringSliceVar(&o.Categories, "categories", o.Categories, "Limit to resources that belong to the specified categories.")
+	flags.AddFlags(cmd)
 	return cmd
 }
 
@@ -126,33 +148,44 @@ func (o *APIResourceOptions) Validate() error {
 	return nil
 }
 
-// Complete adapts from the command line args and validates them
-func (o *APIResourceOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, args []string) error {
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *APIResourceFlags) ToOptions(cmd *cobra.Command, args []string) (*APIResourceOptions, error) {
 	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "unexpected arguments: %v", args)
+		return nil, fmt.Errorf("unexpected arguments: %v", args)
 	}
 
-	discoveryClient, err := restClientGetter.ToDiscoveryClient()
+	discoveryClient, err := flags.RESTClientGetter.ToDiscoveryClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	o.discoveryClient = discoveryClient
 
-	o.groupChanged = cmd.Flags().Changed("api-group")
-	o.nsChanged = cmd.Flags().Changed("namespaced")
+	o := &APIResourceOptions{
+		SortBy:     flags.SortBy,
+		APIGroup:   flags.APIGroup,
+		Namespaced: flags.Namespaced,
+		Verbs:      flags.Verbs,
+		Cached:     flags.Cached,
+		Categories: flags.Categories,
 
-	var printer printers.ResourcePrinter
-	if o.PrintFlags.OutputFormat != nil {
-		printer, err = o.PrintFlags.ToPrinter()
+		groupChanged: cmd.Flags().Changed("api-group"),
+		nsChanged:    cmd.Flags().Changed("namespaced"),
+
+		discoveryClient: discoveryClient,
+		IOStreams:       flags.IOStreams,
+	}
+
+	if flags.PrintFlags.OutputFormat != nil {
+		printer, err := flags.PrintFlags.ToPrinter()
 		if err != nil {
-			return err
+			return nil, err
 		}
 
+		outputFormat := *flags.PrintFlags.OutputFormat
+		noHeaders := flags.PrintFlags.NoHeaders != nil && *flags.PrintFlags.NoHeaders
 		o.PrintObj = func(object runtime.Object, out io.Writer) error {
 			errs := []error{}
-			if !*o.PrintFlags.NoHeaders &&
-				(o.PrintFlags.OutputFormat == nil || *o.PrintFlags.OutputFormat == "" || *o.PrintFlags.OutputFormat == "wide") {
-				if err = printContextHeaders(out, *o.PrintFlags.OutputFormat); err != nil {
+			if !noHeaders && (outputFormat == "" || outputFormat == "wide") {
+				if err := printContextHeaders(out, outputFormat); err != nil {
 					errs = append(errs, err)
 				}
 			}
@@ -163,7 +196,7 @@ func (o *APIResourceOptions) Complete(restClientGetter genericclioptions.RESTCli
 		}
 	}
 
-	return nil
+	return o, nil
 }
 
 // RunAPIResources does the work

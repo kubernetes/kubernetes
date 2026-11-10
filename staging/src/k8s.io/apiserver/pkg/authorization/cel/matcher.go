@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	celgo "github.com/google/cel-go/cel"
+	celgo "cel.dev/cel-go/cel"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -43,6 +43,9 @@ type CELMatcher struct {
 
 // eval evaluates the given SubjectAccessReview against all cel matchCondition expression
 func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessReview) (bool, error) {
+	if len(c.CompilationResults) == 0 {
+		return true, nil
+	}
 	var evalErrors []error
 
 	metrics := c.Metrics

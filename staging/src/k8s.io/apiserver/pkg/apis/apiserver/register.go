@@ -47,6 +47,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AuthorizationConfiguration{},
 		&EncryptionConfiguration{},
 		&EgressSelectorConfiguration{},
+		&StorageCompressionConfiguration{},
 		&TracingConfiguration{},
 	)
 	return nil

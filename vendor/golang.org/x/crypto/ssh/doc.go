@@ -17,6 +17,7 @@ References:
 	[PROTOCOL.certkeys]: http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/usr.bin/ssh/PROTOCOL.certkeys?rev=HEAD
 	[SSH-PARAMETERS]:    http://www.iana.org/assignments/ssh-parameters/ssh-parameters.xml#ssh-parameters-1
 	[SSH-CERTS]:	https://datatracker.ietf.org/doc/html/draft-miller-ssh-cert-01
+	[SSH-MLDSA]:	https://datatracker.ietf.org/doc/html/draft-sfluhrer-ssh-mldsa-08
 	[FIPS 140-3 mode]: https://go.dev/doc/security/fips140
 
 This package does not fall under the stability promise of the Go language itself,

@@ -374,7 +374,7 @@ func (m *PodTemplateList) Reset() { *m = PodTemplateList{} }
 
 func (m *PodTemplateSpec) Reset() { *m = PodTemplateSpec{} }
 
-func (m *PodVolumeHealth) Reset() { *m = PodVolumeHealth{} }
+func (m *PodVolumeStatus) Reset() { *m = PodVolumeStatus{} }
 
 func (m *PortStatus) Reset() { *m = PortStatus{} }
 
@@ -455,6 +455,10 @@ func (m *SecretReference) Reset() { *m = SecretReference{} }
 func (m *SecretVolumeSource) Reset() { *m = SecretVolumeSource{} }
 
 func (m *SecurityContext) Reset() { *m = SecurityContext{} }
+
+func (m *SecurityProfileOCI) Reset() { *m = SecurityProfileOCI{} }
+
+func (m *SecurityProfileOCIBase) Reset() { *m = SecurityProfileOCIBase{} }
 
 func (m *SerializedReference) Reset() { *m = SerializedReference{} }
 
@@ -10547,10 +10551,10 @@ func (m *PodStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.VolumeHealth) > 0 {
-		for iNdEx := len(m.VolumeHealth) - 1; iNdEx >= 0; iNdEx-- {
+	if len(m.VolumeStatuses) > 0 {
+		for iNdEx := len(m.VolumeStatuses) - 1; iNdEx >= 0; iNdEx-- {
 			{
-				size, err := m.VolumeHealth[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				size, err := m.VolumeStatuses[iNdEx].MarshalToSizedBuffer(dAtA[:i])
 				if err != nil {
 					return 0, err
 				}
@@ -10560,7 +10564,7 @@ func (m *PodStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			i--
 			dAtA[i] = 0x1
 			i--
-			dAtA[i] = 0xb2
+			dAtA[i] = 0xba
 		}
 	}
 	if len(m.NodeAllocatableResourceClaimStatuses) > 0 {
@@ -10931,7 +10935,7 @@ func (m *PodTemplateSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *PodVolumeHealth) Marshal() (dAtA []byte, err error) {
+func (m *PodVolumeStatus) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -10941,39 +10945,27 @@ func (m *PodVolumeHealth) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *PodVolumeHealth) MarshalTo(dAtA []byte) (int, error) {
+func (m *PodVolumeStatus) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *PodVolumeHealth) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *PodVolumeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	{
-		size, err := m.LastTransitionTime.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
-		}
-		i -= size
-		i = encodeVarintGenerated(dAtA, i, uint64(size))
-	}
-	i--
-	dAtA[i] = 0x1a
-	if len(m.HealthConditions) > 0 {
-		for iNdEx := len(m.HealthConditions) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.HealthConditions[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintGenerated(dAtA, i, uint64(size))
+	if m.HealthStatus != nil {
+		{
+			size, err := m.HealthStatus.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
 			}
-			i--
-			dAtA[i] = 0x12
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
 		}
+		i--
+		dAtA[i] = 0x12
 	}
 	i -= len(m.Name)
 	copy(dAtA[i:], m.Name)
@@ -12700,6 +12692,18 @@ func (m *SeccompProfile) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.OCI != nil {
+		{
+			size, err := m.OCI.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	if m.LocalhostProfile != nil {
 		i -= len(*m.LocalhostProfile)
 		copy(dAtA[i:], *m.LocalhostProfile)
@@ -13240,6 +13244,81 @@ func (m *SecurityContext) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0xa
 	}
+	return len(dAtA) - i, nil
+}
+
+func (m *SecurityProfileOCI) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SecurityProfileOCI) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SecurityProfileOCI) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.BaseProfile != nil {
+		{
+			size, err := m.BaseProfile.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Ref)
+	copy(dAtA[i:], m.Ref)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Ref)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *SecurityProfileOCIBase) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SecurityProfileOCIBase) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SecurityProfileOCIBase) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.LocalhostProfile != nil {
+		i -= len(*m.LocalhostProfile)
+		copy(dAtA[i:], *m.LocalhostProfile)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.LocalhostProfile)))
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Type)
+	copy(dAtA[i:], m.Type)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Type)))
+	i--
+	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -19359,8 +19438,8 @@ func (m *PodStatus) Size() (n int) {
 			n += 2 + l + sovGenerated(uint64(l))
 		}
 	}
-	if len(m.VolumeHealth) > 0 {
-		for _, e := range m.VolumeHealth {
+	if len(m.VolumeStatuses) > 0 {
+		for _, e := range m.VolumeStatuses {
 			l = e.Size()
 			n += 2 + l + sovGenerated(uint64(l))
 		}
@@ -19411,7 +19490,7 @@ func (m *PodTemplateSpec) Size() (n int) {
 	return n
 }
 
-func (m *PodVolumeHealth) Size() (n int) {
+func (m *PodVolumeStatus) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -19419,14 +19498,10 @@ func (m *PodVolumeHealth) Size() (n int) {
 	_ = l
 	l = len(m.Name)
 	n += 1 + l + sovGenerated(uint64(l))
-	if len(m.HealthConditions) > 0 {
-		for _, e := range m.HealthConditions {
-			l = e.Size()
-			n += 1 + l + sovGenerated(uint64(l))
-		}
+	if m.HealthStatus != nil {
+		l = m.HealthStatus.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
-	l = m.LastTransitionTime.Size()
-	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -20063,6 +20138,10 @@ func (m *SeccompProfile) Size() (n int) {
 		l = len(*m.LocalhostProfile)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.OCI != nil {
+		l = m.OCI.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -20254,6 +20333,36 @@ func (m *SecurityContext) Size() (n int) {
 	}
 	if m.AppArmorProfile != nil {
 		l = m.AppArmorProfile.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *SecurityProfileOCI) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Ref)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.BaseProfile != nil {
+		l = m.BaseProfile.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *SecurityProfileOCIBase) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Type)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.LocalhostProfile != nil {
+		l = len(*m.LocalhostProfile)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -23908,11 +24017,11 @@ func (this *PodStatus) String() string {
 		repeatedStringForNodeAllocatableResourceClaimStatuses += strings.Replace(strings.Replace(f.String(), "NodeAllocatableResourceClaimStatus", "NodeAllocatableResourceClaimStatus", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForNodeAllocatableResourceClaimStatuses += "}"
-	repeatedStringForVolumeHealth := "[]PodVolumeHealth{"
-	for _, f := range this.VolumeHealth {
-		repeatedStringForVolumeHealth += strings.Replace(strings.Replace(f.String(), "PodVolumeHealth", "PodVolumeHealth", 1), `&`, ``, 1) + ","
+	repeatedStringForVolumeStatuses := "[]PodVolumeStatus{"
+	for _, f := range this.VolumeStatuses {
+		repeatedStringForVolumeStatuses += strings.Replace(strings.Replace(f.String(), "PodVolumeStatus", "PodVolumeStatus", 1), `&`, ``, 1) + ","
 	}
-	repeatedStringForVolumeHealth += "}"
+	repeatedStringForVolumeStatuses += "}"
 	keysForAllocatedResources := make([]string, 0, len(this.AllocatedResources))
 	for k := range this.AllocatedResources {
 		keysForAllocatedResources = append(keysForAllocatedResources, string(k))
@@ -23945,7 +24054,7 @@ func (this *PodStatus) String() string {
 		`AllocatedResources:` + mapStringForAllocatedResources + `,`,
 		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
 		`NodeAllocatableResourceClaimStatuses:` + repeatedStringForNodeAllocatableResourceClaimStatuses + `,`,
-		`VolumeHealth:` + repeatedStringForVolumeHealth + `,`,
+		`VolumeStatuses:` + repeatedStringForVolumeStatuses + `,`,
 		`}`,
 	}, "")
 	return s
@@ -23988,19 +24097,13 @@ func (this *PodTemplateSpec) String() string {
 	}, "")
 	return s
 }
-func (this *PodVolumeHealth) String() string {
+func (this *PodVolumeStatus) String() string {
 	if this == nil {
 		return "nil"
 	}
-	repeatedStringForHealthConditions := "[]VolumeHealthCondition{"
-	for _, f := range this.HealthConditions {
-		repeatedStringForHealthConditions += strings.Replace(strings.Replace(f.String(), "VolumeHealthCondition", "VolumeHealthCondition", 1), `&`, ``, 1) + ","
-	}
-	repeatedStringForHealthConditions += "}"
-	s := strings.Join([]string{`&PodVolumeHealth{`,
+	s := strings.Join([]string{`&PodVolumeStatus{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
-		`HealthConditions:` + repeatedStringForHealthConditions + `,`,
-		`LastTransitionTime:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.LastTransitionTime), "Time", "v1.Time", 1), `&`, ``, 1) + `,`,
+		`HealthStatus:` + strings.Replace(this.HealthStatus.String(), "VolumeHealthStatus", "VolumeHealthStatus", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24509,6 +24612,7 @@ func (this *SeccompProfile) String() string {
 	s := strings.Join([]string{`&SeccompProfile{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`LocalhostProfile:` + valueToStringGenerated(this.LocalhostProfile) + `,`,
+		`OCI:` + strings.Replace(this.OCI.String(), "SecurityProfileOCI", "SecurityProfileOCI", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24650,6 +24754,28 @@ func (this *SecurityContext) String() string {
 		`WindowsOptions:` + strings.Replace(this.WindowsOptions.String(), "WindowsSecurityContextOptions", "WindowsSecurityContextOptions", 1) + `,`,
 		`SeccompProfile:` + strings.Replace(this.SeccompProfile.String(), "SeccompProfile", "SeccompProfile", 1) + `,`,
 		`AppArmorProfile:` + strings.Replace(this.AppArmorProfile.String(), "AppArmorProfile", "AppArmorProfile", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SecurityProfileOCI) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SecurityProfileOCI{`,
+		`Ref:` + fmt.Sprintf("%v", this.Ref) + `,`,
+		`BaseProfile:` + strings.Replace(this.BaseProfile.String(), "SecurityProfileOCIBase", "SecurityProfileOCIBase", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *SecurityProfileOCIBase) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&SecurityProfileOCIBase{`,
+		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
+		`LocalhostProfile:` + valueToStringGenerated(this.LocalhostProfile) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -57758,9 +57884,9 @@ func (m *PodStatus) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 22:
+		case 23:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field VolumeHealth", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field VolumeStatuses", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -57787,8 +57913,8 @@ func (m *PodStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.VolumeHealth = append(m.VolumeHealth, PodVolumeHealth{})
-			if err := m.VolumeHealth[len(m.VolumeHealth)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			m.VolumeStatuses = append(m.VolumeStatuses, PodVolumeStatus{})
+			if err := m.VolumeStatuses[len(m.VolumeStatuses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -58162,7 +58288,7 @@ func (m *PodTemplateSpec) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *PodVolumeHealth) Unmarshal(dAtA []byte) error {
+func (m *PodVolumeStatus) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -58185,10 +58311,10 @@ func (m *PodVolumeHealth) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: PodVolumeHealth: wiretype end group for non-group")
+			return fmt.Errorf("proto: PodVolumeStatus: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PodVolumeHealth: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: PodVolumeStatus: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -58225,7 +58351,7 @@ func (m *PodVolumeHealth) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field HealthConditions", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field HealthStatus", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -58252,41 +58378,10 @@ func (m *PodVolumeHealth) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.HealthConditions = append(m.HealthConditions, VolumeHealthCondition{})
-			if err := m.HealthConditions[len(m.HealthConditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
+			if m.HealthStatus == nil {
+				m.HealthStatus = &VolumeHealthStatus{}
 			}
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LastTransitionTime", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.LastTransitionTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.HealthStatus.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -64232,6 +64327,42 @@ func (m *SeccompProfile) Unmarshal(dAtA []byte) error {
 			s := string(dAtA[iNdEx:postIndex])
 			m.LocalhostProfile = &s
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OCI", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.OCI == nil {
+				m.OCI = &SecurityProfileOCI{}
+			}
+			if err := m.OCI.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -65795,6 +65926,239 @@ func (m *SecurityContext) Unmarshal(dAtA []byte) error {
 			if err := m.AppArmorProfile.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SecurityProfileOCI) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SecurityProfileOCI: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SecurityProfileOCI: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Ref", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Ref = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BaseProfile", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.BaseProfile == nil {
+				m.BaseProfile = &SecurityProfileOCIBase{}
+			}
+			if err := m.BaseProfile.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *SecurityProfileOCIBase) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SecurityProfileOCIBase: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SecurityProfileOCIBase: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Type", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Type = SecurityProfileOCIBaseType(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LocalhostProfile", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.LocalhostProfile = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

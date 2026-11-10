@@ -821,7 +821,6 @@ func TestLimitRangerAllowPodResize(t *testing.T) {
 	informerFactory.Start(wait.NeverStop)
 
 	testPod := validPod("testPod", 1, api.ResourceRequirements{})
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(&testPod, nil, api.Kind("Pod").WithVersion("version"), limitRange.Namespace, "testPod", api.Resource("pods").WithVersion("version"), "resize", admission.Update, &metav1.UpdateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
@@ -833,7 +832,6 @@ func TestLimitRangerAllowPodResize(t *testing.T) {
 // already holds is valid by definition and must not be rejected by a constraint
 // it no longer satisfies; a value the resize changes is checked as on create.
 func TestLimitRangerValidatePodResize(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
 
 	cpu := func(request, limit string) api.ResourceRequirements {

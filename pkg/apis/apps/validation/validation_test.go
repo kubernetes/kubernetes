@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/api/pod"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -612,19 +611,19 @@ func TestValidateStatefulSet(t *testing.T) {
 		name: "invalid restart policy 1",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyOnFailure)),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "invalid restart policy 2",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy(api.RestartPolicyNever)),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 		},
 	}, {
 		name: "empty restart policy",
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 		errs: field.ErrorList{
-			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil).MarkCoveredByDeclarative(),
 			field.Required(field.NewPath("spec", "template", "spec", "restartPolicy"), ""),
 		},
 	}, {
@@ -851,7 +850,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				AllowStatefulSetRecreateStrategy: testCase.allowRecreateUpdateStrategy,
 			}
 
-			errs := ValidateStatefulSet(&testCase.set, setOpts, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
+			errs := ValidateStatefulSet(&testCase.set, setOpts, corevalidation.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
 			wantErrs := testCase.errs
 			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
@@ -1465,7 +1464,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				AllowStatefulSetRecreateStrategy: testCase.recreateStrategyFG ||
 					testCase.old.Spec.UpdateStrategy.Type == apps.RecreateStatefulSetStrategyType,
 			}
-			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, setOpts, pod.GetValidationOptionsFromPodTemplate(&testCase.update.Spec.Template, &testCase.old.Spec.Template))
+			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, setOpts, corevalidation.GetValidationOptionsFromPodTemplate(&testCase.update.Spec.Template, &testCase.old.Spec.Template))
 			wantErrs := testCase.errs
 			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
 				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)

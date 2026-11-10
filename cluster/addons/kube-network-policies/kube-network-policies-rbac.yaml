@@ -2,7 +2,6 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:network-policies
-  namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:

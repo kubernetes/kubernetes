@@ -8,7 +8,7 @@
       "name": "compositepodgroups",
       "namespaced": true,
       "singularName": "compositepodgroup",
-      "storageVersionHash": "L+dT284DGFE=",
+      "storageVersionHash": "5vMsYhftljI=",
       "verbs": [
         "create",
         "delete",

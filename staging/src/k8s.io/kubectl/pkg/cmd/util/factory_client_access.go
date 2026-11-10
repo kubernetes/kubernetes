@@ -154,10 +154,11 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 		return validation.NullSchema{}, nil
 	}
 
-	schema := validation.ConjunctiveSchema{
-		validation.NewSchemaValidation(f),
-		validation.NoDoubleKeySchema{},
-	}
+	// Client-side validation is limited to checks that need no schema. The
+	// server validates the fields; if it cannot (fieldValidation unsupported),
+	// the ParamVerifyingSchema below warns or runs this schema instead of the
+	// former OpenAPI v2 schema validation.
+	schema := validation.NoDoubleKeySchema{}
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
@@ -172,10 +173,8 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 	// the discovery client.
 	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
 	queryParam := resource.QueryParamFieldValidation
-	primary := newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam))
-	secondary := resource.NewQueryParamVerifier(dynamicClient, f.openAPIGetter(), queryParam)
-	fallback := resource.NewFallbackQueryParamVerifier(primary, secondary)
-	return validation.NewParamVerifyingSchema(schema, fallback, string(validationDirective)), nil
+	verifier := newCachingVerifier(resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam))
+	return validation.NewParamVerifyingSchema(schema, verifier, string(validationDirective)), nil
 }
 
 // OpenAPISchema returns metadata and structural information about

@@ -64,6 +64,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeDeclaredFeatures},
 					},
 				},
+				Reserve: v1.PluginSet{
+					Disabled: []v1.Plugin{
+						{Name: names.DefaultPreemption},
+					},
+				},
 			},
 		},
 		{
@@ -96,6 +101,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeDeclaredFeatures},
 					},
 				},
+				Reserve: v1.PluginSet{
+					Disabled: []v1.Plugin{
+						{Name: names.DefaultPreemption},
+					},
+				},
 			},
 		},
 		{
@@ -125,6 +135,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 						{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 						{Name: names.DefaultBinder},
+					},
+				},
+				Reserve: v1.PluginSet{
+					Disabled: []v1.Plugin{
+						{Name: names.DefaultPreemption},
 					},
 				},
 			},

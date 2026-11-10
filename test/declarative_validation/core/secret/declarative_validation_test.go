@@ -75,21 +75,21 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			old:    mkValidSecret(),
 			update: mkValidSecret(tweakType(api.SecretType("custom-type"))),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("type"), api.SecretType("custom-type"), "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("type"), api.SecretType("custom-type"), "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"type: set from unset": {
 			old:    mkValidSecret(tweakType("")),
 			update: mkValidSecret(tweakType(api.SecretTypeOpaque)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("type"), api.SecretTypeOpaque, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("type"), api.SecretTypeOpaque, "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 		"type: unset from set": {
 			old:    mkValidSecret(),
 			update: mkValidSecret(tweakType("")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("type"), api.SecretType(""), "field is immutable").WithOrigin("immutable").MarkAlpha(),
+				field.Invalid(field.NewPath("type"), api.SecretType(""), "field is immutable").WithOrigin("immutable").MarkBeta(),
 			},
 		},
 	}

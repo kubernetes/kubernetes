@@ -30,15 +30,64 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// Object size budget for ResourceSlice
+//
+// All limits in the resource.k8s.io API together have to fit into 1.5 MiB, the
+// default maximum object size in etcd.
+//
+// Why the device limit is conditional and attribute entries and values have
+// separate limits:
+//
+//   - The device limit is halved as soon as one device uses a feature which adds
+//     a significant number of bytes, instead of giving each feature a limit of its
+//     own. A table of limits per feature combination would be more precise, but
+//     harder to reason about.
+//
+//   - The combined limit on attribute and capacity entries bounds the space used
+//     by map keys and entry overhead. A separate per-device limit counts all
+//     attribute values, including each scalar value and each list item, to bound
+//     the payload size even when lists are used. The value limit was chosen to
+//     leave room in the object size budget for future device features.
+//
+// Only the largest valid slices are built here, not every feature combination:
+// what has to fit into the budget is the maximum.
+//
+// Sizes measured with the command at the end of this comment:
+//
+//	variant            devices    spec size    total size    % of budget
+//	basic                  128      729,946       744,798             47
+//	advanced                64    1,356,250     1,371,101             87
+//	shared-counters          0       20,856        35,700              2
+//
+// Total size minus spec size is almost entirely ManagedFields. The total varies
+// by a byte or two between runs because the encoded timestamps differ in length.
+//
+// These fields are not at their maximum:
+//
+//   - capacity: its entries share the limit of 32 with the attributes, and
+//     attributes encode to more bytes, so the maximum uses attributes only.
+//   - nodeSelector: devices set nodeName instead. A node selector term has no
+//     size limit of its own, so a slice using per-device node selectors can be
+//     larger than anything measured here.
+//
+// To re-measure after changing a limit or adding a field:
+//
+//	go test -v -run='TestDRA/all/MaxResourceSlice' ./test/integration/dra/all -args -v=0
+
+// maxObjectSize is the 1.5 MiB budget described above. testMaxResourceSlice
+// asserts it for each of the objects built here.
+const maxObjectSize = 1536 * 1024
+
 // NewMaxResourceSlices creates slices that are as large as possible given the current validation constraints.
 func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 	slices := map[string]*resourceapi.ResourceSlice{
 		"basic": newBasicResourceSlice(resourceapi.ResourceSliceMaxDevices),
 		// advanced combines all device-level features (taints, consumes counters
-		// with compatibility groups, and list values) into the largest possible
-		// device-based slice.
+		// with compatibility groups, list values, and binding conditions) into the
+		// largest possible device-based slice.
 		// Compatibility groups grow this maximal slice by ~16,640 B (1,190,621 B -> ~1,207,261 B, +1.4%),
-		// which stays well within the object size limit.
+		// binding conditions by another ~163,840 B (~1,207,262 B -> ~1,371,101 B, +13.6%),
+		// which stays within the object size budget.
 		"advanced": newAdvancedResourceSlice(),
 		// shared-counters is a distinct slice kind: SharedCounters and Devices are
 		// mutually exclusive per slice, so it cannot be merged into "advanced".
@@ -134,6 +183,7 @@ func newAdvancedResourceSlice() *resourceapi.ResourceSlice {
 	slice := newResourceSliceWithTaintsAndConsumesCounters()
 	addListValues(slice)
 	addCompatibilityGroups(slice)
+	addBindingConditions(slice)
 	return slice
 }
 
@@ -148,6 +198,23 @@ func addCompatibilityGroups(slice *resourceapi.ResourceSlice) {
 			}
 			slice.Spec.Devices[i].ConsumesCounters[j].CompatibilityGroups = groups
 		}
+	}
+}
+
+// addBindingConditions declares the maximum number of binding conditions on
+// each device. Both lists have to be set together and must not overlap.
+func addBindingConditions(slice *resourceapi.ResourceSlice) {
+	conditions := make([]string, 0, resourceapi.BindingConditionsMaxSize)
+	for i := range resourceapi.BindingConditionsMaxSize {
+		conditions = append(conditions, maxQualifiedName(i))
+	}
+	failureConditions := make([]string, 0, resourceapi.BindingFailureConditionsMaxSize)
+	for i := range resourceapi.BindingFailureConditionsMaxSize {
+		failureConditions = append(failureConditions, maxQualifiedName(resourceapi.BindingConditionsMaxSize+i))
+	}
+	for i := range slice.Spec.Devices {
+		slice.Spec.Devices[i].BindingConditions = conditions
+		slice.Spec.Devices[i].BindingFailureConditions = failureConditions
 	}
 }
 

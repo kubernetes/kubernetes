@@ -268,7 +268,7 @@ func (ht *serverHandlerTransport) writeStatus(s *ServerStream, st *status.Status
 				for _, v := range vv {
 					// http2 ResponseWriter mechanism to send undeclared Trailers after
 					// the headers have possibly been written.
-					h.Add(http2.TrailerPrefix+k, encodeMetadataHeader(k, v))
+					h.Add(http.TrailerPrefix+k, encodeMetadataHeader(k, v))
 				}
 			}
 		}
@@ -494,7 +494,8 @@ func mapRecvMsgError(err error) error {
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		return err
 	}
-	if se, ok := err.(http2.StreamError); ok {
+	var se http2.StreamError
+	if errors.As(err, &se) {
 		if code, ok := http2ErrConvTab[se.Code]; ok {
 			return status.Error(code, se.Error())
 		}

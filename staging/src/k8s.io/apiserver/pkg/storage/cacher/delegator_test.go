@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package cacher_test
 
 import (
 	"fmt"
@@ -25,18 +25,26 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/consistency"
+	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
+	"k8s.io/apiserver/pkg/storage/cacher/testing/setup"
 )
 
 func TestConsistencyCheckerDigestMatches(t *testing.T) {
-	ctx, store, terminate := testSetup(t)
+	ctx, cacher, etcdStorage, store, _, terminate := setup.SetupWithCacher(t)
 	t.Cleanup(terminate)
+
+	originalPageSize := consistency.CheckerListPageSize
+	consistency.CheckerListPageSize = 10
+	t.Cleanup(func() {
+		consistency.CheckerListPageSize = originalPageSize
+	})
 
 	var out example.Pod
 	resourceVersion := ""
-	t.Logf("Create %d pods to ensure pagination", storageWatchListPageSize+1)
-	for i := 0; i < int(storageWatchListPageSize)+1; i++ {
+	t.Logf("Create %d pods to ensure pagination", consistency.CheckerListPageSize+1)
+	for i := 0; i <= int(consistency.CheckerListPageSize); i++ {
 		pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: fmt.Sprintf("%d", i)}}
-		err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+		err := store.Create(ctx, cachertesting.ComputePodKey(pod), pod, &out, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -45,15 +53,15 @@ func TestConsistencyCheckerDigestMatches(t *testing.T) {
 
 	t.Log("Execute list to ensure cache is up to date")
 	outList := &example.PodList{}
-	err := store.cacher.GetList(ctx, "/pods/", storage.ListOptions{ResourceVersion: resourceVersion, Recursive: true, Predicate: storage.Everything, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}, outList)
+	err := cacher.GetList(ctx, "/pods/", storage.ListOptions{ResourceVersion: resourceVersion, Recursive: true, Predicate: storage.Everything, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}, outList)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(outList.Items) != int(storageWatchListPageSize)+1 {
-		t.Errorf("Expect to get %d pods, got %d", storageWatchListPageSize+1, len(outList.Items))
+	if len(outList.Items) != int(consistency.CheckerListPageSize)+1 {
+		t.Errorf("Expect to get %d pods, got %d", consistency.CheckerListPageSize+1, len(outList.Items))
 	}
 
-	checker := consistency.NewChecker("/pods/", schema.GroupResource{}, store.cacher.newListFunc, store.cacher, store.storage)
+	checker := consistency.NewChecker("/pods/", schema.GroupResource{}, cachertesting.NewPodList, cacher, etcdStorage)
 	digest, err := checker.CalculateDigests(ctx)
 	if err != nil {
 		t.Fatal(err)

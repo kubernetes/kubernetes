@@ -25,36 +25,38 @@ import (
 	"github.com/stretchr/testify/require"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	"sigs.k8s.io/yaml"
 )
 
-func TestAPIResourcesComplete(t *testing.T) {
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-	cmd := NewCmdAPIResources(tf, genericiooptions.NewTestIOStreamsDiscard())
-	parentCmd := &cobra.Command{Use: "kubectl"}
-	parentCmd.AddCommand(cmd)
-	o := NewAPIResourceOptions(genericiooptions.NewTestIOStreamsDiscard())
+func (d *fakeCachedDiscoveryClient) ServerPreferredResources() ([]*v1.APIResourceList, error) {
+	return d.DiscoveryInterface.(*fakediscovery.FakeDiscovery).Resources, nil
+}
 
-	err := o.Complete(tf, cmd, []string{})
+func TestAPIResourcesToOptions(t *testing.T) {
+	tf := genericclioptions.NewTestConfigFlags().WithDiscoveryClient(newFakeCachedDiscoveryClient(nil))
+	flags := NewAPIResourceFlags(tf, genericiooptions.NewTestIOStreamsDiscard())
+	cmd := &cobra.Command{Use: "api-resources"}
+	flags.AddFlags(cmd)
+
+	_, err := flags.ToOptions(cmd, []string{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	err = o.Complete(tf, cmd, []string{"foo"})
+	_, err = flags.ToOptions(cmd, []string{"foo"})
 	if err == nil {
 		t.Fatalf("An error was expected but not returned")
 	}
-	expectedError := `unexpected arguments: [foo]
-See 'kubectl api-resources -h' for help and examples`
+	expectedError := `unexpected arguments: [foo]`
 	if err.Error() != expectedError {
 		t.Fatalf("Unexpected error: %v\n expected: %v", err, expectedError)
 	}
 
-	*o.PrintFlags.OutputFormat = "foo"
-	err = o.Complete(tf, cmd, []string{})
+	*flags.PrintFlags.OutputFormat = "foo"
+	_, err = flags.ToOptions(cmd, []string{})
 	if err == nil {
 		t.Fatalf("An error was expected but not returned")
 	}
@@ -86,7 +88,7 @@ func TestAPIResourcesValidate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
-			o := NewAPIResourceOptions(genericiooptions.NewTestIOStreamsDiscard())
+			o := &APIResourceOptions{IOStreams: genericiooptions.NewTestIOStreamsDiscard()}
 			tc.optionSetupFn(o)
 			err := o.Validate()
 			if tc.expectedError == "" {
@@ -106,8 +108,7 @@ func TestAPIResourcesValidate(t *testing.T) {
 }
 
 func TestAPIResourcesRun(t *testing.T) {
-	dc := cmdtesting.NewFakeCachedDiscoveryClient()
-	dc.PreferredResources = []*v1.APIResourceList{
+	dc := newFakeCachedDiscoveryClient([]*v1.APIResourceList{
 		{
 			GroupVersion: "v1",
 			APIResources: []v1.APIResource{
@@ -154,9 +155,8 @@ func TestAPIResourcesRun(t *testing.T) {
 			GroupVersion: "someothergroup/v1",
 			APIResources: []v1.APIResource{},
 		},
-	}
-	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
-	defer tf.Cleanup()
+	})
+	tf := genericclioptions.NewTestConfigFlags().WithDiscoveryClient(dc)
 
 	testCases := []struct {
 		name                  string
@@ -311,7 +311,7 @@ bazzes   b            somegroup/v1   true         Baz
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
-			dc.Invalidations = 0
+			dc.invalidations = 0
 			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
 			cmd := NewCmdAPIResources(tf, ioStreams)
 			tc.commandSetupFn(cmd)
@@ -323,8 +323,8 @@ bazzes   b            somegroup/v1   true         Baz
 			if out.String() != tc.expectedOutput {
 				tt.Fatalf("unexpected output: %s\nexpected: %s", out.String(), tc.expectedOutput)
 			}
-			if dc.Invalidations != tc.expectedInvalidations {
-				tt.Fatalf("unexpected invalidations: %d, expected: %d", dc.Invalidations, tc.expectedInvalidations)
+			if dc.invalidations != tc.expectedInvalidations {
+				tt.Fatalf("unexpected invalidations: %d, expected: %d", dc.invalidations, tc.expectedInvalidations)
 			}
 		})
 	}
@@ -334,10 +334,6 @@ bazzes   b            somegroup/v1   true         Baz
 // A separate test function is created because we are using apieqaulity.Semantic.DeepEqual
 // to check equality between input and output
 func TestAPIResourcesRunJsonYaml(t *testing.T) {
-	dc := cmdtesting.NewFakeCachedDiscoveryClient()
-	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
-	defer tf.Cleanup()
-
 	testCases := []struct {
 		name                  string
 		expectedInvalidations int
@@ -383,7 +379,8 @@ func TestAPIResourcesRunJsonYaml(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
-			dc.PreferredResources = tc.preferredResources
+			dc := newFakeCachedDiscoveryClient(tc.preferredResources)
+			tf := genericclioptions.NewTestConfigFlags().WithDiscoveryClient(dc)
 			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
 
 			for _, v := range []string{"json", "yaml"} {

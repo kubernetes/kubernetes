@@ -105,6 +105,7 @@ type serializer struct {
 	creater     runtime.ObjectCreater
 	typer       runtime.ObjectTyper
 	options     options
+	identifier  runtime.Identifier
 }
 
 func (serializer) private() {}
@@ -126,11 +127,12 @@ func newSerializer(metaFactory metaFactory, creater runtime.ObjectCreater, typer
 	for _, o := range options {
 		o(&s.options)
 	}
+	s.identifier = runtime.Identifier(fmt.Sprintf(`{"name":"cbor","strict":%t,"transcode":%t}`, s.options.strict, s.options.transcode))
 	return s
 }
 
 func (s *serializer) Identifier() runtime.Identifier {
-	return "cbor"
+	return s.identifier
 }
 
 // Encode writes a CBOR representation of the given object.

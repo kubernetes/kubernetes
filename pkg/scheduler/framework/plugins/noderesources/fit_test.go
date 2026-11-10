@@ -18,6 +18,8 @@ package noderesources
 
 import (
 	"fmt"
+	"math"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -146,6 +148,41 @@ var defaultScoringStrategy = &config.ScoringStrategy{
 func newPodLevelResourcesPod(pod *v1.Pod, podResources v1.ResourceRequirements) *v1.Pod {
 	pod.Spec.Resources = &podResources
 	return pod
+}
+
+func withContainerStatusResources(pod *v1.Pod, reqMap map[v1.ResourceName]string) *v1.Pod {
+	res := v1.ResourceList{}
+	for k, v := range reqMap {
+		res[k] = resource.MustParse(v)
+	}
+	pod.Status.ContainerStatuses = []v1.ContainerStatus{{
+		Name:               pod.Spec.Containers[0].Name,
+		AllocatedResources: res,
+		Resources:          &v1.ResourceRequirements{Requests: res.DeepCopy()},
+	}}
+	return pod
+}
+
+func withPodLevelStatusResources(pod *v1.Pod, reqMap map[v1.ResourceName]string) *v1.Pod {
+	res := v1.ResourceList{}
+	for k, v := range reqMap {
+		res[k] = resource.MustParse(v)
+	}
+	pod.Status.AllocatedResources = res
+	pod.Status.Resources = &v1.ResourceRequirements{Requests: res.DeepCopy()}
+	return pod
+}
+
+func TestFitsSaturatedNodeStaysFailClosed(t *testing.T) {
+	// Two MaxInt64 memory requests must saturate the node total, not wrap it to -2 and fit a 1-byte pod.
+	huge := framework.Resource{Memory: math.MaxInt64}
+	nodeInfo := framework.NewNodeInfo(newResourcePod(huge), newResourcePod(huge))
+	nodeInfo.SetNode(&v1.Node{Status: v1.NodeStatus{Allocatable: makeAllocatableResources(0, 100, 32, 0, 0, 0)}})
+
+	got := Fits(newResourcePod(framework.Resource{Memory: 1}), nodeInfo, nil, ResourceRequestsOptions{})
+	if !slices.ContainsFunc(got, func(r InsufficientResource) bool { return r.ResourceName == v1.ResourceMemory }) {
+		t.Errorf("a 1-byte memory request fits on a saturated node, insufficient resources = %v", got)
+	}
 }
 
 func TestEnoughRequests(t *testing.T) { testEnoughRequests(ktesting.Init(t)) }
@@ -1422,14 +1459,12 @@ func BenchmarkTestFitScore(b *testing.B) {
 
 func TestEventsToRegister(t *testing.T) {
 	tests := []struct {
-		name                            string
-		enableInPlacePodVerticalScaling bool
-		enableDRAExtendedResource       bool
-		expectedClusterEvents           []fwk.ClusterEventWithHint
+		name                      string
+		enableDRAExtendedResource bool
+		expectedClusterEvents     []fwk.ClusterEventWithHint
 	}{
 		{
-			name:                            "Register events with InPlacePodVerticalScaling feature enabled",
-			enableInPlacePodVerticalScaling: true,
+			name: "Register events with default features",
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
 				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
@@ -1438,18 +1473,13 @@ func TestEventsToRegister(t *testing.T) {
 			},
 		},
 		{
-			name: "Register events with default features",
-			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
-				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
-			},
-		},
-		{
 			name:                      "Register events with DRAExtendedResource feature enabled",
 			enableDRAExtendedResource: true,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
 				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
 				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
+				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}},
+				{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}},
 				{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 			},
 		},
@@ -1457,7 +1487,7 @@ func TestEventsToRegister(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableDRAExtendedResource: test.enableDRAExtendedResource}
+			fp := &Fit{enableDRAExtendedResource: test.enableDRAExtendedResource}
 			_, ctx := ktesting.NewTestContext(t)
 			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {
@@ -1557,9 +1587,7 @@ func Test_isSchedulableAfterTargetPodScaleDown(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScaling: true,
-			})
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1641,7 +1669,6 @@ func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScaling:                    true,
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			})
 			if err != nil {
@@ -1747,11 +1774,11 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Memory:          2,
 				ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1},
 			}),
-			oldObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+			oldObj: st.MakeNode().Name("node-a").Capacity(map[v1.ResourceName]string{
 				v1.ResourceMemory: "4",
 				extendedResourceA: "2",
 			}).Obj(),
-			newObj: st.MakeNode().Capacity(map[v1.ResourceName]string{
+			newObj: st.MakeNode().Name("node-a").Capacity(map[v1.ResourceName]string{
 				v1.ResourceMemory: "1",
 				extendedResourceA: "2",
 			}).Obj(),
@@ -1771,6 +1798,121 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				extendedResourceA: "2",
 			}).Obj(),
 			expectedHint: fwk.Queue,
+		},
+		"queue-nominated-pod-when-nominated-node-memory-decreases": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		"skip-queue-nominated-pod-when-nominated-node-scalar-resource-decreases": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{
+					ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 2},
+				})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "4",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				extendedResourceA: "1",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-podgroup-pod-when-nominated-node-memory-decreases": {
+			pod: func() *v1.Pod {
+				p := st.MakePod().PodGroupName("my-group").Req(map[v1.ResourceName]string{
+					v1.ResourceMemory: "4",
+				}).Obj()
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-nominated-pod-when-non-requested-resource-decreases-on-nominated-node": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+				extendedResourceA: "4",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+				extendedResourceA: "1",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-nominated-pod-when-nominated-node-decreases-but-still-fits": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "6",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-nominated-pod-when-nominated-node-already-too-small-and-shrinks-further": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "1",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-nominated-pod-on-new-node-too-small": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			newObj: st.MakeNode().Name("target-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-nominated-pod-when-different-node-decreases": {
+			pod: func() *v1.Pod {
+				p := newResourcePod(framework.Resource{Memory: 4})
+				p.Status.NominatedNodeName = "target-node"
+				return p
+			}(),
+			oldObj: st.MakeNode().Name("other-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "8",
+			}).Obj(),
+			newObj: st.MakeNode().Name("other-node").Capacity(map[v1.ResourceName]string{
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 
@@ -2062,7 +2204,7 @@ func Test_isSchedulableAfterAssignedPodScaleUp(t *testing.T) {
 	}
 }
 
-func TestIsFit(t *testing.T) {
+func TestFitsEmptyNode(t *testing.T) {
 	testCases := map[string]struct {
 		pod                      *v1.Pod
 		node                     *v1.Node
@@ -2119,7 +2261,70 @@ func TestIsFit(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := isFit(tc.pod, tc.node, nil, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
+			if got := fitsEmptyNode(tc.pod, tc.node, nil, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
+				t.Errorf("expected: %v, got: %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestFitsNativeResourcesOnEmptyNode(t *testing.T) {
+	testCases := map[string]struct {
+		pod      *v1.Pod
+		node     *v1.Node
+		expected bool
+	}{
+		"nil node": {
+			pod:      &v1.Pod{},
+			expected: false,
+		},
+		"insufficient CPU": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expected: false,
+		},
+		"insufficient memory": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceMemory: "4"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Obj(),
+			expected: false,
+		},
+		"insufficient ephemeral-storage": {
+			pod:      st.MakePod().Req(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "2Gi"}).Obj(),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "1Gi"}).Obj(),
+			expected: false,
+		},
+		"sufficient native resources": {
+			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				v1.ResourceMemory: "2",
+			}).Obj(),
+			node: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				v1.ResourceMemory: "4",
+			}).Obj(),
+			expected: true,
+		},
+		"scalar resource over-capacity does not block": {
+			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "1",
+				extendedResourceA: "10",
+			}).Obj(),
+			node: st.MakeNode().Capacity(map[v1.ResourceName]string{
+				v1.ResourceCPU:    "2",
+				extendedResourceA: "1",
+			}).Obj(),
+			expected: true,
+		},
+		"zero native requests fit any node": {
+			pod:      newResourcePod(framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 5}}),
+			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{extendedResourceA: "2"}).Obj(),
+			expected: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if got := fitsNativeResourcesOnEmptyNode(tc.pod, tc.node, ResourceRequestsOptions{}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
@@ -2500,6 +2705,7 @@ func TestScorePlacement_Resources(t *testing.T) {
 		podGroupAssignments map[types.UID]string
 		preExistingPods     []*v1.Pod
 		resourceSpec        []config.ResourceSpec
+		features            plfeature.Features
 		expectedScore       int64
 	}{
 		{
@@ -2681,6 +2887,215 @@ func TestScorePlacement_Resources(t *testing.T) {
 			// Score: MaxScore * (0.3 + 0.2) / 2 = 25
 			expectedScore: 25,
 		},
+		{
+			name: "Ignores pod-level resources when PodLevelResources is disabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "1000")).PodLevelResourceRequests(cpuAndMemory("3000m", "3000")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("1000m", "1000")).PodLevelResourceRequests(cpuAndMemory("2000m", "3000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			features:      plfeature.Features{EnablePodLevelResources: false},
+			expectedScore: 20,
+		},
+		{
+			name: "Honors pod-level resources when PodLevelResources is enabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "1000")).PodLevelResourceRequests(cpuAndMemory("3000m", "3000")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("1000m", "1000")).PodLevelResourceRequests(cpuAndMemory("2000m", "3000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			features:      plfeature.Features{EnablePodLevelResources: true},
+			expectedScore: 55,
+		},
+		{
+			name: "Ignores pod-level resources on requestless containers when PodLevelResources is disabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "2000Mi")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "2000Mi")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Container("img1").Container("img2").PodLevelResourceRequests(cpuAndMemory("3000m", "600Mi")).Obj(),
+				st.MakePod().UID("bar").Container("img1").Container("img2").PodLevelResourceRequests(cpuAndMemory("2000m", "600Mi")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			features: plfeature.Features{EnablePodLevelResources: false},
+			// Default container requests: 2 pods * 2 containers * (100m, 200Mi) = (400m/10000m=4%, 800Mi/4000Mi=20%) -> 12
+			expectedScore: 12,
+		},
+		{
+			name: "Honors pod-level resources on requestless containers when PodLevelResources is enabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "2000Mi")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "2000Mi")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Container("img1").Container("img2").PodLevelResourceRequests(cpuAndMemory("3000m", "600Mi")).Obj(),
+				st.MakePod().UID("bar").Container("img1").Container("img2").PodLevelResourceRequests(cpuAndMemory("2000m", "600Mi")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			features: plfeature.Features{EnablePodLevelResources: true},
+			// Pod-level requests: (5000m/10000m=50%, 1200Mi/4000Mi=30%) -> 40
+			expectedScore: 40,
+		},
+		{
+			name: "Ignores pod-level scalar hugepages when PodLevelResources is disabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "5000m", v1.ResourceMemory: "5000", hugePageResourceA: "10Mi"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "5000m", v1.ResourceMemory: "5000", hugePageResourceA: "10Mi"}).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "1000")).PodLevelResourceRequests(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "1000",
+					hugePageResourceA: "10Mi",
+				}).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("1000m", "1000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+				{Name: string(hugePageResourceA), Weight: 1},
+			},
+			features:      plfeature.Features{EnablePodLevelResources: false},
+			expectedScore: 20,
+		},
+		{
+			name: "Honors pod-level scalar hugepages when PodLevelResources is enabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "5000m", v1.ResourceMemory: "5000", hugePageResourceA: "10Mi"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "5000m", v1.ResourceMemory: "5000", hugePageResourceA: "10Mi"}).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "1000")).PodLevelResourceRequests(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "1000",
+					hugePageResourceA: "10Mi",
+				}).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("1000m", "1000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+				{Name: string(hugePageResourceA), Weight: 1},
+			},
+			features:      plfeature.Features{EnablePodLevelResources: true},
+			expectedScore: 30,
+		},
+		{
+			name: "Honors container status resources",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				withContainerStatusResources(st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "1000")).Obj(), cpuAndMemory("4000m", "4000")),
+			},
+			podGroupAssignments: map[types.UID]string{"foo": "node1"},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			expectedScore: 40,
+		},
+		{
+			name: "Ignores pod-level status resources when InPlacePodLevelResourcesVerticalScaling is disabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				withPodLevelStatusResources(
+					st.MakePod().UID("foo").Req(cpuAndMemory("500m", "500")).PodLevelResourceRequests(cpuAndMemory("1000m", "1000")).Obj(),
+					cpuAndMemory("4000m", "4000"),
+				),
+			},
+			podGroupAssignments: map[types.UID]string{"foo": "node1"},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			features: plfeature.Features{
+				EnablePodLevelResources:                       true,
+				EnableInPlacePodLevelResourcesVerticalScaling: false,
+			},
+			expectedScore: 10,
+		},
+		{
+			name: "Honors pod-level status resources when InPlacePodLevelResourcesVerticalScaling is enabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				withPodLevelStatusResources(
+					st.MakePod().UID("foo").Req(cpuAndMemory("500m", "500")).PodLevelResourceRequests(cpuAndMemory("1000m", "1000")).Obj(),
+					cpuAndMemory("4000m", "4000"),
+				),
+			},
+			podGroupAssignments: map[types.UID]string{"foo": "node1"},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			features: plfeature.Features{
+				EnablePodLevelResources:                       true,
+				EnableInPlacePodLevelResourcesVerticalScaling: true,
+			},
+			expectedScore: 40,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2689,9 +3104,11 @@ func TestScorePlacement_Resources(t *testing.T) {
 			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			scoringStrategy := defaultScoringStrategy.DeepCopy()
 			scoringStrategy.Resources = tc.resourceSpec
+			fts := tc.features
+			fts.EnableTopologyAwareWorkloadScheduling = true
 			plugin, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
 				ScoringStrategy: scoringStrategy,
-			}, fh, plfeature.Features{EnableTopologyAwareWorkloadScheduling: true})
+			}, fh, fts)
 
 			if err != nil {
 				t.Fatal(err)
@@ -3283,6 +3700,253 @@ func TestDeferredResizeFit(t *testing.T) {
 			gotStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				tCtx.Errorf("status does not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFitScoreFeatureGates(t *testing.T) {
+	testCtx := ktesting.Init(t)
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{
+			v1.ResourceCPU:    "5000m",
+			v1.ResourceMemory: "2000Mi",
+			hugePageResourceA: "12Mi",
+		}).Obj(),
+		st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{
+			v1.ResourceCPU:    "10000m",
+			v1.ResourceMemory: "2000Mi",
+			hugePageResourceA: "20Mi",
+		}).Obj(),
+	}
+
+	scoringResources := []config.ResourceSpec{
+		{Name: string(v1.ResourceCPU), Weight: 1},
+		{Name: string(v1.ResourceMemory), Weight: 1},
+		{Name: string(hugePageResourceA), Weight: 1},
+	}
+
+	strategies := []*config.ScoringStrategy{
+		{
+			Type:      config.LeastAllocated,
+			Resources: scoringResources,
+		},
+		{
+			Type:      config.MostAllocated,
+			Resources: scoringResources,
+		},
+		{
+			Type:      config.RequestedToCapacityRatio,
+			Resources: scoringResources,
+			RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 50, Score: 10},
+					{Utilization: 100, Score: 0},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		pod            *v1.Pod
+		features       plfeature.Features
+		expectedScores map[config.ScoringStrategyType]fwk.NodeScoreList
+	}{
+		{
+			name: "PodLevelResources disabled uses container requests",
+			pod: st.MakePod().
+				Req(cpuAndMemory("1000m", "400Mi")).
+				PodLevelResourceRequests(cpuAndMemory("2000m", "800Mi")).
+				Obj(),
+			features: plfeature.Features{EnablePodLevelResources: false},
+			// Effective request: cpu=1000m, memory=400Mi -> node1: 20% cpu, 20% mem; node2: 10% cpu, 20% mem
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 80}, {Name: "node2", Score: 85}},
+				config.MostAllocated:            {{Name: "node1", Score: 20}, {Name: "node2", Score: 15}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
+			},
+		},
+		{
+			name: "PodLevelResources enabled uses pod-level requests",
+			pod: st.MakePod().
+				Req(cpuAndMemory("1000m", "400Mi")).
+				PodLevelResourceRequests(cpuAndMemory("2000m", "800Mi")).
+				Obj(),
+			features: plfeature.Features{EnablePodLevelResources: true},
+			// Effective request: cpu=2000m, memory=800Mi -> node1: 40% cpu, 40% mem; node2: 20% cpu, 40% mem
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 60}, {Name: "node2", Score: 70}},
+				config.MostAllocated:            {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 80}, {Name: "node2", Score: 60}},
+			},
+		},
+		{
+			name: "PodLevelResources disabled uses default container requests on requestless containers",
+			pod: st.MakePod().
+				Container("img1").
+				Container("img2").
+				PodLevelResourceRequests(cpuAndMemory("2000m", "800Mi")).
+				Obj(),
+			features: plfeature.Features{EnablePodLevelResources: false},
+			// Effective request: 2 * (100m, 200Mi) = (200m, 400Mi) -> node1: 4% cpu, 20% mem; node2: 2% cpu, 20% mem
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 88}, {Name: "node2", Score: 89}},
+				config.MostAllocated:            {{Name: "node1", Score: 12}, {Name: "node2", Score: 11}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 24}, {Name: "node2", Score: 22}},
+			},
+		},
+		{
+			name: "PodLevelResources enabled uses pod-level requests on requestless containers",
+			pod: st.MakePod().
+				Container("img1").
+				Container("img2").
+				PodLevelResourceRequests(cpuAndMemory("2000m", "800Mi")).
+				Obj(),
+			features: plfeature.Features{EnablePodLevelResources: true},
+			// Effective request: cpu=2000m, memory=800Mi -> node1: 40% cpu, 40% mem; node2: 20% cpu, 40% mem
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 60}, {Name: "node2", Score: 70}},
+				config.MostAllocated:            {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 80}, {Name: "node2", Score: 60}},
+			},
+		},
+		{
+			name: "PodLevelResources disabled ignores pod-level scalar hugepages",
+			pod: st.MakePod().
+				Req(cpuAndMemory("1000m", "400Mi")).
+				PodLevelResourceRequests(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "400Mi",
+					hugePageResourceA: "6Mi",
+				}).
+				Obj(),
+			features: plfeature.Features{EnablePodLevelResources: false},
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 80}, {Name: "node2", Score: 85}},
+				config.MostAllocated:            {{Name: "node1", Score: 20}, {Name: "node2", Score: 15}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
+			},
+		},
+		{
+			name: "PodLevelResources enabled scores pod-level scalar hugepages",
+			pod: st.MakePod().
+				Req(cpuAndMemory("1000m", "400Mi")).
+				PodLevelResourceRequests(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1000m",
+					v1.ResourceMemory: "400Mi",
+					hugePageResourceA: "6Mi",
+				}).
+				Obj(),
+			features: plfeature.Features{EnablePodLevelResources: true},
+			// Effective request: cpu=1000m, memory=400Mi, hugepages-2Mi=6Mi -> node1: 20%, 20%, 50%; node2: 10%, 20%, 30%
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 70}, {Name: "node2", Score: 80}},
+				config.MostAllocated:            {{Name: "node1", Score: 30}, {Name: "node2", Score: 20}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 60}, {Name: "node2", Score: 40}},
+			},
+		},
+		{
+			name: "Uses container status resources",
+			pod: withContainerStatusResources(
+				st.MakePod().Req(cpuAndMemory("1000m", "400Mi")).Obj(),
+				cpuAndMemory("2000m", "800Mi"),
+			),
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 60}, {Name: "node2", Score: 70}},
+				config.MostAllocated:            {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 80}, {Name: "node2", Score: 60}},
+			},
+		},
+		{
+			name: "InPlacePodLevelResourcesVerticalScaling disabled uses pod-level spec requests",
+			pod: withPodLevelStatusResources(
+				st.MakePod().
+					Req(cpuAndMemory("500m", "200Mi")).
+					PodLevelResourceRequests(cpuAndMemory("1000m", "400Mi")).
+					Obj(),
+				cpuAndMemory("3000m", "1200Mi"),
+			),
+			features: plfeature.Features{
+				EnablePodLevelResources:                       true,
+				EnableInPlacePodLevelResourcesVerticalScaling: false,
+			},
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 80}, {Name: "node2", Score: 85}},
+				config.MostAllocated:            {{Name: "node1", Score: 20}, {Name: "node2", Score: 15}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 40}, {Name: "node2", Score: 30}},
+			},
+		},
+		{
+			name: "InPlacePodLevelResourcesVerticalScaling enabled uses pod-level status resources",
+			pod: withPodLevelStatusResources(
+				st.MakePod().
+					Req(cpuAndMemory("500m", "200Mi")).
+					PodLevelResourceRequests(cpuAndMemory("1000m", "400Mi")).
+					Obj(),
+				cpuAndMemory("3000m", "1200Mi"),
+			),
+			features: plfeature.Features{
+				EnablePodLevelResources:                       true,
+				EnableInPlacePodLevelResourcesVerticalScaling: true,
+			},
+			// Effective request: cpu=3000m, memory=1200Mi -> node1: 60% cpu, 60% mem; node2: 30% cpu, 60% mem
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node1", Score: 40}, {Name: "node2", Score: 55}},
+				config.MostAllocated:            {{Name: "node1", Score: 60}, {Name: "node2", Score: 45}},
+				config.RequestedToCapacityRatio: {{Name: "node1", Score: 80}, {Name: "node2", Score: 70}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			snapshot := cache.NewSnapshot(nil, nodes)
+			fh, err := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			tCtx.ExpectNoError(err, "create framework")
+			tCtx.Cleanup(func() {
+				runtime.WaitForShutdown(fh)
+			})
+
+			for _, strategy := range strategies {
+				for _, runPreScore := range []bool{true, false} {
+					p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
+						ScoringStrategy: strategy,
+					}, fh, test.features)
+					tCtx.ExpectNoError(err, "create fit plugin")
+
+					state := framework.NewCycleState()
+					if runPreScore {
+						status := p.(fwk.PreScorePlugin).PreScore(tCtx, state, test.pod, tf.BuildNodeInfos(nodes))
+						if !status.IsSuccess() {
+							tCtx.Errorf("strategy=%s runPreScore=%v: PreScore failed: %v", strategy.Type, runPreScore, status)
+							continue
+						}
+					}
+
+					var gotScores fwk.NodeScoreList
+					scoreFailed := false
+					for _, n := range nodes {
+						nodeInfo, err := snapshot.Get(n.Name)
+						tCtx.ExpectNoError(err, "get node from snapshot")
+						score, status := p.(fwk.ScorePlugin).Score(tCtx, state, test.pod, nodeInfo)
+						if !status.IsSuccess() {
+							tCtx.Errorf("strategy=%s runPreScore=%v node=%s: Score failed: %v", strategy.Type, runPreScore, n.Name, status)
+							scoreFailed = true
+							break
+						}
+						gotScores = append(gotScores, fwk.NodeScore{Name: n.Name, Score: score})
+					}
+					if scoreFailed {
+						continue
+					}
+
+					if diff := cmp.Diff(test.expectedScores[strategy.Type], gotScores); diff != "" {
+						tCtx.Errorf("strategy=%s runPreScore=%v: unexpected scores (-want,+got):\n%s", strategy.Type, runPreScore, diff)
+					}
+				}
 			}
 		})
 	}

@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	apischeduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	"k8s.io/utils/ptr"
 )
@@ -156,6 +157,8 @@ func ValidateJobCreate(job *batch.Job, opts JobValidationOptions) field.ErrorLis
 	allErrs := apivalidation.ValidateObjectMeta(&job.ObjectMeta, true, apimachineryapivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateGeneratedSelector(job, opts.RequirePrefixedLabels)...)
 	allErrs = append(allErrs, ValidateJobSpec(&job.Spec, nil, field.NewPath("spec"), opts.PodValidationOptions)...)
+	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&job.ObjectMeta, nil, &job.Spec, nil, field.NewPath("spec", "scheduling"))...)
+	allErrs = append(allErrs, validateDelegationAnnotations(&job.ObjectMeta, nil, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, validateNameAllowsCompletions(job, opts)...)
 	return allErrs
 }
@@ -288,6 +291,11 @@ func validateJobSpec(spec, oldSpec *batch.JobSpec, fldPath *field.Path, opts api
 	// no-op when spec.scheduling is unset.
 	allErrs = append(allErrs, validateGangMinCount(spec, fldPath.Child("scheduling"))...)
 
+	// Controllers treat a user-supplied schedulingGroup as authoritative, so
+	// spec.scheduling would have no effect. Reject the combination unless the
+	// old object already had both (v1.37 alpha carve-out).
+	allErrs = append(allErrs, validateSchedulingAndSchedulingGroup(spec, oldSpec, fldPath.Child("scheduling"))...)
+
 	// Controller-policy checks that declarative validation cannot express:
 	// the resolved scheduling policy and disruption mode must be in the Job's
 	// allow-lists, and the Basic policy cannot be combined with All disruption.
@@ -318,15 +326,24 @@ func validatePodFailurePolicy(spec *batch.JobSpec, fldPath *field.Path) field.Er
 	if len(spec.PodFailurePolicy.Rules) > maxPodFailurePolicyRules {
 		allErrs = append(allErrs, field.TooMany(rulesPath, len(spec.PodFailurePolicy.Rules), maxPodFailurePolicyRules))
 	}
-	containerNames := sets.NewString()
+	containerNames := sets.Set[string]{}
 	for _, containerSpec := range spec.Template.Spec.Containers {
 		containerNames.Insert(containerSpec.Name)
 	}
 	for _, containerSpec := range spec.Template.Spec.InitContainers {
 		containerNames.Insert(containerSpec.Name)
 	}
+
+	ruleNames := sets.Set[string]{}
 	for i, rule := range spec.PodFailurePolicy.Rules {
-		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulesPath.Index(i), containerNames)...)
+		rulePath := rulesPath.Index(i)
+		allErrs = append(allErrs, validatePodFailurePolicyRule(spec, &rule, rulePath, containerNames)...)
+		if rule.Name != nil {
+			if ruleNames.Has(*rule.Name) {
+				allErrs = append(allErrs, field.Duplicate(rulePath.Child("name"), *rule.Name))
+			}
+			ruleNames.Insert(*rule.Name)
+		}
 	}
 	return allErrs
 }
@@ -347,7 +364,7 @@ func validatePodReplacementPolicy(spec *batch.JobSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePolicyRule, rulePath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	actionPath := rulePath.Child("action")
 	if rule.Action == "" {
@@ -392,7 +409,7 @@ func validatePodFailurePolicyRuleOnPodConditions(onPodConditions []batch.PodFail
 	return allErrs
 }
 
-func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.String) field.ErrorList {
+func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyOnExitCodesRequirement, onExitCodesPath *field.Path, containerNames sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 	operatorPath := onExitCodesPath.Child("operator")
 	if onExitCode.Operator == "" {
@@ -624,6 +641,8 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 func ValidateJobUpdate(job, oldJob *batch.Job, opts JobValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateJobSpecUpdate(job.Spec, oldJob.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&job.ObjectMeta, &oldJob.ObjectMeta, &job.Spec, &oldJob.Spec, field.NewPath("spec", "scheduling"))...)
+	allErrs = append(allErrs, validateDelegationAnnotations(&job.ObjectMeta, &oldJob.ObjectMeta, field.NewPath("metadata", "annotations"))...)
 	allErrs = append(allErrs, validateNameAllowsCompletions(job, opts)...)
 	return allErrs
 }
@@ -685,6 +704,83 @@ func validateGangMinCount(spec *batch.JobSpec, fldPath *field.Path) field.ErrorL
 		fmt.Sprintf("must not be greater than parallelism (%d)", parallelism))}
 }
 
+// validateSchedulingAndSchedulingGroup rejects spec.scheduling when the pod
+// template also carries schedulingGroup. On update, the combination is allowed
+// only if oldSpec already had both fields set.
+func validateSchedulingAndSchedulingGroup(spec, oldSpec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if spec == nil || spec.Scheduling == nil || spec.Template.Spec.SchedulingGroup == nil {
+		return nil
+	}
+	if oldSpec != nil && oldSpec.Scheduling != nil && oldSpec.Template.Spec.SchedulingGroup != nil {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(fldPath, field.OmitValueType{},
+		"must not be set together with template.spec.schedulingGroup")}
+}
+
+// delegationAnnotations select a template in an external Workload.
+var delegationAnnotations = []string{apischeduling.WorkloadNameAnnotation, apischeduling.GroupTemplateNameAnnotation}
+
+// validateSchedulingAndDelegationAnnotations rejects spec.scheduling when the
+// object also carries a delegation annotation. On update, an annotation is
+// allowed only if oldSpec already had spec.scheduling and oldMeta already had
+// that same annotation.
+func validateSchedulingAndDelegationAnnotations(meta, oldMeta *metav1.ObjectMeta, spec,
+	oldSpec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
+	if spec == nil || spec.Scheduling == nil {
+		return nil
+	}
+	oldHadScheduling := oldSpec != nil && oldSpec.Scheduling != nil && oldMeta != nil
+	for _, key := range delegationAnnotations {
+		if _, ok := meta.Annotations[key]; !ok {
+			continue
+		}
+		if oldHadScheduling {
+			if _, ok := oldMeta.Annotations[key]; ok {
+				continue
+			}
+		}
+		return field.ErrorList{field.Invalid(fldPath, field.OmitValueType{},
+			fmt.Sprintf("must not be set together with the %s annotation", key))}
+	}
+	return nil
+}
+
+// validateDelegationAnnotations requires both delegation annotations to be
+// set to non-empty values once either is present. fldPath points at
+// metadata.annotations. On update, a pair that is unchanged from oldMeta is
+// allowed so existing objects stay updatable.
+func validateDelegationAnnotations(meta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+	_, hasWorkload := meta.Annotations[apischeduling.WorkloadNameAnnotation]
+	_, hasTemplate := meta.Annotations[apischeduling.GroupTemplateNameAnnotation]
+	if !hasWorkload && !hasTemplate {
+		return nil
+	}
+	if oldMeta != nil && delegationAnnotationsUnchanged(meta, oldMeta) {
+		return nil
+	}
+	var allErrs field.ErrorList
+	for _, key := range delegationAnnotations {
+		if meta.Annotations[key] == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Key(key),
+				fmt.Sprintf("must be set to a non-empty value when %s or %s is set",
+					apischeduling.WorkloadNameAnnotation, apischeduling.GroupTemplateNameAnnotation)))
+		}
+	}
+	return allErrs
+}
+
+func delegationAnnotationsUnchanged(meta, oldMeta *metav1.ObjectMeta) bool {
+	for _, key := range delegationAnnotations {
+		value, ok := meta.Annotations[key]
+		oldValue, oldOk := oldMeta.Annotations[key]
+		if ok != oldOk || value != oldValue {
+			return false
+		}
+	}
+	return true
+}
+
 // validateJobSchedulingUpdate enforces the spec.scheduling immutability
 // constraint that declarative validation cannot express: the basic/gang policy
 // variant is frozen after creation. Only schedulingPolicy.gang.minCount may change.
@@ -713,6 +809,11 @@ func validateJobSchedulingUpdate(spec, oldSpec batch.JobSpec, fldPath *field.Pat
 // oldSpec is nil on create, non-nil on update.
 func validateJobScheduling(spec, oldSpec *batch.JobSpec, fldPath *field.Path) field.ErrorList {
 	if spec.Scheduling == nil {
+		return nil
+	}
+	// an unchanged spec skips these checks so that tightening them
+	// later never invalidates already-persisted objects.
+	if apiequality.Semantic.DeepEqual(spec, oldSpec) {
 		return nil
 	}
 	// Build the same logical workload tree the Job controller compiles, so
@@ -996,10 +1097,15 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 // oldSpec is nil on create, non-nil on update.
 func ValidateJobTemplateSpec(spec, oldSpec *batch.JobTemplateSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	var oldJobSpec *batch.JobSpec
+	var oldMeta *metav1.ObjectMeta
 	if oldSpec != nil {
-		oldJobSpec = &oldSpec.Spec // +k8s:verify-mutation:reason=clone
+		oldJobSpec = &oldSpec.Spec    // +k8s:verify-mutation:reason=clone
+		oldMeta = &oldSpec.ObjectMeta // +k8s:verify-mutation:reason=clone
 	}
 	allErrs := validateJobSpec(&spec.Spec, oldJobSpec, fldPath.Child("spec"), opts)
+	// Reject delegation annotations on jobTemplate when jobTemplate.spec.scheduling is set.
+	allErrs = append(allErrs, validateSchedulingAndDelegationAnnotations(&spec.ObjectMeta, oldMeta, &spec.Spec, oldJobSpec, fldPath.Child("spec", "scheduling"))...)
+	allErrs = append(allErrs, validateDelegationAnnotations(&spec.ObjectMeta, oldMeta, fldPath.Child("metadata", "annotations"))...)
 
 	// jobtemplate will always have the selector automatically generated
 	if spec.Spec.Selector != nil {

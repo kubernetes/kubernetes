@@ -106,7 +106,7 @@ type SignJWTResponse struct {
 	// header must contain only alg, kid, typ claims.
 	// typ must be “JWT”.
 	// kid must be non-empty, <=1024 characters, and its corresponding public key should not be excluded from OIDC discovery.
-	// alg must be one of the algorithms supported by kube-apiserver (currently RS256, ES256, ES384, ES512).
+	// alg must be one of the algorithms supported by kube-apiserver (currently RS256, ES256, ES384, ES512, ML-DSA-44, ML-DSA-65, ML-DSA-87).
 	// header cannot have any additional data that kube-apiserver does not recognize.
 	// Already wrapped in URL-safe base64, exactly as it appears in the first segment of the JWT.
 	Header string `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`

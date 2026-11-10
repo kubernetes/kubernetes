@@ -18,6 +18,7 @@ package jose
 
 import (
 	"crypto/elliptic"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
@@ -52,11 +53,8 @@ var (
 	// algorithm that is not yet implemented.
 	ErrUnsupportedAlgorithm = errors.New("go-jose/go-jose: unknown/unsupported algorithm")
 
-	// ErrUnsupportedKeyType indicates that the given key type/format is not
-	// supported. This occurs when trying to instantiate an encrypter and passing
-	// it a key of an unrecognized type or with unsupported parameters, such as
-	// an RSA private key with more than two primes.
-	ErrUnsupportedKeyType = errors.New("go-jose/go-jose: unsupported key type/format")
+	// ErrUnsupportedKeyType indicates that the given key is not supported.
+	ErrUnsupportedKeyType = errors.New("go-jose/go-jose: unsupported key type, format, curve, or RSA modulus size")
 
 	// ErrInvalidKeySize indicates that the given key is not the correct size
 	// for the selected algorithm. This can occur, for example, when trying to
@@ -74,9 +72,6 @@ var (
 
 	// ErrMissingX5cHeader indicates that the JWT header is missing x5c headers.
 	ErrMissingX5cHeader = errors.New("go-jose/go-jose: no x5c header present in message")
-
-	// ErrUnsupportedEllipticCurve indicates unsupported or unknown elliptic curve has been found.
-	ErrUnsupportedEllipticCurve = errors.New("go-jose/go-jose: unsupported/unknown elliptic curve")
 
 	// ErrUnsupportedCriticalHeader is returned when a header is marked critical but not supported by go-jose.
 	ErrUnsupportedCriticalHeader = errors.New("go-jose/go-jose: unsupported critical header")
@@ -112,19 +107,22 @@ const (
 
 // Signature algorithms
 const (
-	EdDSA = SignatureAlgorithm("EdDSA")
-	HS256 = SignatureAlgorithm("HS256") // HMAC using SHA-256
-	HS384 = SignatureAlgorithm("HS384") // HMAC using SHA-384
-	HS512 = SignatureAlgorithm("HS512") // HMAC using SHA-512
-	RS256 = SignatureAlgorithm("RS256") // RSASSA-PKCS-v1.5 using SHA-256
-	RS384 = SignatureAlgorithm("RS384") // RSASSA-PKCS-v1.5 using SHA-384
-	RS512 = SignatureAlgorithm("RS512") // RSASSA-PKCS-v1.5 using SHA-512
-	ES256 = SignatureAlgorithm("ES256") // ECDSA using P-256 and SHA-256
-	ES384 = SignatureAlgorithm("ES384") // ECDSA using P-384 and SHA-384
-	ES512 = SignatureAlgorithm("ES512") // ECDSA using P-521 and SHA-512
-	PS256 = SignatureAlgorithm("PS256") // RSASSA-PSS using SHA256 and MGF1-SHA256
-	PS384 = SignatureAlgorithm("PS384") // RSASSA-PSS using SHA384 and MGF1-SHA384
-	PS512 = SignatureAlgorithm("PS512") // RSASSA-PSS using SHA512 and MGF1-SHA512
+	EdDSA   = SignatureAlgorithm("EdDSA")
+	HS256   = SignatureAlgorithm("HS256")     // HMAC using SHA-256
+	HS384   = SignatureAlgorithm("HS384")     // HMAC using SHA-384
+	HS512   = SignatureAlgorithm("HS512")     // HMAC using SHA-512
+	RS256   = SignatureAlgorithm("RS256")     // RSASSA-PKCS-v1.5 using SHA-256
+	RS384   = SignatureAlgorithm("RS384")     // RSASSA-PKCS-v1.5 using SHA-384
+	RS512   = SignatureAlgorithm("RS512")     // RSASSA-PKCS-v1.5 using SHA-512
+	ES256   = SignatureAlgorithm("ES256")     // ECDSA using P-256 and SHA-256
+	ES384   = SignatureAlgorithm("ES384")     // ECDSA using P-384 and SHA-384
+	ES512   = SignatureAlgorithm("ES512")     // ECDSA using P-521 and SHA-512
+	PS256   = SignatureAlgorithm("PS256")     // RSASSA-PSS using SHA256 and MGF1-SHA256
+	PS384   = SignatureAlgorithm("PS384")     // RSASSA-PSS using SHA384 and MGF1-SHA384
+	PS512   = SignatureAlgorithm("PS512")     // RSASSA-PSS using SHA512 and MGF1-SHA512
+	MLDSA44 = SignatureAlgorithm("ML-DSA-44") // ML-DSA-44 (FIPS 204, RFC 9964), requires Go 1.27 or later
+	MLDSA65 = SignatureAlgorithm("ML-DSA-65") // ML-DSA-65 (FIPS 204, RFC 9964), requires Go 1.27 or later
+	MLDSA87 = SignatureAlgorithm("ML-DSA-87") // ML-DSA-87 (FIPS 204, RFC 9964), requires Go 1.27 or later
 )
 
 // Content encryption algorithms
@@ -210,11 +208,18 @@ type Header struct {
 
 // Certificates verifies & returns the certificate chain present
 // in the x5c header field of a message, if one was present. Returns
-// an error if there was no x5c header present or the chain could
+// an error if there was no x5c header present, any certificate in the
+// chain has an RSA key larger than [MaxRSAModulusBits], or the chain could
 // not be validated with the given verify options.
 func (h Header) Certificates(opts x509.VerifyOptions) ([][]*x509.Certificate, error) {
 	if len(h.certificates) == 0 {
 		return nil, ErrMissingX5cHeader
+	}
+
+	for _, cert := range h.certificates {
+		if pub, ok := cert.PublicKey.(*rsa.PublicKey); ok && pub.N.BitLen() > MaxRSAModulusBits {
+			return nil, fmt.Errorf("go-jose/go-jose: invalid RSA key in x5c certificate, modulus too large")
+		}
 	}
 
 	leaf := h.certificates[0]
@@ -297,9 +302,10 @@ func (parsed rawHeader) getEPK() (*JSONWebKey, error) {
 	if v == nil {
 		return nil, nil
 	}
-	var epk *JSONWebKey
-	err := json.Unmarshal(*v, &epk)
-	if err != nil {
+	// RFC 7518 Section 4.6.1.1: the "epk" header is the ephemeral public key
+	// of the originator. Reject private key material before parsing it.
+	epk := new(JSONWebKey)
+	if err := epk.unmarshalJSON(*v, false); err != nil {
 		return nil, err
 	}
 	return epk, nil
@@ -323,20 +329,6 @@ func (parsed rawHeader) getIV() (*byteBuffer, error) {
 // getTag extracts parsed "tag" from the raw JSON.
 func (parsed rawHeader) getTag() (*byteBuffer, error) {
 	return parsed.getByteBuffer(headerTag)
-}
-
-// getJWK extracts parsed "jwk" from the raw JSON.
-func (parsed rawHeader) getJWK() (*JSONWebKey, error) {
-	v := parsed[headerJWK]
-	if v == nil {
-		return nil, nil
-	}
-	var jwk *JSONWebKey
-	err := json.Unmarshal(*v, &jwk)
-	if err != nil {
-		return nil, err
-	}
-	return jwk, nil
 }
 
 // getCritical extracts parsed "crit" from the raw JSON. If omitted, it
@@ -424,10 +416,14 @@ func (parsed rawHeader) sanitized() (h Header, err error) {
 		}
 		switch k {
 		case headerJWK:
-			var jwk *JSONWebKey
-			err = json.Unmarshal(*v, &jwk)
+			// RFC 7515 Section 4.1.3 and RFC 7516 Section 4.1.5: the "jwk"
+			// header is the public key that corresponds to the key used to
+			// sign the JWS or encrypt the JWE. Reject private key material
+			// before parsing it.
+			jwk := new(JSONWebKey)
+			err = jwk.unmarshalJSON(*v, false)
 			if err != nil {
-				err = fmt.Errorf("failed to unmarshal JWK: %v: %#v", err, string(*v))
+				err = fmt.Errorf("failed to unmarshal JWK: %w", err)
 				return
 			}
 			h.JSONWebKey = jwk
@@ -499,22 +495,8 @@ func parseCertificateChain(chain []string) ([]*x509.Certificate, error) {
 }
 
 func (parsed rawHeader) isSet(k HeaderKey) bool {
-	dvr := parsed[k]
-	if dvr == nil {
-		return false
-	}
-
-	var dv interface{}
-	err := json.Unmarshal(*dvr, &dv)
-	if err != nil {
-		return true
-	}
-
-	if dvStr, ok := dv.(string); ok {
-		return dvStr != ""
-	}
-
-	return true
+	_, ok := parsed[k]
+	return ok
 }
 
 // Merge headers from src into dst, giving precedence to headers from l.
@@ -542,7 +524,7 @@ func curveName(crv elliptic.Curve) (string, error) {
 	case elliptic.P521():
 		return "P-521", nil
 	default:
-		return "", ErrUnsupportedEllipticCurve
+		return "", ErrUnsupportedKeyType
 	}
 }
 
@@ -563,4 +545,25 @@ func curveSize(crv elliptic.Curve) int {
 func makeRawMessage(b []byte) *json.RawMessage {
 	rm := json.RawMessage(b)
 	return &rm
+}
+
+// parseProtectedHeader parses a `byteBuffer` into a `*rawHeader`.
+//
+// The byteBuffer represents a base64-decoded "protected" header, which
+// is specified to contain a JSON object.
+//
+// If the input is nil or empty, returns `nil, nil`.
+//
+// `rawHeader` is a map type and so can be nil. When this function
+// returns a non-nil `*rawHeader`, the map is guaranteed to be non-nil.
+func parseProtectedHeader(in *byteBuffer) (*rawHeader, error) {
+	if in == nil || len(in.bytes()) == 0 {
+		return nil, nil
+	}
+	var header rawHeader
+	err := json.Unmarshal(in.bytes(), &header)
+	if err != nil || header == nil {
+		return nil, errors.New("go-jose/go-jose: invalid protected header")
+	}
+	return &header, nil
 }

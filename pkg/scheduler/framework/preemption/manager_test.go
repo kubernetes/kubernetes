@@ -18,13 +18,14 @@ package preemption
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,7 +50,7 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
-func newTestPodGroupInfo(pg *schedulingv1beta1.PodGroup, cpg *schedulingv1alpha3.CompositePodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
+func newTestPodGroupInfo(pg *schedulingv1beta1.PodGroup, cpg *schedulingv1beta1.CompositePodGroup, pods []*v1.Pod) fwk.PodGroupInfo {
 	gpg := &fwk.GenericPodGroup{
 		PodGroup:          pg,
 		CompositePodGroup: cpg,
@@ -140,7 +141,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 		}
 		return pg.Obj()
 	}
-	makeCPG := func(name string, priority int32, disruptionAll bool) *schedulingv1alpha3.CompositePodGroup {
+	makeCPG := func(name string, priority int32, disruptionAll bool) *schedulingv1beta1.CompositePodGroup {
 		cpg := st.MakeCompositePodGroup().Name(name).Namespace("default").UID(name).Priority(priority)
 		if disruptionAll {
 			cpg = cpg.DisruptionModeAll()
@@ -173,7 +174,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 		featureGates           featuregatetesting.FeatureOverrides
 		initPods               []*v1.Pod
 		initPodGroups          []*schedulingv1beta1.PodGroup
-		initCompositePodGroups []*schedulingv1alpha3.CompositePodGroup
+		initCompositePodGroups []*schedulingv1beta1.CompositePodGroup
 		pdbs                   []*policy.PodDisruptionBudget
 		preemptor              fwk.PodGroupInfo
 		injectSnapshotErr      bool
@@ -222,7 +223,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				makePG("pg-child1", lowPriority, false, "cpg-all"),
 				makePG("pg-child2", lowPriority, false, "cpg-all"),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				makeCPG("cpg-all", lowPriority, true),
 			},
 			preemptor: makePreemptor(highPriority),
@@ -241,7 +242,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				makePG("pg-all", lowPriority, true, "cpg-single"),
 				makePG("pg-single", lowPriority, false, "cpg-single"),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				makeCPG("cpg-single", lowPriority, false),
 			},
 			preemptor: makePreemptor(highPriority),
@@ -340,7 +341,7 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				// pg-child has DisruptionModeSingle, so its pods are individual victims.
 				makePG("pg-child", lowPriority, false, "cpg-root"),
 			},
-			initCompositePodGroups: []*schedulingv1alpha3.CompositePodGroup{
+			initCompositePodGroups: []*schedulingv1beta1.CompositePodGroup{
 				// If enabled, cpg-root's DisruptionModeAll would group p1/p2 into one atomic victim.
 				makeCPG("cpg-root", lowPriority, true),
 			},
@@ -348,23 +349,6 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			wantVictims: []wantVictim{
 				wantVic("p2"),
 				wantVic("p1"),
-			},
-		},
-		{
-			name: "feature gates: PodGroupPreemptionPolicy disabled ignores PodGroup PreemptNever and uses pod PreemptLowerPriority",
-			featureGates: featuregatetesting.FeatureOverrides{
-				features.PodGroupPreemptionPolicy: false,
-			},
-			initPods: []*v1.Pod{
-				makePod("low-pod", lowPriority),
-			},
-			preemptor: newTestPodGroupInfo(
-				st.MakePodGroup().Name("pg-never").Priority(highPriority).PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
-				nil,
-				[]*v1.Pod{st.MakePod().Name("preemptor-pod").Priority(highPriority).PreemptionPolicy(v1.PreemptLowerPriority).Obj()},
-			),
-			wantVictims: []wantVictim{
-				wantVic("low-pod"),
 			},
 		},
 		{
@@ -380,16 +364,13 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 			name: "non-successful status: preemptor CompositePodGroup with PreemptNever returns Unschedulable",
 			preemptor: newTestPodGroupInfo(
 				nil,
-				st.MakeCompositePodGroup().Name("cpg-never").Priority(highPriority).PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
+				st.MakeCompositePodGroup().Name("cpg-never").Priority(highPriority).PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
 				[]*v1.Pod{makePod("preemptor-pod", highPriority)},
 			),
 			wantStatusCode: fwk.Unschedulable,
 		},
 		{
-			name: "non-successful status: preemptor pod with PreemptNever and PodGroupPreemptionPolicy disabled returns Unschedulable",
-			featureGates: featuregatetesting.FeatureOverrides{
-				features.PodGroupPreemptionPolicy: false,
-			},
+			name: "non-successful status: preemptor pod with PreemptNever and unset PodGroup PreemptionPolicy returns Unschedulable",
 			preemptor: newTestPodGroupInfo(
 				st.MakePodGroup().Name("pg").Priority(highPriority).Obj(),
 				nil,
@@ -417,7 +398,6 @@ func TestDefaultPreemptionManager_GenerateVictims(t *testing.T) {
 				features.GenericWorkload:                 true,
 				features.TopologyAwareWorkloadScheduling: true,
 				features.CompositePodGroup:               true,
-				features.PodGroupPreemptionPolicy:        true,
 			}
 			maps.Copy(overrides, tt.featureGates)
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, overrides)
@@ -494,88 +474,219 @@ func TestGetPreemptionPolicy(t *testing.T) {
 	noPolicyPod := st.MakePod().Name("p-nil").Obj()
 
 	tests := []struct {
-		name                           string
-		pg                             *schedulingv1beta1.PodGroup
-		cpg                            *schedulingv1alpha3.CompositePodGroup
-		pods                           []*v1.Pod
-		enablePodGroupPreemptionPolicy bool
-		wantPolicy                     v1.PreemptionPolicy
+		name       string
+		pg         *schedulingv1beta1.PodGroup
+		cpg        *schedulingv1beta1.CompositePodGroup
+		pods       []*v1.Pod
+		wantPolicy v1.PreemptionPolicy
 	}{
 		{
-			name:                           "PreemptionPolicy PreemptNever is resolved from PodGroup, ignoring policy in pod, with PodGroupPreemptionPolicy enabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptNever,
+			name:       "PreemptionPolicy PreemptNever is resolved from PodGroup, ignoring policy in pod",
+			pg:         st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+			pods:       []*v1.Pod{preemptLowerPriorityPod},
+			wantPolicy: v1.PreemptNever,
 		},
 		{
-			name:                           "PreemptionPolicy PreemptLowerPriority is resolved from PodGroup, ignoring different policies in pods, with PodGroupPreemptionPolicy enabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptLowerPriority,
+			name:       "PreemptionPolicy PreemptLowerPriority is resolved from PodGroup, ignoring different policies in pods",
+			pg:         st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+			pods:       []*v1.Pod{preemptLowerPriorityPod, preemptNeverPod},
+			wantPolicy: v1.PreemptLowerPriority,
 		},
 		{
-			name:                           "PreemptionPolicy is resolved from pods with PodGroupPreemptionPolicy disabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod},
-			enablePodGroupPreemptionPolicy: false,
-			wantPolicy:                     v1.PreemptLowerPriority,
+			name:       "PreemptionPolicy is resolved from pods when PodGroup has nil PreemptionPolicy: PreemptLowerPriority when no pod is PreemptNever",
+			pg:         st.MakePodGroup().Name("pg").Obj(),
+			pods:       []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
+			wantPolicy: v1.PreemptLowerPriority,
 		},
 		{
-			name:                           "PreemptionPolicy is resolved from pods when multiple pods have different policies, with PodGroupPreemptionPolicy disabled",
-			pg:                             st.MakePodGroup().Name("pg").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
-			pods:                           []*v1.Pod{preemptNeverPod, preemptLowerPriorityPod, noPolicyPod},
-			enablePodGroupPreemptionPolicy: false,
-			wantPolicy:                     v1.PreemptNever,
+			name:       "PreemptionPolicy is resolved from pods when PodGroup has nil PreemptionPolicy: PreemptNever when any pod is PreemptNever",
+			pg:         st.MakePodGroup().Name("pg").Obj(),
+			pods:       []*v1.Pod{preemptNeverPod, preemptLowerPriorityPod, noPolicyPod},
+			wantPolicy: v1.PreemptNever,
 		},
 		{
-			name:       "PreemptionPolicy is resolved from pods when CompositePodGroup is active: PreemptLowerPriority when no pod is PreemptNever",
+			name:       "PreemptionPolicy PreemptNever is resolved from CompositePodGroup, ignoring policy in pod",
+			cpg:        st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1beta1.PreemptNever).Obj(),
+			pods:       []*v1.Pod{preemptLowerPriorityPod},
+			wantPolicy: v1.PreemptNever,
+		},
+		{
+			name:       "PreemptionPolicy PreemptLowerPriority is resolved from CompositePodGroup, ignoring different policies in pods",
+			cpg:        st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1beta1.PreemptLowerPriority).Obj(),
+			pods:       []*v1.Pod{preemptLowerPriorityPod, preemptNeverPod},
+			wantPolicy: v1.PreemptLowerPriority,
+		},
+		{
+			name:       "PreemptionPolicy is resolved from pods when CompositePodGroup has nil PreemptionPolicy: PreemptLowerPriority when no pod is PreemptNever",
 			cpg:        st.MakeCompositePodGroup().Name("cpg1").Obj(),
 			pods:       []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
 			wantPolicy: v1.PreemptLowerPriority,
 		},
 		{
-			name:       "PreemptionPolicy is resolved from pods when CompositePodGroup is active: PreemptNever when any pod is PreemptNever",
+			name:       "PreemptionPolicy is resolved from pods when CompositePodGroup has nil PreemptionPolicy: PreemptNever when any pod is PreemptNever",
 			cpg:        st.MakeCompositePodGroup().Name("cpg1").Obj(),
 			pods:       []*v1.Pod{preemptNeverPod, preemptLowerPriorityPod},
 			wantPolicy: v1.PreemptNever,
-		},
-		{
-			name:                           "PreemptionPolicy PreemptNever is resolved from CompositePodGroup, ignoring policy in pod, with PodGroupPreemptionPolicy enabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptNever,
-		},
-		{
-			name:                           "PreemptionPolicy PreemptLowerPriority is resolved from CompositePodGroup, ignoring different policies in pods, with PodGroupPreemptionPolicy enabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptLowerPriority).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod, preemptNeverPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptLowerPriority,
-		},
-		{
-			name:                           "PreemptionPolicy is resolved from pods when CompositePodGroup has policy but PodGroupPreemptionPolicy is disabled",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").PreemptionPolicy(schedulingv1alpha3.PreemptNever).Obj(),
-			pods:                           []*v1.Pod{preemptLowerPriorityPod, noPolicyPod},
-			enablePodGroupPreemptionPolicy: false,
-			wantPolicy:                     v1.PreemptLowerPriority,
-		},
-		{
-			name:                           "PreemptionPolicy defaults to PreemptLowerPriority when CompositePodGroup has no policy set with PodGroupPreemptionPolicy enabled, even if pods are PreemptNever",
-			cpg:                            st.MakeCompositePodGroup().Name("cpg1").Obj(),
-			pods:                           []*v1.Pod{preemptNeverPod},
-			enablePodGroupPreemptionPolicy: true,
-			wantPolicy:                     v1.PreemptLowerPriority,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			preemptionPolicy := getPreemptionPolicy(newTestPodGroupInfo(tt.pg, tt.cpg, tt.pods), tt.enablePodGroupPreemptionPolicy)
+			preemptionPolicy := getPreemptionPolicy(newTestPodGroupInfo(tt.pg, tt.cpg, tt.pods))
 			if preemptionPolicy != tt.wantPolicy {
 				t.Errorf("expected preemption policy %q, got %q", tt.wantPolicy, preemptionPolicy)
+			}
+		})
+	}
+}
+
+func TestCompareVictimSets(t *testing.T) {
+	now := time.Now()
+	makeVictim := func(name string, priority int32, keyType fwk.EntityKeyType, podCount int, startOffset time.Duration, pdbViolations int) fwk.PreemptionVictim {
+		var pods []fwk.PodInfo
+		for i := range podCount {
+			podName := fmt.Sprintf("%s-%d", name, i)
+			pod := st.MakePod().Name(podName).UID(podName).Priority(priority).StartTime(metav1.NewTime(now.Add(startOffset))).Node("node1").Obj()
+			pi, _ := framework.NewPodInfo(pod)
+			pods = append(pods, pi)
+		}
+		v, err := NewVictim(pods, priority, keyType)
+		if err != nil {
+			t.Fatalf("NewVictim failed: %v", err)
+		}
+		return &victimWithPDBViolations{
+			Victim:           v,
+			numPDBViolations: pdbViolations,
+		}
+	}
+
+	veryLowPrioPod := makeVictim("very-low-pod", 1, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	veryLowPrioPDBViolatingPod := makeVictim("very-low-pod-pdb", 1, fwk.PodKeyType, 1, -10*time.Minute, 1)
+	veryLowPrioPDBViolatingPodGroupSize1 := makeVictim("very-low-pg-1-pdb", 1, fwk.PodGroupKeyType, 1, -10*time.Minute, 1)
+	veryLowPrioPodGroupSize3 := makeVictim("very-low-pg-3", 1, fwk.PodGroupKeyType, 3, -10*time.Minute, 0)
+	lowPrioPod := makeVictim("low-pod", 10, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	lowPrioPDBViolatingPod := makeVictim("low-pod-pdb", 10, fwk.PodKeyType, 1, -10*time.Minute, 1)
+	midLowPrioPod := makeVictim("mid-low-pod", 9, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	midLowPrioPDBViolatingPod := makeVictim("mid-low-pod-pdb", 9, fwk.PodKeyType, 1, -10*time.Minute, 1)
+	midHighPrioPod := makeVictim("mid-high-pod", 19, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	highPrioPod := makeVictim("high-pod", 20, fwk.PodKeyType, 1, -10*time.Minute, 0)
+	highPrioPodGroupSize1 := makeVictim("high-pg-1", 20, fwk.PodGroupKeyType, 1, -10*time.Minute, 0)
+	highPrioPodGroupSize2 := makeVictim("high-pg-2", 20, fwk.PodGroupKeyType, 2, -10*time.Minute, 0)
+	lowPrioPodGroupSize1 := makeVictim("pg-1", 10, fwk.PodGroupKeyType, 1, -10*time.Minute, 0)
+	lowPrioPodGroupSize2 := makeVictim("pg-2", 10, fwk.PodGroupKeyType, 2, -10*time.Minute, 0)
+	lowPrioPodGroupSize3 := makeVictim("pg-3", 10, fwk.PodGroupKeyType, 3, -10*time.Minute, 0)
+	lowPrioPodGroupSize4 := makeVictim("pg-4", 10, fwk.PodGroupKeyType, 4, -10*time.Minute, 0)
+	youngerLowPrioPod := makeVictim("young-low-pod", 10, fwk.PodKeyType, 1, -1*time.Minute, 0)
+
+	tests := []struct {
+		name      string
+		set1      []fwk.PreemptionVictim
+		set2      []fwk.PreemptionVictim
+		wantOrder int // -1 if set1 is strictly better to preempt than set2, 1 if worse, 0 if equal
+	}{
+		{
+			name:      "empty set strictly preferred over non-empty set",
+			set1:      nil,
+			set2:      []fwk.PreemptionVictim{lowPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "fewer PDB violations strictly preferred",
+			set1:      []fwk.PreemptionVictim{highPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPDBViolatingPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "when PDB violations tie, highest priority across both violating and non-violating victims is compared",
+			set1:      []fwk.PreemptionVictim{midLowPrioPDBViolatingPod, veryLowPrioPod},
+			set2:      []fwk.PreemptionVictim{veryLowPrioPDBViolatingPod, highPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "when PDB violations tie, equal-priority bands merge violating and non-violating victims",
+			set1:      []fwk.PreemptionVictim{lowPrioPDBViolatingPod, midLowPrioPod, midLowPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPDBViolatingPod, lowPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "when PDB violations and priority bands tie, structural importance is compared in priority order across runs",
+			set1:      []fwk.PreemptionVictim{veryLowPrioPDBViolatingPodGroupSize1, highPrioPod},
+			set2:      []fwk.PreemptionVictim{veryLowPrioPDBViolatingPod, highPrioPodGroupSize1},
+			wantOrder: -1,
+		},
+		{
+			name:      "lower priority victim preferred over higher priority victim",
+			set1:      []fwk.PreemptionVictim{lowPrioPod},
+			set2:      []fwk.PreemptionVictim{highPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "priorities across the set compared before total pod count",
+			set1:      []fwk.PreemptionVictim{highPrioPod, veryLowPrioPodGroupSize3},
+			set2:      []fwk.PreemptionVictim{highPrioPod, midHighPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "fewer evicted pods at highest priority preferred even with higher secondary priority",
+			set1:      []fwk.PreemptionVictim{lowPrioPod, midLowPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize3, veryLowPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "fewer evicted pods at highest priority preferred over multi-pod group at same priority",
+			set1:      []fwk.PreemptionVictim{highPrioPod, midHighPrioPod},
+			set2:      []fwk.PreemptionVictim{highPrioPodGroupSize2, veryLowPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "fewer evicted pods in a priority band preferred across different victim types",
+			set1:      []fwk.PreemptionVictim{lowPrioPodGroupSize2},
+			set2:      []fwk.PreemptionVictim{lowPrioPod, lowPrioPod, lowPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "one 4-pod PodGroup preferred over three 3-pod PodGroups of same priority",
+			set1:      []fwk.PreemptionVictim{lowPrioPodGroupSize4},
+			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize3, lowPrioPodGroupSize3, lowPrioPodGroupSize3},
+			wantOrder: -1,
+		},
+		{
+			name:      "set without additional lower-priority band preferred when higher priority bands tie",
+			set1:      []fwk.PreemptionVictim{highPrioPod},
+			set2:      []fwk.PreemptionVictim{highPrioPod, veryLowPrioPod},
+			wantOrder: -1,
+		},
+		{
+			name:      "standalone pod preferred over PodGroup of same priority and total pod count",
+			set1:      []fwk.PreemptionVictim{lowPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize1},
+			wantOrder: -1,
+		},
+		{
+			name:      "smaller PodGroups preferred over larger PodGroup when priority band pod counts tie",
+			set1:      []fwk.PreemptionVictim{lowPrioPodGroupSize2, lowPrioPodGroupSize2},
+			set2:      []fwk.PreemptionVictim{lowPrioPodGroupSize4},
+			wantOrder: -1,
+		},
+		{
+			name:      "equal cost when priority bands and structural importance tie",
+			set1:      []fwk.PreemptionVictim{youngerLowPrioPod},
+			set2:      []fwk.PreemptionVictim{lowPrioPod},
+			wantOrder: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preemptionManager := &defaultPreemptionManager{}
+
+			got := preemptionManager.CompareVictimSets(t.Context(), tt.set1, tt.set2)
+			if got != tt.wantOrder {
+				t.Errorf("CompareVictimSets(set1, set2) = %d, want %d", got, tt.wantOrder)
+			}
+			gotRev := preemptionManager.CompareVictimSets(t.Context(), tt.set2, tt.set1)
+			if gotRev != -tt.wantOrder {
+				t.Errorf("CompareVictimSets(set2, set1) = %d, want %d", gotRev, -tt.wantOrder)
 			}
 		})
 	}

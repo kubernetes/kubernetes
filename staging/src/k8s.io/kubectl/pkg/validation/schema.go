@@ -131,12 +131,7 @@ func (c *paramVerifyingSchema) ValidateBytes(data []byte) error {
 		return err
 	}
 
-	gvk, errs := getObjectKind(obj)
-	if errs != nil {
-		return utilerrors.NewAggregate(errs)
-	}
-
-	err = c.verifier.HasSupport(gvk)
+	err = c.hasSupport(obj)
 	if resource.IsParamUnsupportedError(err) {
 		switch c.directive {
 		case metav1.FieldValidationStrict:
@@ -150,4 +145,49 @@ func (c *paramVerifyingSchema) ValidateBytes(data []byte) error {
 		return nil
 	}
 	return err
+}
+
+// hasSupport returns nil if the apiserver supports the fieldValidation query
+// parameter for the object, a ParamUnsupportedError if it does not, or any
+// other error from the verifier.
+//
+// A list (an object with an "items" array, the same test
+// resource.FlattenListVisitor applies) is checked per item, recursively: the
+// list is split into its items before they are sent to the server, so the
+// items' kinds, not the list kind, decide whether server-side validation
+// applies. The list kind itself never supports fieldValidation; checking it
+// would force client-side validation of every list.
+func (c *paramVerifyingSchema) hasSupport(obj interface{}) error {
+	items, ok := listItems(obj)
+	if !ok {
+		gvk, errs := getObjectKind(obj)
+		if errs != nil {
+			return utilerrors.NewAggregate(errs)
+		}
+		return c.verifier.HasSupport(gvk)
+	}
+	var unsupported error
+	for _, item := range items {
+		err := c.hasSupport(item)
+		if resource.IsParamUnsupportedError(err) {
+			// Keep looking: a verifier failure on a later item should
+			// not be hidden by an unsupported earlier one.
+			unsupported = err
+			continue
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return unsupported
+}
+
+// listItems returns the object's items if it is a list.
+func listItems(obj interface{}) ([]interface{}, bool) {
+	fields, ok := obj.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	items, ok := fields["items"].([]interface{})
+	return items, ok
 }

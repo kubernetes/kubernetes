@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/util/watchlist"
+	"k8s.io/ktesting"
 )
 
 type fakeWatchListClient struct {
@@ -75,6 +76,7 @@ func TestToListWatcherWithWatchListSemantics(t *testing.T) {
 }
 
 func TestNewShardedListWatch(t *testing.T) {
+	logger := ktesting.Init(t).Logger()
 	base := ToListWatcherWithWatchListSemantics(&ListWatch{}, fakeWatchListClient{unSupportedWatchListSemantics: true})
 	for _, emptySel := range []sharding.Selector{nil, sharding.Everything()} {
 		passthrough := NewShardedListWatch(base, emptySel)
@@ -101,7 +103,7 @@ func TestNewShardedListWatch(t *testing.T) {
 			}, nil
 		},
 		WatchFuncWithContext: func(_ context.Context, _ metav1.ListOptions) (watch.Interface, error) {
-			return watch.NewFake(), nil
+			return watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil
 		},
 	}, sel0)
 	if _, err := conflictLW.List(metav1.ListOptions{}); err == nil {
@@ -184,7 +186,7 @@ func TestNewShardedListWatch(t *testing.T) {
 						},
 						WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 							gotWatchSelector = opts.ShardSelector
-							fw := watch.NewFake()
+							fw := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 							if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
 								go func() {
 									for i := range pods {
@@ -237,7 +239,7 @@ func TestNewShardedListWatch(t *testing.T) {
 
 					// Verify Reflector.list pagination (with small page size so some unsharded pages filter to 0 items).
 					store := NewStore(MetaNamespaceKeyFunc)
-					reflector := NewReflector(legacyShardedLW, &v1.Pod{}, store, 0)
+					reflector := NewReflectorWithOptions(legacyShardedLW, &v1.Pod{}, store, ReflectorOptions{Logger: &logger})
 					reflector.WatchListPageSize = 2
 					if err := reflector.list(context.Background()); err != nil {
 						t.Fatalf("reflector.list: %v", err)
@@ -256,7 +258,7 @@ func TestNewShardedListWatch(t *testing.T) {
 						t.Errorf("expected WatchListSemantics to be supported by default")
 					}
 					watchListStore := NewStore(MetaNamespaceKeyFunc)
-					watchListReflector := NewReflector(watchListShardedLW, &v1.Pod{}, watchListStore, 0)
+					watchListReflector := NewReflectorWithOptions(watchListShardedLW, &v1.Pod{}, watchListStore, ReflectorOptions{Logger: &logger})
 					watchListReflector.useWatchList = true
 					wlWatcher, err := watchListReflector.watchList(context.Background())
 					if err != nil {
@@ -275,7 +277,7 @@ func TestNewShardedListWatch(t *testing.T) {
 					}
 
 					// Live watch stream (Added + Bookmark + Error).
-					liveFakeWatch := watch.NewFake()
+					liveFakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
 					liveLW := NewShardedListWatch(&ListWatch{
 						WatchFuncWithContext: func(_ context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 							gotWatchSelector = opts.ShardSelector
@@ -391,6 +393,7 @@ func TestNewShardedListWatchUnstructured(t *testing.T) {
 }
 
 func TestSharedIndexInformerShardSelector(t *testing.T) {
+	logger := ktesting.Init(t).Logger()
 	pods := make([]v1.Pod, 12)
 	for i := range pods {
 		pods[i] = v1.Pod{
@@ -421,7 +424,7 @@ func TestSharedIndexInformerShardSelector(t *testing.T) {
 				}, nil
 			},
 			WatchFuncWithContext: func(_ context.Context, _ metav1.ListOptions) (watch.Interface, error) {
-				return watch.NewFake(), nil
+				return watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger}), nil
 			},
 		}
 

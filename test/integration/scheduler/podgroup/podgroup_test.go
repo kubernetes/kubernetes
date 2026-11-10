@@ -19,6 +19,7 @@ package podgroup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -26,11 +27,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/ktesting"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	framework "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -38,6 +43,7 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
@@ -635,30 +641,47 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		tasEnabledValues := tt.enableTopologyAwareWorkloadScheduling
-		if len(tasEnabledValues) == 0 {
-			tasEnabledValues = []bool{true, false}
-		}
-		for _, tasEnabled := range tasEnabledValues {
-			for _, cpgEnabled := range []bool{true, false} {
-				if !tasEnabled && cpgEnabled {
-					// Cannot happen, skip.
+	// CompositePodGroup requires TopologyAwareWorkloadScheduling, so (TAS off, CPG on) can't be enabled.
+	for _, gates := range []struct{ tas, cpg bool }{{true, true}, {true, false}, {false, false}} {
+		t.Run(fmt.Sprintf("TAS enabled: %v, CPG enabled: %v", gates.tas, gates.cpg), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.GenericWorkload:                 true,
+				features.TopologyAwareWorkloadScheduling: gates.tas,
+				features.CompositePodGroup:               gates.cpg,
+			})
+			// The apiserver serves the PodGroup APIs depending on these gates, so share one per combination.
+			sharedAPICtx := testutils.InitTestAPIServer(t, "podgroup-scheduling", nil)
+
+			for _, tt := range tests {
+				if len(tt.enableTopologyAwareWorkloadScheduling) > 0 && !slices.Contains(tt.enableTopologyAwareWorkloadScheduling, gates.tas) {
 					continue
 				}
-				t.Run(fmt.Sprintf("%s (TAS enabled: %v, CPG enabled: %v)", tt.name, tasEnabled, cpgEnabled), func(t *testing.T) {
-					featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-						features.GenericWorkload:                 true,
-						features.TopologyAwareWorkloadScheduling: tasEnabled,
-						features.CompositePodGroup:               cpgEnabled,
-					})
-
-					testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-scheduling",
+				t.Run(tt.name, func(t *testing.T) {
+					nsCtx := schedulerutils.WithNewNamespace(t, sharedAPICtx, "podgroup-scheduling")
+					// Attribute scheduler logs to the test case rather than the feature-gate combination.
+					tCtx := ktesting.Init(t)
+					nsCtx.Ctx = tCtx
+					testCtx := testutils.InitTestSchedulerWithOptions(t, nsCtx, 0,
 						// disable backoff
 						scheduler.WithPodMaxBackoffSeconds(0),
 						scheduler.WithPodInitialBackoffSeconds(0))
+					testutils.SyncSchedulerInformerFactory(testCtx)
+					done := make(chan struct{})
+					go func() {
+						testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+						close(done)
+					}()
 
 					ns := testCtx.NS.Name
+					tCtx.CleanupCtx(func(cleanupCtx ktesting.TContext) {
+						testCtx.SchedulerCloseFn()
+						<-done
+						testCtx.InformerFactory.Shutdown()
+						if testCtx.DynInformerFactory != nil {
+							testCtx.DynInformerFactory.Shutdown()
+						}
+						cleanupPodGroupTestResources(t, cleanupCtx, testCtx.ClientSet, ns)
+					})
 
 					commonSteps := []stepsframework.Step{
 						{
@@ -676,7 +699,69 @@ func TestPodGroupScheduling(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+// cleanupPodGroupTestResources deletes pods, podgroups, and workloads (which outlive their deleted namespace without a namespace controller) and cluster-scoped nodes.
+func cleanupPodGroupTestResources(t *testing.T, ctx context.Context, cs clientset.Interface, ns string) {
+	t.Helper()
+
+	if err := cs.CoreV1().Pods(ns).DeleteCollection(ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		t.Fatalf("Failed to delete pods in namespace %s: %v", ns, err)
+	}
+	if err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, wait.ForeverTestTimeout, true,
+		schedulerutils.PodsCleanedUp(ctx, cs, ns)); err != nil {
+		t.Fatalf("Failed to wait for pods in namespace %s to be deleted: %v", ns, err)
+	}
+
+	// PodGroupProtection admission adds a finalizer and no controller removes it here.
+	pgs, err := cs.SchedulingV1beta1().PodGroups(ns).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list podgroups in namespace %s: %v", ns, err)
+	}
+	for i := range pgs.Items {
+		if _, err := cs.SchedulingV1beta1().PodGroups(ns).Patch(ctx, pgs.Items[i].Name, types.MergePatchType, []byte(`{"metadata":{"finalizers":null}}`), metav1.PatchOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			t.Fatalf("Failed to remove finalizers from podgroup %s/%s: %v", ns, pgs.Items[i].Name, err)
 		}
+	}
+	if err := cs.SchedulingV1beta1().PodGroups(ns).DeleteCollection(ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		t.Fatalf("Failed to delete podgroups in namespace %s: %v", ns, err)
+	}
+	if err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		pgs, err := cs.SchedulingV1beta1().PodGroups(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return len(pgs.Items) == 0, nil
+	}); err != nil {
+		t.Fatalf("Failed to wait for podgroups in namespace %s to be deleted: %v", ns, err)
+	}
+
+	if err := cs.SchedulingV1beta1().Workloads(ns).DeleteCollection(ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		t.Fatalf("Failed to delete workloads in namespace %s: %v", ns, err)
+	}
+	if err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		workloads, err := cs.SchedulingV1beta1().Workloads(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return len(workloads.Items) == 0, nil
+	}); err != nil {
+		t.Fatalf("Failed to wait for workloads in namespace %s to be deleted: %v", ns, err)
+	}
+
+	if err := cs.CoreV1().Nodes().DeleteCollection(ctx, *metav1.NewDeleteOptions(0), metav1.ListOptions{}); err != nil {
+		t.Fatalf("Failed to delete nodes: %v", err)
+	}
+	if err := wait.PollUntilContextTimeout(ctx, 50*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		nodes, err := cs.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return len(nodes.Items) == 0, nil
+	}); err != nil {
+		t.Fatalf("Failed to wait for nodes to be deleted: %v", err)
 	}
 }
 
@@ -710,7 +795,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 				st.MakePod().Namespace("default").Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
 			}
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "wap-inv",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "wap-inv",
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0))
 			cs, ns := testCtx.ClientSet, testCtx.NS.Name
@@ -731,7 +816,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 			// Wait for low priority pods to be scheduled
 			for _, p := range lowPods {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
@@ -855,7 +940,7 @@ func TestPostFilterNotCalled(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "post-filter-count",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "post-filter-count",
 				// Set high backoff times so that the scheduler does not retry scheduling before checking the count.
 				scheduler.WithPodMaxBackoffSeconds(100),
 				scheduler.WithPodInitialBackoffSeconds(100),
@@ -880,7 +965,7 @@ func TestPostFilterNotCalled(t *testing.T) {
 			// Wait for low priority pods to be scheduled
 			for _, p := range lowPods {
 				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-					testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+					schedulerutils.PodScheduled(cs, ns, p.Name)); err != nil {
 					t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
 				}
 			}
@@ -907,7 +992,7 @@ func TestPostFilterNotCalled(t *testing.T) {
 			// 5. Wait for high priority pod to be marked as unschedulable
 			for _, p := range highPods {
 				err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-					testutils.PodUnschedulable(cs, ns, p.Name))
+					schedulerutils.PodUnschedulable(cs, ns, p.Name))
 				if err != nil {
 					t.Fatalf("failed to wait for pod %s to be unschedulable: %v", p.Name, err)
 				}
@@ -996,7 +1081,7 @@ func TestPodGroupPostFilterIteration(t *testing.T) {
 				}},
 			})
 
-			testCtx := testutils.InitTestSchedulerWithNS(t, "pg-post-filter-iter",
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "pg-post-filter-iter",
 				scheduler.WithPodMaxBackoffSeconds(100),
 				scheduler.WithPodInitialBackoffSeconds(100),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),

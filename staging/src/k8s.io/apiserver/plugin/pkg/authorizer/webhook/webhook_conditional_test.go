@@ -129,9 +129,8 @@ func newTestWebhookAuthorizer(
 		0, // unauthorizedTTL
 		testRetryBackoff,
 		decisionOnError,
-		nil, // matchConditions
+		nil, // matcher
 		noopAuthorizerMetrics(),
-		authorizationcel.NewDefaultCompiler(),
 		"test",
 		acrReviewer,
 	)
@@ -1336,7 +1335,7 @@ func TestConditionalResponseCaching(t *testing.T) {
 		t.Helper()
 		wh, err := newWithBackoff(sarReviewer, time.Hour, 0, testRetryBackoff,
 			authorizer.DecisionNoOpinion, nil, noopAuthorizerMetrics(),
-			authorizationcel.NewDefaultCompiler(), "test", &fakeAuthorizationConditionsReviewer{})
+			"test", &fakeAuthorizationConditionsReviewer{})
 		if err != nil {
 			t.Fatalf("newWithBackoff failed: %v", err)
 		}

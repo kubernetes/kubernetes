@@ -118,7 +118,7 @@ func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.
 	}
 }
 
-func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc) {
 	// create an object to test
 	key, createdObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	// update the object once to allow get by exact resource version to be tested
@@ -126,22 +126,16 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	updateObj.Annotations = map[string]string{"test-annotation": "1"}
 	storedObj := &example.Pod{}
 	err := store.GuaranteedUpdate(ctx, key, storedObj, true, nil,
-		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
-			ttl := uint64(1)
-			return updateObj, &ttl, nil
-		}, nil)
+		storage.SimpleUpdate(func(_ runtime.Object) (runtime.Object, error) {
+			return updateObj, nil
+		}), nil)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
-	// create an additional object to increment the resource version for pods above the resource version of the foo object
-	secondObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test-ns"}}
-	lastUpdatedObj := &example.Pod{}
-	if err := store.Create(ctx, computePodKey(secondObj), secondObj, lastUpdatedObj, 0); err != nil {
-		t.Fatalf("Set failed: %v", err)
-	}
+	// Increase RV to test consistent Get.
+	lastUpdatedCurrentRV := int(increaseRV(ctx, t))
 
 	currentRV, _ := strconv.Atoi(storedObj.ResourceVersion)
-	lastUpdatedCurrentRV, _ := strconv.Atoi(lastUpdatedObj.ResourceVersion)
 	_, invalidRVErr := storage.APIObjectVersioner{}.ParseResourceVersion("invalid")
 
 	// TODO(jpbetz): Add exact test cases
@@ -234,9 +228,12 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 				return
 			}
 			if tt.expectNotFoundErr {
-				if err == nil || !storage.IsNotFound(err) {
+				var storageErr *storage.StorageError
+				if !errors.As(err, &storageErr) || storageErr.Code != storage.ErrCodeKeyNotFound {
 					t.Errorf("expecting not found error, but get: %v", err)
+					return
 				}
+				assert.Equal(t, int64(lastUpdatedCurrentRV), storageErr.ResourceVersion)
 				return
 			}
 			if tt.expectRVTooLarge {
@@ -711,7 +708,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 }
 
 func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compact Compaction, watchCacheEnabled bool, recorder *KubernetesRecorder) {
-	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
+	initialRV, compactRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, t, store, compact)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -737,7 +734,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
 	// Compact and increase RV to test consistent List.
-	compact(ctx, t, createdPods[0].ResourceVersion)
+	compact(ctx, t, compactRV)
 	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
@@ -807,9 +804,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*createdPods[0]},
-			rv:          createdPods[0].ResourceVersion,
+			rv:          compactRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -817,7 +814,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/first/",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 					},
 				}
 			},
@@ -827,9 +824,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			prefix:      "/pods/second/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{},
-			rv:          createdPods[0].ResourceVersion,
+			rv:          compactRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -837,7 +834,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/second/",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 					},
 				}
 			},
@@ -1133,9 +1130,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut:    []example.Pod{},
 			expectContinue: false,
-			rv:             createdPods[0].ResourceVersion,
+			rv:             compactRV,
 			rvMatch:        metav1.ResourceVersionMatchExact,
-			expectRV:       createdPods[0].ResourceVersion,
+			expectRV:       compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -1143,7 +1140,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/second/",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 						Limit:    1,
 					},
 				}
@@ -1609,13 +1606,21 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRVTooOld: true,
 		},
 		{
-			name:        "test List with resource version of first write, match=Exact",
+			name:           "test List with compacted resource version of first write, match=Exact",
+			prefix:         "/pods/",
+			pred:           storage.Everything,
+			rv:             createdPods[0].ResourceVersion,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRVTooOld: true,
+		},
+		{
+			name:        "test List with compacted resource version between first and second write, match=Exact",
 			prefix:      "/pods/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*createdPods[0]},
-			rv:          createdPods[0].ResourceVersion,
+			rv:          compactRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -1623,7 +1628,32 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 2,
+						Revision: mustParseResourceVersion(t, compactRV),
+					},
+				}
+			},
+		},
+		{
+			name:   "test List with compacted resource version between first and second write and limit, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut: []example.Pod{*createdPods[0]},
+			rv:          compactRV,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    compactRV,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, compactRV),
+						Limit:    1,
 					},
 				}
 			},
@@ -1643,7 +1673,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 3,
+						Revision: mustParseResourceVersion(t, createdPods[1].ResourceVersion),
 					},
 				}
 			},
@@ -1663,7 +1693,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 4,
+						Revision: mustParseResourceVersion(t, createdPods[2].ResourceVersion),
 					},
 				}
 			},
@@ -1683,7 +1713,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 5,
+						Revision: mustParseResourceVersion(t, createdPods[3].ResourceVersion),
 					},
 				}
 			},
@@ -1703,7 +1733,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 6,
+						Revision: mustParseResourceVersion(t, createdPods[4].ResourceVersion),
 					},
 				}
 			},
@@ -1723,7 +1753,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 7,
+						Revision: mustParseResourceVersion(t, createdPods[5].ResourceVersion),
 					},
 				}
 			},
@@ -1743,7 +1773,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/",
-						Revision: 8,
+						Revision: mustParseResourceVersion(t, updatedPod.ResourceVersion),
 					},
 				}
 			},
@@ -2051,16 +2081,39 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 		},
 		{
-			name:   "test List with continue, resource version of first write",
+			name:   "test List with continue, compacted resource version of first write",
 			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
 				Limit:    1,
-				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[0].ResourceVersion))),
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", mustParseResourceVersion(t, createdPods[0].ResourceVersion)),
+			},
+			expectContinueTooOld: true,
+			expectCacherRequestsToEtcd: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:      "/registry/pods/",
+						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Limit:    4,
+					},
+				}
+			},
+		},
+		{
+			name:   "test List with continue, compacted resource version between first and second write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", mustParseResourceVersion(t, compactRV)),
 			},
 			expectedOut: []example.Pod{},
-			expectRV:    createdPods[0].ResourceVersion,
+			expectRV:    compactRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
@@ -2068,7 +2121,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				return []RecordedList{
 					{
 						Key:      "/registry/pods/first/bar\x00",
-						Revision: mustParseResourceVersion(t, createdPods[0].ResourceVersion),
+						Revision: mustParseResourceVersion(t, compactRV),
 						Limit:    1,
 					},
 				}
@@ -2677,7 +2730,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 
 // seedMultiLevelData creates a set of keys with a multi-level structure, returning a resourceVersion
 // from before any were created along with the full set of objects that were persisted
-func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV string, created []*example.Pod, updated *example.Pod, err error) {
+func seedMultiLevelData(ctx context.Context, t *testing.T, store storage.Interface, compact Compaction) (initialRV, compactRV string, created []*example.Pod, updated *example.Pod, err error) {
 	// Setup storage with the following structure:
 	//  /
 	//   - first/
@@ -2732,7 +2785,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
 	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
 	}
 	initialRV = initialList.ResourceVersion
 
@@ -2740,7 +2793,12 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 		preset[i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to create object: %w", err)
+			return "", "", nil, nil, fmt.Errorf("failed to create object: %w", err)
+		}
+		if i == 0 {
+			// Advance revision before creating the second object so there is a non-pod revision strictly between createdPods[0] and createdPods[1].
+			compact(ctx, t, initialRV)
+			compactRV = fmt.Sprintf("%d", mustParseResourceVersion(t, preset[0].storedObj.ResourceVersion)+1)
 		}
 	}
 
@@ -2755,7 +2813,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 			pod.Spec.NodeName = "fakeNode"
 			return pod, nil, nil
 		}, nil); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to update object: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to update object: %w", err)
 	}
 
 	// We now delete bazSecond provided it has been created first. We do this to enable
@@ -2763,13 +2821,13 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	// would be reflected in responses of different calls.
 	storedObj := &example.Pod{}
 	if err := store.Delete(ctx, computePodKey(bazSecond), storedObj, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to delete object: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to delete object: %w", err)
 	}
 
 	for _, item := range preset {
 		created = append(created, item.storedObj)
 	}
-	return initialRV, created, updated, nil
+	return initialRV, compactRV, created, updated, nil
 }
 
 func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV IncreaseRVFunc, store storage.Interface) {
@@ -3922,6 +3980,7 @@ type PrefixTransformerModifier func(*PrefixTransformer) value.Transformer
 type InterfaceWithPrefixTransformer interface {
 	storage.Interface
 
+	UnderlyingStorage() storage.Interface
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
@@ -4022,6 +4081,8 @@ func RunTestListResourceVersionMatch(ctx context.Context, t *testing.T, store In
 func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, validation KeyValidation) {
 	inputObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", UID: "A"}}
 	key := computePodKey(inputObj)
+	nonExistingObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "non-existing", Namespace: "test-ns", UID: "A"}}
+	nonExistingKey := computePodKey(nonExistingObj)
 
 	tests := []struct {
 		name                string
@@ -4035,7 +4096,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 		hasSelfLink         bool
 	}{{
 		name:                "non-existing key, ignoreNotFound=false",
-		key:                 "/pods/non-existing",
+		key:                 nonExistingKey,
 		ignoreNotFound:      false,
 		precondition:        nil,
 		expectNotFoundErr:   true,
@@ -4043,7 +4104,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 		expectNoUpdate:      false,
 	}, {
 		name:                "non-existing key, ignoreNotFound=true",
-		key:                 "/pods/non-existing",
+		key:                 nonExistingKey,
 		ignoreNotFound:      true,
 		precondition:        nil,
 		expectNotFoundErr:   false,
@@ -4103,7 +4164,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key, storeObj := testPropagateStore(ctx, t, store, inputObj)
+			_, storeObj := testPropagateStore(ctx, t, store, inputObj)
 
 			out := &example.Pod{}
 			annotations := map[string]string{"version": fmt.Sprintf("%d", i)}
@@ -4129,6 +4190,9 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 						}
 					}
 					pod := *storeObj
+					if tt.key == nonExistingKey {
+						pod = *nonExistingObj
+					}
 					if tt.hasSelfLink {
 						pod.SelfLink = "testlink"
 					}
@@ -4159,7 +4223,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 			}
 
 			// verify that kv pair is not empty after set and that the underlying data matches expectations
-			validation(ctx, t, key)
+			validation(ctx, t, tt.key)
 
 			switch tt.expectNoUpdate {
 			case true:
@@ -4274,7 +4338,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 		err := store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
 			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
 				pod := obj.(*example.Pod)
-				pod.Name = "foo-1"
+				pod.Spec.NodeName = "node-1"
 				secondToEnter.Wait()
 				return pod, nil
 			}), nil)
@@ -4291,7 +4355,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 			}
 			updateCount++
 			pod := obj.(*example.Pod)
-			pod.Name = "foo-2"
+			pod.Spec.NodeName = "node-2"
 			return pod, nil
 		}), nil)
 	if err != nil {
@@ -4329,7 +4393,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 				}
 			}
 			pod := obj.(*example.Pod)
-			pod.Name = "foo-3"
+			pod.Spec.NodeName = "node-3"
 			return pod, nil
 		}), nil)
 	if !storage.IsInvalidObj(err) {
@@ -4350,7 +4414,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 				}
 			}
 			pod := obj.(*example.Pod)
-			pod.Name = "foo-4"
+			pod.Spec.NodeName = "node-4"
 			return pod, nil
 		}), nil)
 	if !storage.IsNotFound(err) {
@@ -5775,7 +5839,9 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 		t.Errorf("Unexpected error: %v", err)
 	}
 	increaseRV(ctx, t)
-	expectCompactedRV := currentRV + 1
+	increaseRV(ctx, t)
+	compactedFutureRV := currentRV + 1
+	expectCompactedRV := currentRV + 2
 	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
 	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
 		Predicate:            storage.Everything,
@@ -5784,6 +5850,26 @@ func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Int
 		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
 	}, listOut); err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
 		t.Errorf(`Expected "The resourceVersion for the provided list is too old", but got error: %v`, err)
+	}
+	// Call twice: the first syncs watchCache to compactedFutureRV via bookmark (falling back after waiting),
+	// and the second exercises upfront delegation once watchCache is already fresh.
+	for range 2 {
+		if err := store.GetList(ctx, "/pods/", storage.ListOptions{
+			Predicate:            storage.Everything,
+			Recursive:            true,
+			ResourceVersion:      fmt.Sprintf("%d", compactedFutureRV),
+			ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		}, listOut); err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+			t.Errorf(`Expected "The resourceVersion for the provided list is too old", but got error: %v`, err)
+		}
+	}
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{
+		Predicate:            storage.Everything,
+		Recursive:            true,
+		ResourceVersion:      fmt.Sprintf("%d", expectCompactedRV),
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	}, listOut); err != nil {
+		t.Errorf("Unexpected error listing at compacted RV %d: %v", expectCompactedRV, err)
 	}
 	compactedRV = store.CompactRevision()
 	if compactedRV != int64(expectCompactedRV) {
@@ -5803,9 +5889,9 @@ func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface
 	require.ErrorContains(t, store.Create(ctx, "/pods.apps", createObj, createOut, 0), "lacks resource prefix")
 	require.ErrorContains(t, store.Create(ctx, "/foo/", createObj, createOut, 0), "lacks resource prefix")
 	require.NoError(t, store.Create(ctx, "/pods/", createObj, createOut, 0))
-	require.NoError(t, store.Create(ctx, "/pods/name", createObj, createOut, 0))
-	require.NoError(t, store.Create(ctx, "/pods/namespace", createObj, createOut, 0))
-	require.NoError(t, store.Create(ctx, "/pods/namespace/name", createObj, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/name", &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}}, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace", &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "namespace"}}, createOut, 0))
+	require.NoError(t, store.Create(ctx, "/pods/namespace/name", &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "namespace", Name: "name"}}, createOut, 0))
 
 	listOut := &example.PodList{}
 	recursiveListOpts := storage.ListOptions{Predicate: storage.Everything, Recursive: true}
@@ -5865,10 +5951,9 @@ func RunTestKeySchema(ctx context.Context, t *testing.T, store storage.Interface
 	require.NoError(t, err)
 	w.Stop()
 
-	updateIn := &example.Pod{}
 	updateOut := &example.Pod{}
 	updateFunc := func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-		return updateIn, nil, nil
+		return input, nil, nil
 	}
 	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "", updateOut, false, nil, updateFunc, nil), "empty key")
 	require.ErrorContains(t, store.GuaranteedUpdate(ctx, "/", updateOut, false, nil, updateFunc, nil), "empty key")
@@ -5908,4 +5993,619 @@ func mustParseResourceVersion(t *testing.T, resourceVersion string) int64 {
 		t.Fatal(err)
 	}
 	return int64(rv)
+}
+
+type optimisticCallbackAction int
+
+const (
+	actionMutate optimisticCallbackAction = iota
+	actionNoop
+	actionReject
+	actionConflictUpdate
+	actionConflictReject
+	actionConflictDelete
+)
+
+type optimisticConcurrencyTestCase struct {
+	name              string
+	missingKey        bool
+	ignoreNotFound    bool
+	action            optimisticCallbackAction
+	preconditions     func(current *example.Pod) *storage.Preconditions
+	transformer       PrefixTransformerModifier
+	expectStatsCacher KubernetesRequestStats
+	expectStatsEtcd   KubernetesRequestStats
+	expectErr         func(error) bool
+}
+
+func RunTestOptimisticConcurrency(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, watchCacheEnabled bool, recorder *KubernetesRecorder) {
+	matchCurrent := func(cur *example.Pod) *storage.Preconditions {
+		return &storage.Preconditions{UID: &cur.UID, ResourceVersion: &cur.ResourceVersion}
+	}
+	wrongUID := func(_ *example.Pod) *storage.Preconditions {
+		return storage.NewUIDPreconditions("wrong-uid")
+	}
+	wrongRV := func(_ *example.Pod) *storage.Preconditions {
+		return &storage.Preconditions{ResourceVersion: ptr.To("999999999")}
+	}
+	rotatedTransformer := func(previous *PrefixTransformer) value.Transformer {
+		prevCopy := *previous
+		return value.NewPrefixTransformers(nil,
+			value.PrefixTransformer{Prefix: []byte("rotated!"), Transformer: NewPrefixTransformer([]byte{}, false)},
+			value.PrefixTransformer{Prefix: []byte{}, Transformer: &prevCopy},
+		)
+	}
+	incompatibleTransformer := func(_ *PrefixTransformer) value.Transformer {
+		return NewPrefixTransformer([]byte("otherprefix!"), false)
+	}
+
+	testCases := []optimisticConcurrencyTestCase{
+		{
+			name:              "existing object commits in single transaction",
+			expectStatsCacher: KubernetesRequestStats{Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "existing object with rotated transformer commits in single transaction",
+			transformer:       rotatedTransformer,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "noop update short-circuits without writing",
+			action:            actionNoop,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+		},
+		{
+			name:              "noop update with rotated transformer rewrites object",
+			action:            actionNoop,
+			transformer:       rotatedTransformer,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1, Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "noop update with incompatible transformer fails",
+			action:            actionNoop,
+			transformer:       incompatibleTransformer,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInternalError,
+		},
+		{
+			name:              "missing key returns NotFound",
+			missingKey:        true,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsNotFound,
+		},
+		{
+			name:              "missing key with preconditions returns NotFound",
+			missingKey:        true,
+			preconditions:     wrongUID,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsNotFound,
+		},
+		{
+			name:              "missing key with ignoreNotFound creates object",
+			missingKey:        true,
+			ignoreNotFound:    true,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1, Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "missing key with ignoreNotFound fails preconditions without retry",
+			missingKey:        true,
+			ignoreNotFound:    true,
+			preconditions:     wrongUID,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "matching preconditions commit in single transaction",
+			preconditions:     matchCurrent,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1},
+		},
+		{
+			name:              "UID precondition mismatch fails without retry",
+			preconditions:     wrongUID,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "ResourceVersion precondition mismatch fails without retry",
+			preconditions:     wrongRV,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "callback error fails without retry",
+			action:            actionReject,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1},
+			expectErr:         apierrors.IsConflict,
+		},
+		{
+			name:              "concurrent update conflict refreshes and retries",
+			action:            actionConflictUpdate,
+			expectStatsCacher: KubernetesRequestStats{Writes: 2, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+		},
+		{
+			name:              "concurrent update conflict fails preconditions on retry",
+			preconditions:     matchCurrent,
+			action:            actionConflictUpdate,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1, Conflicts: 1},
+			expectErr:         storage.IsInvalidObj,
+		},
+		{
+			name:              "concurrent update conflict fails callback on retry",
+			action:            actionConflictReject,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1, Conflicts: 1},
+			expectErr:         apierrors.IsConflict,
+		},
+		{
+			name:              "concurrent delete conflict returns NotFound",
+			action:            actionConflictDelete,
+			expectStatsCacher: KubernetesRequestStats{Writes: 1, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 1, Conflicts: 1},
+			expectErr:         storage.IsNotFound,
+		},
+		{
+			name:              "concurrent delete conflict with ignoreNotFound recreates object",
+			ignoreNotFound:    true,
+			action:            actionConflictDelete,
+			expectStatsCacher: KubernetesRequestStats{Writes: 2, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+		},
+		{
+			name:              "missing key with ignoreNotFound and concurrent create refreshes and retries",
+			missingKey:        true,
+			ignoreNotFound:    true,
+			action:            actionConflictUpdate,
+			expectStatsCacher: KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+			expectStatsEtcd:   KubernetesRequestStats{Gets: 1, Writes: 2, Conflicts: 1},
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.ignoreNotFound && tc.action != actionNoop {
+				t.Run("Delete", func(t *testing.T) {
+					runOptimisticConcurrencyOp(ctx, t, store, watchCacheEnabled, recorder, fmt.Sprintf("pod-%d-delete", i), tc, true)
+				})
+			}
+			t.Run("GuaranteedUpdate", func(t *testing.T) {
+				runOptimisticConcurrencyOp(ctx, t, store, watchCacheEnabled, recorder, fmt.Sprintf("pod-%d-update", i), tc, false)
+			})
+		})
+	}
+}
+
+func runOptimisticConcurrencyOp(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, watchCacheEnabled bool, recorder *KubernetesRecorder, podName string, tc optimisticConcurrencyTestCase, isDelete bool) {
+	key := "/pods/test-ns/" + podName
+	out := &example.Pod{}
+
+	var current *example.Pod
+	if !tc.missingKey {
+		seed := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-ns",
+				Name:      podName,
+				UID:       "uid-1",
+				Labels:    map[string]string{"rev": "initial"},
+			},
+		}
+		current = &example.Pod{}
+		require.NoError(t, store.Create(ctx, key, seed, current, 0))
+		if watchCacheEnabled {
+			require.NoError(t, store.Get(ctx, key, storage.GetOptions{ResourceVersion: current.ResourceVersion}, &example.Pod{}))
+		}
+	}
+
+	var revertTransformer func()
+	if tc.transformer != nil {
+		revertFn := store.UpdatePrefixTransformer(tc.transformer)
+		var reverted bool
+		revertTransformer = func() {
+			if reverted {
+				return
+			}
+			if watchCacheEnabled && out.ResourceVersion != "" {
+				// Ensure the background watch transforms the event at out.ResourceVersion before restoring the old prefix.
+				_ = store.Get(ctx, key, storage.GetOptions{IgnoreNotFound: true, ResourceVersion: out.ResourceVersion}, &example.Pod{})
+			}
+			revertFn()
+			reverted = true
+		}
+		defer revertTransformer()
+	}
+
+	var precond *storage.Preconditions
+	if tc.preconditions != nil {
+		precond = tc.preconditions(current)
+	}
+
+	rejectWithDirtyMutation := func(obj runtime.Object) error {
+		// Mutate input in place before failing so missing DeepCopy on cached objects is caught.
+		if p, ok := obj.(*example.Pod); ok && p != nil {
+			if p.Labels == nil {
+				p.Labels = map[string]string{}
+			}
+			p.Labels["rejected"] = "dirty"
+		}
+		return apierrors.NewConflict(example.Resource("pods"), podName, errors.New("rejected"))
+	}
+
+	var conflictInjected bool
+	onCallback := func(obj runtime.Object) error {
+		switch tc.action {
+		case actionReject:
+			return rejectWithDirtyMutation(obj)
+		case actionConflictUpdate, actionConflictReject:
+			if !conflictInjected {
+				conflictInjected = true
+				updated := &example.Pod{}
+				require.NoError(t, store.GuaranteedUpdate(ctx, key, updated, true, nil, storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
+					p := in.(*example.Pod)
+					if p.Name == "" {
+						p.Namespace = "test-ns"
+						p.Name = podName
+						p.Labels = map[string]string{}
+					}
+					p.Labels["rev"] = "conflict"
+					return p, nil
+				}), nil))
+				current = updated
+				return nil
+			}
+			if tc.action == actionConflictReject {
+				return rejectWithDirtyMutation(obj)
+			}
+		case actionConflictDelete:
+			if !conflictInjected {
+				conflictInjected = true
+				require.NoError(t, store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}))
+				current = nil
+			}
+		}
+		return nil
+	}
+
+	recorderKey := t.Name()
+	opCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
+	var err error
+	if isDelete {
+		err = store.Delete(opCtx, key, out, precond, func(_ context.Context, obj runtime.Object) error {
+			return onCallback(obj)
+		}, nil, storage.DeleteOptions{})
+	} else {
+		err = store.GuaranteedUpdate(opCtx, key, out, tc.ignoreNotFound, precond, storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			if err := onCallback(obj); err != nil {
+				return nil, err
+			}
+			pod := obj.(*example.Pod)
+			if pod.Name == "" {
+				require.Equal(t, &example.Pod{}, pod)
+				pod.Namespace = "test-ns"
+				pod.Name = podName
+			}
+			if tc.action != actionNoop {
+				if pod.Annotations == nil {
+					pod.Annotations = make(map[string]string)
+				}
+				pod.Annotations["mutated"] = "updated"
+			}
+			return pod, nil
+		}), nil)
+	}
+
+	if tc.expectErr != nil {
+		require.True(t, tc.expectErr(err), "unexpected error: %v", err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	wantStats := tc.expectStatsEtcd
+	if watchCacheEnabled {
+		wantStats = tc.expectStatsCacher
+	}
+	require.Equal(t, wantStats, recorder.StatsForKey(recorderKey))
+
+	if tc.expectErr != nil {
+		if current != nil && (tc.action == actionReject || tc.action == actionConflictReject) {
+			cached := &example.Pod{}
+			require.NoError(t, store.Get(ctx, key, storage.GetOptions{ResourceVersion: current.ResourceVersion}, cached))
+			require.Equal(t, current, cached)
+		}
+		return
+	}
+
+	expectOut := &example.Pod{}
+	if isDelete {
+		expectOut = current.DeepCopy()
+		expectOut.ResourceVersion = out.ResourceVersion
+		require.True(t, storage.IsNotFound(store.Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
+	} else {
+		if tc.action == actionNoop {
+			if tc.transformer != nil {
+				require.NotEqual(t, current.ResourceVersion, out.ResourceVersion)
+			} else {
+				require.Equal(t, current.ResourceVersion, out.ResourceVersion)
+			}
+		} else {
+			require.Equal(t, "updated", out.Annotations["mutated"])
+		}
+		require.NoError(t, store.Get(ctx, key, storage.GetOptions{}, expectOut))
+	}
+
+	require.Equal(t, expectOut, out)
+
+	if revertTransformer != nil {
+		revertTransformer()
+		if !isDelete {
+			// Stored bytes now carry the rotated prefix and cannot be read from underlying storage with the original prefix alone.
+			require.True(t, storage.IsInternalError(store.UnderlyingStorage().Get(ctx, key, storage.GetOptions{}, &example.Pod{})))
+		}
+	}
+}
+
+func RunTestDeleteOnce(ctx context.Context, t *testing.T, store storage.Interface, prefix string, codec runtime.Codec) {
+	mustState := func(obj runtime.Object) *storage.ObjState {
+		state, err := storage.GetStateFromObject(store.Versioner(), codec, obj, true)
+		require.NoError(t, err)
+		return state
+	}
+
+	key, existing := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
+	existingRev, err := strconv.ParseInt(existing.ResourceVersion, 10, 64)
+	require.NoError(t, err)
+	_, emptyKeyErr := storage.PrepareKey("/pods/", "", false)
+
+	stale := existing.DeepCopy()
+	stale.ResourceVersion = "999999"
+
+	tests := []struct {
+		name         string
+		key          string
+		origState    *storage.ObjState
+		expectError  error
+		expectOut    *example.Pod
+		expectStored *example.Pod
+	}{
+		{
+			name:         "conflicts on stale revision",
+			key:          key,
+			origState:    mustState(stale),
+			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: existing,
+		},
+		{
+			name:         "conflicts when key does not exist",
+			key:          "/pods/test-ns/missing",
+			origState:    mustState(existing.DeepCopy()),
+			expectError:  storage.NewResourceVersionConflictsError(prefix+"/pods/test-ns/missing", existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: nil,
+		},
+		{
+			name:        "rejects empty key",
+			key:         "",
+			origState:   mustState(existing.DeepCopy()),
+			expectError: emptyKeyErr,
+			expectOut:   &example.Pod{},
+		},
+		// Placed last because it deletes key from storage.
+		{
+			name:         "deletes object at matching revision",
+			key:          key,
+			origState:    mustState(existing.DeepCopy()),
+			expectOut:    existing,
+			expectStored: nil,
+		},
+	}
+
+	for i := range tests {
+		tt := &tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			out := &example.Pod{}
+			err := store.DeleteOnce(ctx, tt.key, tt.origState, out)
+			require.Equal(t, tt.expectError, err)
+
+			wantOut := tt.expectOut.DeepCopy()
+			if tt.expectError == nil {
+				require.NotEmpty(t, out.ResourceVersion)
+				require.NotEqual(t, tt.expectOut.ResourceVersion, out.ResourceVersion)
+				wantOut.ResourceVersion = out.ResourceVersion
+			}
+			require.Equal(t, wantOut, out)
+
+			if tt.key == "" {
+				return
+			}
+			got := &example.Pod{}
+			err = store.Get(ctx, tt.key, storage.GetOptions{}, got)
+			if tt.expectStored == nil {
+				require.True(t, storage.IsNotFound(err), "expected NotFound, got: %v", err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectStored, got)
+			}
+		})
+	}
+}
+
+func RunTestUpdateOnce(ctx context.Context, t *testing.T, store storage.Interface, prefix string, codec runtime.Codec) {
+	mustState := func(obj runtime.Object) *storage.ObjState {
+		state, err := storage.GetStateFromObject(store.Versioner(), codec, obj, true)
+		require.NoError(t, err)
+		return state
+	}
+	mustStorageState := func(obj runtime.Object) *storage.ObjState {
+		state := mustState(obj)
+		state.FromStorage = true
+		return state
+	}
+
+	key, existing := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
+	existingRev, err := strconv.ParseInt(existing.ResourceVersion, 10, 64)
+	require.NoError(t, err)
+	_, emptyKeyErr := storage.PrepareKey("/pods/", "", false)
+
+	stale := existing.DeepCopy()
+	stale.ResourceVersion = "999999"
+
+	updated := existing.DeepCopy()
+	updated.Labels = map[string]string{"mutated": "updated"}
+
+	created := existing.DeepCopy()
+	created.Name = "bar"
+	created.ResourceVersion = ""
+	created.Labels = map[string]string{"mutated": "created"}
+
+	tests := []struct {
+		name           string
+		key            string
+		origState      *storage.ObjState
+		obj            *example.Pod
+		ignoreNotFound bool
+		expectState    *storage.ObjState
+		expectError    error
+		expectOut      *example.Pod
+		expectRV       string
+		expectStored   *example.Pod
+	}{
+		{
+			name:         "noop update returns existing object without changing revision",
+			key:          key,
+			origState:    mustState(existing.DeepCopy()),
+			obj:          existing,
+			expectState:  mustStorageState(existing.DeepCopy()),
+			expectOut:    existing,
+			expectRV:     existing.ResourceVersion,
+			expectStored: existing,
+		},
+		{
+			name:         "noop update conflicts and returns refreshed state when stored object differs",
+			key:          key,
+			origState:    mustState(updated.DeepCopy()),
+			obj:          updated,
+			expectState:  mustStorageState(existing.DeepCopy()),
+			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: existing,
+		},
+		{
+			name:         "conflicts on stale revision",
+			key:          key,
+			origState:    mustState(stale),
+			obj:          updated,
+			expectError:  storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: existing,
+		},
+		{
+			name:           "conflicts when creating with zero revision on existing key",
+			key:            key,
+			origState:      mustState(&example.Pod{}),
+			obj:            updated,
+			ignoreNotFound: true,
+			expectError:    storage.NewResourceVersionConflictsError(prefix+key, existingRev),
+			expectOut:      &example.Pod{},
+			expectStored:   existing,
+		},
+		{
+			name:         "conflicts when key does not exist",
+			key:          "/pods/test-ns/missing",
+			origState:    mustState(existing.DeepCopy()),
+			obj:          updated,
+			expectError:  storage.NewResourceVersionConflictsError(prefix+"/pods/test-ns/missing", existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: nil,
+		},
+		{
+			name:         "noop update fails when key is missing and ignoreNotFound is false",
+			key:          "/pods/test-ns/missing",
+			origState:    mustState(existing.DeepCopy()),
+			obj:          existing,
+			expectError:  storage.NewKeyNotFoundError(prefix+"/pods/test-ns/missing", existingRev),
+			expectOut:    &example.Pod{},
+			expectStored: nil,
+		},
+		{
+			name:        "rejects empty key",
+			key:         "",
+			origState:   mustState(existing.DeepCopy()),
+			obj:         updated,
+			expectError: emptyKeyErr,
+			expectOut:   &example.Pod{},
+		},
+		{
+			name:           "creates object when origState has zero revision",
+			key:            computePodKey(created),
+			origState:      mustState(&example.Pod{}),
+			obj:            created,
+			ignoreNotFound: true,
+			expectState:    mustState(&example.Pod{}),
+			expectOut:      created,
+			expectStored:   created,
+		},
+		// Placed last because it mutates key in storage.
+		{
+			name:         "updates object at matching revision",
+			key:          key,
+			origState:    mustState(existing.DeepCopy()),
+			obj:          updated,
+			expectState:  mustState(existing.DeepCopy()),
+			expectOut:    updated,
+			expectStored: updated,
+		},
+	}
+
+	for i := range tests {
+		tt := &tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			out := &example.Pod{}
+			state, err := store.UpdateOnce(ctx, tt.key, tt.origState, tt.obj.DeepCopy(), 0, out, tt.ignoreNotFound)
+			require.Equal(t, tt.expectError, err)
+			require.Equal(t, tt.expectState, state)
+
+			if tt.expectRV != "" {
+				require.Equal(t, tt.expectRV, out.ResourceVersion)
+			} else if tt.expectError == nil {
+				require.NotEmpty(t, out.ResourceVersion)
+				require.NotEqual(t, tt.expectOut.ResourceVersion, out.ResourceVersion)
+			}
+
+			wantOut := tt.expectOut.DeepCopy()
+			if tt.expectError == nil {
+				wantOut.ResourceVersion = out.ResourceVersion
+			}
+			require.Equal(t, wantOut, out)
+
+			if tt.key == "" {
+				return
+			}
+			got := &example.Pod{}
+			err = store.Get(ctx, tt.key, storage.GetOptions{}, got)
+			if tt.expectStored == nil {
+				require.True(t, storage.IsNotFound(err), "expected NotFound, got: %v", err)
+			} else {
+				require.NoError(t, err)
+				wantStored := tt.expectStored.DeepCopy()
+				if tt.expectError == nil {
+					wantStored.ResourceVersion = out.ResourceVersion
+				}
+				require.Equal(t, wantStored, got)
+			}
+		})
+	}
 }

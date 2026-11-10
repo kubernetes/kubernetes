@@ -290,8 +290,10 @@ func ValidateCSINodeUpdate(new, old *storage.CSINode) field.ErrorList {
 }
 
 var validStorageHealthStatusTypes = sets.New(
+	storage.StorageHealthUnknown,
 	storage.StorageUnreachable,
 	storage.StorageDegraded,
+	storage.StorageHealthy,
 )
 
 var validStorageHealthAccessModes = sets.New(
@@ -305,8 +307,10 @@ const maxStorageHealthConditions = 16
 
 func validateStorageHealthCondition(condition storage.StorageHealthCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if !validStorageHealthStatusTypes.Has(condition.Status) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)))
+	if len(condition.Status) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("status"), "").MarkCoveredByDeclarative())
+	} else if !validStorageHealthStatusTypes.Has(condition.Status) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("status"), condition.Status, sets.List(validStorageHealthStatusTypes)).MarkCoveredByDeclarative())
 	}
 	if len(condition.Reason) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "").MarkCoveredByDeclarative())
@@ -319,7 +323,7 @@ func validateStorageHealthCondition(condition storage.StorageHealthCondition, fl
 		}
 	}
 	if len(condition.Message) > 1024 {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), condition.Message, 1024).WithOrigin("maxBytes").MarkCoveredByDeclarative())
 	}
 	if condition.AccessMode != nil && !validStorageHealthAccessModes.Has(*condition.AccessMode) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessMode"), *condition.AccessMode, sets.List(validStorageHealthAccessModes)))
@@ -334,7 +338,7 @@ func validateStorageHealth(health storage.StorageHealth, fldPath *field.Path) fi
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(health.Name, fldPath.Child("name"), apivalidation.RequiredCovered)...)
 	if len(health.HealthConditions) > maxStorageHealthConditions {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("healthConditions"), len(health.HealthConditions), maxStorageHealthConditions))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("healthConditions"), len(health.HealthConditions), maxStorageHealthConditions).WithOrigin("maxItems").MarkCoveredByDeclarative())
 		return allErrs
 	}
 	for i, condition := range health.HealthConditions {
@@ -623,8 +627,12 @@ func ValidateCSIStorageCapacity(capacity *storage.CSIStorageCapacity, opts CSISt
 	allErrs := apivalidation.ValidateObjectMeta(&capacity.ObjectMeta, true, ValidateStorageCapacityName, field.NewPath("metadata"))
 	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
 	allErrs = append(allErrs, metav1validation.ValidateLabelSelector(capacity.NodeTopology, labelSelectorValidationOptions, field.NewPath("nodeTopology"))...)
-	for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg))
+	if len(capacity.StorageClassName) == 0 {
+		allErrs = append(allErrs, field.Required(field.NewPath("storageClassName"), "").MarkCoveredByDeclarative())
+	} else {
+		for _, msg := range apivalidation.ValidateClassName(capacity.StorageClassName, false) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, msg))
+		}
 	}
 	if capacity.Capacity != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeQuantity(*capacity.Capacity, field.NewPath("capacity"))...)
@@ -642,7 +650,7 @@ func ValidateCSIStorageCapacityUpdate(capacity, oldCapacity *storage.CSIStorageC
 		allErrs = append(allErrs, field.Invalid(field.NewPath("nodeTopology"), capacity.NodeTopology, "field is immutable"))
 	}
 	if capacity.StorageClassName != oldCapacity.StorageClassName {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("storageClassName"), capacity.StorageClassName, "field is immutable").WithOrigin("immutable").MarkCoveredByDeclarative())
 	}
 
 	return allErrs

@@ -26,15 +26,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-# Ensure that we find the binaries we build before anything else.
-export GOBIN="${KUBE_OUTPUT_BIN}"
-PATH="${GOBIN}:${PATH}"
-
-# Install zeitgeist
-go install sigs.k8s.io/zeitgeist@v0.5.4
-
 # Prefer full path for running zeitgeist
-ZEITGEIST_BIN="$(which zeitgeist)"
+ZEITGEIST_BIN="$(go -C hack/tools tool -n zeitgeist)"
 
 # TODO: revert sed hack when zetigeist respects CLICOLOR/ttys
 CLICOLOR=0 "${ZEITGEIST_BIN}" validate \

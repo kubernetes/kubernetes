@@ -591,16 +591,16 @@ func setup(tCtx ktesting.TContext) (ktesting.TContext, *fake.Clientset, *Extende
 	client := fake.NewClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	ec := NewExtendedResourceCache(tCtx.Logger())
-	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(ec)
+	handle, err := informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandlerWithOptions(ec, clientcache.HandlerOptions{Logger: new(tCtx.Logger())})
 	tCtx.ExpectNoError(err, "failed to add device class informer event handler")
-	informerFactory.Start(tCtx.Done())
+	informerFactory.StartWithContext(tCtx)
 	tCtx.Cleanup(func() {
 		// Need to cancel before waiting for the shutdown.
 		tCtx.Cancel("test is done")
 		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
-	informerFactory.WaitForCacheSync(tCtx.Done())
+	informerFactory.WaitForCacheSyncWithContext(tCtx)
 	clientcache.WaitForNamedCacheSyncWithContext(tCtx, handle.HasSynced)
 
 	// fake.Clientset suffers from a race condition related to informers:

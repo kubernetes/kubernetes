@@ -25,3 +25,5 @@ DriverInfo:
     NumPods: 10
     NumRestarts: 20
     NumSnapshots: 10
+  VolumeCloneStressTestOptions:
+    NumClones: 3

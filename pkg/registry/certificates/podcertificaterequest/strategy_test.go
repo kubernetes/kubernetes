@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -107,8 +108,9 @@ func TestPrepareForCreate(t *testing.T) {
 
 	wantPCR := &certificates.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "foo",
-			Name:      "bar",
+			Namespace:  "foo",
+			Name:       "bar",
+			Generation: 1,
 		},
 		Spec: certificates.PodCertificateRequestSpec{
 			SignerName:           "foo.com/abc",

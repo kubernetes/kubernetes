@@ -112,6 +112,14 @@ type Manager interface {
 	GetAllocatedPods() []*v1.Pod
 }
 
+// PodProvider is the subset of Kubelet methods the allocation manager depends on.
+type PodProvider interface {
+	GetActivePods() []*v1.Pod
+	GetPodByUID(types.UID) (*v1.Pod, bool)
+	IsPodTerminatingOrTerminal(*v1.Pod) bool
+	SyncPodNow(ctx context.Context, pod *v1.Pod)
+}
+
 type manager struct {
 	allocated state.State
 
@@ -119,10 +127,8 @@ type manager struct {
 	statusManager status.Manager
 	sourcesReady  config.SourcesReady
 
-	ticker         *time.Ticker
-	triggerPodSync func(context.Context, *v1.Pod)
-	getActivePods  func() []*v1.Pod
-	getPodByUID    func(types.UID) (*v1.Pod, bool)
+	ticker      *time.Ticker
+	podProvider PodProvider
 
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
@@ -132,9 +138,7 @@ type manager struct {
 
 func NewManager(checkpointDirectory string,
 	statusManager status.Manager,
-	triggerPodSync func(context.Context, *v1.Pod),
-	getActivePods func() []*v1.Pod,
-	getPodByUID func(types.UID) (*v1.Pod, bool),
+	podProvider PodProvider,
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
 	logger klog.Logger,
@@ -146,19 +150,13 @@ func NewManager(checkpointDirectory string,
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
 
-		ticker:         time.NewTicker(initialRetryDelay),
-		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
-		getPodByUID:    getPodByUID,
-		recorder:       recorder,
+		ticker:      time.NewTicker(initialRetryDelay),
+		podProvider: podProvider,
+		recorder:    recorder,
 	}
 }
 
 func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string) state.State {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return state.NewNoopStateCheckpoint()
-	}
-
 	stateImpl, err := state.NewStateCheckpoint(logger, checkpointDirectory, checkpointName, nil)
 	if err != nil {
 		// This is a critical, non-recoverable failure.
@@ -175,9 +173,7 @@ func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string
 func NewInMemoryManager(
 	logger klog.Logger,
 	statusManager status.Manager,
-	triggerPodSync func(context.Context, *v1.Pod),
-	getActivePods func() []*v1.Pod,
-	getPodByUID func(types.UID) (*v1.Pod, bool),
+	podProvider PodProvider,
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
 ) Manager {
@@ -188,11 +184,9 @@ func NewInMemoryManager(
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
 
-		ticker:         time.NewTicker(initialRetryDelay),
-		triggerPodSync: triggerPodSync,
-		getActivePods:  getActivePods,
-		getPodByUID:    getPodByUID,
-		recorder:       recorder,
+		ticker:      time.NewTicker(initialRetryDelay),
+		podProvider: podProvider,
+		recorder:    recorder,
 	}
 }
 
@@ -237,13 +231,23 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 
 	// Retry all pending resizes.
 	for _, uid := range m.podsWithPendingResizes {
-		pod, found := m.getPodByUID(uid)
+		pod, found := m.podProvider.GetPodByUID(uid)
 		if !found {
 			logger.V(4).Info("Pod not found; removing from pending resizes", "podUID", uid)
 			continue
 		}
 
 		oldResizeStatus := m.statusManager.GetPodResizeConditions(uid)
+		// The pod may have started terminating after its resize was queued.
+		if m.podProvider.IsPodTerminatingOrTerminal(pod) {
+			logger.V(4).Info("Pod is terminating or terminal; removing from pending resizes", "pod", klog.KObj(pod))
+			m.statusManager.ClearPodResizePendingCondition(uid, metrics.DeferredResizeResolutionTerminated)
+			if !apiequality.Semantic.DeepEqual(oldResizeStatus, m.statusManager.GetPodResizeConditions(uid)) {
+				m.podProvider.SyncPodNow(ctx, pod)
+			}
+			continue
+		}
+
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
 
 		resizeAllocated, err := m.handlePodResourcesResize(ctx, pod)
@@ -267,7 +271,7 @@ func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1
 		// If the pod resize status has changed, we need to update the pod status.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
 		if resizeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
-			m.triggerPodSync(ctx, pod)
+			m.podProvider.SyncPodNow(ctx, pod)
 		}
 	}
 
@@ -299,7 +303,7 @@ func (m *manager) PushPendingResize(logger klog.Logger, uid types.UID) {
 func (m *manager) sortPendingResizes(logger klog.Logger) {
 	var pendingPods []*v1.Pod
 	for _, uid := range m.podsWithPendingResizes {
-		pod, found := m.getPodByUID(uid)
+		pod, found := m.podProvider.GetPodByUID(uid)
 		if !found {
 			logger.V(4).Info("Pod not found; removing from pending resizes", "podUID", uid)
 			continue
@@ -507,17 +511,15 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// To handle kubelet restarts, test pod admissibility using AllocatedResources values
-		// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
-		pod, _ = m.UpdatePodFromAllocation(pod)
-	}
+	// To handle kubelet restarts, test pod admissibility using AllocatedResources values
+	// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
+	pod, _ = m.UpdatePodFromAllocation(pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
 	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod, lifecycle.AddOperation)
 
-	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	if ok {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
@@ -554,7 +556,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 	}
 
 	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
-	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.getActivePods()), pod, lifecycle.ResizeOperation)
+	fit, reason, message := m.canAdmitPod(ctx, m.getAllocatedPods(m.podProvider.GetActivePods()), pod, lifecycle.ResizeOperation)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(logger, pod); err != nil {
@@ -604,19 +606,7 @@ func isResizeRequested(desired, allocated *v1.Pod) bool {
 			}
 		}
 	}
-	for _, vol := range desired.Spec.Volumes {
-		for _, allocVol := range allocated.Spec.Volumes {
-			if allocVol.Name != vol.Name {
-				continue
-			}
-			hasLimit, hasAllocLimit := VolHasMemoryBackedEmptyDirSizeLimit(&vol), VolHasMemoryBackedEmptyDirSizeLimit(&allocVol)
-			if hasLimit != hasAllocLimit || (hasLimit && vol.EmptyDir.SizeLimit.Cmp(*allocVol.EmptyDir.SizeLimit) != 0) {
-				return true
-			}
-			break
-		}
-	}
-	return false
+	return IsMemoryBackedVolumeResizeRequested(desired, allocated)
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
@@ -644,10 +634,6 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 }
 
 func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return activePods
-	}
-
 	allocatedPods := make([]*v1.Pod, 0, len(activePods))
 	for _, pod := range activePods {
 		// Filter out pods that don't yet have an allocation, which will filter pods that
@@ -661,7 +647,7 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 }
 
 func (m *manager) GetAllocatedPods() []*v1.Pod {
-	return m.getAllocatedPods(m.getActivePods())
+	return m.getAllocatedPods(m.podProvider.GetActivePods())
 }
 
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
@@ -675,6 +661,22 @@ func IsResizableContainer(container *v1.Container, containerType podutil.Contain
 	}
 }
 
+func VolHasMemoryBackedEmptyDir(vol *v1.Volume) bool {
+	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory
+}
+
+func PodHasMemoryBackedEmptyDir(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	for i := range pod.Spec.Volumes {
+		if VolHasMemoryBackedEmptyDir(&pod.Spec.Volumes[i]) {
+			return true
+		}
+	}
+	return false
+}
+
 func VolHasMemoryBackedEmptyDirSizeLimit(vol *v1.Volume) bool {
-	return vol != nil && vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
+	return VolHasMemoryBackedEmptyDir(vol) && vol.EmptyDir.SizeLimit != nil && !vol.EmptyDir.SizeLimit.IsZero()
 }

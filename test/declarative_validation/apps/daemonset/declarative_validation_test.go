@@ -84,7 +84,7 @@ func TestDeclarativeValidate(t *testing.T) {
 			"invalid toleration key format": {
 				input: mkDaemonSet(tweakPodSpec(podtest.SetTolerations(api.Toleration{Key: "invalid key", Operator: api.TolerationOpExists}))),
 				expectedErrs: field.ErrorList{
-					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+					field.Invalid(field.NewPath("spec", "template", "spec", "tolerations").Index(0).Child("key"), nil, "").WithOrigin("format=k8s-label-key").MarkBeta(),
 				},
 			},
 			"activeDeadlineSeconds minimum boundary violation": {
@@ -105,6 +105,12 @@ func TestDeclarativeValidate(t *testing.T) {
 				expectedErrs: field.ErrorList{
 					field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported").MarkFromImperative(),
 					field.Invalid(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), int64(2147483648), "").WithOrigin("maximum").MarkAlpha(),
+				},
+			},
+			"restartPolicy not Always": {
+				input: mkDaemonSet(tweakPodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever))),
+				expectedErrs: field.ErrorList{
+					field.NotSupported(field.NewPath("spec", "template", "spec", "restartPolicy"), api.RestartPolicyNever, []api.RestartPolicy{api.RestartPolicyAlways}).MarkAlpha(),
 				},
 			},
 		}

@@ -2,7 +2,6 @@
 
 reviewers:
   - sig-network-reviewers
-  - smarterclayton
   - justinsb
 labels:
   - sig/network

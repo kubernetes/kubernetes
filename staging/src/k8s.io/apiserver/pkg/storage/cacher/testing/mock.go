@@ -33,6 +33,7 @@ type MockStorage struct {
 	sync.RWMutex
 	GetListErr         error
 	WatchErr           error
+	GetFn              func(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error
 	GetListFn          func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
 	GetRVFn            func(_ context.Context) (uint64, error)
 	WatchFn            func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
@@ -93,6 +94,9 @@ func (d *MockStorage) Delete(ctx context.Context, key string, out runtime.Object
 	}
 	return fmt.Errorf("unimplemented")
 }
+func (d *MockStorage) DeleteOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object) error {
+	return fmt.Errorf("unimplemented")
+}
 func (d *MockStorage) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	if d.WatchFn != nil {
 		return d.WatchFn(ctx, key, opts)
@@ -102,7 +106,10 @@ func (d *MockStorage) Watch(ctx context.Context, key string, opts storage.ListOp
 
 	return NewMockWatch(), d.WatchErr
 }
-func (d *MockStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
+func (d *MockStorage) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+	if d.GetFn != nil {
+		return d.GetFn(ctx, key, opts, objPtr)
+	}
 	d.RLock()
 	defer d.RUnlock()
 	return d.GetListErr
@@ -122,6 +129,9 @@ func (d *MockStorage) GuaranteedUpdate(ctx context.Context, key string, destinat
 		return d.GuaranteedUpdateFn(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
 	}
 	return fmt.Errorf("unimplemented")
+}
+func (d *MockStorage) UpdateOnce(_ context.Context, _ string, _ *storage.ObjState, _ runtime.Object, _ uint64, _ runtime.Object, _ bool) (*storage.ObjState, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 func (d *MockStorage) Stats(_ context.Context) (storage.Stats, error) {
 	return storage.Stats{}, fmt.Errorf("unimplemented")

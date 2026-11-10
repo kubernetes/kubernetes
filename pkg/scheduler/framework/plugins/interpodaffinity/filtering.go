@@ -275,11 +275,14 @@ func (m topologyToMatchedTermCount) clone() topologyToMatchedTermCount {
 }
 
 func (m topologyToMatchedTermCount) update(node *v1.Node, tk string, value int64) {
+	if node == nil {
+		return
+	}
 	if tv, ok := node.Labels[tk]; ok {
 		pair := topologyPair{key: tk, value: tv}
 		m[pair] += value
 		// value could be negative, hence we delete the entry if it is down to zero.
-		if m[pair] == 0 {
+		if m[pair] <= 0 {
 			delete(m, pair)
 		}
 	}
@@ -318,6 +321,9 @@ type topologyPairCount struct {
 }
 
 func (m *topologyToMatchedTermCountList) recordMatch(node *v1.Node, tk string, value int64) {
+	if node == nil {
+		return
+	}
 	if tv, ok := node.Labels[tk]; ok {
 		pair := topologyPair{key: tk, value: tv}
 		*m = append(*m, topologyPairCount{
@@ -350,26 +356,31 @@ func (m *topologyToMatchedTermCountList) appendWithAntiAffinityTerms(terms []fwk
 }
 
 // podMatchesAllAffinityTerms returns true if the given terms list is not empty and given pod matches all the given terms.
-// Useful for checking affinity. For anti-affinity, use podMatchesAnyAffinityTerms.
+// It assumes the terms have already had NamespaceSelector unrolled into Namespaces.
+// For anti-affinity, use podMatchesAnyAffinityTermsWithNSLabels.
 func podMatchesAllAffinityTerms(terms []fwk.AffinityTerm, pod *v1.Pod) bool {
+	return podMatchesAllAffinityTermsWithNSLabels(terms, pod, nil)
+}
+
+// podMatchesAllAffinityTermsWithNSLabels reports whether the pod matches all
+// terms, using nsLabels when the terms have not been unrolled into Namespaces.
+func podMatchesAllAffinityTermsWithNSLabels(terms []fwk.AffinityTerm, pod *v1.Pod, nsLabels labels.Set) bool {
 	if len(terms) == 0 {
 		return false
 	}
 	for _, t := range terms {
-		// The incoming pod NamespaceSelector was merged into the Namespaces set, and so
-		// we are not explicitly passing in namespace labels.
-		if !t.Matches(pod, nil) {
+		if !t.Matches(pod, nsLabels) {
 			return false
 		}
 	}
 	return true
 }
 
-// podMatchesAnyAffinityTerms returns true if the given pod matches any of the given terms.
-// Useful for checking anti-affinity.
-func podMatchesAnyAffinityTerms(terms []fwk.AffinityTerm, pod *v1.Pod) bool {
+// podMatchesAnyAffinityTermsWithNSLabels reports whether the pod matches any
+// term, using nsLabels when the terms have not been unrolled into Namespaces.
+func podMatchesAnyAffinityTermsWithNSLabels(terms []fwk.AffinityTerm, pod *v1.Pod, nsLabels labels.Set) bool {
 	for _, t := range terms {
-		if t.Matches(pod, nil) {
+		if t.Matches(pod, nsLabels) {
 			return true
 		}
 	}

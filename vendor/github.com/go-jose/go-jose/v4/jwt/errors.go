@@ -47,7 +47,7 @@ var ErrNotValidYet = errors.New("go-jose/go-jose/jwt: validation failed, token n
 var ErrExpired = errors.New("go-jose/go-jose/jwt: validation failed, token is expired (exp)")
 
 // ErrIssuedInTheFuture indicates that the iat field is in the future.
-var ErrIssuedInTheFuture = errors.New("go-jose/go-jose/jwt: validation field, token issued in the future (iat)")
+var ErrIssuedInTheFuture = errors.New("go-jose/go-jose/jwt: validation failed, token issued in the future (iat)")
 
 // ErrInvalidContentType indicates that token requires JWT cty header.
 var ErrInvalidContentType = errors.New("go-jose/go-jose/jwt: expected content type to be JWT (cty header)")

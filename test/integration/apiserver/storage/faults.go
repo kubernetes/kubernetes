@@ -50,11 +50,14 @@ func hasUnaryTimeoutError(ops []correctness.Operation) bool {
 	return false
 }
 
-// hasConsistentListFallback checks whether any consistent List (ResourceVersion == "")
-// waited for cacher's 3s blockTimeout before falling back to etcd and succeeding.
+// hasConsistentListFallback checks whether any consistent List waited for
+// cacher's 3s blockTimeout before falling back to etcd and succeeding.
 func hasConsistentListFallback(ops []correctness.Operation) bool {
 	for _, op := range ops {
-		if op.Request.Op == correctness.OpList && op.Request.List.Options.ResourceVersion == "" && op.Response.Err == nil && op.End.Sub(op.Start) >= 3*time.Second {
+		if op.Request.Op != correctness.OpList || op.Response.Err != nil || op.End.Sub(op.Start) < 3*time.Second {
+			continue
+		}
+		if consistency, _, _, err := correctness.ListReadConsistency("", storage.APIObjectVersioner{}, op.Request.List.Options); err == nil && consistency == correctness.ConsistencyConsistent {
 			return true
 		}
 	}
@@ -330,6 +333,16 @@ func (s *bookmarkDroppingStore) Delete(ctx context.Context, key string, out runt
 	return err
 }
 
+func (s *bookmarkDroppingStore) DeleteOnce(ctx context.Context, key string, origState *storage.ObjState, out runtime.Object) error {
+	s.writeMu.RLock()
+	defer s.writeMu.RUnlock()
+	err := s.Interface.DeleteOnce(ctx, key, origState, out)
+	if err == nil {
+		s.writesSeen.Add(1)
+	}
+	return err
+}
+
 func (s *bookmarkDroppingStore) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	s.writeMu.RLock()
 	defer s.writeMu.RUnlock()
@@ -338,6 +351,16 @@ func (s *bookmarkDroppingStore) GuaranteedUpdate(ctx context.Context, key string
 		s.writesSeen.Add(1)
 	}
 	return err
+}
+
+func (s *bookmarkDroppingStore) UpdateOnce(ctx context.Context, key string, origState *storage.ObjState, obj runtime.Object, ttl uint64, destination runtime.Object, ignoreNotFound bool) (*storage.ObjState, error) {
+	s.writeMu.RLock()
+	defer s.writeMu.RUnlock()
+	state, err := s.Interface.UpdateOnce(ctx, key, origState, obj, ttl, destination, ignoreNotFound)
+	if err == nil {
+		s.writesSeen.Add(1)
+	}
+	return state, err
 }
 
 func (s *bookmarkDroppingStore) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {

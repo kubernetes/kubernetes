@@ -17,8 +17,9 @@ limitations under the License.
 package workloadbuilder
 
 import (
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	"slices"
+
+	schedulingv1 "k8s.io/api/scheduling/v1"
 )
 
 // mapWorkloadInput translates the leaf-level scheduling.k8s.io building blocks
@@ -85,7 +86,7 @@ func mapCompositeGroupInput(input WorkloadInput) *SchedulingConfig {
 // mapSchedulingPolicy returns nil for an empty policy so resolveSchedulingConfig
 // falls back to the controller default instead of treating an unset user block
 // as an explicit override.
-func mapSchedulingPolicy(p *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy) *SchedulingPolicy {
+func mapSchedulingPolicy(p *schedulingv1.WorkloadPodGroupSchedulingPolicy) *SchedulingPolicy {
 	switch {
 	case p.Basic != nil:
 		return &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}
@@ -109,7 +110,7 @@ func mapSchedulingPolicy(p *schedulingv1alpha3.WorkloadPodGroupSchedulingPolicy)
 // CompositePodGroupSchedulingPolicy.MinGroupCount for composite nodes. An empty
 // policy returns nil so resolveSchedulingConfig falls back to the controller
 // default instead of treating an unset user block as an explicit override.
-func mapCompositeSchedulingPolicy(p *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingPolicy) *SchedulingPolicy {
+func mapCompositeSchedulingPolicy(p *schedulingv1.WorkloadCompositePodGroupSchedulingPolicy) *SchedulingPolicy {
 	switch {
 	case p.Basic != nil:
 		return &SchedulingPolicy{Basic: &BasicSchedulingPolicy{}}
@@ -127,29 +128,21 @@ func mapCompositeSchedulingPolicy(p *schedulingv1alpha3.WorkloadCompositePodGrou
 	}
 }
 
-func mapTopologyConstraints(c *schedulingv1alpha3.WorkloadPodGroupSchedulingConstraints) *SchedulingConstraints {
+func mapTopologyConstraints(c *schedulingv1.WorkloadPodGroupSchedulingConstraints) *SchedulingConstraints {
 	if len(c.Topology) == 0 {
 		return nil
 	}
-	topology := make([]schedulingv1beta1.TopologyConstraint, len(c.Topology))
-	for i, t := range c.Topology {
-		topology[i] = schedulingv1beta1.TopologyConstraint{Key: t.Key}
-	}
-	return &SchedulingConstraints{Topology: topology}
+	return &SchedulingConstraints{Topology: slices.Clone(c.Topology)}
 }
 
-func mapCompositeTopologyConstraints(c *schedulingv1alpha3.WorkloadCompositePodGroupSchedulingConstraints) *SchedulingConstraints {
+func mapCompositeTopologyConstraints(c *schedulingv1.WorkloadCompositePodGroupSchedulingConstraints) *SchedulingConstraints {
 	if len(c.Topology) == 0 {
 		return nil
 	}
-	topology := make([]schedulingv1beta1.TopologyConstraint, len(c.Topology))
-	for i, t := range c.Topology {
-		topology[i] = schedulingv1beta1.TopologyConstraint{Key: t.Key}
-	}
-	return &SchedulingConstraints{Topology: topology}
+	return &SchedulingConstraints{Topology: slices.Clone(c.Topology)}
 }
 
-func mapDisruptionMode(d *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) *DisruptionMode {
+func mapDisruptionMode(d *schedulingv1.WorkloadPodGroupDisruptionMode) *DisruptionMode {
 	switch {
 	case d.Single != nil:
 		return &DisruptionMode{Single: &SingleDisruptionMode{}}
@@ -160,7 +153,7 @@ func mapDisruptionMode(d *schedulingv1alpha3.WorkloadPodGroupDisruptionMode) *Di
 	}
 }
 
-func mapCompositeDisruptionMode(d *schedulingv1alpha3.WorkloadCompositePodGroupDisruptionMode) *DisruptionMode {
+func mapCompositeDisruptionMode(d *schedulingv1.WorkloadCompositePodGroupDisruptionMode) *DisruptionMode {
 	switch {
 	case d.Single != nil:
 		return &DisruptionMode{Single: &SingleDisruptionMode{}}
@@ -171,7 +164,7 @@ func mapCompositeDisruptionMode(d *schedulingv1alpha3.WorkloadCompositePodGroupD
 	}
 }
 
-func mapResourceClaims(claims []schedulingv1alpha3.WorkloadPodGroupResourceClaim) []ResourceClaim {
+func mapResourceClaims(claims []schedulingv1.WorkloadPodGroupResourceClaim) []ResourceClaim {
 	result := make([]ResourceClaim, len(claims))
 	for i := range claims {
 		rc := ResourceClaim{Name: claims[i].Name}
