@@ -322,53 +322,8 @@ func (s *Plugin) getServiceAccount(namespace string, name string) (*corev1.Servi
 
 func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
-	mountableSecrets := sets.NewString()
-	for _, s := range serviceAccount.Secrets {
-		mountableSecrets.Insert(s.Name)
-	}
-	for _, volume := range pod.Spec.Volumes {
-		source := volume.VolumeSource
-		if source.Secret == nil {
-			continue
-		}
-		secretName := source.Secret.SecretName
-		if !mountableSecrets.Has(secretName) {
-			return fmt.Errorf("volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", secretName, serviceAccount.Name)
-		}
-	}
-
-	for _, container := range pod.Spec.InitContainers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("init container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
-				}
-			}
-		}
-		for _, envFrom := range container.EnvFrom {
-			if envFrom.SecretRef != nil {
-				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
-					return fmt.Errorf("init container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
-				}
-			}
-		}
-	}
-
-	for _, container := range pod.Spec.Containers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
-				}
-			}
-		}
-		for _, envFrom := range container.EnvFrom {
-			if envFrom.SecretRef != nil {
-				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
-					return fmt.Errorf("container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
-				}
-			}
-		}
+	if err := checkMountableSecrets(serviceAccount, pod, nil); err != nil {
+		return err
 	}
 
 	// limit pull secret references as well
@@ -397,26 +352,40 @@ func (s *Plugin) limitEphemeralContainerSecretReferences(pod *api.Pod, a admissi
 	if !s.enforceMountableSecrets(serviceAccount) {
 		return nil
 	}
-	// Ensure all secrets the ephemeral containers reference are allowed by the service account
-	mountableSecrets := sets.NewString()
+	// Ensure all secrets newly referenced by the update are allowed by the service account
+	oldPod, _ := a.GetOldObject().(*api.Pod)
+	return checkMountableSecrets(serviceAccount, pod, oldPod)
+}
+
+// checkMountableSecrets returns an error listing the secrets referenced by pod that are not in
+// serviceAccount.Secrets. Secrets already referenced by oldPod (nil on create) are allowed, so
+// that pods created before enforcement was enabled on the service account can still be updated.
+func checkMountableSecrets(serviceAccount *corev1.ServiceAccount, pod, oldPod *api.Pod) error {
+	mountableSecrets := sets.New[string]()
 	for _, s := range serviceAccount.Secrets {
 		mountableSecrets.Insert(s.Name)
 	}
-	for _, container := range pod.Spec.EphemeralContainers {
-		for _, env := range container.Env {
-			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
-				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("ephemeral container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
-				}
-			}
-		}
-		for _, envFrom := range container.EnvFrom {
-			if envFrom.SecretRef != nil {
-				if !mountableSecrets.Has(envFrom.SecretRef.Name) {
-					return fmt.Errorf("ephemeral container %s with envFrom referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, envFrom.SecretRef.Name, serviceAccount.Name)
-				}
-			}
-		}
+
+	// Image pull secrets are limited by serviceAccount.ImagePullSecrets instead, so they are
+	// excluded here. A name that is also referenced elsewhere in the pod is still visited.
+	secretNames := func(p *api.Pod) sets.Set[string] {
+		names := sets.New[string]()
+		withoutPullSecrets := *p
+		withoutPullSecrets.Spec.ImagePullSecrets = nil
+		podutil.VisitPodSecretNames(&withoutPullSecrets, func(name string) bool {
+			names.Insert(name)
+			return true
+		}, podutil.AllContainers)
+		return names
+	}
+
+	disallowed := secretNames(pod).Difference(mountableSecrets)
+	// Ignore secrets the old pod already referenced.
+	if oldPod != nil {
+		disallowed = disallowed.Difference(secretNames(oldPod))
+	}
+	if disallowed.Len() > 0 {
+		return fmt.Errorf("pod references secrets %q which are not allowed because service account %s does not reference them", sets.List(disallowed), serviceAccount.Name)
 	}
 	return nil
 }
