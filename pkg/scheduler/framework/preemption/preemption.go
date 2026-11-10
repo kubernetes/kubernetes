@@ -109,11 +109,9 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 	// The scheduler nominates a pod in memory before the informer shows the
 	// nominated node name. Without it, the pod would look like it had not
 	// preempted yet and could preempt again while its victims are terminating.
-	if nominator, ok := ev.Handler.(framework.NominatedNodeNameGetter); ok {
-		if nodeName := nominator.NominatedNodeName(pod); nodeName != pod.Status.NominatedNodeName {
-			pod = pod.DeepCopy()
-			pod.Status.NominatedNodeName = nodeName
-		}
+	if nodeName := nominatedNodeName(ev.Handler, pod); nodeName != pod.Status.NominatedNodeName {
+		pod = pod.DeepCopy()
+		pod.Status.NominatedNodeName = nodeName
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.

@@ -37,6 +37,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -1825,11 +1826,14 @@ func TestPodGroupEvaluator_Preempt_NominatedNodes(t *testing.T) {
 func TestPodGroupEvaluator_Preempt(t *testing.T) {
 	tests := []struct {
 		name               string
+		draPreemption      bool
+		allowEvaluation    bool
 		nodes              []*v1.Node
 		initPods           []*v1.Pod
 		initPodGroups      []*schedulingv1beta1.PodGroup
 		preemptorPodGroup  *schedulingv1beta1.PodGroup
 		preemptorPods      []*v1.Pod
+		setupQueue         func(t *testing.T, ctx context.Context, logger klog.Logger, queue internalqueue.SchedulingQueue)
 		expectedStatus     *fwk.Status
 		expectedNominating map[types.NamespacedName]*fwk.NominatingInfo
 	}{
@@ -1938,12 +1942,113 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 			},
 			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "not eligible due to preemptionPolicy=Never."),
 		},
+		{
+			name:          "DRAPreemption: member nominated in memory while pod object lags returns ongoing preemption with in-memory nomination",
+			draPreemption: true,
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(lowPriority).Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+			},
+			preemptorPodGroup: st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj(),
+			},
+			setupQueue: func(t *testing.T, _ context.Context, logger klog.Logger, queue internalqueue.SchedulingQueue) {
+				p2Info, err := framework.NewPodInfo(st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj())
+				if err != nil {
+					t.Fatal(err)
+				}
+				queue.AddNominatedPod(logger, p2Info, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+			},
+			expectedStatus: fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes"),
+			expectedNominating: map[types.NamespacedName]*fwk.NominatingInfo{
+				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: ""},
+				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
+			},
+		},
+		{
+			name:            "Without DRAPreemption: member nominated only in memory follows pod object",
+			allowEvaluation: true,
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(lowPriority).Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+			},
+			preemptorPodGroup: st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj(),
+			},
+			setupQueue: func(t *testing.T, _ context.Context, logger klog.Logger, queue internalqueue.SchedulingQueue) {
+				p2Info, err := framework.NewPodInfo(st.MakePod().Name("p2").UID("p2").Priority(highPriority).Obj())
+				if err != nil {
+					t.Fatal(err)
+				}
+				queue.AddNominatedPod(logger, p2Info, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "no fit"),
+		},
+		{
+			name:            "DRAPreemption: member cleared in memory while pod object lags does not report ongoing preemption",
+			draPreemption:   true,
+			allowEvaluation: true,
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("victim").UID("v1").Node("node1").Priority(lowPriority).Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+			},
+			preemptorPodGroup: st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Priority(highPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			},
+			setupQueue: func(_ *testing.T, ctx context.Context, logger klog.Logger, queue internalqueue.SchedulingQueue) {
+				p2 := st.MakePod().Name("p2").UID("p2").Priority(highPriority).NominatedNodeName("node1").Obj()
+				queue.Add(ctx, p2)
+				queue.(framework.NominationClearer).ClearNominatedPod(logger, p2, "node1")
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "no fit"),
+		},
+		{
+			name:          "DRAPreemption: ongoing preemption on sibling does not revive member nomination cleared in memory",
+			draPreemption: true,
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Obj(),
+				st.MakeNode().Name("node2").Obj(),
+			},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("victim2").UID("v2").Node("node2").Priority(lowPriority).Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Terminating().Obj(),
+			},
+			preemptorPodGroup: st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Priority(highPriority).NominatedNodeName("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Priority(highPriority).NominatedNodeName("node2").Obj(),
+			},
+			setupQueue: func(_ *testing.T, ctx context.Context, logger klog.Logger, queue internalqueue.SchedulingQueue) {
+				p1 := st.MakePod().Name("p1").UID("p1").Priority(highPriority).NominatedNodeName("node1").Obj()
+				p2 := st.MakePod().Name("p2").UID("p2").Priority(highPriority).NominatedNodeName("node2").Obj()
+				queue.Add(ctx, p1)
+				queue.Add(ctx, p2)
+				queue.(framework.NominationClearer).ClearNominatedPod(logger, p1, "node1")
+			},
+			expectedStatus: fwk.NewStatus(fwk.Success, "ongoing preemption on nominated nodes"),
+			expectedNominating: map[types.NamespacedName]*fwk.NominatingInfo{
+				{Namespace: "", Name: "p1"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: ""},
+				{Namespace: "", Name: "p2"}: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodGroupPreemptionPolicy, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, tt.draPreemption)
 			logger, ctx := ktesting.NewTestContext(t)
 
 			var objs []runtime.Object
@@ -1959,10 +2064,11 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			snapshot := internalcache.NewTestSnapshotWithPodGroups(tt.initPods, tt.nodes, tt.initPodGroups, nil)
+			queue := internalqueue.NewSchedulingQueue((&queuesort.PrioritySort{}).Less, informerFactory)
 			f, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithPodNominator(queue),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithMutableSnapshotLister(snapshot),
@@ -1977,6 +2083,9 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 
 			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSyncWithContext(ctx)
+			if tt.setupQueue != nil {
+				tt.setupQueue(t, ctx, logger, queue)
+			}
 
 			podGroups := make(map[string]*schedulingv1beta1.PodGroup)
 			for _, pg := range tt.initPodGroups {
@@ -1988,8 +2097,10 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 			}
 
 			mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
-				t.Fatal("podGroupSchedulingFunc should not be called when ongoing preemption is detected")
-				return nil, fwk.NewStatus(fwk.Error)
+				if !tt.allowEvaluation {
+					t.Fatal("podGroupSchedulingFunc should not be called when ongoing preemption is detected")
+				}
+				return nil, fwk.NewStatus(fwk.Unschedulable, "no fit")
 			}
 
 			pgInfo := &framework.PodGroupInfo{
@@ -1997,7 +2108,13 @@ func TestPodGroupEvaluator_Preempt(t *testing.T) {
 				UnscheduledPods: tt.preemptorPods,
 			}
 
+			if err := pl.Handle.MutableSnapshotSharedLister().StartMutations(); err != nil {
+				t.Fatalf("Unexpected error starting mutations: %v", err)
+			}
 			gotResult, gotStatus := pl.Preempt(ctx, framework.NewCycleState(), pgInfo, mockSchedulingFunc)
+			if err := pl.Handle.MutableSnapshotSharedLister().EndMutations(); err != nil {
+				t.Errorf("Unexpected error ending mutations: %v", err)
+			}
 			if gotStatus.Code() != tt.expectedStatus.Code() || gotStatus.Message() != tt.expectedStatus.Message() {
 				t.Errorf("Status mismatch. Want status code %v with message %q, Got code %v with message %q",
 					tt.expectedStatus.Code(), tt.expectedStatus.Message(), gotStatus.Code(), gotStatus.Message())

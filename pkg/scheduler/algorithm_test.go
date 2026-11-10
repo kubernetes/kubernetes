@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -384,91 +385,93 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, true)
-			logger, ctx := ktesting.NewTestContext(t)
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", tt.name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+				logger, ctx := ktesting.NewTestContext(t)
 
-			plugin := &assumeReserveTestPlugin{
-				fakePodGroupPlugin: &fakePodGroupPlugin{
-					filterStatus: map[string]*fwk.Status{tt.pod.Name: fwk.NewStatus(fwk.Success)},
-				},
-			}
-			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
-			f := newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, tt.pod)
+				plugin := &assumeReserveTestPlugin{
+					fakePodGroupPlugin: &fakePodGroupPlugin{
+						filterStatus: map[string]*fwk.Status{tt.pod.Name: fwk.NewStatus(fwk.Success)},
+					},
+				}
+				nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+				f := newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, tt.pod)
 
-			podInfo, err := framework.NewPodInfo(tt.pod)
-			if err != nil {
-				t.Fatalf("Failed to create PodInfo: %v", err)
-			}
-			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+				podInfo, err := framework.NewPodInfo(tt.pod)
+				if err != nil {
+					t.Fatalf("Failed to create PodInfo: %v", err)
+				}
+				queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
 
-			state := newPodGroupCycleState()
+				state := newPodGroupCycleState()
 
-			if tt.nominated {
-				f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{
-					NominatedNodeName: node1.Name,
-					NominatingMode:    fwk.ModeOverride,
-				})
-			}
-			isNominated := func() bool {
-				return slices.ContainsFunc(f.fwk.NominatedPodsForNode(logger, node1.Name), func(pi fwk.PodInfo) bool {
-					return pi.GetPod().UID == tt.pod.UID
-				})
-			}
-			callsBefore := nominationExtensions.Calls()
+				if tt.nominated {
+					f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{
+						NominatedNodeName: node1.Name,
+						NominatingMode:    fwk.ModeOverride,
+					})
+				}
+				isNominated := func() bool {
+					return slices.ContainsFunc(f.fwk.NominatedPodsForNode(logger, node1.Name), func(pi fwk.PodInfo) bool {
+						return pi.GetPod().UID == tt.pod.UID
+					})
+				}
+				callsBefore := nominationExtensions.Calls()
 
-			scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
-			if err != nil {
-				t.Fatalf("schedulePod failed: %v", err)
-			}
+				scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("schedulePod failed: %v", err)
+				}
 
-			status, revertFn := f.algorithm.AssumeAndReserveInSnapshot(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
-			if !status.IsSuccess() {
-				t.Fatalf("AssumeAndReserveInSnapshot status = %v, want success", status)
-			}
-			if revertFn == nil {
-				t.Fatal("AssumeAndReserveInSnapshot returned no revert function on success")
-			}
+				status, revertFn := f.algorithm.AssumeAndReserveInSnapshot(ctx, state, f.fwk, queuedPodInfo, scheduleResult)
+				if !status.IsSuccess() {
+					t.Fatalf("AssumeAndReserveInSnapshot status = %v, want success", status)
+				}
+				if revertFn == nil {
+					t.Fatal("AssumeAndReserveInSnapshot returned no revert function on success")
+				}
 
-			// The pod group cycle keeps its tentative placement out of the shared cache.
-			isAssumed, err := f.algorithm.cache.IsAssumedPod(tt.pod)
-			if err != nil {
-				t.Fatalf("cache.IsAssumedPod() error: %v", err)
-			}
-			if isAssumed {
-				t.Error("pod assumed in the cache during a pod group cycle, want snapshot only")
-			}
-			if !isPodInSnapshot(f.algorithm.nodeInfoSnapshot, node1.Name, tt.pod.Name) {
-				t.Error("pod not assumed in the snapshot during a pod group cycle")
-			}
-			if !f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod.UID) {
-				t.Error("snapshot does not report the pod as assumed")
-			}
-			if tt.pod.Spec.NodeName != "" {
-				t.Errorf("input pod Spec.NodeName mutated = %q, want empty", tt.pod.Spec.NodeName)
-			}
-			if got := isNominated(); got != tt.nominated {
-				t.Errorf("pod nominated while assumed in the snapshot: %v, want %v", got, tt.nominated)
-			}
+				// The pod group cycle keeps its tentative placement out of the shared cache.
+				isAssumed, err := f.algorithm.cache.IsAssumedPod(tt.pod)
+				if err != nil {
+					t.Fatalf("cache.IsAssumedPod() error: %v", err)
+				}
+				if isAssumed {
+					t.Error("pod assumed in the cache during a pod group cycle, want snapshot only")
+				}
+				if !isPodInSnapshot(f.algorithm.nodeInfoSnapshot, node1.Name, tt.pod.Name) {
+					t.Error("pod not assumed in the snapshot during a pod group cycle")
+				}
+				if !f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod.UID) {
+					t.Error("snapshot does not report the pod as assumed")
+				}
+				if tt.pod.Spec.NodeName != "" {
+					t.Errorf("input pod Spec.NodeName mutated = %q, want empty", tt.pod.Spec.NodeName)
+				}
+				if got := isNominated(); got != tt.nominated {
+					t.Errorf("pod nominated while assumed in the snapshot: %v, want %v", got, tt.nominated)
+				}
 
-			revertFn()
+				revertFn()
 
-			if isPodInSnapshot(f.algorithm.nodeInfoSnapshot, node1.Name, tt.pod.Name) {
-				t.Error("pod still in the snapshot after revert")
-			}
-			if f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod.UID) {
-				t.Error("snapshot reports the pod as assumed after revert")
-			}
-			if !plugin.unreserved {
-				t.Error("expected Unreserve to be called on revert")
-			}
-			if got := isNominated(); got != tt.nominated {
-				t.Errorf("pod nominated after revert: %v, want %v", got, tt.nominated)
-			}
-			if diff := cmp.Diff(callsBefore, nominationExtensions.Calls()); diff != "" {
-				t.Errorf("Unexpected NominationExtensions calls for the snapshot assume and revert (-want,+got):\n%s", diff)
-			}
-		})
+				if isPodInSnapshot(f.algorithm.nodeInfoSnapshot, node1.Name, tt.pod.Name) {
+					t.Error("pod still in the snapshot after revert")
+				}
+				if f.algorithm.nodeInfoSnapshot.IsPodAssumed(tt.pod.UID) {
+					t.Error("snapshot reports the pod as assumed after revert")
+				}
+				if !plugin.unreserved {
+					t.Error("expected Unreserve to be called on revert")
+				}
+				if got := isNominated(); got != tt.nominated {
+					t.Errorf("pod nominated after revert: %v, want %v", got, tt.nominated)
+				}
+				if diff := cmp.Diff(callsBefore, nominationExtensions.Calls()); diff != "" {
+					t.Errorf("Unexpected NominationExtensions calls for the snapshot assume and revert (-want,+got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
 

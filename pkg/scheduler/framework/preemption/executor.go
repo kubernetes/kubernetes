@@ -440,13 +440,22 @@ func observeVictims(preemptor ExecutorPreemptor, candidate fwk.PreemptionCandida
 	}
 }
 
+// nominatedNodeName returns the nominated node of pod from fh if it implements
+// NominatedNodeNameGetter, otherwise what the pod object shows.
+func nominatedNodeName(fh fwk.Handle, pod *v1.Pod) string {
+	if nominator, ok := fh.(framework.NominatedNodeNameGetter); ok {
+		return nominator.NominatedNodeName(pod)
+	}
+	return pod.Status.NominatedNodeName
+}
+
 // IsPodGroupWaitingForVictims returns true if previously preempted victims on the
 // pod group's nominated nodes are still terminating in the current snapshot.
 func (e *Executor) IsPodGroupWaitingForVictims(pgInfo fwk.PodGroupInfo) bool {
 	nominatedNodes := sets.New[string]()
 	for _, pod := range pgInfo.GetAllUnscheduledPods() {
-		if len(pod.Status.NominatedNodeName) > 0 {
-			nominatedNodes.Insert(pod.Status.NominatedNodeName)
+		if nnn := nominatedNodeName(e.fh, pod); len(nnn) > 0 {
+			nominatedNodes.Insert(nnn)
 		}
 	}
 
