@@ -809,4 +809,102 @@ var _ = SIGDescribe("CPU Manager Metrics Pod Level Resources", ginkgo.Ordered, g
 			return nil
 		}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).Should(gomega.Succeed())
 	})
+
+	ginkgo.It("should increment cpu alignment metrics in pod scope", func(ctx context.Context) {
+		if smtLevel := smtLevelFromSysFS(); smtLevel > 2 {
+			e2eskipper.Skipf("Skipping the test case since the SMTLevel=%d > 2", smtLevel)
+		}
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:                     string(cpumanager.PolicyStatic),
+				topologyManagerPolicy:          string(topologymanager.PolicyRestricted),
+				topologyManagerScope:           string(topologymanager.PodTopologyScope),
+				enablePodLevelResources:        true,
+				enablePodLevelResourceManagers: true,
+				reservedSystemCPUs:             cpuset.New(0),
+				enableCPUManagerOptions:        true,
+				options:                        map[string]string{cpumanager.FullPCPUsOnlyOption: "true"},
+			},
+		)
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ginkgo.By("Getting baseline metrics")
+		baselineMetrics, err := getKubeletMetrics(ctx)
+		framework.ExpectNoError(err)
+
+		basePodAligned, err := getCounterMetricValue(baselineMetrics, "kubelet_container_aligned_compute_resources_count", map[string]string{"scope": "pod", "boundary": "physical_cpu"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+		baseCtnAligned, err := getCounterMetricValue(baselineMetrics, "kubelet_container_aligned_compute_resources_count", map[string]string{"scope": "container", "boundary": "physical_cpu"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+		basePodAlignedFailures, err := getCounterMetricValue(baselineMetrics, "kubelet_container_aligned_compute_resources_failure_count", map[string]string{"scope": "pod", "boundary": "physical_cpu"})
+		if !errors.Is(err, ErrMetricNotFound) {
+			framework.ExpectNoError(err)
+		}
+
+		ginkgo.By("Creating a Guaranteed pod with pod-level resources")
+		testPod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "plrm-metrics-pod-aligned-resources",
+			},
+			Spec: v1.PodSpec{
+				RestartPolicy: v1.RestartPolicyNever,
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("2"),
+						v1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:    "shared-ctn",
+						Image:   busyboxImage,
+						Command: []string{"sh", "-c", "sleep 1d"},
+					},
+				},
+			},
+		}
+
+		testPod = e2epod.NewPodClient(f).CreateSync(ctx, testPod)
+
+		ginkgo.By("Verifying aligned_compute_resources metrics")
+		gomega.Eventually(ctx, func(ctx context.Context) error {
+			currentMetrics, err := getKubeletMetrics(ctx)
+			if err != nil {
+				return err
+			}
+
+			currentPodAligned, err := getCounterMetricValue(currentMetrics, "kubelet_container_aligned_compute_resources_count", map[string]string{"scope": "pod", "boundary": "physical_cpu"})
+			if err != nil {
+				return err
+			}
+			if diff := currentPodAligned - basePodAligned; diff != 1 {
+				return fmt.Errorf("expected pod-scope physical_cpu alignment to be increased (diff=1), got %v", diff)
+			}
+
+			currentCtnAligned, err := getCounterMetricValue(currentMetrics, "kubelet_container_aligned_compute_resources_count", map[string]string{"scope": "container", "boundary": "physical_cpu"})
+			if err != nil {
+				return err
+			}
+			if diff := currentCtnAligned - baseCtnAligned; diff != 0 {
+				return fmt.Errorf("expected container-scope physical_cpu alignment to stay untouched (diff=0), got %v", diff)
+			}
+
+			currentPodAlignedFailures, err := getCounterMetricValue(currentMetrics, "kubelet_container_aligned_compute_resources_failure_count", map[string]string{"scope": "pod", "boundary": "physical_cpu"})
+			if err != nil {
+				return err
+			}
+			if diff := currentPodAlignedFailures - basePodAlignedFailures; diff != 0 {
+				return fmt.Errorf("expected pod-scope physical_cpu alignment failures to stay untouched (diff=0), got %v", diff)
+			}
+			return nil
+		}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).Should(gomega.Succeed())
+	})
 })
