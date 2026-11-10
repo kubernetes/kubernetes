@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -413,6 +414,9 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 		if rerr != nil {
 			metrics.CPUManagerPinningErrorsTotal.Inc()
 			metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerPod).Inc()
+			if p.options.FullPhysicalCPUsOnly && errors.As(rerr, &SMTAlignmentError{}) {
+				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedPhysicalCPU).Inc()
+			}
 		}
 	}()
 
@@ -496,9 +500,6 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 	// Store the pod-level allocation in the state.
 	s.SetPodCPUSet(podUID, podAllocation.CPUs)
 
-	// Update metrics after the pod-level allocation is set, as metrics recalculation requires it.
-	p.updateMetricsOnAllocate(logger, s, podAllocation)
-
 	// From this point on the pod owns the whole bubble: if the partitioning
 	// below fails, every CPU taken from the default CPU set must go back to
 	// it, or the CPUs would leak out of the shared pool with no pod able to
@@ -517,6 +518,9 @@ func (p *staticPolicy) allocatePodForAdd(logger klog.Logger, s state.State, pod 
 		return err
 	}
 	logger.V(4).Info("Partitioned pod-level CPU allocation", "exclusiveCPUs", podCPUAllocationToString(result.exclusiveCPUs), "podSharedPool", result.podSharedPool)
+
+	// Update metrics after the pod-level allocation is set, as metrics recalculation requires it.
+	p.updateMetricsOnAllocate(logger, s, podAllocation, metrics.AlignScopePod)
 
 	// 6. Save all container assignments to the state.
 	p.savePodContainerAssignments(s, podUID, pod, result, nil)
@@ -734,6 +738,10 @@ func (p *staticPolicy) restorePodAllocation(logger klog.Logger, s state.State, p
 		return err
 	}
 
+	// After a kubelet restart, the counter starts from zero, so a restored
+	// pod is counted again, same as on a fresh allocation.
+	p.updateAlignmentMetrics(metrics.AlignScopePod)
+
 	if result.missing == 0 {
 		// The full allocation was restored from the checkpoint, nothing to update.
 		logger.V(2).Info("Pod-level CPU allocation fully restored from checkpoint", "podCPUSet", podCPUSet)
@@ -906,15 +914,10 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 		if rerr != nil {
 			metrics.CPUManagerPinningErrorsTotal.Inc()
 			metrics.ResourceManagerAllocationErrorsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
-			if p.options.FullPhysicalCPUsOnly {
+			if p.options.FullPhysicalCPUsOnly && errors.As(rerr, &SMTAlignmentError{}) {
 				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 			}
 			return
-		}
-		// TODO: move in updateMetricsOnAllocate
-		if p.options.FullPhysicalCPUsOnly {
-			// increment only if we know we allocate aligned resources
-			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 		}
 	}()
 
@@ -925,6 +928,9 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 	// satisfy SMT alignment are accepted to avoid disrupting running workloads.
 	if cset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
 		p.updateCPUsToReuse(pod, container, cset)
+		// After a kubelet restart, the counter starts from zero, so increment
+		// the alignment counter for the restored container again.
+		p.updateAlignmentMetrics(metrics.AlignScopeContainer)
 		logger.Info("Static policy: container already present in state, skipping")
 		return nil
 	}
@@ -946,7 +952,7 @@ func (p *staticPolicy) allocateForAdd(logger klog.Logger, s state.State, pod *v1
 
 	s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
 	p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
-	p.updateMetricsOnAllocate(logger, s, cpuAllocation)
+	p.updateMetricsOnAllocate(logger, s, cpuAllocation, metrics.AlignScopeContainer)
 	metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
 	metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusiveNode).Inc()
 
@@ -1508,6 +1514,9 @@ func (p *staticPolicy) initializeMetrics(logger klog.Logger, s state.State) {
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)        // ensure the value exists
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedPhysicalCPU).Add(0)
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedPhysicalCPU).Add(0)
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedUncoreCache).Add(0)
 	p.updateMetricsFromState(logger, s)
 }
 
@@ -1526,9 +1535,18 @@ func (p *staticPolicy) updateMetricsFromState(logger klog.Logger, s state.State)
 	updateAllocationPerNUMAMetric(logger, p.topology, totalExclusiveCPUs, p.numaNodes)
 }
 
-func (p *staticPolicy) updateMetricsOnAllocate(logger klog.Logger, s state.State, cpuAlloc topology.Allocation) {
+// updateAlignmentMetrics increments the physical_cpu counter in the given
+// scope. It is a no-op unless the full-pcpus-only option is set.
+func (p *staticPolicy) updateAlignmentMetrics(scope string) {
+	if p.options.FullPhysicalCPUsOnly {
+		metrics.ContainerAlignedComputeResources.WithLabelValues(scope, metrics.AlignedPhysicalCPU).Inc()
+	}
+}
+
+func (p *staticPolicy) updateMetricsOnAllocate(logger klog.Logger, s state.State, cpuAlloc topology.Allocation, scope string) {
+	p.updateAlignmentMetrics(scope)
 	if cpuAlloc.Aligned.UncoreCache {
-		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
+		metrics.ContainerAlignedComputeResources.WithLabelValues(scope, metrics.AlignedUncoreCache).Inc()
 	}
 	p.updateMetricsFromState(logger, s)
 }
