@@ -90,6 +90,10 @@ func (pl *DynamicResources) holdsOnNode(logger klog.Logger, p *preemptionState, 
 				// going to allocate it for both.
 				continue
 			}
+			if pl.draManager.ResourceClaims().GetPendingAllocation(uid) != nil {
+				// Pending allocations are already in the allocated state.
+				continue
+			}
 			claim, err := pl.draManager.ResourceClaims().Get(held.claim.Namespace, held.claim.Name)
 			if err != nil || claim.UID != uid || claim.Status.Allocation != nil {
 				// Allocated devices are already in use, a different

@@ -390,6 +390,50 @@ func testHoldsConsumableCapacity(tCtx ktesting.TContext) {
 		})
 		require.True(tCtx, fits(tCtx, testCtx, p), "p after the claim of its victim is deallocated")
 	})
+
+	tCtx.Run("pending-allocation", func(tCtx ktesting.TContext) {
+		// While a held claim has a pending allocation (for example from a
+		// tentative snapshot assume or another pod sharing the claim in
+		// Permit/PreBind), GatherAllocatedState already counts it, so the
+		// hold must not count its capacity a second time.
+		v1Pod := preemptionPod("v1", "v1-claim").Node(nodeName).Obj()
+		v2Pod := preemptionPod("v2", "v2-claim").Node(nodeName).Obj()
+		h := preemptionPod("h", "h-claim").Priority(100).Obj()
+		p2 := preemptionPod("p2", "p2-claim").Priority(100).Obj()
+		low := preemptionPod("low", "low-claim").Priority(50).Obj()
+		lowLarge := preemptionPod("low-large", "low-large-claim").Priority(50).Obj()
+		testCtx := setup(tCtx, []*resourceapi.ResourceClaim{
+			request("h-claim", "40Gi"),
+			request("p2-claim", "40Gi"),
+			request("low-claim", "40Gi"),
+			request("low-large-claim", "50Gi"),
+			reserve(st.FromResourceClaim(request("v1-claim", "40Gi")).Allocation(share("v1", "40Gi")).Obj(), v1Pod),
+			reserve(st.FromResourceClaim(request("v2-claim", "40Gi")).Allocation(share("v2", "40Gi")).Obj(), v2Pod),
+		}, slice("80Gi"), v1Pod, v2Pod, h, p2, low, lowLarge)
+		nominate(tCtx, testCtx, h, nodeName, v1Pod)
+		updateClaim(tCtx, testCtx, "v1-claim", func(claim *resourceapi.ResourceClaim) {
+			claim.Status.ReservedFor = nil
+			claim.Status.Allocation = nil
+		})
+
+		// Reserve h-claim while keeping h's nomination: 40Gi pending + 40Gi of v2 = 80Gi.
+		assumedH, assumedState := assume(tCtx, testCtx, h, nodeName)
+		nominate(tCtx, testCtx, p2, nodeName, v2Pod)
+		require.Len(tCtx, heldDevices(testCtx, p2), 1, "held for p2 without double-counting h's pending allocation")
+		testCtx.p.RemoveNomination(tCtx, p2, nodeName)
+
+		updateClaim(tCtx, testCtx, "v2-claim", func(claim *resourceapi.ResourceClaim) {
+			claim.Status.ReservedFor = nil
+			claim.Status.Allocation = nil
+		})
+		require.True(tCtx, fits(tCtx, testCtx, low), "40Gi remaining while 40Gi is pending")
+		require.False(tCtx, fits(tCtx, testCtx, lowLarge), "pending 40Gi is still counted")
+
+		// Reverting the assumption restores the hold on h-claim.
+		testCtx.p.Unreserve(tCtx, assumedState, assumedH, nodeName)
+		require.True(tCtx, fits(tCtx, testCtx, low), "40Gi remaining while 40Gi is held")
+		require.False(tCtx, fits(tCtx, testCtx, lowLarge), "held 40Gi applies again after Unreserve")
+	})
 }
 
 func TestJoinVictimClaim(t *testing.T) {
