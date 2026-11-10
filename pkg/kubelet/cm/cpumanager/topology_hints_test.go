@@ -859,7 +859,8 @@ func returnTestCases() []testCase {
 				},
 			},
 			defaultCPUSet: cpuset.New(),
-			// Handled as a resize, which the static policy does not support yet.
+			// Handled as a resize, which the static policy skips with
+			// InPlacePodVerticalScalingExclusiveCPUs disabled.
 			expectedHints: nil,
 		},
 		{
@@ -872,7 +873,8 @@ func returnTestCases() []testCase {
 				},
 			},
 			defaultCPUSet: cpuset.New(),
-			// Handled as a resize, which the static policy does not support yet.
+			// Handled as a resize, which the static policy skips with
+			// InPlacePodVerticalScalingExclusiveCPUs disabled.
 			expectedHints: nil,
 		},
 		{

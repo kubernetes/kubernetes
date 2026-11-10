@@ -3639,9 +3639,9 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 
 // TestStaticPolicyAddWithResizedAllocation checks that a container admitted
 // again with allocated resources that differ from its CPU assignment, for
-// example after a kubelet restart, is handled as a resize. The static policy
-// does not support resize yet, so the pod is admitted with its CPU assignment
-// unchanged.
+// example after a kubelet restart, is handled as a resize. With
+// InPlacePodVerticalScalingExclusiveCPUs disabled, the static policy skips the
+// resize, so the pod is admitted with its CPU assignment unchanged.
 func TestStaticPolicyAddWithResizedAllocation(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -3687,6 +3687,54 @@ func TestStaticPolicyAddWithResizedAllocation(t *testing.T) {
 			} {
 				require.Contains(t, logs, expectedLog, "the resize path must be taken")
 			}
+		})
+	}
+}
+
+// TestStaticPolicyAddWithResizedAllocationExclusiveCPUs checks that a container
+// admitted again with allocated resources that differ from its CPU assignment,
+// for example after a kubelet restart that lost the resize transaction, gets the
+// resize applied when InPlacePodVerticalScalingExclusiveCPUs is enabled. The Add
+// operation does not use the resize transaction, so the state changes at once.
+func TestStaticPolicyAddWithResizedAllocationExclusiveCPUs(t *testing.T) {
+	testCases := []struct {
+		name     string
+		size     int
+		baseline cpuset.CPUSet
+	}{
+		{
+			name:     "scale up",
+			size:     4,
+			baseline: cpuset.New(1, 5),
+		},
+		{
+			name:     "scale down",
+			size:     1,
+			baseline: cpuset.New(1),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+			logger, _ := ktesting.NewTestContext(t)
+			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			require.NoError(t, err)
+
+			s := state.NewMemoryState(logger)
+			s.SetCPUSet("pod", "c1", cpuset.New(1, 5))
+			s.SetCPUBaselines(state.ContainerCPUBaselines{"pod": {"c1": {Baseline: tc.baseline}}})
+			s.SetDefaultCPUSet(cpuset.New(0, 2, 3, 4, 6, 7))
+			allCPUs := cpuset.New(1, 5).Union(s.GetDefaultCPUSet())
+
+			pod := makePod("pod", "c1", fmt.Sprint(tc.size), fmt.Sprint(tc.size))
+			hints := policy.GetTopologyHints(logger, s, pod, &pod.Spec.Containers[0], lifecycle.AddOperation)
+			require.NotEmpty(t, hints[string(v1.ResourceCPU)], "the hints of the resize must be generated")
+			require.NoError(t, policy.Allocate(logger, s, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+
+			c1, _ := s.GetCPUSet("pod", "c1")
+			require.Equal(t, tc.size, c1.Size(), "c1 must get the allocated number of CPUs, got %s", c1)
+			require.True(t, tc.baseline.IsSubsetOf(c1), "c1 must retain its baseline %s, got %s", tc.baseline, c1)
+			require.True(t, allCPUs.Difference(c1).Equals(s.GetDefaultCPUSet()), "expected default %s, got %s", allCPUs.Difference(c1), s.GetDefaultCPUSet())
 		})
 	}
 }

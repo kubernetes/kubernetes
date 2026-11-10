@@ -1227,11 +1227,9 @@ func (p *staticPolicy) allocateForResize(logger klog.Logger, s state.State, pod 
 	metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode).Inc()
 	metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusiveNode).Inc()
 	logger.V(4).Info("Allocated exclusive CPUs for resize", "cpuset", newallocatedcpuset.CPUs.String())
-	// Updated state to the checkpoint file will be stored during
-	// the reconcile loop.
-	// TODO Follow IPRR expected model, admission decides whether kubelet can accept the resize,
-	// and nothing is committed until every admit handler has passed and the allocation is persisted; actuation then happens in syncPod.
-	// https://github.com/kubernetes/kubernetes/pull/140629#discussion_r4273387867
+	// For a resize, s is the scratch state of the admission. The CPU manager
+	// commits it to the state once every admit handler admitted the pod and
+	// the pod allocation is persisted, see CompleteAdmit.
 	return nil
 }
 
