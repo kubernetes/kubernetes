@@ -6469,6 +6469,25 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: dra_preemption_deferred_total
+  subsystem: scheduler
+  help: Number of preemption attempts deferred while ResourceClaims of preempted pods
+    are being deallocated, by scheduler profile.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - profile
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: dra_preemption_victim_claim_timeouts_total
+  subsystem: scheduler
+  help: Number of ResourceClaims of preempted pods that timed out waiting to be deallocated.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: event_handling_duration_seconds
   subsystem: scheduler
   help: Event handling latency in seconds.

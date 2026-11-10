@@ -4584,6 +4584,13 @@ func setupMetrics(features feature.Features) compbasemetrics.KubeRegistry {
 		metrics.DRABindingConditionsAllocationsTotal.Reset()
 		metrics.DRABindingConditionsPreBindDuration.Reset()
 	}
+	if features.EnableDRAPreemption {
+		testRegistry.MustRegister(metrics.DRAPreemptionDeferredTotal)
+		testRegistry.MustRegister(metrics.DRAPreemptionVictimClaimTimeoutsTotal)
+
+		metrics.DRAPreemptionDeferredTotal.Reset()
+		metrics.DRAPreemptionVictimClaimTimeoutsTotal.Reset()
+	}
 	return testRegistry
 }
 

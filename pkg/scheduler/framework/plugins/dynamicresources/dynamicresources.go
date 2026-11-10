@@ -1143,7 +1143,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			// allocation failed and some pool on the node is invalid or
 			// being updated, which may be unrelated to the allocation.
 			status := statusUnschedulable(logger, err.Error(), "pod", klog.KObj(pod), "node", klog.KObj(node))
-			if pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+			if pl.preemptionMightHelp(logger, state, pod, nodeInfo, allocatedState) {
 				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
 			}
 			return status
@@ -1165,7 +1165,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
 		if len(allocationResult) != len(claimsToAllocate) {
 			status := statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(claimsToAllocate))
-			if pl.preemptionMightHelp(state, pod, nodeInfo, allocatedState) {
+			if pl.preemptionMightHelp(logger, state, pod, nodeInfo, allocatedState) {
 				status = fwk.NewStatus(fwk.Unschedulable, status.Reasons()...)
 			}
 			return status

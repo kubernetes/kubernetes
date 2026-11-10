@@ -647,7 +647,7 @@ func (s *simulation) applyTo(state *structured.AllocatedState, consumableCapacit
 // stays a candidate even if those pods are gone already. Otherwise
 // DefaultPreemption would let a preemptor nominated to the node preempt
 // elsewhere without asking PodEligibleToPreempt.
-func (pl *DynamicResources) preemptionMightHelp(state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
+func (pl *DynamicResources) preemptionMightHelp(logger klog.Logger, state *stateData, pod *v1.Pod, nodeInfo fwk.NodeInfo, allocatedState *structured.AllocatedState) bool {
 	p := state.preemption
 	if p == nil || !p.root.canRelease || allocatedState == nil {
 		return false
@@ -657,7 +657,7 @@ func (pl *DynamicResources) preemptionMightHelp(state *stateData, pod *v1.Pod, n
 	if !slices.ContainsFunc(nodeInfo.GetPods(), func(podInfo fwk.PodInfo) bool {
 		other := podInfo.GetPod()
 		return len(other.Spec.ResourceClaims) > 0 && corev1helpers.PodPriority(other) < priority
-	}) && len(pl.settlingVictimClaims(nodeName, true)) == 0 {
+	}) && len(pl.settlingVictimClaims(logger, nodeName, true)) == 0 {
 		return false
 	}
 	return p.root.hasAllocatedNodeLocalDevice(nodeName, allocatedState)

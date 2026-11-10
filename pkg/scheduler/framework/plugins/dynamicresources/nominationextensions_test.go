@@ -330,6 +330,41 @@ func testPrepareNomination(tCtx ktesting.TContext) {
 	}
 }
 
+func TestAddNominationWithoutPrepared(t *testing.T) {
+	testAddNominationWithoutPrepared(ktesting.Init(t))
+}
+
+// testAddNominationWithoutPrepared checks the two nil-prepared cases documented
+// on NominationExtensions.AddNomination:
+//   - An API-restored nomination (such as after a scheduler restart) records no
+//     hold or victim tracking, leaving freed devices open and the preemptor
+//     eligible to preempt again.
+//   - A follow-up same-node nomination without a prepared result keeps an
+//     existing prepared nomination intact.
+func testAddNominationWithoutPrepared(tCtx ktesting.TContext) {
+	slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
+	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).NominatedNodeName(nodeName).Obj()
+	claims := []*resourceapi.ResourceClaim{
+		preemptionClaim("preemptor-claim").Obj(),
+		reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("instance-1")).Obj(), victim),
+	}
+	testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, preemptor})
+
+	require.Empty(tCtx, testCtx.p.AddNomination(tCtx, preemptor, nodeName, nil).Events)
+	require.Nil(tCtx, testCtx.p.nominations.nomination(preemptor.UID), "API-restored nomination has no prepared state")
+	eligible, _ := testCtx.p.PodEligibleToPreempt(tCtx, preemptor, nodeName)
+	require.True(tCtx, eligible, "eligible without tracked victim claims after restart")
+
+	// Once prepared and added, a same-node AddNomination with prepared == nil
+	// preserves the existing nomination and held devices.
+	nominate(tCtx, testCtx, preemptor, nodeName, victim)
+	before := testCtx.p.nominations.nomination(preemptor.UID)
+	require.NotNil(tCtx, before)
+	require.Empty(tCtx, testCtx.p.AddNomination(tCtx, preemptor, nodeName, nil).Events, "existing hold kept")
+	require.Same(tCtx, before, testCtx.p.nominations.nomination(preemptor.UID), "existing nomination preserved")
+}
+
 func TestIsSchedulableAfterAssignedPodDeleted(t *testing.T) {
 	testIsSchedulableAfterAssignedPodDeleted(ktesting.Init(t))
 }

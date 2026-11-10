@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -31,6 +32,8 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	schedmetrics "k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/utils/ptr"
 )
 
 // This file implements framework.VictimExtensions (KEP-5690): a pod does
@@ -50,6 +53,9 @@ func (pl *DynamicResources) AssumeVictim(ctx context.Context, victim *v1.Pod) {
 		return
 	}
 	logger := klog.FromContext(ctx)
+	now := pl.victimClaims.clock.Now()
+	graceSeconds := max(ptr.Deref(victim.Spec.TerminationGracePeriodSeconds, v1.DefaultTerminationGracePeriodSeconds), 0)
+	gracePeriod := time.Duration(graceSeconds) * time.Second
 	victims := map[types.UID]types.NamespacedName{victim.UID: {Namespace: victim.Namespace, Name: victim.Name}}
 	for _, claim := range pl.claimsOfPod(victim) {
 		allocation := claim.Status.Allocation
@@ -61,10 +67,12 @@ func (pl *DynamicResources) AssumeVictim(ctx context.Context, victim *v1.Pod) {
 			continue
 		}
 		pl.victimClaims.add(victim.Spec.NodeName, &victimClaim{
-			claim:   types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
-			uid:     claim.UID,
-			results: allocation.Devices.Results,
-			victims: victims,
+			claim:       types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+			uid:         claim.UID,
+			results:     allocation.Devices.Results,
+			victims:     victims,
+			addedAt:     now,
+			gracePeriod: gracePeriod,
 		})
 		logger.V(5).Info("Tracking ResourceClaim of preempted pod", "pod", klog.KObj(victim), "node", victim.Spec.NodeName, "resourceclaim", klog.KObj(claim))
 	}
@@ -77,6 +85,7 @@ func (pl *DynamicResources) PodEligibleToPreempt(ctx context.Context, pod *v1.Po
 	if pl.victimClaims == nil || !pl.needsAllocation(pod) {
 		return true, ""
 	}
+	logger := klog.FromContext(ctx)
 	nodeNames := sets.New[string]()
 	if nodeName != "" {
 		nodeNames.Insert(nodeName)
@@ -89,10 +98,17 @@ func (pl *DynamicResources) PodEligibleToPreempt(ctx context.Context, pod *v1.Po
 	}
 	var settling []string
 	for _, nodeName := range sets.List(nodeNames) {
-		settling = append(settling, pl.settlingVictimClaims(nodeName, false)...)
+		settling = append(settling, pl.settlingVictimClaims(logger, nodeName, false)...)
 	}
 	if len(settling) == 0 {
 		return true, ""
+	}
+	if schedmetrics.DRAPreemptionDeferredTotal != nil {
+		var profile string
+		if pl.fh != nil {
+			profile = pl.fh.ProfileName()
+		}
+		schedmetrics.DRAPreemptionDeferredTotal.WithLabelValues(profile).Inc()
 	}
 	slices.Sort(settling)
 	claims := strings.Join(settling[:min(len(settling), maxClaimsInReason)], ", ")
@@ -125,14 +141,13 @@ func (pl *DynamicResources) needsAllocation(pod *v1.Pod) bool {
 // settlingVictimClaims returns the claims of preempted pods on the node which
 // are still expected to get deallocated, or just the first one, and forgets
 // those which are not.
-func (pl *DynamicResources) settlingVictimClaims(nodeName string, first bool) []string {
+func (pl *DynamicResources) settlingVictimClaims(logger klog.Logger, nodeName string, first bool) []string {
 	if pl.victimClaims == nil {
 		return nil
 	}
 	var settling []string
 	for _, claim := range pl.victimClaims.onNode(nodeName) {
-		if !pl.victimClaimSettling(claim) {
-			pl.victimClaims.forget(claim.uid, claim)
+		if !pl.victimClaimSettling(logger, claim) {
 			continue
 		}
 		settling = append(settling, claim.claim.String())
@@ -144,22 +159,37 @@ func (pl *DynamicResources) settlingVictimClaims(nodeName string, first bool) []
 }
 
 // victimClaimSettling returns true while the claim of preempted pods is
-// expected to get deallocated without further preemption.
-func (pl *DynamicResources) victimClaimSettling(victimClaim *victimClaim) bool {
+// expected to get deallocated without further preemption, and forgets it
+// otherwise.
+func (pl *DynamicResources) victimClaimSettling(logger klog.Logger, victimClaim *victimClaim) bool {
+	settling, timedOut := pl.evalVictimClaimSettling(victimClaim)
+	if !settling {
+		if pl.victimClaims.forget(victimClaim.uid, victimClaim) && timedOut {
+			logger.V(2).Info("Stopped waiting for ResourceClaim of preempted pods to be deallocated after timeout", "resourceclaim", victimClaim.claim, "timeout", victimClaimSettlingTimeout)
+			if schedmetrics.DRAPreemptionVictimClaimTimeoutsTotal != nil {
+				schedmetrics.DRAPreemptionVictimClaimTimeoutsTotal.Inc()
+			}
+		}
+		return false
+	}
+	return true
+}
+
+func (pl *DynamicResources) evalVictimClaimSettling(victimClaim *victimClaim) (settling, timedOut bool) {
 	claim, err := pl.draManager.ResourceClaims().Get(victimClaim.claim.Namespace, victimClaim.claim.Name)
 	if err != nil || claim.UID != victimClaim.uid {
-		return false
+		return false, false
 	}
 	allocation := claim.Status.Allocation
 	if allocation == nil {
 		allocation = pl.draManager.ResourceClaims().GetPendingAllocation(claim.UID)
 	}
 	if allocation == nil || !apiequality.Semantic.DeepEqual(allocation.Devices.Results, victimClaim.results) {
-		return false
+		return false, false
 	}
 	for _, consumer := range claim.Status.ReservedFor {
 		if consumer.APIGroup != "" || consumer.Resource != "pods" {
-			return false
+			return false, false
 		}
 		if _, ok := victimClaim.victims[consumer.UID]; ok {
 			// Victims may still be running, for example while
@@ -168,7 +198,7 @@ func (pl *DynamicResources) victimClaimSettling(victimClaim *victimClaim) bool {
 		}
 		if !pl.podStoppedUsingClaims(claim.Namespace, consumer) {
 			// Some other pod started to use it.
-			return false
+			return false, false
 		}
 	}
 	if claim.Status.Allocation != nil && len(claim.Status.ReservedFor) == 0 {
@@ -178,19 +208,61 @@ func (pl *DynamicResources) victimClaimSettling(victimClaim *victimClaim) bool {
 		// claim only gets deallocated if a victim owns it (garbage
 		// collection) or if a victim still exists (its PostFilter
 		// deallocates it).
+		canDeallocate := false
 		for uid, victim := range victimClaim.victims {
 			if slices.ContainsFunc(claim.OwnerReferences, func(owner metav1.OwnerReference) bool {
 				return owner.UID == uid && owner.Controller != nil && *owner.Controller
 			}) {
-				return true
+				canDeallocate = true
+				break
 			}
 			if pod, err := pl.podLister.Pods(victim.Namespace).Get(victim.Name); err == nil && pod.UID == uid {
-				return true
+				canDeallocate = true
+				break
 			}
 		}
+		if !canDeallocate {
+			return false, false
+		}
+		if !victimClaim.addedAt.IsZero() && pl.victimClaims.clock.Since(victimClaim.addedAt) >= victimClaimSettlingTimeout {
+			return false, true
+		}
+		return true, false
+	}
+	if pl.victimClaimTimedOut(victimClaim) {
+		return false, true
+	}
+	return true, false
+}
+
+func (pl *DynamicResources) victimClaimTimedOut(victimClaim *victimClaim) bool {
+	if pl.victimClaims == nil || victimClaim.addedAt.IsZero() {
 		return false
 	}
-	return true
+	now := pl.victimClaims.clock.Now()
+	maxTotalWait := victimClaim.gracePeriod + victimClaimSettlingTimeout
+	for uid, victim := range victimClaim.victims {
+		if pod, err := pl.podLister.Pods(victim.Namespace).Get(victim.Name); err == nil &&
+			pod.UID == uid &&
+			pod.Spec.NodeName != "" &&
+			pod.DeletionTimestamp != nil &&
+			pod.Status.Phase != v1.PodSucceeded &&
+			pod.Status.Phase != v1.PodFailed {
+			victimClaim.settlingSince.Store(0)
+			return now.Sub(victimClaim.addedAt) >= maxTotalWait
+		}
+	}
+	unixNano := now.UnixNano()
+	since := victimClaim.settlingSince.Load()
+	if since == 0 {
+		if victimClaim.settlingSince.CompareAndSwap(0, unixNano) {
+			since = unixNano
+		} else {
+			since = victimClaim.settlingSince.Load()
+		}
+	}
+	return (since != 0 && now.Sub(time.Unix(0, since)) >= victimClaimSettlingTimeout) ||
+		now.Sub(victimClaim.addedAt) >= maxTotalWait
 }
 
 // deallocateVictimClaims is called by PostFilter. It deallocates a claim of

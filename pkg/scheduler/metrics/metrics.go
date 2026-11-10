@@ -213,6 +213,10 @@ var (
 	DRABindingConditionsAllocationsTotal *metrics.CounterVec
 	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
 
+	// The below are only available when the DRAPreemption feature gate is enabled.
+	DRAPreemptionDeferredTotal            *metrics.CounterVec
+	DRAPreemptionVictimClaimTimeoutsTotal *metrics.Counter
+
 	WorkloadPreemptionAttempts    *metrics.CounterVec
 	WorkloadPreemptionVictims     *metrics.HistogramVec
 	PreemptionWorkloadDisruptions *metrics.HistogramVec
@@ -271,6 +275,12 @@ func Register() {
 			RegisterMetrics(
 				DRABindingConditionsAllocationsTotal,
 				DRABindingConditionsPreBindDuration,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+			RegisterMetrics(
+				DRAPreemptionDeferredTotal,
+				DRAPreemptionVictimClaimTimeoutsTotal,
 			)
 		}
 	})
@@ -568,6 +578,25 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"profile", "driver", "status"},
+	)
+
+	DRAPreemptionDeferredTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "dra_preemption_deferred_total",
+			Help:           "Number of preemption attempts deferred while ResourceClaims of preempted pods are being deallocated, by scheduler profile.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile"},
+	)
+
+	DRAPreemptionVictimClaimTimeoutsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "dra_preemption_victim_claim_timeouts_total",
+			Help:           "Number of ResourceClaims of preempted pods that timed out waiting to be deallocated.",
+			StabilityLevel: metrics.ALPHA,
+		},
 	)
 
 	GetNodeHintDuration = metrics.NewHistogramVec(

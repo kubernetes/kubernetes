@@ -119,6 +119,7 @@ func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, no
 	if nomination == nil {
 		return framework.NominationChangeResult{}
 	}
+	logger := klog.FromContext(ctx)
 	var kept map[types.UID]heldClaim
 	if replacement != nil && replacement.nodeName == nomination.nodeName {
 		kept = replacement.holds
@@ -130,7 +131,7 @@ func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, no
 		if pl.usesHeldDevices(uid, held) {
 			continue
 		}
-		klog.FromContext(ctx).V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nomination.nodeName, "resourceclaim", held.claim)
+		logger.V(5).Info("Released devices held for pod", "pod", klog.KObj(pod), "node", nomination.nodeName, "resourceclaim", held.claim)
 		// One event is enough, the queueing hints don't check which
 		// claim got deallocated.
 		return framework.NominationChangeResult{Events: releaseEvents(uid, held)}
@@ -148,8 +149,7 @@ func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, no
 		if !preemptedFor(victimClaim, victims) || preemptedFor(victimClaim, keptVictims) {
 			continue
 		}
-		if !pl.victimClaimSettling(victimClaim) {
-			pl.victimClaims.forget(victimClaim.uid, victimClaim)
+		if !pl.victimClaimSettling(logger, victimClaim) {
 			continue
 		}
 		unprotected = append(unprotected, victimClaim)
@@ -162,7 +162,7 @@ func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, no
 	})
 	events := make([]framework.NominationEvent, 0, len(unprotected))
 	for _, victimClaim := range unprotected {
-		klog.FromContext(ctx).V(5).Info("Stopped holding ResourceClaim of preempted pods for deallocation", "pod", klog.KObj(pod), "node", nomination.nodeName, "resourceclaim", victimClaim.claim)
+		logger.V(5).Info("Stopped holding ResourceClaim of preempted pods for deallocation", "pod", klog.KObj(pod), "node", nomination.nodeName, "resourceclaim", victimClaim.claim)
 		events = append(events, unprotectedClaimEvent(pod.UID, victimClaim))
 	}
 	return framework.NominationChangeResult{Events: events}

@@ -29,10 +29,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	schedmetrics "k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestVictimClaimTracker(t *testing.T) {
@@ -420,4 +424,98 @@ func testPodGroupPostFilterDeallocatesVictimClaim(tCtx ktesting.TContext) {
 	claim, err := testCtx.client.ResourceV1().ResourceClaims(namespace).Get(tCtx, "victim-claim", metav1.GetOptions{})
 	tCtx.ExpectNoError(err)
 	require.Nil(tCtx, claim.Status.Allocation, "allocation")
+}
+
+func TestVictimClaimSettlingTimeoutAndMetrics(t *testing.T) {
+	testVictimClaimSettlingTimeoutAndMetrics(ktesting.Init(t))
+}
+
+// testVictimClaimSettlingTimeoutAndMetrics checks that settling victim claims
+// record deferral metrics and expire after victimClaimSettlingTimeout when no
+// victim is actively terminating on a node (such as a scheduling-gated victim
+// whose PreBind was cancelled), while respecting longer termination grace
+// periods of actively terminating victims.
+func testVictimClaimSettlingTimeoutAndMetrics(tCtx ktesting.TContext) {
+	_ = setupMetrics(feature.Features{EnableDRAPreemption: true})
+	slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
+
+	tCtx.Run("unreserved-gated-victim-times-out", func(tCtx ktesting.TContext) {
+		schedmetrics.DRAPreemptionDeferredTotal.Reset()
+		schedmetrics.DRAPreemptionVictimClaimTimeoutsTotal.Reset()
+
+		// Unassigned victim with a scheduling gate never reaches PostFilter to
+		// deallocate its unreserved claim.
+		victim := preemptionPod("victim", "victim-claim").SchedulingGates([]string{"example.com/gate"}).Obj()
+		claims := []*resourceapi.ResourceClaim{
+			preemptionClaim("preemptor-claim").Obj(),
+			st.FromResourceClaim(preemptionClaim("victim-claim").Allocation(preemptionAllocation("instance-1")).Obj()).Obj(),
+		}
+		testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, preemptor, victim})
+		fakeClock := testingclock.NewFakePassiveClock(time.Unix(1_000, 0))
+		testCtx.p.victimClaims.clock = fakeClock
+
+		state := nominate(tCtx, testCtx, preemptor, nodeName, fromPod(victim).Node(nodeName).Obj())
+
+		fakeClock.SetTime(time.Unix(1_000, 0).Add(victimClaimSettlingTimeout - time.Second))
+		eligible, _ := testCtx.p.PodEligibleToPreempt(tCtx, preemptor, nodeName)
+		require.False(tCtx, eligible, "still settling before timeout")
+		deferred, err := testutil.GetCounterMetricValue(schedmetrics.DRAPreemptionDeferredTotal.WithLabelValues(testCtx.p.fh.ProfileName()))
+		require.NoError(tCtx, err)
+		require.Equal(tCtx, 1.0, deferred, "deferred preemption metric")
+		timeouts, err := testutil.GetCounterMetricValue(schedmetrics.DRAPreemptionVictimClaimTimeoutsTotal)
+		require.NoError(tCtx, err)
+		require.Equal(tCtx, 0.0, timeouts, "timeouts before expiry")
+
+		fakeClock.SetTime(time.Unix(1_000, 0).Add(victimClaimSettlingTimeout))
+		eligible, reason := testCtx.p.PodEligibleToPreempt(tCtx, preemptor, nodeName)
+		require.True(tCtx, eligible, "eligible once settling timed out, got reason %q", reason)
+		require.Empty(tCtx, testCtx.p.victimClaims.onNode(nodeName), "timed-out victim claim forgotten")
+		timeouts, err = testutil.GetCounterMetricValue(schedmetrics.DRAPreemptionVictimClaimTimeoutsTotal)
+		require.NoError(tCtx, err)
+		require.Equal(tCtx, 1.0, timeouts, "timeout metric incremented once")
+
+		status := testCtx.p.Filter(tCtx, state, preemptor, testCtx.nodeInfos[0])
+		require.Equal(tCtx, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "cannot allocate all claims"), status, "node no longer kept Unschedulable after timeout")
+	})
+
+	tCtx.Run("terminating-victim-grace-period-respected", func(tCtx ktesting.TContext) {
+		schedmetrics.DRAPreemptionVictimClaimTimeoutsTotal.Reset()
+
+		start := time.Unix(2_000, 0)
+		graceSeconds := int64(600) // 10 minutes > victimClaimSettlingTimeout
+		victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
+		victim.Spec.TerminationGracePeriodSeconds = &graceSeconds
+		claims := []*resourceapi.ResourceClaim{
+			preemptionClaim("preemptor-claim").Obj(),
+			reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("instance-1")).Obj(), victim),
+		}
+		testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, preemptor, victim})
+		fakeClock := testingclock.NewFakePassiveClock(start)
+		testCtx.p.victimClaims.clock = fakeClock
+
+		nominate(tCtx, testCtx, preemptor, nodeName, victim)
+		updatePod(tCtx, testCtx, victim.Name, func(pod *v1.Pod) {
+			pod.DeletionTimestamp = &metav1.Time{Time: start}
+		})
+
+		// Past victimClaimSettlingTimeout, but victim is still terminating within its grace period.
+		fakeClock.SetTime(start.Add(victimClaimSettlingTimeout + time.Minute))
+		eligible, _ := testCtx.p.PodEligibleToPreempt(tCtx, preemptor, nodeName)
+		require.False(tCtx, eligible, "still waiting while victim terminates within grace period")
+
+		// Victim finishes terminating at 10m; claim gets another victimClaimSettlingTimeout window to deallocate.
+		deletePod(tCtx, testCtx, victim)
+		fakeClock.SetTime(start.Add(10*time.Minute + time.Second))
+		eligible, _ = testCtx.p.PodEligibleToPreempt(tCtx, preemptor, nodeName)
+		require.False(tCtx, eligible, "settling window starts once victim is deleted")
+
+		// If the claim controller never deallocates it, the claim expires after victimClaimSettlingTimeout.
+		fakeClock.SetTime(start.Add(10*time.Minute + time.Second + victimClaimSettlingTimeout))
+		eligible, _ = testCtx.p.PodEligibleToPreempt(tCtx, preemptor, nodeName)
+		require.True(tCtx, eligible, "eligible after post-deletion settling timeout")
+		timeouts, err := testutil.GetCounterMetricValue(schedmetrics.DRAPreemptionVictimClaimTimeoutsTotal)
+		require.NoError(tCtx, err)
+		require.Equal(tCtx, 1.0, timeouts, "timeout metric incremented after grace period + settling timeout")
+	})
 }

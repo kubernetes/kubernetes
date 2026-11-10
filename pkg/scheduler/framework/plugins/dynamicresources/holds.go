@@ -121,7 +121,7 @@ func (pl *DynamicResources) holdsOnNode(logger klog.Logger, p *preemptionState, 
 		return holds
 	}
 	for _, victimClaim := range pl.victimClaims.onNode(nodeName) {
-		if !preemptedFor(victimClaim, holds.victims) || !pl.victimClaimSettling(victimClaim) {
+		if !preemptedFor(victimClaim, holds.victims) || !pl.victimClaimSettling(logger, victimClaim) {
 			continue
 		}
 		capacity := structured.NewConsumedCapacityCollection()

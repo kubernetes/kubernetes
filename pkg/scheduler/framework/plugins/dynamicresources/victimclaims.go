@@ -19,13 +19,21 @@ package dynamicresources
 import (
 	"maps"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/clock"
 )
+
+// victimClaimSettlingTimeout bounds how long a victim claim without actively
+// terminating victims is treated as settling before giving up, so a stalled
+// controller or unschedulable victim cannot block preemption indefinitely.
+const victimClaimSettlingTimeout = 5 * time.Minute
 
 // victimClaimTracker remembers the claims of preempted pods which are not
 // deallocated yet, by node (KEP-5690). It does not matter which pod
@@ -37,6 +45,7 @@ import (
 // including fwk.Handle methods backed by the queue and AssumeCache mutations
 // whose event handlers call into it.
 type victimClaimTracker struct {
+	clock clock.PassiveClock
 	mutex sync.RWMutex
 	// claims maps node names to the claims of preempted pods on that
 	// node, by claim UID.
@@ -46,7 +55,8 @@ type victimClaimTracker struct {
 }
 
 // victimClaim is a claim of preempted pods which gets deallocated once they
-// are gone. Instances are never modified, only replaced.
+// are gone. Instances are replaced rather than mutated in place, except for
+// settlingSince which tracks when all victims ceased terminating on a node.
 type victimClaim struct {
 	claim types.NamespacedName
 	uid   types.UID
@@ -57,10 +67,18 @@ type victimClaim struct {
 	// added once their preemption is under way, so they are not expected
 	// to keep using it.
 	victims map[types.UID]types.NamespacedName
+	// addedAt is when the claim was last added to the tracker.
+	addedAt time.Time
+	// gracePeriod is the max TerminationGracePeriodSeconds of victims.
+	gracePeriod time.Duration
+	// settlingSince is the UnixNano timestamp when no victim in victims was
+	// observed actively terminating on a node anymore, or 0 while one is.
+	settlingSince atomic.Int64
 }
 
 func newVictimClaimTracker() *victimClaimTracker {
 	return &victimClaimTracker{
+		clock:  clock.RealClock{},
 		claims: make(map[string]map[types.UID]*victimClaim),
 		nodes:  make(map[types.UID]string),
 	}
@@ -71,11 +89,20 @@ func newVictimClaimTracker() *victimClaimTracker {
 func (t *victimClaimTracker) add(nodeName string, claim *victimClaim) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+	if claim.addedAt.IsZero() {
+		claim.addedAt = t.clock.Now()
+	}
 	if existing := t.claims[nodeName][claim.uid]; existing != nil {
-		merged := *claim
-		merged.victims = maps.Clone(existing.victims)
-		maps.Copy(merged.victims, claim.victims)
-		claim = &merged
+		victims := maps.Clone(existing.victims)
+		maps.Copy(victims, claim.victims)
+		claim = &victimClaim{
+			claim:       claim.claim,
+			uid:         claim.uid,
+			results:     claim.results,
+			victims:     victims,
+			addedAt:     claim.addedAt,
+			gracePeriod: max(existing.gracePeriod, claim.gracePeriod),
+		}
 	}
 	if t.claims[nodeName] == nil {
 		t.claims[nodeName] = make(map[types.UID]*victimClaim)
@@ -102,21 +129,22 @@ func (t *victimClaimTracker) isTracked(uid types.UID) bool {
 	return ok
 }
 
-// forget stops tracking a victim claim. If claim is not nil, then only if
-// the tracked instance is still the same, because it may have been replaced
-// after the caller looked at it.
-func (t *victimClaimTracker) forget(uid types.UID, claim *victimClaim) {
+// forget stops tracking a victim claim and reports whether it was still
+// tracked. If claim is not nil, then only if the tracked instance is still
+// the same, because it may have been replaced after the caller looked at it.
+func (t *victimClaimTracker) forget(uid types.UID, claim *victimClaim) bool {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	nodeName, ok := t.nodes[uid]
 	if !ok || claim != nil && t.claims[nodeName][uid] != claim {
-		return
+		return false
 	}
 	delete(t.claims[nodeName], uid)
 	if len(t.claims[nodeName]) == 0 {
 		delete(t.claims, nodeName)
 	}
 	delete(t.nodes, uid)
+	return true
 }
 
 // handlers forget victim claims when they get deallocated or deleted.

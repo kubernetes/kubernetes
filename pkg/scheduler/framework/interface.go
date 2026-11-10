@@ -253,12 +253,19 @@ type NominationExtensions interface {
 	PrepareNomination(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) any
 	// AddNomination is called when pod got nominated to nodeName. prepared
 	// is what PrepareNomination returned for this nomination, nil if nothing
-	// got prepared for it, for example for nominations read from the API.
-	// Each result of PrepareNomination gets passed at most once.
+	// got prepared for it, for example for nominations read from the API on
+	// scheduler startup or when an earlier pod update to nodeName already
+	// consumed the prepared result right before AddNominatedPod. Each result
+	// of PrepareNomination gets passed at most once.
 	//
-	// If the pod was nominated to nodeName already, plugins replace the
-	// previous nomination and return events for its resources which the new
-	// one doesn't keep, like RemoveNomination.
+	// If the pod was nominated to nodeName already and prepared is non-nil,
+	// plugins replace the previous nomination and return events for its
+	// resources which the new one doesn't keep, like RemoveNomination. When
+	// prepared is nil, plugins have nothing new to record and may keep an
+	// existing nomination for nodeName. Nominations restored from
+	// pod.Status.NominatedNodeName across a scheduler restart arrive with
+	// prepared == nil and therefore carry no prepared plugin state (such as
+	// held devices).
 	AddNomination(ctx context.Context, pod *v1.Pod, nodeName string, prepared any) NominationChangeResult
 	// RemoveNomination is called when the nomination of pod to nodeName
 	// ended, including when the pod got assumed, bound or deleted. Plugins
@@ -294,7 +301,11 @@ type NominationExtensionsRunner interface {
 // them: the plugins only use it to keep pods from starting another
 // preemption while resources released by an earlier one are still being
 // reclaimed. Victims are not treated as removed in later scheduling cycles
-// or preemption simulations.
+// or preemption simulations. State is kept in memory only (not reconstructed
+// across scheduler restarts, after which nominated preemptors may preempt
+// again once terminating victims are gone), and plugins should bound how long
+// they wait for asynchronous reclamation so a stalled controller or
+// unschedulable victim cannot block preemption indefinitely.
 //
 // The interface is internal to kube-scheduler and only used when the
 // DRAPreemption feature gate is enabled. It may change or move into the
