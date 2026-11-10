@@ -202,6 +202,14 @@ func (npm *nominator) tracks(uid types.UID) bool {
 	return nominated || expected
 }
 
+// isNominatedTo returns true if the pod is nominated to nodeName in memory,
+// or not nominated at all if nodeName is empty.
+func (npm *nominator) isNominatedTo(uid types.UID, nodeName string) bool {
+	npm.nLock.RLock()
+	defer npm.nLock.RUnlock()
+	return npm.nominatedPodToNode[uid] == nodeName
+}
+
 // forgetExpected is called when setting nodeName as the nominated node name
 // of the pod in the API failed. The pod objects are up-to-date again, unless
 // the scheduler set another nominated node name in the meantime.

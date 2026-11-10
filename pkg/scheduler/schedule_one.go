@@ -30,12 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	compresource "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -777,6 +779,15 @@ func (sched *Scheduler) runFailureHandler(ctx context.Context, schedFramework fr
 	sched.FailureHandler(ctx, schedFramework, podInfo, status, nominatingInfo, start)
 }
 
+// nominatesBeforeRequeue returns true with the DRAPreemption feature gate:
+// handleSchedulingFailure then changes the nomination of a pod before it puts
+// the pod back into the scheduling queue. The queue takes care that the pod
+// does not retry because of that change. Without the feature gate, the queue
+// does not track changes of nominations, and the order stays as it was.
+func nominatesBeforeRequeue() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption)
+}
+
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
@@ -807,6 +818,8 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	pod := podInfo.Pod
 	nominatedPodInfo := podInfo.PodInfo
 	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod)
+	nominateBeforeRequeue := nominatesBeforeRequeue()
+	nominatedBeforeRequeue := false
 	err := status.AsError()
 	errMsg := status.Message()
 
@@ -857,6 +870,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
 			nominatedPodInfo = podInfo.PodInfo
+			if nominateBeforeRequeue && !isDeferredResize {
+				// Once the pod is back in the queue, another scheduling
+				// attempt may nominate it. This call must not override
+				// that, which it could when it runs on a binding goroutine.
+				sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
+				nominatedBeforeRequeue = true
+			}
 			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
@@ -875,13 +895,20 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	// this, there would be a race condition between the next scheduling cycle
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
-	if sched.SchedulingQueue != nil {
+	if sched.SchedulingQueue != nil && !nominatedBeforeRequeue {
 		sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
 	}
 
 	if err == nil {
 		// Only tests can reach here.
 		return
+	}
+
+	if nominatedBeforeRequeue && nominatingInfo.Mode() == fwk.ModeOverride && !sched.SchedulingQueue.IsNominatedTo(pod, nominatingInfo.NominatedNodeName) {
+		// Something changed the nomination since the pod went back into
+		// the queue, for example another scheduling attempt. Its nominated
+		// node name in the API must not get overwritten with the older one.
+		nominatingInfo = nil
 	}
 
 	msg := truncateMessage(errMsg)

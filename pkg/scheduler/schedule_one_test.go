@@ -26,6 +26,7 @@ import (
 	"math/rand"
 	"regexp"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -5768,6 +5769,110 @@ func TestRunFailureHandlerPreparesNominations(t *testing.T) {
 			calls := nominationExtensions.Calls()
 			if want := "AddNomination ns/foo node1 assigned= prepared=<nil>"; calls[len(calls)-1] != want {
 				t.Errorf("A later nomination got %q, want %q", calls[len(calls)-1], want)
+			}
+		})
+	}
+}
+
+// requeueHookQueue runs afterRequeue once a pod went back into the queue,
+// like a scheduling cycle which picks the pod up before the caller of
+// AddUnschedulablePodIfNotPresent continues.
+type requeueHookQueue struct {
+	internalqueue.SchedulingQueue
+	afterRequeue func()
+}
+
+func (q *requeueHookQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+	err := q.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, pInfo, podSchedulingCycle)
+	q.afterRequeue()
+	return err
+}
+
+// TestHandleSchedulingFailureAfterNewerNomination checks that the failure
+// handling of a binding cycle does not undo what a newer scheduling attempt
+// did after the pod went back into the queue: neither the nomination in
+// memory nor the nominated node name in the API. Without the DRAPreemption
+// feature gate, the older attempt still overrides both.
+func TestHandleSchedulingFailureAfterNewerNomination(t *testing.T) {
+	for _, draPreemption := range []bool{true, false} {
+		t.Run(fmt.Sprintf("DRAPreemption=%v", draPreemption), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			// The binding cycle set the nominated node name of the pod.
+			pod := st.MakePod().Name("foo").Namespace("ns").UID("foo").SchedulerName(testSchedulerName).NominatedNodeName("node1").Obj()
+			client := clientsetfake.NewClientset(pod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			schedFramework, err := tf.NewFramework(ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				testSchedulerName,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+			// Another scheduling attempt nominates the pod to node2 and sets
+			// that in the API.
+			newerNomination := func() {
+				podInfo, err := framework.NewPodInfo(pod.DeepCopy())
+				if err != nil {
+					t.Fatal(err)
+				}
+				queue.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"})
+				nominated := pod.DeepCopy()
+				nominated.Status.NominatedNodeName = "node2"
+				if _, err := client.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, nominated, metav1.UpdateOptions{}); err != nil {
+					t.Fatalf("UpdateStatus: %v", err)
+				}
+			}
+			sched := &Scheduler{
+				client:          client,
+				SchedulingQueue: &requeueHookQueue{SchedulingQueue: queue, afterRequeue: newerNomination},
+			}
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			queue.Add(ctx, pod)
+			popped, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+			// The pod got assumed, which ended its nomination.
+			assumed := pod.DeepCopy()
+			assumed.Spec.NodeName = "node1"
+			queue.DeleteNominatedPodIfExists(assumed)
+
+			sched.handleSchedulingFailure(ctx, schedFramework, popped.(*framework.QueuedPodInfo), fwk.AsStatus(errors.New("binding failed")), clearNominatedNode, time.Now())
+
+			if nominated := len(queue.NominatedPodsForNode(logger, "node2")) == 1; nominated != draPreemption {
+				t.Errorf("Pod nominated to node2 in memory: %v, want %v", nominated, draPreemption)
+			}
+			updatedPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Get pod: %v", err)
+			}
+			wantNodeName := ""
+			if draPreemption {
+				wantNodeName = "node2"
+			}
+			if updatedPod.Status.NominatedNodeName != wantNodeName {
+				t.Errorf("Nominated node name %q in the API, want %q", updatedPod.Status.NominatedNodeName, wantNodeName)
+			}
+			// The condition of the failed attempt still gets set.
+			if !slices.ContainsFunc(updatedPod.Status.Conditions, func(condition v1.PodCondition) bool {
+				return condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse
+			}) {
+				t.Errorf("PodScheduled condition not set: %v", updatedPod.Status.Conditions)
 			}
 		})
 	}
