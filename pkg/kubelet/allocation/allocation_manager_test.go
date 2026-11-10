@@ -275,10 +275,19 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, test.inPlacePodLevelResizeEnabled)
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil)
 			pod := test.pod.DeepCopy()
+			var storedBefore *v1.Pod
+			var storedSnapshot *v1.Pod
 			if test.allocated != nil {
 				require.NoError(t, allocationManager.(*manager).allocated.SetPod(logger, test.allocated))
+				var ok bool
+				storedBefore, ok = allocationManager.(*manager).allocated.GetPodReadOnly(pod.UID)
+				require.True(t, ok)
+				storedSnapshot = storedBefore.DeepCopy()
 			}
 			allocatedPod, updated := allocationManager.UpdatePodFromAllocation(pod)
+			if storedBefore != nil {
+				assert.Equal(t, storedSnapshot, storedBefore, "UpdatePodFromAllocation must not mutate stored read-only pod")
+			}
 
 			if test.expectUpdate {
 				assert.True(t, updated, "updated")

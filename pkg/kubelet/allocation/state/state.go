@@ -36,6 +36,9 @@ type Reader interface {
 	GetPodVolumes(podUID types.UID) ([]v1.Volume, bool)
 	GetPodUIDs() []types.UID
 	GetPod(podUID types.UID) (*v1.Pod, bool)
+	// GetPodReadOnly returns a read-only reference to the stored pod without copying.
+	// Callers must not mutate the returned pod or any of its nested fields.
+	GetPodReadOnly(podUID types.UID) (*v1.Pod, bool)
 	HasPod(podUID types.UID) bool
 	GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool)
 	GetEmptyDirVolumeLimit(podUID types.UID, volumeName string) (*resource.Quantity, bool)

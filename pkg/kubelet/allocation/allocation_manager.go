@@ -441,7 +441,7 @@ func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 		return pod, false
 	}
 
-	allocated, ok := m.allocated.GetPod(pod.UID)
+	allocated, ok := m.allocated.GetPodReadOnly(pod.UID)
 	if !ok {
 		return pod, false
 	}
@@ -472,20 +472,30 @@ func copyPassthroughFields(spec, desired *v1.PodSpec) {
 	spec.EphemeralContainers = desired.EphemeralContainers
 	// TODO: The image becomes gated with dynamic containers, at which point we
 	// should stop copying the image here.
-	copyImages(spec.Containers, desired.Containers)
-	copyImages(spec.InitContainers, desired.InitContainers)
+	spec.Containers = copyImages(spec.Containers, desired.Containers)
+	spec.InitContainers = copyImages(spec.InitContainers, desired.InitContainers)
 }
 
-// copyImages sets the image of each container to the one of the container with the same name in desired.
-func copyImages(containers, desired []v1.Container) {
+// copyImages returns containers with each container's image set to the one of the container with
+// the same name in desired, cloning the slice only if an image differs so stored read-only slices
+// are not mutated in place.
+func copyImages(containers, desired []v1.Container) []v1.Container {
+	cloned := false
 	for i := range containers {
 		for j := range desired {
 			if desired[j].Name == containers[i].Name {
-				containers[i].Image = desired[j].Image
+				if desired[j].Image != containers[i].Image {
+					if !cloned {
+						containers = slices.Clone(containers)
+						cloned = true
+					}
+					containers[i].Image = desired[j].Image
+				}
 				break
 			}
 		}
 	}
+	return containers
 }
 
 // HasPodAllocatedResources returns whether a pod has been allocated resources.
