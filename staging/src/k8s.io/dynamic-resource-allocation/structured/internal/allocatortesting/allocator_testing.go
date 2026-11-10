@@ -9946,7 +9946,7 @@ func runTestAllocator(tCtx ktesting.TContext,
 			if tc.expectWithFeatures != nil {
 				expectResults, matchError, expectErrorIs = tc.expectWithFeatures(tc.expectResults, tc.expectError, tc.expectErrorIs, features)
 				if tc.expectResultsWithoutFeatures != nil || tc.expectErrorWithoutFeatures != nil || tc.expectErrorIsWithoutFeatures != nil {
-					tCtx.Fatal("expectWithAdditionalFeatures is mutually exclusive with *WithoutFeatures fields")
+					tCtx.Fatal("expectWithFeatures is mutually exclusive with *WithoutFeatures fields")
 				}
 			} else if withoutFeatures {
 				expectResults = tc.expectResultsWithoutFeatures
@@ -10008,6 +10008,8 @@ func runTestAllocator(tCtx ktesting.TContext,
 			//
 			// Features which are disabled are not included in the name to keep it shorter.
 			// Configurations with no enabled features contain the word "none" instead of the feature list.
+			// The "with-less-features-" and "with-allocator-features-" prefix in front of enabled
+			// features make it clearer why the set of features is being tested.
 			for name, features := range allFeaturePermutations(tc.features, supportedFeatures.Set()) {
 				tCtx.Run(name, func(tCtx ktesting.TContext) {
 					run(tCtx, features)
@@ -10019,28 +10021,49 @@ func runTestAllocator(tCtx ktesting.TContext,
 
 func allFeaturePermutations(requiredFeatures Features, supportedFeatures sets.Set[string]) iter.Seq2[string, Features] {
 	return func(yield func(string, Features) bool) {
+		testCaseSupported := len(requiredFeatures.Set().Difference(supportedFeatures)) == 0
+
 		// Test with required features first, if supported.
-		name := "exactly-required-features"
-		if enabled := enabledFeatures(requiredFeatures); enabled != "" {
-			name = name + "=" + enabled
-		} else {
-			name = name + "=none"
-		}
-		if len(requiredFeatures.Set().Difference(supportedFeatures)) == 0 {
+		if testCaseSupported {
+			name := "exactly-required-features"
+			if enabled := enabledFeatures(requiredFeatures); enabled != "" {
+				name += "=" + enabled
+			} else {
+				name += "=none"
+			}
 			if !yield(name, requiredFeatures) {
 				return
 			}
 		}
+
 		// Then with everything off, if different.
+		// That can always run, it just might not succeed.
 		var emptyFeatures Features
 		if emptyFeatures != requiredFeatures {
 			if !yield("without-features=none", emptyFeatures) {
 				return
 			}
 		}
-		// Now all other feature combinations.
-		features := slices.Sorted(maps.Keys(internal.FeaturesAll.Set()))
-		doFeaturePermutations(yield, requiredFeatures, supportedFeatures, emptyFeatures, features)
+
+		// Now some (but not all!) other feature combinations:
+		// testing all permutations of all features creates too many
+		// combinations and timed out in the CI. Instead, we focus
+		// on all permutations of the features required by a test case
+		// (typically a small set, so few permutations) and one additional
+		// test with all supported features.
+		features := slices.Sorted(maps.Keys(requiredFeatures.Set()))
+		if !doFeaturePermutations(func(name string, features Features) bool {
+			return yield("with-less-features-"+name, features)
+		}, requiredFeatures, supportedFeatures, emptyFeatures, features) {
+			return
+		}
+		additionalFeatures := supportedFeatures.Difference(requiredFeatures.Set())
+		if len(additionalFeatures) > 0 {
+			features := internal.FeaturesFromSet(supportedFeatures)
+			if !yield("with-allocator-features-"+enabledFeatures(features), features) {
+				return
+			}
+		}
 	}
 }
 
