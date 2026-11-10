@@ -1915,7 +1915,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	}
 
 	// Set up allocation for the pod before HandlePodUpdates
-	err := kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), pods[0])
+	err := kubelet.allocationManager.SetAllocatedPod(klog.FromContext(tCtx), pods[0])
 	require.NoError(t, err)
 
 	// Let the pod worker sets the status to fail after this sync.
@@ -1972,7 +1972,7 @@ func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 
 	// Set up allocation for the pod before HandlePodUpdates
-	err := kubelet.allocationManager.SetAllocatedResources(klog.FromContext(tCtx), pods[0])
+	err := kubelet.allocationManager.SetAllocatedPod(klog.FromContext(tCtx), pods[0])
 	require.NoError(t, err)
 
 	kubelet.HandlePodUpdates(tCtx, pods)
@@ -3056,7 +3056,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.existingPodAllocation != nil {
 				// when kubelet restarts, AllocatedResources has already existed before adding pod
-				err := kubelet.allocationManager.SetAllocatedResources(logger, tc.existingPodAllocation)
+				err := kubelet.allocationManager.SetAllocatedPod(logger, tc.existingPodAllocation)
 				if err != nil {
 					t.Fatalf("failed to set pod allocation: %v", err)
 				}
@@ -5155,7 +5155,7 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 			kubelet := testKubelet.kubelet
 
 			kubelet.podManager.AddPod(initialPod)
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, initialPod))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedPod(logger, initialPod))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{updatedPod})
 
 			tc.updateExpectedFunc(&expectedMetrics)
@@ -5436,7 +5436,7 @@ func TestHandlePodUpdates_VolumeResize(t *testing.T) {
 			kubelet := testKubelet.kubelet
 
 			kubelet.podManager.AddPod(initialPod)
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, initialPod))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedPod(logger, initialPod))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{resizedPod})
 
 			allocatedPod, wasUpdated := kubelet.allocationManager.UpdatePodFromAllocation(resizedPod.DeepCopy())
@@ -5696,7 +5696,7 @@ func TestHandlePodUpdates_RecordVolumeRequestedResizes(t *testing.T) {
 			kubelet := testKubelet.kubelet
 
 			kubelet.podManager.AddPod(initialPod)
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, initialPod))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedPod(logger, initialPod))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{updatedPod})
 
 			tc.updateExpectedFunc(&expectedMetrics)
@@ -5900,9 +5900,9 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			handler := &testPodAdmitHandler{podsToReject: []*v1.Pod{pendingResizeAllocated}}
 			kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, pendingResizeAllocated))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedPod(logger, pendingResizeAllocated))
 			if tc.setAllocation {
-				require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.oldPod))
+				require.NoError(t, kubelet.allocationManager.SetAllocatedPod(logger, tc.oldPod))
 			}
 
 			// We only expect status resources to change in HandlePodReconcile.
@@ -6174,7 +6174,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 				allocated = tc.newPod
 			}
 			kubelet.statusManager.SetPodStatus(logger, allocated, v1.PodStatus{Phase: v1.PodRunning})
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, allocated))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedPod(logger, allocated))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{tc.newPod})
 			if tc.expectPendingCondition {
 				conditions := kubelet.statusManager.GetPodResizeConditions(tc.newPod.UID)
@@ -6439,7 +6439,7 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 		allocatedPod := newPod(1, cpu100m)
 		kl.podManager.SetPods([]*v1.Pod{podManagerPod})
 		kl.statusManager.SetPodStatus(logger, allocatedPod, v1.PodStatus{Phase: v1.PodRunning})
-		require.NoError(t, kl.allocationManager.SetAllocatedResources(logger, allocatedPod))
+		require.NoError(t, kl.allocationManager.SetAllocatedPod(logger, allocatedPod))
 		return logger, tCtx, kl
 	}
 
@@ -6583,7 +6583,7 @@ func TestAllocatedPodManager(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(t, kl.allocationManager.SetAllocatedResources(logger, podWithoutMemVol))
+	require.NoError(t, kl.allocationManager.SetAllocatedPod(logger, podWithoutMemVol))
 
 	desiredPodWithoutMemVol := podWithoutMemVol.DeepCopy()
 	desiredPodWithoutMemVol.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("200Mi")
@@ -6624,7 +6624,7 @@ func TestAllocatedPodManager(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(t, kl.allocationManager.SetAllocatedResources(logger, podWithMemVol))
+	require.NoError(t, kl.allocationManager.SetAllocatedPod(logger, podWithMemVol))
 
 	desiredPodWithMemVol := podWithMemVol.DeepCopy()
 	desiredPodWithMemVol.Spec.Volumes[0].EmptyDir.SizeLimit = &size200Mi

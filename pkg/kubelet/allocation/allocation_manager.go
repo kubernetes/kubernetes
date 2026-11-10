@@ -71,8 +71,8 @@ type Manager interface {
 	// field that is gated on allocation is pending. Callers must not mutate the returned pod.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
-	// SetAllocatedResources checkpoints the allocation for a pod.
-	SetAllocatedResources(logger klog.Logger, allocatedPod *v1.Pod) error
+	// SetAllocatedPod checkpoints the allocation for a pod.
+	SetAllocatedPod(logger klog.Logger, allocatedPod *v1.Pod) error
 
 	// AddPodAdmitHandlers adds the admit handlers to the allocation manager.
 	// TODO: See if we can remove this and just add them in the allocation manager constructor.
@@ -503,8 +503,8 @@ func (m *manager) HasPodAllocatedResources(podUID types.UID) bool {
 	return m.allocated.HasPod(podUID)
 }
 
-// SetAllocatedResources checkpoints the allocation for a pod
-func (m *manager) SetAllocatedResources(logger klog.Logger, pod *v1.Pod) error {
+// SetAllocatedPod checkpoints the allocation for a pod
+func (m *manager) SetAllocatedPod(logger klog.Logger, pod *v1.Pod) error {
 	return m.allocated.SetPod(logger, pod)
 }
 
@@ -533,7 +533,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 
 	if ok {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
-		if err := m.SetAllocatedResources(logger, pod); err != nil {
+		if err := m.SetAllocatedPod(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			logger.Error(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 		}
@@ -580,7 +580,7 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (boo
 	})
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := m.SetAllocatedResources(logger, pod); err != nil {
+		if err := m.SetAllocatedPod(logger, pod); err != nil {
 			return false, err
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)

@@ -1178,12 +1178,12 @@ func TestRetryPendingResizes(t *testing.T) {
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod1, testPod2, testPod3}, nil)
 
 				for _, p := range []*v1.Pod{testPod1, testPod2, testPod3} {
-					require.NoError(t, allocationManager.SetAllocatedResources(logger, p))
+					require.NoError(t, allocationManager.SetAllocatedPod(logger, p))
 				}
 				if !tt.newResourcesAllocated {
-					require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+					require.NoError(t, allocationManager.SetAllocatedPod(logger, originalPod))
 				} else {
-					require.NoError(t, allocationManager.SetAllocatedResources(logger, newPod))
+					require.NoError(t, allocationManager.SetAllocatedPod(logger, newPod))
 				}
 				t.Cleanup(func() {
 					for _, p := range []*v1.Pod{testPod1, testPod2, testPod3} {
@@ -1453,7 +1453,7 @@ func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
 				}
 				allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{guaranteedQOSPod, guaranteedQOSPodWithSidecar, bestEffortPod}, &nodeConfig)
 
-				require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+				require.NoError(t, allocationManager.SetAllocatedPod(logger, originalPod))
 				t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 				allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -1663,7 +1663,7 @@ func TestRetryPendingResizesMemoryBackedVolumes(t *testing.T) {
 
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{originalPod}, &nodeConfig)
 
-			require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, originalPod))
 			t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 			allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -1821,7 +1821,7 @@ func TestRetryPendingResizesWithSwap(t *testing.T) {
 			}
 			allocationManager := makeAllocationManager(t, runtime, []*v1.Pod{testPod}, nil)
 
-			require.NoError(t, allocationManager.SetAllocatedResources(logger, originalPod))
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, originalPod))
 			t.Cleanup(func() { allocationManager.RemovePod(logger, originalPod.UID) })
 
 			allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -1913,7 +1913,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 	}
 
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod}, nil)
-	require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, testPod))
 	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 		return testPod, true
 	}
@@ -2142,7 +2142,7 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 			tc.change(pod)
 
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
-			require.NoError(t, allocationManager.SetAllocatedResources(logger, allocatedPod))
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
 			if tc.reject {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{
 					admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
@@ -2435,7 +2435,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 			}
 
 			for podUID, resources := range tc.initialAllocatedResourcesState {
-				err := allocationManager.SetAllocatedResources(logger, podForAllocation(podUID, resources))
+				err := allocationManager.SetAllocatedPod(logger, podForAllocation(podUID, resources))
 				require.NoError(t, err)
 			}
 
@@ -2629,7 +2629,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 			}
 
 			for podUID, resources := range tc.initialAllocatedResourcesState {
-				err := allocationManager.SetAllocatedResources(logger, podForAllocation(podUID, resources))
+				err := allocationManager.SetAllocatedPod(logger, podForAllocation(podUID, resources))
 				require.NoError(t, err)
 			}
 
@@ -2845,7 +2845,7 @@ func TestIsResizeIncreasingRequests(t *testing.T) {
 			}
 
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{testPod}, nil)
-			require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, testPod))
 
 			if tc.newPodRequests != nil {
 				testPod.Spec.Resources.Requests = tc.newPodRequests
@@ -2890,7 +2890,7 @@ func TestSortPendingResizes(t *testing.T) {
 	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5), createTestPod(6)}
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, testPods, nil)
 	for _, testPod := range testPods {
-		require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
+		require.NoError(t, allocationManager.SetAllocatedPod(logger, testPod))
 	}
 
 	// testPods[0] has the highest priority, as it doesn't increase resource requests (pod-level).
@@ -3024,7 +3024,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			resizedPod.Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
 
 			am := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{original}, nil)
-			require.NoError(t, am.SetAllocatedResources(logger, original))
+			require.NoError(t, am.SetAllocatedPod(logger, original))
 			if tc.hasPendingCondition {
 				am.(*manager).statusManager.SetPodResizePendingCondition(original.UID, v1.PodReasonDeferred, "message", 1)
 			}
@@ -4068,7 +4068,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{test.pod}, nil)
 
 			// Set the initial checkpoints
-			err := allocationManager.SetAllocatedResources(logger, test.pod)
+			err := allocationManager.SetAllocatedPod(logger, test.pod)
 			require.NoError(t, err)
 
 			// Setup getPodByUID mock to return targetPod
@@ -4383,7 +4383,7 @@ func setupNonAllocatedCapacityTest(t *testing.T) (Manager, *v1.Pod, *v1.Pod, klo
 	}
 
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{runningPod, pendingPod}, nil)
-	require.NoError(t, allocationManager.SetAllocatedResources(logger, runningPod))
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, runningPod))
 	t.Cleanup(func() {
 		allocationManager.RemovePod(logger, runningPod.UID)
 		allocationManager.RemovePod(logger, pendingPod.UID)
@@ -4478,7 +4478,7 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 			resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = cpu200m
 
 			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: podStatus}, []*v1.Pod{resizedPod}, nil)
-			require.NoError(t, allocationManager.SetAllocatedResources(logger, allocatedPod))
+			require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
 			t.Cleanup(func() {
 				allocationManager.RemovePod(logger, allocatedPod.UID)
 			})

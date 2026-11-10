@@ -7805,7 +7805,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			} else {
 				tPod.Spec.Containers[0].Resources = tc.Resources
 			}
-			err := kubelet.allocationManager.SetAllocatedResources(logger, tPod)
+			err := kubelet.allocationManager.SetAllocatedPod(logger, tPod)
 			require.NoError(t, err)
 			resources := tc.ActualResources
 			if resources == nil {
