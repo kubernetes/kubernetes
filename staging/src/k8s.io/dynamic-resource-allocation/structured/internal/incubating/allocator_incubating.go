@@ -1713,9 +1713,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// Skip the counter check for an allow-multiple device in use: its counters are already
-	// accounted for, so a further share must not charge them again.
-	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
+	// Admin access does not reserve counters. Further shares of a device with an
+	// existing ordinary allocation must not reserve its fixed counters again.
+	skipCounterCheck := request.adminAccess() || (allowMultipleAllocations && alloc.deviceCapacityInUse(device.id))
 
 	var parentRequestName string
 	if requestData.parentRequest != nil {
@@ -1772,16 +1772,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			}
 			return false, nil, nil
 		}
-		if request.adminAccess() && allowMultipleAllocations {
-			// The device passed the check for the counters it consumes (ConsumesCounters).
-			// Admin access creates no capacity entry, which is how a later share of this
-			// device knows those counters are already charged. Release them here, or that
-			// share charges them a second time.
-			// TODO: decide whether admin access should bypass the counter check entirely.
-			alloc.deallocateCountersForDevice(device)
-		} else {
-			state.countersReserved = true
-		}
+		state.countersReserved = true
 	}
 
 	// Might be tainted, in which case the taint has to be tolerated.
