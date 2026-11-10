@@ -31,7 +31,8 @@ import (
 //
 // NominationExtensions and queueing hints use it while the scheduling queue
 // is locked. Therefore nothing which locks the queue may be called while
-// mutex is locked.
+// mutex is locked, including fwk.Handle methods backed by the queue and
+// AssumeCache mutations whose event handlers call into it.
 type claimNominations struct {
 	mutex sync.RWMutex
 	// pods maps the UIDs of nominated preemptors to their nomination.

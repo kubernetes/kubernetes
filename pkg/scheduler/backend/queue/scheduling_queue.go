@@ -306,8 +306,11 @@ type priorityQueueOptions struct {
 }
 
 // NominationChangeHandler gets called for every change of the node that a
-// pod is nominated to, while the queue is locked. It returns events for
-// resources which became available because of the change.
+// pod is nominated to, while p.lock is held for writing. It returns events for
+// resources which became available because of the change. Because p.lock is
+// held, it must not lock the queue again, directly, through fwk.Handle, or by
+// mutating caches whose event handlers call into the queue, and must not take
+// a lock that is held elsewhere across such calls.
 type NominationChangeHandler func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent
 
 // Option configures a PriorityQueue

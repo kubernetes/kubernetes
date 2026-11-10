@@ -220,9 +220,14 @@ type NominationChangeResult struct {
 // nomination of such a pod there.
 //
 // PrepareNomination gets called by the scheduling cycle. AddNomination and
-// RemoveNomination get called by the scheduling queue while it is locked,
-// from any goroutine. Plugins must not call back into the scheduling queue or
-// the API server.
+// RemoveNomination get called by the scheduling queue while its write lock is
+// held, from any goroutine. To avoid deadlocks, plugins must not call the API
+// server or anything that locks the scheduling queue, directly or indirectly:
+//   - scheduling queue methods or fwk.Handle methods backed by it, such as
+//     NominatedPodsForNode, Activate or PodNominator methods,
+//   - mutations of caches whose event handlers run synchronously and call into
+//     the scheduling queue, such as Assume or Restore on AssumeCache,
+//   - acquiring a lock that is held elsewhere across any such call.
 //
 // Pods of pod groups and shared claims are not supported yet: snapshot
 // assumes of pod group cycles don't end the nomination.

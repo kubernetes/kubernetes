@@ -33,7 +33,9 @@ import (
 // DefaultDRAManager owns it, so all profiles share it.
 //
 // Queueing hints read it while the scheduling queue is locked. Therefore
-// nothing which locks the queue may be called while mutex is locked.
+// nothing which locks the queue may be called while mutex is locked,
+// including fwk.Handle methods backed by the queue and AssumeCache mutations
+// whose event handlers call into it.
 type victimClaimTracker struct {
 	mutex sync.RWMutex
 	// claims maps node names to the claims of preempted pods on that

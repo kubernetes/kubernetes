@@ -178,6 +178,10 @@ func sameDevices(a, b []resourceapi.DeviceRequestAllocationResult) bool {
 // The pod gets queued when the last of its victims is gone, or when the
 // deleted pod lost a pending allocation: that happens without a claim event
 // when a pod in Permit or PreBind gets preempted or its binding fails.
+//
+// Like AddNomination and RemoveNomination, it runs while the scheduling queue
+// is locked, so the same lock-order rules apply (see
+// framework.NominationExtensions).
 func (pl *DynamicResources) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := schedutil.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
