@@ -23,9 +23,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/endpoints/request"
-
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
 	tracing "k8s.io/component-base/tracing"
 )
 
@@ -45,19 +45,28 @@ func WithTracing(handler http.Handler, tp trace.TracerProvider) http.Handler {
 		}),
 	}
 	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		// Adjust otelhttp tracing start time to match the start time used
 		// for Prometheus metrics.
-		if startTime, ok := request.ReceivedTimestampFrom(r.Context()); ok {
-			r = r.WithContext(otelhttp.ContextWithStartTime(r.Context(), startTime))
+		if startTime, ok := request.ReceivedTimestampFrom(ctx); ok {
+			ctx = otelhttp.ContextWithStartTime(ctx, startTime)
 		}
 		// Add the http.target attribute to the otelhttp span
 		// Workaround for https://github.com/open-telemetry/opentelemetry-go-contrib/issues/3743
-		span := trace.SpanFromContext(r.Context())
+		span := trace.SpanFromContext(ctx)
 		if r.URL != nil {
 			span.SetAttributes(attribute.Key("http.target").String(r.URL.RequestURI()))
 		}
 		// Add auditID attribute if available. This helps us connect traces to audit log entries
-		span.SetAttributes(attribute.String("audit-id", audit.GetAuditIDTruncated(r.Context())))
+		span.SetAttributes(attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)))
+		if spanCtx := span.SpanContext(); spanCtx.IsValid() && spanCtx.IsSampled() {
+			ctx = tracing.ContextWithSpanLogger(ctx, span)
+			httplog.AddKeyValue(ctx, "trace_id", spanCtx.TraceID())
+			httplog.AddKeyValue(ctx, "span_id", spanCtx.SpanID())
+		}
+		if ctx != r.Context() {
+			r = r.WithContext(ctx)
+		}
 		handler.ServeHTTP(w, r)
 	})
 	// With Noop TracerProvider, the otelhttp still handles context propagation.

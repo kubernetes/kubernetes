@@ -18,8 +18,10 @@ package filterlatency
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +29,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -223,6 +227,9 @@ func TestStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
 }
 
 func TestNestedStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
+	var buffer ktesting.BufferTL
+	_, ctx := ktesting.NewTestContext(&buffer)
+
 	outerFilterName := "outer-filter"
 	innerFilterName := "inner-filter"
 	// Seup OTel for testing
@@ -234,6 +241,7 @@ func TestNestedStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
 	handler := http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		// we expect the handler to be invoked just once.
 		callCount++
+		klog.FromContext(req.Context()).Info("inside inner filter")
 	})
 	// wrap the handler with the inner start and completed handler
 	wrapped := TrackCompleted(handler)
@@ -243,7 +251,7 @@ func TestNestedStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
 	wrapped = TrackCompleted(wrapped)
 	wrapped = TrackStarted(wrapped, tp, outerFilterName)
 
-	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+	testRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}
@@ -255,7 +263,19 @@ func TestNestedStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
 	}
 
 	checkSpans(t, fakeRecorder.Started(), []string{outerFilterName, innerFilterName})
-	checkSpans(t, fakeRecorder.Ended(), []string{innerFilterName, outerFilterName})
+	ended := fakeRecorder.Ended()
+	checkSpans(t, ended, []string{innerFilterName, outerFilterName})
+
+	innerSpanCtx := ended[0].SpanContext()
+	logOutput := buffer.String()
+	wantTraceID := fmt.Sprintf("trace_id=%q", innerSpanCtx.TraceID().String())
+	wantSpanID := fmt.Sprintf("span_id=%q", innerSpanCtx.SpanID().String())
+	if !strings.Contains(logOutput, wantTraceID) || !strings.Contains(logOutput, wantSpanID) {
+		t.Errorf("expected log output to contain %s and %s, got:\n%s", wantTraceID, wantSpanID, logOutput)
+	}
+	if strings.Count(logOutput, "trace_id=") != 1 || strings.Count(logOutput, "span_id=") != 1 {
+		t.Errorf("expected deduplicated trace_id and span_id in log output, got:\n%s", logOutput)
+	}
 }
 
 func checkSpans[T sdktrace.ReadOnlySpan](t *testing.T, output []T, spanNames []string) {
