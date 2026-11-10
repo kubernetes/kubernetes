@@ -36,8 +36,8 @@ func TestEnsureRBACPolicy(t *testing.T) {
 		policy *PolicyData
 		// change edits the cluster before ensureRBACPolicy runs again.
 		change func(*testing.T, clienttesting.ObjectTracker)
-		// changeAfterList edits the cluster after ensureRBACPolicy lists it.
-		changeAfterList func(*testing.T, clienttesting.ObjectTracker)
+		// changeAfterList edits the cluster right after ensureRBACPolicy lists it.
+		changeAfterList map[string]func(*testing.T, clienttesting.ObjectTracker)
 		// wantRequests are the requests ensureRBACPolicy sends, in order.
 		wantRequests []string
 	}{
@@ -49,14 +49,14 @@ func TestEnsureRBACPolicy(t *testing.T) {
 		{
 			name: "drifted objects are read live and repaired unless protected",
 			change: func(t *testing.T, tracker clienttesting.ObjectTracker) {
-				updateObject(t, tracker, "clusterroles", "cluster-admin", func(role *rbacapiv1.ClusterRole) {
+				updateObject(t, tracker, "clusterroles", "", "cluster-admin", func(role *rbacapiv1.ClusterRole) {
 					role.Rules = nil
 				})
-				updateObject(t, tracker, "clusterroles", "system:monitoring", func(role *rbacapiv1.ClusterRole) {
+				updateObject(t, tracker, "clusterroles", "", "system:monitoring", func(role *rbacapiv1.ClusterRole) {
 					role.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
 					role.Rules = nil
 				})
-				updateObject(t, tracker, "clusterrolebindings", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
+				updateObject(t, tracker, "clusterrolebindings", "", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
 					binding.RoleRef.Name = "custom-role"
 				})
 			},
@@ -70,20 +70,22 @@ func TestEnsureRBACPolicy(t *testing.T) {
 		{
 			name: "objects protected after the List are not written",
 			change: func(t *testing.T, tracker clienttesting.ObjectTracker) {
-				updateObject(t, tracker, "clusterroles", "cluster-admin", func(role *rbacapiv1.ClusterRole) {
+				updateObject(t, tracker, "clusterroles", "", "cluster-admin", func(role *rbacapiv1.ClusterRole) {
 					role.Rules = nil
 				})
-				updateObject(t, tracker, "clusterrolebindings", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
+				updateObject(t, tracker, "clusterrolebindings", "", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
 					binding.RoleRef.Name = "custom-role"
 				})
 			},
-			changeAfterList: func(t *testing.T, tracker clienttesting.ObjectTracker) {
-				updateObject(t, tracker, "clusterroles", "cluster-admin", func(role *rbacapiv1.ClusterRole) {
-					role.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
-				})
-				updateObject(t, tracker, "clusterrolebindings", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
-					binding.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
-				})
+			changeAfterList: map[string]func(*testing.T, clienttesting.ObjectTracker){
+				"list clusterrolebindings": func(t *testing.T, tracker clienttesting.ObjectTracker) {
+					updateObject(t, tracker, "clusterroles", "", "cluster-admin", func(role *rbacapiv1.ClusterRole) {
+						role.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
+					})
+					updateObject(t, tracker, "clusterrolebindings", "", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
+						binding.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
+					})
+				},
 			},
 			wantRequests: []string{
 				"list clusterroles", "list clusterrolebindings",
@@ -135,18 +137,15 @@ func TestEnsureRBACPolicy(t *testing.T) {
 			if tc.change != nil {
 				tc.change(t, client.Tracker())
 			}
-			if tc.changeAfterList != nil {
-				// ensureRBACPolicy lists ClusterRoles, then ClusterRoleBindings, then
-				// reconciles. Making the change right after the second List leaves
-				// both List results out of date before any object is reconciled.
-				// The change goes through the tracker because calling the fake
-				// client from inside a reactor deadlocks.
-				client.PrependReactor("list", "clusterrolebindings", func(action clienttesting.Action) (bool, runtime.Object, error) {
-					handled, list, err := clienttesting.ObjectReaction(client.Tracker())(action)
-					tc.changeAfterList(t, client.Tracker())
-					return handled, list, err
-				})
-			}
+			client.PrependReactor("list", "*", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				handled, list, err := clienttesting.ObjectReaction(client.Tracker())(action)
+				if change := tc.changeAfterList[requestString(action)]; change != nil {
+					// The change goes through the tracker because calling the fake
+					// client from inside a reactor deadlocks.
+					change(t, client.Tracker())
+				}
+				return handled, list, err
+			})
 
 			client.ClearActions()
 			if done, err := ensureRBACPolicy(policy, client); err != nil || !done {
@@ -154,14 +153,7 @@ func TestEnsureRBACPolicy(t *testing.T) {
 			}
 			var requests []string
 			for _, action := range client.Actions() {
-				request := action.GetVerb() + " " + action.GetResource().Resource
-				switch action := action.(type) {
-				case clienttesting.GetAction: // also matches Deletes
-					request += "/" + action.GetName()
-				case clienttesting.CreateAction: // also matches Updates
-					request += "/" + action.GetObject().(metav1.Object).GetName()
-				}
-				requests = append(requests, request)
+				requests = append(requests, requestString(action))
 			}
 			if diff := cmp.Diff(tc.wantRequests, requests); diff != "" {
 				t.Errorf("requests (-want +got):\n%s", diff)
@@ -170,16 +162,32 @@ func TestEnsureRBACPolicy(t *testing.T) {
 	}
 }
 
-// updateObject edits the named ClusterRole or ClusterRoleBinding in tracker.
-func updateObject[T runtime.Object](t *testing.T, tracker clienttesting.ObjectTracker, resource, name string, change func(T)) {
+// requestString describes a client request as "verb resource[/name][ in namespace]".
+func requestString(action clienttesting.Action) string {
+	request := action.GetVerb() + " " + action.GetResource().Resource
+	switch action := action.(type) {
+	case clienttesting.GetAction: // also matches Deletes
+		request += "/" + action.GetName()
+	case clienttesting.CreateAction: // also matches Updates
+		request += "/" + action.GetObject().(metav1.Object).GetName()
+	}
+	if namespace := action.GetNamespace(); namespace != "" {
+		request += " in " + namespace
+	}
+	return request
+}
+
+// updateObject edits the named RBAC object in tracker. namespace is empty for
+// ClusterRoles and ClusterRoleBindings.
+func updateObject[T runtime.Object](t *testing.T, tracker clienttesting.ObjectTracker, resource, namespace, name string, change func(T)) {
 	t.Helper()
 	gvr := rbacapiv1.SchemeGroupVersion.WithResource(resource)
-	obj, err := tracker.Get(gvr, "", name)
+	obj, err := tracker.Get(gvr, namespace, name)
 	if err != nil {
 		t.Fatal(err)
 	}
 	change(obj.(T))
-	if err := tracker.Update(gvr, obj, ""); err != nil {
+	if err := tracker.Update(gvr, obj, namespace); err != nil {
 		t.Fatal(err)
 	}
 }
