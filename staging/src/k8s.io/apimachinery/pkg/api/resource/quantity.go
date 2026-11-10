@@ -677,9 +677,12 @@ func (_ Quantity) OpenAPISchemaFormat() string { return "" }
 // the OpenAPI v3 spec of this type.
 func (Quantity) OpenAPIV3OneOfTypes() []string { return []string{"string", "number"} }
 
-// minExponentNotationBinarySIScale is the Scale at or above which
-// CanonicalizeBytes writes BinarySI formatted values in exponent notation.
-const minExponentNotationBinarySIScale = 70
+// exponentNotationBinarySIShortCircuitThreshold is Scale well all values that CanonicalizeBytes
+// will serialize with a BinarySI suffix.
+// 10^70 is value is well above 1024^7 (and the smallest base 10 exponent that 1024^7
+// divides into evenly) but low enough that all scales below this value can safely
+// be handled by CanonicalizeBytes without short-circuiting.
+const exponentNotationBinarySIShortCircuitThreshold = 70
 
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
@@ -701,8 +704,8 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		if q.CmpInt64(-1024) > 0 && q.CmpInt64(1024) < 0 {
 			// This avoids rounding and hopefully confusion, too.
 			format = DecimalSI
-		} else if q.widenedScale() >= minExponentNotationBinarySIScale {
-			// Short-circuit the base-1024 computation since q must be written in exponent notation.
+		} else if q.widenedScale() >= exponentNotationBinarySIShortCircuitThreshold {
+			// Short-circuit the base-1024 computation since q must be written in base1024Exponent notation.
 			format = DecimalExponent
 		} else {
 			var exact bool
@@ -733,18 +736,15 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		return number, suffix
 	default:
 		// format must be BinarySI
-		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
-		suffix, ok := quantitySuffixer.constructBytes(2, exponent*10, format)
-		if !ok && exponent != 0 {
-			// BinarySI only defines suffixes up to "Ei" (2^60). For a larger
-			// exponent there is no suffix, so fall back to decimal exponent
-			// notation ("e") instead of dropping the suffix, which would
-			// silently corrupt the value (e.g. 2^70 serializing to "1").
-			// The base-1024 mantissa/exponent cannot be reused for "e"
-			// notation, so recompute the canonical mantissa and exponent in
-			// base 10.
-			number, exponent := rounded.AsCanonicalBytes(out)
-			suffix, ok := quantitySuffixer.constructBytes(10, exponent, DecimalExponent)
+		number, base1024Exponent := rounded.AsCanonicalBase1024Bytes(out)
+		base2Exponent := base1024Exponent * 10
+		suffix, ok := quantitySuffixer.constructBytes(2, base2Exponent, format)
+		if !ok && base1024Exponent != 0 {
+			// A BinarySI that is below a scale of
+			// exponentNotationBinarySIShortCircuitThreshold but mantissa large enough so
+			// that the effective scale is above 1024^7 we still write it in decimal format.
+			number, base10Exponent := rounded.AsCanonicalBytes(out)
+			suffix, ok := quantitySuffixer.constructBytes(10, base10Exponent, DecimalExponent)
 			if !ok {
 				assertUnreachable("CanonicalizeBytes: no DecimalExponent suffix")
 			}
