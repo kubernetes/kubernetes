@@ -362,6 +362,81 @@ func TestNominationExpectations(t *testing.T) {
 	}
 }
 
+// TestNominatedNodeName checks that the nominated node of a pod is what the
+// scheduler set as long as the pod object doesn't show it yet, and what the
+// pod object shows otherwise. Without the DRAPreemption feature gate, it is
+// always what the pod object shows.
+func TestNominatedNodeName(t *testing.T) {
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	withNomination := func(nodeName string) *v1.Pod {
+		p := pod.DeepCopy()
+		p.Status.NominatedNodeName = nodeName
+		return p
+	}
+	type nomination struct {
+		// pod is the pod object at the time of the nomination.
+		pod      *v1.Pod
+		nodeName string
+	}
+
+	for name, tc := range map[string]struct {
+		// nominations is what the scheduler set, in this order.
+		nominations []nomination
+		pod         *v1.Pod
+		// want and wantWithoutDRAPreemption are the nominated node for pod.
+		want, wantWithoutDRAPreemption string
+	}{
+		"not-nominated": {
+			pod: pod,
+		},
+		"nominated-through-api": {
+			pod:                      withNomination("node1"),
+			want:                     "node1",
+			wantWithoutDRAPreemption: "node1",
+		},
+		"nominated-with-stale-pod": {
+			nominations: []nomination{{pod, "node1"}},
+			pod:         pod,
+			want:        "node1",
+		},
+		"nominated-with-up-to-date-pod": {
+			nominations:              []nomination{{pod, "node1"}},
+			pod:                      withNomination("node1"),
+			want:                     "node1",
+			wantWithoutDRAPreemption: "node1",
+		},
+		"nominated-elsewhere-with-stale-pod": {
+			nominations:              []nomination{{pod, "node1"}, {withNomination("node1"), "node2"}},
+			pod:                      withNomination("node1"),
+			want:                     "node2",
+			wantWithoutDRAPreemption: "node1",
+		},
+		"cleared-with-stale-pod": {
+			nominations:              []nomination{{withNomination("node1"), "node1"}, {withNomination("node1"), ""}},
+			pod:                      withNomination("node1"),
+			wantWithoutDRAPreemption: "node1",
+		},
+	} {
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+				logger, ctx := ktesting.NewTestContext(t)
+				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod})
+				for _, nomination := range tc.nominations {
+					q.AddNominatedPod(logger, mustPodInfo(t, nomination.pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nomination.nodeName})
+				}
+				want := tc.want
+				if !draPreemption {
+					want = tc.wantWithoutDRAPreemption
+				}
+				if nodeName := q.NominatedNodeName(tc.pod); nodeName != want {
+					t.Errorf("Nominated node %q, want %q", nodeName, want)
+				}
+			})
+		}
+	}
+}
+
 // TestPatchPodStatusOverwritten checks that an update of the nominated node
 // name which got overwritten by another one lets the nominator take it from
 // pod objects again.

@@ -176,6 +176,22 @@ func (npm *nominator) expectedNodeName(uid types.UID) (string, bool) {
 	return expected, ok
 }
 
+// NominatedNodeName returns the node which the pod is nominated to: the
+// nominated node name which the scheduler set, also by clearing it, as long
+// as the pod object does not show it yet, otherwise the one of the pod
+// object.
+func (npm *nominator) NominatedNodeName(pod *v1.Pod) string {
+	if !npm.draPreemption {
+		return nominatedNodeName(pod)
+	}
+	npm.nLock.Lock()
+	defer npm.nLock.Unlock()
+	if expected, pending := npm.pendingUnlocked(pod); pending {
+		return expected
+	}
+	return nominatedNodeName(pod)
+}
+
 // forgetExpected is called when setting nodeName as the nominated node name
 // of the pod in the API failed. The pod objects are up-to-date again, unless
 // the scheduler set another nominated node name in the meantime.
