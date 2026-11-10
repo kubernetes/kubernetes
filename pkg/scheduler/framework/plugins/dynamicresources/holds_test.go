@@ -589,18 +589,21 @@ func TestNominationWithoutHold(t *testing.T) {
 // testNominationWithoutHold covers a preemptor whose claims cannot be
 // allocated in the simulation, for example because the node changed since
 // the dry run. Nothing gets held, but the claims of its victims are still
-// protected and still defer preemption.
+// protected while the nomination lasts, and ending the nomination wakes pods
+// referencing those claims.
 func testNominationWithoutHold(tCtx ktesting.TContext) {
 	slice := st.MakeResourceSlice(nodeName, driver).Device("gpu-0").Obj()
 	victim := preemptionPod("victim", "victim-claim").Node(nodeName).Obj()
 	preemptor := preemptionPod("preemptor", "preemptor-claim").Priority(100).Obj()
 	replacement := preemptionPod("replacement", "victim-claim").Priority(10).Obj()
+	unrelated := preemptionPod("unrelated", "unrelated-claim").Priority(10).Obj()
 	claims := []*resourceapi.ResourceClaim{
 		// Two devices, the node only has one.
 		preemptionClaim("preemptor-claim").Request(className).Obj(),
+		preemptionClaim("unrelated-claim").Obj(),
 		reserve(preemptionClaim("victim-claim").Allocation(preemptionAllocation("gpu-0")).Obj(), victim),
 	}
-	testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, preemptor, replacement})
+	testCtx := setupNominations(tCtx, claims, []apiruntime.Object{slice, victim, preemptor, replacement, unrelated})
 	nominate(tCtx, testCtx, preemptor, nodeName, victim)
 	require.NotNil(tCtx, testCtx.p.nominations.nomination(preemptor.UID), "nomination")
 	require.Empty(tCtx, heldDevices(testCtx, preemptor), "held devices")
@@ -616,7 +619,57 @@ func testNominationWithoutHold(tCtx ktesting.TContext) {
 	status = filterBothPasses(tCtx, testCtx, state, replacement)
 	require.Equal(tCtx, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "resourceclaim of preempted pods is being deallocated"), status, "Filter of a pod which uses the claim of the victim")
 
-	require.Empty(tCtx, testCtx.p.RemoveNomination(tCtx, preemptor, nodeName).Events, "release events")
+	// Replacing the nomination with the same victim keeps protecting the claim.
+	_, prepared := prepareNomination(tCtx, testCtx, preemptor, nodeName, victim)
+	require.Empty(tCtx, testCtx.p.AddNomination(tCtx, preemptor, nodeName, prepared).Events, "events when victim is kept")
+
+	// Ending the nomination stops holds.deallocating and wakes pods referencing
+	// the victim claim without waking unrelated pods waiting for a free device.
+	releaseResult := testCtx.p.RemoveNomination(tCtx, preemptor, nodeName)
+	require.Len(tCtx, releaseResult.Events, 1, "release events")
+	event := releaseResult.Events[0]
+	require.Equal(tCtx, framework.EventResourceClaimHoldReleased, event.Event)
+	logger := klog.FromContext(tCtx)
+	hint, err := testCtx.p.isSchedulableAfterClaimChange(logger, replacement, event.OldObj, event.NewObj)
+	require.NoError(tCtx, err)
+	require.Equal(tCtx, fwk.Queue, hint, "pod referencing victim claim is woken")
+	hint, err = testCtx.p.isSchedulableAfterClaimChange(logger, unrelated, event.OldObj, event.NewObj)
+	require.NoError(tCtx, err)
+	require.Equal(tCtx, fwk.QueueSkip, hint, "unrelated pod waiting for a free device is skipped")
+
+	state = framework.NewCycleState()
+	_, status = testCtx.p.PreFilter(tCtx, state, replacement, testCtx.nodeInfos)
+	require.True(tCtx, status.IsSuccess(), "PreFilter after nomination ended: %v", status)
+	require.True(tCtx, filterBothPasses(tCtx, testCtx, state, replacement).IsSuccess(), "replacement fits once nomination ended")
+
+	tCtx.Run("assumed-with-extra-settling-victim-claim", func(tCtx ktesting.TContext) {
+		twoSlices := st.MakeResourceSlice(nodeName, driver).Device("gpu-0").Device("gpu-1").Obj()
+		victim1 := preemptionPod("victim1", "victim-claim-1").Node(nodeName).Obj()
+		victim2 := preemptionPod("victim2", "victim-claim-2").Node(nodeName).Obj()
+		holder := preemptionPod("holder", "holder-claim").Priority(100).Obj()
+		sharer := preemptionPod("sharer", "victim-claim-2").Priority(10).Obj()
+		subClaims := []*resourceapi.ResourceClaim{
+			preemptionClaim("holder-claim").Obj(),
+			reserve(preemptionClaim("victim-claim-1").Allocation(preemptionAllocation("gpu-0")).Obj(), victim1),
+			reserve(preemptionClaim("victim-claim-2").Allocation(preemptionAllocation("gpu-1")).Obj(), victim2),
+		}
+		subCtx := setupNominations(tCtx, subClaims, []apiruntime.Object{twoSlices, victim1, victim2, holder, sharer})
+		nominate(tCtx, subCtx, holder, nodeName, victim1, victim2)
+		updateClaim(tCtx, subCtx, "victim-claim-1", func(claim *resourceapi.ResourceClaim) {
+			claim.Status.ReservedFor = nil
+			claim.Status.Allocation = nil
+		})
+		updateClaim(tCtx, subCtx, "victim-claim-2", func(claim *resourceapi.ResourceClaim) {
+			claim.Status.ReservedFor = nil
+		})
+		assume(tCtx, subCtx, holder, nodeName)
+
+		result := subCtx.p.RemoveNomination(tCtx, holder, nodeName)
+		require.Len(tCtx, result.Events, 1, "event for remaining settling victim claim when held device is used")
+		hint, err := subCtx.p.isSchedulableAfterClaimChange(logger, sharer, result.Events[0].OldObj, result.Events[0].NewObj)
+		require.NoError(tCtx, err)
+		require.Equal(tCtx, fwk.Queue, hint, "pod referencing second victim claim is woken")
+	})
 }
 
 func TestHoldsThroughAddPod(t *testing.T) {

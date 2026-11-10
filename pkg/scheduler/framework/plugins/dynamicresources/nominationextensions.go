@@ -17,14 +17,17 @@ limitations under the License.
 package dynamicresources
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -91,7 +94,7 @@ func (pl *DynamicResources) AddNomination(ctx context.Context, pod *v1.Pod, node
 		return framework.NominationChangeResult{}
 	}
 	klog.FromContext(ctx).V(5).Info("Added nomination", "pod", klog.KObj(pod), "node", nodeName, "numHeldClaims", len(nomination.holds))
-	return pl.releasedDevices(ctx, pod, pl.nominations.add(pod.UID, nomination), nomination.holds)
+	return pl.releasedDevices(ctx, pod, pl.nominations.add(pod.UID, nomination), nomination)
 }
 
 // RemoveNomination drops the nomination of the pod. Claims of the victims of
@@ -104,15 +107,21 @@ func (pl *DynamicResources) RemoveNomination(ctx context.Context, pod *v1.Pod, n
 	return pl.releasedDevices(ctx, pod, pl.nominations.remove(pod.UID, nodeName), nil)
 }
 
-// releasedDevices returns an event for the devices held for a nomination
-// which ended or got replaced, so that pods waiting for devices get another
-// chance, unless the pod keeps them. It keeps them if the nomination which
-// replaces this one holds them for the same claims (kept), or if its claims
-// use them: the nomination of an assumed pod ends after Reserve, so the
-// devices which it reserved are pending allocations of its claims then.
-func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, nomination *podNomination, kept map[types.UID]heldClaim) framework.NominationChangeResult {
+// releasedDevices returns events for what a nomination held or protected once
+// the nomination ended or got replaced, so that blocked pods get another
+// chance, unless the pod keeps them. Held devices are kept if the replacement
+// nomination on the same node holds them for the same claims, or if the pod's
+// claims use them (the nomination of an assumed pod ends after Reserve, when
+// its claims have pending allocations). When no held device is released,
+// settling claims of the nomination's victims that are no longer protected
+// against reuse still wake pods referencing those claims.
+func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, nomination, replacement *podNomination) framework.NominationChangeResult {
 	if nomination == nil {
 		return framework.NominationChangeResult{}
+	}
+	var kept map[types.UID]heldClaim
+	if replacement != nil && replacement.nodeName == nomination.nodeName {
+		kept = replacement.holds
 	}
 	for uid, held := range nomination.holds {
 		if keptClaim, ok := kept[uid]; ok && sameDevices(keptClaim.allocation.Devices.Results, held.allocation.Devices.Results) {
@@ -126,7 +135,37 @@ func (pl *DynamicResources) releasedDevices(ctx context.Context, pod *v1.Pod, no
 		// claim got deallocated.
 		return framework.NominationChangeResult{Events: releaseEvents(uid, held)}
 	}
-	return framework.NominationChangeResult{}
+	if pl.victimClaims == nil || len(nomination.victims) == 0 {
+		return framework.NominationChangeResult{}
+	}
+	victims := sets.KeySet(nomination.victims)
+	var keptVictims sets.Set[types.UID]
+	if replacement != nil && replacement.nodeName == nomination.nodeName {
+		keptVictims = sets.KeySet(replacement.victims)
+	}
+	var unprotected []*victimClaim
+	for _, victimClaim := range pl.victimClaims.onNode(nomination.nodeName) {
+		if !preemptedFor(victimClaim, victims) || preemptedFor(victimClaim, keptVictims) {
+			continue
+		}
+		if !pl.victimClaimSettling(victimClaim) {
+			pl.victimClaims.forget(victimClaim.uid, victimClaim)
+			continue
+		}
+		unprotected = append(unprotected, victimClaim)
+	}
+	slices.SortFunc(unprotected, func(a, b *victimClaim) int {
+		if c := cmp.Compare(a.claim.Namespace, b.claim.Namespace); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.claim.Name, b.claim.Name)
+	})
+	events := make([]framework.NominationEvent, 0, len(unprotected))
+	for _, victimClaim := range unprotected {
+		klog.FromContext(ctx).V(5).Info("Stopped holding ResourceClaim of preempted pods for deallocation", "pod", klog.KObj(pod), "node", nomination.nodeName, "resourceclaim", victimClaim.claim)
+		events = append(events, unprotectedClaimEvent(pod.UID, victimClaim))
+	}
+	return framework.NominationChangeResult{Events: events}
 }
 
 // usesHeldDevices returns true if the claim has the held devices, as a
@@ -152,6 +191,22 @@ func releaseEvents(uid types.UID, held heldClaim) []framework.NominationEvent {
 	deallocated := claim.DeepCopy()
 	deallocated.Status.Allocation = nil
 	return []framework.NominationEvent{{Event: framework.EventResourceClaimHoldReleased, OldObj: claim, NewObj: deallocated}}
+}
+
+// unprotectedClaimEvent returns an event for a victim claim that is no longer
+// blocked via holds.deallocating. Keeping Allocation non-nil while changing
+// ReservedFor wakes only pods referencing that claim instead of all pods
+// waiting for a free device.
+func unprotectedClaimEvent(podUID types.UID, victimClaim *victimClaim) framework.NominationEvent {
+	oldClaim := &resourceapi.ResourceClaim{}
+	oldClaim.Namespace, oldClaim.Name, oldClaim.UID = victimClaim.claim.Namespace, victimClaim.claim.Name, victimClaim.uid
+	oldClaim.Status.Allocation = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{Results: victimClaim.results},
+	}
+	oldClaim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{{UID: podUID}}
+	newClaim := oldClaim.DeepCopy()
+	newClaim.Status.ReservedFor = nil
+	return framework.NominationEvent{Event: framework.EventResourceClaimHoldReleased, OldObj: oldClaim, NewObj: newClaim}
 }
 
 // sameDevices compares allocation results without their ShareIDs, which
