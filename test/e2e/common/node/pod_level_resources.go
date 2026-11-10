@@ -447,18 +447,18 @@ func podLevelResourcesTests(f *framework.Framework) {
 func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
 	var errs []error
 	for _, container := range pod.Spec.Containers {
-		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Memory() != nil &&
-			container.Resources.Limits.Memory() == nil {
-			err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, &container.Resources, true)
-			if err != nil {
+		// A container without its own limit inherits the pod-level limit in its
+		// cgroup, so resolve the expected limits accordingly before verifying.
+		expectedResources := cgroups.ExpectedContainerLimits(pod, &container.Resources)
+
+		if !expectedResources.Limits.Memory().IsZero() {
+			if err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, expectedResources, true); err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
 			}
 		}
 
-		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
-			container.Resources.Limits.Cpu() == nil {
-			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true)
-			if err != nil {
+		if !expectedResources.Limits.Cpu().IsZero() {
+			if err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, expectedResources, true); err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}
 		}
