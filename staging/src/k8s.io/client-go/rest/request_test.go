@@ -2090,6 +2090,54 @@ func TestBody(t *testing.T) {
 	}
 }
 
+type slowTestObjectDecoder struct {
+	runtime.Decoder
+	delay time.Duration
+}
+
+func (d slowTestObjectDecoder) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
+	time.Sleep(d.delay)
+	return d.Decoder.Decode(data, defaults, into)
+}
+
+func TestNewWatchEventDecoderWithContextConcurrentLogger(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClientConcurrentDecoding, true)
+
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.Verbosity(2), ktesting.BufferLogs(true))).
+		WithValues("customTag", "from-context")
+	ctx := klog.NewContext(context.Background(), logger)
+	r := &Request{
+		params: url.Values{"sendInitialEvents": {"true"}},
+	}
+	payload := `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo"}}}` + "\n"
+	objDecoder := scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion)
+	stream := streaming.NewDecoder(io.NopCloser(strings.NewReader(payload)), objDecoder)
+	d := r.newWatchEventDecoderWithContext(ctx, stream, slowTestObjectDecoder{
+		Decoder: objDecoder,
+		delay:   220 * time.Millisecond,
+	})
+	require.IsType(t, &restclientwatch.ConcurrentWatchEventDecoder{}, d)
+
+	_, _, err := d.Decode()
+	require.NoError(t, err)
+	d.Close()
+
+	entries := logger.GetSink().(ktesting.Underlier).GetBuffer().Data()
+	require.NotEmpty(t, entries)
+	stages := map[string]bool{}
+	for _, entry := range entries {
+		vals := map[string]any{}
+		for _, kvs := range [][]any{entry.WithKVList, entry.ParameterKVList} {
+			for i := 0; i+1 < len(kvs); i += 2 {
+				vals[fmt.Sprint(kvs[i])] = kvs[i+1]
+			}
+		}
+		assert.Equal(t, "from-context", vals["customTag"])
+		stages[fmt.Sprint(vals["stage"])] = true
+	}
+	assert.True(t, stages["collector-wait"], "expected collector-wait stage warning, got %v", stages)
+}
+
 func TestNewWatchEventDecoder(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -2117,6 +2165,64 @@ func TestNewWatchEventDecoder(t *testing.T) {
 			} else {
 				require.IsType(t, &restclientwatch.Decoder{}, decoder)
 			}
+		})
+	}
+}
+
+func TestNewStreamWatcherAttributesAuditID(t *testing.T) {
+	for _, concurrent := range []bool{false, true} {
+		name := "serial"
+		if concurrent {
+			name = "concurrent"
+		}
+		t.Run(name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClientConcurrentDecoding, concurrent)
+
+			baseLogger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.Verbosity(2), ktesting.BufferLogs(true)))
+			ctx := klog.NewContext(context.Background(), baseLogger)
+
+			params := url.Values{}
+			if concurrent {
+				params.Set("sendInitialEvents", "true")
+			}
+			r := &Request{
+				verb:          "GET",
+				params:        params,
+				contentConfig: ClientContentConfig{ContentType: "application/json", Negotiator: runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)},
+			}
+			resp := &http.Response{
+				Header: http.Header{"Audit-Id": {"audit-abc-123"}, "Content-Type": {"application/json"}},
+				Body:   io.NopCloser(strings.NewReader("")),
+			}
+
+			w, err := r.newStreamWatcher(ctx, resp)
+			require.NoError(t, err)
+			sw, ok := w.(*watch.StreamWatcher)
+			require.True(t, ok)
+
+			sw.DispatchLogger().RecordWait(250 * time.Millisecond)
+			sw.DispatchLogger().Flush()
+			sw.Stop()
+
+			entries := baseLogger.GetSink().(ktesting.Underlier).GetBuffer().Data()
+			require.NotEmpty(t, entries)
+			var auditCount int
+			vals := map[string]any{}
+			for _, kvs := range [][]any{entries[0].WithKVList, entries[0].ParameterKVList} {
+				for i := 0; i+1 < len(kvs); i += 2 {
+					k := fmt.Sprint(kvs[i])
+					if k == "auditID" {
+						auditCount++
+					}
+					vals[k] = kvs[i+1]
+				}
+			}
+			assert.Equal(t, 1, auditCount, "auditID key must not be duplicated")
+			assert.Equal(t, "audit-abc-123", vals["auditID"])
+			assert.NotContains(t, vals, "source")
+			assert.NotContains(t, vals, "watchID")
+			assert.NotContains(t, vals, "reflectorID")
+			assert.NotContains(t, vals, "informer")
 		})
 	}
 }

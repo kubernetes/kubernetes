@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/framer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/clock"
 )
 
 func podJSON(rv string) string {
@@ -295,4 +297,106 @@ func TestConcurrentWatchEventDecoderShutdown(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestConcurrentWatchEventDecoderDecodeLogger(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		objectDecoder := getDecoder()
+		slowDecoder := objectDecoderFunc(func(data []byte) (runtime.Object, error) {
+			time.Sleep(time.Second)
+			return runtime.Decode(objectDecoder, data)
+		})
+		input := watchEventJSON(watch.Added, podJSON("1")) +
+			watchEventJSON(watch.Added, podJSON("2")) +
+			watchEventJSON(watch.Added, podJSON("3"))
+		stream := streaming.NewDecoder(framer.NewJSONFramedReader(io.NopCloser(strings.NewReader(input))), getDecoder())
+		decoder := NewConcurrentWatchEventDecoder(stream, slowDecoder)
+
+		for range 3 {
+			_, _, err := decoder.Decode()
+			require.NoError(t, err)
+		}
+		_, _, err := decoder.Decode()
+		require.ErrorIs(t, err, io.EOF)
+		decoder.Close()
+
+		// The three 1s decodes overlap, so only the 1s the output waited on the first one counts.
+		// Stream read errors after the last event are not recorded.
+		require.Equal(t, time.Second, decoder.decodeLogger.TimeWaiting())
+		require.Equal(t, 3, decoder.decodeLogger.EventCount())
+		require.Equal(t, "*v1.Pod", decoder.decodeLogger.ResourceType())
+		require.Equal(t, "*v1.Pod", decoder.readerBlockLogger.ResourceType())
+		require.Equal(t, "*v1.Pod", decoder.schedulerBlockLogger.ResourceType())
+		require.Equal(t, "*v1.Pod", decoder.collectorBlockLogger.ResourceType())
+	})
+}
+
+func TestConcurrentWatchEventDecoderStageBlockLoggers(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.Verbosity(2), ktesting.BufferLogs(true)))
+		objectDecoder := getDecoder()
+		// Event 1 takes 1s, stalling collector-wait.
+		// With queue sizes 1 and concurrency 2, leaving Decode uncalled for 1.5s also stalls collector-handoff, scheduler, and reader.
+		delayedDecoder := objectDecoderFunc(func(data []byte) (runtime.Object, error) {
+			if string(data) == podJSON("1") {
+				time.Sleep(time.Second)
+			}
+			return runtime.Decode(objectDecoder, data)
+		})
+		input := strings.Join([]string{
+			watchEventJSON(watch.Added, podJSON("1")),
+			watchEventJSON(watch.Added, podJSON("2")),
+			watchEventJSON(watch.Added, podJSON("3")),
+			watchEventJSON(watch.Added, podJSON("4")),
+			watchEventJSON(watch.Added, podJSON("5")),
+			watchEventJSON(watch.Added, podJSON("6")),
+		}, "")
+		stream := streaming.NewDecoder(framer.NewJSONFramedReader(io.NopCloser(strings.NewReader(input))), getDecoder())
+		decoder := newConcurrentWatchEventDecoderWithLogger(stream, delayedDecoder, 1, 1, 2, &logger, "/api/v1/pods", clock.RealClock{})
+
+		// Stall the consumer long enough for every stage queue to back up.
+		time.Sleep(2 * time.Second)
+		for range 6 {
+			_, _, err := decoder.Decode()
+			require.NoError(t, err)
+		}
+		_, _, err := decoder.Decode()
+		require.ErrorIs(t, err, io.EOF)
+		decoder.Close()
+
+		stages := map[string]bool{}
+		for _, entry := range logger.GetSink().(ktesting.Underlier).GetBuffer().Data() {
+			for _, kvs := range [][]any{entry.WithKVList, entry.ParameterKVList} {
+				for i := 0; i+1 < len(kvs); i += 2 {
+					if fmt.Sprint(kvs[i]) == "stage" {
+						stages[fmt.Sprint(kvs[i+1])] = true
+					}
+				}
+			}
+		}
+		for _, wantStage := range []string{"reader", "scheduler", "collector-wait", "collector-handoff"} {
+			require.True(t, stages[wantStage], "expected warning for stage %q, got stages %v", wantStage, stages)
+		}
+	})
+}
+
+func TestConcurrentWatchEventDecoderWithLoggerPreservesContextFields(t *testing.T) {
+	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.Verbosity(2), ktesting.BufferLogs(true))).
+		WithValues("watchID", uint64(7), "source", "/api/v1/pods")
+	stream := streaming.NewDecoder(io.NopCloser(strings.NewReader("")), getDecoder())
+	decoder := NewConcurrentWatchEventDecoderWithLogger(stream, getDecoder(), &logger)
+	decoder.decodeLogger.RecordWait(250 * time.Millisecond)
+	decoder.Close()
+
+	entries := logger.GetSink().(ktesting.Underlier).GetBuffer().Data()
+	require.Len(t, entries, 1)
+	kvsMap := map[string]any{}
+	for _, kvs := range [][]any{entries[0].WithKVList, entries[0].ParameterKVList} {
+		for i := 0; i+1 < len(kvs); i += 2 {
+			kvsMap[fmt.Sprint(kvs[i])] = kvs[i+1]
+		}
+	}
+	require.Equal(t, "/api/v1/pods", kvsMap["source"])
+	require.Equal(t, uint64(7), kvsMap["watchID"])
+	require.Equal(t, "collector-wait", kvsMap["stage"])
 }
