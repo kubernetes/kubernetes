@@ -296,3 +296,32 @@ func TestConcurrentWatchEventDecoderShutdown(t *testing.T) {
 		})
 	}
 }
+
+func TestConcurrentWatchEventDecoderDecodeLogger(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		objectDecoder := getDecoder()
+		slowDecoder := objectDecoderFunc(func(data []byte) (runtime.Object, error) {
+			time.Sleep(time.Second)
+			return runtime.Decode(objectDecoder, data)
+		})
+		input := watchEventJSON(watch.Added, podJSON("1")) +
+			watchEventJSON(watch.Added, podJSON("2")) +
+			watchEventJSON(watch.Added, podJSON("3"))
+		stream := streaming.NewDecoder(framer.NewJSONFramedReader(io.NopCloser(strings.NewReader(input))), getDecoder())
+		decoder := NewConcurrentWatchEventDecoder(stream, slowDecoder)
+
+		for range 3 {
+			_, _, err := decoder.Decode()
+			require.NoError(t, err)
+		}
+		_, _, err := decoder.Decode()
+		require.ErrorIs(t, err, io.EOF)
+		decoder.Close()
+
+		// The three 1s decodes overlap, so only the 1s the output waited on the first one counts.
+		// Stream read errors after the last event are not recorded.
+		require.Equal(t, time.Second, decoder.decodeLogger.TimeWaiting())
+		require.Equal(t, 3, decoder.decodeLogger.EventCount())
+		require.Equal(t, "*v1.Pod", decoder.decodeLogger.ResourceType())
+	})
+}
