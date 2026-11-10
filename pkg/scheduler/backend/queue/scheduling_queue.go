@@ -964,10 +964,30 @@ func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *v1.Pod) {
 		p.nominator.DeleteNominatedPodIfExists(pod)
 		return
 	}
+	if !p.nominator.tracks(pod.UID) {
+		// Most pods get assumed without ever having been nominated. They
+		// must not make the scheduling goroutine wait for p.lock, which
+		// event handlers hold while they go through the unschedulable pods.
+		return
+	}
 	p.lock.Lock()
 	// fwk.PodNominator does not pass a logger.
 	defer p.processNominationChangesAndUnlock(klog.TODO())
 	p.nominator.DeleteNominatedPodIfExists(pod)
+}
+
+// UpdateNominatedPod replaces the pod object of a nomination, which changes
+// the nomination if the nominated node name of the pod changed. Methods which
+// hold p.lock already call the nominator directly.
+func (p *PriorityQueue) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo fwk.PodInfo) {
+	if !p.nominator.draPreemption {
+		// Nothing to process, so p.lock is not needed.
+		p.nominator.UpdateNominatedPod(logger, oldPod, newPodInfo)
+		return
+	}
+	p.lock.Lock()
+	defer p.processNominationChangesAndUnlock(logger)
+	p.nominator.UpdateNominatedPod(logger, oldPod, newPodInfo)
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
@@ -1481,7 +1501,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(logger, oldPod)
 		if !hasRoot {
 			if pInfo := p.incompletePodGroupPods.update(newPod); pInfo != nil {
-				p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+				p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 				pInfo.PodSignature = p.signPod(ctx, newPod)
 			}
 			return
@@ -1508,7 +1528,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		}
 		// If the entity is already in the active queue, just update the pod there.
 		if pInfo := unlockedActiveQ.update(newPod, entityLookup); pInfo != nil {
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 			pInfo.PodSignature = p.signPod(ctx, newPod)
 			updated = true
 			return
@@ -1516,7 +1536,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 
 		// If the entity is in the backoff queue, update the pod there.
 		if pInfo := p.backoffQ.update(newPod, entityLookup); pInfo != nil {
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 			pInfo.PodSignature = p.signPod(ctx, newPod)
 			updated = true
 			return
@@ -1536,7 +1556,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			p.addPod(ctx, newPod)
 			return
 		}
-		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+		p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 		pInfo.PodSignature = p.signPod(ctx, newPod)
 
 		// When unscheduled Pods are updated, we check with QueueingHint
@@ -1563,7 +1583,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 
 	if p.isPodGroupMember(newPod) {
 		if pInfo := p.pendingPodGroupPods.update(newPod); pInfo != nil {
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 			pInfo.PodSignature = p.signPod(ctx, newPod)
 			return
 		}

@@ -83,6 +83,15 @@ func TestNominationChanges(t *testing.T) {
 			},
 			wantMoved: true,
 		},
+		// Through fwk.PodNominator, without the rest of Update.
+		"cleared-by-nominated-pod-update": {
+			change: func(t *testing.T, q *PriorityQueue) {
+				logger, _ := ktesting.NewTestContext(t)
+				var nominator fwk.PodNominator = q
+				nominator.UpdateNominatedPod(logger, pod, mustPodInfo(t, withNomination("")))
+			},
+			wantMoved: true,
+		},
 		"cleared-in-memory": {
 			change: func(t *testing.T, q *PriorityQueue) {
 				logger, _ := ktesting.NewTestContext(t)
@@ -594,6 +603,43 @@ func TestPatchPodStatusMerged(t *testing.T) {
 				t.Errorf("Nominated node name %q set by the merged call, want node1", updatedPod.Status.NominatedNodeName)
 			}
 		})
+	}
+}
+
+// TestDeleteNominatedPodIfExistsWithoutNomination checks that a pod which is
+// not nominated, like most pods when they get assumed, does not have to wait
+// for the lock of the scheduling queue, and that a nominated node name which
+// the scheduler still expects for a pod without a nomination gets dropped.
+func TestDeleteNominatedPodIfExistsWithoutNomination(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod})
+
+	q.lock.Lock()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		q.DeleteNominatedPodIfExists(pod)
+	}()
+	select {
+	case <-done:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Error("Waited for the lock of the scheduling queue although the pod is not nominated")
+	}
+	q.lock.Unlock()
+	<-done
+
+	// The scheduler cleared the nomination which the pod object still shows.
+	nominated := pod.DeepCopy()
+	nominated.Status.NominatedNodeName = "node1"
+	q.AddNominatedPod(logger, mustPodInfo(t, nominated), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride})
+	if _, expected := q.nominator.expectedNodeName(pod.UID); !expected {
+		t.Fatal("Cleared nomination not expected")
+	}
+	q.DeleteNominatedPodIfExists(pod)
+	if _, expected := q.nominator.expectedNodeName(pod.UID); expected {
+		t.Error("Cleared nomination still expected")
 	}
 }
 
