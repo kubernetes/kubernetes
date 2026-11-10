@@ -328,24 +328,27 @@ func NewHintMerger(numaInfo *NUMAInfo, hints []resourceHints, policyName string,
 			return current
 		}
 
-		// The structural comparison below comes first: the allocation strategy
-		// only gets to decide between masks which Narrowest, respectively
-		// Closest, considers equally good and would otherwise separate with an
-		// arbitrary fallback.
-		if allocationStrategy != NUMAAllocationStrategyNone &&
-			numaInfo.equallyFit(current.NUMANodeAffinity, candidate.NUMANodeAffinity, preferClosest) {
-			if best := compareHintScores(allocationStrategy, current, candidate); best != nil {
-				return best
+		// Compare the hints based on the policy options (Closest or Narrowest).
+		// The structural comparison comes first: the allocation strategy only
+		// gets to decide between masks which the structural comparison considers
+		// equally good and would otherwise separate with an arbitrary tiebreaker.
+		var best bitmask.BitMask
+		var equal bool
+		if preferClosest {
+			best, equal = numaInfo.Closest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
+		} else {
+			best, equal = numaInfo.Narrowest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
+		}
+
+		// If the masks are equally fit and we have an allocation strategy,
+		// let the strategy decide based on scores.
+		if equal && allocationStrategy != NUMAAllocationStrategyNone {
+			if scoreBest := compareHintScores(allocationStrategy, current, candidate); scoreBest != nil {
+				return scoreBest
 			}
 		}
 
-		// Otherwise compare the hints, based on the policy options provided
-		var best bitmask.BitMask
-		if preferClosest {
-			best = numaInfo.Closest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
-		} else {
-			best = numaInfo.Narrowest(current.NUMANodeAffinity, candidate.NUMANodeAffinity)
-		}
+		// Otherwise, use the result from the structural comparison.
 		if best.IsEqual(current.NUMANodeAffinity) {
 			return current
 		}

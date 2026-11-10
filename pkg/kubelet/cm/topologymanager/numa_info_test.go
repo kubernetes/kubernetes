@@ -697,7 +697,7 @@ func TestClosest(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.description, func(t *testing.T) {
 
-			result := tc.numaInfo.Closest(tc.candidate, tc.current)
+			result, _ := tc.numaInfo.Closest(tc.candidate, tc.current)
 			if result != tc.current && result != tc.candidate {
 				t.Errorf("Expected result to be either 'current' or 'candidate' hint")
 			}
@@ -772,8 +772,14 @@ func TestEquallyFit(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run(tc.description, func(t *testing.T) {
-			if got := numaInfo.equallyFit(tc.m1, tc.m2, tc.preferClosest); got != tc.expected {
-				t.Errorf("expected equallyFit to return %v, got %v", tc.expected, got)
+			var equal bool
+			if tc.preferClosest {
+				_, equal = numaInfo.Closest(tc.m1, tc.m2)
+			} else {
+				_, equal = numaInfo.Narrowest(tc.m1, tc.m2)
+			}
+			if equal != tc.expected {
+				t.Errorf("expected equal to be %v, got %v", tc.expected, equal)
 			}
 		})
 	}
