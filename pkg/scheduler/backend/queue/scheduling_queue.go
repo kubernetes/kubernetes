@@ -28,7 +28,6 @@ package queue
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -2115,26 +2114,38 @@ func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodConditio
 	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, conditions, nominatingInfo), fwk.APICallOptions{
 		OnFinish: onFinish,
 	})
-	expected := nominatingInfo.Mode() == fwk.ModeOverride && p.nominator.expects(pod.UID, nominatingInfo.NominatedNodeName)
+	// The nominator ignores the nominated node name in pod objects until
+	// they show the one which it expects. That never happens if it doesn't
+	// get set, so the nominator must not go on expecting it then.
+	expected, pending := p.nominator.expectedNodeName(pod.UID)
+	if pending && nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != expected {
+		// This call replaces the one which was going to set the expected
+		// nominated node name, for example when preemption clears the
+		// nomination of another pod.
+		p.NominationNotPersisted(pod, expected)
+		pending = false
+	}
 	if fwk.IsUnexpectedError(err) {
-		if expected {
-			p.NominationNotPersisted(pod, nominatingInfo.NominatedNodeName)
+		if pending {
+			p.NominationNotPersisted(pod, expected)
 		}
 		return onFinish, err
 	}
-	if !expected {
+	if !pending {
 		return onFinish, nil
 	}
-	// The nominator ignores the nominated node name in pod objects until
-	// they show this one, which never happens if the call fails. A call
-	// which got overwritten by a newer one may not set it either, for
-	// example when preemption cleared the nomination.
+	// This call sets the expected nominated node name, or the dispatcher
+	// merges the pending call which sets it into this one. The older call
+	// then finishes with ErrCallOverwritten although the nominated node name
+	// still gets set, so only a failure counts. If the older call had set it
+	// already, a failure of this one makes the nominator stop expecting it
+	// too early, but only until pod objects show it.
 	result := make(chan error, 1)
 	go func() {
 		select {
 		case err := <-onFinish:
-			if fwk.IsUnexpectedError(err) || errors.Is(err, fwk.ErrCallOverwritten) {
-				p.NominationNotPersisted(pod, nominatingInfo.NominatedNodeName)
+			if fwk.IsUnexpectedError(err) {
+				p.NominationNotPersisted(pod, expected)
 			}
 			result <- err
 		case <-p.stop:
