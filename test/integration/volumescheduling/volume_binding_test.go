@@ -30,6 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -1036,6 +1037,66 @@ func TestRescheduleProvisioning(t *testing.T) {
 	// Validate that the annotation is removed by controller for provision reschedule.
 	if err := waitForProvisionAnn(clientset, pvc, false); err != nil {
 		t.Errorf("Expect to reschedule provision for PVC %v/%v, but still found selected-node annotation on it", ns, pvcName)
+	}
+}
+
+func TestPreemptionDuringVolumeBinding(t *testing.T) {
+	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, "volume-preemption-", nil), 0)
+	testutil.SyncSchedulerInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+	ctx, client, ns := testCtx.Ctx, testCtx.ClientSet, testCtx.NS.Name
+
+	node := makeNode(1)
+	node.Status.Capacity[v1.ResourcePods] = resource.MustParse("1")
+	if _, err := client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	// Leave provisioning pending so preemption happens after the selected-node
+	// API update, while VolumeBinding is still waiting for the volume to bind.
+	sc := makeDynamicProvisionerStorageClass("preemption", &modeWait, nil)
+	if _, err := client.StorageV1().StorageClasses().Create(ctx, sc, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	pvc := makePVC("victim-vol", ns, &sc.Name, "")
+	victim := makePod("victim", ns, nil)
+	victim.Spec.Priority = new(int32(0))
+	victim.Spec.Volumes = []v1.Volume{{
+		Name: "vol",
+		VolumeSource: v1.VolumeSource{Ephemeral: &v1.EphemeralVolumeSource{
+			VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{Spec: pvc.Spec},
+		}},
+	}}
+	victim, err := client.CoreV1().Pods(ns).Create(ctx, victim, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create the claim normally supplied by the ephemeral volume controller.
+	pvc.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(victim, v1.SchemeGroupVersion.WithKind("Pod"))}
+	if _, err := client.CoreV1().PersistentVolumeClaims(ns).Create(ctx, pvc, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		claim, err := client.CoreV1().PersistentVolumeClaims(ns).Get(ctx, pvc.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return claim.Annotations["volume.kubernetes.io/selected-node"] == node.Name, nil
+	}); err != nil {
+		t.Fatalf("Waiting for volume provisioning to start: %v", err)
+	}
+
+	preemptor := makePod("preemptor", ns, nil)
+	preemptor.Spec.Priority = new(int32(1000))
+	preemptor, err = client.CoreV1().Pods(ns).Create(ctx, preemptor, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := waitForPodToSchedule(client, preemptor); err != nil {
+		t.Fatalf("Waiting for preemptor to schedule: %v", err)
+	}
+	if _, err := client.CoreV1().Pods(ns).Get(ctx, victim.Name, metav1.GetOptions{}); !apierrors.IsNotFound(err) {
+		t.Fatalf("Expected victim to be deleted so its ephemeral PVC can be garbage collected, got: %v", err)
 	}
 }
 
