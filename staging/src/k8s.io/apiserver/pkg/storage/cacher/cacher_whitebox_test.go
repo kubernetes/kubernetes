@@ -1349,6 +1349,20 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 	}
 }
 
+func TestCacherStopImmediately(t *testing.T) {
+	for _, watchCacheStallResume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchCacheStallResume, watchCacheStallResume)
+			backingStorage := &cachertesting.MockStorage{}
+			for range 100 {
+				cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
+				require.NoError(t, err)
+				cacher.Stop()
+			}
+		})
+	}
+}
+
 func TestCacherDontMissEventsOnReinitialization(t *testing.T) {
 	for _, watchCacheStallResume := range []bool{true, false} {
 		t.Run(fmt.Sprintf("WatchCacheStallResume=%v", watchCacheStallResume), func(t *testing.T) {

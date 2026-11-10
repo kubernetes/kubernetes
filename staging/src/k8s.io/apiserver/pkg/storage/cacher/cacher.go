@@ -493,7 +493,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	go cacher.dispatchEvents()
 	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
-		go cacher.startBackgroundResync()
+		cacher.startBackgroundResync()
 	}
 	go progressRequester.Run(stopCh)
 	go watchCache.freshness.Run(stopCh)
