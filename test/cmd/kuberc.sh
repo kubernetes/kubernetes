@@ -205,6 +205,9 @@ EOF
   kube::test::if_has_string "${output_message}" "KUBERC=off and passing kuberc flag are mutually exclusive"
   output_message=$(! KUBERC=off kubectl getn 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" "error: unknown command \"getn\" for \"kubectl\""
+  output_message=$(KUBERC=off kubectl create configmap cm --from-literal=flags=--kuberc=/tmp/x 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" "configmap/cm created"
+  kubectl delete configmap cm
 
   cat > "${TMPDIR:-/tmp}"/kuberc_file_multi << EOF
 ---

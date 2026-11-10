@@ -2748,6 +2748,18 @@ func TestGetExplicitKuberc(t *testing.T) {
 			args:     []string{"kubectl", "get", "--", "/bin/bash", "--kuberc", "anotherpath"},
 			expected: "",
 		},
+		{
+			args:     []string{"kubectl", "create", "configmap", "cm", "--from-literal=flags=--kuberc=/tmp/x"},
+			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "set", "env", "deploy/x", "ARGS=--kuberc=/tmp/x"},
+			expected: "",
+		},
+		{
+			args:     []string{"kubectl", "create", "configmap", "cm", "--from-literal=flags=--kuberc=/tmp/x", "--kuberc=/tmp/filepath"},
+			expected: "/tmp/filepath",
+		},
 	}
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
