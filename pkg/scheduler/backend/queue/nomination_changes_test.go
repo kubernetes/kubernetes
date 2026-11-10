@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -393,7 +394,7 @@ func TestPatchPodStatusOverwritten(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatal("Call did not finish")
 	}
-	if q.nominator.expects(pod.UID, "node1") {
+	if _, expected := q.nominator.expectedNodeName(pod.UID); expected {
 		t.Error("Nomination still expected")
 	}
 }
@@ -433,8 +434,89 @@ func TestPatchPodStatusNotPersisted(t *testing.T) {
 			case <-time.After(wait.ForeverTestTimeout):
 				t.Fatal("Call did not finish")
 			}
-			if expected := q.nominator.expects(pod.UID, "node1"); expected != (patchErr == nil) {
+			if _, expected := q.nominator.expectedNodeName(pod.UID); expected != (patchErr == nil) {
 				t.Errorf("Nomination still expected: %v", expected)
+			}
+		})
+	}
+}
+
+// TestPatchPodStatusMerged checks that the nominator keeps waiting for the
+// nominated node name when the call which sets it gets merged into a later
+// one which only updates a condition: the merged call still sets it. Only a
+// failure of the merged call lets the nominator take the nominated node name
+// from pod objects again.
+func TestPatchPodStatusMerged(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+	condition := &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse, Reason: v1.PodReasonUnschedulable}
+
+	for name, patchErr := range map[string]error{
+		"succeeded": nil,
+		"failed":    errors.New("injected patch error"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			client := clientsetfake.NewClientset(pod)
+			client.PrependReactor("patch", "pods", func(clienttesting.Action) (bool, runtime.Object, error) {
+				return patchErr != nil, nil, patchErr
+			})
+			apiDispatcher := apidispatcher.New(client, 1, apicalls.Relevances)
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithAPIDispatcher(apiDispatcher))
+
+			q.AddNominatedPod(logger, mustPodInfo(t, pod), nominatingInfo)
+			onFinish, err := q.PatchPodStatus(pod, nil, nominatingInfo)
+			if err != nil {
+				t.Fatalf("PatchPodStatus: %v", err)
+			}
+			// Like the next scheduling attempt ending without a
+			// PostFilterResult, before the dispatcher executed the first call.
+			q.AddNominatedPod(logger, mustPodInfo(t, pod), nil)
+			mergedOnFinish, err := q.PatchPodStatus(pod, []*v1.PodCondition{condition}, nil)
+			if err != nil {
+				t.Fatalf("PatchPodStatus: %v", err)
+			}
+			select {
+			case err := <-onFinish:
+				if !errors.Is(err, fwk.ErrCallOverwritten) {
+					t.Fatalf("Unexpected result of the first call: %v", err)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("First call did not finish")
+			}
+			// The pod object still does not show the nominated node name in
+			// the attempt after that.
+			q.AddNominatedPod(logger, mustPodInfo(t, pod), nil)
+			q.nominator.nLock.RLock()
+			nodeName := q.nominator.nominatedPodToNode[pod.UID]
+			q.nominator.nLock.RUnlock()
+			if nodeName != "node1" {
+				t.Errorf("Nominated node %q before the merged call got executed, want node1", nodeName)
+			}
+
+			apiDispatcher.Run(logger)
+			defer apiDispatcher.Close()
+			select {
+			case err := <-mergedOnFinish:
+				if (err != nil) != (patchErr != nil) {
+					t.Fatalf("Unexpected result of the merged call: %v", err)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("Merged call did not finish")
+			}
+			if _, expected := q.nominator.expectedNodeName(pod.UID); expected != (patchErr == nil) {
+				t.Errorf("Nomination still expected: %v", expected)
+			}
+			if patchErr != nil {
+				return
+			}
+			updatedPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Get pod: %v", err)
+			}
+			if updatedPod.Status.NominatedNodeName != "node1" {
+				t.Errorf("Nominated node name %q set by the merged call, want node1", updatedPod.Status.NominatedNodeName)
 			}
 		})
 	}

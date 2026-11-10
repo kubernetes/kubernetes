@@ -167,13 +167,13 @@ func (npm *nominator) pendingUnlocked(pod *v1.Pod) (string, bool) {
 	return expected, true
 }
 
-// expects returns true if the scheduler set nodeName as the nominated node
-// name of the pod and the pod object does not show it yet.
-func (npm *nominator) expects(uid types.UID, nodeName string) bool {
+// expectedNodeName returns the nominated node name which the scheduler set
+// for the pod and true if pod objects don't show it yet.
+func (npm *nominator) expectedNodeName(uid types.UID) (string, bool) {
 	npm.nLock.RLock()
 	defer npm.nLock.RUnlock()
 	expected, ok := npm.expected[uid]
-	return ok && expected == nodeName
+	return expected, ok
 }
 
 // forgetExpected is called when setting nodeName as the nominated node name
