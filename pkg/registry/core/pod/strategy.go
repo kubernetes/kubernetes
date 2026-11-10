@@ -685,7 +685,7 @@ func LogLocation(
 	// Try to figure out a container
 	// If a container was provided, it must be valid
 	container := opts.Container
-	container, err = validateContainer(container, pod)
+	container, err = validateContainer(container, pod, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -834,7 +834,7 @@ func streamLocation(
 
 	// Try to figure out a container
 	// If a container was provided, it must be valid
-	container, err = validateContainer(container, pod)
+	container, err = validateContainer(container, pod, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -896,8 +896,9 @@ func PortForwardLocation(
 	return loc, nodeInfo, nil
 }
 
-// validateContainer validate container is valid for pod, return valid container
-func validateContainer(container string, pod *api.Pod) (string, error) {
+// validateContainer validate container is valid for pod, return valid container. If allowRemoved
+// is set, a regular container removed through pods/dynamic that still has a status is also valid.
+func validateContainer(container string, pod *api.Pod, allowRemoved bool) (string, error) {
 	if len(container) == 0 {
 		switch len(pod.Spec.Containers) {
 		case 1:
@@ -913,8 +914,11 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.Name, containerNames)
 			return "", errors.NewBadRequest(errStr)
 		}
-	} else {
-		if !podHasContainerWithName(pod, container) {
+	} else if !podHasContainerWithName(pod, container) {
+		// A container removed through pods/dynamic keeps its status until the kubelet has cleaned
+		// it up, and can be inspected until then.
+		_, hasStatus := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container)
+		if !allowRemoved || !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) || !hasStatus {
 			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
 		}
 	}

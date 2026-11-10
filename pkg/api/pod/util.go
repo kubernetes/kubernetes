@@ -1257,6 +1257,17 @@ func atomicWriteVolumeUserFieldsInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
+// GetContainerStatus extracts the status of container "name" from "statuses".
+// It returns true if "name" exists, else returns false.
+func GetContainerStatus(statuses []api.ContainerStatus, name string) (api.ContainerStatus, bool) {
+	for i := range statuses {
+		if statuses[i].Name == name {
+			return statuses[i], true
+		}
+	}
+	return api.ContainerStatus{}, false
+}
+
 // IsRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
 // This function is not checking if the container passed to it is indeed an init container.
 // It is just checking if the container restart policy has been set to always.

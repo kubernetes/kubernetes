@@ -5879,3 +5879,13 @@ func TestContainerPairs(t *testing.T) {
 		}
 	})
 }
+
+func TestGetContainerStatus(t *testing.T) {
+	statuses := []api.ContainerStatus{{Name: "c1", Image: "image1"}, {Name: "c2", Image: "image2"}}
+	status, ok := GetContainerStatus(statuses, "c2")
+	assert.True(t, ok)
+	assert.Equal(t, statuses[1], status)
+	status, ok = GetContainerStatus(statuses, "c3")
+	assert.False(t, ok)
+	assert.Equal(t, api.ContainerStatus{}, status)
+}

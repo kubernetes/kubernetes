@@ -1227,6 +1227,7 @@ func TestCheckLogLocation(t *testing.T) {
 		opts              *api.PodLogOptions
 		expectedErr       error
 		expectedTransport http.RoundTripper
+		dynamicContainers bool
 	}{
 		{
 			name: "simple",
@@ -1366,9 +1367,75 @@ func TestCheckLogLocation(t *testing.T) {
 			expectedErr:       nil,
 			expectedTransport: fakeSecureRoundTripper,
 		},
+		{
+			name: "removed container with a status",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{Name: "container1"},
+						{Name: "removed"},
+					},
+				},
+			},
+			opts:              &api.PodLogOptions{Container: "removed"},
+			dynamicContainers: true,
+			expectedErr:       nil,
+			expectedTransport: fakeSecureRoundTripper,
+		},
+		{
+			name: "removed container with a status, DynamicContainers disabled",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{Name: "container1"},
+						{Name: "removed"},
+					},
+				},
+			},
+			opts:              &api.PodLogOptions{Container: "removed"},
+			expectedErr:       errors.NewBadRequest("container removed is not valid for pod test"),
+			expectedTransport: nil,
+		},
+		{
+			name: "unknown container without a status",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+					},
+					NodeName: "foo",
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{Name: "container1"},
+						{Name: "removed"},
+					},
+				},
+			},
+			opts:              &api.PodLogOptions{Container: "unknown"},
+			dynamicContainers: true,
+			expectedErr:       errors.NewBadRequest("container unknown is not valid for pod test"),
+			expectedTransport: nil,
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, tc.dynamicContainers)
 			getter := &mockPodGetter{tc.in}
 			connectionGetter := &mockConnectionInfoGetter{&client.ConnectionInfo{
 				Transport:                      fakeSecureRoundTripper,
@@ -1494,6 +1561,7 @@ func TestPortForwardLocation(t *testing.T) {
 }
 
 func TestExecLocation(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
 	ctx := genericapirequest.NewDefaultContext()
 	tcs := []struct {
 		name             string
@@ -1532,6 +1600,22 @@ func TestExecLocation(t *testing.T) {
 			info:        &client.ConnectionInfo{},
 			opts:        &api.PodExecOptions{Container: "unknown"},
 			expectedErr: errors.NewBadRequest("container unknown is not valid for pod pod1"),
+		},
+		{
+			name: "removed container with a status returns error",
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1"},
+				Spec: api.PodSpec{
+					NodeName:   "node1",
+					Containers: []api.Container{{Name: "c1"}},
+				},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{{Name: "c1"}, {Name: "removed"}},
+				},
+			},
+			info:        &client.ConnectionInfo{},
+			opts:        &api.PodExecOptions{Container: "removed"},
+			expectedErr: errors.NewBadRequest("container removed is not valid for pod pod1"),
 		},
 		{
 			name: "valid exec location with node features propagated",
