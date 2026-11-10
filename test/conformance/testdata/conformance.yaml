@@ -2650,6 +2650,14 @@
     its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
   release: v1.32
   file: test/e2e/node/node_lifecycle.go
+- testname: In-place Pod Resize, burstable pod with pod-level resources
+  codename: '[sig-node] PLR Pod InPlace Resize burstable pod with pod-level resources
+    resized [MinimumKubeletVersion:1.36] [Conformance]'
+  description: Issuing an in-place Pod Resize request via the Pod Resize subresource
+    patch endpoint to modify pod-level CPU and memory requests and limits on a burstable
+    pod MUST result in the pod-level and container resources being updated as expected.
+  release: v1.38
+  file: test/e2e/common/node/pod_level_resources_resize.go
 - testname: In-place Pod Resize, burtable pod with multiple containers and various
     operations
   codename: '[sig-node] Pod InPlace Resize Container burstable pods - extended 6 containers
@@ -2678,6 +2686,14 @@
     from the main Pod endpoint after the resize is completed.
   release: v1.35
   file: test/e2e/common/node/pod_resize.go
+- testname: Pod Level Resources Spec and QoS
+  codename: '[sig-node] Pod Level Resources should support pod-level resource limits
+    and requests specification [Conformance]'
+  description: Ensure pods created with pod-level resources (requests and limits)
+    are successfully created with correct pod-level resources defaulted and assigned
+    appropriate QoS class.
+  release: v1.38
+  file: test/e2e/common/node/pod_level_resources.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST

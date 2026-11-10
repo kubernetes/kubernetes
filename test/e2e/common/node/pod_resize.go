@@ -1201,7 +1201,6 @@ func doPodResizeMemoryVolumeSizeLimitDecreaseTest(f *framework.Framework) {
 	})
 
 	f.It("should fail to shrink pod-level memory limit below active memory-backed volume usage",
-		framework.WithFeatureGate(features.InPlacePodLevelResourcesVerticalScaling),
 		func(ctx context.Context) {
 			podClient := e2epod.NewPodClient(f)
 			originalPLR := &v1.ResourceRequirements{
