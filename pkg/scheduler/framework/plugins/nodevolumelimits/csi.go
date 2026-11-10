@@ -209,11 +209,14 @@ func (pl *CSILimits) isSchedulableAfterCSINodeUpdated(logger klog.Logger, pod *v
 		oldLimits[d.Name] = count
 	}
 
-	// Compare new driver limits vs. old. If limit increased, queue pod.
 	for _, d := range newCSINode.Spec.Drivers {
-		var oldLimit int32
-		if val, exists := oldLimits[d.Name]; exists {
-			oldLimit = val
+		oldLimit, exists := oldLimits[d.Name]
+		if !exists {
+			logger.V(5).Info("CSI driver was added to CSINode, might make this pod schedulable",
+				"pod", klog.KObj(pod),
+				"driver", d.Name,
+			)
+			return fwk.Queue, nil
 		}
 		newLimit := int32(0)
 		if d.Allocatable != nil && d.Allocatable.Count != nil {
@@ -231,7 +234,6 @@ func (pl *CSILimits) isSchedulableAfterCSINodeUpdated(logger klog.Logger, pod *v
 		}
 	}
 
-	// If no driver limit was increased, skip queueing.
 	return fwk.QueueSkip, nil
 }
 

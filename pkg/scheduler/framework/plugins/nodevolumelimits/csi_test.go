@@ -1006,6 +1006,26 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 		wantQHint  fwk.QueueingHint
 	}{
 		{
+			name: "driver added without volume limit, queue",
+			newDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+			}},
+			wantQHint: fwk.Queue,
+		},
+		{
+			name: "driver unchanged without volume limit, skip queueing",
+			oldDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+			}},
+			newDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+			}},
+			wantQHint: fwk.QueueSkip,
+		},
+		{
 			name: "limit raised, queue",
 			oldDrivers: []storagev1.CSINodeDriver{{
 				Name:   "ebs.csi.aws.com",
