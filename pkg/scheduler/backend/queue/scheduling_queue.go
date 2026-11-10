@@ -417,6 +417,7 @@ var defaultPriorityQueueOptions = priorityQueueOptions{
 // Making sure that PriorityQueue implements SchedulingQueue.
 var _ SchedulingQueue = &PriorityQueue{}
 var _ framework.NominatedNodeNameGetter = &PriorityQueue{}
+var _ framework.NominationClearer = &PriorityQueue{}
 
 // newQueuedPodInfoForLookup builds a QueuedPodInfo object for a lookup in the queue.
 func newQueuedPodInfoForLookup(pod *v1.Pod, plugins ...string) *framework.QueuedPodInfo {
@@ -1003,6 +1004,21 @@ func (p *PriorityQueue) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, n
 	p.lock.Lock()
 	defer p.processNominationChangesAndUnlock(logger)
 	p.nominator.UpdateNominatedPod(logger, oldPod, newPodInfo)
+}
+
+// ClearNominatedPod clears the nomination of the pod if it is nominated to
+// nodeName, for example when preemption for a pod with higher priority clears
+// the nominations of pods with lower priority on the node.
+func (p *PriorityQueue) ClearNominatedPod(logger klog.Logger, pod *v1.Pod, nodeName string) bool {
+	if !p.nominator.draPreemption {
+		return p.nominator.clearNominatedPod(pod, nodeName)
+	}
+	if !p.nominator.isNominatedTo(pod.UID, nodeName) {
+		return false
+	}
+	p.lock.Lock()
+	defer p.processNominationChangesAndUnlock(logger)
+	return p.nominator.clearNominatedPod(pod, nodeName)
 }
 
 // Add adds a pod to the active queue. It should be called only when a new pod
@@ -2150,20 +2166,23 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
 	// Don't store anything in the cache. This might be extended in the next releases.
 	onFinish := make(chan error, 1)
-	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, conditions, nominatingInfo), fwk.APICallOptions{
-		OnFinish: onFinish,
-	})
+	// Read before adding the call to the dispatcher, so a nomination which
+	// another goroutine sets after this call got queued is not mistaken for
+	// one which this call replaced.
+	//
 	// The nominator ignores the nominated node name in pod objects until
 	// they show the one which it expects. That never happens if it doesn't
 	// get set, so the nominator must not go on expecting it then.
 	expected, pending := p.nominator.expectedNodeName(pod.UID)
 	if pending && nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != expected {
 		// This call replaces the one which was going to set the expected
-		// nominated node name, for example when preemption clears the
-		// nomination of another pod.
+		// nominated node name.
 		p.NominationNotPersisted(pod, expected)
 		pending = false
 	}
+	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, conditions, nominatingInfo), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
 	if fwk.IsUnexpectedError(err) {
 		if pending {
 			p.NominationNotPersisted(pod, expected)

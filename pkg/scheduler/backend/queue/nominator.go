@@ -309,6 +309,32 @@ func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
 	npm.nLock.Unlock()
 }
 
+// clearNominatedPod clears the nomination of the pod if it is nominated to
+// nodeName, as a change not made by the pod's own scheduling cycle, and
+// returns whether it was.
+func (npm *nominator) clearNominatedPod(pod *v1.Pod, nodeName string) bool {
+	if nodeName == "" {
+		return false
+	}
+	npm.nLock.Lock()
+	defer npm.nLock.Unlock()
+	if npm.nominatedPodToNode[pod.UID] != nodeName {
+		return false
+	}
+	latestPod := pod
+	if npm.podLister != nil {
+		if cachedPod, err := npm.podLister.Pods(pod.Namespace).Get(pod.Name); err == nil && cachedPod.UID == pod.UID {
+			latestPod = cachedPod
+		}
+	}
+	npm.deleteUnlocked(pod)
+	npm.recordChangeUnlocked(latestPod, nodeName, false)
+	if npm.draPreemption {
+		npm.expectUnlocked(latestPod, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride})
+	}
+	return true
+}
+
 func (npm *nominator) deleteUnlocked(p *v1.Pod) {
 	nnn, ok := npm.nominatedPodToNode[p.UID]
 	if !ok {

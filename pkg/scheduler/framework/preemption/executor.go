@@ -313,8 +313,7 @@ func (e *Executor) prepareCandidateAsync(c fwk.PreemptionCandidate, preemptor Ex
 		// longer fit on them. So, we should remove their nomination. Removing their
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them sooner than after waiting for preemption completion.
-		nominatedPods := getLowerPriorityNominatedPods(logger, e.fh, preemptor.Priority(), c.Nodes())
-		if err := clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), nominatedPods...); err != nil {
+		if err := e.clearNominatedPods(ctx, preemptor.Priority(), c.Nodes()); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
 			// We do not return as this error is not critical.
@@ -387,7 +386,6 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 	}()
 
 	fh := e.fh
-	cs := e.fh.ClientSet()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -414,8 +412,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c fwk.PreemptionCandida
 	// longer fit on them. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them sooner than after waiting for preemption completion.
-	nominatedPods := getLowerPriorityNominatedPods(logger, fh, preemptor.Priority(), c.Nodes())
-	if err := clearNominatedNodeName(ctx, cs, fh.APICacher(), nominatedPods...); err != nil {
+	if err := e.clearNominatedPods(ctx, preemptor.Priority(), c.Nodes()); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
 	}
@@ -520,6 +517,64 @@ func (v pendingVictim) gateUntilAssumed() bool {
 	}
 	v.gatedBeforeAssume.Store(true)
 	return true
+}
+
+type nominatedPodOnNode struct {
+	pod      *v1.Pod
+	nodeName string
+}
+
+// clearNominatedPods clears the nominations of pods with priority lower than
+// the preemptor on the candidate nodes. With DRAPreemption, nominations get
+// cleared in memory first so that devices held for displaced pods are released
+// and the pods get requeued even when the informer did not show their
+// nomination yet.
+func (e *Executor) clearNominatedPods(ctx context.Context, priority int32, nodeNames []string) utilerrors.Aggregate {
+	logger := klog.FromContext(ctx)
+	if !e.fts.EnableDRAPreemption {
+		nominatedPods := getLowerPriorityNominatedPods(logger, e.fh, priority, nodeNames)
+		return clearNominatedNodeName(ctx, e.fh.ClientSet(), e.fh.APICacher(), nominatedPods...)
+	}
+
+	clearer, _ := e.fh.(framework.NominationClearer)
+	var cleared []nominatedPodOnNode
+	for _, nodeName := range nodeNames {
+		for _, pi := range e.fh.NominatedPodsForNode(logger, nodeName) {
+			if corev1helpers.PodPriority(pi.GetPod()) < priority {
+				pod := pi.GetPod()
+				if clearer != nil && !clearer.ClearNominatedPod(logger, pod, nodeName) {
+					continue
+				}
+				cleared = append(cleared, nominatedPodOnNode{pod: pod, nodeName: nodeName})
+			}
+		}
+	}
+
+	var errs []error
+	cs := e.fh.ClientSet()
+	apiCacher := e.fh.APICacher()
+	for _, item := range cleared {
+		p := item.pod
+		if clearer != nil && !clearer.IsNominatedTo(p, "") {
+			// Another scheduling cycle nominated the pod after ClearNominatedPod woke it up.
+			continue
+		}
+		if p.Status.NominatedNodeName != item.nodeName {
+			// The pod object from the informer may not show the nomination yet
+			// although the scheduler already set it in the API. Without the
+			// old name, patching to "" would look like a no-op and leave the
+			// nomination in the API.
+			p = p.DeepCopy()
+			p.Status.NominatedNodeName = item.nodeName
+		}
+		if err := clearNominatedNodeName(ctx, cs, apiCacher, p); err != nil {
+			if apiCacher == nil && clearer != nil {
+				clearer.NominationNotPersisted(p, "")
+			}
+			errs = append(errs, err.Errors()...)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // clearNominatedNodeName internally submit a patch request to API server

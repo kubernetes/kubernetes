@@ -99,6 +99,13 @@ func TestNominationChanges(t *testing.T) {
 			},
 			wantMoved: true,
 		},
+		"cleared-by-preemption": {
+			change: func(t *testing.T, q *PriorityQueue) {
+				logger, _ := ktesting.NewTestContext(t)
+				q.ClearNominatedPod(logger, pod, "node1")
+			},
+			wantMoved: true,
+		},
 		"deleted": {
 			change: func(t *testing.T, q *PriorityQueue) {
 				logger, _ := ktesting.NewTestContext(t)
@@ -745,6 +752,13 @@ func TestNominationChangeOfPodItself(t *testing.T) {
 			},
 			wantMoved: true,
 		},
+		"cleared-by-preemption": {
+			change: func(t *testing.T, q *PriorityQueue) {
+				logger, _ := ktesting.NewTestContext(t)
+				q.ClearNominatedPod(logger, pod, "node1")
+			},
+			wantMoved: true,
+		},
 		"cleared-by-own-cycle": {
 			change: func(t *testing.T, q *PriorityQueue) {
 				logger, _ := ktesting.NewTestContext(t)
@@ -777,4 +791,129 @@ func TestNominationChangeOfPodItself(t *testing.T) {
 			}
 		})
 	}
+}
+
+type hookAPIDispatcher struct {
+	fwk.APIDispatcher
+	afterAdd func()
+}
+
+func (d *hookAPIDispatcher) Add(newAPICall fwk.APICall, opts fwk.APICallOptions) error {
+	err := d.APIDispatcher.Add(newAPICall, opts)
+	if d.afterAdd != nil {
+		d.afterAdd()
+	}
+	return err
+}
+
+// TestPatchPodStatusConcurrentNomination checks that PatchPodStatus does not
+// forget a newer nomination which another goroutine sets right after the call
+// got added to the API dispatcher.
+func TestPatchPodStatusConcurrentNomination(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	logger, ctx := ktesting.NewTestContext(t)
+	client := clientsetfake.NewClientset(pod)
+	baseDispatcher := apidispatcher.New(client, 1, apicalls.Relevances)
+	dispatcher := &hookAPIDispatcher{APIDispatcher: baseDispatcher}
+	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithAPIDispatcher(dispatcher))
+
+	q.AddNominatedPod(logger, mustPodInfo(t, pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+	dispatcher.afterAdd = func() {
+		dispatcher.afterAdd = nil
+		// Another scheduling cycle nominates the pod elsewhere before
+		// PatchPodStatus of the earlier call returns.
+		q.AddNominatedPod(logger, mustPodInfo(t, pod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"})
+	}
+	if _, err := q.PatchPodStatus(pod, nil, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}); err != nil {
+		t.Fatalf("PatchPodStatus: %v", err)
+	}
+	if got, expected := q.nominator.expectedNodeName(pod.UID); !expected || got != "node2" {
+		t.Errorf("Expected nomination = (%q, %v), want (\"node2\", true)", got, expected)
+	}
+}
+
+// TestClearNominatedPod checks clearing a nomination in memory for preemption:
+//   - When the informer does not show the nomination yet, clearing removes it
+//     in memory, calls the handler, and a later condition-only informer update
+//     does not restore it.
+//   - When the informer already shows the nomination, clearing keeps ignoring
+//     stale pod objects until the informer catches up or NominationNotPersisted
+//     is called.
+//   - Clearing for a different node leaves a newer nomination untouched.
+func TestClearNominatedPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	basePod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(lowPriority).Obj()
+	withNomination := func(nodeName string) *v1.Pod {
+		p := basePod.DeepCopy()
+		p.Status.NominatedNodeName = nodeName
+		return p
+	}
+
+	t.Run("stale-empty-pod-in-informer", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		var changes []string
+		q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{basePod},
+			WithNominationChangeHandler(func(_ klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent {
+				changes = append(changes, fmt.Sprintf("%s %s->%s", pod.Name, oldNodeName, newNodeName))
+				return nil
+			}))
+		q.Add(ctx, basePod)
+		q.AddNominatedPod(logger, mustPodInfo(t, basePod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+
+		if !q.ClearNominatedPod(logger, basePod, "node1") {
+			t.Fatal("ClearNominatedPod returned false, want true")
+		}
+		if _, expected := q.nominator.expectedNodeName(basePod.UID); expected {
+			t.Error("Nomination still expected after clearing an unpersisted nomination")
+		}
+		// Informer delivers the merged condition update with NominatedNodeName still empty.
+		updated := basePod.DeepCopy()
+		updated.Status.Conditions = []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}}
+		q.Update(ctx, basePod, updated)
+		if !q.IsNominatedTo(basePod, "") {
+			t.Error("Pod got nominated again by an empty->empty informer update")
+		}
+		if diff := cmp.Diff([]string{"p ->node1", "p node1->"}, changes); diff != "" {
+			t.Errorf("Unexpected handler calls (-want, +got):\n%s", diff)
+		}
+	})
+
+	t.Run("nominated-in-informer", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		nominated := withNomination("node1")
+		q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{nominated})
+		q.Add(ctx, nominated)
+
+		if !q.ClearNominatedPod(logger, nominated, "node1") {
+			t.Fatal("ClearNominatedPod returned false, want true")
+		}
+		if got, expected := q.nominator.expectedNodeName(nominated.UID); !expected || got != "" {
+			t.Fatalf("Expected nomination = (%q, %v), want (\"\", true)", got, expected)
+		}
+		// A scheduling attempt with stale pod object does not restore node1.
+		q.AddNominatedPod(logger, mustPodInfo(t, nominated), nil)
+		if !q.IsNominatedTo(nominated, "") {
+			t.Error("Stale pod object restored cleared nomination")
+		}
+		// Failed API patch forgets the expectation.
+		q.NominationNotPersisted(nominated, "")
+		if _, expected := q.nominator.expectedNodeName(nominated.UID); expected {
+			t.Error("Cleared nomination still expected after NominationNotPersisted")
+		}
+	})
+
+	t.Run("already-moved-elsewhere", func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{basePod})
+		q.Add(ctx, basePod)
+		q.AddNominatedPod(logger, mustPodInfo(t, basePod), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"})
+
+		if q.ClearNominatedPod(logger, basePod, "node1") {
+			t.Error("ClearNominatedPod returned true for another node")
+		}
+		if !q.IsNominatedTo(basePod, "node2") {
+			t.Error("Nomination to node2 was lost")
+		}
+	})
 }

@@ -367,6 +367,7 @@ func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 
 var _ framework.Framework = &frameworkImpl{}
 var _ framework.NominatedNodeNameGetter = &frameworkImpl{}
+var _ framework.NominationClearer = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
 //
@@ -616,6 +617,26 @@ func (f *frameworkImpl) NominatedNodeName(pod *v1.Pod) string {
 		return nominator.NominatedNodeName(pod)
 	}
 	return pod.Status.NominatedNodeName
+}
+
+func (f *frameworkImpl) ClearNominatedPod(logger klog.Logger, pod *v1.Pod, nodeName string) bool {
+	if clearer, ok := f.PodNominator.(framework.NominationClearer); ok {
+		return clearer.ClearNominatedPod(logger, pod, nodeName)
+	}
+	return true
+}
+
+func (f *frameworkImpl) IsNominatedTo(pod *v1.Pod, nodeName string) bool {
+	if clearer, ok := f.PodNominator.(framework.NominationClearer); ok {
+		return clearer.IsNominatedTo(pod, nodeName)
+	}
+	return nodeName == ""
+}
+
+func (f *frameworkImpl) NominationNotPersisted(pod *v1.Pod, nodeName string) {
+	if clearer, ok := f.PodNominator.(framework.NominationClearer); ok {
+		clearer.NominationNotPersisted(pod, nodeName)
+	}
 }
 
 func (f *frameworkImpl) SetPodActivator(a fwk.PodActivator) {

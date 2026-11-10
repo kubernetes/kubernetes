@@ -2619,3 +2619,224 @@ func TestIsPodGroupWaitingForVictims(t *testing.T) {
 		})
 	}
 }
+
+// TestClearDisplacedNominatedPod checks that with DRAPreemption, preemption
+// clears displaced lower-priority nominations in memory as well as in the API:
+//   - When a displaced pod's nomination patch is still pending in the API
+//     dispatcher, the nomination and its extensions state get cleared, the pod
+//     is requeued, and the merged status update does not restore the nomination.
+//   - When the nomination was already persisted in the API while the informer
+//     still shows an empty NominatedNodeName, the API nomination still gets cleared.
+//   - When a synchronous status patch fails, the expected empty nomination is
+//     forgotten so future informer updates are not ignored.
+func TestClearDisplacedNominatedPod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	metrics.Register()
+
+	preemptor := st.MakePod().Name("preemptor").Namespace("ns").UID("preemptor").Priority(highPriority).Obj()
+	victim := st.MakePod().Name("victim").Namespace("ns").UID("victim").Node("node1").Priority(midPriority).Obj()
+	displaced := st.MakePod().Name("displaced").Namespace("ns").UID("displaced").Priority(lowPriority).Obj()
+	condition := &v1.PodCondition{Type: v1.PodScheduled, Status: v1.ConditionFalse, Reason: v1.PodReasonUnschedulable}
+
+	newSetup := func(t *testing.T, apiPod, informerPod *v1.Pod, asyncAPICalls bool) (
+		context.Context, klog.Logger, *clientsetfake.Clientset, *apidispatcher.APIDispatcher, internalqueue.SchedulingQueue, framework.Framework, *[]string,
+	) {
+		t.Helper()
+		logger, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		t.Cleanup(cancel)
+
+		cs := clientsetfake.NewClientset(victim.DeepCopy(), apiPod.DeepCopy())
+		informerFactory := informers.NewSharedInformerFactory(cs, 0)
+		podStore := informerFactory.Core().V1().Pods().Informer().GetStore()
+		for _, p := range []*v1.Pod{victim, informerPod} {
+			if err := podStore.Add(p.DeepCopy()); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		var changes []string
+		hintMap := internalqueue.QueueingHintMapPerProfile{
+			"": {
+				framework.EventAssignedPodDelete: {
+					{
+						PluginName: "fooPlugin",
+						QueueingHintFn: func(klog.Logger, *v1.Pod, interface{}, interface{}) (fwk.QueueingHint, error) {
+							return fwk.Queue, nil
+						},
+					},
+				},
+			},
+		}
+		var apiDispatcher *apidispatcher.APIDispatcher
+		queueOpts := []internalqueue.Option{
+			internalqueue.WithMetricsRecorder(metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())),
+			internalqueue.WithQueueingHintMapPerProfile(hintMap),
+			internalqueue.WithNominationChangeHandler(func(_ klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent {
+				changes = append(changes, fmt.Sprintf("%s %s->%s", pod.Name, oldNodeName, newNodeName))
+				return nil
+			}),
+		}
+		if asyncAPICalls {
+			apiDispatcher = apidispatcher.New(cs, 1, apicalls.Relevances)
+			queueOpts = append(queueOpts, internalqueue.WithAPIDispatcher(apiDispatcher))
+		}
+		queue := internalqueue.NewSchedulingQueue((&queuesort.PrioritySort{}).Less, informerFactory, queueOpts...)
+		schedFwk, err := tf.NewFramework(
+			ctx,
+			[]tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			"",
+			frameworkruntime.WithClientSet(cs),
+			frameworkruntime.WithAPIDispatcher(apiDispatcher),
+			frameworkruntime.WithInformerFactory(informerFactory),
+			frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{st.MakeNode().Name("node1").Obj()})),
+			frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+			frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+			frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+			frameworkruntime.WithPodNominator(queue),
+			frameworkruntime.WithPodActivator(queue),
+			frameworkruntime.WithLogger(logger),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if asyncAPICalls {
+			cache := internalcache.New(ctx, apiDispatcher, false, false)
+			schedFwk.SetAPICacher(apicache.New(queue, cache))
+		}
+
+		queue.Add(ctx, informerPod.DeepCopy())
+		popped, err := queue.Pop(logger)
+		if err != nil {
+			t.Fatalf("Pop: %v", err)
+		}
+		pInfo := popped.(*framework.QueuedPodInfo)
+		pInfo.UnschedulablePlugins = sets.New("fooPlugin")
+		if informerPod.Status.NominatedNodeName == "" {
+			queue.AddNominatedPod(logger, pInfo.PodInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+		}
+		if err := queue.AddUnschedulablePodIfNotPresent(ctx, pInfo, queue.SchedulingCycle()); err != nil {
+			t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+		}
+		return ctx, logger, cs, apiDispatcher, queue, schedFwk, &changes
+	}
+
+	t.Run("async-api-pending-nomination-overwritten", func(t *testing.T) {
+		ctx, logger, cs, apiDispatcher, queue, schedFwk, changes := newSetup(t, displaced, displaced, true)
+		onFinish, err := queue.PatchPodStatus(displaced, []*v1.PodCondition{condition}, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+		if err != nil {
+			t.Fatalf("PatchPodStatus: %v", err)
+		}
+
+		executor := NewExecutor(schedFwk, feature.Features{EnableDRAPreemption: true})
+		if status := executor.prepareCandidate(ctx, &candidate{name: "node1", nodes: []string{"node1"}, victims: &extenderv1.Victims{Pods: []*v1.Pod{victim}}}, &podExecutorPreemptor{Pod: preemptor}, "test-plugin"); !status.IsSuccess() {
+			t.Fatalf("prepareCandidate: %v", status)
+		}
+
+		if !queue.IsNominatedTo(displaced, "") {
+			t.Error("Displaced pod remained nominated in memory")
+		}
+		if len(queue.UnschedulablePods()) != 0 {
+			t.Error("Displaced pod was not moved out of unschedulable pool")
+		}
+		if diff := cmp.Diff([]string{"displaced ->node1", "displaced node1->"}, *changes); diff != "" {
+			t.Errorf("Unexpected handler calls (-want, +got):\n%s", diff)
+		}
+
+		apiDispatcher.Run(logger)
+		defer apiDispatcher.Close()
+		select {
+		case err := <-onFinish:
+			if !errors.Is(err, fwk.ErrCallOverwritten) {
+				t.Fatalf("Unexpected result of first call: %v", err)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatal("First call did not finish")
+		}
+
+		var updatedPod *v1.Pod
+		if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+			var getErr error
+			updatedPod, getErr = cs.CoreV1().Pods(displaced.Namespace).Get(ctx, displaced.Name, metav1.GetOptions{})
+			if getErr != nil {
+				return false, getErr
+			}
+			return len(updatedPod.Status.Conditions) > 0, nil
+		}); err != nil {
+			t.Fatalf("Merged status patch did not apply: %v", err)
+		}
+		if updatedPod.Status.NominatedNodeName != "" {
+			t.Errorf("API NominatedNodeName = %q, want empty", updatedPod.Status.NominatedNodeName)
+		}
+		// Informer delivers the merged condition update (old and new NominatedNodeName both empty).
+		queue.Update(ctx, displaced, updatedPod)
+		if !queue.IsNominatedTo(displaced, "") {
+			t.Error("Informer update restored displaced nomination in memory")
+		}
+	})
+
+	for _, asyncAPICalls := range []bool{false, true} {
+		t.Run(fmt.Sprintf("persisted-nomination-stale-informer/asyncAPICalls=%v", asyncAPICalls), func(t *testing.T) {
+			apiPod := displaced.DeepCopy()
+			apiPod.Status.NominatedNodeName = "node1"
+			ctx, logger, cs, apiDispatcher, queue, schedFwk, changes := newSetup(t, apiPod, displaced, asyncAPICalls)
+			if asyncAPICalls {
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
+			}
+
+			executor := NewExecutor(schedFwk, feature.Features{EnableDRAPreemption: true})
+			if status := executor.prepareCandidate(ctx, &candidate{name: "node1", nodes: []string{"node1"}, victims: &extenderv1.Victims{Pods: []*v1.Pod{victim}}}, &podExecutorPreemptor{Pod: preemptor}, "test-plugin"); !status.IsSuccess() {
+				t.Fatalf("prepareCandidate: %v", status)
+			}
+
+			if !queue.IsNominatedTo(displaced, "") {
+				t.Error("Displaced pod remained nominated in memory")
+			}
+			if len(queue.UnschedulablePods()) != 0 {
+				t.Error("Displaced pod was not moved out of unschedulable pool")
+			}
+			if diff := cmp.Diff([]string{"displaced ->node1", "displaced node1->"}, *changes); diff != "" {
+				t.Errorf("Unexpected handler calls (-want, +got):\n%s", diff)
+			}
+			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				updatedPod, err := cs.CoreV1().Pods(displaced.Namespace).Get(ctx, displaced.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return updatedPod.Status.NominatedNodeName == "", nil
+			}); err != nil {
+				t.Errorf("API NominatedNodeName was not cleared when informer copy was stale: %v", err)
+			}
+		})
+	}
+
+	t.Run("sync-patch-error-forgets-expectation", func(t *testing.T) {
+		nominated := displaced.DeepCopy()
+		nominated.Status.NominatedNodeName = "node1"
+		ctx, _, cs, _, queue, schedFwk, _ := newSetup(t, nominated, nominated, false)
+		cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+			patchAction := action.(clienttesting.PatchAction)
+			if patchAction.GetName() == displaced.Name {
+				return true, nil, errors.New("injected status patch failure")
+			}
+			return false, nil, nil
+		})
+
+		executor := NewExecutor(schedFwk, feature.Features{EnableDRAPreemption: true})
+		if status := executor.prepareCandidate(ctx, &candidate{name: "node1", nodes: []string{"node1"}, victims: &extenderv1.Victims{Pods: []*v1.Pod{victim}}}, &podExecutorPreemptor{Pod: preemptor}, "test-plugin"); !status.IsSuccess() {
+			t.Fatalf("prepareCandidate: %v", status)
+		}
+		if !queue.IsNominatedTo(displaced, "") {
+			t.Error("Displaced pod remained nominated in memory")
+		}
+		// Because patching "" failed, NominationNotPersisted dropped the pending
+		// "" expectation and NominatedNodeName follows the pod object again.
+		if got := schedFwk.(framework.NominatedNodeNameGetter).NominatedNodeName(nominated); got != "node1" {
+			t.Errorf("NominatedNodeName after failed patch = %q, want \"node1\"", got)
+		}
+	})
+}

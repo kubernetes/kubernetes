@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -336,6 +337,25 @@ type NominatedNodeNameGetter interface {
 	// it does, the result is what the scheduler set, also when it cleared
 	// the nomination, otherwise what the pod object shows.
 	NominatedNodeName(pod *v1.Pod) string
+}
+
+// NominationClearer is implemented by the scheduling queue, as the
+// PodNominator of kube-scheduler, and by the Framework, which asks its
+// PodNominator.
+//
+// The interface is internal to kube-scheduler and only used when the
+// DRAPreemption feature gate is enabled.
+type NominationClearer interface {
+	// ClearNominatedPod clears the nomination of the pod in memory if it is
+	// nominated to nodeName, as a change not made by the pod's own scheduling
+	// cycle, and returns whether it was.
+	ClearNominatedPod(logger klog.Logger, pod *v1.Pod, nodeName string) bool
+	// IsNominatedTo returns true if the pod is nominated to nodeName in
+	// memory, or not nominated at all if nodeName is empty.
+	IsNominatedTo(pod *v1.Pod, nodeName string) bool
+	// NominationNotPersisted is called when setting the nominated node name
+	// of the pod to nodeName in the API failed.
+	NominationNotPersisted(pod *v1.Pod, nodeName string)
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
