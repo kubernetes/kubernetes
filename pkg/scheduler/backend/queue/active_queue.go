@@ -58,7 +58,7 @@ type activeQueuer interface {
 	listInFlightPods() []*v1.Pod
 	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error)
 	addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool
-	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool
+	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent, skipPodUID types.UID) bool
 
 	isLastPoppedEntity(entityLookup framework.QueuedEntityInfo) bool
 	clearPoppedEntity()
@@ -464,6 +464,10 @@ func (aq *activeQueue) clusterEventsForPod(logger klog.Logger, pInfo *framework.
 			// Must be another in-flight Pod (*v1.Pod). Can be ignored.
 			continue
 		}
+		if e.skipPodUID != "" && e.skipPodUID == pInfo.Pod.UID {
+			// The scheduling cycle of the pod itself caused the event.
+			continue
+		}
 		events = append(events, e)
 	}
 	return events, nil
@@ -479,17 +483,19 @@ func (aq *activeQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []f
 }
 
 // addEventIfAnyInFlight adds clusterEvent to inFlightEvents if any pod is in inFlightPods.
+// The pod with skipPodUID, if not empty, does not get the event from clusterEventsForPod.
 // It returns true if pushed the event to the inFlightEvents.
-func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool {
+func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent, skipPodUID types.UID) bool {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
 	if len(aq.inFlightPods) != 0 {
 		aq.metricsRecorder.ObserveInFlightEventsAsync(event.Label(), 1, false)
 		aq.inFlightEvents.PushBack(&clusterEvent{
-			event:  event,
-			oldObj: oldObj,
-			newObj: newObj,
+			event:      event,
+			oldObj:     oldObj,
+			newObj:     newObj,
+			skipPodUID: skipPodUID,
 		})
 		return true
 	}

@@ -281,6 +281,10 @@ type clusterEvent struct {
 	oldObj interface{}
 	// newObj is the object that involved this event.
 	newObj interface{}
+	// skipPodUID is the UID of the pod whose own scheduling cycle caused
+	// this event while the pod was in flight. That pod must not retry
+	// because of it when it comes back. Empty if all in-flight pods get it.
+	skipPodUID types.UID
 }
 
 type priorityQueueOptions struct {
@@ -864,9 +868,17 @@ func (p *PriorityQueue) processNominationChangesLocked(logger klog.Logger) {
 			}
 			return entity.GetPriority() <= priority
 		}
+		// preCheck only covers pods in the queue. The pod may be in flight
+		// when its own cycle changes its nomination, for example when the
+		// nomination ends after Permit, and comes back when WaitOnPermit or
+		// PreBind reject it.
+		var skipInFlightPodUID types.UID
+		if change.ownCycle {
+			skipInFlightPodUID = pod.UID
+		}
 		if p.nominationChangeHandler != nil {
 			for _, event := range p.nominationChangeHandler(logger, pod, change.oldNodeName, change.newNodeName) {
-				p.moveAllToActiveOrBackoffQueue(logger, event.Event, event.OldObj, event.NewObj, preCheck)
+				p.moveAllToActiveOrBackoffQueue(logger, event.Event, event.OldObj, event.NewObj, preCheck, skipInFlightPodUID)
 			}
 		}
 		// A pod which got bound to its nominated node, or got nominated to
@@ -882,7 +894,7 @@ func (p *PriorityQueue) processNominationChangesLocked(logger klog.Logger) {
 			oldPod = pod.DeepCopy()
 			oldPod.Status.NominatedNodeName = change.oldNodeName
 		}
-		p.moveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, preCheck)
+		p.moveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, preCheck, skipInFlightPodUID)
 	}
 }
 
@@ -1460,7 +1472,7 @@ func (p *PriorityQueue) flushUnschedulableEntitiesLeftover(logger klog.Logger) {
 	}
 
 	if len(entitiesToMove) > 0 {
-		p.moveEntitiesToActiveOrBackoffQueue(logger, entitiesToMove, framework.EventUnschedulableTimeout, nil, nil, nil)
+		p.moveEntitiesToActiveOrBackoffQueue(logger, entitiesToMove, framework.EventUnschedulableTimeout, nil, nil, nil, "")
 	}
 }
 
@@ -1821,7 +1833,10 @@ func (p *PriorityQueue) DeleteGenericPodGroup(logger klog.Logger, gpg *fwk.Gener
 // This function adds all pods and then signals the condition variable to ensure that
 // if Pop() is waiting for an entity, it receives the signal after all the pods are in the
 // queue and the head is the highest priority pod.
-func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
+//
+// skipInFlightPodUID, if not empty, is the pod which must not retry because of
+// the event if it is in flight, see clusterEvent.
+func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck, skipInFlightPodUID types.UID) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
 		// Return early before iterating all entities in unschedulableEntities for preCheck.
@@ -1829,7 +1844,7 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 	}
 
 	entities, hintKeys := p.collectEntitiesToEvaluate(logger, event, oldObj, newObj, preCheck)
-	p.moveEntitiesToActiveOrBackoffQueue(logger, entities, event, oldObj, newObj, hintKeys)
+	p.moveEntitiesToActiveOrBackoffQueue(logger, entities, event, oldObj, newObj, hintKeys, skipInFlightPodUID)
 }
 
 // collectEntitiesToEvaluate determines which unschedulable entities should be evaluated
@@ -1907,7 +1922,7 @@ func (p *PriorityQueue) collectEntitiesToEvaluate(logger klog.Logger, event fwk.
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.moveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck)
+	p.moveAllToActiveOrBackoffQueue(logger, event, oldObj, newObj, preCheck, "")
 }
 
 // requeueEntityWithQueueingStrategy tries to requeue entity to activeQ, backoffQ or unschedulable pod pool based on schedulingHint.
@@ -1939,7 +1954,7 @@ func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, en
 }
 
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, entityInfoList []framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys) {
+func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, entityInfoList []framework.QueuedEntityInfo, event fwk.ClusterEvent, oldObj, newObj interface{}, hintKeys *preQueueingHintPodKeys, skipInFlightPodUID types.UID) {
 	if !p.isEventOfInterest(logger, event) {
 		// No plugin is interested in this event.
 		return
@@ -1973,7 +1988,7 @@ func (p *PriorityQueue) moveEntitiesToActiveOrBackoffQueue(logger klog.Logger, e
 	// AddUnschedulablePodIfNotPresent might get called for in-flight Pods later, and in
 	// AddUnschedulablePodIfNotPresent we need to know whether events were
 	// observed while scheduling them.
-	if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event); added {
+	if added := p.activeQ.addEventIfAnyInFlight(oldObj, newObj, event, skipInFlightPodUID); added {
 		logger.V(5).Info("Event received while entities are in flight", "event", event.Label())
 	}
 
