@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -103,6 +105,9 @@ type Allocator struct {
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
 	availableCounters map[PoolID]counterSets
+	// allocatedCounterDevices groups immutable exclusive/shared and capacity allocation IDs by pool.
+	// devicesForCounterPool initializes it under mutex and returns cloned sets.
+	allocatedCounterDevices map[PoolID]sets.Set[DeviceID]
 	// compatibilityGroupsBaseline caches, per resource pool, the
 	// compatibility-group intersection contributed by already-allocated devices
 	// (their groups read live from the source ResourceSlice). Like
@@ -1987,6 +1992,55 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	pool := device.pool
 	poolID := pool.PoolID
 
+	availableCountersForPool := alloc.availableCountersForPool(pool)
+
+	// Update the consumedCounters data structure with the counters consumed
+	// by the current device.
+	consumedCountersForPool, found := alloc.consumedCounters[poolID]
+	// If no devices in the allocating state have consumed any counters from the current
+	// pool, initialize the data structure.
+	if !found {
+		consumedCountersForPool = make(counterSets)
+		alloc.consumedCounters[poolID] = consumedCountersForPool
+	}
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		consumedCountersForCounterSet, found := consumedCountersForPool[deviceCounterConsumption.CounterSet]
+		if !found {
+			consumedCountersForCounterSet = make(map[string]resourceapi.Counter)
+			consumedCountersForPool[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
+		}
+		for name, c := range deviceCounterConsumption.Counters {
+			consumedCounters, found := consumedCountersForCounterSet[name]
+			if !found {
+				consumedCountersForCounterSet[name] = c
+				continue
+			}
+			consumedCounters.Value.Add(c.Value)
+			consumedCountersForCounterSet[name] = consumedCounters
+		}
+	}
+
+	// Check that we didn't exceed the availability of any counters by allocating
+	// the current device. If we did, the current set of devices doesn't work, so we
+	// update the consumed counters to no longer reflect the current device.
+	for availableCounterSetName, availableCounters := range availableCountersForPool {
+		consumedCounters := consumedCountersForPool[availableCounterSetName]
+		for availableCounterName, availableCounter := range availableCounters {
+			consumedCounter := consumedCounters[availableCounterName]
+			if availableCounter.Value.Cmp(consumedCounter.Value) < 0 {
+				alloc.deallocateCountersForDevice(device)
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
+}
+
+// availableCountersForPool caches the budget after subtracting existing allocations.
+func (alloc *allocator) availableCountersForPool(pool *Pool) counterSets {
+	poolID := pool.PoolID
+
 	// Check first if the available counters for this pool have already been
 	// calculated.
 	alloc.mutex.RLock()
@@ -2051,47 +2105,44 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		alloc.mutex.Unlock()
 	}
 
-	// Update the consumedCounters data structure with the counters consumed
-	// by the current device.
-	consumedCountersForPool, found := alloc.consumedCounters[poolID]
-	// If no devices in the allocating state have consumed any counters from the current
-	// pool, initialize the data structure.
-	if !found {
-		consumedCountersForPool = make(counterSets)
-		alloc.consumedCounters[poolID] = consumedCountersForPool
-	}
-	for _, deviceCounterConsumption := range device.ConsumesCounters {
-		consumedCountersForCounterSet, found := consumedCountersForPool[deviceCounterConsumption.CounterSet]
-		if !found {
-			consumedCountersForCounterSet = make(map[string]resourceapi.Counter)
-			consumedCountersForPool[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
-		}
-		for name, c := range deviceCounterConsumption.Counters {
-			consumedCounters, found := consumedCountersForCounterSet[name]
-			if !found {
-				consumedCountersForCounterSet[name] = c
-				continue
-			}
-			consumedCounters.Value.Add(c.Value)
-			consumedCountersForCounterSet[name] = consumedCounters
-		}
-	}
+	return availableCountersForPool
+}
 
-	// Check that we didn't exceed the availability of any counters by allocating
-	// the current device. If we did, the current set of devices doesn't work, so we
-	// update the consumed counters to no longer reflect the current device.
-	for availableCounterSetName, availableCounters := range availableCountersForPool {
-		consumedCounters := consumedCountersForPool[availableCounterSetName]
-		for availableCounterName, availableCounter := range availableCounters {
-			consumedCounter := consumedCounters[availableCounterName]
-			if availableCounter.Value.Cmp(consumedCounter.Value) < 0 {
-				alloc.deallocateCountersForDevice(device)
-				return false, nil
+// devicesForCounterPool lazily indexes immutable allocation state by pool.
+// Callers receive independent sets because fixed-counter reconstruction removes devices.
+func (a *Allocator) devicesForCounterPool(poolID PoolID) sets.Set[DeviceID] {
+	a.mutex.RLock()
+	if a.allocatedCounterDevices != nil {
+		devices := a.allocatedCounterDevices[poolID]
+		a.mutex.RUnlock()
+		return devices.Clone()
+	}
+	a.mutex.RUnlock()
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	// Another goroutine may have initialized the index while switching locks.
+	if a.allocatedCounterDevices != nil {
+		devices := a.allocatedCounterDevices[poolID]
+		return devices.Clone()
+	}
+	a.allocatedCounterDevices = make(map[PoolID]sets.Set[DeviceID])
+	for _, allocated := range []iter.Seq[DeviceID]{
+		maps.Keys(a.allocatedState.AllocatedDevices),
+		maps.Keys(a.allocatedState.AllocatedSharedDeviceIDs),
+		maps.Keys(a.allocatedState.AggregatedCapacity),
+	} {
+		for id := range allocated {
+			idPool := PoolID{Driver: id.Driver, Pool: id.Pool}
+			devices := a.allocatedCounterDevices[idPool]
+			if devices == nil {
+				devices = sets.New[DeviceID]()
+				a.allocatedCounterDevices[idPool] = devices
 			}
+			devices.Insert(id)
 		}
 	}
-
-	return true, nil
+	devices := a.allocatedCounterDevices[poolID]
+	return devices.Clone()
 }
 
 func (alloc *allocator) deviceInUse(deviceID DeviceID) bool {
