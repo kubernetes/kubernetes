@@ -72,6 +72,9 @@ func (p *nonePolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ life
 	return nil
 }
 
+func (p *nonePolicy) ResizeCommitted(_ klog.Logger, _ state.State, _ state.PendingResize) {
+}
+
 // Assignable CPUs are the ones that can be exclusively allocated to pods that meet the exclusivity requirement
 // (ie guaranteed QoS class and integral CPU request).
 // Assignability of CPUs as a concept is only applicable in case of static policy i.e. scenarios where workloads

@@ -23,12 +23,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -962,4 +964,96 @@ func TestStaticPolicyMetricsRestartConsistencyPodLevelRestoredAfterRestartAndRel
 
 	require.NoError(t, p.RemoveContainer(logger, st, "plrm-pod", "shared-container"))
 	assertCPUMetrics(t, cpuMetricsSnapshot{exclusiveCPUs: 0, sharedPoolMilli: 11000, perNUMA: map[string]float64{"0": 0, "1": 0}})
+}
+
+// resizeCounters are the counters a resize of exclusive CPUs updates.
+type resizeCounters struct {
+	pinningRequests      float64
+	pinningErrors        float64
+	allocations          float64
+	exclusiveAssignments float64
+}
+
+func readResizeCounters(t *testing.T) resizeCounters {
+	t.Helper()
+	var c resizeCounters
+	var err error
+	c.pinningRequests, err = testutil.GetCounterMetricValue(metrics.CPUManagerPinningRequestsTotal)
+	require.NoError(t, err)
+	c.pinningErrors, err = testutil.GetCounterMetricValue(metrics.CPUManagerPinningErrorsTotal)
+	require.NoError(t, err)
+	c.allocations, err = testutil.GetCounterMetricValue(metrics.ResourceManagerAllocationsTotal.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerNode))
+	require.NoError(t, err)
+	c.exclusiveAssignments, err = testutil.GetCounterMetricValue(metrics.ResourceManagerContainerAssignments.WithLabelValues(metrics.ResourceManagerCPU, metrics.ResourceManagerExclusiveNode))
+	require.NoError(t, err)
+	return c
+}
+
+// requireResizeCounters checks how much the counters grew since before.
+func requireResizeCounters(t *testing.T, before resizeCounters, expectedGrowth resizeCounters) {
+	t.Helper()
+	const delta = 0.001
+	got := readResizeCounters(t)
+	require.InDelta(t, expectedGrowth.pinningRequests, got.pinningRequests-before.pinningRequests, delta, "growth of cpu_manager_pinning_requests_total")
+	require.InDelta(t, expectedGrowth.pinningErrors, got.pinningErrors-before.pinningErrors, delta, "growth of cpu_manager_pinning_errors_total")
+	require.InDelta(t, expectedGrowth.allocations, got.allocations-before.allocations, delta, "growth of resource_manager_allocations_total")
+	require.InDelta(t, expectedGrowth.exclusiveAssignments, got.exclusiveAssignments-before.exclusiveAssignments, delta, "growth of resource_manager_container_assignments_total")
+}
+
+// TestStaticPolicyMetricsResize checks that a resize, which is allocated on the
+// scratch state of the admission, updates the metrics derived from its result
+// only once it is committed, and that an attempt that changes no CPUs updates
+// no metric.
+func TestStaticPolicyMetricsResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+	logger, ctx := ktesting.NewTestContext(t)
+
+	p := newMetricsTestPolicy(t, topoSingleSocketHT, 1, cpuset.New(0), nil)
+	pod := makePod("podUID", "cont", "2", "2")
+	m := &manager{
+		policy:          p,
+		state:           state.NewMemoryState(logger),
+		lastUpdateState: state.NewMemoryState(logger),
+		containerMap:    containermap.NewContainerMap(),
+		sourcesReady:    &sourcesReadyStub{},
+		activePods:      func() []*v1.Pod { return []*v1.Pod{pod} },
+	}
+	require.NoError(t, p.Start(logger, m.state))
+	require.NoError(t, m.Allocate(ctx, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	allocated := cpuMetricsSnapshot{exclusiveCPUs: 2, sharedPoolMilli: 5000, perNUMA: map[string]float64{"0": 2}}
+	assertCPUMetrics(t, allocated)
+
+	resize := func(pod *v1.Pod, result lifecycle.AdmitResult) {
+		t.Helper()
+		m.GetTopologyHints(logger, pod, &pod.Spec.Containers[0], lifecycle.ResizeOperation)
+		require.NoError(t, m.Allocate(ctx, pod, &pod.Spec.Containers[0], lifecycle.ResizeOperation))
+		m.CompleteAdmit(ctx, pod, lifecycle.ResizeOperation, result)
+	}
+
+	scaledUp := makePod("podUID", "cont", "4", "4")
+	before := readResizeCounters(t)
+	resize(scaledUp, lifecycle.AdmitFailure)
+	requireResizeCounters(t, before, resizeCounters{pinningRequests: 1})
+	assertCPUMetrics(t, allocated)
+
+	before = readResizeCounters(t)
+	resize(scaledUp, lifecycle.AdmitSuccess)
+	requireResizeCounters(t, before, resizeCounters{pinningRequests: 1, allocations: 1})
+	resized := cpuMetricsSnapshot{exclusiveCPUs: 4, sharedPoolMilli: 3000, perNUMA: map[string]float64{"0": 4}}
+	assertCPUMetrics(t, resized)
+
+	// The exclusive CPUs do not change, as when only memory is resized.
+	before = readResizeCounters(t)
+	resize(scaledUp, lifecycle.AdmitSuccess)
+	requireResizeCounters(t, before, resizeCounters{})
+	assertCPUMetrics(t, resized)
+
+	// A pod admitted again with a resize that was not applied, for example
+	// after a kubelet restart, is resized on the state, so the metrics are
+	// updated at once, and the attempt is counted once.
+	before = readResizeCounters(t)
+	scaledDown := makePod("podUID", "cont", "2", "2")
+	require.NoError(t, p.Allocate(logger, m.state, scaledDown, &scaledDown.Spec.Containers[0], lifecycle.AddOperation))
+	requireResizeCounters(t, before, resizeCounters{pinningRequests: 1, allocations: 1})
+	assertCPUMetrics(t, allocated)
 }

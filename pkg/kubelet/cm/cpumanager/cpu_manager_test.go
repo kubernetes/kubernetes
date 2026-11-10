@@ -151,6 +151,17 @@ func (s *mockState) SetCPUBaselines(a state.ContainerCPUBaselines) {
 	s.baselines = a.Clone()
 }
 
+func (s *mockState) CommitPendingResize(pending state.PendingResize) {
+	taken, released := state.PendingResizeDelta(s.assignments, s.podAssignments, pending)
+	for containerName, target := range pending.ContainerCPUSets {
+		s.SetCPUSet(pending.PodUID, containerName, target)
+	}
+	if pending.PodCPUSet != nil {
+		s.SetPodCPUSet(pending.PodUID, *pending.PodCPUSet)
+	}
+	s.defaultCPUSet = s.defaultCPUSet.Difference(taken).Union(released)
+}
+
 func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
@@ -193,6 +204,9 @@ func (p *mockPolicy) GetPodTopologyHints(_ klog.Logger, _ state.State, _ *v1.Pod
 
 func (p *mockPolicy) AllocatePod(_ klog.Logger, _ state.State, _ *v1.Pod, _ lifecycle.Operation) error {
 	return p.err
+}
+
+func (p *mockPolicy) ResizeCommitted(_ klog.Logger, _ state.State, _ state.PendingResize) {
 }
 
 func (p *mockPolicy) GetAllocatableCPUs(_ state.State) cpuset.CPUSet {
