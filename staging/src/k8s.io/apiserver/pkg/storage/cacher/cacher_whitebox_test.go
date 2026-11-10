@@ -2948,6 +2948,14 @@ func TestStartDispatchingSelectsWatchers(t *testing.T) {
 				selected = append(selected, w.identifier)
 			}
 			require.ElementsMatch(t, slices.Concat(scenario.expected, scenario.expected), selected)
+
+			triggerValues, triggerSupported := cacher.triggerValuesThreadUnsafe(scenario.event)
+			count := 0
+			for range cacher.watchers.allMatchingWatchers(scenario.event.ObjFields["metadata.namespace"], scenario.event.ObjFields["metadata.name"], triggerValues, triggerSupported) {
+				count++
+				break
+			}
+			require.Equal(t, 1, count)
 		})
 	}
 }

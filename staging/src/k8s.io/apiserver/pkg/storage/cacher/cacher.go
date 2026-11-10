@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"iter"
 	"net/http"
 	"reflect"
 	"strings"
@@ -1257,24 +1258,41 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 
 	namespace := event.ObjFields["metadata.namespace"]
 	name := event.ObjFields["metadata.name"]
-	forEachSelectionKey(namespace, name, triggerValues, supported,
-		func(scope namespacedName) {
-			for _, watcher := range c.watchers.scopeWatchers[scope] {
-				c.watchersBuffer = append(c.watchersBuffer, watcher)
+	for watcher := range c.watchers.allMatchingWatchers(namespace, name, triggerValues, supported) {
+		c.watchersBuffer = append(c.watchersBuffer, watcher)
+	}
+}
+
+func (i *indexedWatchers) allMatchingWatchers(namespace, name string, triggerValues []string, triggerSupported bool) iter.Seq[*cacheWatcher] {
+	return func(yield func(*cacheWatcher) bool) {
+		stopped := false
+		yieldWatchers := func(watchers watchersMap) {
+			if stopped {
+				return
 			}
-		},
-		func(indexValue string) {
-			for _, watcher := range c.watchers.indexWatchers[indexValue] {
-				c.watchersBuffer = append(c.watchersBuffer, watcher)
-			}
-		},
-		func() {
-			for _, watchers := range c.watchers.indexWatchers {
-				for _, watcher := range watchers {
-					c.watchersBuffer = append(c.watchersBuffer, watcher)
+			for _, watcher := range watchers {
+				if !yield(watcher) {
+					stopped = true
+					return
 				}
 			}
-		})
+		}
+		forEachSelectionKey(namespace, name, triggerValues, triggerSupported,
+			func(scope namespacedName) {
+				yieldWatchers(i.scopeWatchers[scope])
+			},
+			func(indexValue string) {
+				yieldWatchers(i.indexWatchers[indexValue])
+			},
+			func() {
+				for _, watchers := range i.indexWatchers {
+					yieldWatchers(watchers)
+					if stopped {
+						return
+					}
+				}
+			})
+	}
 }
 
 // forEachSelectionKey encodes how an event selects watchers. It calls scope
