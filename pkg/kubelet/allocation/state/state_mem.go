@@ -33,7 +33,7 @@ import (
 )
 
 // stateMemory never modifies a stored pod. It replaces it with an updated copy that shares whatever
-// the update leaves alone, so toPodList can hand out stored pods without copying them.
+// the update leaves alone, so toPodList and GetPodReadOnly can hand out stored pods without copying them.
 type stateMemory struct {
 	sync.RWMutex
 	pods PodMap
@@ -167,6 +167,14 @@ func (s *stateMemory) GetPod(podUID types.UID) (*v1.Pod, bool) {
 
 	pod, ok := s.pods[podUID]
 	return pod.DeepCopy(), ok
+}
+
+func (s *stateMemory) GetPodReadOnly(podUID types.UID) (*v1.Pod, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	pod, ok := s.pods[podUID]
+	return pod, ok
 }
 
 func (s *stateMemory) HasPod(podUID types.UID) bool {

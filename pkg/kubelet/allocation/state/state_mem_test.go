@@ -590,3 +590,59 @@ func TestStateMemory_ToPodList(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []types.UID{"pod-1", "pod-2"}, uids)
 }
+
+func TestStateMemory_GetPodReadOnly(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	sm := newStateMemory(logger, PodMap{}, nil)
+
+	got, ok := sm.GetPodReadOnly("missing")
+	assert.Nil(t, got)
+	assert.False(t, ok)
+
+	cpu100m := resource.MustParse("100m")
+	cpu200m := resource.MustParse("200m")
+	size100Mi := resource.MustParse("100Mi")
+	size200Mi := resource.MustParse("200Mi")
+	initial := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-ro", Name: "pod-ro", Namespace: "default"},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{{
+				Name: "vol-1",
+				VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{
+					Medium:    v1.StorageMediumMemory,
+					SizeLimit: &size100Mi,
+				}},
+			}},
+			Containers: []v1.Container{{
+				Name:      "c1",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu100m}},
+			}},
+		},
+	}
+	require.NoError(t, sm.SetPod(logger, initial))
+
+	readOnly1, ok := sm.GetPodReadOnly("pod-ro")
+	require.True(t, ok)
+	readOnly2, ok := sm.GetPodReadOnly("pod-ro")
+	require.True(t, ok)
+	assert.Same(t, readOnly1, readOnly2, "GetPodReadOnly should return the stored pointer without copying")
+	snapshot := readOnly1.DeepCopy()
+
+	// Subsequent copy-on-write mutations must not modify a previously returned read-only pod.
+	require.NoError(t, sm.SetContainerResources(logger, "pod-ro", "c1", podutil.Containers, v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu200m},
+	}))
+	require.NoError(t, sm.SetPodLevelResources(logger, "pod-ro", &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu200m},
+	}))
+	require.NoError(t, sm.SetEmptyDirVolumeLimit(logger, "pod-ro", "vol-1", &v1.EmptyDirVolumeSource{
+		Medium:    v1.StorageMediumMemory,
+		SizeLimit: &size200Mi,
+	}))
+	require.NoError(t, sm.SetPodVolume(logger, "pod-ro", v1.Volume{
+		Name:         "vol-2",
+		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+	}))
+	require.NoError(t, sm.RemovePodVolume(logger, "pod-ro", "vol-1"))
+	assert.Equal(t, snapshot, readOnly1, "previously returned read-only pod must remain immutable across updates")
+}

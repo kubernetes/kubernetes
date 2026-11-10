@@ -473,6 +473,9 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 				sc.GetPodUIDs()
 				sc.HasPod(podUID)
 				sc.GetPod(podUID)
+				if roPod, ok := sc.GetPodReadOnly(podUID); ok {
+					_ = len(roPod.Spec.Containers)
+				}
 				sc.GetContainerResources(podUID, "container1")
 				sc.GetPodLevelResources(podUID)
 				sc.GetEmptyDirVolumeLimit(podUID, "volume1")
