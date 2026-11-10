@@ -708,6 +708,8 @@ type allocator struct {
 	// that are in the process of being allocated.
 	// The keys in the map are resource pool IDs (driver name and pool name).
 	consumedCounters map[PoolID]counterSets
+	// allocatingCounterDevices excludes admin capacity entries from the static-counter shortcut.
+	allocatingCounterDevices sets.Set[DeviceID]
 	// consumedCompatibilityGroups tracks the rolling compatibility-group
 	// intersection per counter set for each pool across the devices being
 	// allocated in the current attempt. It is seeded from the already-allocated
@@ -1713,9 +1715,9 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// Skip the counter check for an allow-multiple device in use: its counters are already
-	// accounted for, so a further share must not charge them again.
-	skipCounterCheck := allowMultipleAllocations && alloc.deviceCapacityInUse(device.id)
+	// Admin access does not reserve counters. Further shares of a device with an
+	// existing ordinary allocation must not reserve its fixed counters again.
+	skipCounterCheck := request.adminAccess() || (allowMultipleAllocations && (internal.IsDeviceAllocated(device.id, &alloc.allocatedState) || alloc.allocatingCounterDevices.Has(device.id)))
 
 	var parentRequestName string
 	if requestData.parentRequest != nil {
@@ -1773,6 +1775,10 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			return false, nil, nil
 		}
 		state.countersReserved = true
+		if alloc.allocatingCounterDevices == nil {
+			alloc.allocatingCounterDevices = sets.New[DeviceID]()
+		}
+		alloc.allocatingCounterDevices.Insert(device.id)
 	}
 
 	// Might be tainted, in which case the taint has to be tolerated.
@@ -1845,10 +1851,8 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 				alloc.loggerV7.Info("Device capacity allocated", "device", device.id,
 					"consumed capacity", klog.Format(consumedCapacity))
 			}
-			// A prior share of this device may already hold the capacity entry.
-			// That entry doubles as the "already shared" marker that lets a later
-			// share skip the counter check, so record whether it predated this
-			// share; rollback must not delete it while another share still needs it.
+			// Remember whether an earlier share owns the capacity entry so rollback
+			// keeps that share visible even when its consumed capacity is zero.
 			_, state.capacityEntryExisted = alloc.allocatingCapacity[device.id]
 			alloc.allocatingCapacity.Insert(DeviceConsumedCapacity{DeviceID: device.id, ConsumedCapacity: consumedCapacity})
 			state.capacityInserted = true
@@ -1928,6 +1932,7 @@ func (alloc *allocator) rollbackDevice(r deviceIndices, device deviceWithID, req
 		state.restoreCompatibilityGroups()
 	}
 	if state.countersReserved {
+		alloc.allocatingCounterDevices.Delete(device.id)
 		alloc.deallocateCountersForDevice(device)
 	}
 	if state.resultAdded {
