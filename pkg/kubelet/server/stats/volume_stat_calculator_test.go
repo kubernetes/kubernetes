@@ -22,13 +22,18 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	kubestats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -117,7 +122,7 @@ func testPVCRef(tCtx ktesting.TContext) {
 	}
 
 	// Calculate stats for pod
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder, nil)
 	statsCalculator.calcAndStoreStats(logger)
 	vs, _ := statsCalculator.GetLatest()
 
@@ -176,7 +181,7 @@ func testNormalVolumeEvent(tCtx ktesting.TContext) {
 	}
 
 	// Calculate stats for pod
-	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder)
+	statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, fakePod, &fakeEventRecorder, nil)
 	statsCalculator.calcAndStoreStats(logger)
 
 	event, err := WatchEvent(eventStore)
@@ -274,4 +279,181 @@ func expectedBlockStats() kubestats.FsStats {
 		InodesFree:     &null,
 		InodesUsed:     &null,
 	}
+}
+
+func TestDynamicVolumeSpecRefresh(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	tCtx := ktesting.Init(t)
+	logger := tCtx.Logger()
+
+	initialPod := &k8sv1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pName0,
+			Namespace: namespace0,
+			UID:       "UID-dyn-vol",
+		},
+		Spec: k8sv1.PodSpec{
+			Volumes: []k8sv1.Volume{
+				{
+					Name: vol0,
+					VolumeSource: k8sv1.VolumeSource{
+						EmptyDir: &k8sv1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+
+	updatedPod := initialPod.DeepCopy()
+	updatedPod.Spec.Volumes = append(updatedPod.Spec.Volumes, k8sv1.Volume{
+		Name: "dyn-emptydir",
+		VolumeSource: k8sv1.VolumeSource{
+			EmptyDir: &k8sv1.EmptyDirVolumeSource{},
+		},
+	})
+
+	t.Run("calcAndStoreStats refreshes pod spec when mounted volume is missing from cached spec", func(t *testing.T) {
+		mockStats := statstest.NewMockProvider(t)
+		volumes := map[string]volume.Volume{
+			vol0:           &fakeVolume{},
+			"dyn-emptydir": &fakeVolume{},
+		}
+		mockStats.EXPECT().ListVolumesForPod(initialPod.UID).Return(volumes, true)
+		mockStats.EXPECT().ListBlockVolumesForPod(initialPod.UID).Return(nil, false)
+		mockStats.EXPECT().GetPodByName(initialPod.Namespace, initialPod.Name).Return(updatedPod, true)
+
+		statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, initialPod, &record.FakeRecorder{}, nil)
+		statsCalculator.calcAndStoreStats(logger)
+
+		vs, ok := statsCalculator.GetLatest()
+		require.True(t, ok)
+		assert.Empty(t, vs.PersistentVolumes)
+		assert.ElementsMatch(t, []kubestats.VolumeStats{
+			{Name: vol0, FsStats: expectedFSStats()},
+			{Name: "dyn-emptydir", FsStats: expectedFSStats()},
+		}, vs.EphemeralVolumes)
+	})
+
+	t.Run("updateCachedPodVolumeStats refreshes cached calculator pod spec", func(t *testing.T) {
+		mockStats := statstest.NewMockProvider(t)
+		analyzer := newFsResourceAnalyzer(mockStats, 0, &record.FakeRecorder{}, nil)
+
+		existingCalc := newVolumeStatCalculator(mockStats, time.Minute, initialPod, &record.FakeRecorder{}, nil)
+		analyzer.cachedVolumeStats.Store(statCache{initialPod.UID: existingCalc})
+
+		podWithConfigMap := updatedPod.DeepCopy()
+		podWithConfigMap.Spec.Volumes = append(podWithConfigMap.Spec.Volumes, k8sv1.Volume{
+			Name: "dyn-cm",
+			VolumeSource: k8sv1.VolumeSource{
+				ConfigMap: &k8sv1.ConfigMapVolumeSource{
+					LocalObjectReference: k8sv1.LocalObjectReference{Name: "cm-1"},
+				},
+			},
+		})
+		mockStats.EXPECT().GetPods().Return([]*k8sv1.Pod{podWithConfigMap})
+		analyzer.updateCachedPodVolumeStats(logger)
+
+		volumes := map[string]volume.Volume{
+			vol0:           &fakeVolume{},
+			"dyn-emptydir": &fakeVolume{},
+			"dyn-cm":       &fakeVolume{},
+		}
+		mockStats.EXPECT().ListVolumesForPod(initialPod.UID).Return(volumes, true)
+		mockStats.EXPECT().ListBlockVolumesForPod(initialPod.UID).Return(nil, false)
+
+		existingCalc.calcAndStoreStats(logger)
+		vs, ok := analyzer.GetPodVolumeStats(initialPod.UID)
+		require.True(t, ok)
+		assert.Empty(t, vs.PersistentVolumes)
+		assert.ElementsMatch(t, []kubestats.VolumeStats{
+			{Name: vol0, FsStats: expectedFSStats()},
+			{Name: "dyn-emptydir", FsStats: expectedFSStats()},
+			{Name: "dyn-cm", FsStats: expectedFSStats()},
+		}, vs.EphemeralVolumes)
+	})
+
+	t.Run("unmounting dynamic volume removed from allocated spec uses actuatedState", func(t *testing.T) {
+		actuatedState := state.NewStateMemory(logger, nil, nil)
+		podInActuated := initialPod.DeepCopy()
+		podInActuated.Spec.Volumes = nil
+		require.NoError(t, actuatedState.SetPod(logger, podInActuated))
+		require.NoError(t, actuatedState.SetPodVolume(logger, initialPod.UID, updatedPod.Spec.Volumes[1]))
+
+		// Allocated pod has already dropped dyn-emptydir, while ASW and actuatedState still hold it during teardown.
+		mockStats := statstest.NewMockProvider(t)
+		volumes := map[string]volume.Volume{
+			vol0:           &fakeVolume{},
+			"dyn-emptydir": &fakeVolume{},
+		}
+		mockStats.EXPECT().ListVolumesForPod(initialPod.UID).Return(volumes, true)
+		mockStats.EXPECT().ListBlockVolumesForPod(initialPod.UID).Return(nil, false)
+
+		statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, initialPod, &record.FakeRecorder{}, actuatedState)
+		statsCalculator.calcAndStoreStats(logger)
+
+		vs, ok := statsCalculator.GetLatest()
+		require.True(t, ok)
+		assert.Empty(t, vs.PersistentVolumes)
+		assert.ElementsMatch(t, []kubestats.VolumeStats{
+			{Name: vol0, FsStats: expectedFSStats()},
+			{Name: "dyn-emptydir", FsStats: expectedFSStats()},
+		}, vs.EphemeralVolumes)
+	})
+
+	t.Run("actuatedState overrides pod spec when volume has same name with different source", func(t *testing.T) {
+		actuatedState := state.NewStateMemory(logger, nil, nil)
+		require.NoError(t, actuatedState.SetPodVolume(logger, initialPod.UID, k8sv1.Volume{
+			Name: "readded-vol",
+			VolumeSource: k8sv1.VolumeSource{
+				EmptyDir: &k8sv1.EmptyDirVolumeSource{},
+			},
+		}))
+
+		podWithReaddedSecret := initialPod.DeepCopy()
+		podWithReaddedSecret.Spec.Volumes = append(podWithReaddedSecret.Spec.Volumes, k8sv1.Volume{
+			Name: "readded-vol",
+			VolumeSource: k8sv1.VolumeSource{
+				Secret: &k8sv1.SecretVolumeSource{SecretName: "my-secret"},
+			},
+		})
+
+		mockStats := statstest.NewMockProvider(t)
+		volumes := map[string]volume.Volume{
+			vol0:          &fakeVolume{},
+			"readded-vol": &fakeVolume{},
+		}
+		mockStats.EXPECT().ListVolumesForPod(initialPod.UID).Return(volumes, true)
+		mockStats.EXPECT().ListBlockVolumesForPod(initialPod.UID).Return(nil, false)
+
+		statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, podWithReaddedSecret, &record.FakeRecorder{}, actuatedState)
+		statsCalculator.calcAndStoreStats(logger)
+
+		vs, ok := statsCalculator.GetLatest()
+		require.True(t, ok)
+		assert.Empty(t, vs.PersistentVolumes)
+		assert.ElementsMatch(t, []kubestats.VolumeStats{
+			{Name: vol0, FsStats: expectedFSStats()},
+			{Name: "readded-vol", FsStats: expectedFSStats()},
+		}, vs.EphemeralVolumes)
+	})
+
+	t.Run("feature gate disabled does not refresh cached pod spec", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+
+		mockStats := statstest.NewMockProvider(t)
+		volumes := map[string]volume.Volume{
+			vol0:           &fakeVolume{},
+			"dyn-emptydir": &fakeVolume{},
+		}
+		mockStats.EXPECT().ListVolumesForPod(initialPod.UID).Return(volumes, true)
+		mockStats.EXPECT().ListBlockVolumesForPod(initialPod.UID).Return(nil, false)
+
+		statsCalculator := newVolumeStatCalculator(mockStats, time.Minute, initialPod, &record.FakeRecorder{}, nil)
+		statsCalculator.calcAndStoreStats(logger)
+
+		vs, ok := statsCalculator.GetLatest()
+		require.True(t, ok)
+		assert.Equal(t, []kubestats.VolumeStats{{Name: vol0, FsStats: expectedFSStats()}}, vs.EphemeralVolumes)
+		assert.Equal(t, []kubestats.VolumeStats{{Name: "dyn-emptydir", FsStats: expectedFSStats()}}, vs.PersistentVolumes)
+	})
 }

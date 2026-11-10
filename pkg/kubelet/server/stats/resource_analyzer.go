@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 )
 
 // ResourceAnalyzer provides statistics on node resource consumption
@@ -40,8 +41,8 @@ type resourceAnalyzer struct {
 var _ ResourceAnalyzer = &resourceAnalyzer{}
 
 // NewResourceAnalyzer returns a new ResourceAnalyzer
-func NewResourceAnalyzer(ctx context.Context, statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder) ResourceAnalyzer {
-	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency, eventRecorder)
+func NewResourceAnalyzer(ctx context.Context, statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder, actuatedState state.Reader) ResourceAnalyzer {
+	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency, eventRecorder, actuatedState)
 	summaryProvider := NewSummaryProvider(ctx, statsProvider)
 	return &resourceAnalyzer{fsAnalyzer, summaryProvider}
 }
