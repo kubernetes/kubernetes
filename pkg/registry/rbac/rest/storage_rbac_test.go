@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,9 +31,10 @@ import (
 )
 
 func TestEnsureRBACPolicy(t *testing.T) {
+	kubeSystemRole := bootstrappolicy.NamespaceRoles()["kube-system"][0]
 	tests := []struct {
 		name string
-		// policy defaults to the cluster-scoped bootstrap policy.
+		// policy defaults to the bootstrap policy.
 		policy *PolicyData
 		// change edits the cluster before ensureRBACPolicy runs again.
 		change func(*testing.T, clienttesting.ObjectTracker)
@@ -40,11 +42,17 @@ func TestEnsureRBACPolicy(t *testing.T) {
 		changeAfterList map[string]func(*testing.T, clienttesting.ObjectTracker)
 		// wantRequests are the requests ensureRBACPolicy sends, in order.
 		wantRequests []string
+		// wantFailRequest is a List request that the test makes fail.
+		wantFailRequest string
 	}{
 		{
 			// Without drift, no bootstrap object needs its own Get.
-			name:         "already bootstrapped",
-			wantRequests: []string{"list clusterroles", "list clusterrolebindings"},
+			name: "already bootstrapped",
+			wantRequests: []string{
+				"list clusterroles", "list clusterrolebindings",
+				"list roles in kube-system",
+				"list rolebindings in kube-system",
+			},
 		},
 		{
 			name: "drifted objects are read live and repaired unless protected",
@@ -59,12 +67,23 @@ func TestEnsureRBACPolicy(t *testing.T) {
 				updateObject(t, tracker, "clusterrolebindings", "", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
 					binding.RoleRef.Name = "custom-role"
 				})
+				updateObject(t, tracker, "roles", "kube-system", "extension-apiserver-authentication-reader", func(role *rbacapiv1.Role) {
+					role.Rules = nil
+				})
+				updateObject(t, tracker, "rolebindings", "kube-system", "system:controller:bootstrap-signer", func(binding *rbacapiv1.RoleBinding) {
+					binding.RoleRef.Name = "custom-role"
+				})
 			},
 			wantRequests: []string{
 				"list clusterroles", "list clusterrolebindings",
 				"get clusterroles/cluster-admin", "update clusterroles/cluster-admin",
 				"get clusterroles/system:monitoring", // protected, so not updated
 				"get clusterrolebindings/system:basic-user", "delete clusterrolebindings/system:basic-user", "create clusterrolebindings/system:basic-user",
+				"list roles in kube-system",
+				"get roles/extension-apiserver-authentication-reader in kube-system", "update roles/extension-apiserver-authentication-reader in kube-system",
+				"list rolebindings in kube-system",
+				"get rolebindings/system:controller:bootstrap-signer in kube-system", "delete rolebindings/system:controller:bootstrap-signer in kube-system",
+				"get namespaces/kube-system", "create rolebindings/system:controller:bootstrap-signer in kube-system",
 			},
 		},
 		{
@@ -74,6 +93,12 @@ func TestEnsureRBACPolicy(t *testing.T) {
 					role.Rules = nil
 				})
 				updateObject(t, tracker, "clusterrolebindings", "", "system:basic-user", func(binding *rbacapiv1.ClusterRoleBinding) {
+					binding.RoleRef.Name = "custom-role"
+				})
+				updateObject(t, tracker, "roles", "kube-system", "extension-apiserver-authentication-reader", func(role *rbacapiv1.Role) {
+					role.Rules = nil
+				})
+				updateObject(t, tracker, "rolebindings", "kube-system", "system::leader-locking-kube-scheduler", func(binding *rbacapiv1.RoleBinding) {
 					binding.RoleRef.Name = "custom-role"
 				})
 			},
@@ -86,11 +111,76 @@ func TestEnsureRBACPolicy(t *testing.T) {
 						binding.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
 					})
 				},
+				"list roles in kube-system": func(t *testing.T, tracker clienttesting.ObjectTracker) {
+					updateObject(t, tracker, "roles", "kube-system", "extension-apiserver-authentication-reader", func(role *rbacapiv1.Role) {
+						role.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
+					})
+				},
+				"list rolebindings in kube-system": func(t *testing.T, tracker clienttesting.ObjectTracker) {
+					updateObject(t, tracker, "rolebindings", "kube-system", "system::leader-locking-kube-scheduler", func(binding *rbacapiv1.RoleBinding) {
+						binding.Annotations[rbacapiv1.AutoUpdateAnnotationKey] = "false"
+					})
+				},
 			},
 			wantRequests: []string{
 				"list clusterroles", "list clusterrolebindings",
 				"get clusterroles/cluster-admin",
 				"get clusterrolebindings/system:basic-user",
+				"list roles in kube-system",
+				"get roles/extension-apiserver-authentication-reader in kube-system",
+				"list rolebindings in kube-system",
+				"get rolebindings/system::leader-locking-kube-scheduler in kube-system",
+			},
+		},
+		{
+			name: "a Role under the wrong namespace key is read live",
+			policy: &PolicyData{
+				Roles: map[string][]rbacapiv1.Role{"kube-public": {kubeSystemRole}},
+			},
+			change: func(t *testing.T, tracker clienttesting.ObjectTracker) {
+				inKubePublic := kubeSystemRole.DeepCopy()
+				inKubePublic.Namespace = "kube-public"
+				if err := tracker.Add(inKubePublic); err != nil {
+					t.Fatal(err)
+				}
+				updateObject(t, tracker, "roles", "kube-system", kubeSystemRole.Name, func(role *rbacapiv1.Role) {
+					role.Rules = nil
+				})
+			},
+			wantRequests: []string{
+				"list clusterroles", "list clusterrolebindings",
+				"list roles in kube-public",
+				"get roles/extension-apiserver-authentication-reader in kube-system", "update roles/extension-apiserver-authentication-reader in kube-system",
+			},
+		},
+		{
+			name:            "a failed Role List falls back to live reads",
+			wantFailRequest: "list roles in kube-system",
+			wantRequests: []string{
+				"list clusterroles", "list clusterrolebindings",
+				"list roles in kube-system",
+				"get roles/extension-apiserver-authentication-reader in kube-system",
+				"get roles/system:controller:bootstrap-signer in kube-system",
+				"get roles/system:controller:cloud-provider in kube-system",
+				"get roles/system:controller:token-cleaner in kube-system",
+				"get roles/system::leader-locking-kube-controller-manager in kube-system",
+				"get roles/system::leader-locking-kube-scheduler in kube-system",
+				"list rolebindings in kube-system",
+			},
+		},
+		{
+			name:            "a failed RoleBinding List falls back to live reads",
+			wantFailRequest: "list rolebindings in kube-system",
+			wantRequests: []string{
+				"list clusterroles", "list clusterrolebindings",
+				"list roles in kube-system",
+				"list rolebindings in kube-system",
+				"get rolebindings/system::extension-apiserver-authentication-reader in kube-system",
+				"get rolebindings/system::leader-locking-kube-controller-manager in kube-system",
+				"get rolebindings/system::leader-locking-kube-scheduler in kube-system",
+				"get rolebindings/system:controller:bootstrap-signer in kube-system",
+				"get rolebindings/system:controller:cloud-provider in kube-system",
+				"get rolebindings/system:controller:token-cleaner in kube-system",
 			},
 		},
 		{
@@ -120,12 +210,11 @@ func TestEnsureRBACPolicy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			policy := tc.policy
 			if policy == nil {
-				// Leave out the namespaced Roles and RoleBindings. Every run reads
-				// each of them with its own Get, so they would add the same
-				// requests to every case's wantRequests.
 				policy = &PolicyData{
 					ClusterRoles:               append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
 					ClusterRoleBindings:        append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
+					Roles:                      map[string][]rbacapiv1.Role{"kube-system": bootstrappolicy.NamespaceRoles()["kube-system"]},
+					RoleBindings:               map[string][]rbacapiv1.RoleBinding{"kube-system": bootstrappolicy.NamespaceRoleBindings()["kube-system"]},
 					ClusterRolesToAggregate:    bootstrappolicy.ClusterRolesToAggregate(),
 					ClusterRoleBindingsToSplit: bootstrappolicy.ClusterRoleBindingsToSplit(),
 				}
@@ -138,8 +227,12 @@ func TestEnsureRBACPolicy(t *testing.T) {
 				tc.change(t, client.Tracker())
 			}
 			client.PrependReactor("list", "*", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				request := requestString(action)
+				if request == tc.wantFailRequest {
+					return true, nil, errors.New("list failed")
+				}
 				handled, list, err := clienttesting.ObjectReaction(client.Tracker())(action)
-				if change := tc.changeAfterList[requestString(action)]; change != nil {
+				if change := tc.changeAfterList[request]; change != nil {
 					// The change goes through the tracker because calling the fake
 					// client from inside a reactor deadlocks.
 					change(t, client.Tracker())

@@ -183,13 +183,18 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 }
 
 // listedObjects is a client optimized for dry-run reconciles. It serves Gets from
-// previously listed ClusterRoles or ClusterRoleBindings.
-type listedObjects[T any] map[string]T
+// previously listed objects, keyed by name.
+type listedObjects[T namespaceGetter] map[string]T
+type namespaceGetter interface {
+	// GetNamespace returns the namespace or "" for cluster scope.
+	GetNamespace() string
+}
 
-func (l listedObjects[T]) Get(_, name string) (T, error) {
+func (l listedObjects[T]) Get(namespace, name string) (T, error) {
 	obj, ok := l[name]
-	if !ok {
-		return obj, apierrors.NewNotFound(schema.GroupResource{}, name) // The reconciler only checks IsNotFound, so no GroupResource is needed.
+	if !ok || obj.GetNamespace() != namespace {
+		var none T
+		return none, apierrors.NewNotFound(schema.GroupResource{}, name) // The reconciler only checks IsNotFound, so no GroupResource is needed.
 	}
 	return obj, nil
 }
@@ -324,12 +329,31 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 
 	// ensure bootstrap namespaced roles are created or reconciled
 	for namespace, roles := range p.Roles {
+		// The List is only an optimization. If it fails, every role is reconciled live.
+		listedNamespacedRoles := listedObjects[reconciliation.RuleOwner]{}
+		roleList, err := client.RbacV1().Roles(namespace).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to list roles in %v: %w", namespace, err))
+		} else {
+			for _, role := range roleList.Items {
+				listedNamespacedRoles[role.Name] = reconciliation.RoleRuleOwner{Role: &role}
+			}
+		}
+
 		for _, role := range roles {
 			opts := reconciliation.ReconcileRoleOptions{
 				Role:    reconciliation.RoleRuleOwner{Role: &role},
 				Client:  reconciliation.RoleModifier{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
 				Confirm: true,
 			}
+			// Skip the role if a dry run against the List finds nothing to change.
+			dryRun := opts
+			dryRun.Client = listedNamespacedRoles
+			dryRun.Confirm = false
+			if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
+				continue
+			}
+
 			// ServiceUnavailble error is returned when the API server is blocked by storage version updates
 			err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 				result, err := opts.Run()
@@ -356,12 +380,31 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 
 	// ensure bootstrap namespaced rolebindings are created or reconciled
 	for namespace, roleBindings := range p.RoleBindings {
+		// The List is only an optimization. If it fails, every binding is reconciled live.
+		listedNamespacedBindings := listedObjects[reconciliation.RoleBinding]{}
+		roleBindingList, err := client.RbacV1().RoleBindings(namespace).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to list rolebindings in %v: %w", namespace, err))
+		} else {
+			for _, binding := range roleBindingList.Items {
+				listedNamespacedBindings[binding.Name] = reconciliation.RoleBindingAdapter{RoleBinding: &binding}
+			}
+		}
+
 		for _, roleBinding := range roleBindings {
 			opts := reconciliation.ReconcileRoleBindingOptions{
 				RoleBinding: reconciliation.RoleBindingAdapter{RoleBinding: &roleBinding},
 				Client:      reconciliation.RoleBindingClientAdapter{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
 				Confirm:     true,
 			}
+			// Skip the binding if a dry run against the List finds nothing to change.
+			dryRun := opts
+			dryRun.Client = listedNamespacedBindings
+			dryRun.Confirm = false
+			if result, err := dryRun.Run(); err == nil && result.Operation == reconciliation.ReconcileNone {
+				continue
+			}
+
 			// ServiceUnavailble error is returned when the API server is blocked by storage version updates
 			err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 				result, err := opts.Run()
