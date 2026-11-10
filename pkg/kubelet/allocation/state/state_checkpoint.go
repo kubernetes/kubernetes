@@ -145,6 +145,11 @@ func (sc *stateCheckpoint) GetPodVolumes(podUID types.UID) ([]v1.Volume, bool) {
 	return sc.cache.GetPodVolumes(podUID)
 }
 
+// GetContainer returns a copy of the stored container of the given type
+func (sc *stateCheckpoint) GetContainer(podUID types.UID, containerName string, containerType podutil.ContainerType) (*v1.Container, bool) {
+	return sc.cache.GetContainer(podUID, containerName, containerType)
+}
+
 // GetPodLevelResources returns current resources information at pod-level
 func (sc *stateCheckpoint) GetPodLevelResources(podUID types.UID) (*v1.ResourceRequirements, bool) {
 	return sc.cache.GetPodLevelResources(podUID)
@@ -176,7 +181,7 @@ func (sc *stateCheckpoint) HasPod(podUID types.UID) bool {
 	return sc.cache.HasPod(podUID)
 }
 
-// SetContainer sets resources and volume mounts information for a pod's container
+// SetContainer stores a container of the given type
 func (sc *stateCheckpoint) SetContainer(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, container v1.Container) error {
 	err := sc.cache.SetContainer(logger, podUID, containerType, container)
 	if err != nil {
@@ -189,6 +194,15 @@ func (sc *stateCheckpoint) SetContainer(logger klog.Logger, podUID types.UID, co
 func (sc *stateCheckpoint) SetContainerResources(logger klog.Logger, podUID types.UID, containerName string, containerType podutil.ContainerType, resources v1.ResourceRequirements) error {
 	err := sc.cache.SetContainerResources(logger, podUID, containerName, containerType, resources)
 	if err != nil {
+		return err
+	}
+	return sc.storeState(logger)
+}
+
+// RemoveContainers removes the named containers of the given type
+func (sc *stateCheckpoint) RemoveContainers(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, containerNames ...string) error {
+	removed, err := sc.cache.removeContainers(logger, podUID, containerType, containerNames...)
+	if err != nil || !removed {
 		return err
 	}
 	return sc.storeState(logger)
@@ -270,6 +284,14 @@ func (sc *noopStateCheckpoint) GetContainerVolumeMounts(_ types.UID, _ string) (
 
 func (sc *noopStateCheckpoint) GetPodVolumes(_ types.UID) ([]v1.Volume, bool) {
 	return nil, false
+}
+
+func (sc *noopStateCheckpoint) GetContainer(_ types.UID, _ string, _ podutil.ContainerType) (*v1.Container, bool) {
+	return nil, false
+}
+
+func (sc *noopStateCheckpoint) RemoveContainers(_ klog.Logger, _ types.UID, _ podutil.ContainerType, _ ...string) error {
+	return nil
 }
 
 func (sc *noopStateCheckpoint) GetPodLevelResources(_ types.UID) (*v1.ResourceRequirements, bool) {

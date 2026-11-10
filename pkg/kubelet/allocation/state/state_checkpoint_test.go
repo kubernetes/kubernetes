@@ -493,3 +493,31 @@ func Test_stateCheckpoint_concurrentUpdates(t *testing.T) {
 	require.Len(t, expected, pods)
 	verifyPodResourceAllocation(t, &expected, &actual, "the checkpoint does not have the latest state")
 }
+
+// The V2 checkpoint stores whole containers, so a full container spec survives a restart without
+// a format change.
+func Test_stateCheckpoint_containersSurviveRestart(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testDir := getTestDir(t)
+	podUID := types.UID("pod-1")
+	main := &v1.Container{
+		Name:         "main",
+		Image:        "image",
+		VolumeMounts: []v1.VolumeMount{{Name: "vol", MountPath: "/vol"}},
+		Lifecycle:    &v1.Lifecycle{PreStop: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"stop"}}}},
+	}
+
+	sc, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	require.NoError(t, sc.SetContainer(logger, podUID, podutil.Containers, *main))
+	require.NoError(t, sc.SetContainer(logger, podUID, podutil.Containers, v1.Container{Name: "removed", Image: "image"}))
+	require.NoError(t, sc.RemoveContainers(logger, podUID, podutil.Containers, "removed"))
+
+	restored, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	got, ok := restored.GetContainer(podUID, "main", podutil.Containers)
+	require.True(t, ok)
+	assert.Equal(t, main, got)
+	_, ok = restored.GetContainer(podUID, "removed", podutil.Containers)
+	assert.False(t, ok)
+}

@@ -278,7 +278,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	// When creating a container, mark the resources and volume mounts as actuated.
+	// When creating a container, record its whole spec as actuated.
 	if err := m.setActuatedContainer(logger, pod, container, spec.containerType); err != nil {
 		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
 		return err.Error(), ErrCreateContainerConfig
@@ -437,25 +437,25 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(ctx context.Context
 	return err
 }
 
-func (m *kubeGenericRuntimeManager) setActuatedContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
-		return m.setActuatedContainerResources(logger, pod, container, containerType)
-	}
-	actuatedContainer := *container
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
-		actuatedContainer.Resources = *container.Resources.DeepCopy()
-		actuatedContainer.Resources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
-	}
-	return m.actuatedState.SetContainer(logger, pod.UID, containerType, actuatedContainer)
+func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerType, actuatedContainerResources(pod, container))
 }
 
-func (m *kubeGenericRuntimeManager) setActuatedContainerResources(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+// setActuatedContainer records the whole spec of a container that is being started, so that it can
+// still be looked up after the container is removed from the pod spec.
+func (m *kubeGenericRuntimeManager) setActuatedContainer(logger klog.Logger, pod *v1.Pod, container *v1.Container, containerType podutil.ContainerType) error {
+	actuated := container.DeepCopy()
+	actuated.Resources = actuatedContainerResources(pod, container)
+	return m.actuatedState.SetContainer(logger, pod.UID, containerType, *actuated)
+}
+
+func actuatedContainerResources(pod *v1.Pod, container *v1.Container) v1.ResourceRequirements {
 	containerResources := container.Resources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		containerResources = *containerResources.DeepCopy()
 		containerResources.Limits = kubeutil.GetLimits(&kubeutil.ResourceOpts{PodResources: pod.Spec.Resources, ContainerResources: &container.Resources})
 	}
-	return m.actuatedState.SetContainerResources(logger, pod.UID, container.Name, containerType, containerResources)
+	return containerResources
 }
 
 func (m *kubeGenericRuntimeManager) updatePodSandboxResources(ctx context.Context, sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {

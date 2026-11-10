@@ -840,6 +840,9 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 		return
 	}
 	// If there is no actuated checkpoint for the pod, seed it with the allocated pod.
+	// TODO(KEP-5972): Revisit what is seeded for containers that haven't started yet (only their
+	// resources, see KeepOnlyResourceValues) together with tracking the actual pod-level resources,
+	// which depend on which containers are running.
 	actuatedPod := *allocatedPod
 	if hasPod {
 		// TODO: Remove V1 overlay in v1.39 when the V1 checkpoint format is no longer supported,

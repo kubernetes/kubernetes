@@ -1264,13 +1264,14 @@ func TestContainerVolumeMountsActuatedState(t *testing.T) {
 
 	podStatus := &kubecontainer.PodStatus{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace}
 
-	// When DynamicNodeLocalEphemeralVolumes is disabled, starting the container does not record volumeMounts.
+	// Starting the container records its whole spec, including volumeMounts, even when
+	// DynamicNodeLocalEphemeralVolumes is disabled.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
 	msg, err := m.startContainer(tCtx, sandboxID, sandboxConfig, containerStartSpec(&pod.Spec.Containers[0]), pod, podStatus, nil, "", nil, nil)
 	require.NoError(t, err, msg)
 	gotMounts, found := m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
 	require.True(t, found)
-	assert.Empty(t, gotMounts)
+	assert.Equal(t, volumeMounts, gotMounts)
 
 	// When DynamicNodeLocalEphemeralVolumes is enabled, starting the container records its volumeMounts in the actuation checkpoint.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
