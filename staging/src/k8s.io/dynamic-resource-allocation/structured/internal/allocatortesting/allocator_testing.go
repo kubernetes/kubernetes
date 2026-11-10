@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+	"github.com/go-logr/logr"
 	g "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gstruct"
@@ -9777,6 +9778,9 @@ func TestAllocator(t *testing.T,
 				// That one took over 30 seconds, this one here only 0.07 seconds.
 				// But even that is too long when we interrupt in the near future or
 				// even before starting...
+				//
+				// To be sure of the timing, logging is wrapped in a sink which has log
+				// output enabled and then sleeps when called.
 				deviceClass := class(classA, driverA)
 				classLister := informerLister[resourceapi.DeviceClass]{
 					objs: []*resourceapi.DeviceClass{deviceClass},
@@ -9803,8 +9807,10 @@ func TestAllocator(t *testing.T,
 				case "off":
 				case "timeout":
 					tCtx = tCtx.WithTimeout(time.Nanosecond, "timeout test")
+					tCtx = withSleepyLogger(tCtx)
 				case "deadline":
 					tCtx = tCtx.WithDeadline(time.Now(), "deadline test")
+					tCtx = withSleepyLogger(tCtx)
 				case "cancel":
 					tCtx = tCtx.WithCancel()
 					tCtx.Cancel("cancel test")
@@ -9822,6 +9828,39 @@ func TestAllocator(t *testing.T,
 			})
 		}
 	})
+}
+
+func withSleepyLogger(tCtx ktesting.TContext) ktesting.TContext {
+	sink := tCtx.Logger().GetSink()
+	return tCtx.WithLogger(logr.New(sleepySink{tCtx: tCtx, sink: sink}))
+}
+
+type sleepySink struct {
+	tCtx ktesting.TContext
+	sink logr.LogSink
+}
+
+func (s sleepySink) Init(info logr.RuntimeInfo) {}
+func (s sleepySink) Enabled(level int) bool     { return true }
+func (s sleepySink) Info(level int, msg string, keysAndValues ...any) {
+	s.tCtx.Helper()
+	select {
+	case <-s.tCtx.Done():
+	case <-time.After(time.Second):
+	}
+	s.sink.Info(level, msg, keysAndValues...)
+}
+
+func (s sleepySink) Error(err error, msg string, keysAndValues ...any) {
+	s.tCtx.Helper()
+	s.sink.Error(err, msg, keysAndValues...)
+}
+
+func (s sleepySink) WithValues(keysAndValues ...any) logr.LogSink {
+	return sleepySink{tCtx: s.tCtx, sink: s.sink.WithValues(keysAndValues...)}
+}
+func (s sleepySink) WithName(name string) logr.LogSink {
+	return sleepySink{tCtx: s.tCtx, sink: s.sink.WithName(name)}
 }
 
 // expectDistinctAttributeWithLists covers test cases with a distinctAttribute
