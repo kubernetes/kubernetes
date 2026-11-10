@@ -6448,7 +6448,7 @@
       "type": "object"
     },
     "io.k8s.api.core.v1.Binding": {
-      "description": "Binding ties one object to another; for example, a pod is bound to a node by a scheduler.",
+      "description": "Binding assigns a pod to a node.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -6464,7 +6464,7 @@
         },
         "target": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ObjectReference",
-          "description": "target is the target object that you want to bind to the standard object."
+          "description": "target is the node that you want to bind the pod to."
         }
       },
       "required": [

@@ -7806,7 +7806,7 @@ type NamespaceList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
-// Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
+// Binding assigns a pod to a node.
 type Binding struct {
 	metav1.TypeMeta `json:""`
 	// metadata is the standard object's metadata.
@@ -7815,7 +7815,7 @@ type Binding struct {
 	// +k8s:opaqueType
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// target is the target object that you want to bind to the standard object.
+	// target is the node that you want to bind the pod to.
 	Target ObjectReference `json:"target" protobuf:"bytes,2,opt,name=target"`
 }
 

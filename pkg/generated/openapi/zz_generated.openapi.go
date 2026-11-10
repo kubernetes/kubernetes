@@ -20222,7 +20222,7 @@ func schema_k8sio_api_core_v1_Binding(ref common.ReferenceCallback) common.OpenA
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Binding ties one object to another; for example, a pod is bound to a node by a scheduler.",
+				Description: "Binding assigns a pod to a node.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -20248,7 +20248,7 @@ func schema_k8sio_api_core_v1_Binding(ref common.ReferenceCallback) common.OpenA
 					},
 					"target": {
 						SchemaProps: spec.SchemaProps{
-							Description: "target is the target object that you want to bind to the standard object.",
+							Description: "target is the node that you want to bind the pod to.",
 							Default:     map[string]interface{}{},
 							Ref:         ref(corev1.ObjectReference{}.OpenAPIModelName()),
 						},

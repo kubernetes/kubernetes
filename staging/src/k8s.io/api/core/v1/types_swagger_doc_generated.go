@@ -117,9 +117,9 @@ func (AzureFileVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_Binding = map[string]string{
-	"":         "Binding ties one object to another; for example, a pod is bound to a node by a scheduler.",
+	"":         "Binding assigns a pod to a node.",
 	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"target":   "target is the target object that you want to bind to the standard object.",
+	"target":   "target is the node that you want to bind the pod to.",
 }
 
 func (Binding) SwaggerDoc() map[string]string {
