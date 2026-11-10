@@ -1115,6 +1115,56 @@ func TestContainerLogs(t *testing.T) {
 	}
 }
 
+func TestContainerLogsOfRemovedContainer(t *testing.T) {
+	const (
+		podNamespace = "other"
+		podName      = "foo"
+		output       = "foo bar"
+	)
+	tests := []struct {
+		name           string
+		disableGate    bool
+		container      string
+		expectedStatus int
+	}{
+		{name: "removed container", container: "removed", expectedStatus: http.StatusOK},
+		{name: "removed container with gate disabled", disableGate: true, container: "removed", expectedStatus: http.StatusNotFound},
+		{name: "unknown container", container: "unknown", expectedStatus: http.StatusNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, !tc.disableGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLogsQuerySplitStreams, false)
+			tCtx := ktesting.Init(t)
+			fw := newServerTest(tCtx)
+			defer fw.testHTTPServer.Close()
+
+			fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: podName},
+					Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "spec"}}},
+					Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{
+						{Name: "spec"}, {Name: "removed"},
+					}},
+				}, true
+			}
+			setGetContainerLogsFunc(fw, t, getPodName(podName, podNamespace), tc.container, &v1.PodLogOptions{}, output)
+
+			resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + tc.container)
+			require.NoError(t, err)
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
+			if tc.expectedStatus == http.StatusOK {
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				assert.Equal(t, output, string(body))
+			}
+		})
+	}
+}
+
 func TestContainerLogsWithInvalidTail(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fw := newServerTest(tCtx)
