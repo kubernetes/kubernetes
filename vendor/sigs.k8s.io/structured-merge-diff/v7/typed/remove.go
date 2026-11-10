@@ -103,7 +103,10 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 			newItems = append(newItems, item.Unstructured())
 		}
 	}
-	if len(newItems) > 0 {
+	if len(newItems) > 0 || !w.shouldExtract {
+		if newItems == nil {
+			newItems = []interface{}{}
+		}
 		w.out = newItems
 	}
 	return nil

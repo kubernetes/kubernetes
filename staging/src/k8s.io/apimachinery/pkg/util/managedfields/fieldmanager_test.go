@@ -274,6 +274,167 @@ func getObjectBytes(file string) []byte {
 	return s
 }
 
+func TestApplyEmptyAssociativeList(t *testing.T) {
+	t.Run("single manager empties associative list", func(t *testing.T) {
+		f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+
+		// 1. Initial populated associative list
+		appliedObj1 := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		if err := yaml.Unmarshal([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {"name": "test"},
+			"spec": {
+				"containers": [
+					{"name": "test", "image": "nginx"}
+				]
+			}
+		}`), &appliedObj1.Object); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Apply(appliedObj1, "manager_a", false); err != nil {
+			t.Fatal(err)
+		}
+
+		// 2. Manager A applies empty associative list.
+		// On the first apply, the empty list must be preserved (not dropped or turned to nil).
+		appliedObj2 := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		if err := yaml.Unmarshal([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {"name": "test"},
+			"spec": {
+				"containers": []
+			}
+		}`), &appliedObj2.Object); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Apply(appliedObj2, "manager_a", false); err != nil {
+			t.Fatal(err)
+		}
+
+		live := f.Live().(*unstructured.Unstructured)
+		spec, ok := live.Object["spec"].(map[string]interface{})
+		if !ok {
+			t.Fatalf("expected spec to exist in live object: %#v", live.Object)
+		}
+		containers, containersExist := spec["containers"]
+		if !containersExist {
+			t.Fatalf("expected containers to be present on first apply, but was absent: %#v", spec)
+		}
+		containersSlice, ok := containers.([]interface{})
+		if !ok || len(containersSlice) != 0 {
+			t.Fatalf("expected empty containers slice on first apply, got: %#v", containers)
+		}
+
+		// Verify manager_a owns the empty list
+		managed := f.ManagedFields()
+		if len(managed) != 1 || managed[0].Manager != "manager_a" {
+			t.Fatalf("expected manager_a to retain ownership, got: %#v", managed)
+		}
+
+		// 3. Repeating identical apply must be strictly idempotent
+		if err := f.Apply(appliedObj2, "manager_a", false); err != nil {
+			t.Fatal(err)
+		}
+		live2 := f.Live().(*unstructured.Unstructured)
+		spec2 := live2.Object["spec"].(map[string]interface{})
+		if !reflect.DeepEqual(spec["containers"], spec2["containers"]) {
+			t.Fatalf("subsequent apply changed containers: %#v vs %#v", spec["containers"], spec2["containers"])
+		}
+
+		// 4. Omitting the field later must properly remove it
+		appliedObj3 := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		if err := yaml.Unmarshal([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {"name": "test"},
+			"spec": {
+				"restartPolicy": "Always"
+			}
+		}`), &appliedObj3.Object); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Apply(appliedObj3, "manager_a", false); err != nil {
+			t.Fatal(err)
+		}
+		live3 := f.Live().(*unstructured.Unstructured)
+		spec3 := live3.Object["spec"].(map[string]interface{})
+		if _, exists := spec3["containers"]; exists {
+			t.Fatalf("omitted containers should be removed, but still present: %#v", spec3)
+		}
+	})
+
+	t.Run("co-owned items preserved when one manager empties list", func(t *testing.T) {
+		f := managedfieldstest.NewTestFieldManager(fakeTypeConverter, schema.FromAPIVersionAndKind("v1", "Pod"))
+
+		// Manager A adds container-a
+		appliedA := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		if err := yaml.Unmarshal([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {"name": "test"},
+			"spec": {
+				"containers": [
+					{"name": "container-a", "image": "nginx"}
+				]
+			}
+		}`), &appliedA.Object); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Apply(appliedA, "manager_a", false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Manager B adds container-b
+		appliedB := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		if err := yaml.Unmarshal([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {"name": "test"},
+			"spec": {
+				"containers": [
+					{"name": "container-b", "image": "redis"}
+				]
+			}
+		}`), &appliedB.Object); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Apply(appliedB, "manager_b", false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Manager A empties its list (releases container-a)
+		emptyA := &unstructured.Unstructured{Object: map[string]interface{}{}}
+		if err := yaml.Unmarshal([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {"name": "test"},
+			"spec": {
+				"containers": []
+			}
+		}`), &emptyA.Object); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Apply(emptyA, "manager_a", false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Container-b owned by Manager B must be preserved, container-a removed
+		live := f.Live().(*unstructured.Unstructured)
+		spec := live.Object["spec"].(map[string]interface{})
+		containers := spec["containers"].([]interface{})
+		if len(containers) != 1 {
+			t.Fatalf("expected 1 container remaining, got: %#v", containers)
+		}
+		container := containers[0].(map[string]interface{})
+		if container["name"] != "container-b" {
+			t.Fatalf("expected container-b, got: %#v", container)
+		}
+	})
+}
+
+
 func TestApplyNewObject(t *testing.T) {
 	tests := []struct {
 		gvk schema.GroupVersionKind
