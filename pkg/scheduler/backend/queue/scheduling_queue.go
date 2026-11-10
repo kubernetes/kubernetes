@@ -170,6 +170,9 @@ type SchedulingQueue interface {
 	// of the pod to nodeName in the API failed, after AddNominatedPod set it
 	// in memory.
 	NominationNotPersisted(pod *v1.Pod, nodeName string)
+	// IsNominatedTo returns true if the pod is nominated to nodeName in
+	// memory, or not nominated at all if nodeName is empty.
+	IsNominatedTo(pod *v1.Pod, nodeName string) bool
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -2194,6 +2197,12 @@ func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, conditions []*v1.PodConditio
 // pod objects again, unless the scheduler nominated the pod again.
 func (p *PriorityQueue) NominationNotPersisted(pod *v1.Pod, nodeName string) {
 	p.nominator.forgetExpected(pod.UID, nodeName)
+}
+
+// IsNominatedTo returns true if the pod is nominated to nodeName in memory,
+// or not nominated at all if nodeName is empty.
+func (p *PriorityQueue) IsNominatedTo(pod *v1.Pod, nodeName string) bool {
+	return p.nominator.isNominatedTo(pod.UID, nodeName)
 }
 
 // Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
