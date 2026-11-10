@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -781,6 +782,88 @@ func TestPrintTable_ConsistentAlignmentAcrossFlushes(t *testing.T) {
 			t.Fatalf("PrintObj error: %v", err)
 		}
 		assertAligned(t, out.String(), rowCount)
+	})
+}
+
+// TestPrintTable_PrescanUsesPrintedWidth verifies that the column widths
+// learned by printTable's pre-scan match the cells as they are printed:
+// truncated at a line break, with terminal characters escaped, and counted
+// in runes like tabwriter does.
+func TestPrintTable_PrescanUsesPrintedWidth(t *testing.T) {
+	columns := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string"},
+		{Name: "Message", Type: "string"},
+		{Name: "Age", Type: "string"},
+	}
+
+	tests := []struct {
+		name      string
+		messages  []string
+		noHeaders bool
+		expected  string
+	}{
+		{
+			name:     "multi-line cell",
+			messages: []string{"first\nsecond line which is quite a bit longer"},
+			expected: "" +
+				"NAME    MESSAGE    AGE\n" +
+				"test1   first...   20h\n",
+		},
+		{
+			// Without headers the first row is padded instead, so a later
+			// row has to be the widest one.
+			name:      "multi-line cell without headers",
+			messages:  []string{"short", "first\nsecond line which is quite a bit longer"},
+			noHeaders: true,
+			expected: "" +
+				"test1   short      20h\n" +
+				"test2   first...   20h\n",
+		},
+		{
+			name:     "multi-byte cell",
+			messages: []string{"日本語日本語"},
+			expected: "" +
+				"NAME    MESSAGE   AGE\n" +
+				"test1   日本語日本語    20h\n",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			table := &metav1.Table{ColumnDefinitions: columns}
+			for i, message := range test.messages {
+				table.Rows = append(table.Rows, metav1.TableRow{Cells: []interface{}{fmt.Sprintf("test%d", i+1), message, "20h"}})
+			}
+			out := &bytes.Buffer{}
+			if err := NewTablePrinter(PrintOptions{NoHeaders: test.noHeaders}).PrintObj(table, out); err != nil {
+				t.Fatalf("PrintObj error: %v", err)
+			}
+			if out.String() != test.expected {
+				t.Errorf("wanted:\n%s\ngot:\n%s", test.expected, out.String())
+			}
+		})
+	}
+
+	// "\x1b" is printed as "^[", so the widest cell is one rune wider than
+	// its raw length. It appears after the first flush, so the pre-scan has
+	// to count it as printed to keep all rows aligned.
+	t.Run("escaped cell after first flush", func(t *testing.T) {
+		rows := make([]metav1.TableRow, flushInterval+1)
+		for i := range rows {
+			rows[i] = metav1.TableRow{Cells: []interface{}{"a", "Running", "5d"}}
+		}
+		rows[flushInterval].Cells[0] = "wide\x1bname"
+		table := &metav1.Table{ColumnDefinitions: columns, Rows: rows}
+		out := &bytes.Buffer{}
+		if err := NewTablePrinter(PrintOptions{}).PrintObj(table, out); err != nil {
+			t.Fatalf("PrintObj error: %v", err)
+		}
+		lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+		want := columnStartOffsets(lines[0])
+		for i, line := range lines {
+			if got := columnStartOffsets(line); !slices.Equal(got, want) {
+				t.Fatalf("line %d: column offsets %v, want %v\nline: %q\nref:  %q", i, got, want, line, lines[0])
+			}
+		}
 	})
 }
 

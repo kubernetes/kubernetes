@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/liggitt/tabwriter"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -189,8 +190,8 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 	// then pad either the header (with headers) or the first data row
 	// (NoHeaders) so the first flush sets widths matching the ultimate max.
 	// Without this, a wider cell appearing after row flushInterval causes
-	// misalignment. Width comparisons use byte length because tabwriter
-	// measures columns in bytes, not runes.
+	// misalignment. Widths are measured on the cells as printed (see
+	// printedCellWidth), in runes, the same way tabwriter measures them.
 	var maxCellWidths []int
 	tw, isTabwriter := output.(*tabwriter.Writer)
 	if isTabwriter && len(table.Rows) > 0 {
@@ -208,9 +209,9 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				}
 				var l int
 				if s, ok := cell.(string); ok {
-					l = len(s)
+					l = printedCellWidth(s)
 				} else {
-					l = len(fmt.Sprint(cell))
+					l = printedCellWidth(fmt.Sprint(cell))
 				}
 				if l > maxCellWidths[i] {
 					maxCellWidths[i] = l
@@ -249,7 +250,7 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 			name := strings.ToUpper(column.Name)
 			io.WriteString(output, name) //nolint:errcheck
 			if i != lastVisibleCol && i < len(maxCellWidths) {
-				if pad := maxCellWidths[i] - len(name); pad > 0 {
+				if pad := maxCellWidths[i] - utf8.RuneCountInString(name); pad > 0 {
 					output.Write(bytes.Repeat([]byte{' '}, pad)) //nolint:errcheck
 				}
 			}
@@ -293,24 +294,22 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 			} else {
 				rowBuf = append(rowBuf, '\t')
 			}
-			// Track byte length of the cell string we're about to
-			// write so we can pad to maxCellWidths without measuring
-			// through rowBuf (appendCellValue's slow path flushes
-			// rowBuf directly, making post-write measurement unsafe).
-			cellLen := 0
+			// Keep the cell string we're about to write so we can pad
+			// to maxCellWidths without measuring through rowBuf
+			// (appendCellValue's slow path flushes rowBuf directly,
+			// making post-write measurement unsafe).
+			var cellStr string
 			if cell != nil {
-				var cellStr string
 				switch val := cell.(type) {
 				case string:
 					cellStr = val
 				default:
 					cellStr = fmt.Sprint(val)
 				}
-				cellLen = len(cellStr)
 				rowBuf = appendCellValue(output, rowBuf, cellStr)
 			}
 			if padFirstRow && ri == 0 && i != lastVisibleCol && i < len(maxCellWidths) {
-				if pad := maxCellWidths[i] - cellLen; pad > 0 {
+				if pad := maxCellWidths[i] - printedCellWidth(cellStr); pad > 0 {
 					rowBuf = append(rowBuf, bytes.Repeat([]byte{' '}, pad)...)
 				}
 			}
@@ -355,6 +354,24 @@ func appendCellValue(w io.Writer, buf []byte, val string) []byte {
 		WriteEscaped(w, val) //nolint:errcheck
 	}
 	return buf
+}
+
+// printedCellWidth returns the width tabwriter measures for val after
+// appendCellValue writes it: cut at the first break character, with
+// terminal characters escaped, counted in runes.
+func printedCellWidth(val string) int {
+	for i := 0; i < len(val); i++ {
+		if c := val[i]; c < ' ' || c >= utf8.RuneSelf {
+			// Control characters may be cut or escaped, and non-ASCII
+			// characters take more than one byte.
+			if breakchar := strings.IndexAny(val, cellBreakChars); breakchar >= 0 {
+				return utf8.RuneCountInString(EscapeTerminal(val[:breakchar])) + len("...")
+			}
+			return utf8.RuneCountInString(EscapeTerminal(val))
+		}
+	}
+	// Printable ASCII is written unchanged, one rune per byte.
+	return len(val)
 }
 
 type cellValueFunc func(metav1.TableRow) (interface{}, error)
