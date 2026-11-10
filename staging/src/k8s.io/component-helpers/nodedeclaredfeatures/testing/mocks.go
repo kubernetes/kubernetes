@@ -83,7 +83,9 @@ func (m *MockFeature) SetDiscover(discover func(cfg *types.NodeConfiguration) bo
 }
 func (m *MockFeature) InferForScheduling(podInfo *types.PodInfo) bool {
 	if m.inferForScheduling == nil {
-		m.t.Errorf("unexpected call to InferForScheduling")
+		if m.inferForUpdate == nil {
+			m.t.Errorf("unexpected call to InferForScheduling")
+		}
 		return false
 	}
 	return m.inferForScheduling(podInfo)
@@ -93,7 +95,9 @@ func (m *MockFeature) SetInferForScheduling(inferForScheduling func(podInfo *typ
 }
 func (m *MockFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
 	if m.inferForUpdate == nil {
-		m.t.Errorf("unexpected call to InferForUpdate")
+		if m.inferForScheduling == nil {
+			m.t.Errorf("unexpected call to InferForUpdate")
+		}
 		return false
 	}
 	return m.inferForUpdate(oldPodInfo, newPodInfo)
