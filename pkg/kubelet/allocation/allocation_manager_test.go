@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	goruntime "runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -2887,7 +2888,7 @@ func TestSortPendingResizes(t *testing.T) {
 		}
 	}
 
-	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5), createTestPod(6)}
+	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5), createTestPod(6), createTestPod(7), createTestPod(8)}
 	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, testPods, nil)
 	for _, testPod := range testPods {
 		require.NoError(t, allocationManager.SetAllocatedResources(logger, testPod))
@@ -2895,10 +2896,12 @@ func TestSortPendingResizes(t *testing.T) {
 
 	// testPods[0] has the highest priority, as it doesn't increase resource requests (pod-level).
 	// testPods[1] has the next highest priority, as it doesn't increase resource requests (container-level).
-	// testPods[2] has the highest PriorityClass.
-	// testPods[3] is the only pod with QoS class "guaranteed" (all others are burstable).
+	// testPods[2] has the highest PriorityClass (even with PreemptNever).
+	// testPods[3] has QoS class "guaranteed" and can preempt (nil PreemptionPolicy).
 	// testPods[4] has been in a "deferred" state for longer than testPods[5].
-	// testPods[6] has no resize conditions yet, indicating it is a newer request than the other deferred resizes.
+	// testPods[6] has no resize conditions yet (explicit PreemptLowerPriority).
+	// testPods[7] has QoS class "guaranteed" and has been deferred longest, but has PreemptNever.
+	// testPods[8] is burstable and deferred before testPods[4], but has PreemptNever.
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
 
@@ -2909,7 +2912,16 @@ func TestSortPendingResizes(t *testing.T) {
 	}
 
 	testPods[2].Spec.Priority = ptr.To(int32(100))
+	testPods[2].Spec.PreemptionPolicy = new(v1.PreemptNever)
 	testPods[3].Status.QOSClass = v1.PodQOSGuaranteed
+	testPods[6].Spec.PreemptionPolicy = new(v1.PreemptLowerPriority)
+	testPods[7].Status.QOSClass = v1.PodQOSGuaranteed
+	testPods[7].Spec.PreemptionPolicy = new(v1.PreemptNever)
+	testPods[8].Spec.PreemptionPolicy = new(v1.PreemptNever)
+
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[7].UID, v1.PodReasonDeferred, "some-message", 1)
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[8].UID, v1.PodReasonDeferred, "some-message", 1)
+	time.Sleep(5 * time.Millisecond)
 	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message", 1)
 	time.Sleep(5 * time.Millisecond)
 	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[5].UID, v1.PodReasonDeferred, "some-message", 1)
@@ -2923,20 +2935,30 @@ func TestSortPendingResizes(t *testing.T) {
 		return pod, found
 	}
 
-	expected := []types.UID{testPods[0].UID, testPods[1].UID, testPods[2].UID, testPods[3].UID, testPods[4].UID, testPods[5].UID, testPods[6].UID}
+	for _, schedulerPreemptionEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("schedulerPreemptionEnabled=%v", schedulerPreemptionEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, schedulerPreemptionEnabled)
 
-	// Push all the pods to the queue.
-	for i := range testPods {
-		allocationManager.PushPendingAllocation(logger, testPods[i].UID)
-	}
-	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingAllocations)
+			expected := []types.UID{testPods[0].UID, testPods[1].UID, testPods[2].UID, testPods[3].UID, testPods[4].UID, testPods[5].UID, testPods[6].UID, testPods[7].UID, testPods[8].UID}
+			if !schedulerPreemptionEnabled {
+				expected = []types.UID{testPods[0].UID, testPods[1].UID, testPods[2].UID, testPods[7].UID, testPods[3].UID, testPods[8].UID, testPods[4].UID, testPods[5].UID, testPods[6].UID}
+			}
 
-	// Clear the queue and push the pods in reverse order to spice things up.
-	allocationManager.(*manager).podsWithPendingAllocations = nil
-	for i := len(testPods) - 1; i >= 0; i-- {
-		allocationManager.PushPendingAllocation(logger, testPods[i].UID)
+			// Push all the pods to the queue.
+			allocationManager.(*manager).podsWithPendingAllocations = nil
+			for i := range testPods {
+				allocationManager.PushPendingAllocation(logger, testPods[i].UID)
+			}
+			require.Equal(t, expected, allocationManager.(*manager).podsWithPendingAllocations)
+
+			// Clear the queue and push the pods in reverse order to spice things up.
+			allocationManager.(*manager).podsWithPendingAllocations = nil
+			for _, pod := range slices.Backward(testPods) {
+				allocationManager.PushPendingAllocation(logger, pod.UID)
+			}
+			require.Equal(t, expected, allocationManager.(*manager).podsWithPendingAllocations)
+		})
 	}
-	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingAllocations)
 }
 
 func TestRecordPodDeferredAcceptedResizes(t *testing.T) {

@@ -296,7 +296,8 @@ func (m *manager) PushPendingAllocation(logger klog.Logger, uid types.UID) {
 // sortPendingAllocations sorts the list of pending allocations:
 // - First, prioritizing allocations that do not increase requests.
 // - Second, based on the pod's PriorityClass.
-// - Third, based on the pod's QoS class.
+// - Third, prioritizing pods that can preempt over PreemptNever pods (when InPlacePodVerticalScalingSchedulerPreemption is enabled).
+// - Fourth, based on the pod's QoS class.
 // - Last, prioritizing allocations that have been in the deferred state the longest.
 func (m *manager) sortPendingAllocations(logger klog.Logger) {
 	var pendingPods []*v1.Pod
@@ -337,7 +338,20 @@ func (m *manager) sortPendingAllocations(logger klog.Logger) {
 			return 1
 		}
 
-		// Third, pods with a higher QoS class will be prioritized, where guaranteed > burstable.
+		// Third, prioritize pods eligible to preempt over PreemptNever pods so a pod that preempted
+		// lower-priority victims to free node capacity isn't jumped by an equal-priority PreemptNever pod.
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+			firstNeverPreempts := firstPod.Spec.PreemptionPolicy != nil && *firstPod.Spec.PreemptionPolicy == v1.PreemptNever
+			secondNeverPreempts := secondPod.Spec.PreemptionPolicy != nil && *secondPod.Spec.PreemptionPolicy == v1.PreemptNever
+			if !firstNeverPreempts && secondNeverPreempts {
+				return -1
+			}
+			if firstNeverPreempts && !secondNeverPreempts {
+				return 1
+			}
+		}
+
+		// Fourth, pods with a higher QoS class will be prioritized, where guaranteed > burstable.
 		// Best effort pods don't have resource requests or limits, so we don't need to consider them here.
 		firstPodQOS := v1qos.GetPodQOS(firstPod)
 		secondPodQOS := v1qos.GetPodQOS(secondPod)
