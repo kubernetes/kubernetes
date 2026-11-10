@@ -1385,7 +1385,8 @@ func doPatchAndRollback(ctx context.Context, f *framework.Framework, originalCon
 }
 
 func patchAndVerify(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, newPod *v1.Pod, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, opStr string) {
-	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, newPod.Name, newPod.Spec.Containers[0].Name)
+	onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(f, newPod, newPod.Spec.Containers[0].Name)
+	framework.ExpectNoError(err)
 	oldWeights := make(map[string]int64)
 	for _, ci := range originalContainers {
 		if ci.Resources != nil {
@@ -1575,7 +1576,10 @@ func verifyInitContainerResources(ctx context.Context, f *framework.Framework, p
 					return fmt.Sprintf("init container status resources don't match expected: %v", err)
 				}, nil
 			}
-			onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.InitContainers[0].Name)
+			onCgroupv2, err := cgroups.IsPodOnCgroupv2Node(f, pod, pod.Spec.InitContainers[0].Name)
+			if err != nil {
+				return nil, err
+			}
 			if err := cgroups.VerifyContainerCgroupValues(ctx, f, pod, &expectedInitCtr, onCgroupv2); err != nil {
 				return func() string {
 					return fmt.Sprintf("cgroup values for init container don't match expected: %v", err)
