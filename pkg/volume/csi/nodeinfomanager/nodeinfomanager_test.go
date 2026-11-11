@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -738,7 +739,7 @@ func TestInstallCSIDriver(t *testing.T) {
 					},
 				},
 			},
-			specUpdates: ptr.To(1),
+			specUpdates: new(1),
 		},
 		{
 			name:       "pending driver registration from the same driver, and node info and driver registration from different driver",
@@ -798,7 +799,7 @@ func TestInstallCSIDriver(t *testing.T) {
 					},
 				},
 			},
-			specUpdates: ptr.To(1),
+			specUpdates: new(1),
 		},
 	}
 
@@ -956,7 +957,7 @@ func TestUninstallCSIDriver(t *testing.T) {
 				Spec:       storage.CSINodeSpec{},
 			},
 			hasModified: true,
-			specUpdates: ptr.To(1),
+			specUpdates: new(1),
 		},
 		{
 			name:       "pre-existing node info and driver registrations from the same driver and different driver",
@@ -1010,7 +1011,7 @@ func TestUninstallCSIDriver(t *testing.T) {
 				},
 			},
 			hasModified: true,
-			specUpdates: ptr.To(1),
+			specUpdates: new(1),
 		},
 	}
 
@@ -2154,9 +2155,9 @@ func TestInstallCSIDriverRegistration(t *testing.T) {
 
 			err := nim.InstallCSIDriverRegistration(driverName, tc.driverNodeID)
 			if tc.wantErr != "" {
-				assert.ErrorContains(t, err, tc.wantErr)
+				require.ErrorContains(t, err, tc.wantErr)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 
 			actions := client.Actions()

@@ -797,9 +797,7 @@ func TestClientNodeSupportsNodeInfoFromController(t *testing.T) {
 		func(client *csiDriverClient) (bool, error) {
 			return client.NodeSupportsNodeInfoFromController(context.Background())
 		},
-		func(nodeInfoFromControllerCapable bool) *fake.NodeClient {
-			return fake.NewNodeClientWithNodeInfoFromController(nodeInfoFromControllerCapable)
-		})
+		fake.NewNodeClientWithNodeInfoFromController)
 }
 
 func testClientNodeSupportsCapabilities(

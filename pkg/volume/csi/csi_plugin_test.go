@@ -48,7 +48,6 @@ import (
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/mount-utils"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -1488,7 +1487,7 @@ func TestRegisterPlugin(t *testing.T) {
 		Name:         testDriver,
 		NodeID:       driverNodeID,
 		TopologyKeys: []string{topologyKey},
-		Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](10)},
+		Allocatable:  &storage.VolumeNodeResources{Count: new(int32(10))},
 	}
 	registration := storage.CSINodeDriverRegistration{Name: testDriver, NodeID: driverNodeID}
 	// completedRegistration is the CSINode spec after external-attacher completed the registration.
@@ -1496,8 +1495,8 @@ func TestRegisterPlugin(t *testing.T) {
 		Drivers:             []storage.CSINodeDriver{nodeDriver},
 		DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
 	}
-	attachRequired := getTestCSIDriver(testDriver, nil, ptr.To(true), nil)
-	attachNotRequired := getTestCSIDriver(testDriver, nil, ptr.To(false), nil)
+	attachRequired := getTestCSIDriver(testDriver, nil, new(true), nil)
+	attachNotRequired := getTestCSIDriver(testDriver, nil, new(false), nil)
 
 	testCases := []struct {
 		name        string
@@ -1647,7 +1646,7 @@ func TestRegisterPlugin(t *testing.T) {
 			}
 			client := fakeclient.NewSimpleClientset(objects...)
 			plug, tmpDir := newTestPlugin(t, client)
-			defer os.RemoveAll(tmpDir)
+			t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 			if tc.csiDriverLookupFails {
 				plug.csiDriverLister = nil
 			}
@@ -1876,7 +1875,7 @@ func TestUpdateCSIDriver(t *testing.T) {
 			useFakeNodeClient(t, nodeClient)
 			client := fakeclient.NewSimpleClientset()
 			_, tmpDir := newTestPlugin(t, client)
-			defer os.RemoveAll(tmpDir)
+			t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 			err := PluginHandler.RegisterPlugin(t.Context(), testDriver, "endpoint", []string{"1.0.0"}, nil)
 			if err != nil {
@@ -1939,8 +1938,8 @@ func TestVerifyExhaustedResource(t *testing.T) {
 			useFakeNodeClient(t, nodeClient)
 
 			const volumeHandle = "test-volume"
-			csiDriver := getTestCSIDriver(testDriver, nil, ptr.To(true), nil)
-			csiDriver.Spec.NodeAllocatableUpdatePeriodSeconds = ptr.To[int64](60)
+			csiDriver := getTestCSIDriver(testDriver, nil, new(true), nil)
+			csiDriver.Spec.NodeAllocatableUpdatePeriodSeconds = new(int64(60))
 			attachment := &storage.VolumeAttachment{
 				ObjectMeta: meta.ObjectMeta{
 					Name: getAttachmentName(volumeHandle, testDriver, "fakeNode"),
@@ -1948,13 +1947,13 @@ func TestVerifyExhaustedResource(t *testing.T) {
 				Status: storage.VolumeAttachmentStatus{
 					AttachError: &storage.VolumeError{
 						Message:   "volume attachment limit exceeded",
-						ErrorCode: ptr.To(int32(codes.ResourceExhausted)),
+						ErrorCode: new(int32(codes.ResourceExhausted)),
 					},
 				},
 			}
 			client := fakeclient.NewSimpleClientset(csiDriver, attachment)
 			plug, tmpDir := newTestPlugin(t, client)
-			defer os.RemoveAll(tmpDir)
+			t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
 
 			err := PluginHandler.RegisterPlugin(t.Context(), testDriver, "endpoint", []string{"1.0.0"}, nil)
 			if err != nil {
