@@ -53,39 +53,6 @@ https://github.com/kubernetes-csi/csi-driver-host-path/tree/$hostpath_version/de
 Do not edit manually. Run $script to refresh the content.
 EOF
 cp -r csi-driver-host-path/deploy/kubernetes-latest/hostpath hostpath/
-cat >hostpath/hostpath/e2e-test-rbac.yaml <<EOF
-# privileged Pod Security Policy, previously defined just for gcePD via PrivilegedTestPSPClusterRoleBinding()
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: psp-csi-hostpath-role
-subjects:
-  # This list of ServiceAccount intentionally covers everything that might
-  # be needed. In practice, only some of these accounts are actually
-  # used.
-  - kind: ServiceAccount
-    name: csi-attacher
-    namespace: default
-  - kind: ServiceAccount
-    name: csi-provisioner
-    namespace: default
-  - kind: ServiceAccount
-    name: csi-snapshotter
-    namespace: default
-  - kind: ServiceAccount
-    name: csi-resizer
-    namespace: default
-  - kind: ServiceAccount
-    name: csi-external-health-monitor-controller
-    namespace: default
-  - kind: ServiceAccount
-    name: csi-hostpathplugin-sa
-    namespace: default
-roleRef:
-  kind: ClusterRole
-  name: e2e-test-privileged-psp
-  apiGroup: rbac.authorization.k8s.io
-EOF
 
 download () {
     project="$1"
