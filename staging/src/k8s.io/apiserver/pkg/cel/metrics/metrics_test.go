@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics"
 )
 
 func TestObserveCompilation(t *testing.T) {
-	defer legacyregistry.Reset()
-	Metrics.ObserveCompilation(2 * time.Second)
-	c, s := gatherHistogram(t, "apiserver_cel_compilation_duration_seconds")
+	m, registry := newTestCelMetrics()
+	m.ObserveCompilation(2 * time.Second)
+	c, s := gatherHistogram(t, registry, "apiserver_cel_compilation_duration_seconds")
 	if c != 1 {
 		t.Errorf("unexpected count: %v", c)
 	}
@@ -37,9 +37,9 @@ func TestObserveCompilation(t *testing.T) {
 }
 
 func TestObserveEvaluation(t *testing.T) {
-	defer legacyregistry.Reset()
-	Metrics.ObserveEvaluation(2 * time.Second)
-	c, s := gatherHistogram(t, "apiserver_cel_evaluation_duration_seconds")
+	m, registry := newTestCelMetrics()
+	m.ObserveEvaluation(2 * time.Second)
+	c, s := gatherHistogram(t, registry, "apiserver_cel_evaluation_duration_seconds")
 	if c != 1 {
 		t.Errorf("unexpected count: %v", c)
 	}
@@ -48,12 +48,19 @@ func TestObserveEvaluation(t *testing.T) {
 	}
 }
 
-func gatherHistogram(t *testing.T, name string) (count uint64, sum float64) {
-	metrics, err := legacyregistry.DefaultGatherer.Gather()
+// newTestCelMetrics returns metrics registered only with the returned registry,
+// so each test observes into histograms nothing else has touched.
+func newTestCelMetrics() (*CelMetrics, metrics.KubeRegistry) {
+	registry := metrics.NewKubeRegistry()
+	return newCelMetrics(registry.MustRegister), registry
+}
+
+func gatherHistogram(t *testing.T, gatherer metrics.Gatherer, name string) (count uint64, sum float64) {
+	metricFamilies, err := gatherer.Gather()
 	if err != nil {
 		t.Fatalf("Failed to gather metrics: %s", err)
 	}
-	for _, mf := range metrics {
+	for _, mf := range metricFamilies {
 		if mf.GetName() == name {
 			for _, m := range mf.GetMetric() {
 				h := m.GetHistogram()
