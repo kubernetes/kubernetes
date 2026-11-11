@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -55,6 +56,155 @@ func TestNormalizationFuncGlobalExistence(t *testing.T) {
 	// In case of failure of this test check this PR: spf13/cobra#110
 	if reflect.ValueOf(sub.Flags().GetNormalizeFunc()).Pointer() != reflect.ValueOf(root.Flags().GetNormalizeFunc()).Pointer() {
 		t.Fatal("child and root commands should have the same normalization functions")
+	}
+}
+
+func TestKubercArgumentBoundaries(t *testing.T) {
+	t.Setenv("KUBECTL_KUBERC", "true")
+	t.Setenv("KUBERC", "")
+
+	tests := []struct {
+		name        string
+		command     string
+		args        []string
+		flag        string
+		defaultVal  string
+		expectedVal string
+		explicit    bool
+	}{
+		{
+			name:        "output default with attached namespace",
+			command:     "get",
+			args:        []string{"pods", "-nproduction"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "yaml",
+		},
+		{
+			name:        "interactive default with attached namespace",
+			command:     "delete",
+			args:        []string{"pod", "web-0", "-nproduction"},
+			flag:        "interactive",
+			defaultVal:  "true",
+			expectedVal: "true",
+		},
+		{
+			name:        "remote combined short options",
+			command:     "exec",
+			args:        []string{"web-0", "--", "curl", "-ic/tmp/cookies", "https://example.invalid"},
+			flag:        "container",
+			defaultVal:  "app",
+			expectedVal: "app",
+		},
+		{
+			name:        "remote separate short option",
+			command:     "exec",
+			args:        []string{"web-0", "--", "sh", "-c", "echo ready"},
+			flag:        "container",
+			defaultVal:  "app",
+			expectedVal: "app",
+		},
+		{
+			name:        "remote long option",
+			command:     "exec",
+			args:        []string{"web-0", "--", "echo", "--container=sidecar"},
+			flag:        "container",
+			defaultVal:  "app",
+			expectedVal: "app",
+		},
+		{
+			name:        "explicit container before remote command",
+			command:     "exec",
+			args:        []string{"web-0", "-csidecar", "--", "sh", "-c", "echo ready"},
+			flag:        "container",
+			defaultVal:  "app",
+			expectedVal: "sidecar",
+			explicit:    true,
+		},
+		{
+			name:        "separator consumed as long option value",
+			command:     "get",
+			args:        []string{"pods", "--template", "--", "-ojson"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "json",
+			explicit:    true,
+		},
+		{
+			name:        "separator consumed as short option value",
+			command:     "get",
+			args:        []string{"-f", "--", "-ojson"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "json",
+			explicit:    true,
+		},
+		{
+			name:        "separator consumed after combined short options",
+			command:     "get",
+			args:        []string{"-wf", "--", "-ojson"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "json",
+			explicit:    true,
+		},
+		{
+			name:        "long option inside a separate value",
+			command:     "create configmap",
+			args:        []string{"cm", "--from-literal", "--output=json", "--dry-run=client"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "yaml",
+		},
+		{
+			name:        "short option inside a separate value",
+			command:     "get",
+			args:        []string{"-f", "-ojson"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "yaml",
+		},
+	}
+	for _, mode := range []string{"defaults", "aliases"} {
+		t.Run(mode, func(t *testing.T) {
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					entry := fmt.Sprintf("command: %q\n    options:\n      - name: %s\n        default: %q\n", test.command, test.flag, test.defaultVal)
+					preference := "apiVersion: kubectl.config.k8s.io/v1\nkind: Preference\ndefaults:\n  - " + entry
+					commandName := test.command
+					if mode == "aliases" {
+						commandName = "testalias"
+						preference = "apiVersion: kubectl.config.k8s.io/v1\nkind: Preference\naliases:\n  - name: testalias\n    " + entry
+					}
+					kubercPath := filepath.Join(t.TempDir(), "kuberc")
+					if err := os.WriteFile(kubercPath, []byte(preference), 0600); err != nil {
+						t.Fatal(err)
+					}
+					args := append([]string{"kubectl", "--kuberc=" + kubercPath}, strings.Fields(commandName)...)
+					args = append(args, test.args...)
+					ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+					root := NewKubectlCommand(KubectlOptions{Arguments: args, IOStreams: ioStreams})
+					cmd, commandArgs, err := root.Find(args[1:])
+					if err != nil {
+						t.Fatal(err)
+					}
+					flag := cmd.Flag(test.flag)
+					expectedBeforeParse := test.defaultVal
+					if test.explicit {
+						expectedBeforeParse = flag.DefValue
+					}
+					if got := flag.Value.String(); got != expectedBeforeParse {
+						t.Fatalf("before parsing, expected %s=%q, got %q", test.flag, expectedBeforeParse, got)
+					}
+					if err := cmd.ParseFlags(commandArgs); err != nil {
+						t.Fatal(err)
+					}
+					if got := flag.Value.String(); got != test.expectedVal {
+						t.Fatalf("after parsing, expected %s=%q, got %q", test.flag, test.expectedVal, got)
+					}
+				})
+			}
+		})
 	}
 }
 

@@ -48,7 +48,6 @@ var (
 	RecommendedKubeRCFile = filepath.Join(RecommendedConfigDir, RecommendedKubeRCFileName)
 
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
-	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
 )
 
 // compile-time check that these two types are aligned
@@ -190,19 +189,12 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 		// This function triggers merging the persistent flags in the parent commands.
 		_ = cmd.InheritedFlags()
 
-		allShorthands := make(map[string]struct{})
-		cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-			if flag.Shorthand != "" {
-				allShorthands[flag.Shorthand] = struct{}{}
-			}
-		})
-
 		for _, fl := range c.Options {
 			existingFlag := cmd.Flag(fl.Name)
 			if existingFlag == nil {
 				return fmt.Errorf("invalid flag %s for command %s", fl.Name, c.Command)
 			}
-			if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
+			if searchInArgs(existingFlag.Name, cmd.Flags(), args) {
 				// Don't modify the value implicitly, if it is passed in args explicitly
 				continue
 			}
@@ -296,19 +288,12 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		// This function triggers merging the persistent flags in the parent commands.
 		_ = foundAliasCmd.InheritedFlags()
 
-		allShorthands := make(map[string]struct{})
-		foundAliasCmd.Flags().VisitAll(func(flag *pflag.Flag) {
-			if flag.Shorthand != "" {
-				allShorthands[flag.Shorthand] = struct{}{}
-			}
-		})
-
 		for _, fl := range aliasArgs.flags {
 			existingFlag := foundAliasCmd.Flag(fl.Name)
 			if existingFlag == nil {
 				return args, fmt.Errorf("invalid alias flag %s in alias %s", fl.Name, alias.Name)
 			}
-			if searchInArgs(existingFlag.Name, existingFlag.Shorthand, allShorthands, args) {
+			if searchInArgs(existingFlag.Name, foundAliasCmd.Flags(), args) {
 				// Don't modify the value implicitly, if it is passed in args explicitly
 				continue
 			}
@@ -457,46 +442,50 @@ func getExplicitKuberc(args []string) (string, error) {
 
 // searchInArgs searches the given key in the args and returns
 // true, if it finds. Otherwise, it returns false.
-func searchInArgs(flagName string, shorthand string, allShorthands map[string]struct{}, args []string) bool {
-	for _, arg := range args {
-		// if flag is set in args in "--flag value" or "--flag=value" format,
-		// we should return it as found
-		if fmt.Sprintf("--%s", flagName) == arg || strings.HasPrefix(arg, fmt.Sprintf("--%s=", flagName)) {
-			return true
+func searchInArgs(flagName string, flags *pflag.FlagSet, args []string) bool {
+	// Consume flag values before interpreting "--" as the end of flags.
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			break
 		}
-		if shorthand == "" {
+		if strings.HasPrefix(arg, "--") {
+			name, _, assigned := strings.Cut(arg[2:], "=")
+			flag := flags.Lookup(name)
+			if flag == nil {
+				continue
+			}
+			if flag.Name == flagName {
+				return true
+			}
+			if !assigned && flag.NoOptDefVal == "" {
+				i++
+			}
 			continue
 		}
-		// shorthand can be in "-n value" or "-nvalue" format
-		// it is guaranteed that shorthand is one letter. So that
-		// checking just the prefix -oyaml also finds --output.
-		if strings.HasPrefix(arg, fmt.Sprintf("-%s", shorthand)) {
-			return true
-		}
-
-		if !shortHandRegex.MatchString(arg) {
+		if !strings.HasPrefix(arg, "-") {
 			continue
 		}
 
-		// remove prefix "-"
 		arg = arg[1:]
-		// short hands can be in a combined "-abc" format.
-		// First we need to ensure that all the values are shorthand to safely search ours.
-		// Because we know that "-abcvalue" is not valid. So that we need to be sure that if we find
-		// "b" it correctly refers to the shorthand "b" not arbitrary value "-cargb".
-		arbitraryFound := false
-		for _, runeValue := range shorthand {
-			if _, ok := allShorthands[string(runeValue)]; !ok {
-				arbitraryFound = true
+		for len(arg) > 0 {
+			flag := flags.ShorthandLookup(arg[:1])
+			if flag == nil {
 				break
 			}
-		}
-		if arbitraryFound {
-			continue
-		}
-		// verified that all values are short hand. Now search ours
-		if strings.Contains(arg, shorthand) {
-			return true
+			if flag.Name == flagName {
+				return true
+			}
+			arg = arg[1:]
+			if strings.HasPrefix(arg, "=") {
+				break
+			}
+			if flag.NoOptDefVal == "" {
+				if len(arg) == 0 {
+					i++
+				}
+				break
+			}
 		}
 	}
 	return false

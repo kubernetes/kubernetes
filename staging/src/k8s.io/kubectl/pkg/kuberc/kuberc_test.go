@@ -912,6 +912,136 @@ func TestApplyOverride(t *testing.T) {
 	}
 }
 
+func TestApplyShorthandValues(t *testing.T) {
+	tests := []struct {
+		name        string
+		command     string
+		args        []string
+		flag        string
+		defaultVal  string
+		expectedVal string
+		explicit    bool
+	}{
+		{
+			name:        "output default with attached namespace",
+			command:     "get",
+			args:        []string{"pods", "-nproduction"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "yaml",
+		},
+		{
+			name:        "namespace value containing only registered shorthands",
+			command:     "get",
+			args:        []string{"pods", "-nnon"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "yaml",
+		},
+		{
+			name:        "combined boolean and attached namespace",
+			command:     "get",
+			args:        []string{"pods", "-wnproduction"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "yaml",
+		},
+		{
+			name:        "combined boolean and explicit output",
+			command:     "get",
+			args:        []string{"pods", "-wojson"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "json",
+			explicit:    true,
+		},
+		{
+			name:        "combined boolean and output with punctuation",
+			command:     "get",
+			args:        []string{"pods", "-wojsonpath={.items}"},
+			flag:        "output",
+			defaultVal:  "yaml",
+			expectedVal: "jsonpath={.items}",
+			explicit:    true,
+		},
+		{
+			name:        "interactive default with attached namespace",
+			command:     "delete",
+			args:        []string{"pod", "web-0", "-nproduction"},
+			flag:        "interactive",
+			defaultVal:  "true",
+			expectedVal: "true",
+		},
+		{
+			name:        "combined booleans before attached namespace",
+			command:     "delete",
+			args:        []string{"pod", "web-0", "-Rinproduction"},
+			flag:        "interactive",
+			defaultVal:  "false",
+			expectedVal: "true",
+			explicit:    true,
+		},
+		{
+			name:        "explicit false in combined booleans",
+			command:     "delete",
+			args:        []string{"pod", "web-0", "-Ri=false", "-nproduction"},
+			flag:        "interactive",
+			defaultVal:  "true",
+			expectedVal: "false",
+			explicit:    true,
+		},
+	}
+	for _, mode := range []string{"defaults", "aliases"} {
+		t.Run(mode, func(t *testing.T) {
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					rootCmd := &cobra.Command{Use: "kubectl"}
+					rootCmd.PersistentFlags().StringP("namespace", "n", "", "")
+					cmd := &cobra.Command{Use: test.command}
+					if test.command == "get" {
+						cmd.Flags().BoolP("watch", "w", false, "")
+						cmd.Flags().StringP("output", "o", "", "")
+					} else {
+						cmd.Flags().BoolP("recursive", "R", false, "")
+						cmd.Flags().BoolP("interactive", "i", false, "")
+					}
+					rootCmd.AddCommand(cmd)
+					expectedBeforeParse := test.defaultVal
+					if test.explicit {
+						expectedBeforeParse = cmd.Flag(test.flag).Value.String()
+					}
+
+					options := []config.CommandOptionDefault{{Name: test.flag, Default: test.defaultVal}}
+					preference := &config.Preference{}
+					commandName := test.command
+					if mode == "defaults" {
+						preference.Defaults = []config.CommandDefaults{{Command: test.command, Options: options}}
+					} else {
+						commandName = "alias"
+						preference.Aliases = []config.AliasOverride{{Name: commandName, Command: test.command, Options: options}}
+					}
+					pref := NewPreferences().(*Preferences)
+					pref.AddFlags(rootCmd.PersistentFlags())
+					pref.getPreferencesFunc = func(string, io.Writer) (*config.Preference, error) {
+						return preference, nil
+					}
+
+					args := append([]string{"kubectl", commandName}, test.args...)
+					errWriter := &bytes.Buffer{}
+					args, err := pref.Apply(rootCmd, genericclioptions.NewConfigFlags(false), args, errWriter)
+					require.NoError(t, err)
+					require.Empty(t, errWriter.String())
+					actualCmd, _, err := rootCmd.Find(args[1:])
+					require.NoError(t, err)
+					require.Equal(t, expectedBeforeParse, actualCmd.Flag(test.flag).Value.String())
+					require.NoError(t, actualCmd.ParseFlags(args[1:]))
+					require.Equal(t, test.expectedVal, actualCmd.Flag(test.flag).Value.String())
+				})
+			}
+		})
+	}
+}
+
 func TestApplyOverrideBool(t *testing.T) {
 	tests := []testApplyOverride[bool]{
 		{
