@@ -1231,6 +1231,132 @@ func TestHandleMemExceeded(t *testing.T) {
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
 }
 
+func TestSortPodsForAdmission(t *testing.T) {
+	baseTime := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	type testPod struct {
+		name      string
+		created   int // seconds after baseTime
+		allocated bool
+	}
+	testCases := []struct {
+		name          string
+		pods          []testPod
+		expectedOrder []string
+	}{
+		{
+			name: "only new pods are sorted by creation time",
+			pods: []testPod{
+				{name: "new-2", created: 2},
+				{name: "new-0", created: 0},
+				{name: "new-1", created: 1},
+			},
+			expectedOrder: []string{"new-0", "new-1", "new-2"},
+		},
+		{
+			name: "only allocated pods are sorted by creation time",
+			pods: []testPod{
+				{name: "allocated-1", created: 1, allocated: true},
+				{name: "allocated-0", created: 0, allocated: true},
+			},
+			expectedOrder: []string{"allocated-0", "allocated-1"},
+		},
+		{
+			name: "allocated pod goes before an older new pod",
+			pods: []testPod{
+				{name: "new-0", created: 0},
+				{name: "allocated-1", created: 1, allocated: true},
+			},
+			expectedOrder: []string{"allocated-1", "new-0"},
+		},
+		{
+			name: "allocated pods go first, each group by creation time",
+			pods: []testPod{
+				{name: "allocated-2", created: 2, allocated: true},
+				{name: "new-3", created: 3},
+				{name: "new-0", created: 0},
+				{name: "allocated-1", created: 1, allocated: true},
+			},
+			expectedOrder: []string{"allocated-1", "allocated-2", "new-0", "new-3"},
+		},
+		{
+			name: "pods with the same creation time are sorted by UID",
+			pods: []testPod{
+				{name: "new-b", created: 0},
+				{name: "new-a", created: 0},
+				{name: "allocated-b", created: 0, allocated: true},
+				{name: "allocated-a", created: 0, allocated: true},
+			},
+			expectedOrder: []string{"allocated-a", "allocated-b", "new-a", "new-b"},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			allocated := sets.New[types.UID]()
+			var pods []*v1.Pod
+			for _, p := range tc.pods {
+				pod := podWithUIDNameNs(types.UID(p.name), p.name, "foo")
+				pod.CreationTimestamp = metav1.NewTime(baseTime.Add(time.Duration(p.created) * time.Second))
+				if p.allocated {
+					allocated.Insert(pod.UID)
+				}
+				pods = append(pods, pod)
+			}
+
+			sortPodsForAdmission(pods, allocated.Has)
+
+			var order []string
+			for _, pod := range pods {
+				order = append(order, pod.Name)
+			}
+			assert.Equal(t, tc.expectedOrder, order)
+		})
+	}
+}
+
+// Tests that a pod with allocated resources (e.g. admitted before a kubelet restart)
+// is admitted before an older new pod, so the new pod cannot take its resources.
+func TestHandlePodAdditionsAdmitsAllocatedPodsFirst(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(10, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(100, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+			}}},
+	}
+	kl.nodeLister = testNodeLister{nodes: nodes}
+
+	kl.dnsConfigurer = createDNSConfigurer()
+
+	spec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("90"),
+			},
+		}}},
+	}
+	newPod := podWithUIDNameNsSpec("123456789", "newpod", "foo", spec)
+	allocatedPod := podWithUIDNameNsSpec("987654321", "allocatedpod", "foo", spec)
+	// The new pod is older than the allocated one, e.g. it waited long to be scheduled.
+	newPod.CreationTimestamp = metav1.NewTime(time.Now())
+	allocatedPod.CreationTimestamp = metav1.NewTime(time.Now().Add(1 * time.Second))
+	require.NoError(t, kl.allocationManager.SetAllocatedResources(logger, allocatedPod))
+	kl.podWorkers.(*fakePodWorkers).running = map[types.UID]bool{
+		newPod.UID:       true,
+		allocatedPod.UID: true,
+	}
+
+	kl.HandlePodAdditions(tCtx, []*v1.Pod{newPod, allocatedPod})
+
+	// The new pod should be rejected, even though it is older and comes first in the input.
+	checkPodStatus(t, kl, newPod, v1.PodFailed)
+	checkPodStatus(t, kl, allocatedPod, v1.PodPending)
+}
+
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
