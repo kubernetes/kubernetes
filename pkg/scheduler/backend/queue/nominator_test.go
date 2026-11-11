@@ -280,3 +280,101 @@ func TestNominationsInMemory(t *testing.T) {
 		}
 	}
 }
+
+// TestNominatedNodeName checks that with the DRAPreemption feature gate, the
+// nominated node of a pod is its nomination in memory, also while the pod
+// object doesn't show it yet. Without the gate, and for a pod of a pod group,
+// it is what the pod object shows. A pod with a scheduling group is only a
+// pod of a pod group with the GenericWorkload feature gate.
+func TestNominatedNodeName(t *testing.T) {
+	pod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).Obj()
+	podGroupPod := st.MakePod().Name("p").Namespace("ns").UID("p").Priority(highPriority).PodGroupName("pg").Obj()
+	for _, tc := range []struct {
+		name string
+		// pod defaults to a pod without a scheduling group.
+		pod *v1.Pod
+		// genericWorkload enables the GenericWorkload feature gate.
+		genericWorkload bool
+		// podNodeName is what the pod object shows.
+		podNodeName string
+		// added is true if the queue got the pod object from the informer.
+		added bool
+		// nominations is what the scheduler set in memory, in this order.
+		nominations []string
+		// want and wantWithoutDRAPreemption are the nominated node of the pod.
+		want, wantWithoutDRAPreemption string
+	}{
+		{name: "not-nominated"},
+		{
+			name:                     "nominated-through-api",
+			podNodeName:              "node1",
+			added:                    true,
+			want:                     "node1",
+			wantWithoutDRAPreemption: "node1",
+		},
+		{
+			name:        "nominated-with-stale-pod-object",
+			nominations: []string{"node1"},
+			want:        "node1",
+		},
+		{
+			name:                     "nominated-elsewhere-with-stale-pod-object",
+			nominations:              []string{"node1", "node2"},
+			podNodeName:              "node1",
+			want:                     "node2",
+			wantWithoutDRAPreemption: "node1",
+		},
+		{
+			name:                     "cleared-with-stale-pod-object",
+			nominations:              []string{"node1", ""},
+			podNodeName:              "node1",
+			wantWithoutDRAPreemption: "node1",
+		},
+		{
+			name:                     "pod-group-pod-nominated-elsewhere-with-stale-pod-object",
+			pod:                      podGroupPod,
+			genericWorkload:          true,
+			nominations:              []string{"node1", "node2"},
+			podNodeName:              "node1",
+			want:                     "node1",
+			wantWithoutDRAPreemption: "node1",
+		},
+		// Without GenericWorkload, the pod gets scheduled like any other pod.
+		{
+			name:                     "scheduling-group-without-GenericWorkload-nominated-elsewhere-with-stale-pod-object",
+			pod:                      podGroupPod,
+			nominations:              []string{"node1", "node2"},
+			podNodeName:              "node1",
+			want:                     "node2",
+			wantWithoutDRAPreemption: "node1",
+		},
+	} {
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", tc.name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAPreemption:   draPreemption,
+					features.GenericWorkload: tc.genericWorkload,
+				})
+				logger, ctx := ktesting.NewTestContext(t)
+				pod := pod
+				if tc.pod != nil {
+					pod = tc.pod
+				}
+				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod})
+				if tc.added {
+					q.Add(ctx, withNominatedNodeName(pod, tc.podNodeName))
+				}
+				for _, nodeName := range tc.nominations {
+					q.AddNominatedPod(logger, mustNewTestPodInfo(t, pod), overrideNomination(nodeName))
+				}
+				want := tc.want
+				if !draPreemption {
+					want = tc.wantWithoutDRAPreemption
+				}
+				if nodeName := q.NominatedNodeName(withNominatedNodeName(pod, tc.podNodeName)); nodeName != want {
+					t.Errorf("Nominated node %q, want %q", nodeName, want)
+				}
+			})
+		}
+	}
+}

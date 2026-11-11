@@ -179,10 +179,26 @@ type RankNodesPlugin interface {
 	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
 }
 
+// NominatedNodeNameGetter provides the nominated node of a pod as the
+// PodNominator knows it. The scheduling queue implements it as the
+// PodNominator of kube-scheduler, and Framework implements it by delegating
+// to its PodNominator.
+//
+// The interface is internal to kube-scheduler.
+type NominatedNodeNameGetter interface {
+	// NominatedNodeName returns the node that pod is nominated to. If the
+	// DRAPreemption feature gate is enabled and pod is not a pod of a pod
+	// group, it returns the nomination in the PodNominator, which the
+	// scheduler sets or clears before it patches the pod. Otherwise it
+	// returns pod.Status.NominatedNodeName.
+	NominatedNodeName(pod *v1.Pod) string
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	fwk.Handle
+	NominatedNodeNameGetter
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []fwk.PreEnqueuePlugin

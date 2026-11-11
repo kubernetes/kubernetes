@@ -459,7 +459,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 	}
 
 	nodeInfos := pl.fh.MutableSnapshotSharedLister().NodeInfos()
-	nomNodeName := pod.Status.NominatedNodeName
+	nomNodeName := preemption.NominatedNodeName(pl.fh, pod)
 	isResize := pl.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resourcehelper.IsPodResizeDeferred(pod)
 	targetNodeName := nomNodeName
 	if isResize {

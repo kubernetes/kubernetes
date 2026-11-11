@@ -398,6 +398,7 @@ var defaultPriorityQueueOptions = priorityQueueOptions{
 
 // Making sure that PriorityQueue implements SchedulingQueue.
 var _ SchedulingQueue = &PriorityQueue{}
+var _ framework.NominatedNodeNameGetter = &PriorityQueue{}
 
 // newQueuedPodInfoForLookup builds a QueuedPodInfo object for a lookup in the queue.
 func newQueuedPodInfoForLookup(pod *v1.Pod, plugins ...string) *framework.QueuedPodInfo {
