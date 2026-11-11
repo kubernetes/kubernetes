@@ -27,24 +27,82 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// fakeUpdateStrategy validates ObjectMeta itself, as in-tree strategies do.
 type fakeUpdateStrategy struct {
 	RESTUpdateStrategy
+	// validateMeta mimics in-tree strategies, which validate ObjectMeta themselves.
+	validateMeta bool
 }
 
-func (fakeUpdateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return genericvalidation.ValidateObjectMetaAccessorUpdate(obj.(metav1.Object), old.(metav1.Object), field.NewPath("metadata"))
+func (s fakeUpdateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	var errs field.ErrorList
+	if s.validateMeta {
+		errs = genericvalidation.ValidateObjectMetaAccessorUpdate(obj.(metav1.Object), old.(metav1.Object), field.NewPath("metadata"))
+	}
+	if _, ok := obj.(*v1.ConfigMap).Data["invalid"]; ok {
+		errs = append(errs, field.Invalid(field.NewPath("data"), "invalid", "spec-level error"))
+	}
+	return errs
 }
 
 func (fakeUpdateStrategy) NamespaceScoped() bool { return true }
 
-func TestValidateUpdateReportsMetadataErrorsOnce(t *testing.T) {
-	oldObj := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm", Namespace: "default", ResourceVersion: "1"}}
-	newObj := oldObj.DeepCopy()
-	newObj.Annotations = map[string]string{"invalid@key": "value"}
+func TestValidateUpdate(t *testing.T) {
+	invalidAnnotation := func(cm *v1.ConfigMap) { cm.Annotations = map[string]string{"invalid@key": "value"} }
+	invalidData := func(cm *v1.ConfigMap) { cm.Data = map[string]string{"invalid": ""} }
 
-	errs := ValidateUpdate(context.Background(), newObj, oldObj, fakeUpdateStrategy{})
-	if len(errs) != 1 {
-		t.Errorf("expected the invalid annotation to be reported once, got %d errors: %v", len(errs), errs)
+	tests := []struct {
+		name         string
+		validateMeta bool
+		mutate       []func(*v1.ConfigMap)
+		wantFields   []string
+	}{
+		{
+			name:         "valid update",
+			validateMeta: true,
+		},
+		{
+			name:         "invalid annotation reported once",
+			validateMeta: true,
+			mutate:       []func(*v1.ConfigMap){invalidAnnotation},
+			wantFields:   []string{"metadata.annotations"},
+		},
+		{
+			name:         "invalid data only",
+			validateMeta: true,
+			mutate:       []func(*v1.ConfigMap){invalidData},
+			wantFields:   []string{"data"},
+		},
+		{
+			name:         "invalid annotation and data both reported once",
+			validateMeta: true,
+			mutate:       []func(*v1.ConfigMap){invalidAnnotation, invalidData},
+			wantFields:   []string{"metadata.annotations", "data"},
+		},
+		{
+			// Matches ValidateCreate: common checks are skipped once the strategy has rejected the object.
+			name:       "strategy errors short-circuit common checks",
+			mutate:     []func(*v1.ConfigMap){invalidAnnotation, invalidData},
+			wantFields: []string{"data"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			oldObj := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm", Namespace: "default", ResourceVersion: "1"}}
+			newObj := oldObj.DeepCopy()
+			for _, m := range tc.mutate {
+				m(newObj)
+			}
+
+			errs := ValidateUpdate(context.Background(), newObj, oldObj, fakeUpdateStrategy{validateMeta: tc.validateMeta})
+			if len(errs) != len(tc.wantFields) {
+				t.Fatalf("expected %d errors for %v, got %d: %v", len(tc.wantFields), tc.wantFields, len(errs), errs)
+			}
+			for i, want := range tc.wantFields {
+				if errs[i].Field != want {
+					t.Errorf("error %d: expected field %q, got %q (%v)", i, want, errs[i].Field, errs[i])
+				}
+			}
+		})
 	}
 }
