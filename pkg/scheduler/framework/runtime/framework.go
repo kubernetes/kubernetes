@@ -376,6 +376,7 @@ func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 }
 
 var _ framework.Framework = &frameworkImpl{}
+var _ framework.NominatedNodeNameGetter = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
 //
@@ -669,6 +670,16 @@ func pluginsForPod[T fwk.Plugin](f *frameworkImpl, pod *v1.Pod, all, resize []T)
 
 func (f *frameworkImpl) SetPodNominator(n fwk.PodNominator) {
 	f.PodNominator = n
+}
+
+// NominatedNodeName implements framework.NominatedNodeNameGetter by delegating
+// to the PodNominator. It falls back to pod.Status.NominatedNodeName if the
+// PodNominator does not implement framework.NominatedNodeNameGetter.
+func (f *frameworkImpl) NominatedNodeName(pod *v1.Pod) string {
+	if nominator, ok := f.PodNominator.(framework.NominatedNodeNameGetter); ok {
+		return nominator.NominatedNodeName(pod)
+	}
+	return pod.Status.NominatedNodeName
 }
 
 func (f *frameworkImpl) SetPodActivator(a fwk.PodActivator) {

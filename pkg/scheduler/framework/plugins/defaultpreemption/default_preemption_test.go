@@ -3425,6 +3425,181 @@ func TestPreempt(t *testing.T) {
 	}
 }
 
+// TestPreemptNominatedInMemory checks that with the DRAPreemption feature
+// gate, preemption treats a pod as nominated to the node which the scheduler
+// nominated it to in memory, whatever the informer shows: the pod must not
+// preempt again while its victims are terminating on that node, but may
+// preempt once the scheduler cleared that nomination. Without the gate, only
+// the pod object counts.
+func TestPreemptNominatedInMemory(t *testing.T) {
+	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).
+		Terminating().Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()
+	const notEligible = "not eligible due to a terminating pod on the nominated node."
+
+	for _, tc := range []struct {
+		name          string
+		draPreemption bool
+		// podNominatedNodeName is what the informer shows for the preemptor.
+		podNominatedNodeName string
+		// nominations is what the scheduler set in memory, in this order.
+		nominations []string
+		// wantMessage is why the pod must not preempt, empty if it may.
+		wantMessage string
+	}{
+		{
+			name:          "nominated-in-memory",
+			draPreemption: true,
+			nominations:   []string{"node1"},
+			wantMessage:   notEligible,
+		},
+		{
+			name:        "nominated-in-memory-without-DRAPreemption",
+			nominations: []string{"node1"},
+		},
+		{
+			name:                 "cleared-in-memory",
+			draPreemption:        true,
+			podNominatedNodeName: "node1",
+			nominations:          []string{"node1", ""},
+		},
+		{
+			name:                 "cleared-in-memory-without-DRAPreemption",
+			podNominatedNodeName: "node1",
+			nominations:          []string{"node1", ""},
+			wantMessage:          notEligible,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: false,
+				features.DRAPreemption:            tc.draPreemption,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).
+				NominatedNodeName(tc.podNominatedNodeName).Obj()
+			test := newPreemptOnNodeTest(ctx, t, clientsetfake.NewClientset(victim.DeepCopy()), preemptor, victim)
+			preemptorInfo, err := framework.NewPodInfo(preemptor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, nodeName := range tc.nominations {
+				test.queue.AddNominatedPod(logger, preemptorInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nodeName})
+			}
+
+			_, status := test.plugin.Evaluator.Preempt(ctx, test.cycleState, preemptor, test.nodeToStatus)
+			if tc.wantMessage == "" {
+				if !status.IsSuccess() {
+					t.Errorf("Unexpected preemption status: %v", status)
+				}
+			} else if status.Code() != fwk.Unschedulable || status.Message() != tc.wantMessage {
+				t.Errorf("Unexpected preemption status: %v, want Unschedulable with %q", status, tc.wantMessage)
+			}
+		})
+	}
+}
+
+// preemptOnNodeTest is what a test needs to let a pod preempt on a single
+// node through DefaultPreemption.
+type preemptOnNodeTest struct {
+	plugin *DefaultPreemption
+	// queue is the PodNominator of the framework.
+	queue internalqueue.SchedulingQueue
+	// cycleState is the CycleState of the preemptor after PreFilter.
+	cycleState fwk.CycleState
+	// nodeToStatus reports the node as Unschedulable.
+	nodeToStatus *framework.NodeToStatus
+}
+
+// newPreemptOnNodeTest returns DefaultPreemption for preemptor in a cluster
+// with node1, which runs victim. Both pods are in the pod informer. Feature
+// gates must be set before calling it.
+func newPreemptOnNodeTest(ctx context.Context, t *testing.T, client *clientsetfake.Clientset, preemptor, victim *v1.Pod) *preemptOnNodeTest {
+	t.Helper()
+
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	podInformer := informerFactory.Core().V1().Pods().Informer()
+	for _, pod := range []*v1.Pod{preemptor, victim} {
+		if err := podInformer.GetStore().Add(pod.DeepCopy()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	node := st.MakeNode().Name("node1").Capacity(veryLargeRes).Obj()
+	snapshot := internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{node})
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		"",
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+		frameworkruntime.WithPodNominator(queue),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithMutableSnapshotLister(snapshot),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+		frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+		frameworkruntime.WithLogger(klog.FromContext(ctx)),
+		frameworkruntime.WithPodActivator(&fakePodActivator{}),
+		frameworkruntime.WithPreemptionManager(func(fh fwk.Handle) fwk.PreemptionManager {
+			return preemption.NewPreemptionManager(fh, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cycleState := framework.NewCycleState()
+	if _, s, _ := schedFramework.RunPreFilterPlugins(ctx, cycleState, preemptor); !s.IsSuccess() {
+		t.Fatalf("Unexpected PreFilter status: %v", s)
+	}
+	pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), schedFramework, feature.NewSchedulerFeaturesFromGates(utilfeature.DefaultFeatureGate))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeToStatus := framework.NewDefaultNodeToStatus()
+	nodeToStatus.Set(node.Name, fwk.NewStatus(fwk.Unschedulable))
+	return &preemptOnNodeTest{plugin: pl, queue: queue, cycleState: cycleState, nodeToStatus: nodeToStatus}
+}
+
+// TestPodEligibleToPreemptOthersNominatedInMemory checks that with the
+// DRAPreemption feature gate, PodEligibleToPreemptOthers uses the node that
+// the pod is nominated to in memory also when it is called directly with a
+// pod object that does not show the nomination.
+func TestPodEligibleToPreemptOthersNominatedInMemory(t *testing.T) {
+	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).
+		Terminating().Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()
+	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
+
+	for _, draPreemption := range []bool{false, true} {
+		t.Run(fmt.Sprintf("DRAPreemption=%v", draPreemption), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			test := newPreemptOnNodeTest(ctx, t, clientsetfake.NewClientset(victim.DeepCopy()), preemptor, victim)
+			preemptorInfo, err := framework.NewPodInfo(preemptor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.queue.AddNominatedPod(logger, preemptorInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+
+			// The victim of the earlier preemption is terminating on node1.
+			// Without the feature gate, the pod object has no nominated node.
+			eligible, _ := test.plugin.PodEligibleToPreemptOthers(ctx, preemptor, test.nodeToStatus.Get("node1"))
+			if eligible == draPreemption {
+				t.Errorf("Pod eligible to preempt: got %v, want %v", eligible, !draPreemption)
+			}
+		})
+	}
+}
+
 type fakePodActivator struct {
 }
 

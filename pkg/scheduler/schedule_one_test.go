@@ -5757,7 +5757,7 @@ func TestEvaluateNominatedNode(t *testing.T) {
 			}
 			initTestAlgorithm(t, sched)
 
-			gotNodes, err := sched.algorithm.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), "", &framework.Diagnosis{})
+			gotNodes, err := sched.algorithm.evaluateNominatedNode(ctx, tt.pod, fw, framework.NewCycleState(), tt.pod.Status.NominatedNodeName, "", &framework.Diagnosis{})
 
 			if (err != nil) != tt.wantError {
 				t.Errorf("Unexpected error, want error: %v, got: %v", tt.wantError, err)
@@ -6180,6 +6180,118 @@ func TestSchedulePodWithOpportunisticBatching(t *testing.T) {
 				t.Errorf("Unexpected EvaluatedNodes for pod2, want: %d, got: %d", tt.wantEvaluatedNodes, result.EvaluatedNodes)
 			}
 			sched.SchedulingQueue.Done(pod2.UID)
+		})
+	}
+}
+
+// TestSchedulePodNominatedInMemory checks that with the DRAPreemption feature
+// gate, SchedulePod tries the node that the pod is nominated to in memory
+// first, also when the pod object shows no or another nominated node. Without
+// the feature gate, it uses the nominated node of the pod object.
+func TestSchedulePodNominatedInMemory(t *testing.T) {
+	tests := []struct {
+		name          string
+		draPreemption bool
+		// podNominatedNodeName is what the pod object shows.
+		podNominatedNodeName string
+		// nominations is what the scheduler set in memory, in this order.
+		nominations []string
+		// wantHost is checked if not empty.
+		wantHost           string
+		wantEvaluatedNodes int
+	}{
+		{
+			name:               "nominated in memory, the pod object shows no nominated node",
+			draPreemption:      true,
+			nominations:        []string{"node2"},
+			wantHost:           "node2",
+			wantEvaluatedNodes: 1,
+		},
+		{
+			name:                 "nominated in memory, the pod object shows another nominated node",
+			draPreemption:        true,
+			podNominatedNodeName: "node1",
+			nominations:          []string{"node1", "node2"},
+			wantHost:             "node2",
+			wantEvaluatedNodes:   1,
+		},
+		{
+			name:                 "nomination cleared in memory, the pod object still shows it",
+			draPreemption:        true,
+			podNominatedNodeName: "node1",
+			nominations:          []string{"node1", ""},
+			wantEvaluatedNodes:   2,
+		},
+		{
+			name:                 "without DRAPreemption, the pod object counts",
+			podNominatedNodeName: "node1",
+			nominations:          []string{"node1", "node2"},
+			wantHost:             "node1",
+			wantEvaluatedNodes:   1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAPreemption: tt.draPreemption,
+				// Node hints would also replace the search through all nodes.
+				features.OpportunisticBatching: false,
+			})
+			logger, ctx := ktesting.NewTestContext(t)
+
+			nodes := []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			}
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+			schedFramework, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterPluginAsExtensions(noderesources.Name, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit), "PreFilter", "Filter", "Score"),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				}, "",
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(queue),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sched := &Scheduler{
+				Cache:            internalcache.New(ctx, nil, false, false),
+				nodeInfoSnapshot: snapshot,
+				SchedulingQueue:  queue,
+			}
+			initTestAlgorithm(t, sched)
+
+			pod := st.MakePod().Name("pod").UID("pod").Namespace(v1.NamespaceDefault).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).
+				NominatedNodeName(tt.podNominatedNodeName).Obj()
+			// The nominator only accepts pods which the pod lister knows.
+			if err := informerFactory.Core().V1().Pods().Informer().GetStore().Add(pod); err != nil {
+				t.Fatal(err)
+			}
+			podInfo, err := framework.NewPodInfo(pod)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, nodeName := range tt.nominations {
+				queue.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: nodeName})
+			}
+
+			result, err := sched.algorithm.SchedulePod(ctx, schedFramework, framework.NewCycleState(), &framework.QueuedPodInfo{PodInfo: podInfo})
+			if err != nil {
+				t.Fatalf("SchedulePod failed: %v", err)
+			}
+			if tt.wantHost != "" && result.SuggestedHost != tt.wantHost {
+				t.Errorf("Unexpected SuggestedHost, want: %s, got: %s", tt.wantHost, result.SuggestedHost)
+			}
+			if result.EvaluatedNodes != tt.wantEvaluatedNodes {
+				t.Errorf("Unexpected EvaluatedNodes, want: %d, got: %d", tt.wantEvaluatedNodes, result.EvaluatedNodes)
+			}
 		})
 	}
 }

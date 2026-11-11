@@ -114,6 +114,13 @@ func (ev *Evaluator) evaluate(ctx context.Context, state fwk.CycleState, pod *v1
 	if isResize && (pod.UID != evaluatedUID || !compresource.IsPodResizeDeferred(pod) || util.IsPodResizeSchedulerEvaluationCompleted(pod)) {
 		return nil, nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("pod resize on node %v is no longer deferred or already evaluated", pod.Spec.NodeName))
 	}
+	// If PodLister lags behind an in-memory nomination change, PodEligibleToPreemptOthers
+	// needs the in-memory node name so the pod does not preempt twice.
+	if nodeName := NominatedNodeName(ev.Handler, pod); nodeName != pod.Status.NominatedNodeName {
+		podCopy := *pod
+		podCopy.Status.NominatedNodeName = nodeName
+		pod = &podCopy
+	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
 	nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)

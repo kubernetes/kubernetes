@@ -222,6 +222,16 @@ func (npm *nominator) nominatedPodsForNode(nodeName string) []podRef {
 	return slices.Clone(npm.nominatedPods[nodeName])
 }
 
+// NominatedNodeName implements framework.NominatedNodeNameGetter.
+func (npm *nominator) NominatedNodeName(pod *v1.Pod) string {
+	if !npm.TracksNominationInMemory(pod) {
+		return nominatedNodeName(pod)
+	}
+	npm.nLock.RLock()
+	defer npm.nLock.RUnlock()
+	return npm.nominatedPodToNode[pod.UID]
+}
+
 // nominatedNodeName returns nominated node name of a Pod.
 func nominatedNodeName(pod *v1.Pod) string {
 	return pod.Status.NominatedNodeName
