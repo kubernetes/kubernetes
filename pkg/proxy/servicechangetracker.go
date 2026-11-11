@@ -115,6 +115,10 @@ type UpdateServiceMapResult struct {
 	// UpdatedServices lists the names of all services added/updated/deleted since the
 	// last Update.
 	UpdatedServices sets.Set[types.NamespacedName]
+	// UpdatedServicePorts lists every port, before and after the update, of each of
+	// UpdatedServices. A proxier can resync just these ports rather than every port in
+	// the ServicePortMap.
+	UpdatedServicePorts sets.Set[ServicePortName]
 	// DeletedServices holds all the ServicePorts removed since the last Update,
 	// either because their Service was deleted or because the port was removed
 	// from it. Callers can use this to clean up stale state (e.g. conntrack
@@ -126,10 +130,9 @@ type UpdateServiceMapResult struct {
 }
 
 // HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
-// for all Services in sm with non-zero HealthCheckNodePort.
+// for all Services in sm with non-zero HealthCheckNodePort. Use
+// UpdateHealthCheckNodePorts to keep the result current without rescanning sm.
 func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 {
-	// TODO: If this will appear to be computationally expensive, consider
-	// computing this incrementally similarly to svcPortMap.
 	ports := make(map[types.NamespacedName]uint16)
 	for svcPortName, info := range sm {
 		if info.HealthCheckNodePort() != 0 {
@@ -137,6 +140,20 @@ func (sm ServicePortMap) HealthCheckNodePorts() map[types.NamespacedName]uint16 
 		}
 	}
 	return ports
+}
+
+// UpdateHealthCheckNodePorts updates ports, as returned by HealthCheckNodePorts, for
+// the Services of svcPortNames. svcPortNames must contain every current port of those
+// Services, as UpdateServiceMapResult.UpdatedServicePorts does.
+func (sm ServicePortMap) UpdateHealthCheckNodePorts(ports map[types.NamespacedName]uint16, svcPortNames sets.Set[ServicePortName]) {
+	for svcPortName := range svcPortNames {
+		delete(ports, svcPortName.NamespacedName)
+	}
+	for svcPortName := range svcPortNames {
+		if info, ok := sm[svcPortName]; ok && info.HealthCheckNodePort() != 0 {
+			ports[svcPortName.NamespacedName] = uint16(info.HealthCheckNodePort())
+		}
+	}
 }
 
 // serviceToServiceMap translates a single Service object to a ServicePortMap.
@@ -179,8 +196,9 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 	defer sct.lock.Unlock()
 
 	result := UpdateServiceMapResult{
-		UpdatedServices: sets.New[types.NamespacedName](),
-		DeletedServices: ServicePortMap{},
+		UpdatedServices:     sets.New[types.NamespacedName](),
+		UpdatedServicePorts: sets.New[ServicePortName](),
+		DeletedServices:     ServicePortMap{},
 	}
 
 	for nn, change := range sct.items {
@@ -188,6 +206,12 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 			sct.processServiceMapChange(change.previous, change.current)
 		}
 		result.UpdatedServices.Insert(nn)
+		for svcPortName := range change.previous {
+			result.UpdatedServicePorts.Insert(svcPortName)
+		}
+		for svcPortName := range change.current {
+			result.UpdatedServicePorts.Insert(svcPortName)
+		}
 
 		sm.merge(change.current)
 		// filter out the Update event of current changes from previous changes
