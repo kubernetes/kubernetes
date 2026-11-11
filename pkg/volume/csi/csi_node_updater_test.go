@@ -206,6 +206,25 @@ func (f *testFixture) cleanup() {
 	close(f.stopCh)
 }
 
+func TestSyncDriverUpdaterNodeInfoFromController(t *testing.T) {
+	driver := createTestDriver(testDriverName, new(int64(10)))
+	f := setupTest(t, driver)
+	defer f.cleanup()
+
+	csiDrivers.Set(testDriverName, Driver{infoFromController: true})
+	defer unregisterTestDriver(testDriverName)
+
+	stopCh := make(chan struct{})
+	f.updater.driverUpdaters.Store(testDriverName, stopCh)
+
+	f.updater.syncDriverUpdater(testDriverName)
+
+	verifyUpdaterState(t, f.updater, testDriverName, false)
+	if !isChannelClosed(stopCh) {
+		t.Error("controller-managed driver must stop the node-side updater")
+	}
+}
+
 func createTestDriver(name string, updatePeriodSeconds *int64) *v1.CSIDriver {
 	return &v1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
