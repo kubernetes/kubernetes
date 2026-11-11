@@ -124,10 +124,17 @@ type SchedulingQueue interface {
 	// Pop removes the head of the queue and returns it. It blocks if the
 	// queue is empty and waits until a new item is added to the queue.
 	Pop(logger klog.Logger) (framework.QueuedEntityInfo, error)
-	// Done must be called for pod returned by Pop. This allows the queue to
+	// DropInFlightEvents must be called for a pod when it finishes waiting on permit (after WaitOnPermit).
+	// It stops accumulating in-flight cluster events for the pod, but keeps the pod tracked as in-flight
+	// until Done is called after binding or on failure.
+	DropInFlightEvents(types.UID)
+	// Done must be called for pod returned by Pop when processing finishes. This allows the queue to
 	// keep track of which pods are currently being processed.
 	Done(types.UID)
 	Update(ctx context.Context, oldPod, newPod *v1.Pod)
+	// UpdateIfPresent updates the pod in the queue or in-flight tracking if present,
+	// without adding it if it is not found.
+	UpdateIfPresent(ctx context.Context, oldPod, newPod *v1.Pod)
 	Delete(logger klog.Logger, pod *v1.Pod)
 	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
@@ -154,6 +161,7 @@ type SchedulingQueue interface {
 	GetPodGroup(name, namespace string) (*framework.QueuedPodGroupInfo, bool)
 	GetPod(ctx context.Context, name, namespace string, schedulingGroup *v1.PodSchedulingGroup) (*framework.QueuedPodInfo, bool)
 	PendingPods() ([]*v1.Pod, string)
+	InFlightPod(types.UID) *v1.Pod
 	InFlightPods() []*v1.Pod
 	PodsInActiveQ() []*v1.Pod
 	// PodsInBackoffQ returns all the Pods in the backoffQ.
@@ -1109,6 +1117,14 @@ func (p *PriorityQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pIn
 		}
 	}()
 
+	// Refresh the pod from inFlightPods if it was updated by an Update event while in-flight,
+	// preventing stale informer reads from overwriting concurrent updates.
+	if inFlightPod := p.activeQ.updatedInFlightPod(pInfo.Pod.UID); inFlightPod != nil {
+		// Ignore this err since apiserver doesn't properly validate affinity terms
+		// and we can't fix the validation for backwards compatibility.
+		pInfo.PodInfo, _ = framework.NewPodInfo(inFlightPod.DeepCopy())
+	}
+
 	pod := pInfo.Pod
 	if p.unschedulableEntities.get(pInfo) != nil {
 		return fmt.Errorf("Pod %v is already present in unschedulable queue", klog.KObj(pod))
@@ -1372,14 +1388,32 @@ func (p *PriorityQueue) Pop(logger klog.Logger) (framework.QueuedEntityInfo, err
 	return p.activeQ.pop(logger)
 }
 
-// Done must be called for pod returned by Pop. This allows the queue to
+// DropInFlightEvents must be called for a pod when it finishes waiting on permit (after WaitOnPermit).
+// It stops accumulating in-flight cluster events for the pod, but keeps the pod tracked as in-flight
+// until Done is called after binding or on failure.
+func (p *PriorityQueue) DropInFlightEvents(pod types.UID) {
+	p.activeQ.dropInFlightEvents(pod)
+}
+
+// Done must be called for pod returned by Pop when processing finishes. This allows the queue to
 // keep track of which pods are currently being processed.
 func (p *PriorityQueue) Done(pod types.UID) {
 	p.activeQ.done(pod)
 }
 
+// InFlightPod returns the *v1.Pod for the given UID if it is currently in flight, or nil otherwise.
+func (p *PriorityQueue) InFlightPod(uid types.UID) *v1.Pod {
+	return p.activeQ.inFlightPod(uid)
+}
+
 func (p *PriorityQueue) InFlightPods() []*v1.Pod {
 	return p.activeQ.listInFlightPods()
+}
+
+// UpdateIfPresent updates the pod in the queue or in-flight tracking if present,
+// without adding it if it is not found.
+func (p *PriorityQueue) UpdateIfPresent(ctx context.Context, oldPod, newPod *v1.Pod) {
+	p.update(ctx, oldPod, newPod, false /* addIfMissing */)
 }
 
 // Update updates a pod in the active or backoff queue if present. Otherwise, it removes
@@ -1387,6 +1421,12 @@ func (p *PriorityQueue) InFlightPods() []*v1.Pod {
 // become schedulable and adds the updated one to the active queue.
 // If pod is not present in any of the queues, it is added to the active queue.
 func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
+	p.update(ctx, oldPod, newPod, true /* addIfMissing */)
+}
+
+// update updates the pod in-flight or in its current queue. When addIfMissing is true,
+// an entity not found in any queue is added to activeQ (disabled for assumed pods via UpdateIfPresent).
+func (p *PriorityQueue) update(ctx context.Context, oldPod, newPod *v1.Pod, addIfMissing bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	logger := klog.FromContext(ctx)
@@ -1402,7 +1442,14 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			if pInfo := p.incompletePodGroupPods.update(newPod); pInfo != nil {
 				p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 				pInfo.PodSignature = p.signPod(ctx, newPod)
+				return
 			}
+			// A pod group member without a root can still be in-flight if its group was removed after Pop.
+			p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
+				if unlockedActiveQ.updateInFlightPod(oldPod, newPod, events) {
+					logger.V(6).Info("The pod doesn't need to be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
+				}
+			})
 			return
 		}
 	} else {
@@ -1415,12 +1462,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	// Locking only the part of Update method is sufficient, because in the other part the entity is in the unschedulableEntities,
 	// which is protected by p.lock anyway.
 	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
-		// The inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
-		// Record this Pod update because
-		// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
-		// We can clean it up once we change updatePodInSchedulingQueue to call MoveAllToActiveOrBackoffQueue.
-		// See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
-		if exists := unlockedActiveQ.addEventsIfPodInFlight(oldPod, newPod, events); exists {
+		if unlockedActiveQ.updateInFlightPod(oldPod, newPod, events) {
 			logger.V(6).Info("The pod doesn't need to be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
 			updated = true
 			return
@@ -1451,8 +1493,10 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		pInfo, err := entity.Update(newPod)
 		if err != nil {
 			logger.Error(err, "Failed to update pod in an entity", "type", entity.Type(), "entity", klog.KObj(entity), "pod", klog.KObj(newPod))
-			// Handle this case gracefully by adding the newPod to the queue.
-			p.addPod(ctx, newPod)
+			if addIfMissing {
+				// Handle this case gracefully by adding the newPod to the queue.
+				p.addPod(ctx, newPod)
+			}
 			return
 		}
 		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
@@ -1487,8 +1531,10 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			return
 		}
 	}
-	// If the entity is not in any of the queues, we add it.
-	p.addPod(ctx, newPod)
+	if addIfMissing {
+		// If the entity is not in any of the queues, we add it.
+		p.addPod(ctx, newPod)
+	}
 }
 
 // decreaseUnschedulableReasonMetric decreases the metrics for the rejector plugins
@@ -1522,6 +1568,8 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	if !hasRoot {
 		pInfo := p.incompletePodGroupPods.delete(pod)
 		if pInfo == nil {
+			// The pod may still be in-flight if its group was removed after Pop.
+			p.activeQ.deleteInFlight(pod.UID)
 			return
 		}
 		// Drop metric for deleted pod.
@@ -1532,18 +1580,22 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 		return
 	}
 
-	entity, strategy := p.deleteFromAnyQueue(rootInfoLookup)
-	if entity == nil {
-		pInfo := p.pendingPodGroupPods.delete(pod)
-		if pInfo == nil {
-			return
-		}
-
+	if pInfo := p.pendingPodGroupPods.delete(pod); pInfo != nil {
 		logger.V(5).Info("Pod belonging to a root group got deleted from pending pod group info", "rootType", rootInfoLookup.Type(), "root", klog.KObj(rootInfoLookup), "pod", klog.KObj(pInfo))
 		// Drop metric for deleted pod.
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
+		p.activeQ.deleteInFlight(pod.UID)
+		return
+	}
+	// If this pod is in-flight while the rest of its group stays queued, remove only its in-flight entry.
+	if p.activeQ.deleteInFlight(pod.UID) {
+		return
+	}
+
+	entity, strategy := p.deleteFromAnyQueue(rootInfoLookup)
+	if entity == nil {
 		return
 	}
 	pgInfo := entity.(*framework.QueuedPodGroupInfo)
@@ -1590,7 +1642,11 @@ func (p *PriorityQueue) deletePod(pod *v1.Pod) {
 		p.unschedulableEntities.delete(pInfoLookup, entity.Gated())
 		// Drop metric for deleted pod.
 		decreaseUnschedulableReasonMetric(entity)
+		return
 	}
+
+	// Check inFlightPods
+	p.activeQ.deleteInFlight(pod.UID)
 }
 
 // AddGenericPodGroup adds a PodGroup or CompositePodGroup object to the queue,

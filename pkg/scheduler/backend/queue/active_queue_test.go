@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -63,5 +65,223 @@ func TestClose(t *testing.T) {
 
 	if len(aq.listInFlightPods()) != 0 {
 		t.Fatalf("in-flight pods should be cleaned up, but %v pod(s) is remaining", len(aq.listInFlightPods()))
+	}
+}
+
+func TestActiveQueue_InFlightPods(t *testing.T) {
+	tests := []struct {
+		name                 string
+		initialPods          []*v1.Pod
+		popCount             int
+		callDropEvents       types.UID
+		updatePod            *v1.Pod
+		callDone             types.UID
+		callDelete           types.UID
+		wantInFlightPodLabel map[string]string
+		wantUpdatedInFlight  bool
+		wantInFlightCount    int
+		wantInFlightEvents   int
+	}{
+		{
+			name: "popped pod is in-flight but not marked updated until updateInFlightPod is called",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v1").Obj(),
+			},
+			popCount:             1,
+			wantInFlightPodLabel: map[string]string{"version": "v1"},
+			wantUpdatedInFlight:  false,
+			wantInFlightCount:    1,
+			wantInFlightEvents:   1,
+		},
+		{
+			name: "update in-flight pod updates pod content",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v1").Obj(),
+			},
+			popCount:             1,
+			updatePod:            st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v2").Obj(),
+			wantInFlightPodLabel: map[string]string{"version": "v2"},
+			wantUpdatedInFlight:  true,
+			wantInFlightCount:    1,
+			wantInFlightEvents:   2,
+		},
+		{
+			name: "dropInFlightEvents removes events marker but keeps pod in-flight",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v1").Obj(),
+			},
+			popCount:             1,
+			callDropEvents:       "p1",
+			wantInFlightPodLabel: map[string]string{"version": "v1"},
+			wantUpdatedInFlight:  false,
+			wantInFlightCount:    1,
+			wantInFlightEvents:   0,
+		},
+		{
+			name: "update after dropInFlightEvents updates pod content without recording events",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v1").Obj(),
+			},
+			popCount:             1,
+			callDropEvents:       "p1",
+			updatePod:            st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v2").Obj(),
+			wantInFlightPodLabel: map[string]string{"version": "v2"},
+			wantUpdatedInFlight:  true,
+			wantInFlightCount:    1,
+			wantInFlightEvents:   0,
+		},
+		{
+			name: "delete in-flight pod removes it completely",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v1").Obj(),
+			},
+			popCount:           1,
+			callDelete:         "p1",
+			wantInFlightCount:  0,
+			wantInFlightEvents: 0,
+		},
+		{
+			name: "done on in-flight pod removes it completely",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("version", "v1").Obj(),
+			},
+			popCount:           1,
+			callDone:           "p1",
+			wantInFlightCount:  0,
+			wantInFlightEvents: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			aq := newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActiveEntitiesRecorder()), rr, nil)
+
+			for _, pod := range tt.initialPods {
+				aq.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}}, framework.EventUnscheduledPodAdd.Label(), nil)
+			}
+			for i := 0; i < tt.popCount; i++ {
+				if _, err := aq.pop(logger); err != nil {
+					t.Fatalf("pop failed: %v", err)
+				}
+			}
+
+			if tt.callDropEvents != "" {
+				aq.dropInFlightEvents(tt.callDropEvents)
+			}
+			if tt.updatePod != nil {
+				aq.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
+					unlockedActiveQ.updateInFlightPod(tt.initialPods[0], tt.updatePod, framework.PodSchedulingPropertiesChange(tt.updatePod, tt.initialPods[0], true))
+				})
+			}
+			if tt.callDone != "" {
+				aq.done(tt.callDone)
+			}
+			if tt.callDelete != "" {
+				aq.deleteInFlight(tt.callDelete)
+			}
+
+			if len(aq.listInFlightPods()) != tt.wantInFlightCount {
+				t.Fatalf("expected %d in-flight pods, got %d", tt.wantInFlightCount, len(aq.listInFlightPods()))
+			}
+			pod := aq.inFlightPod(tt.initialPods[0].UID)
+			if tt.wantInFlightCount == 0 && pod != nil {
+				t.Fatalf("expected inFlightPod to be nil, got %v", pod)
+			}
+			if tt.wantInFlightCount > 0 && pod == nil {
+				t.Fatalf("expected inFlightPod to find pod %s", tt.initialPods[0].UID)
+			}
+			for k, v := range tt.wantInFlightPodLabel {
+				if pod.Labels[k] != v {
+					t.Fatalf("expected label %s=%s, got %s", k, v, pod.Labels[k])
+				}
+			}
+			if gotUpdated := aq.updatedInFlightPod(tt.initialPods[0].UID) != nil; gotUpdated != tt.wantUpdatedInFlight {
+				t.Fatalf("expected updatedInFlightPod!=nil to be %v, got %v", tt.wantUpdatedInFlight, gotUpdated)
+			}
+			if len(aq.listInFlightEvents()) != tt.wantInFlightEvents {
+				t.Fatalf("expected %d in-flight events, got %d", tt.wantInFlightEvents, len(aq.listInFlightEvents()))
+			}
+		})
+	}
+}
+
+func TestActiveQueue_AddEventIfAnyInFlight(t *testing.T) {
+	tests := []struct {
+		name               string
+		initialPods        []*v1.Pod
+		popCount           int
+		callDropEvents     []types.UID
+		wantAdded          bool
+		wantInFlightEvents int
+	}{
+		{
+			name: "no pods in flight",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           0,
+			wantAdded:          false,
+			wantInFlightEvents: 0,
+		},
+		{
+			name: "pod in scheduling cycle (has eventsMarker)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			wantAdded:          true,
+			wantInFlightEvents: 2, // 1 marker + 1 cluster event
+		},
+		{
+			name: "pod in binding cycle (eventsMarker removed by dropInFlightEvents)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			callDropEvents:     []types.UID{"p1"},
+			wantAdded:          false,
+			wantInFlightEvents: 0,
+		},
+		{
+			name: "one pod binding and one pod scheduling",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+				st.MakePod().Namespace("ns").Name("p2").UID("p2").Obj(),
+			},
+			popCount:           2,
+			callDropEvents:     []types.UID{"p1"},
+			wantAdded:          true,
+			wantInFlightEvents: 2, // p2 marker + 1 cluster event
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			aq := newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActiveEntitiesRecorder()), rr, nil)
+
+			for _, pod := range tt.initialPods {
+				aq.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: pod}}, framework.EventUnscheduledPodAdd.Label(), nil)
+			}
+			for i := 0; i < tt.popCount; i++ {
+				if _, err := aq.pop(logger); err != nil {
+					t.Fatalf("pop failed: %v", err)
+				}
+			}
+			for _, uid := range tt.callDropEvents {
+				aq.dropInFlightEvents(uid)
+			}
+
+			gotAdded := aq.addEventIfAnyInFlight(nil, nil, nodeAdd)
+			if gotAdded != tt.wantAdded {
+				t.Fatalf("expected addEventIfAnyInFlight to return %v, got %v", tt.wantAdded, gotAdded)
+			}
+			if len(aq.listInFlightEvents()) != tt.wantInFlightEvents {
+				t.Fatalf("expected %d in-flight events, got %d", tt.wantInFlightEvents, len(aq.listInFlightEvents()))
+			}
+		})
 	}
 }

@@ -877,9 +877,11 @@ func TestUpdatePod(t *testing.T) {
 		oldPod                           *v1.Pod
 		assumedPod                       *v1.Pod
 		newPod                           *v1.Pod
+		inFlight                         bool
 		genericWorkloadEnabled           bool
 		waitingOnPermit                  bool
 		expectInQueue                    *v1.Pod
+		expectInFlight                   *v1.Pod
 		expectInActiveQ                  bool
 		expectInCache                    *v1.Pod
 		expectInPodGroupStateUnscheduled bool
@@ -904,6 +906,15 @@ func TestUpdatePod(t *testing.T) {
 			assumedPod:    scheduledPod,
 			newPod:        updatedPod,
 			expectInCache: scheduledPod,
+		},
+		{
+			name:           "update assumed in-flight pod",
+			oldPod:         pod,
+			assumedPod:     scheduledPod,
+			newPod:         updatedPod,
+			inFlight:       true,
+			expectInFlight: updatedPod,
+			expectInCache:  scheduledPod,
 		},
 		{
 			name:          "update scheduled pod",
@@ -1114,6 +1125,12 @@ func TestUpdatePod(t *testing.T) {
 			}
 
 			var waitOnPermitDone chan struct{}
+			if tt.inFlight {
+				sched.addPod(tt.oldPod)
+				if _, err := sched.SchedulingQueue.Pop(logger); err != nil {
+					t.Fatalf("Failed to pop pod: %v", err)
+				}
+			}
 			if tt.assumedPod != nil {
 				if tt.oldPod.Spec.SchedulingGroup != nil {
 					sched.Cache.AddPodGroupMember(tt.oldPod)
@@ -1130,7 +1147,7 @@ func TestUpdatePod(t *testing.T) {
 						schedFramework.WaitOnPermit(ctx, tt.assumedPod)
 					}()
 				}
-			} else {
+			} else if !tt.inFlight {
 				sched.addPod(tt.oldPod)
 			}
 
@@ -1168,6 +1185,14 @@ func TestUpdatePod(t *testing.T) {
 				}
 			} else if ok {
 				t.Errorf("Expected pod not to be in scheduling queue")
+			}
+			inFlightPod := sched.SchedulingQueue.InFlightPod(tt.newPod.UID)
+			if tt.expectInFlight != nil {
+				if diff := cmp.Diff(tt.expectInFlight, inFlightPod); diff != "" {
+					t.Errorf("Unexpected in-flight pod after update (-want,+got):\n%s", diff)
+				}
+			} else if inFlightPod != nil {
+				t.Errorf("Expected pod not to be in flight, got %v", inFlightPod)
 			}
 			if tt.expectInActiveQ {
 				var found bool

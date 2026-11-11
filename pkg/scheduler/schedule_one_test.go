@@ -1839,7 +1839,8 @@ func TestSignatures(t *testing.T) {
 	}
 }
 
-// Tests the logic removing pods from inFlightPods after Permit (needed to fix issue https://github.com/kubernetes/kubernetes/issues/129967).
+// Tests two-phase cycle completion (DropInFlightEvents after WaitOnPermit to free cluster events,
+// while keeping pods in inFlightPods through PreBind and Bind until Done is called before PostBind).
 // This needs to be a separate test case, because it mocks the waitOnPermit and runPrebindPlugins functions.
 func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
@@ -1859,21 +1860,23 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 	assignedTestPod := podWithID("foo", testNode.Name)
 
 	table := []struct {
-		name                                string
-		sendPod                             *v1.Pod
-		registerPluginFuncs                 []tf.RegisterPluginFunc
-		injectSchedulingError               error
-		injectBindError                     error
-		mockScheduleResult                  ScheduleResult
-		mockWaitOnPermitResult              *fwk.Status
-		mockRunPreBindPluginsResult         *fwk.Status
-		expectErrorPod                      *v1.Pod
-		expectAssumedPod                    *v1.Pod
-		expectError                         error
-		expectBind                          *v1.Binding
-		eventReason                         string
-		expectPodIsInFlightAtFailureHandler bool
-		expectPodIsInFlightAtWaitOnPermit   bool
+		name                                   string
+		sendPod                                *v1.Pod
+		registerPluginFuncs                    []tf.RegisterPluginFunc
+		injectSchedulingError                  error
+		injectBindError                        error
+		mockScheduleResult                     ScheduleResult
+		mockWaitOnPermitResult                 *fwk.Status
+		mockRunPreBindPluginsResult            *fwk.Status
+		expectErrorPod                         *v1.Pod
+		expectAssumedPod                       *v1.Pod
+		expectError                            error
+		expectBind                             *v1.Binding
+		eventReason                            string
+		expectPodIsInFlightAtFailureHandler    bool
+		expectPodIsInFlightAtWaitOnPermit      bool
+		expectPodIsInFlightAtRunPreBindPlugins bool
+		expectPodIsInFlightAtRunBindPlugins    bool
 	}{
 		{
 			name:               "error on permit",
@@ -1938,26 +1941,29 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			registerPluginFuncs: []tf.RegisterPluginFunc{
 				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(nil, fwk.NewStatus(fwk.Unschedulable))),
 			},
-			mockWaitOnPermitResult:              fwk.NewStatus(fwk.Success),
-			mockRunPreBindPluginsResult:         fwk.NewStatus(fwk.Unschedulable, preBindErr.Error()),
-			expectErrorPod:                      assignedTestPod,
-			expectAssumedPod:                    assignedTestPod,
-			expectError:                         preBindErr,
-			eventReason:                         "FailedScheduling",
-			expectPodIsInFlightAtFailureHandler: false,
-			expectPodIsInFlightAtWaitOnPermit:   true,
+			mockWaitOnPermitResult:                 fwk.NewStatus(fwk.Success),
+			mockRunPreBindPluginsResult:            fwk.NewStatus(fwk.Unschedulable, preBindErr.Error()),
+			expectErrorPod:                         assignedTestPod,
+			expectAssumedPod:                       assignedTestPod,
+			expectError:                            preBindErr,
+			eventReason:                            "FailedScheduling",
+			expectPodIsInFlightAtFailureHandler:    true,
+			expectPodIsInFlightAtWaitOnPermit:      true,
+			expectPodIsInFlightAtRunPreBindPlugins: true,
 		},
 		{
-			name:                                "bind assumed pod scheduled",
-			sendPod:                             testPod,
-			mockScheduleResult:                  scheduleResultOk,
-			expectBind:                          bindingOk,
-			expectAssumedPod:                    assignedTestPod,
-			mockWaitOnPermitResult:              fwk.NewStatus(fwk.Success),
-			mockRunPreBindPluginsResult:         fwk.NewStatus(fwk.Success),
-			eventReason:                         "Scheduled",
-			expectPodIsInFlightAtFailureHandler: false,
-			expectPodIsInFlightAtWaitOnPermit:   true,
+			name:                                   "bind assumed pod scheduled",
+			sendPod:                                testPod,
+			mockScheduleResult:                     scheduleResultOk,
+			expectBind:                             bindingOk,
+			expectAssumedPod:                       assignedTestPod,
+			mockWaitOnPermitResult:                 fwk.NewStatus(fwk.Success),
+			mockRunPreBindPluginsResult:            fwk.NewStatus(fwk.Success),
+			eventReason:                            "Scheduled",
+			expectPodIsInFlightAtFailureHandler:    false,
+			expectPodIsInFlightAtWaitOnPermit:      true,
+			expectPodIsInFlightAtRunPreBindPlugins: true,
+			expectPodIsInFlightAtRunBindPlugins:    true,
 		},
 		{
 			name:                                "error pod failed scheduling",
@@ -1970,19 +1976,21 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			expectPodIsInFlightAtFailureHandler: true,
 		},
 		{
-			name:                                "error bind forget pod failed scheduling",
-			sendPod:                             testPod,
-			mockScheduleResult:                  scheduleResultOk,
-			mockWaitOnPermitResult:              fwk.NewStatus(fwk.Success),
-			mockRunPreBindPluginsResult:         fwk.NewStatus(fwk.Success),
-			expectBind:                          bindingOk,
-			expectAssumedPod:                    assignedTestPod,
-			injectBindError:                     bindingErr,
-			expectError:                         fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", bindingErr),
-			expectErrorPod:                      assignedTestPod,
-			eventReason:                         "FailedScheduling",
-			expectPodIsInFlightAtFailureHandler: false,
-			expectPodIsInFlightAtWaitOnPermit:   true,
+			name:                                   "error bind forget pod failed scheduling",
+			sendPod:                                testPod,
+			mockScheduleResult:                     scheduleResultOk,
+			mockWaitOnPermitResult:                 fwk.NewStatus(fwk.Success),
+			mockRunPreBindPluginsResult:            fwk.NewStatus(fwk.Success),
+			expectBind:                             bindingOk,
+			expectAssumedPod:                       assignedTestPod,
+			injectBindError:                        bindingErr,
+			expectError:                            fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", bindingErr),
+			expectErrorPod:                         assignedTestPod,
+			eventReason:                            "FailedScheduling",
+			expectPodIsInFlightAtFailureHandler:    true,
+			expectPodIsInFlightAtWaitOnPermit:      true,
+			expectPodIsInFlightAtRunPreBindPlugins: true,
+			expectPodIsInFlightAtRunBindPlugins:    true,
 		},
 		{
 			name:                                "deleting pod",
@@ -2006,6 +2014,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				var gotPodIsInFlightAtFailureHandler bool
 				var gotPodIsInFlightAtWaitOnPermit bool
 				var gotPodIsInFlightAtRunPreBindPlugins bool
+				var gotPodIsInFlightAtRunBindPlugins bool
 
 				client := clientsetfake.NewClientset(item.sendPod)
 				client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -2071,6 +2080,10 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				schedFramework.runPreBindPluginsFn = func(_ context.Context, _ fwk.CycleState, pod *v1.Pod, _ string) *fwk.Status {
 					gotPodIsInFlightAtRunPreBindPlugins = podListContainsPod(schedFramework.queue.InFlightPods(), pod)
 					return item.mockRunPreBindPluginsResult
+				}
+				schedFramework.runBindPluginsFn = func(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+					gotPodIsInFlightAtRunBindPlugins = podListContainsPod(schedFramework.queue.InFlightPods(), pod)
+					return schedFramework.Framework.RunBindPlugins(ctx, state, pod, nodeName)
 				}
 
 				sched := &Scheduler{
@@ -2145,8 +2158,13 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					t.Errorf("unexpected pod being in flight at start of WaitOnPermit, expected %v but got %v",
 						item.expectPodIsInFlightAtWaitOnPermit, gotPodIsInFlightAtWaitOnPermit)
 				}
-				if gotPodIsInFlightAtRunPreBindPlugins {
-					t.Errorf("unexpected pod being in flight at start of RunPreBindPlugins")
+				if item.expectPodIsInFlightAtRunPreBindPlugins != gotPodIsInFlightAtRunPreBindPlugins {
+					t.Errorf("unexpected pod being in flight at start of RunPreBindPlugins, expected %v but got %v",
+						item.expectPodIsInFlightAtRunPreBindPlugins, gotPodIsInFlightAtRunPreBindPlugins)
+				}
+				if item.expectPodIsInFlightAtRunBindPlugins != gotPodIsInFlightAtRunBindPlugins {
+					t.Errorf("unexpected pod being in flight at start of RunBindPlugins, expected %v but got %v",
+						item.expectPodIsInFlightAtRunBindPlugins, gotPodIsInFlightAtRunBindPlugins)
 				}
 				// We have to use wait here
 				// because the Pod goes to the binding cycle in some test cases and the inflight pods might not be empty immediately at this point in such case.
@@ -2161,13 +2179,14 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 	}
 }
 
-// Fake Framework allows mocking calls to WaitOnPermit, RunPreBindPlugins and RunPostBindPlugins, to allow for
+// Fake Framework allows mocking calls to WaitOnPermit, RunPreBindPlugins and RunBindPlugins, to allow for
 // simpler and more efficient testing of Scheduler's logic within the bindingCycle.
 type FakeFramework struct {
 	framework.Framework
 	queue               internalqueue.SchedulingQueue
 	waitOnPermitFn      func(context.Context, *v1.Pod) *fwk.Status
 	runPreBindPluginsFn func(context.Context, fwk.CycleState, *v1.Pod, string) *fwk.Status
+	runBindPluginsFn    func(context.Context, fwk.CycleState, *v1.Pod, string) *fwk.Status
 }
 
 func NewFakeFramework(ctx context.Context, schedQueue internalqueue.SchedulingQueue, fns []tf.RegisterPluginFunc,
@@ -2190,6 +2209,13 @@ func (ff *FakeFramework) RunPreBindPlugins(ctx context.Context, state fwk.CycleS
 	return ff.runPreBindPluginsFn(ctx, state, pod, nodeName)
 }
 
+func (ff *FakeFramework) RunBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if ff.runBindPluginsFn != nil {
+		return ff.runBindPluginsFn(ctx, state, pod, nodeName)
+	}
+	return ff.Framework.RunBindPlugins(ctx, state, pod, nodeName)
+}
+
 func podListContainsPod(list []*v1.Pod, pod *v1.Pod) bool {
 	for _, p := range list {
 		if p.UID == pod.UID {
@@ -2197,6 +2223,152 @@ func podListContainsPod(list []*v1.Pod, pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func TestScheduleOne_PodUpdateDuringBindingCycle(t *testing.T) {
+	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
+	scheduleResultOk := ScheduleResult{SuggestedHost: testNode.Name}
+	bindingOk := &v1.Binding{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod1", UID: types.UID("pod1")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}}
+
+	tests := []struct {
+		name                  string
+		preBindStatus         *fwk.Status
+		expectInActiveQCount  int
+		expectInBackoffQCount int
+		expectBackoffPodLabel map[string]string
+		expectBind            *v1.Binding
+	}{
+		{
+			name:                  "pod updated during binding and prebind fails, pod is moved to backoff with updated version and not activeQ",
+			preBindStatus:         fwk.NewStatus(fwk.Error, "prebind failure"),
+			expectInActiveQCount:  0,
+			expectInBackoffQCount: 1,
+			expectBackoffPodLabel: map[string]string{"version": "v2"},
+		},
+		{
+			name:                  "pod updated during binding and binding succeeds, pod is completed and not in any queue",
+			preBindStatus:         fwk.NewStatus(fwk.Success),
+			expectInActiveQCount:  0,
+			expectInBackoffQCount: 0,
+			expectBind:            bindingOk,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			initialPod := st.MakePod().Namespace("ns").Name("pod1").UID("pod1").ResourceVersion("1").SchedulerName(testSchedulerName).Label("version", "v1").Obj()
+			updatedPod := st.MakePod().Namespace("ns").Name("pod1").UID("pod1").ResourceVersion("2").SchedulerName(testSchedulerName).Label("version", "v2").Obj()
+
+			client := clientsetfake.NewClientset(initialPod, &testNode)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+
+			cache := internalcache.New(ctx, nil, false, false)
+			ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			queue := internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))
+			defer queue.Close()
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			schedFramework, err := NewFakeFramework(
+				ctx,
+				queue,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				testSchedulerName,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			schedFramework.waitOnPermitFn = func(_ context.Context, _ *v1.Pod) *fwk.Status {
+				return fwk.NewStatus(fwk.Success)
+			}
+
+			var sched *Scheduler
+			schedFramework.runPreBindPluginsFn = func(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ string) *fwk.Status {
+				// Deliver the update via sched.updatePod while keeping the informer lister at v1,
+				// verifying that updatePodInSchedulingQueue updates the assumed in-flight pod and
+				// AddUnschedulablePodIfNotPresent refreshes pInfo from it.
+				sched.updatePod(initialPod, updatedPod)
+
+				if inFlight := queue.InFlightPod(initialPod.UID); inFlight == nil || inFlight.Labels["version"] != "v2" {
+					t.Errorf("expected in-flight pod to be updated with label v2, got %v", inFlight)
+				}
+				if activePods := queue.PodsInActiveQ(); len(activePods) != 0 {
+					t.Errorf("expected pod not to be added to activeQ while in flight, got %v", activePods)
+				}
+				return tt.preBindStatus
+			}
+
+			var gotBinding *v1.Binding
+			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				if action.GetSubresource() == "binding" {
+					gotBinding = action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
+					return true, gotBinding, nil
+				}
+				return false, nil, nil
+			})
+
+			sched = &Scheduler{
+				Cache:            cache,
+				client:           client,
+				logger:           logger,
+				NextEntity:       queue.Pop,
+				SchedulingQueue:  queue,
+				Profiles:         profile.Map{testSchedulerName: schedFramework},
+				nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+			}
+			initTestAlgorithm(t, sched)
+			failureDone := make(chan struct{})
+			sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+				defer close(failureDone)
+				sched.handleSchedulingFailure(ctx, fwk, p, status, ni, start)
+			}
+			sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
+				return scheduleResultOk, nil
+			}
+
+			queue.Add(ctx, initialPod)
+			sched.ScheduleOne(ctx)
+
+			if !tt.preBindStatus.IsSuccess() {
+				<-failureDone
+			}
+			if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*10, wait.ForeverTestTimeout, false, func(context.Context) (bool, error) {
+				return len(queue.InFlightPods()) == 0 &&
+					len(queue.PodsInActiveQ()) == tt.expectInActiveQCount &&
+					len(queue.PodsInBackoffQ()) == tt.expectInBackoffQCount, nil
+			}); err != nil {
+				t.Fatalf("unexpected queue state after ScheduleOne: inFlight=%d, activeQ=%d (want %d), backoffQ=%d (want %d)",
+					len(queue.InFlightPods()), len(queue.PodsInActiveQ()), tt.expectInActiveQCount, len(queue.PodsInBackoffQ()), tt.expectInBackoffQCount)
+			}
+
+			backoffPods := queue.PodsInBackoffQ()
+			if len(backoffPods) > 0 {
+				for k, v := range tt.expectBackoffPodLabel {
+					if backoffPods[0].Labels[k] != v {
+						t.Errorf("expected backoff pod label %s=%s, got %s", k, v, backoffPods[0].Labels[k])
+					}
+				}
+			}
+			if diff := cmp.Diff(tt.expectBind, gotBinding); diff != "" {
+				t.Errorf("Unexpected binding (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {

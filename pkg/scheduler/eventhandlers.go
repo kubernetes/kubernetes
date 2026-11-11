@@ -358,6 +358,9 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldPod, newPod *v1.Pod) {
 			// because we can't update such pod in any structure directly.
 			sched.handleAssumedPodDeletion(newPod)
 		}
+		// Keep the pod fresh if it is still in-flight or was just requeued after a failure,
+		// without adding already-bound pods back to activeQ.
+		sched.SchedulingQueue.UpdateIfPresent(klog.NewContext(context.Background(), logger), oldPod, newPod)
 		return
 	}
 
