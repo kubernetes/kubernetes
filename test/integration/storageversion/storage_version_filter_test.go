@@ -178,8 +178,7 @@ func TestStorageVersionBootstrap(t *testing.T) {
 		},
 		[]string{
 			// force enable all resources to ensure that the storage updates can handle cross group resources.
-			// TODO: drop these once we stop allowing them to be served.
-			"--runtime-config=api/all=true,extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true,internal.apiserver.k8s.io/v1alpha1=true",
+			"--runtime-config=api/all=true,internal.apiserver.k8s.io/v1alpha1=true",
 		},
 		etcdConfig)
 	defer server.TearDownFn()
