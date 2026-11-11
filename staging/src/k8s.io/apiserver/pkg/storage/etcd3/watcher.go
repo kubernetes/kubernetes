@@ -144,10 +144,10 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if opts.ProgressNotify && w.newFunc == nil {
 		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
 	}
+	if err := storage.ValidateWatchOptions(opts); err != nil {
+		return nil, err
+	}
 	if opts.WatchWithoutPrevKV {
-		if !opts.Predicate.Empty() {
-			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
-		}
 		if w.newFunc == nil {
 			return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc"))
 		}

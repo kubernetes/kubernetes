@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -424,6 +425,13 @@ func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions
 		return withRev, "", fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 	}
 	return withRev, "", nil
+}
+
+func ValidateWatchOptions(opts ListOptions) error {
+	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
+		return apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
+	}
+	return nil
 }
 
 // Stats provides statistics information about storage.
