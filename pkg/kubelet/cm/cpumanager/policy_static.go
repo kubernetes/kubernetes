@@ -967,32 +967,61 @@ func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName strin
 	return cset
 }
 
+// cpusAssignedToOtherPods returns the CPUs held by every pod other than
+// `podUID`, through either container assignments or pod-level allocations.
+func cpusAssignedToOtherPods(s state.State, podUID string) cpuset.CPUSet {
+	inUse := cpuset.New()
+	for otherPodUID, containers := range s.GetCPUAssignments() {
+		if otherPodUID == podUID {
+			continue
+		}
+		for _, cset := range containers {
+			inUse = inUse.Union(cset)
+		}
+	}
+	for otherPodUID, podEntry := range s.GetPodCPUAssignments() {
+		if otherPodUID == podUID {
+			continue
+		}
+		inUse = inUse.Union(podEntry.CPUSet)
+	}
+	return inUse
+}
+
 func (p *staticPolicy) RemoveContainer(logger klog.Logger, s state.State, podUID string, containerName string) error {
 	logger = klog.LoggerWithValues(logger, "podUID", podUID, "containerName", containerName)
 	logger.Info("RemoveContainer start") // backward compatibility
 	defer logger.V(4).Info("RemoveContainer start")
 	toRelease, ok := s.GetCPUSet(podUID, containerName)
-	if !ok {
-		return nil
-	}
-	s.Delete(podUID, containerName)
 
 	// Check if this pod is managed with pod-level CPUs.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		if podCPUSet, isPodLevel := s.GetPodCPUSet(podUID); isPodLevel {
+			if ok {
+				s.Delete(podUID, containerName)
+			}
 			// If this was the last container for the pod, then release the entire pod-level CPU set.
+			// The container assignment may already be gone: the last container
+			// deletion may have been checkpointed before the pod-level allocation
+			// was returned to the shared pool, and the pod entry is then reclaimed
+			// by removeStaleState.
 			if len(s.GetCPUAssignments()[podUID]) == 0 {
-				updatedCPUSets := s.GetDefaultCPUSet().Union(podCPUSet)
-				s.SetDefaultCPUSet(updatedCPUSets)
-				s.DeletePod(podUID) // Clean up all state for the pod.
-				p.updateMetricsFromState(logger, s)
-				logger.Info("Released pod-level CPUs", "defaultCPUSet", updatedCPUSets)
+				// An interrupted release may have returned the CPUs to the shared
+				// pool before the pod entry was dropped, and another pod admitted
+				// after the restart may hold them now. Never hand them back.
+				p.releasePodAllocation(logger, s, podUID, podCPUSet.Difference(cpusAssignedToOtherPods(s, podUID)))
+				logger.Info("Released pod-level CPUs", "defaultCPUSet", s.GetDefaultCPUSet())
 			}
 			// If other containers still exist, do not release any CPUs yet.
 			// The pod-level CPUs will be released when the last container is removed.
 			return nil
 		}
 	}
+
+	if !ok {
+		return nil
+	}
+	s.Delete(podUID, containerName)
 
 	cpusInUse := getAssignedCPUsOfSiblings(s, podUID, containerName)
 	// Mutate the shared pool, adding released cpus.
