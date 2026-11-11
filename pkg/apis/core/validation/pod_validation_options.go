@@ -19,8 +19,6 @@ package validation
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -45,8 +43,6 @@ type PodValidationOptions struct {
 	// The top-level resource being validated is a Pod, not just a PodSpec
 	// embedded in some other resource.
 	ResourceIsPod bool
-	// Allow relaxed validation of environment variable names
-	AllowRelaxedEnvironmentVariableValidation bool
 	// Allow only Recursive value of SELinuxChangePolicy.
 	AllowOnlyRecursiveSELinuxChangePolicy bool
 	// Indicates whether PodLevelResources feature is enabled or disabled.
@@ -216,9 +212,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		AllowSecurityProfileOCI:                                 utilfeature.DefaultFeatureGate.Enabled(features.SecurityProfileOCI),
 	}
 
-	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
-	// we must allow it
-	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 	opts.AllowUserNamespacesHostNetworkSupport = useAllowUserNamespacesHostNetworkSupport(oldPodSpec)
 
@@ -281,29 +274,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 	}
 
 	return opts
-}
-
-func useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec *core.PodSpec) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedEnvironmentVariableValidation) {
-		return true
-	}
-
-	var oldPodEnvVarNames, podEnvVarNames sets.Set[string]
-	if oldPodSpec != nil {
-		oldPodEnvVarNames = gatherPodEnvVarNames(oldPodSpec)
-	}
-
-	if podSpec != nil {
-		podEnvVarNames = gatherPodEnvVarNames(podSpec)
-	}
-
-	for env := range podEnvVarNames {
-		if relaxedEnvVarUsed(env, oldPodEnvVarNames) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func useAllowUserNamespacesHostNetworkSupport(oldPodSpec *core.PodSpec) bool {
@@ -392,65 +362,6 @@ func hasMLDSAPodCertificateProjection(volumes []core.Volume) bool {
 				}
 			}
 		}
-	}
-
-	return false
-}
-
-func gatherPodEnvVarNames(podSpec *core.PodSpec) sets.Set[string] {
-	podEnvVarNames := sets.Set[string]{}
-
-	for _, c := range podSpec.Containers {
-		for _, env := range c.Env {
-			podEnvVarNames.Insert(env.Name)
-		}
-
-		for _, env := range c.EnvFrom {
-			podEnvVarNames.Insert(env.Prefix)
-		}
-	}
-
-	for _, c := range podSpec.InitContainers {
-		for _, env := range c.Env {
-			podEnvVarNames.Insert(env.Name)
-		}
-
-		for _, env := range c.EnvFrom {
-			podEnvVarNames.Insert(env.Prefix)
-		}
-	}
-
-	for _, c := range podSpec.EphemeralContainers {
-		for _, env := range c.Env {
-			podEnvVarNames.Insert(env.Name)
-		}
-
-		for _, env := range c.EnvFrom {
-			podEnvVarNames.Insert(env.Prefix)
-		}
-	}
-
-	return podEnvVarNames
-}
-
-func relaxedEnvVarUsed(name string, oldPodEnvVarNames sets.Set[string]) bool {
-	// A length of 0 means this is not an update request,
-	// or the old pod does not exist in the env.
-	// We will let the feature gate decide whether to use relaxed rules.
-	if oldPodEnvVarNames.Len() == 0 {
-		return false
-	}
-
-	if len(validation.IsEnvVarName(name)) == 0 || len(validation.IsRelaxedEnvVarName(name)) != 0 {
-		// It's either a valid name by strict rules or an invalid name under relaxed rules.
-		// Either way, we'll use strict rules to validate.
-		return false
-	}
-
-	// The name in question failed strict rules but passed relaxed rules.
-	if oldPodEnvVarNames.Has(name) {
-		// This relaxed-rules name was already in use.
-		return true
 	}
 
 	return false

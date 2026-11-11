@@ -2834,14 +2834,8 @@ func ValidateEnv(vars []core.EnvVar, fldPath *field.Path, opts PodValidationOpti
 		if len(ev.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
 		} else {
-			if opts.AllowRelaxedEnvironmentVariableValidation {
-				for _, msg := range validation.IsRelaxedEnvVarName(ev.Name) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
-				}
-			} else {
-				for _, msg := range validation.IsEnvVarName(ev.Name) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
-				}
+			for _, msg := range validation.IsRelaxedEnvVarName(ev.Name) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), ev.Name, msg))
 			}
 		}
 		allErrs = append(allErrs, validateEnvVarValueFrom(ev, idxPath.Child("valueFrom"), opts)...)
@@ -2989,14 +2983,8 @@ func ValidateEnvFrom(vars []core.EnvFromSource, fldPath *field.Path, opts PodVal
 	for i, ev := range vars {
 		idxPath := fldPath.Index(i)
 		if len(ev.Prefix) > 0 {
-			if opts.AllowRelaxedEnvironmentVariableValidation {
-				for _, msg := range validation.IsRelaxedEnvVarName(ev.Prefix) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
-				}
-			} else {
-				for _, msg := range validation.IsEnvVarName(ev.Prefix) {
-					allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
-				}
+			for _, msg := range validation.IsRelaxedEnvVarName(ev.Prefix) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("prefix"), ev.Prefix, msg))
 			}
 		}
 
