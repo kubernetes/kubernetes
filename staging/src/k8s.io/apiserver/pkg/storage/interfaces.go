@@ -431,6 +431,9 @@ func ValidateWatchOptions(opts ListOptions) error {
 	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
 		return apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires an empty predicate"))
 	}
+	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
+		return apierrors.NewInternalError(errors.New("limit and continue are not supported for watch"))
+	}
 	return nil
 }
 

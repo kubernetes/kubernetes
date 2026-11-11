@@ -123,9 +123,6 @@ func checkWatchOptions(versioner storage.Versioner, request WatchRequest) error 
 	if err := storage.ValidateWatchOptions(opts); err != nil {
 		return err
 	}
-	if opts.Predicate.Limit != 0 || opts.Predicate.Continue != "" {
-		panic("pagination (limit, continue) is not supported")
-	}
 	if !opts.Predicate.Empty() && opts.Predicate.GetAttrs == nil {
 		panic("selectors without GetAttrs are not supported")
 	}
