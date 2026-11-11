@@ -164,6 +164,10 @@ type writer interface {
 	SetPodCPUAssignments(PodCPUAssignments)
 	// DeletePod deletes pod-level CPU assignments for specified pod
 	DeletePod(podUID string)
+	// ReleasePod atomically removes every resource the pod holds: its container
+	// assignments and baselines, its pod-level entry, and hands the explicitly
+	// calculated released CPUSet back to the default CPU set.
+	ReleasePod(podUID string, releasedCPUSet cpuset.CPUSet)
 	// SetCPUBaselines stores all container-level CPU assignments recorded at admission time, prior to any resize
 	SetCPUBaselines(ContainerCPUBaselines)
 }

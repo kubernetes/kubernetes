@@ -139,6 +139,15 @@ func (s *mockState) DeletePod(podUID string) {
 	delete(s.podAssignments, podUID)
 }
 
+func (s *mockState) ReleasePod(podUID string, releasedCPUSet cpuset.CPUSet) {
+	delete(s.assignments, podUID)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		delete(s.baselines, podUID)
+	}
+	delete(s.podAssignments, podUID)
+	s.defaultCPUSet = s.defaultCPUSet.Union(releasedCPUSet)
+}
+
 func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
 	s.assignments = a.Clone()
 }

@@ -1521,3 +1521,92 @@ func TestDeletePod(t *testing.T) {
 		})
 	}
 }
+
+// ReleasePod drops every entry of the pod regardless of the feature gates, like
+// ClearState: a released pod must not leave baselines or a pod-level entry
+// behind, in memory or in the checkpoint.
+func TestReleasePod(t *testing.T) {
+	testCases := []struct {
+		description      string
+		baselinesEnabled bool
+		podLevelEnabled  bool
+	}{
+		{
+			description:      "all feature gates enabled",
+			baselinesEnabled: true,
+			podLevelEnabled:  true,
+		},
+		{
+			description:      "feature gates disabled",
+			baselinesEnabled: false,
+			podLevelEnabled:  false,
+		},
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, tc.baselinesEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, tc.podLevelEnabled)
+
+			tmpDir := t.TempDir()
+			newState := func() State {
+				st, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+				require.NoError(t, err)
+				return st
+			}
+
+			st := newState()
+			st.SetCPUAssignments(ContainerCPUAssignments{
+				"pod1": {"c1": cpuset.New(1, 2), "c2": cpuset.New(3)},
+				"pod2": {"c1": cpuset.New(5)},
+			})
+			st.SetPodCPUAssignments(PodCPUAssignments{
+				"pod1": {CPUSet: cpuset.New(1, 2, 3)},
+				"pod2": {CPUSet: cpuset.New(5)},
+			})
+			st.SetDefaultCPUSet(cpuset.New(0, 4, 6, 7, 8))
+			st.SetCPUBaselines(ContainerCPUBaselines{
+				"pod1": {"c1": {Baseline: cpuset.New(1, 2)}, "c2": {Baseline: cpuset.New(3)}},
+				"pod2": {"c1": {Baseline: cpuset.New(5)}},
+			})
+
+			st.ReleasePod("pod1", cpuset.New(1, 2, 3))
+
+			expectedAssignments := ContainerCPUAssignments{"pod2": {"c1": cpuset.New(5)}}
+			expectedDefault := cpuset.New(0, 1, 2, 3, 4, 6, 7, 8)
+			check := func(st State, name string) {
+				t.Helper()
+				_, podEntryPresent := st.GetPodCPUSet("pod1")
+				require.False(t, podEntryPresent, "%s: pod-level entry must be released", name)
+				for _, container := range []string{"c1", "c2"} {
+					_, baselinePresent := st.GetBaselineCPUSet("pod1", container)
+					require.False(t, baselinePresent, "%s: baseline of %s must be released", name, container)
+				}
+				require.Equal(t, expectedAssignments, st.GetCPUAssignments(), "%s: assignments", name)
+				require.Equal(t, expectedDefault, st.GetDefaultCPUSet(), "%s: default CPU set", name)
+			}
+			check(st, "in memory")
+
+			// A single checkpoint write must persist the whole release.
+			check(newState(), "after reload")
+		})
+	}
+}
+
+// A pod without any entry in the state (e.g. an allocation rolled back before
+// the pod-level entry was written) is still released: the explicitly calculated
+// CPUs go back to the default CPU set.
+func TestReleasePodWithoutPodEntry(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	tmpDir := t.TempDir()
+	st, err := NewCheckpointState(logger, tmpDir, testingCheckpoint, "static", containermap.ContainerMap{})
+	require.NoError(t, err)
+	st.SetDefaultCPUSet(cpuset.New(0, 4))
+
+	st.ReleasePod("pod1", cpuset.New(1, 2, 3))
+
+	require.Equal(t, cpuset.New(0, 1, 2, 3, 4), st.GetDefaultCPUSet())
+	require.Empty(t, st.GetPodCPUAssignments())
+	require.Empty(t, st.GetCPUAssignments())
+}
