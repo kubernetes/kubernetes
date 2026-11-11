@@ -77,6 +77,9 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		return result
 	}
 
+	continueToken, err := storage.EncodeContinue("/foo", "/", -1)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name               string
 		namespace          string
@@ -171,6 +174,16 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 				return labels.Set(obj.(*example.Pod).Labels), nil, nil
 			},
 		},
+	}, {
+		name:               "watch with limit",
+		namespace:          fmt.Sprintf("test-ns-9-%t", recursive),
+		expectedWatchError: errors.NewInternalError(fmt.Errorf("limit and continue are not supported for watch")),
+		pred:               storage.SelectionPredicate{Label: labels.Everything(), Field: fields.Everything(), Limit: 1},
+	}, {
+		name:               "watch with continue",
+		namespace:          fmt.Sprintf("test-ns-10-%t", recursive),
+		expectedWatchError: errors.NewInternalError(fmt.Errorf("limit and continue are not supported for watch")),
+		pred:               storage.SelectionPredicate{Label: labels.Everything(), Field: fields.Everything(), Continue: continueToken},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
