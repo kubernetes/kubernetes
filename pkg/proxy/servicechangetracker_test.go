@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/dump"
 	netutils "k8s.io/utils/net"
 )
@@ -751,7 +752,26 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	if len(result.UpdatedServices) != 4 {
 		t.Errorf("expected 4 updated services, got %d", len(result.UpdatedServices))
 	}
+	// Removed ports are included, so that a proxier can clean up after them.
+	expectedPorts := sets.New(
+		makeServicePortName("ns2", "cluster-ip", "port1", v1.ProtocolUDP),
+		makeServicePortName("ns2", "cluster-ip", "port2", v1.ProtocolUDP),
+		makeServicePortName("ns2", "cluster-ip", "p2", v1.ProtocolUDP),
+		makeServicePortName("ns2", "node-port", "port1", v1.ProtocolUDP),
+		makeServicePortName("ns2", "node-port", "port2", v1.ProtocolTCP),
+		makeServicePortName("ns1", "load-balancer", "foobar", v1.ProtocolUDP),
+		makeServicePortName("ns1", "load-balancer", "baz", v1.ProtocolUDP),
+		makeServicePortName("ns1", "only-local-load-balancer", "foobar2", v1.ProtocolUDP),
+		makeServicePortName("ns1", "only-local-load-balancer", "baz", v1.ProtocolUDP),
+	)
+	if !result.UpdatedServicePorts.Equal(expectedPorts) {
+		t.Errorf("expected updated service ports %v, got %v", expectedPorts.UnsortedList(), result.UpdatedServicePorts.UnsortedList())
+	}
 
+	fp.svcPortMap.UpdateHealthCheckNodePorts(healthCheckNodePorts, result.UpdatedServicePorts)
+	if len(healthCheckNodePorts) != 0 {
+		t.Errorf("expected 0 healthcheck ports after incremental update, got %v", healthCheckNodePorts)
+	}
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
 	if len(healthCheckNodePorts) != 0 {
 		t.Errorf("expected 0 healthcheck ports, got %v", healthCheckNodePorts)
