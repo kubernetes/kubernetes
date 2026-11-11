@@ -426,6 +426,7 @@ type mockCSIDriver struct {
 	enableSELinuxMount                   *bool
 	disableControllerExpansion           bool
 	enableMutableCSINodeAllocatableCount bool
+	enableNodeInfoFromController         bool
 
 	// Additional values set during PrepareTest
 	clientSet       clientset.Interface
@@ -478,6 +479,12 @@ type CSIMockDriverOpts struct {
 	FSGroupPolicy                        *storagev1.FSGroupPolicy
 	EnableSELinuxMount                   *bool
 	EnableMutableCSINodeAllocatableCount bool
+
+	// EnableNodeInfoFromController enables the NODE_INFO_FROM_CONTROLLER
+	// node capability and, unless DisableAttach is set, the GET_NODE_INFO
+	// controller capability of the CSI mock driver. It is only supported
+	// by the embedded CSI mock driver.
+	EnableNodeInfoFromController bool
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -636,6 +643,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		enableVolumeMountGroup:               driverOpts.EnableVolumeMountGroup,
 		enableSELinuxMount:                   driverOpts.EnableSELinuxMount,
 		enableMutableCSINodeAllocatableCount: driverOpts.EnableMutableCSINodeAllocatableCount,
+		enableNodeInfoFromController:         driverOpts.EnableNodeInfoFromController,
 		embedded:                             driverOpts.Embedded,
 		hooks:                                driverOpts.Hooks,
 	}
@@ -712,6 +720,7 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			NodeStorageHealthRequired:   m.enableNodeStorageHealth,
 			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
 			EnableTopology:              m.enableTopology,
+			NodeInfoFromController:      m.enableNodeInfoFromController,
 			IO: proxy.PodDirIO{
 				TCtx:          f.TContext(context.Background() /* no cancellation, the traditional behavior! */),
 				Namespace:     m.driverNamespace.Name,

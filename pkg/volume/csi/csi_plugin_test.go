@@ -17,29 +17,38 @@ limitations under the License.
 package csi
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/grpc/codes"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	clitesting "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -155,6 +164,27 @@ func registerFakePlugin(pluginName, endpoint string, versions []string, t *testi
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersions,
 	})
+}
+
+// useFakeNodeClient makes the CSI clients created by newCsiDriverClient call nodeClient until the test ends.
+func useFakeNodeClient(t *testing.T, nodeClient *fakecsi.NodeClient) {
+	originalCreator := defaultNodeV1ClientCreator
+	t.Cleanup(func() {
+		defaultNodeV1ClientCreator = originalCreator
+	})
+	defaultNodeV1ClientCreator = func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+		return nodeClient, fakecsi.NewCloser(t), nil
+	}
+}
+
+// hasCSINodeUpdate returns true if client received a CSINode update.
+func hasCSINodeUpdate(client *fakeclient.Clientset) bool {
+	for _, action := range client.Actions() {
+		if action.Matches("update", "csinodes") {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPluginGetPluginName(t *testing.T) {
@@ -1435,6 +1465,271 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 	}
 }
 
+func TestRegisterPlugin(t *testing.T) {
+	const (
+		endpoint     = "endpoint"
+		driverNodeID = "test-node-id"
+		topologyKey  = "topology.test-driver/zone"
+		// nodeIDAnnotation is the Node annotation where kubelet publishes the node IDs of CSI drivers.
+		nodeIDAnnotation = "csi.volume.kubernetes.io/nodeid"
+	)
+	versions := []string{"1.0.0"}
+
+	// nodeInfo has the topology and volume attachment limit that kubelet ignores in the controller flow.
+	nodeInfo := &csipbv1.NodeGetInfoResponse{
+		NodeId:            driverNodeID,
+		MaxVolumesPerNode: 10,
+		AccessibleTopology: &csipbv1.Topology{
+			Segments: map[string]string{topologyKey: "zone-1"},
+		},
+	}
+	// nodeDriver is the CSINode drivers entry that kubelet writes from nodeInfo.
+	nodeDriver := storage.CSINodeDriver{
+		Name:         testDriver,
+		NodeID:       driverNodeID,
+		TopologyKeys: []string{topologyKey},
+		Allocatable:  &storage.VolumeNodeResources{Count: ptr.To[int32](10)},
+	}
+	registration := storage.CSINodeDriverRegistration{Name: testDriver, NodeID: driverNodeID}
+	// completedRegistration is the CSINode spec after external-attacher completed the registration.
+	completedRegistration := storage.CSINodeSpec{
+		Drivers:             []storage.CSINodeDriver{nodeDriver},
+		DriverRegistrations: []storage.CSINodeDriverRegistration{registration},
+	}
+	attachRequired := getTestCSIDriver(testDriver, nil, ptr.To(true), nil)
+	attachNotRequired := getTestCSIDriver(testDriver, nil, ptr.To(false), nil)
+
+	testCases := []struct {
+		name        string
+		gateEnabled bool
+		// advertiseCapability makes the driver advertise the NODE_INFO_FROM_CONTROLLER node capability.
+		advertiseCapability bool
+		csiDriver           *storage.CSIDriver
+		// csiDriverLookupFails makes every CSIDriver lookup return an error.
+		csiDriverLookupFails bool
+		existingCSINodeSpec  storage.CSINodeSpec
+		getCapabilitiesErr   error
+		nodeGetInfoResp      *csipbv1.NodeGetInfoResponse
+		nodeGetInfoErr       error
+		// rejectDriverRegistrations makes the API server reject CSINode updates that set
+		// driverRegistrations, as it does when the registration node ID differs from the drivers entry.
+		rejectDriverRegistrations bool
+		expectErr                 bool
+		// expectNodeInfoFromController means that kubelet sets controller_get_node_info and leaves the
+		// topology and volume attachment limit of the driver to external-attacher.
+		expectNodeInfoFromController bool
+		expectCSINodeSpec            storage.CSINodeSpec
+	}{
+		{
+			name:                "feature gate disabled: NodeGetInfo flow although the driver advertises NODE_INFO_FROM_CONTROLLER",
+			advertiseCapability: true,
+			csiDriver:           attachRequired,
+			nodeGetInfoResp:     nodeInfo,
+			expectCSINodeSpec:   storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{nodeDriver}},
+		},
+		{
+			name:                 "NODE_INFO_FROM_CONTROLLER not advertised: NodeGetInfo flow without CSIDriver lookup",
+			gateEnabled:          true,
+			csiDriverLookupFails: true,
+			nodeGetInfoResp:      nodeInfo,
+			expectCSINodeSpec:    storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{nodeDriver}},
+		},
+		{
+			name:                         "attach required: controller flow records only the node ID",
+			gateEnabled:                  true,
+			advertiseCapability:          true,
+			csiDriver:                    attachRequired,
+			nodeGetInfoResp:              nodeInfo,
+			expectNodeInfoFromController: true,
+			expectCSINodeSpec:            storage.CSINodeSpec{DriverRegistrations: []storage.CSINodeDriverRegistration{registration}},
+		},
+		{
+			name:                         "no CSIDriver: controller flow",
+			gateEnabled:                  true,
+			advertiseCapability:          true,
+			nodeGetInfoResp:              nodeInfo,
+			expectNodeInfoFromController: true,
+			expectCSINodeSpec:            storage.CSINodeSpec{DriverRegistrations: []storage.CSINodeDriverRegistration{registration}},
+		},
+		{
+			name:                "attach not required: NodeGetInfo flow",
+			gateEnabled:         true,
+			advertiseCapability: true,
+			csiDriver:           attachNotRequired,
+			nodeGetInfoResp:     nodeInfo,
+			expectCSINodeSpec:   storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{nodeDriver}},
+		},
+		{
+			name:                         "NodeGetInfo flow to controller flow: drivers entry with the same node ID is kept",
+			gateEnabled:                  true,
+			advertiseCapability:          true,
+			csiDriver:                    attachRequired,
+			existingCSINodeSpec:          storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{nodeDriver}},
+			nodeGetInfoResp:              nodeInfo,
+			expectNodeInfoFromController: true,
+			expectCSINodeSpec:            completedRegistration,
+		},
+		{
+			name:                "controller flow to NodeGetInfo flow after the feature gate is disabled: registration is removed",
+			advertiseCapability: true,
+			csiDriver:           attachRequired,
+			existingCSINodeSpec: completedRegistration,
+			nodeGetInfoResp:     nodeInfo,
+			expectCSINodeSpec:   storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{nodeDriver}},
+		},
+		{
+			name:                "NodeGetCapabilities error",
+			gateEnabled:         true,
+			advertiseCapability: true,
+			csiDriver:           attachRequired,
+			existingCSINodeSpec: completedRegistration,
+			getCapabilitiesErr:  errors.New("NodeGetCapabilities failed"),
+			nodeGetInfoResp:     nodeInfo,
+			expectErr:           true,
+		},
+		{
+			name:                 "CSIDriver lookup error",
+			gateEnabled:          true,
+			advertiseCapability:  true,
+			csiDriverLookupFails: true,
+			existingCSINodeSpec:  completedRegistration,
+			nodeGetInfoResp:      nodeInfo,
+			expectErr:            true,
+		},
+		{
+			name:                         "NodeGetInfo error in the controller flow",
+			gateEnabled:                  true,
+			advertiseCapability:          true,
+			csiDriver:                    attachRequired,
+			existingCSINodeSpec:          completedRegistration,
+			nodeGetInfoErr:               errors.New("NodeGetInfo failed"),
+			expectErr:                    true,
+			expectNodeInfoFromController: true,
+		},
+		{
+			name:                         "empty node ID in the controller flow",
+			gateEnabled:                  true,
+			advertiseCapability:          true,
+			csiDriver:                    attachRequired,
+			existingCSINodeSpec:          completedRegistration,
+			nodeGetInfoResp:              &csipbv1.NodeGetInfoResponse{MaxVolumesPerNode: 10},
+			expectErr:                    true,
+			expectNodeInfoFromController: true,
+		},
+		{
+			name:                         "CSINode update error in the controller flow",
+			gateEnabled:                  true,
+			advertiseCapability:          true,
+			csiDriver:                    attachRequired,
+			existingCSINodeSpec:          storage.CSINodeSpec{Drivers: []storage.CSINodeDriver{{Name: testDriver, NodeID: "old-node-id"}}},
+			nodeGetInfoResp:              nodeInfo,
+			rejectDriverRegistrations:    true,
+			expectErr:                    true,
+			expectNodeInfoFromController: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIControllerGetNodeInfo, tc.gateEnabled)
+			csiDrivers.Clear()
+			t.Cleanup(csiDrivers.Clear)
+
+			nodeClient := fakecsi.NewNodeClientWithNodeInfoFromController(tc.advertiseCapability)
+			nodeClient.SetGetCapabilitiesErr(tc.getCapabilitiesErr)
+			nodeClient.SetNodeGetInfoResp(tc.nodeGetInfoResp)
+			nodeClient.SetNextError(tc.nodeGetInfoErr)
+			useFakeNodeClient(t, nodeClient)
+
+			var objects []runtime.Object
+			if tc.csiDriver != nil {
+				objects = append(objects, tc.csiDriver)
+			}
+			client := fakeclient.NewSimpleClientset(objects...)
+			plug, tmpDir := newTestPlugin(t, client)
+			defer os.RemoveAll(tmpDir)
+			if tc.csiDriverLookupFails {
+				plug.csiDriverLister = nil
+			}
+
+			// The plugin initialization created the CSINode.
+			csiNode, err := client.StorageV1().CSINodes().Get(t.Context(), "fakeNode", meta.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get CSINode: %v", err)
+			}
+			csiNode.Spec = tc.existingCSINodeSpec
+			_, err = client.StorageV1().CSINodes().Update(t.Context(), csiNode, meta.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("failed to update CSINode: %v", err)
+			}
+			if tc.rejectDriverRegistrations {
+				client.PrependReactor("update", "csinodes", func(action clitesting.Action) (bool, runtime.Object, error) {
+					newCSINode := action.(clitesting.UpdateAction).GetObject().(*storage.CSINode)
+					if len(newCSINode.Spec.DriverRegistrations) == 0 {
+						return false, nil, nil
+					}
+					return true, nil, errors.New("driverRegistrations rejected")
+				})
+			}
+
+			// Act
+			err = PluginHandler.RegisterPlugin(t.Context(), testDriver, endpoint, versions, nil)
+
+			// Assert
+			checkErr(t, tc.expectErr, err)
+
+			// kubelet checks NODE_INFO_FROM_CONTROLLER only with the feature gate enabled.
+			calledGetCapabilities := nodeClient.GetCapabilitiesCallCount > 0
+			if calledGetCapabilities != tc.gateEnabled {
+				t.Errorf("expected NodeGetCapabilities call %v, got %v", tc.gateEnabled, calledGetCapabilities)
+			}
+			controllerGetNodeInfo := nodeClient.FakeNodeGetInfoRequest.GetControllerGetNodeInfo()
+			if controllerGetNodeInfo != tc.expectNodeInfoFromController {
+				t.Errorf("expected NodeGetInfo controller_get_node_info %v, got %v", tc.expectNodeInfoFromController, controllerGetNodeInfo)
+			}
+
+			driver, registered := csiDrivers.Get(testDriver)
+			if registered == tc.expectErr {
+				t.Errorf("expected driver registered %v, got %v", !tc.expectErr, registered)
+			}
+			if registered && driver.nodeInfoFromController != tc.expectNodeInfoFromController {
+				t.Errorf("expected driver nodeInfoFromController %v, got %v", tc.expectNodeInfoFromController, driver.nodeInfoFromController)
+			}
+			if tc.expectErr {
+				// The plugin manager retries a failed registration with the same versions.
+				err = PluginHandler.ValidatePlugin(t.Context(), testDriver, endpoint, versions)
+				if err != nil {
+					t.Errorf("ValidatePlugin failed after the failed registration: %v", err)
+				}
+			}
+
+			csiNode, err = client.StorageV1().CSINodes().Get(t.Context(), "fakeNode", meta.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get CSINode: %v", err)
+			}
+			diff := cmp.Diff(tc.expectCSINodeSpec, csiNode.Spec, cmpopts.EquateEmpty())
+			if diff != "" {
+				t.Errorf("unexpected CSINode spec (-want +got):\n%s", diff)
+			}
+
+			node, err := client.CoreV1().Nodes().Get(t.Context(), "fakeNode", meta.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to get Node: %v", err)
+			}
+			// Only the NodeGetInfo flow publishes the node ID and topology of the driver on the Node.
+			expectNodeInfoOnNode := !tc.expectErr && !tc.expectNodeInfoFromController
+			_, hasNodeIDAnnotation := node.Annotations[nodeIDAnnotation]
+			if hasNodeIDAnnotation != expectNodeInfoOnNode {
+				t.Errorf("expected Node annotation %s %v, got %v", nodeIDAnnotation, expectNodeInfoOnNode, hasNodeIDAnnotation)
+			}
+			_, hasTopologyLabel := node.Labels[topologyKey]
+			if hasTopologyLabel != expectNodeInfoOnNode {
+				t.Errorf("expected Node label %s %v, got %v", topologyKey, expectNodeInfoOnNode, hasTopologyLabel)
+			}
+		})
+	}
+}
+
 func TestGetNodeAllocatableUpdatePeriod(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -1545,6 +1840,146 @@ func TestIsResourceExhaustError(t *testing.T) {
 			actual := isResourceExhaustError(tc.attachment)
 			if actual != tc.expected {
 				t.Errorf("Expected isResourceExhaustError to return %v, but got %v", tc.expected, actual)
+			}
+		})
+	}
+}
+
+// TestUpdateCSIDriver checks that kubelet updates the CSINode with NodeGetInfo only for drivers that it
+// registered with NodeGetInfo.
+func TestUpdateCSIDriver(t *testing.T) {
+	testCases := []struct {
+		name              string
+		gateEnabled       bool
+		expectNodeGetInfo bool
+	}{
+		{
+			name:              "NodeGetInfo flow",
+			gateEnabled:       false,
+			expectNodeGetInfo: true,
+		},
+		{
+			name:              "controller flow",
+			gateEnabled:       true,
+			expectNodeGetInfo: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIControllerGetNodeInfo, tc.gateEnabled)
+			csiDrivers.Clear()
+			t.Cleanup(csiDrivers.Clear)
+			// The driver has no CSIDriver, so kubelet uses the controller flow if the feature gate is enabled.
+			nodeClient := fakecsi.NewNodeClientWithNodeInfoFromController(true)
+			nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{NodeId: "test-node-id", MaxVolumesPerNode: 10})
+			useFakeNodeClient(t, nodeClient)
+			client := fakeclient.NewSimpleClientset()
+			_, tmpDir := newTestPlugin(t, client)
+			defer os.RemoveAll(tmpDir)
+
+			err := PluginHandler.RegisterPlugin(t.Context(), testDriver, "endpoint", []string{"1.0.0"}, nil)
+			if err != nil {
+				t.Fatalf("RegisterPlugin failed: %v", err)
+			}
+			// The driver reports a new volume attachment limit.
+			nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{NodeId: "test-node-id", MaxVolumesPerNode: 20})
+			nodeClient.FakeNodeGetInfoRequest = nil
+			client.ClearActions()
+
+			// Act
+			err = updateCSIDriver(testDriver)
+
+			// Assert
+			if err != nil {
+				t.Errorf("updateCSIDriver failed: %v", err)
+			}
+			calledNodeGetInfo := nodeClient.FakeNodeGetInfoRequest != nil
+			if calledNodeGetInfo != tc.expectNodeGetInfo {
+				t.Errorf("expected NodeGetInfo call %v, got %v", tc.expectNodeGetInfo, calledNodeGetInfo)
+			}
+			if nodeClient.FakeNodeGetInfoRequest.GetControllerGetNodeInfo() {
+				t.Error("updateCSIDriver set controller_get_node_info")
+			}
+			updatedCSINode := hasCSINodeUpdate(client)
+			if updatedCSINode != tc.expectNodeGetInfo {
+				t.Errorf("expected CSINode update %v, got %v", tc.expectNodeGetInfo, updatedCSINode)
+			}
+		})
+	}
+}
+
+// TestVerifyExhaustedResource checks that kubelet reports a ResourceExhausted attach error in both
+// registration flows, and refreshes the volume attachment limit with NodeGetInfo only in the NodeGetInfo flow.
+func TestVerifyExhaustedResource(t *testing.T) {
+	testCases := []struct {
+		name              string
+		gateEnabled       bool
+		expectNodeGetInfo bool
+	}{
+		{
+			name:              "NodeGetInfo flow",
+			gateEnabled:       false,
+			expectNodeGetInfo: true,
+		},
+		{
+			name:              "controller flow",
+			gateEnabled:       true,
+			expectNodeGetInfo: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIControllerGetNodeInfo, tc.gateEnabled)
+			csiDrivers.Clear()
+			t.Cleanup(csiDrivers.Clear)
+			nodeClient := fakecsi.NewNodeClientWithNodeInfoFromController(true)
+			nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{NodeId: "test-node-id", MaxVolumesPerNode: 10})
+			useFakeNodeClient(t, nodeClient)
+
+			const volumeHandle = "test-volume"
+			csiDriver := getTestCSIDriver(testDriver, nil, ptr.To(true), nil)
+			csiDriver.Spec.NodeAllocatableUpdatePeriodSeconds = ptr.To[int64](60)
+			attachment := &storage.VolumeAttachment{
+				ObjectMeta: meta.ObjectMeta{
+					Name: getAttachmentName(volumeHandle, testDriver, "fakeNode"),
+				},
+				Status: storage.VolumeAttachmentStatus{
+					AttachError: &storage.VolumeError{
+						Message:   "volume attachment limit exceeded",
+						ErrorCode: ptr.To(int32(codes.ResourceExhausted)),
+					},
+				},
+			}
+			client := fakeclient.NewSimpleClientset(csiDriver, attachment)
+			plug, tmpDir := newTestPlugin(t, client)
+			defer os.RemoveAll(tmpDir)
+
+			err := PluginHandler.RegisterPlugin(t.Context(), testDriver, "endpoint", []string{"1.0.0"}, nil)
+			if err != nil {
+				t.Fatalf("RegisterPlugin failed: %v", err)
+			}
+			// The driver reports a new volume attachment limit.
+			nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{NodeId: "test-node-id", MaxVolumesPerNode: 20})
+			nodeClient.FakeNodeGetInfoRequest = nil
+			client.ClearActions()
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, testDriver, volumeHandle), false)
+
+			// Act
+			exhausted := plug.VerifyExhaustedResource(spec)
+
+			// Assert
+			if !exhausted {
+				t.Error("expected VerifyExhaustedResource to return true for a ResourceExhausted attach error")
+			}
+			calledNodeGetInfo := nodeClient.FakeNodeGetInfoRequest != nil
+			if calledNodeGetInfo != tc.expectNodeGetInfo {
+				t.Errorf("expected NodeGetInfo call %v, got %v", tc.expectNodeGetInfo, calledNodeGetInfo)
+			}
+			updatedCSINode := hasCSINodeUpdate(client)
+			if updatedCSINode != tc.expectNodeGetInfo {
+				t.Errorf("expected CSINode update %v, got %v", tc.expectNodeGetInfo, updatedCSINode)
 			}
 		})
 	}

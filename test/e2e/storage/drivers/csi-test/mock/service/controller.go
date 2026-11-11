@@ -580,6 +580,17 @@ func (s *service) ControllerGetCapabilities(
 		})
 	}
 
+	// GET_NODE_INFO requires PUBLISH_UNPUBLISH_VOLUME.
+	if s.config.NodeInfoFromController && !s.config.DisableAttach {
+		caps = append(caps, &csi.ControllerServiceCapability{
+			Type: &csi.ControllerServiceCapability_Rpc{
+				Rpc: &csi.ControllerServiceCapability_RPC{
+					Type: csi.ControllerServiceCapability_RPC_GET_NODE_INFO,
+				},
+			},
+		})
+	}
+
 	if !s.config.DisableControllerExpansion {
 		caps = append(caps, &csi.ControllerServiceCapability{
 			Type: &csi.ControllerServiceCapability_Rpc{
@@ -742,6 +753,49 @@ func (s *service) ControllerModifyVolume(
 	req *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
 	// todo: implement the functionality while we add the modifyVolume test
 	resp := &csi.ControllerModifyVolumeResponse{}
+	return resp, nil
+}
+
+func (s *service) ControllerGetNodeInfo(
+	ctx context.Context,
+	req *csi.ControllerGetNodeInfoRequest) (
+	*csi.ControllerGetNodeInfoResponse, error) {
+
+	if len(req.GetNodeId()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Node ID cannot be empty")
+	}
+	if req.GetNodeId() != s.nodeID {
+		return nil, status.Errorf(codes.NotFound, "Not matching Node ID %s to Mock Node ID %s", req.GetNodeId(), s.nodeID)
+	}
+
+	resp := &csi.ControllerGetNodeInfoResponse{}
+	if s.config.AttachLimit > 0 {
+		resp.MaxVolumesPerNode = s.config.AttachLimit
+	}
+	if s.config.EnableTopology {
+		resp.AccessibleTopology = &csi.Topology{
+			Segments: map[string]string{
+				TopologyKey: TopologyValue,
+			},
+		}
+	}
+
+	// devPathKey is the key in the volume's attributes that is set to a
+	// mock device path if the volume has been published by the controller
+	// to the specified node.
+	devPathKey := path.Join(req.GetNodeId(), "dev")
+
+	s.volsRWL.RLock()
+	defer s.volsRWL.RUnlock()
+
+	for _, v := range s.vols {
+		if v.GetVolumeContext()[devPathKey] != "" {
+			resp.PublishedVolumes = append(resp.PublishedVolumes, &csi.ControllerGetNodeInfoResponse_PublishedVolume{
+				VolumeId: v.GetVolumeId(),
+			})
+		}
+	}
+
 	return resp, nil
 }
 

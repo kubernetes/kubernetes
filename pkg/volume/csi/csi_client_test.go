@@ -85,12 +85,12 @@ func newFakeCsiDriverClientWithVolumeMountGroup(t *testing.T, stagingCapable, vo
 	}
 }
 
-func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
+func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context, controllerGetNodeInfo bool) (
 	nodeID string,
 	maxVolumePerNode int64,
 	accessibleTopology map[string]string,
 	err error) {
-	resp, err := c.nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{})
+	resp, err := c.nodeClient.NodeGetInfo(ctx, &csipbv1.NodeGetInfoRequest{ControllerGetNodeInfo: controllerGetNodeInfo})
 	topology := resp.GetAccessibleTopology()
 	if topology != nil {
 		accessibleTopology = topology.Segments
@@ -436,6 +436,7 @@ func checkErr(t *testing.T, expectedAnError bool, actualError error) {
 func TestClientNodeGetInfo(t *testing.T) {
 	testCases := []struct {
 		name                       string
+		controllerGetNodeInfo      bool
 		expectedNodeID             string
 		expectedMaxVolumePerNode   int64
 		expectedAccessibleTopology map[string]string
@@ -449,6 +450,11 @@ func TestClientNodeGetInfo(t *testing.T) {
 			expectedAccessibleTopology: map[string]string{"com.example.csi-topology/zone": "zone1"},
 		},
 		{
+			name:                  "controller_get_node_info with node ID only",
+			controllerGetNodeInfo: true,
+			expectedNodeID:        "node1",
+		},
+		{
 			name:     "grpc error",
 			mustFail: true,
 			err:      errors.New("grpc error"),
@@ -459,24 +465,29 @@ func TestClientNodeGetInfo(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 
 		fakeCloser := fake.NewCloser(t)
+		nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+		nodeClient.SetNextError(tc.err)
+		nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{
+			NodeId:            tc.expectedNodeID,
+			MaxVolumesPerNode: tc.expectedMaxVolumePerNode,
+			AccessibleTopology: &csipbv1.Topology{
+				Segments: tc.expectedAccessibleTopology,
+			},
+		})
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
 			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
-				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
-				nodeClient.SetNextError(tc.err)
-				nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{
-					NodeId:            tc.expectedNodeID,
-					MaxVolumesPerNode: tc.expectedMaxVolumePerNode,
-					AccessibleTopology: &csipbv1.Topology{
-						Segments: tc.expectedAccessibleTopology,
-					},
-				})
 				return nodeClient, fakeCloser, nil
 			},
 		}
 
-		nodeID, maxVolumePerNode, accessibleTopology, err := client.NodeGetInfo(context.Background())
+		nodeID, maxVolumePerNode, accessibleTopology, err := client.NodeGetInfo(context.Background(), tc.controllerGetNodeInfo)
 		checkErr(t, tc.mustFail, err)
+
+		controllerGetNodeInfo := nodeClient.FakeNodeGetInfoRequest.GetControllerGetNodeInfo()
+		if controllerGetNodeInfo != tc.controllerGetNodeInfo {
+			t.Errorf("expected controller_get_node_info: %v; got: %v", tc.controllerGetNodeInfo, controllerGetNodeInfo)
+		}
 
 		if nodeID != tc.expectedNodeID {
 			t.Errorf("expected nodeID: %v; got: %v", tc.expectedNodeID, nodeID)
@@ -778,6 +789,16 @@ func TestClientNodeSupportsVolumeMountGroup(t *testing.T) {
 		},
 		func(volumeMountGroupCapable bool) *fake.NodeClient {
 			return fake.NewNodeClientWithVolumeMountGroup(false /* stagingCapable */, volumeMountGroupCapable)
+		})
+}
+
+func TestClientNodeSupportsNodeInfoFromController(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsNodeInfoFromController(context.Background())
+		},
+		func(nodeInfoFromControllerCapable bool) *fake.NodeClient {
+			return fake.NewNodeClientWithNodeInfoFromController(nodeInfoFromControllerCapable)
 		})
 }
 
