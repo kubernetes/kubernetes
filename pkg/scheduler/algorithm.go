@@ -763,7 +763,11 @@ func (a *SchedulingAlgorithm) AssumeAndReserveInCache(ctx context.Context, state
 		logger.Error(err, "Scheduler cache AssumePod failed")
 		return assumedPodInfo, fwk.AsStatus(err)
 	}
-	schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+	// When in-memory nomination tracking is active, keep the nomination until
+	// Reserve and Permit succeed in prepareForBindingCycle (or clear it on failure).
+	if !schedFramework.TracksNominationInMemory(assumedPodInfo.Pod) {
+		schedFramework.DeleteNominatedPodIfExists(assumedPodInfo.Pod)
+	}
 
 	if status := a.reserve(ctx, state, schedFramework, assumedPodInfo, podInfo.Pod, host); !status.IsSuccess() {
 		if err := a.UnreserveAndForgetFromCache(ctx, state, schedFramework, assumedPodInfo, host); err != nil {

@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -89,6 +90,7 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 			QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
 			Filter:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 			Reserve:   schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
+			Permit:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "AssumeReserveTestPlugin"}}},
 			Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
 		},
 	}
@@ -97,6 +99,7 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithPodNominator(queue),
+		frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create framework: %v", err)
@@ -260,6 +263,105 @@ func TestAssumeAndReserveInCacheDeferredResize(t *testing.T) {
 	}
 	if _, err := f.algorithm.cache.GetPod(pod1); err != nil {
 		t.Errorf("expected the bound pod to stay in the cache: %v", err)
+	}
+}
+
+// TestNominationEndsAfterPermit checks that with the DRAPreemption feature
+// gate, the nomination of an assumed pod ends only after Reserve and Permit
+// succeeded or Permit returned Wait. If Reserve or Permit rejects the pod, the
+// nomination is kept, so that handleSchedulingFailure still finds it. Without
+// the feature gate, and for a pod of a pod group, the nomination ends when the
+// pod is assumed.
+func TestNominationEndsAfterPermit(t *testing.T) {
+	node1 := st.MakeNode().Name("node1").Obj()
+
+	for _, tt := range []struct {
+		name          string
+		reserveStatus *fwk.Status
+		permitStatus  *fwk.Status
+		// schedulingGroup gives the pod a scheduling group. That makes it a
+		// pod of a pod group if genericWorkload enables the GenericWorkload
+		// feature gate.
+		schedulingGroup bool
+		genericWorkload bool
+	}{
+		{name: "success"},
+		{name: "reserve failure", reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure")},
+		{name: "permit rejection", permitStatus: fwk.NewStatus(fwk.Unschedulable, "permit fake rejection")},
+		{name: "permit wait", permitStatus: fwk.NewStatus(fwk.Wait, "permit fake wait")},
+		{name: "pod group pod, success", schedulingGroup: true, genericWorkload: true},
+		{name: "pod group pod, reserve failure", reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"), schedulingGroup: true, genericWorkload: true},
+		{name: "scheduling group without GenericWorkload, reserve failure", reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"), schedulingGroup: true},
+	} {
+		for _, draPreemption := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", tt.name, draPreemption), func(t *testing.T) {
+				featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+					features.DRAPreemption:   draPreemption,
+					features.GenericWorkload: tt.genericWorkload,
+				})
+				logger, ctx := ktesting.NewTestContext(t)
+				pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
+				if tt.schedulingGroup {
+					pod1 = st.MakePod().Name("pod1").Namespace("default").UID("pod1").PodGroupName("pg").Obj()
+				}
+				endsAfterPermit := draPreemption && (!tt.schedulingGroup || !tt.genericWorkload)
+				// Permit only runs after Reserve succeeded.
+				permitRuns := tt.reserveStatus == nil
+				wantSuccess := tt.reserveStatus == nil && (tt.permitStatus == nil || tt.permitStatus.IsWait())
+
+				var f *assumeReserveFixture
+				var nominatedDuringReserve, nominatedDuringPermit bool
+				plugin := &assumeReserveTestPlugin{
+					fakePodGroupPlugin: &fakePodGroupPlugin{
+						filterStatus: map[string]*fwk.Status{pod1.Name: fwk.NewStatus(fwk.Success)},
+					},
+					reserveStatus: tt.reserveStatus,
+					permitStatus:  tt.permitStatus,
+					onReserve: func() {
+						nominatedDuringReserve = len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0
+					},
+					onPermit: func() {
+						nominatedDuringPermit = len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0
+					},
+				}
+				f = newAssumeReserveFixture(t, ctx, node1, plugin, pod1)
+				podInfo, err := framework.NewPodInfo(pod1)
+				if err != nil {
+					t.Fatalf("Failed to create PodInfo: %v", err)
+				}
+				f.fwk.AddNominatedPod(logger, podInfo, &fwk.NominatingInfo{NominatedNodeName: node1.Name, NominatingMode: fwk.ModeOverride})
+				queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+				state := framework.NewCycleState()
+				scheduleResult, err := f.algorithm.SchedulePod(ctx, f.fwk, state, queuedPodInfo)
+				if err != nil {
+					t.Fatalf("SchedulePod failed: %v", err)
+				}
+
+				sched := &Scheduler{algorithm: f.algorithm}
+				if _, status := sched.prepareForBindingCycle(ctx, state, f.fwk, queuedPodInfo, framework.NewPodsToActivate(), scheduleResult); status.IsSuccess() != wantSuccess {
+					t.Fatalf("Unexpected status of prepareForBindingCycle: %v", status)
+				}
+				if tt.permitStatus.IsWait() {
+					// Stop the timer of the waiting pod.
+					defer f.fwk.RejectWaitingPod(pod1.UID)
+				}
+				if nominatedDuringReserve != endsAfterPermit {
+					t.Errorf("Pod nominated during Reserve: got %v, want %v", nominatedDuringReserve, endsAfterPermit)
+				}
+				if want := endsAfterPermit && permitRuns; nominatedDuringPermit != want {
+					t.Errorf("Pod nominated during Permit: got %v, want %v", nominatedDuringPermit, want)
+				}
+				if plugin.unreserved == wantSuccess {
+					t.Errorf("Unreserve called: got %v, want %v", plugin.unreserved, !wantSuccess)
+				}
+				// After a rejection, the nomination survives Unreserve, and
+				// handleSchedulingFailure clears it.
+				wantNominated := endsAfterPermit && !wantSuccess
+				if nominated := len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0; nominated != wantNominated {
+					t.Errorf("Pod nominated after prepareForBindingCycle: got %v, want %v", nominated, wantNominated)
+				}
+			})
+		}
 	}
 }
 
@@ -990,16 +1092,26 @@ func (f *cycleRecordingFramework) GetNodeHint(ctx context.Context, pod *v1.Pod, 
 }
 
 var _ fwk.ReservePlugin = &assumeReserveTestPlugin{}
+var _ fwk.PermitPlugin = &assumeReserveTestPlugin{}
 
 // assumeReserveTestPlugin embeds fakePodGroupPlugin so a single mock instance can test both standard cache assumption
 // and pod-group snapshot assumption paths without duplicating plugin registration logic across subtests.
 type assumeReserveTestPlugin struct {
 	*fakePodGroupPlugin
 	reserveStatus *fwk.Status
-	unreserved    bool
+	// permitStatus is returned by Permit, Success if nil.
+	permitStatus *fwk.Status
+	unreserved   bool
+	// onReserve, if set, gets called by Reserve.
+	onReserve func()
+	// onPermit, if set, gets called by Permit.
+	onPermit func()
 }
 
 func (p *assumeReserveTestPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if p.onReserve != nil {
+		p.onReserve()
+	}
 	if p.reserveStatus != nil {
 		return p.reserveStatus
 	}
@@ -1008,6 +1120,16 @@ func (p *assumeReserveTestPlugin) Reserve(ctx context.Context, state fwk.CycleSt
 
 func (p *assumeReserveTestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
 	p.unreserved = true
+}
+
+func (p *assumeReserveTestPlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
+	if p.onPermit != nil {
+		p.onPermit()
+	}
+	if p.permitStatus != nil {
+		return p.permitStatus, time.Minute
+	}
+	return fwk.NewStatus(fwk.Success), 0
 }
 
 func isPodInSnapshot(snapshot *internalcache.Snapshot, nodeName, podName string) bool {

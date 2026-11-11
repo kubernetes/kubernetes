@@ -265,6 +265,11 @@ func (sched *Scheduler) prepareForBindingCycle(
 
 		return assumedPodInfo, runPermitStatus
 	}
+	if schedFramework.TracksNominationInMemory(assumedPod) {
+		// Reserve and Permit succeeded, which ends the nomination that
+		// AssumeAndReserveInCache kept.
+		schedFramework.DeleteNominatedPodIfExists(assumedPod)
+	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
 	if len(podsToActivate.Map) != 0 {
@@ -851,6 +856,10 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	pod := podInfo.Pod
 	nominatedPodInfo := podInfo.PodInfo
 	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod)
+	// With in-memory nomination tracking, the nomination is updated before
+	// the pod is added back to the queue, see below.
+	tracksNomination := !isDeferredResize && podFwk.TracksNominationInMemory(pod)
+	nominated := false
 
 	if !isDeferredResize {
 		switch reason {
@@ -919,6 +928,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			pod = podInfo.Pod
 			nominatedPodInfo = podInfo.PodInfo
+			if tracksNomination {
+				// Once the pod is back in the queue, the scheduling goroutine can pop
+				// it and nominate it again. When a binding cycle fails, this runs in
+				// the binding goroutine and would then overwrite that newer nomination.
+				sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
+				nominated = true
+			}
 			if err := sched.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred")
 			}
@@ -931,7 +947,15 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
 	// Skip for deferred resize pods as they are already bound to their node and do not use NominatedNodeName.
-	if !isDeferredResize && sched.SchedulingQueue != nil {
+	if !isDeferredResize && sched.SchedulingQueue != nil && !nominated {
+		if tracksNomination {
+			// The pod was not added back to the queue, so nominatedPodInfo is still the
+			// pod of the scheduling cycle. If Reserve or Permit rejected it, it carries
+			// the node that it was assumed on. Clear that node: the scheduling queue
+			// does not requeue the pods blocked by a nomination when the nominated pod
+			// stays assumed on its nominated node.
+			nominatedPodInfo.Pod.Spec.NodeName = ""
+		}
 		sched.SchedulingQueue.AddNominatedPod(logger, nominatedPodInfo, nominatingInfo)
 	}
 

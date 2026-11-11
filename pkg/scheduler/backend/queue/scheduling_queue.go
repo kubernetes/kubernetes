@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/informers"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/resource"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -97,6 +98,7 @@ type PodSigner func(ctx context.Context, pod *v1.Pod) fwk.PodSignature
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
 	fwk.PodNominator
+	framework.NominatedNodeNameGetter
 	Add(ctx context.Context, pod *v1.Pod)
 	// Activate moves the given pods to activeQ.
 	// If a pod isn't found in unschedulableEntities or backoffQ and it's in-flight,
@@ -836,8 +838,53 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, pl fwk.PreEnque
 // It locks the PriorityQueue to make sure it won't race with any other method.
 func (p *PriorityQueue) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
 	p.lock.Lock()
+	defer p.processNominationChangesAndUnlock(logger)
 	p.nominator.addNominatedPod(logger, pi, nominatingInfo)
+}
+
+// processNominationChangesAndUnlock processes the nomination changes recorded
+// while the caller held p.lock and then releases p.lock. Methods that can
+// change nominations must call it instead of p.lock.Unlock().
+func (p *PriorityQueue) processNominationChangesAndUnlock(logger klog.Logger) {
+	p.processNominationChangesLocked(logger)
 	p.lock.Unlock()
+}
+
+// processNominationChangesLocked drains pending nomination changes from
+// p.nominator (recorded only for pods tracked in memory) and requeues
+// unschedulable pods with priority <= priority(pod): when a previous
+// nomination ends or moves to another node, it emits EventAssignedPodDelete.
+// If the scheduler assumed the pod on oldNodeName, it skips
+// EventAssignedPodDelete because the scheduler cache now accounts for those
+// node resources.
+//
+// The pod whose nomination changed is requeued as well, like when the event
+// handlers emit EventAssignedPodDelete for a changed nominated node name.
+//
+// NOTE: The caller must hold p.lock, and must not hold the activeQ, backoffQ,
+// or nominator locks.
+func (p *PriorityQueue) processNominationChangesLocked(logger klog.Logger) {
+	for _, change := range p.nominator.popAllChanges() {
+		if change.oldNodeName == "" || (change.newNodeName == "" && change.pod.Spec.NodeName == change.oldNodeName) {
+			continue
+		}
+		priority := corev1helpers.PodPriority(change.pod)
+		preCheck := func(entity framework.QueuedEntityInfo) bool {
+			return entity.GetPriority() <= priority
+		}
+		// Queueing hints for AssignedPod/Delete must see an unassigned pod
+		// with the nomination that ended, like for a deleted nominated pod.
+		// A pod assumed on another node has that node in Spec.NodeName, and
+		// hints would take it for a pod deleted from that node.
+		oldPod := change.pod
+		if oldPod.Spec.NodeName != "" || oldPod.Status.NominatedNodeName != change.oldNodeName {
+			podCopy := *change.pod
+			podCopy.Spec.NodeName = ""
+			podCopy.Status.NominatedNodeName = change.oldNodeName
+			oldPod = &podCopy
+		}
+		p.moveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, oldPod, nil, preCheck)
+	}
 }
 
 // moveToActiveQ tries to add the entity to the active queue.
@@ -910,11 +957,44 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.Queu
 	return true
 }
 
+// DeleteNominatedPodIfExists removes the nomination of an assumed pod.
+func (p *PriorityQueue) DeleteNominatedPodIfExists(pod *v1.Pod) {
+	if !p.nominator.TracksNominationInMemory(pod) {
+		// No nomination change is recorded, so p.lock is not needed.
+		p.nominator.deleteNominatedPodIfExists(pod)
+		return
+	}
+	if !p.nominator.isNominated(pod.UID) {
+		// Most assumed pods were never nominated. Return before acquiring
+		// p.lock, which event handlers hold while they iterate over the
+		// unschedulable pods, to avoid blocking the scheduling goroutine.
+		return
+	}
+	p.lock.Lock()
+	// fwk.PodNominator does not pass a logger.
+	defer p.processNominationChangesAndUnlock(klog.TODO())
+	p.nominator.deleteNominatedPodIfExists(pod)
+}
+
+// UpdateNominatedPod replaces the pod object of a nomination. The nomination
+// changes if the nominated node name of the pod changed. Methods that already
+// hold p.lock must call p.nominator.UpdateNominatedPod instead.
+func (p *PriorityQueue) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo fwk.PodInfo) {
+	if !p.nominator.TracksNominationInMemory(oldPod) {
+		// No nomination change is recorded, so p.lock is not needed.
+		p.nominator.UpdateNominatedPod(logger, oldPod, newPodInfo)
+		return
+	}
+	p.lock.Lock()
+	defer p.processNominationChangesAndUnlock(logger)
+	p.nominator.UpdateNominatedPod(logger, oldPod, newPodInfo)
+}
+
 // Add adds a pod to the active queue. It should be called only when a new pod
 // is added so there is no chance the pod is already in active/unschedulable/backoff queues
 func (p *PriorityQueue) Add(ctx context.Context, pod *v1.Pod) {
 	p.lock.Lock()
-	defer p.lock.Unlock()
+	defer p.processNominationChangesAndUnlock(klog.FromContext(ctx))
 
 	p.addPod(ctx, pod)
 }
@@ -1414,9 +1494,9 @@ func (p *PriorityQueue) InFlightPods() []*v1.Pod {
 // become schedulable and adds the updated one to the active queue.
 // If pod is not present in any of the queues, it is added to the active queue.
 func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
 	logger := klog.FromContext(ctx)
+	p.lock.Lock()
+	defer p.processNominationChangesAndUnlock(logger)
 
 	// Because the pod itself is being updated here, events are associated with the resource TargetPod.
 	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
@@ -1427,7 +1507,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		entityLookup, hasRoot = p.workloadForest.getRootLookupInfoForPod(logger, oldPod)
 		if !hasRoot {
 			if pInfo := p.incompletePodGroupPods.update(newPod); pInfo != nil {
-				p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+				p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 				pInfo.PodSignature = p.signPod(ctx, newPod)
 			}
 			return
@@ -1456,7 +1536,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		}
 		// If the entity is already in the active queue, just update the pod there.
 		if pInfo := unlockedActiveQ.update(newPod, entityLookup); pInfo != nil {
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 			pInfo.PodSignature = p.signPod(ctx, newPod)
 			updated = true
 			return
@@ -1464,7 +1544,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 
 		// If the entity is in the backoff queue, update the pod there.
 		if pInfo := p.backoffQ.update(newPod, entityLookup); pInfo != nil {
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 			pInfo.PodSignature = p.signPod(ctx, newPod)
 			updated = true
 			return
@@ -1493,7 +1573,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			p.addPod(ctx, newPod)
 			return
 		}
-		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+		p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 		pInfo.PodSignature = p.signPod(ctx, newPod)
 
 		// When unscheduled Pods are updated, we check with QueueingHint
@@ -1520,7 +1600,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 
 	if p.isPodGroupMember(newPod) {
 		if pInfo := p.pendingPodGroupPods.update(newPod); pInfo != nil {
-			p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
+			p.nominator.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
 			pInfo.PodSignature = p.signPod(ctx, newPod)
 			return
 		}
@@ -1546,9 +1626,9 @@ func decreaseUnschedulableReasonMetric(entity framework.QueuedEntityInfo) {
 // It assumes the pod is only in one structure.
 func (p *PriorityQueue) Delete(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Lock()
-	defer p.lock.Unlock()
+	defer p.processNominationChangesAndUnlock(logger)
 
-	p.DeleteNominatedPodIfExists(pod)
+	p.nominator.deleteNominatedPodIfExists(pod)
 	if p.isPodGroupMember(pod) {
 		p.deletePodGroupMember(logger, pod)
 	} else {

@@ -58,6 +58,21 @@ type nominator struct {
 	// A pod with a scheduling group is scheduled as a pod of a pod group only
 	// if it is.
 	genericWorkload bool
+	// changes holds the nomination changes that the PriorityQueue has not
+	// processed yet. They are recorded under nLock. Processing them needs
+	// the activeQ and backoffQ locks, which must not be acquired while nLock
+	// is held, so PriorityQueue.processNominationChangesAndUnlock does it.
+	changes []nominationChange
+}
+
+// nominationChange describes a change of the node that a pod is nominated to
+// in memory. An empty node name means that the pod is not nominated.
+type nominationChange struct {
+	// pod is the pod object that was passed to the nominator with the
+	// change. Spec.NodeName is set if the pod is assumed.
+	pod         *v1.Pod
+	oldNodeName string
+	newNodeName string
 }
 
 func newPodNominator(podLister listersv1.PodLister, draPreemption, genericWorkload bool) *nominator {
@@ -83,6 +98,8 @@ func newPodNominator(podLister listersv1.PodLister, draPreemption, genericWorklo
 //     new pod object have the same nominated node name.
 //   - A pod object with the name of the pod and a different UID does not
 //     allow nominating the pod.
+//   - The nominator records every change of the nomination in changes, so
+//     that the PriorityQueue can requeue the pods blocked by the nomination.
 //
 // Pods of pod groups are excluded in alpha: a pod group scheduling cycle
 // removes the nomination of a pod and restores it from the pod object for
@@ -98,13 +115,40 @@ func (npm *nominator) TracksNominationInMemory(pod *v1.Pod) bool {
 	return true
 }
 
+// recordChangeUnlocked records a nomination change of a tracked pod if the
+// pod is no longer nominated to oldNodeName. It records nothing if the
+// nominator removed and re-added the same nomination, which it does for every
+// pod update, or if a pod update left the nomination in memory unchanged.
+func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string) {
+	if !npm.TracksNominationInMemory(pod) {
+		return
+	}
+	if newNodeName := npm.nominatedPodToNode[pod.UID]; newNodeName != oldNodeName {
+		npm.changes = append(npm.changes, nominationChange{pod: pod, oldNodeName: oldNodeName, newNodeName: newNodeName})
+	}
+}
+
+// popAllChanges returns the recorded nomination changes and clears them.
+func (npm *nominator) popAllChanges() []nominationChange {
+	if !npm.draPreemption {
+		return nil
+	}
+	npm.nLock.Lock()
+	defer npm.nLock.Unlock()
+	changes := npm.changes
+	npm.changes = nil
+	return changes
+}
+
 // addNominatedPod adds a pod to the nominated pods of the given node.
 // This is called during the preemption process when a node is nominated to run
 // the pod. We update the nominator's structure before sending an API request to update the pod
 // object, to avoid races with the following scheduling cycles.
 func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
 	npm.nLock.Lock()
+	oldNodeName := npm.nominatedPodToNode[pi.GetPod().UID]
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
+	npm.recordChangeUnlocked(pi.GetPod(), oldNodeName)
 	npm.nLock.Unlock()
 }
 
@@ -188,15 +232,27 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	}
 	// We update irrespective of the nominatedNodeName changed or not, to ensure
 	// that pod pointer is updated.
+	nominatedNode := npm.nominatedPodToNode[oldPod.UID]
 	npm.deleteUnlocked(oldPod)
 	npm.addNominatedPodUnlocked(logger, newPodInfo, nominatingInfo)
+	npm.recordChangeUnlocked(newPodInfo.GetPod(), nominatedNode)
 }
 
-// DeleteNominatedPodIfExists deletes <pod> from nominatedPods.
-func (npm *nominator) DeleteNominatedPodIfExists(pod *v1.Pod) {
+// deleteNominatedPodIfExists deletes <pod> from nominatedPods.
+func (npm *nominator) deleteNominatedPodIfExists(pod *v1.Pod) {
 	npm.nLock.Lock()
+	oldNodeName := npm.nominatedPodToNode[pod.UID]
 	npm.deleteUnlocked(pod)
+	npm.recordChangeUnlocked(pod, oldNodeName)
 	npm.nLock.Unlock()
+}
+
+// isNominated returns true if the pod is nominated in memory.
+func (npm *nominator) isNominated(uid types.UID) bool {
+	npm.nLock.RLock()
+	defer npm.nLock.RUnlock()
+	_, nominated := npm.nominatedPodToNode[uid]
+	return nominated
 }
 
 func (npm *nominator) deleteUnlocked(p *v1.Pod) {
