@@ -22,7 +22,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"math"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -41,7 +40,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -959,16 +957,18 @@ func TestSetMigrationAnnotation(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Logf("test case: %s", tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("test case: %s", tc.name)
 
-		modified := setMigrationAnnotation(tc.migratedPlugins, tc.existingNode)
-		if modified != tc.expectModified {
-			t.Errorf("Expected modified to be %v but got %v instead", tc.expectModified, modified)
-		}
+			modified := setMigrationAnnotation(tc.migratedPlugins, tc.existingNode)
+			if modified != tc.expectModified {
+				t.Errorf("Expected modified to be %v but got %v instead", tc.expectModified, modified)
+			}
 
-		if !reflect.DeepEqual(tc.expectedNode, tc.existingNode) {
-			t.Errorf("Expected CSINode: %v, but got: %v", tc.expectedNode, tc.existingNode)
-		}
+			if !reflect.DeepEqual(tc.expectedNode, tc.existingNode) {
+				t.Errorf("Expected CSINode: %v, but got: %v", tc.expectedNode, tc.existingNode)
+			}
+		})
 	}
 }
 
@@ -999,52 +999,47 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		tCtx := ktesting.Init(t)
-		t.Logf("test case: %q", tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			t.Logf("test case: %q", tc.name)
 
-		// Arrange
-		nodeName := tc.existingNode.Name
-		client := fake.NewSimpleClientset(tc.existingNode)
+			// Arrange
+			nodeName := tc.existingNode.Name
+			client := fake.NewSimpleClientset(tc.existingNode)
 
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
-			tmpDir,
-			client,
-			nil,
-			nodeName,
-			nil,
-			nil,
-		)
+			tmpDir := t.TempDir()
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
+				tmpDir,
+				client,
+				nil,
+				nodeName,
+				nil,
+				nil,
+			)
 
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
+			nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
 
-		// Act
-		_, err = nim.CreateCSINode(tCtx)
-		if err != nil {
-			t.Errorf("expected no error from creating CSINodeinfo but got: %v", err)
-			continue
-		}
-		err = nim.InstallCSIDriver(tCtx, driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
-		if err != nil {
-			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
-			continue
-		}
+			// Act
+			_, err := nim.CreateCSINode(tCtx)
+			if err != nil {
+				t.Fatalf("expected no error from creating CSINodeinfo but got: %v", err)
+			}
+			err = nim.InstallCSIDriver(tCtx, driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+			if err != nil {
+				t.Fatalf("expected no error from InstallCSIDriver call but got: %v", err)
+			}
 
-		// Assert
-		nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			t.Errorf("error getting CSINode: %v", err)
-			continue
-		}
+			// Assert
+			nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("error getting CSINode: %v", err)
+			}
 
-		driver := nodeInfo.Spec.Drivers[0]
-		if driver.Name != driverName || driver.NodeID != nodeID {
-			t.Errorf("expected Driver to be %q and NodeID to be %q, but got: %q:%q", driverName, nodeID, driver.Name, driver.NodeID)
-		}
+			driver := nodeInfo.Spec.Drivers[0]
+			if driver.Name != driverName || driver.NodeID != nodeID {
+				t.Fatalf("expected Driver to be %q and NodeID to be %q, but got: %q:%q", driverName, nodeID, driver.Name, driver.NodeID)
+			}
+		})
 	}
 }
 
@@ -1061,87 +1056,87 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 
 func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 	for _, tc := range testcases {
-		tCtx := ktesting.Init(t)
-		t.Logf("test case: %q", tc.name)
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			t.Logf("test case: %q", tc.name)
 
-		//// Arrange
-		nodeName := tc.existingNode.Name
-		client := getClientSet(tc.existingNode, tc.existingCSINode)
+			//// Arrange
+			nodeName := tc.existingNode.Name
+			client := getClientSet(tc.existingNode, tc.existingCSINode)
 
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		defer os.RemoveAll(tmpDir)
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
-			tmpDir,
-			client,
-			nil,
-			nodeName,
-			nil,
-			nil,
-		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
+			tmpDir := t.TempDir()
+			host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
+				tmpDir,
+				client,
+				nil,
+				nodeName,
+				nil,
+				nil,
+			)
+			nim := NewNodeInfoManager(types.NodeName(nodeName), host, tc.migratedPlugins)
 
-		//// Act
-		nim.CreateCSINode(tCtx)
-		if addNodeInfo {
-			err = nim.InstallCSIDriver(tCtx, tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
-		} else {
-			err = nim.UninstallCSIDriver(tCtx, tc.driverName)
-		}
-
-		//// Assert
-		if tc.expectFail {
-			if err == nil {
-				t.Errorf("expected an error from InstallCSIDriver call but got none")
+			//// Act
+			// Some cases start with a CSINode that already exists.
+			if _, err := nim.CreateCSINode(tCtx); err != nil && !errors.IsAlreadyExists(err) {
+				t.Fatalf("expected no error from creating CSINode but got: %v", err)
 			}
-			continue
-		} else if err != nil {
-			t.Errorf("expected no error from InstallCSIDriver call but got: %v", err)
-			continue
-		}
-
-		actions := client.Actions()
-
-		var node *v1.Node
-		if action := hasPatchAction(actions); action != nil {
-			node, err = applyNodeStatusPatch(tc.existingNode, action.(clienttesting.PatchActionImpl).GetPatch())
-			assert.NoError(t, err)
-		} else {
-			node, err = client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			assert.NoError(t, err)
-		}
-
-		if node == nil {
-			t.Errorf("error getting node: %v", err)
-			continue
-		}
-
-		if !helper.Semantic.DeepEqual(node, tc.expectedNode) {
-			t.Errorf("expected Node %v; got: %v", tc.expectedNode, node)
-		}
-
-		// CSINode validation
-		nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				t.Errorf("error getting CSINode: %v", err)
+			var err error
+			if addNodeInfo {
+				err = nim.InstallCSIDriver(tCtx, tc.driverName, tc.inputNodeID, tc.inputVolumeLimit, tc.inputTopology)
+			} else {
+				err = nim.UninstallCSIDriver(tCtx, tc.driverName)
 			}
-			continue
-		}
-		if !helper.Semantic.DeepEqual(nodeInfo, tc.expectedCSINode) {
-			t.Errorf("expected CSINode %v; got: %v", tc.expectedCSINode, nodeInfo)
-		}
 
-		if !addNodeInfo && tc.existingCSINode != nil && tc.existingNode != nil {
-			if tc.hasModified && helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
-				t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+			//// Assert
+			if tc.expectFail {
+				if err == nil {
+					t.Fatalf("expected an error from InstallCSIDriver call but got none")
+				}
+				return
+			} else if err != nil {
+				t.Fatalf("expected no error from InstallCSIDriver call but got: %v", err)
 			}
-			if !tc.hasModified && !helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
-				t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+
+			actions := client.Actions()
+
+			var node *v1.Node
+			if action := hasPatchAction(actions); action != nil {
+				node, err = applyNodeStatusPatch(tc.existingNode, action.(clienttesting.PatchActionImpl).GetPatch())
+				assert.NoError(t, err)
+			} else {
+				node, err = client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+				assert.NoError(t, err)
 			}
-		}
+
+			if node == nil {
+				t.Fatalf("error getting node: %v", err)
+			}
+
+			if !helper.Semantic.DeepEqual(node, tc.expectedNode) {
+				t.Errorf("expected Node %v; got: %v", tc.expectedNode, node)
+			}
+
+			// CSINode validation
+			nodeInfo, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					t.Fatalf("error getting CSINode: %v", err)
+				}
+				return
+			}
+			if !helper.Semantic.DeepEqual(nodeInfo, tc.expectedCSINode) {
+				t.Errorf("expected CSINode %v; got: %v", tc.expectedCSINode, nodeInfo)
+			}
+
+			if !addNodeInfo && tc.existingCSINode != nil && tc.existingNode != nil {
+				if tc.hasModified && helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
+					t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+				}
+				if !tc.hasModified && !helper.Semantic.DeepEqual(nodeInfo, tc.existingCSINode) {
+					t.Errorf("existing CSINode %v; got: %v", tc.existingCSINode, nodeInfo)
+				}
+			}
+		})
 	}
 }
 
