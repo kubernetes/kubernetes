@@ -200,6 +200,8 @@ func NewSchedulingQueue(
 //     newly arriving Pods are placed in `pendingPodGroupPods` to wait for the PodGroup to be requeued.
 type PriorityQueue struct {
 	*nominator
+	// nominationChangeHandler is called by processNominationChangesLocked.
+	nominationChangeHandler NominationChangeHandler
 
 	stop  chan struct{}
 	clock clock.WithTicker
@@ -293,10 +295,26 @@ type priorityQueueOptions struct {
 	queueingHintMap                   QueueingHintMapPerProfile
 	apiDispatcher                     fwk.APIDispatcher
 	podSigners                        map[string]PodSigner
+	nominationChangeHandler           NominationChangeHandler
 }
+
+// NominationChangeHandler gets called for every change of the node that a
+// pod is nominated to in memory, while the queue is locked. It returns
+// events for resources which became available because of the change. It
+// doesn't get called for pods of pod groups, whose nominations the queue
+// doesn't track in memory.
+type NominationChangeHandler func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent
 
 // Option configures a PriorityQueue
 type Option func(*priorityQueueOptions)
+
+// WithNominationChangeHandler sets the function which gets called for every
+// change of the node that a pod is nominated to in memory.
+func WithNominationChangeHandler(handler NominationChangeHandler) Option {
+	return func(o *priorityQueueOptions) {
+		o.nominationChangeHandler = handler
+	}
+}
 
 // WithClock sets clock for PriorityQueue, the default clock is clock.RealClock.
 func WithClock(clock clock.WithTicker) Option {
@@ -482,6 +500,7 @@ func NewPriorityQueue(
 	pq.activeQ = newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](lessConverted), metrics.NewActiveEntitiesRecorder()), options.metricsRecorder, backoffQPopper)
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	pq.nominator = newPodNominator(options.podLister, utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption), isGenericWorkloadEnabled)
+	pq.nominationChangeHandler = options.nominationChangeHandler
 
 	return pq
 }
@@ -852,11 +871,13 @@ func (p *PriorityQueue) processNominationChangesAndUnlock(logger klog.Logger) {
 
 // processNominationChangesLocked drains pending nomination changes from
 // p.nominator (recorded only for pods tracked in memory) and requeues
-// unschedulable pods with priority <= priority(pod): when a previous
-// nomination ends or moves to another node, it emits EventAssignedPodDelete.
-// If the scheduler assumed the pod on oldNodeName, it skips
-// EventAssignedPodDelete because the scheduler cache now accounts for those
-// node resources.
+// unschedulable pods with priority <= priority(pod):
+//  1. It calls p.nominationChangeHandler so plugins update held resources, and
+//     dispatches the returned events to the queue.
+//  2. When a previous nomination ends or moves to another node, it emits
+//     EventAssignedPodDelete. If the scheduler assumed the pod on oldNodeName,
+//     it skips EventAssignedPodDelete because the scheduler cache now accounts
+//     for those node resources.
 //
 // The pod whose nomination changed is requeued as well, like when the event
 // handlers emit EventAssignedPodDelete for a changed nominated node name.
@@ -865,12 +886,20 @@ func (p *PriorityQueue) processNominationChangesAndUnlock(logger klog.Logger) {
 // or nominator locks.
 func (p *PriorityQueue) processNominationChangesLocked(logger klog.Logger) {
 	for _, change := range p.nominator.popAllChanges() {
-		if change.oldNodeName == "" || (change.newNodeName == "" && change.pod.Spec.NodeName == change.oldNodeName) {
-			continue
-		}
 		priority := corev1helpers.PodPriority(change.pod)
 		preCheck := func(entity framework.QueuedEntityInfo) bool {
 			return entity.GetPriority() <= priority
+		}
+		if p.nominationChangeHandler != nil {
+			for _, event := range p.nominationChangeHandler(logger, change.pod, change.oldNodeName, change.newNodeName) {
+				p.moveAllToActiveOrBackoffQueue(logger, event.Event, event.OldObj, event.NewObj, preCheck)
+			}
+		}
+		// A pod that was assumed on its nominated node, or nominated to the
+		// same node again, keeps the node resources that it occupied there.
+		if change.oldNodeName == "" || change.oldNodeName == change.newNodeName ||
+			(change.newNodeName == "" && change.pod.Spec.NodeName == change.oldNodeName) {
+			continue
 		}
 		// Queueing hints for AssignedPod/Delete must see an unassigned pod
 		// with the nomination that ended, like for a deleted nominated pod.

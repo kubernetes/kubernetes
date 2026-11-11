@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
@@ -61,6 +62,15 @@ type assumeReserveFixture struct {
 func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	plugin *assumeReserveTestPlugin, pods ...*v1.Pod) *assumeReserveFixture {
 	t.Helper()
+	return newAssumeReserveFixtureWithNominations(t, ctx, node, plugin, nil, pods...)
+}
+
+// newAssumeReserveFixtureWithNominations additionally enables
+// nominationExtensions, if not nil, and reports nomination changes to it
+// like the scheduler does.
+func newAssumeReserveFixtureWithNominations(t *testing.T, ctx context.Context, node *v1.Node,
+	plugin *assumeReserveTestPlugin, nominationExtensions *tf.FakeNominationExtensionsPlugin, pods ...*v1.Pod) *assumeReserveFixture {
+	t.Helper()
 
 	logger := klog.FromContext(ctx)
 
@@ -75,7 +85,9 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	cache := internalcache.New(ctx, nil, true, false)
 	cache.AddNode(logger, node)
 	snapshot := internalcache.NewEmptySnapshot()
-	queue := internalqueue.NewTestQueueWithObjects(ctx, nil, queued)
+	// Filled in once the framework exists.
+	profiles := profile.Map{}
+	queue := internalqueue.NewTestQueueWithObjects(ctx, nil, queued, internalqueue.WithNominationChangeHandler(newNominationChangeHandler(profiles)))
 
 	registry := frameworkruntime.Registry{
 		queuesort.Name:     queuesort.New,
@@ -94,6 +106,10 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 			Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
 		},
 	}
+	if nominationExtensions != nil {
+		registry[nominationExtensions.Name()] = tf.NewFakeNominationExtensionsPlugin(nominationExtensions)
+		profileCfg.Plugins.PreFilter = schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: nominationExtensions.Name()}}}
+	}
 
 	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
 		frameworkruntime.WithInformerFactory(informerFactory),
@@ -104,6 +120,7 @@ func newAssumeReserveFixture(t *testing.T, ctx context.Context, node *v1.Node,
 	if err != nil {
 		t.Fatalf("Failed to create framework: %v", err)
 	}
+	profiles[profileCfg.SchedulerName] = schedFwk
 	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
 		t.Fatalf("Failed to update snapshot: %v", err)
 	}
@@ -268,10 +285,11 @@ func TestAssumeAndReserveInCacheDeferredResize(t *testing.T) {
 
 // TestNominationEndsAfterPermit checks that with the DRAPreemption feature
 // gate, the nomination of an assumed pod ends only after Reserve and Permit
-// succeeded or Permit returned Wait. If Reserve or Permit rejects the pod, the
+// succeeded or Permit returned Wait, so that NominationExtensions can compare
+// it with what the pod reserved. If Reserve or Permit rejects the pod, the
 // nomination is kept, so that handleSchedulingFailure still finds it. Without
 // the feature gate, and for a pod of a pod group, the nomination ends when the
-// pod is assumed.
+// pod is assumed, and NominationExtensions are not called.
 func TestNominationEndsAfterPermit(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
 
@@ -284,14 +302,60 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 		// feature gate.
 		schedulingGroup bool
 		genericWorkload bool
+		// wantCalls are the NominationExtensions calls with the feature gate.
+		wantCalls []string
 	}{
-		{name: "success"},
-		{name: "reserve failure", reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure")},
-		{name: "permit rejection", permitStatus: fwk.NewStatus(fwk.Unschedulable, "permit fake rejection")},
-		{name: "permit wait", permitStatus: fwk.NewStatus(fwk.Wait, "permit fake wait")},
-		{name: "pod group pod, success", schedulingGroup: true, genericWorkload: true},
-		{name: "pod group pod, reserve failure", reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"), schedulingGroup: true, genericWorkload: true},
-		{name: "scheduling group without GenericWorkload, reserve failure", reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"), schedulingGroup: true},
+		{
+			name: "success",
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=node1",
+			},
+		},
+		{
+			name:          "reserve failure",
+			reserveStatus: fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=",
+			},
+		},
+		{
+			name:         "permit rejection",
+			permitStatus: fwk.NewStatus(fwk.Unschedulable, "permit fake rejection"),
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=",
+			},
+		},
+		{
+			name:         "permit wait",
+			permitStatus: fwk.NewStatus(fwk.Wait, "permit fake wait"),
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=node1",
+			},
+		},
+		{
+			name:            "pod group pod, success",
+			schedulingGroup: true,
+			genericWorkload: true,
+		},
+		{
+			name:            "pod group pod, reserve failure",
+			reserveStatus:   fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			schedulingGroup: true,
+			genericWorkload: true,
+		},
+		{
+			name:            "scheduling group without GenericWorkload, reserve failure",
+			reserveStatus:   fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			schedulingGroup: true,
+			wantCalls: []string{
+				"AddNomination default/pod1 node1 assigned= prepared=<nil>",
+				"RemoveNomination default/pod1 node1 assigned=",
+			},
+		},
 	} {
 		for _, draPreemption := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/DRAPreemption=%v", tt.name, draPreemption), func(t *testing.T) {
@@ -300,9 +364,9 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 					features.GenericWorkload: tt.genericWorkload,
 				})
 				logger, ctx := ktesting.NewTestContext(t)
-				pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
+				pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").SchedulerName("default-scheduler").Obj()
 				if tt.schedulingGroup {
-					pod1 = st.MakePod().Name("pod1").Namespace("default").UID("pod1").PodGroupName("pg").Obj()
+					pod1 = st.MakePod().Name("pod1").Namespace("default").UID("pod1").SchedulerName("default-scheduler").PodGroupName("pg").Obj()
 				}
 				endsAfterPermit := draPreemption && (!tt.schedulingGroup || !tt.genericWorkload)
 				// Permit only runs after Reserve succeeded.
@@ -324,7 +388,8 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 						nominatedDuringPermit = len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0
 					},
 				}
-				f = newAssumeReserveFixture(t, ctx, node1, plugin, pod1)
+				nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+				f = newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, pod1)
 				podInfo, err := framework.NewPodInfo(pod1)
 				if err != nil {
 					t.Fatalf("Failed to create PodInfo: %v", err)
@@ -338,7 +403,8 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 				}
 
 				sched := &Scheduler{algorithm: f.algorithm}
-				if _, status := sched.prepareForBindingCycle(ctx, state, f.fwk, queuedPodInfo, framework.NewPodsToActivate(), scheduleResult); status.IsSuccess() != wantSuccess {
+				_, status := sched.prepareForBindingCycle(ctx, state, f.fwk, queuedPodInfo, framework.NewPodsToActivate(), scheduleResult)
+				if status.IsSuccess() != wantSuccess {
 					t.Fatalf("Unexpected status of prepareForBindingCycle: %v", status)
 				}
 				if tt.permitStatus.IsWait() {
@@ -360,6 +426,17 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 				if nominated := len(f.fwk.NominatedPodsForNode(logger, node1.Name)) > 0; nominated != wantNominated {
 					t.Errorf("Pod nominated after prepareForBindingCycle: got %v, want %v", nominated, wantNominated)
 				}
+				if !status.IsSuccess() {
+					// What handleSchedulingFailure does.
+					f.fwk.AddNominatedPod(logger, podInfo, clearNominatedNode)
+				}
+				var wantCalls []string
+				if draPreemption {
+					wantCalls = tt.wantCalls
+				}
+				if diff := cmp.Diff(wantCalls, nominationExtensions.Calls()); diff != "" {
+					t.Errorf("Unexpected NominationExtensions calls (-want,+got):\n%s", diff)
+				}
 			})
 		}
 	}
@@ -367,15 +444,23 @@ func TestNominationEndsAfterPermit(t *testing.T) {
 
 // TestAssumeAndReserveInSnapshot covers the pod group scheduling cycle, where the
 // placement is only tentative: it goes into the snapshot rather than the cache, and
-// the returned revert function has to undo every part of it.
+// the returned revert function has to undo every part of it. That removes and
+// restores the nomination of the pod, also with the DRAPreemption feature gate,
+// which doesn't cover pods of pod groups: plugins with NominationExtensions don't
+// get called for them.
 func TestAssumeAndReserveInSnapshot(t *testing.T) {
 	node1 := st.MakeNode().Name("node1").Obj()
 	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
 	podWithNomination := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").NominatedNodeName("node1").Obj()
+	podGroupPodWithNomination := st.MakePod().Name("pod-nominated").Namespace("default").UID("pod-nominated").SchedulerName("default-scheduler").
+		NominatedNodeName("node1").PodGroupName("pg").Obj()
 
 	tests := []struct {
 		name string
 		pod  *v1.Pod
+		// draPreemption and genericWorkload enable the feature gates.
+		draPreemption   bool
+		genericWorkload bool
 	}{
 		{
 			name: "pod group cycle with cache: still assumed in the snapshot only",
@@ -385,10 +470,20 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			name: "pod group cycle: nomination is dropped on assume and restored on revert",
 			pod:  podWithNomination,
 		},
+		{
+			name:            "pod group cycle with DRAPreemption: nomination is dropped on assume and restored on revert",
+			pod:             podGroupPodWithNomination,
+			draPreemption:   true,
+			genericWorkload: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAPreemption:   tt.draPreemption,
+				features.GenericWorkload: tt.genericWorkload,
+			})
 			logger, ctx := ktesting.NewTestContext(t)
 
 			plugin := &assumeReserveTestPlugin{
@@ -396,7 +491,8 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 					filterStatus: map[string]*fwk.Status{tt.pod.Name: fwk.NewStatus(fwk.Success)},
 				},
 			}
-			f := newAssumeReserveFixture(t, ctx, node1, plugin, tt.pod)
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			f := newAssumeReserveFixtureWithNominations(t, ctx, node1, plugin, nominationExtensions, tt.pod)
 
 			podInfo, err := framework.NewPodInfo(tt.pod)
 			if err != nil {
@@ -455,6 +551,9 @@ func TestAssumeAndReserveInSnapshot(t *testing.T) {
 			}
 			if nominated != "" && len(f.fwk.NominatedPodsForNode(logger, nominated)) == 0 {
 				t.Error("expected the nomination to be restored on revert")
+			}
+			if calls := nominationExtensions.Calls(); len(calls) != 0 {
+				t.Errorf("Unexpected NominationExtensions calls for a pod of a pod group: %v", calls)
 			}
 		})
 	}

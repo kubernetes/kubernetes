@@ -66,7 +66,9 @@ type nominator struct {
 }
 
 // nominationChange describes a change of the node that a pod is nominated to
-// in memory. An empty node name means that the pod is not nominated.
+// in memory, or an explicit nomination to the node that the pod is already
+// nominated to, which replaces the previous nomination. An empty node name
+// means that the pod is not nominated.
 type nominationChange struct {
 	// pod is the pod object that was passed to the nominator with the
 	// change. Spec.NodeName is set if the pod is assumed.
@@ -119,11 +121,18 @@ func (npm *nominator) TracksNominationInMemory(pod *v1.Pod) bool {
 // pod is no longer nominated to oldNodeName. It records nothing if the
 // nominator removed and re-added the same nomination, which it does for every
 // pod update, or if a pod update left the nomination in memory unchanged.
-func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string) {
+//
+// If replaceSameNode is true and the pod is still nominated to oldNodeName,
+// it records a change with the same old and new node. Callers set it for an
+// explicit nomination (ModeOverride), which replaces the previous nomination
+// to that node: NominationExtensions.PrepareNomination may have returned
+// different resources for it.
+func (npm *nominator) recordChangeUnlocked(pod *v1.Pod, oldNodeName string, replaceSameNode bool) {
 	if !npm.TracksNominationInMemory(pod) {
 		return
 	}
-	if newNodeName := npm.nominatedPodToNode[pod.UID]; newNodeName != oldNodeName {
+	newNodeName := npm.nominatedPodToNode[pod.UID]
+	if newNodeName != oldNodeName || (replaceSameNode && newNodeName != "") {
 		npm.changes = append(npm.changes, nominationChange{pod: pod, oldNodeName: oldNodeName, newNodeName: newNodeName})
 	}
 }
@@ -148,7 +157,7 @@ func (npm *nominator) addNominatedPod(logger klog.Logger, pi fwk.PodInfo, nomina
 	npm.nLock.Lock()
 	oldNodeName := npm.nominatedPodToNode[pi.GetPod().UID]
 	npm.addNominatedPodUnlocked(logger, pi, nominatingInfo)
-	npm.recordChangeUnlocked(pi.GetPod(), oldNodeName)
+	npm.recordChangeUnlocked(pi.GetPod(), oldNodeName, nominatingInfo.Mode() == fwk.ModeOverride)
 	npm.nLock.Unlock()
 }
 
@@ -235,7 +244,7 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	nominatedNode := npm.nominatedPodToNode[oldPod.UID]
 	npm.deleteUnlocked(oldPod)
 	npm.addNominatedPodUnlocked(logger, newPodInfo, nominatingInfo)
-	npm.recordChangeUnlocked(newPodInfo.GetPod(), nominatedNode)
+	npm.recordChangeUnlocked(newPodInfo.GetPod(), nominatedNode, false)
 }
 
 // deleteNominatedPodIfExists deletes <pod> from nominatedPods.
@@ -243,7 +252,7 @@ func (npm *nominator) deleteNominatedPodIfExists(pod *v1.Pod) {
 	npm.nLock.Lock()
 	oldNodeName := npm.nominatedPodToNode[pod.UID]
 	npm.deleteUnlocked(pod)
-	npm.recordChangeUnlocked(pod, oldNodeName)
+	npm.recordChangeUnlocked(pod, oldNodeName, false)
 	npm.nLock.Unlock()
 }
 

@@ -134,7 +134,7 @@ func (sched *Scheduler) scheduleOnePod(ctx context.Context, podInfo *framework.Q
 
 	scheduleResult, assumedPodInfo, status := sched.schedulingCycle(schedulingCycleCtx, state, schedFramework, podInfo, start, podsToActivate)
 	if !status.IsSuccess() {
-		sched.FailureHandler(schedulingCycleCtx, schedFramework, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
+		sched.runFailureHandler(schedulingCycleCtx, schedFramework, state, assumedPodInfo, status, scheduleResult.nominatingInfo, start)
 		return
 	}
 
@@ -831,6 +831,22 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 		return "15+"
 	}
 	return strconv.Itoa(p.Attempts)
+}
+
+// runFailureHandler calls the FailureHandler for a pod whose scheduling cycle
+// failed. If the FailureHandler is going to nominate the pod, the
+// NominationExtensions of plugins prepare what the cycle selected for the
+// pod first, because the PodNominator calls them without the CycleState and
+// while the scheduling queue is locked. What they prepared gets dropped when
+// the FailureHandler returns.
+func (sched *Scheduler) runFailureHandler(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState,
+	podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
+	// Assigned pods (deferred resizes) don't get nominated.
+	if nominatingInfo.Mode() == fwk.ModeOverride && nominatingInfo.NominatedNodeName != "" && podInfo.Pod.Spec.NodeName == "" {
+		done := schedFramework.RunNominationExtensionsPrepareNomination(ctx, state, podInfo.Pod, nominatingInfo.NominatedNodeName)
+		defer done()
+	}
+	sched.FailureHandler(ctx, schedFramework, podInfo, status, nominatingInfo, start)
 }
 
 // handleSchedulingFailure records an event for the pod that indicates the
