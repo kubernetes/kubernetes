@@ -132,18 +132,22 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 	admitPod := attrs.Pod
 
 	// perform the checks that preemption will not help first to avoid meaningless pod eviction
+	// TODO: Skip this check for updates, since the pod has already been admitted to the node.
 	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  PodOSSelectorNodeLabelDoesNotMatch,
 			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
+			// The kubelet reconciles the node label.
+			RejectionType: RejectionBlocked,
 		}
 	}
 	if rejectPodAdmissionBasedOnOSField(admitPod) {
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  PodOSNotSupported,
-			Message: "Failed to admit pod as the OS field doesn't match node OS",
+			Admit:         false,
+			Reason:        PodOSNotSupported,
+			Message:       "Failed to admit pod as the OS field doesn't match node OS",
+			RejectionType: RejectionInfeasible,
 		}
 	}
 
@@ -151,9 +155,10 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 		message := fmt.Sprintf("SupplementalGroupsPolicy=%s is not supported in this node", v1.SupplementalGroupsPolicyStrict)
 		logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  SupplementalGroupsPolicyNotSupported,
-			Message: message,
+			Admit:         false,
+			Reason:        SupplementalGroupsPolicyNotSupported,
+			Message:       message,
+			RejectionType: RejectionInfeasible,
 		}
 	}
 
@@ -210,8 +215,14 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 				Message: message,
 			}
 		}
-		// If there are failed predicates, we only return the first one as a reason.
+		// If there are failed predicates, we only return the first one with the highest rejection type as a reason.
 		r := reasons[0]
+		rejectionType := predicateFailureRejectionType(r)
+		for _, other := range reasons[1:] {
+			if otherRejectionType := predicateFailureRejectionType(other); otherRejectionType > rejectionType {
+				r, rejectionType = other, otherRejectionType
+			}
+		}
 		switch re := r.(type) {
 		case *PredicateFailureError:
 			reason = re.PredicateName
@@ -238,14 +249,36 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 			logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}
 		return PodAdmitResult{
-			Admit:   fit,
-			Reason:  reason,
-			Message: message,
+			Admit:         fit,
+			Reason:        reason,
+			Message:       message,
+			RejectionType: rejectionType,
 		}
 	}
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// predicateFailureRejectionType returns the rejection type of a predicate failure reason.
+func predicateFailureRejectionType(reason PredicateFailureReason) RejectionType {
+	switch r := reason.(type) {
+	case *InsufficientResourceError:
+		return RejectionResourceShortage
+	case *PredicateFailureError:
+		switch r.PredicateName {
+		case nodeaffinity.Name, tainttoleration.Name:
+			// Node labels and taints may change.
+			// TODO: Skip these checks for updates, since the pod has already been admitted to the node.
+			return RejectionBlocked
+		case nodeports.Name:
+			// The conflicting pod may terminate.
+			return RejectionBlocked
+		case nodename.Name:
+			return RejectionInfeasible
+		}
+	}
+	return RejectionTransient
 }
 
 // generalFilter checks a group of filterings that the kubelet cares about.

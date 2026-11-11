@@ -18,6 +18,7 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
 	goruntime "runtime"
 	"testing"
 
@@ -866,5 +867,172 @@ func TestPredicateAdmitHandlerPassesPodAdmitAttributes(t *testing.T) {
 	}
 	if failureHandler.recordedAttrs != attrs {
 		t.Errorf("expected HandleAdmissionFailure to receive attrs %v, got %v", attrs, failureHandler.recordedAttrs)
+	}
+}
+
+type stubFailureHandler struct {
+	err error
+}
+
+func (s *stubFailureHandler) HandleAdmissionFailure(_ context.Context, _ *v1.Pod, failureReasons []PredicateFailureReason, _ *PodAdmitAttributes) ([]PredicateFailureReason, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return failureReasons, nil
+}
+
+func TestPredicateAdmitHandlerRejectionType(t *testing.T) {
+	baseNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(1000, 1000, 32, 0, 0, 0), Allocatable: makeAllocatableResources(1000, 1000, 32, 0, 0, 0)},
+	}
+	taintedNode := baseNode.DeepCopy()
+	taintedNode.Spec.Taints = []v1.Taint{{Key: "example.com/maintenance", Effect: v1.TaintEffectNoExecute}}
+
+	fittingPod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)})
+	fittingPod.Spec.NodeName = "machine1"
+
+	oversizedPod := fittingPod.DeepCopy()
+	oversizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(2000, resource.DecimalSI)
+
+	wrongNodePod := fittingPod.DeepCopy()
+	wrongNodePod.Spec.NodeName = "other-machine"
+
+	oversizedAndWrongNodePod := oversizedPod.DeepCopy()
+	oversizedAndWrongNodePod.Spec.NodeName = "other-machine"
+
+	nodeSelectorPod := fittingPod.DeepCopy()
+	nodeSelectorPod.Spec.NodeSelector = map[string]string{"pool": "a"}
+
+	osSelectorMismatchPod := fittingPod.DeepCopy()
+	osSelectorMismatchPod.Labels = map[string]string{v1.LabelOSStable: "dummyOS"}
+
+	osFieldMismatchPod := fittingPod.DeepCopy()
+	osFieldMismatchPod.Spec.OS = &v1.PodOS{Name: "dummyOS"}
+
+	strictGroupsPod := fittingPod.DeepCopy()
+	strictGroupsPod.Spec.SecurityContext = &v1.PodSecurityContext{
+		SupplementalGroupsPolicy: ptr.To(v1.SupplementalGroupsPolicyStrict),
+	}
+
+	tests := []struct {
+		name              string
+		pod               *v1.Pod
+		node              *v1.Node
+		operation         Operation
+		getNodeErr        error
+		pluginErr         error
+		preemptionErr     error
+		wantAdmit         bool
+		wantReason        string
+		wantRejectionType RejectionType
+	}{{
+		name:      "admitted",
+		pod:       fittingPod,
+		wantAdmit: true,
+	}, {
+		name:              "node info unavailable",
+		pod:               fittingPod,
+		getNodeErr:        fmt.Errorf("node not found"),
+		wantReason:        InvalidNodeInfo,
+		wantRejectionType: RejectionTransient,
+	}, {
+		name:              "plugin resource update error",
+		pod:               fittingPod,
+		pluginErr:         fmt.Errorf("plugin update failed"),
+		wantReason:        UnexpectedAdmissionError,
+		wantRejectionType: RejectionTransient,
+	}, {
+		name:              "admission failure handler error",
+		pod:               oversizedPod,
+		preemptionErr:     fmt.Errorf("preemption failed"),
+		wantReason:        UnexpectedAdmissionError,
+		wantRejectionType: RejectionTransient,
+	}, {
+		name:              "OS selector doesn't match the node label",
+		pod:               osSelectorMismatchPod,
+		wantReason:        PodOSSelectorNodeLabelDoesNotMatch,
+		wantRejectionType: RejectionBlocked,
+	}, {
+		name:              "OS field doesn't match the node",
+		pod:               osFieldMismatchPod,
+		wantReason:        PodOSNotSupported,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "SupplementalGroupsPolicy not supported",
+		pod:               strictGroupsPod,
+		wantReason:        SupplementalGroupsPolicyNotSupported,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "resource shortage",
+		pod:               oversizedPod,
+		wantReason:        OutOfCPU,
+		wantRejectionType: RejectionResourceShortage,
+	}, {
+		name:              "resize resource shortage",
+		pod:               oversizedPod,
+		operation:         UpdateOperation,
+		wantReason:        OutOfCPU,
+		wantRejectionType: RejectionResourceShortage,
+	}, {
+		name:              "node name mismatch",
+		pod:               wrongNodePod,
+		wantReason:        nodename.Name,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "resource shortage and node name mismatch",
+		pod:               oversizedAndWrongNodePod,
+		wantReason:        nodename.Name,
+		wantRejectionType: RejectionInfeasible,
+	}, {
+		name:              "node affinity mismatch on update",
+		pod:               nodeSelectorPod,
+		operation:         UpdateOperation,
+		wantReason:        nodeaffinity.Name,
+		wantRejectionType: RejectionBlocked,
+	}, {
+		name:              "untolerated NoExecute taint on update",
+		pod:               fittingPod,
+		node:              taintedNode,
+		operation:         UpdateOperation,
+		wantReason:        tainttoleration.Name,
+		wantRejectionType: RejectionBlocked,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			node := baseNode
+			if tc.node != nil {
+				node = tc.node
+			}
+			handler := NewPredicateAdmitHandler(
+				func(_ context.Context, _ bool) (*v1.Node, error) {
+					if tc.getNodeErr != nil {
+						return nil, tc.getNodeErr
+					}
+					return node.DeepCopy(), nil
+				},
+				&stubFailureHandler{err: tc.preemptionErr},
+				func(_ *schedulerframework.NodeInfo, _ *PodAdmitAttributes) error {
+					return tc.pluginErr
+				},
+			)
+			attrs := &PodAdmitAttributes{Pod: tc.pod, Operation: AddOperation}
+			if tc.operation == UpdateOperation {
+				attrs.Operation = UpdateOperation
+				attrs.Update = &PodUpdate{AllocatedPod: fittingPod, Resize: true}
+			}
+			res := handler.Admit(tCtx, attrs)
+			if res.Admit != tc.wantAdmit {
+				t.Fatalf("expected Admit=%v, got %v (reason=%q, message=%q)", tc.wantAdmit, res.Admit, res.Reason, res.Message)
+			}
+			if res.Reason != tc.wantReason {
+				t.Errorf("expected Reason=%q, got %q", tc.wantReason, res.Reason)
+			}
+			if res.RejectionType != tc.wantRejectionType {
+				t.Errorf("expected RejectionType=%v, got %v", tc.wantRejectionType, res.RejectionType)
+			}
+		})
 	}
 }

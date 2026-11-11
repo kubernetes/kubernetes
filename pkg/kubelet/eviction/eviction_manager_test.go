@@ -1177,8 +1177,12 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure, v1.NodeDiskPressure}
 	expected = []bool{false, false, false}
 	for i, pod := range pods {
-		if result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		result := manager.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod})
+		if expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
+		}
+		if result.RejectionType != lifecycle.RejectionBlocked {
+			t.Errorf("Admit pod: %v, expected rejection type: %v, actual: %v", pod, lifecycle.RejectionBlocked, result.RejectionType)
 		}
 	}
 }

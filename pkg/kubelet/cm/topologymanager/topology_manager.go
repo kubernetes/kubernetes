@@ -59,6 +59,13 @@ func (e TopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
 }
 
+// RejectionType returns RejectionBlocked because topology hints are generated from the currently
+// available resources, so alignment may succeed once other pods release resources.
+// TODO: Return RejectionInfeasible when the resources can't be aligned even on an otherwise empty node.
+func (e TopologyAffinityError) RejectionType() lifecycle.RejectionType {
+	return lifecycle.RejectionBlocked
+}
+
 // PodLevelTopologyAffinityError represents a pod-level resource alignment error.
 type PodLevelTopologyAffinityError struct {
 	message string
@@ -78,6 +85,11 @@ func (e *PodLevelTopologyAffinityError) Error() string {
 
 func (e *PodLevelTopologyAffinityError) Type() string {
 	return ErrorTopologyAffinity
+}
+
+// RejectionType returns RejectionBlocked for the same reason as TopologyAffinityError.RejectionType.
+func (e *PodLevelTopologyAffinityError) RejectionType() lifecycle.RejectionType {
+	return lifecycle.RejectionBlocked
 }
 
 // Manager interface provides methods for Kubelet to manage pod topology hints

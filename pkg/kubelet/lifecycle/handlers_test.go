@@ -1021,6 +1021,7 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 			if !result.Admit {
 				require.Equal(t, tc.expectedReason, result.Reason)
 				require.Contains(t, result.Message, tc.expectedMessage, "Expected message '%s' to contain '%s'", result.Message, tc.expectedMessage)
+				require.Equal(t, RejectionInfeasible, result.RejectionType)
 			}
 		})
 	}

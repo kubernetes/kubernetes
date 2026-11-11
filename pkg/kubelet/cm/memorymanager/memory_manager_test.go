@@ -37,6 +37,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/ktesting"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -1372,7 +1373,7 @@ func TestAddContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedAllocateError:     fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"),
+			expectedAllocateError:     admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available")),
 			expectedAddContainerError: nil,
 			podAllocate: getPod("fakePod2", "fakeContainer2", &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
