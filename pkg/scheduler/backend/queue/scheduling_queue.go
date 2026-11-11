@@ -478,7 +478,7 @@ func NewPriorityQueue(
 	}
 	pq.activeQ = newActiveQueue(heap.NewWithRecorder(queuedEntityKeyFunc, heap.LessFunc[framework.QueuedEntityInfo](lessConverted), metrics.NewActiveEntitiesRecorder()), options.metricsRecorder, backoffQPopper)
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
-	pq.nominator = newPodNominator(options.podLister)
+	pq.nominator = newPodNominator(options.podLister, utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption), isGenericWorkloadEnabled)
 
 	return pq
 }
@@ -1436,6 +1436,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	}
 
 	updated := false
+	inFlight := false
 	// Run the following code under the activeQ lock to make sure that in the meantime entity is not popped from either activeQ or backoffQ.
 	// This way, the event will be registered or the entity will be updated consistently.
 	// Locking only the part of Update method is sufficient, because in the other part the entity is in the unschedulableEntities,
@@ -1449,6 +1450,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		if exists := unlockedActiveQ.addEventsIfPodInFlight(oldPod, newPod, events); exists {
 			logger.V(6).Info("The pod doesn't need to be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
 			updated = true
+			inFlight = true
 			return
 		}
 		// If the entity is already in the active queue, just update the pod there.
@@ -1467,6 +1469,15 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 			return
 		}
 	})
+
+	if inFlight && p.nominator.TracksNominationInMemory(newPod) && nominatedNodeName(oldPod) != nominatedNodeName(newPod) {
+		// The pod object of an in-flight pod is not kept in any queue, but a
+		// changed nominated node name must still reach the nominator. Otherwise
+		// a nomination that was cleared or moved through the API, for example
+		// by preemption for another pod, would stay in memory if the scheduling
+		// cycle of the pod fails without a new nomination.
+		p.nominator.UpdateNominatedPod(logger, oldPod, &framework.PodInfo{Pod: newPod})
+	}
 
 	if updated {
 		return
@@ -2075,6 +2086,16 @@ func (p *PriorityQueue) nominatedPodToInfo(logger klog.Logger, np podRef, unlock
 	pInfo := p.getPod(logger, pod, unlockedActiveQ)
 	if pInfo != nil {
 		return pInfo.PodInfo
+	}
+	if p.nominator.TracksNominationInMemory(pod) {
+		// An in-flight pod is not in any queue. Without the pod object that
+		// it was popped with, callers would see a pod with priority 0.
+		if inFlightPod := unlockedActiveQ.getInFlightPod(np.uid); inFlightPod != nil {
+			// The error is ignored for the same reason as in
+			// handleSchedulingFailure: affinity terms may be invalid.
+			podInfo, _ := framework.NewPodInfo(inFlightPod)
+			return podInfo
+		}
 	}
 	return &framework.PodInfo{Pod: pod}
 }
