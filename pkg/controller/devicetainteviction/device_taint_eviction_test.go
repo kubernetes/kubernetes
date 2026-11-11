@@ -2319,7 +2319,7 @@ func testPodDeletionsMetrics(controller *Controller, latencies ...time.Duration)
 		expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_bucket{le=\"%f\"} %d\n", le, countLE(le)))
 	}
 	expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_bucket{le=\"+Inf\"} %d\n", countLE(-1)))
-	expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_sum %f\n", totalDuration.Seconds()))
+	expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_sum %v\n", totalDuration.Seconds()))
 	expected.WriteString(fmt.Sprintf("device_taint_eviction_controller_pod_deletion_duration_seconds_count %d\n", len(latencies)))
 	expected.WriteString(fmt.Sprintf(`# HELP device_taint_eviction_controller_pod_deletions_total [ALPHA] Total number of Pods deleted by DeviceTaintEvictionController since its start.
 # TYPE device_taint_eviction_controller_pod_deletions_total counter
@@ -2946,12 +2946,21 @@ func synctestRetry(tCtx ktesting.TContext) {
 		tCtx.AssertNoError(controller.Run(tCtx, 10 /* workers */), "eviction controller failed")
 	})
 
-	expectLatencies := []time.Duration{5 * time.Millisecond /* default exponential retry */}
+	// The default rate limiter retries after a jittered delay in [0, 5ms).
+	var latency time.Duration
 
 	// Eventually the pod gets deleted and the event is recorded.
 	tCtx.Eventually(func(tCtx ktesting.TContext) error {
 		tCtx.Expect(listEvents(tCtx)).To(matchDeletionEvent())
-		return testPodDeletionsMetrics(controller, expectLatencies...)
+		sum, err := metricstestutil.GetHistogramMetricValue(controller.metrics.PodDeletionsLatency.ObserverMetric)
+		if err != nil {
+			return err
+		}
+		latency = time.Duration(math.Round(sum * float64(time.Second)))
+		if latency < 0 || latency >= 5*time.Millisecond {
+			return fmt.Errorf("expected retry latency in [0, 5ms), got %v", latency)
+		}
+		return testPodDeletionsMetrics(controller, latency)
 	}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
 
 	// Now we can check the API calls.
@@ -2960,7 +2969,7 @@ func synctestRetry(tCtx ktesting.TContext) {
 	tCtx.Assert(podDeletions).Should(gomega.Equal(1), "number of pod delete calls")
 	tCtx.Assert(listEvents(tCtx)).Should(matchDeletionEvent())
 	tCtx.Assert(controller.workqueue.Len()).Should(gomega.Equal(0), "Work queue should be empty now.")
-	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, expectLatencies...))
+	tCtx.ExpectNoError(testPodDeletionsMetrics(controller, latency))
 }
 
 // BenchTaintUntaint checks the full flow of detecting a claim as

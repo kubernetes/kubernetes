@@ -18,6 +18,7 @@ package workqueue
 
 import (
 	"math"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -38,7 +39,7 @@ type TypedRateLimiter[T comparable] interface {
 }
 
 // DefaultControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has
-// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential
+// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential with jitter
 //
 // Deprecated: Use DefaultTypedControllerRateLimiter instead.
 func DefaultControllerRateLimiter() RateLimiter {
@@ -46,7 +47,7 @@ func DefaultControllerRateLimiter() RateLimiter {
 }
 
 // DefaultTypedControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has
-// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential
+// both overall and per-item rate limiting.  The overall is a token bucket and the per-item is exponential with jitter
 func DefaultTypedControllerRateLimiter[T comparable]() TypedRateLimiter[T] {
 	return NewTypedMaxOfRateLimiter(
 		NewTypedItemExponentialFailureRateLimiter[T](5*time.Millisecond, 1000*time.Second),
@@ -79,14 +80,20 @@ func (r *TypedBucketRateLimiter[T]) Forget(item T) {
 // Deprecated: ItemExponentialFailureRateLimiter is deprecated, use TypedItemExponentialFailureRateLimiter instead.
 type ItemExponentialFailureRateLimiter = TypedItemExponentialFailureRateLimiter[any]
 
-// TypedItemExponentialFailureRateLimiter does a simple baseDelay*2^<num-failures> limit
-// dealing with max failures and expiration are up to the caller
+// TypedItemExponentialFailureRateLimiter waits a random delay in
+// [0, min(maxDelay, baseDelay*2^<num-failures>)), i.e. randomized binary
+// exponential backoff, so items that fail at the same time are spread across
+// the backoff window instead of being retried in lockstep.
+// Dealing with max failures and expiration are up to the caller.
 type TypedItemExponentialFailureRateLimiter[T comparable] struct {
 	failuresLock sync.Mutex
 	failures     map[T]int
 
 	baseDelay time.Duration
 	maxDelay  time.Duration
+
+	// int64N is swappable for tests.
+	int64N func(int64) int64
 }
 
 var _ RateLimiter = &ItemExponentialFailureRateLimiter{}
@@ -101,6 +108,7 @@ func NewTypedItemExponentialFailureRateLimiter[T comparable](baseDelay time.Dura
 		failures:  map[T]int{},
 		baseDelay: baseDelay,
 		maxDelay:  maxDelay,
+		int64N:    rand.Int64N,
 	}
 }
 
@@ -123,15 +131,23 @@ func (r *TypedItemExponentialFailureRateLimiter[T]) When(item T) time.Duration {
 	// The backoff is capped such that 'calculated' value never overflows.
 	backoff := float64(r.baseDelay.Nanoseconds()) * math.Pow(2, float64(exp))
 	if backoff > math.MaxInt64 {
-		return r.maxDelay
+		return r.jitter(r.maxDelay)
 	}
 
 	calculated := time.Duration(backoff)
 	if calculated > r.maxDelay {
-		return r.maxDelay
+		return r.jitter(r.maxDelay)
 	}
 
-	return calculated
+	return r.jitter(calculated)
+}
+
+// jitter returns a random delay in [0, ceiling).
+func (r *TypedItemExponentialFailureRateLimiter[T]) jitter(ceiling time.Duration) time.Duration {
+	if ceiling <= 0 {
+		return 0
+	}
+	return time.Duration(r.int64N(int64(ceiling)))
 }
 
 func (r *TypedItemExponentialFailureRateLimiter[T]) NumRequeues(item T) int {
