@@ -1397,12 +1397,12 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
+            "description": "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver. This field is required.",
             "type": "string"
           },
           "nodeID": {
             "default": "",
-            "description": "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call.",
+            "description": "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call. This field is required.",
             "type": "string"
           }
         },

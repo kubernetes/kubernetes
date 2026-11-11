@@ -60241,7 +60241,7 @@ func schema_k8sio_api_storage_v1_CSINodeDriverRegistration(ref common.ReferenceC
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
+							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -60249,7 +60249,7 @@ func schema_k8sio_api_storage_v1_CSINodeDriverRegistration(ref common.ReferenceC
 					},
 					"nodeID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call.",
+							Description: "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -62009,7 +62009,7 @@ func schema_k8sio_api_storage_v1beta1_CSINodeDriverRegistration(ref common.Refer
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver.",
+							Description: "name is the name of the CSI driver. This MUST be the same name returned by the CSI GetPluginInfo() call for that driver. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -62017,7 +62017,7 @@ func schema_k8sio_api_storage_v1beta1_CSINodeDriverRegistration(ref common.Refer
 					},
 					"nodeID": {
 						SchemaProps: spec.SchemaProps{
-							Description: "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call.",
+							Description: "nodeID is the ID of the node from the driver's point of view, as returned by the driver's NodeGetInfo call. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",

@@ -25,10 +25,10 @@ package v1beta1
 // volume attachment limit are reported by the CSI controller.
 type CSINodeDriverRegistrationApplyConfiguration struct {
 	// name is the name of the CSI driver. This MUST be the same name returned by
-	// the CSI GetPluginInfo() call for that driver.
+	// the CSI GetPluginInfo() call for that driver. This field is required.
 	Name *string `json:"name,omitempty"`
 	// nodeID is the ID of the node from the driver's point of view, as returned
-	// by the driver's NodeGetInfo call.
+	// by the driver's NodeGetInfo call. This field is required.
 	NodeID *string `json:"nodeID,omitempty"`
 }
 

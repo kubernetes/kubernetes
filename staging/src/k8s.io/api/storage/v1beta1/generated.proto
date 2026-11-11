@@ -347,13 +347,13 @@ message CSINodeDriver {
 // volume attachment limit are reported by the CSI controller.
 message CSINodeDriverRegistration {
   // name is the name of the CSI driver. This MUST be the same name returned by
-  // the CSI GetPluginInfo() call for that driver.
+  // the CSI GetPluginInfo() call for that driver. This field is required.
   // +required
   // +k8s:alpha(since: "1.38")=+k8s:required
   optional string name = 1;
 
   // nodeID is the ID of the node from the driver's point of view, as returned
-  // by the driver's NodeGetInfo call.
+  // by the driver's NodeGetInfo call. This field is required.
   // +required
   // +k8s:alpha(since: "1.38")=+k8s:required
   optional string nodeID = 2;
