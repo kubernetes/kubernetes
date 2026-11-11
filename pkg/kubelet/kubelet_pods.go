@@ -2045,7 +2045,13 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 
 	// set all Kubelet-owned conditions
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
-		s.Conditions = append(s.Conditions, status.GeneratePodReadyToStartContainersCondition(logger, pod, &oldPodStatus, podStatus))
+		condition := status.GeneratePodReadyToStartContainersCondition(logger, pod, &oldPodStatus, podStatus)
+		if condition.Status == v1.ConditionTrue {
+			kl.reasonCache.Remove(pod.UID, podSandboxReasonCacheKey)
+		} else if reason, ok := kl.reasonCache.Get(pod.UID, podSandboxReasonCacheKey); ok && reason.Message != "" {
+			condition.Message = fmt.Sprintf("%s: %s", condition.Message, reason.Message)
+		}
+		s.Conditions = append(s.Conditions, condition)
 	}
 	allContainerStatuses := append(s.InitContainerStatuses, s.ContainerStatuses...)
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(pod, &oldPodStatus, allContainerStatuses, s.Phase))
