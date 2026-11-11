@@ -301,6 +301,55 @@ type NominationExtensionsRunner interface {
 	RunNominationExtensionsRemoveNomination(ctx context.Context, pod *v1.Pod, nodeName string) []NominationEvent
 }
 
+// VictimExtensions is an optional interface for plugins which manage
+// resources that preempted pods release asynchronously, after the pods are
+// gone, for example ResourceClaims which the resourceclaim controller
+// deallocates.
+//
+// Tracking victims is independent of nominations and of which pod preempted
+// them: the plugins only use it to keep pods from starting another
+// preemption while resources released by an earlier one are still being
+// reclaimed. Victims are not treated as removed in later scheduling cycles
+// or preemption simulations.
+//
+// The interface is internal to kube-scheduler and only used when the
+// DRAPreemption feature gate is enabled. It may change or move into the
+// framework before KEP-5690 graduates.
+type VictimExtensions interface {
+	fwk.Plugin
+	// AssumeVictim is called once the preemption of victim is under way: the
+	// API call which deletes it succeeded, it got rejected in memory, or its
+	// deletion had started already. Plugins track what the victim releases
+	// asynchronously until it got released. Victims whose preemption failed
+	// are not reported, so nothing needs to be undone. A preemptor which
+	// preempts asynchronously doesn't get scheduled again before
+	// AssumeVictim was called for its victims whose preemption is under way.
+	//
+	// It may be called concurrently, also after the scheduling cycle which
+	// selected the victim ended.
+	//
+	// When it is called, the victim may be gone already (the delete call
+	// returned NotFound), and what it released asynchronously may have been
+	// released already, too. Plugins must therefore check the current state
+	// of those resources instead of only waiting for future informer events.
+	AssumeVictim(ctx context.Context, victim *v1.Pod)
+	// PodEligibleToPreempt reports whether pod may start another preemption,
+	// or whether resources released by an earlier preemption on nodeName are
+	// still being reclaimed. nodeName is the node the pod is currently
+	// nominated to, if any. If not eligible, the string explains why.
+	PodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nodeName string) (bool, string)
+}
+
+// VictimExtensionsRunner runs the VictimExtensions of the plugins of a
+// profile. All methods are no-ops when no plugin implements them.
+type VictimExtensionsRunner interface {
+	// RunVictimExtensionsAssumeVictim calls AssumeVictim of all plugins.
+	RunVictimExtensionsAssumeVictim(ctx context.Context, victim *v1.Pod)
+	// RunVictimExtensionsPodEligibleToPreempt returns the result of the
+	// first plugin which reports that the pod is not eligible.
+	RunVictimExtensionsPodEligibleToPreempt(ctx context.Context, pod *v1.Pod, nodeName string) (bool, string)
+}
+
 // NominatedNodeNameGetter provides the nominated node of a pod as the
 // PodNominator knows it. The scheduling queue implements it as the
 // PodNominator of kube-scheduler, and Framework implements it by delegating
@@ -328,6 +377,7 @@ type Framework interface {
 	fwk.Handle
 	NominatedNodeNameGetter
 	NominationExtensionsRunner
+	VictimExtensionsRunner
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []fwk.PreEnqueuePlugin

@@ -80,6 +80,7 @@ type frameworkImpl struct {
 	podGroupPostFilterPlugins []fwk.PodGroupPostFilterPlugin
 	rankNodesPlugins          []framework.RankNodesPlugin
 	nominationExtensions      []framework.NominationExtensions
+	victimExtensions          []framework.VictimExtensions
 	preparedNominations       *preparedNominations
 	// genericWorkloadEnabled is whether the GenericWorkload feature gate was
 	// enabled when the plugins with NominationExtensions got collected.
