@@ -6101,6 +6101,63 @@ func TestAllocator(t *testing.T,
 			expectError:                g.MatchError(g.ContainSubstring("requested both as")),
 			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
 		},
+		// A missing capacity must not hide the conflict.
+		"consumable-capacity-request-with-unqualified-and-qualified-capacity-request-names-and-missing-capacity-exclusive": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity0, one).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one).withCapacityRequest(capacity1, one)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, two),
+				),
+			),
+			node:                       node(node1, region1),
+			expectError:                g.MatchError(g.ContainSubstring("requested both as")),
+			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+		},
+		// The device does not have the capacity, so there is no conflict on it: skip the device.
+		"consumable-capacity-request-with-unqualified-and-qualified-capacity-request-names-not-on-device-exclusive": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classA).withCapacityRequest(capacity1, one).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity1)), one)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, two),
+				),
+			),
+			node:                       node(node1, region1),
+			expectResults:              nil,
+			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+		},
+		// For a device of another driver, the qualified name is a different capacity.
+		"consumable-capacity-request-with-unqualified-and-foreign-domain-capacity-request-names-exclusive": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(allDeviceRequest(req0, classB).withCapacityRequest(capacity0, one).withCapacityRequest(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), one)),
+			),
+			classes: objects(class(classB, driverB)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverB,
+					device(device1).withCapacity(capacity0, two).withCapacity(resourceapi.QualifiedName(driverA+"/"+string(capacity0)), two),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverB, pool1, device1, false),
+			)},
+			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
+		},
 		"consumable-capacity-request-unqualified-and-unqualified-device-shared": {
 			features: Features{
 				ConsumableCapacity: true,

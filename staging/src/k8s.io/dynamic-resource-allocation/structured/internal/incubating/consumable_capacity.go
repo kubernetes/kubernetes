@@ -162,11 +162,14 @@ func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirem
 		return nil, true, nil
 	}
 	resolved := make(map[draapi.FullyQualifiedName]resource.Quantity, len(deviceRequestCapacity.Requests))
+	missing := false
 	for reqName, reqVal := range deviceRequestCapacity.Requests {
 		key := draapi.MakeFullyQualifiedName(reqName, device.id.Driver, device.slice.LookupUniqueString)
 		_, ok := device.Capacity.Lookup(key)
 		if !ok {
-			return nil, false, nil
+			// Keep going so that a conflict is an error regardless of map order.
+			missing = true
+			continue
 		}
 		if _, alreadyResolved := resolved[key]; alreadyResolved {
 			// The other spelling is whichever of the qualified and unqualified form
@@ -179,6 +182,9 @@ func resolveCapacityRequests(deviceRequestCapacity *resourceapi.CapacityRequirem
 			return nil, false, fmt.Errorf("capacity %q requested both as %q and as %q", key.Identifier, reqName, other)
 		}
 		resolved[key] = reqVal
+	}
+	if missing {
+		return nil, false, nil
 	}
 	return resolved, true, nil
 }
