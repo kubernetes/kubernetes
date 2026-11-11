@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"iter"
 	"slices"
 	"strings"
 
@@ -187,6 +188,9 @@ func effectivePodLevelResources(pod *v1.Pod, spec v1.ResourceList, statuses ...v
 }
 
 func containerSpecRequests(container *v1.Container, _ *v1.ContainerStatus, _ bool) v1.ResourceList {
+	if container == nil {
+		return nil
+	}
 	return container.Resources.Requests
 }
 
@@ -194,7 +198,7 @@ func containerAllocatedRequests(container *v1.Container, containerStatus *v1.Con
 	if containerStatus != nil && containerStatus.AllocatedResources != nil {
 		return containerStatus.AllocatedResources
 	}
-	if isResizeInfeasible {
+	if isResizeInfeasible || container == nil {
 		return nil
 	}
 	return container.Resources.Requests
@@ -207,47 +211,82 @@ func containerActuatedRequests(container *v1.Container, containerStatus *v1.Cont
 	if containerStatus != nil && containerStatus.AllocatedResources != nil {
 		return containerStatus.AllocatedResources
 	}
-	if isResizeInfeasible {
+	if isResizeInfeasible || container == nil {
 		return nil
 	}
 	return container.Resources.Requests
 }
 
-func findContainerStatus(pod *v1.Pod, name string) *v1.ContainerStatus {
-	for i := range pod.Status.ContainerStatuses {
-		if pod.Status.ContainerStatuses[i].Name == name {
-			return &pod.Status.ContainerStatuses[i]
+// containerStatusPair is a container in the pod spec and its status, either of which may be nil.
+type containerStatusPair struct {
+	container *v1.Container
+	status    *v1.ContainerStatus
+}
+
+func (p containerStatusPair) name() string {
+	if p.container != nil {
+		return p.container.Name
+	}
+	return p.status.Name
+}
+
+// containerStatusPairs yields each container with its status, or a nil status if it has none,
+// followed by each status of a running container that matches no container, with a nil container.
+// Such a container was removed from the pod, but holds the resources its status reports until it
+// stops.
+func containerStatusPairs(containers []v1.Container, statuses []v1.ContainerStatus) iter.Seq[containerStatusPair] {
+	return func(yield func(containerStatusPair) bool) {
+		for i := range containers {
+			pair := containerStatusPair{container: &containers[i]}
+			for j := range statuses {
+				if statuses[j].Name == containers[i].Name {
+					pair.status = &statuses[j]
+					break
+				}
+			}
+			if !yield(pair) {
+				return
+			}
+		}
+	statuses:
+		for i := range statuses {
+			if statuses[i].State.Running == nil {
+				continue
+			}
+			for j := range containers {
+				if containers[j].Name == statuses[i].Name {
+					continue statuses
+				}
+			}
+			if !yield(containerStatusPair{status: &statuses[i]}) {
+				return
+			}
 		}
 	}
-	for i := range pod.Status.InitContainerStatuses {
-		if pod.Status.InitContainerStatuses[i].Name == name {
-			return &pod.Status.InitContainerStatuses[i]
-		}
-	}
-	return nil
 }
 
 func isRestartableInitContainer(container *v1.Container) bool {
-	return container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
+	return container != nil && container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways
 }
 
+// aggregateContainerResourcesByFn aggregates the resources that getResourceList returns for the
+// containers in the pod spec and, with UseStatusResources, for the running containers removed
+// from it.
 func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getResourceList func(container *v1.Container, containerStatus *v1.ContainerStatus, isResizeInfeasible bool) v1.ResourceList, dra draNodeAllocatableResources) v1.ResourceList {
 	var isResizeInfeasible bool
+	var statuses, initStatuses []v1.ContainerStatus
 	if opts.UseStatusResources {
 		isResizeInfeasible = IsPodResizeInfeasible(pod)
+		statuses, initStatuses = pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses
 	}
 	result := v1.ResourceList{}
-	for _, container := range pod.Spec.Containers {
-		var cs *v1.ContainerStatus
-		if opts.UseStatusResources {
-			cs = findContainerStatus(pod, container.Name)
-		}
-		containerResources := getResourceList(&container, cs, isResizeInfeasible)
-		if len(opts.NonMissingContainerRequests) > 0 {
+	for pair := range containerStatusPairs(pod.Spec.Containers, statuses) {
+		containerResources := getResourceList(pair.container, pair.status, isResizeInfeasible)
+		if pair.container != nil && len(opts.NonMissingContainerRequests) > 0 {
 			containerResources = applyNonMissing(containerResources, opts.NonMissingContainerRequests)
 		}
 		addResourceList(result, containerResources)
-		addResourceList(result, dra.perContainer[container.Name])
+		addResourceList(result, dra.perContainer[pair.name()])
 	}
 
 	restartableInitContainerResources := v1.ResourceList{}
@@ -259,23 +298,19 @@ func aggregateContainerResourcesByFn(pod *v1.Pod, opts PodResourcesOptions, getR
 	// `InitContainerUse(i) = sum(Resources of restartable init containers with index < i) + Resources of i-th init container`.
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#exposing-pod-resource-requirements for the detail.
-	for _, container := range pod.Spec.InitContainers {
-		var cs *v1.ContainerStatus
-		if opts.UseStatusResources {
-			cs = findContainerStatus(pod, container.Name)
-		}
-		containerResources := getResourceList(&container, cs, isResizeInfeasible)
-		if len(opts.NonMissingContainerRequests) > 0 {
+	for pair := range containerStatusPairs(pod.Spec.InitContainers, initStatuses) {
+		containerResources := getResourceList(pair.container, pair.status, isResizeInfeasible)
+		if pair.container != nil && len(opts.NonMissingContainerRequests) > 0 {
 			containerResources = applyNonMissing(containerResources, opts.NonMissingContainerRequests)
 		}
-		if draResources := dra.perContainer[container.Name]; len(draResources) > 0 {
+		if draResources := dra.perContainer[pair.name()]; len(draResources) > 0 {
 			combinedResources := v1.ResourceList{}
 			addResourceList(combinedResources, containerResources)
 			addResourceList(combinedResources, draResources)
 			containerResources = combinedResources
 		}
 		// Is the init container marked as a restartable init container?
-		if isRestartableInitContainer(&container) {
+		if isRestartableInitContainer(pair.container) {
 			// and add them to the resulting cumulative container requests
 			addResourceList(result, containerResources)
 
@@ -375,6 +410,9 @@ func applyNonMissing(reqs v1.ResourceList, nonMissing v1.ResourceList) v1.Resour
 }
 
 func containerSpecLimits(c *v1.Container, _ *v1.ContainerStatus, _ bool) v1.ResourceList {
+	if c == nil {
+		return nil
+	}
 	return c.Resources.Limits
 }
 
@@ -382,7 +420,7 @@ func containerActuatedLimits(c *v1.Container, cs *v1.ContainerStatus, isResizeIn
 	if cs != nil && cs.Resources != nil && cs.Resources.Limits != nil {
 		return cs.Resources.Limits
 	}
-	if isResizeInfeasible {
+	if isResizeInfeasible || c == nil {
 		return nil
 	}
 	return c.Resources.Limits
