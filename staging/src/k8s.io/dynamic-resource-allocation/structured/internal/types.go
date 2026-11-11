@@ -75,7 +75,7 @@ const (
 // depends on a set of feature gates, then a single entry here should control whether
 // that implementation is active.
 type Features struct {
-	// Sorted alphabetically. When adding a new entry, also extend Set and FeaturesAll.
+	// Sorted alphabetically. When adding a new entry, also extend Set, FeaturesFromSet and FeaturesAll.
 
 	AdminAccess             bool
 	CompatibilityGroups     bool
@@ -129,9 +129,43 @@ func (f Features) Set() sets.Set[string] {
 		enabled.Insert("DRAPrioritizedList")
 	}
 	if f.DeviceBindingAndStatus {
-		enabled.Insert("DRADeviceBindingConditions+DRAResourceClaimDeviceStatus")
+		enabled.Insert("DRADeviceBindingConditions")
 	}
 	return enabled
+}
+
+// FeaturesFromSet reconstructs a Feature struct from a set with keys as created by Set.
+func FeaturesFromSet(features sets.Set[string]) Features {
+	var f Features
+	for feature := range features {
+		switch feature {
+		case "DRAAdminAccess":
+			f.AdminAccess = true
+		case "DRADeviceCompatibilityGroups":
+			f.CompatibilityGroups = true
+		case "DRAConsumableCapacity":
+			f.ConsumableCapacity = true
+		case "DRADerivedAttributes":
+			f.DerivedAttributes = true
+		case "DRADeviceBindingConditions":
+			f.DeviceBindingAndStatus = true
+		case "DRADeviceTaints":
+			f.DeviceTaints = true
+		case "DRAFractionalCapacityRange":
+			f.FractionalCapacityRange = true
+		case "DRAListTypeAttributes":
+			f.ListTypeAttributes = true
+		case "DRAOptionalNodeOperations":
+			f.OptionalNodeOperations = true
+		case "DRAPartitionableDevices":
+			f.PartitionableDevices = true
+		case "DRAPrioritizedList":
+			f.PrioritizedList = true
+		default:
+			panic("unknown feature name: " + feature)
+		}
+	}
+	return f
 }
 
 var FeaturesAll = Features{
