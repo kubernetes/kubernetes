@@ -84,6 +84,7 @@ const (
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
 	RuntimeOperationsErrorsKey   = "runtime_operations_errors_total"
+	CRIListStreamingTotalKey     = "cri_list_streaming_total"
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
@@ -547,6 +548,16 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
+	)
+	// CRIListStreamingTotal counts streaming attempts, including calls that fall back to unary.
+	CRIListStreamingTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CRIListStreamingTotalKey,
+			Help:           "Cumulative number of CRI list streaming RPC attempts by operation type and result (success, error, fallback).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type", "result"},
 	)
 	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
 	// Broken down by eviction signal.
@@ -1636,6 +1647,8 @@ func Register() {
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 			legacyregistry.MustRegister(PodLevelResourcesAdmissionTotal)
 		}
+
+		RegisterCRIStreamingMetrics()
 	})
 }
 
