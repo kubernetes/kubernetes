@@ -41,6 +41,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -54,10 +55,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
 	"k8s.io/utils/ptr"
 )
@@ -2069,11 +2072,15 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 		// change makes the pod differ from its allocated pod.
 		change func(pod *v1.Pod)
 		// reject makes an admit handler reject the pod.
-		reject             bool
+		reject bool
+		// rejectType is the type of the admit handler rejection.
+		rejectType         lifecycle.RejectionType
 		expectedConditions []*v1.PodCondition
 		expectedEvent      string
 		// expectAllocated is whether the change is allocated after the retry.
 		expectAllocated bool
+		// expectQueued is whether the change is still queued for retry.
+		expectQueued bool
 	}{
 		{
 			name:            "other field",
@@ -2087,15 +2094,23 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 			expectAllocated: true,
 		},
 		{
-			name:   "other field, rejected by an admit handler",
-			change: changeOtherField,
-			reject: true,
+			name:         "other field, rejected by an admit handler",
+			change:       changeOtherField,
+			reject:       true,
+			expectQueued: true,
 		},
 		{
-			name:     "other field, rejected by an admit handler, while a deferred resize is reverted",
-			deferred: true,
-			change:   changeOtherField,
-			reject:   true,
+			name:         "other field, rejected by an admit handler, while a deferred resize is reverted",
+			deferred:     true,
+			change:       changeOtherField,
+			reject:       true,
+			expectQueued: true,
+		},
+		{
+			name:       "other field, rejected as infeasible by an admit handler",
+			change:     changeOtherField,
+			reject:     true,
+			rejectType: lifecycle.RejectionInfeasible,
 		},
 		{
 			name: "other field and resources",
@@ -2126,6 +2141,24 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 				ObservedGeneration: 1,
 			}},
 			expectedEvent: `Warning ResizeDeferred Pod resize Rejected: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1"}}}],"generation":1,"error":"rejected by the test"}`,
+			expectQueued:  true,
+		},
+		{
+			name: "other field and resources, rejected as infeasible by an admit handler",
+			change: func(pod *v1.Pod) {
+				changeOtherField(pod)
+				pod.Spec.Containers[0].Resources = cpu("1")
+			},
+			reject:     true,
+			rejectType: lifecycle.RejectionInfeasible,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizePending,
+				Status:             "True",
+				Reason:             v1.PodReasonInfeasible,
+				Message:            "rejected by the test",
+				ObservedGeneration: 1,
+			}},
+			expectedEvent: `Warning ResizeInfeasible Pod resize Rejected: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"1"}}}],"generation":1,"error":"rejected by the test"}`,
 		},
 	}
 
@@ -2146,7 +2179,7 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 			if tc.reject {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{
 					admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-						return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "rejected by the test"}
+						return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "rejected by the test", RejectionType: tc.rejectType}
 					},
 				}})
 			}
@@ -2169,6 +2202,7 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 
 			_, pending := allocationManager.UpdatePodFromAllocation(pod)
 			assert.Equal(t, !tc.expectAllocated, pending, "pending")
+			assert.Equal(t, tc.expectQueued, allocationManager.HasPendingAllocations(), "queued for retry")
 		})
 	}
 }
@@ -4080,7 +4114,7 @@ func TestAllocationManager_EmptyDirVolumeLimits_RetryPendingResizes(t *testing.T
 			}
 
 			// Actuate
-			resizeAllocated, err := allocationManager.(*manager).handlePendingAllocation(tCtx, test.targetPod)
+			_, resizeAllocated, err := allocationManager.(*manager).handlePendingAllocation(tCtx, test.targetPod)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectResizeAllocated, resizeAllocated)
 
@@ -4745,4 +4779,222 @@ func TestAllocationManagerPopulatesPodUpdate(t *testing.T) {
 	assert.True(t, recorder.recorded[0].Update.Resize)
 	require.NotNil(t, recorder.recorded[0].Update.AllocatedPod)
 	assert.True(t, cpu100m.Equal(*recorder.recorded[0].Update.AllocatedPod.Spec.Containers[0].Resources.Requests.Cpu()))
+}
+
+func TestCanAdmitPodRejectionPrecedence(t *testing.T) {
+	admit := lifecycle.PodAdmitResult{Admit: true}
+	reject := func(reason string, rejectionType lifecycle.RejectionType) lifecycle.PodAdmitResult {
+		return lifecycle.PodAdmitResult{Admit: false, Reason: reason, Message: reason + " message", RejectionType: rejectionType}
+	}
+	transient := reject("Transient", lifecycle.RejectionTransient)
+	shortage := reject("Shortage", lifecycle.RejectionResourceShortage)
+	blocked := reject("Blocked", lifecycle.RejectionBlocked)
+	infeasible := reject("Infeasible", lifecycle.RejectionInfeasible)
+
+	// call records whether a handler was called, and whether in dry run.
+	type call struct {
+		called bool
+		dryRun bool
+	}
+	notCalled := call{}
+	called := call{called: true}
+	calledDryRun := call{called: true, dryRun: true}
+
+	tests := []struct {
+		name       string
+		operation  lifecycle.Operation
+		results    []lifecycle.PodAdmitResult
+		wantResult lifecycle.PodAdmitResult
+		wantCalls  []call
+	}{{
+		name:       "all handlers admit",
+		operation:  lifecycle.UpdateOperation,
+		results:    []lifecycle.PodAdmitResult{admit, admit},
+		wantResult: admit,
+		wantCalls:  []call{called, called},
+	}, {
+		name:       "add stops at the first rejection",
+		operation:  lifecycle.AddOperation,
+		results:    []lifecycle.PodAdmitResult{shortage, infeasible},
+		wantResult: shortage,
+		wantCalls:  []call{called, notCalled},
+	}, {
+		name:       "update reports blocked over an earlier resource shortage",
+		operation:  lifecycle.UpdateOperation,
+		results:    []lifecycle.PodAdmitResult{shortage, blocked},
+		wantResult: blocked,
+		wantCalls:  []call{called, calledDryRun},
+	}, {
+		name:       "update reports blocked over a later resource shortage",
+		operation:  lifecycle.UpdateOperation,
+		results:    []lifecycle.PodAdmitResult{blocked, shortage},
+		wantResult: blocked,
+		wantCalls:  []call{called, calledDryRun},
+	}, {
+		name:       "update reports a resource shortage over a transient rejection",
+		operation:  lifecycle.UpdateOperation,
+		results:    []lifecycle.PodAdmitResult{transient, shortage},
+		wantResult: shortage,
+		wantCalls:  []call{called, calledDryRun},
+	}, {
+		name:       "update keeps the first of equal rejections",
+		operation:  lifecycle.UpdateOperation,
+		results:    []lifecycle.PodAdmitResult{blocked, reject("Other", lifecycle.RejectionBlocked)},
+		wantResult: blocked,
+		wantCalls:  []call{called, calledDryRun},
+	}, {
+		name:       "update stops at an infeasible rejection",
+		operation:  lifecycle.UpdateOperation,
+		results:    []lifecycle.PodAdmitResult{transient, infeasible, blocked},
+		wantResult: infeasible,
+		wantCalls:  []call{called, calledDryRun, notCalled},
+	}, {
+		name:       "update calls handlers in dry run only after a rejection",
+		operation:  lifecycle.UpdateOperation,
+		results:    []lifecycle.PodAdmitResult{admit, shortage, admit, blocked},
+		wantResult: blocked,
+		wantCalls:  []call{called, called, calledDryRun, calledDryRun},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns"}}
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil).(*manager)
+			allocationManager.admitHandlers = nil
+			calls := make([]call, len(tc.results))
+			for i, result := range tc.results {
+				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+					calls[i] = call{called: true, dryRun: attrs.DryRun}
+					return result
+				}}})
+			}
+
+			attrs := &lifecycle.PodAdmitAttributes{Pod: pod, Operation: tc.operation}
+			if tc.operation == lifecycle.UpdateOperation {
+				attrs.Update = &lifecycle.PodUpdate{AllocatedPod: pod, Resize: true}
+			}
+			assert.Equal(t, tc.wantResult, allocationManager.canAdmitPod(tCtx, attrs))
+			assert.Equal(t, tc.wantCalls, calls)
+			assert.False(t, attrs.DryRun, "the caller's attributes must not be modified")
+		})
+	}
+}
+
+// TestCanAdmitPodRetrySurfacesResourceShortage checks that once a blocker that outranks a
+// resource shortage clears, re-evaluating the update reports the resource shortage.
+func TestCanAdmitPodRetrySurfacesResourceShortage(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns"}}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil).(*manager)
+	allocationManager.admitHandlers = nil
+	blocked := true
+	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{
+		&testPodAdmitHandler{admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+			return lifecycle.PodAdmitResult{Reason: "Shortage", RejectionType: lifecycle.RejectionResourceShortage}
+		}},
+		&testPodAdmitHandler{admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+			if blocked {
+				return lifecycle.PodAdmitResult{Reason: "Blocked", RejectionType: lifecycle.RejectionBlocked}
+			}
+			return lifecycle.PodAdmitResult{Admit: true}
+		}},
+	})
+	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, Operation: lifecycle.UpdateOperation, Update: &lifecycle.PodUpdate{AllocatedPod: pod, Resize: true}}
+
+	result := allocationManager.canAdmitPod(tCtx, attrs)
+	assert.Equal(t, "Blocked", result.Reason)
+	assert.Equal(t, lifecycle.RejectionBlocked, result.RejectionType)
+
+	blocked = false
+	result = allocationManager.canAdmitPod(tCtx, attrs)
+	assert.Equal(t, "Shortage", result.Reason)
+	assert.Equal(t, lifecycle.RejectionResourceShortage, result.RejectionType)
+}
+
+// TestCanAdmitPodNoPreemptionAfterRejection checks that critical pod preemption doesn't evict
+// pods once an earlier handler has rejected the pod.
+func TestCanAdmitPodNoPreemptionAfterRejection(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, false)
+	requirements := func(cpu string) v1.ResourceRequirements {
+		list := v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu), v1.ResourceMemory: resource.MustParse("1Gi")}
+		return v1.ResourceRequirements{Requests: list, Limits: list}
+	}
+	victim := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "victim", Name: "victim", Namespace: "ns"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "c", Resources: requirements("3")}}},
+	}
+	critical := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "critical", Name: "critical", Namespace: "kube-system",
+			Annotations: map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource}},
+		Spec: v1.PodSpec{Priority: ptr.To[int32](scheduling.SystemCriticalPriority), Containers: []v1.Container{{Name: "c", Resources: requirements("2")}}},
+	}
+	allocatedCritical := critical.DeepCopy()
+	allocatedCritical.Spec.Containers[0].Resources = requirements("1")
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node"},
+		Status:     v1.NodeStatus{Allocatable: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("10Gi"), v1.ResourcePods: resource.MustParse("10")}},
+	}
+
+	for _, attrs := range []*lifecycle.PodAdmitAttributes{
+		{Pod: critical, OtherPods: []*v1.Pod{victim}, Operation: lifecycle.AddOperation},
+		{Pod: critical, OtherPods: []*v1.Pod{victim}, Operation: lifecycle.UpdateOperation, Update: &lifecycle.PodUpdate{AllocatedPod: allocatedCritical, Resize: true}},
+	} {
+		t.Run(string(attrs.Operation), func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			var killed []string
+			killPod := func(pod *v1.Pod, _ bool, _ *int64, _ func(*v1.PodStatus)) error {
+				killed = append(killed, pod.Name)
+				return nil
+			}
+			predicateHandler := lifecycle.NewPredicateAdmitHandler(
+				func(context.Context, bool) (*v1.Node, error) { return node, nil },
+				preemption.NewCriticalPodAdmissionHandler(func() []*v1.Pod { return []*v1.Pod{victim} }, killPod, record.NewFakeRecorder(10)),
+				func(*schedulerframework.NodeInfo, *lifecycle.PodAdmitAttributes) error { return nil },
+			)
+
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, nil, nil).(*manager)
+			allocationManager.admitHandlers = nil
+			allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{
+				&testPodAdmitHandler{admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+					return lifecycle.PodAdmitResult{Reason: "Rejected", RejectionType: lifecycle.RejectionBlocked}
+				}},
+				predicateHandler,
+			})
+
+			result := allocationManager.canAdmitPod(tCtx, attrs)
+			assert.False(t, result.Admit)
+			assert.Empty(t, killed)
+		})
+	}
+}
+
+// TestRetryPendingResizesNodeAffinityDrift checks that a resize of a running pod whose node
+// selector no longer matches the node labels stays deferred and queued for retry.
+func TestRetryPendingResizesNodeAffinityDrift(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	logger, tCtx := ktesting.NewTestContext(t)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{"pool": "a"},
+			Containers: []v1.Container{{Name: "c1", Image: "i1",
+				Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}}},
+		},
+	}
+	allocatedPod := pod.DeepCopy()
+	allocatedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("500m")
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+
+	allocationManager.PushPendingAllocation(logger, pod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+	conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+	require.Len(t, conditions, 1)
+	assert.Equal(t, v1.PodResizePending, conditions[0].Type)
+	assert.Equal(t, v1.PodReasonDeferred, conditions[0].Reason)
+	assert.True(t, allocationManager.HasPendingAllocations(), "resize should stay queued for retry")
 }

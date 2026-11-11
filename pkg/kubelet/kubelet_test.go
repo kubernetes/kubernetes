@@ -6180,6 +6180,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 				conditions := kubelet.statusManager.GetPodResizeConditions(tc.newPod.UID)
 				require.Len(t, conditions, 1)
 				assert.Equal(t, v1.PodResizePending, conditions[0].Type)
+				assert.Equal(t, v1.PodReasonInfeasible, conditions[0].Reason)
 			}
 			if tc.expectAllocated {
 				_, pending := kubelet.allocationManager.UpdatePodFromAllocation(tc.newPod)

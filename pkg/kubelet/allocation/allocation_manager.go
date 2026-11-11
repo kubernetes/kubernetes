@@ -230,6 +230,10 @@ func (m *manager) retryPendingAllocations(ctx context.Context, trigger string) [
 	var successfulAllocations []*v1.Pod
 
 	// Retry all pending allocations.
+	// TODO: Retry each allocation based on the type of its rejection: transient rejections with
+	// backoff, resource shortages when resources are freed, and blocked rejections when the
+	// state they depend on changes (such as node conditions, node shutdown, or device plugin
+	// registration). Keep the periodic retry only as a fallback.
 	for _, uid := range m.podsWithPendingAllocations {
 		pod, found := m.podProvider.GetPodByUID(uid)
 		if !found {
@@ -250,16 +254,16 @@ func (m *manager) retryPendingAllocations(ctx context.Context, trigger string) [
 
 		isDeferred := m.statusManager.IsPodResizeDeferred(uid)
 
-		allocated, err := m.handlePendingAllocation(ctx, pod)
+		result, allocated, err := m.handlePendingAllocation(ctx, pod)
 		switch {
 		case err != nil:
 			logger.Error(err, "Failed to handle pending pod allocation", "pod", klog.KObj(pod))
 			newPendingAllocations = append(newPendingAllocations, uid)
-		case m.statusManager.IsPodResizeDeferred(uid):
-			logger.V(4).Info("Pod resize is deferred; will reevaluate later", "pod", klog.KObj(pod))
+		case !result.Admit && result.RejectionType == lifecycle.RejectionInfeasible:
+			logger.V(4).Info("Pod allocation is infeasible", "pod", klog.KObj(pod))
+		case !result.Admit:
+			logger.V(4).Info("Pod allocation is deferred; will reevaluate later", "pod", klog.KObj(pod))
 			newPendingAllocations = append(newPendingAllocations, uid)
-		case m.statusManager.IsPodResizeInfeasible(uid):
-			logger.V(4).Info("Pod resize is infeasible", "pod", klog.KObj(pod))
 		default:
 			logger.V(4).Info("Pod allocation successfully updated", "pod", klog.KObj(pod))
 			successfulAllocations = append(successfulAllocations, pod)
@@ -525,13 +529,13 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := slices.DeleteFunc(m.getAllocatedPods(activePods), func(p *v1.Pod) bool { return p.UID == pod.UID })
-	ok, reason, message := m.canAdmitPod(ctx, &lifecycle.PodAdmitAttributes{
+	result := m.canAdmitPod(ctx, &lifecycle.PodAdmitAttributes{
 		Pod:       pod,
 		OtherPods: allocatedPods,
 		Operation: lifecycle.AddOperation,
 	})
 
-	if ok {
+	if result.Admit {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedPod(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
@@ -539,7 +543,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 		}
 	}
 
-	return ok, reason, message
+	return result.Admit, result.Reason, result.Message
 }
 
 func (m *manager) RemovePod(logger klog.Logger, uid types.UID) {
@@ -553,13 +557,16 @@ func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	m.allocated.RemoveOrphanedPods(remainingPods)
 }
 
-func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (bool, error) {
+// handlePendingAllocation tries to allocate the pending changes of the pod. It returns the admission
+// result of the changes, which admits the pod if no changes remain pending, and whether the
+// allocation was updated.
+func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lifecycle.PodAdmitResult, bool, error) {
 	logger := klog.FromContext(ctx)
 	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Pod allocation does not need to be updated.
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
-		return false, nil
+		return lifecycle.PodAdmitResult{Admit: true}, false, nil
 	}
 
 	resizeRequested := isResizeRequested(pod, allocatedPod)
@@ -569,7 +576,7 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (boo
 
 	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
 	allocatedPods := slices.DeleteFunc(m.getAllocatedPods(m.podProvider.GetActivePods()), func(p *v1.Pod) bool { return p.UID == pod.UID })
-	fit, reason, message := m.canAdmitPod(ctx, &lifecycle.PodAdmitAttributes{
+	result := m.canAdmitPod(ctx, &lifecycle.PodAdmitAttributes{
 		Pod:       pod,
 		OtherPods: allocatedPods,
 		Operation: lifecycle.UpdateOperation,
@@ -578,10 +585,10 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (boo
 			Resize:       resizeRequested,
 		},
 	})
-	if fit {
+	if result.Admit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedPod(logger, pod); err != nil {
-			return false, err
+			return lifecycle.PodAdmitResult{}, false, err
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionAccepted)
 
@@ -594,21 +601,32 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (boo
 			msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
 			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
 		}
-		return true, nil
+		return result, true, nil
 	}
 
-	if reason != "" && resizeRequested {
-		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
+	// TODO: Report rejected pod updates that aren't resizes in the pod status.
+	if resizeRequested {
+		// TODO: Distinguish resource shortages, which scheduler preemption can resolve, from other
+		// deferred rejections in the pod status.
+		reason := v1.PodReasonDeferred
+		if result.RejectionType == lifecycle.RejectionInfeasible {
+			reason = v1.PodReasonInfeasible
+			// podResizesAdmitHandler counts its own rejections with a more specific reason.
+			if result.Reason != v1.PodReasonInfeasible {
+				metrics.PodInfeasibleResizes.WithLabelValues(result.Reason).Inc()
+			}
+		}
+		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, result.Message, pod.Generation) {
 			eventType := events.ResizeDeferred
 			if reason == v1.PodReasonInfeasible {
 				eventType = events.ResizeInfeasible
 			}
-			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
+			msg := events.PodResizePendingMsg(logger, pod, result.Reason, result.Message, pod.Generation)
 			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
 		}
 	}
 
-	return false, nil
+	return result, false, nil
 }
 
 // isResizeRequested returns whether the desired pod asks for a change to the resources of its
@@ -631,21 +649,39 @@ func isResizeRequested(desired, allocated *v1.Pod) bool {
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
-// cannot. The function returns a boolean value indicating whether the pod
-// can be admitted, a brief single-word reason and a message explaining why
-// the pod cannot be admitted.
-func (m *manager) canAdmitPod(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) (bool, string, string) {
+// cannot. If any handler rejects, the pod is rejected. A pod add stops at the
+// first rejection. A pod update stops at the first infeasible rejection, but
+// otherwise keeps consulting the remaining handlers in dry run and returns the
+// rejection with the highest rejection type.
+func (m *manager) canAdmitPod(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
-	// If any handler rejects, the pod is rejected.
+	var rejection *lifecycle.PodAdmitResult
 	for _, podAdmitHandler := range m.admitHandlers {
-		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
-			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", attrs.Operation)
-			return false, result.Reason, result.Message
+		if rejection != nil {
+			// A rejected new pod is rejected for good, so its rejection type is unused. Consulting
+			// more handlers would only run side effects, such as preemption or resource
+			// allocation, for a pod that won't be admitted anyway. An infeasible update rejection
+			// can't be outranked.
+			if attrs.Operation != lifecycle.UpdateOperation || rejection.RejectionType == lifecycle.RejectionInfeasible {
+				break
+			}
+			if !attrs.DryRun {
+				dryRunAttrs := *attrs
+				dryRunAttrs.DryRun = true
+				attrs = &dryRunAttrs
+			}
+		}
+		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit && (rejection == nil || result.RejectionType > rejection.RejectionType) {
+			rejection = &result
 		}
 	}
+	if rejection != nil {
+		logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", rejection.Reason, "message", rejection.Message, "rejectionType", rejection.RejectionType, "operation", attrs.Operation)
+		return *rejection
+	}
 
-	return true, "", ""
+	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
