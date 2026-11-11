@@ -9910,12 +9910,17 @@ func runTestAllocator(tCtx ktesting.TContext,
 					slices[i] = slice.DeepCopy()
 				}
 			}
-			tCtx.Logf("ResourceSlices:\n%s\n\nResourceClaims:\n%s\n\nDeviceClasses:\n%s\nallocated capacity:\n%s",
-				format.Object(slices, 1),
-				format.Object(claimsToAllocate, 1),
-				format.Object(classLister.objs, 1),
-				format.Object(allocatedShare, 1),
-			)
+
+			// Only log at non-zero verbosity. Running with "-args -v=0" can be useful
+			// to run tests "silently".
+			// If we didn't log upfront, then do it after a failure.
+			tCtx.Logger().V(1).Info("Input for allocator", "resourceSlices", slices, "claimsToAllocate", claimsToAllocate, "deviceClasses", classLister.objs, "allocatedCapacity", allocatedShare)
+			tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+				if tCtx.Failed() && !tCtx.Logger().V(1).Enabled() {
+					tCtx.Logger().Info("Input for allocator, re-run with -args -v=7 to get more log output", "resourceSlices", slices, "claimsToAllocate", claimsToAllocate, "deviceClasses", classLister.objs, "allocatedCapacity", allocatedShare)
+				}
+			})
+
 			allocatedState := AllocatedState{
 				AllocatedDevices:         sets.New(allocatedDevices...),
 				AllocatedSharedDeviceIDs: tc.allocatedSharedDeviceIDs,
