@@ -192,6 +192,12 @@ type NominatedNodeNameGetter interface {
 	// scheduler sets or clears before it patches the pod. Otherwise it
 	// returns pod.Status.NominatedNodeName.
 	NominatedNodeName(pod *v1.Pod) string
+	// TracksNominationInMemory reports whether the PodNominator tracks the
+	// nomination of pod in memory: the DRAPreemption feature gate is enabled
+	// and pod is not a pod of a pod group. For such a pod, the scheduling
+	// queue requeues the pods blocked by the nomination when it ends, and the
+	// nomination of the assumed pod is kept until Reserve and Permit succeed.
+	TracksNominationInMemory(pod *v1.Pod) bool
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.

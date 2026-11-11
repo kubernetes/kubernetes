@@ -682,6 +682,16 @@ func (f *frameworkImpl) NominatedNodeName(pod *v1.Pod) string {
 	return pod.Status.NominatedNodeName
 }
 
+// TracksNominationInMemory implements framework.NominatedNodeNameGetter by
+// delegating to the PodNominator. It returns false if the PodNominator does
+// not implement framework.NominatedNodeNameGetter.
+func (f *frameworkImpl) TracksNominationInMemory(pod *v1.Pod) bool {
+	if nominator, ok := f.PodNominator.(framework.NominatedNodeNameGetter); ok {
+		return nominator.TracksNominationInMemory(pod)
+	}
+	return false
+}
+
 func (f *frameworkImpl) SetPodActivator(a fwk.PodActivator) {
 	f.PodActivator = a
 }

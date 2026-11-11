@@ -1912,6 +1912,176 @@ func TestBindingCycleForDeferredResizeSkipsNominatedNodeName(t *testing.T) {
 	}
 }
 
+// callRecordingQueue records the order of the calls with which
+// handleSchedulingFailure nominates a pod and adds it back to the queue.
+type callRecordingQueue struct {
+	internalqueue.SchedulingQueue
+	calls []string
+}
+
+func (q *callRecordingQueue) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
+	q.calls = append(q.calls, "AddNominatedPod")
+	q.SchedulingQueue.AddNominatedPod(logger, pi, nominatingInfo)
+}
+
+func (q *callRecordingQueue) AddUnschedulablePodIfNotPresent(ctx context.Context, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+	q.calls = append(q.calls, "AddUnschedulablePodIfNotPresent")
+	return q.SchedulingQueue.AddUnschedulablePodIfNotPresent(ctx, pInfo, podSchedulingCycle)
+}
+
+// TestHandleSchedulingFailureNominatesBeforeRequeue checks that with the
+// DRAPreemption feature gate, handleSchedulingFailure updates the nomination
+// of the pod before it adds the pod back to the queue. In the other order, the
+// scheduling goroutine can pop the pod and nominate it again before a binding
+// goroutine applies the result of the failed attempt, which would overwrite
+// the newer nomination.
+func TestHandleSchedulingFailureNominatesBeforeRequeue(t *testing.T) {
+	for _, draPreemption := range []bool{false, true} {
+		t.Run(fmt.Sprintf("DRAPreemption=%v", draPreemption), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, draPreemption)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			pod := st.MakePod().Name("foo").Namespace("ns").UID("pod-uid").SchedulerName(testSchedulerName).Obj()
+			client := clientsetfake.NewClientset(pod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+			queue := &callRecordingQueue{SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory, internalqueue.WithMetricsRecorder(ar))}
+			schedFramework, err := tf.NewFramework(ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				testSchedulerName,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(queue.SchedulingQueue),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sched := &Scheduler{client: client, SchedulingQueue: queue}
+
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			queue.Add(ctx, pod)
+			popped, err := queue.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop: %v", err)
+			}
+			nominatingInfo := &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"}
+			sched.handleSchedulingFailure(ctx, schedFramework, popped.(*framework.QueuedPodInfo), fwk.NewStatus(fwk.Unschedulable, "no fit"), nominatingInfo, time.Now())
+
+			wantCalls := []string{"AddUnschedulablePodIfNotPresent", "AddNominatedPod"}
+			if draPreemption {
+				wantCalls = []string{"AddNominatedPod", "AddUnschedulablePodIfNotPresent"}
+			}
+			if diff := cmp.Diff(wantCalls, queue.calls); diff != "" {
+				t.Errorf("Unexpected order of queue calls (-want,+got):\n%s", diff)
+			}
+			if got := queue.NominatedPodsForNode(logger, "node1"); len(got) != 1 {
+				t.Errorf("Nominated pods of node1: got %d, want 1", len(got))
+			}
+		})
+	}
+}
+
+// TestHandleSchedulingFailureOfAssumedPodRequeuesBlockedPods checks that with
+// the DRAPreemption feature gate, the pods blocked by the nomination of a pod
+// are requeued when Reserve or Permit rejected that pod after it got assumed
+// on its nominated node, also when the pod is not added back to the queue
+// because it is gone from the informer cache.
+func TestHandleSchedulingFailureOfAssumedPodRequeuesBlockedPods(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPreemption, true)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pod := st.MakePod().Name("foo").Namespace("ns").UID("pod-uid").Priority(highPriority).SchedulerName(testSchedulerName).Obj()
+	blockedPod := st.MakePod().Name("blocked").Namespace("ns").UID("blocked-uid").Priority(lowPriority).SchedulerName(testSchedulerName).Obj()
+	client := clientsetfake.NewClientset(pod, blockedPod)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	podStore := informerFactory.Core().V1().Pods().Informer().GetStore()
+	for _, p := range []*v1.Pod{pod, blockedPod} {
+		if err := podStore.Add(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	ar := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
+	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+		testSchedulerName: {
+			framework.EventAssignedPodDelete: {
+				{
+					PluginName: "fooPlugin",
+					QueueingHintFn: func(klog.Logger, *v1.Pod, interface{}, interface{}) (fwk.QueueingHint, error) {
+						return fwk.Queue, nil
+					},
+				},
+			},
+		},
+	}
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory,
+		internalqueue.WithMetricsRecorder(ar),
+		internalqueue.WithQueueingHintMapPerProfile(queueingHintMap))
+	schedFramework, err := tf.NewFramework(ctx,
+		[]tf.RegisterPluginFunc{
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		},
+		testSchedulerName,
+		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithPodNominator(queue),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sched := &Scheduler{client: client, SchedulingQueue: queue}
+
+	// blockedPod was rejected while pod was nominated to node1.
+	queue.Add(ctx, blockedPod)
+	popped, err := queue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop: %v", err)
+	}
+	blockedPodInfo := popped.(*framework.QueuedPodInfo)
+	blockedPodInfo.UnschedulablePlugins = sets.New("fooPlugin")
+	if err := queue.AddUnschedulablePodIfNotPresent(ctx, blockedPodInfo, queue.SchedulingCycle()); err != nil {
+		t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+	}
+
+	// pod got assumed on its nominated node, then Reserve rejected it.
+	queue.Add(ctx, pod)
+	popped, err = queue.Pop(logger)
+	if err != nil {
+		t.Fatalf("Pop: %v", err)
+	}
+	podInfo := popped.(*framework.QueuedPodInfo)
+	queue.AddNominatedPod(logger, podInfo.PodInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
+	assumedPodInfo := podInfo.DeepCopy()
+	assumedPodInfo.Pod.Spec.NodeName = "node1"
+	// The pod got deleted in the meantime: the informer cache doesn't have
+	// it anymore, but the event handler has not removed it from the queue yet.
+	if err := podStore.Delete(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	sched.handleSchedulingFailure(ctx, schedFramework, assumedPodInfo, fwk.NewStatus(fwk.Unschedulable, "reserve rejected"), clearNominatedNode, time.Now())
+
+	if got := queue.NominatedPodsForNode(logger, "node1"); len(got) != 0 {
+		t.Errorf("Nominated pods of node1: got %d, want 0", len(got))
+	}
+	if got := queue.UnschedulablePods(); podListContainsPod(got, blockedPod) {
+		t.Errorf("Pod blocked by the nomination was not requeued, unschedulable pods: %v", got)
+	}
+}
+
 func TestHandleSchedulingFailure_PodGroupFitErrorCloned(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
 

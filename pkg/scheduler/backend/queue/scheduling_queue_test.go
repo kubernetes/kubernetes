@@ -106,7 +106,7 @@ var (
 
 	nominatorCmpOpts = []cmp.Option{
 		cmp.AllowUnexported(nominator{}, podRef{}),
-		cmpopts.IgnoreFields(nominator{}, "podLister", "nLock", "draPreemption", "genericWorkload"),
+		cmpopts.IgnoreFields(nominator{}, "podLister", "nLock", "draPreemption", "genericWorkload", "changes"),
 	}
 
 	queueHintReturnQueue = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
