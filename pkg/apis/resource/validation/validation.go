@@ -1573,13 +1573,6 @@ func validateRequestPolicyRange(defaultValue apiresource.Quantity, maxCapacity a
 		} else {
 			added := valueRange.Min.DeepCopy()
 			added.Add(*valueRange.Step)
-			if added.Format == apiresource.BinarySI {
-				// BinarySI never writes using binary suffixes for exponents of 70 or above,
-				// so switching to DecimalExponent here has no impact on the output, but improves performance.
-				if _, exponent := added.AsCanonicalBytes(nil); exponent >= 70 {
-					added.Format = apiresource.DecimalExponent
-				}
-			}
 			if added.Cmp(maxCapacity) > 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("step"), valueRange.Step.String(), fmt.Sprintf("one step %s is larger than capacity value: %s", added.String(), maxCapacity.String())))
 			}
