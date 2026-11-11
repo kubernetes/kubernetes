@@ -217,7 +217,10 @@ func TestManagerScope(t *testing.T) {
 }
 
 // mockAdmissionError represents the reason why allocation was rejected
-type mockAdmissionError struct{ reason string }
+type mockAdmissionError struct {
+	reason        string
+	rejectionType lifecycle.RejectionType
+}
 
 func (e *mockAdmissionError) Error() string {
 	return ""
@@ -225,6 +228,10 @@ func (e *mockAdmissionError) Error() string {
 
 func (e *mockAdmissionError) Type() string {
 	return e.reason
+}
+
+func (e *mockAdmissionError) RejectionType() lifecycle.RejectionType {
+	return e.rejectionType
 }
 
 type mockHintProvider struct {
@@ -300,13 +307,14 @@ func TestAdmit(t *testing.T) {
 	singleNumaPolicy := NewSingleNumaNodePolicy(numaInfo, opts)
 
 	tcases := []struct {
-		name           string
-		result         lifecycle.PodAdmitResult
-		qosClass       v1.PodQOSClass
-		policy         Policy
-		hp             []HintProvider
-		expected       bool
-		expectedReason string
+		name                  string
+		result                lifecycle.PodAdmitResult
+		qosClass              v1.PodQOSClass
+		policy                Policy
+		hp                    []HintProvider
+		expected              bool
+		expectedReason        string
+		expectedRejectionType lifecycle.RejectionType
 	}{
 		{
 			name:     "QOSClass set as BestEffort. None Policy. No Hints.",
@@ -544,8 +552,9 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
-			expected:       false,
-			expectedReason: ErrorTopologyAffinity,
+			expected:              false,
+			expectedReason:        ErrorTopologyAffinity,
+			expectedRejectionType: lifecycle.RejectionBlocked,
 		},
 		{
 			name:     "QOSClass set as Burstable. Restricted Policy. No Preferred affinity.",
@@ -563,8 +572,9 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
-			expected:       false,
-			expectedReason: ErrorTopologyAffinity,
+			expected:              false,
+			expectedReason:        ErrorTopologyAffinity,
+			expectedRejectionType: lifecycle.RejectionBlocked,
 		},
 		{
 			name:     "QOSClass set as Guaranteed. single-numa-node Policy. Allocation rejected by the HintProvider",
@@ -580,11 +590,12 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
-					allocateError: &mockAdmissionError{"SMTAlignmentError"},
+					allocateError: &mockAdmissionError{reason: "SMTAlignmentError", rejectionType: lifecycle.RejectionInfeasible},
 				},
 			},
-			expected:       false,
-			expectedReason: "SMTAlignmentError",
+			expected:              false,
+			expectedReason:        "SMTAlignmentError",
+			expectedRejectionType: lifecycle.RejectionInfeasible,
 		},
 		{
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. Allocation rejected by the 2nd HintProvider",
@@ -610,11 +621,12 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
-					allocateError: &mockAdmissionError{"OutOfCpu"},
+					allocateError: &mockAdmissionError{reason: "OutOfCpu", rejectionType: lifecycle.RejectionBlocked},
 				},
 			},
-			expected:       false,
-			expectedReason: "OutOfCpu",
+			expected:              false,
+			expectedReason:        "OutOfCpu",
+			expectedRejectionType: lifecycle.RejectionBlocked,
 		},
 		{
 			name:     "QOSClass set as Burstable. single-numa-node Policy. Preferred affinity on two NUMA nodes",
@@ -630,11 +642,12 @@ func TestAdmit(t *testing.T) {
 							},
 						},
 					},
-					allocateError: &mockAdmissionError{"UnexpectedAdmissionError"},
+					allocateError: &mockAdmissionError{reason: "UnexpectedAdmissionError"},
 				},
 			},
-			expected:       false,
-			expectedReason: ErrorTopologyAffinity,
+			expected:              false,
+			expectedReason:        ErrorTopologyAffinity,
+			expectedRejectionType: lifecycle.RejectionBlocked,
 		},
 	}
 	for _, tc := range tcases {
@@ -674,6 +687,9 @@ func TestAdmit(t *testing.T) {
 			if !ctnActual.Admit && ctnActual.Reason != tc.expectedReason {
 				t.Errorf("Error occurred, expected Reason in result to be %v got %v", tc.expectedReason, ctnActual.Reason)
 			}
+			if !ctnActual.Admit && ctnActual.RejectionType != tc.expectedRejectionType {
+				t.Errorf("Error occurred, expected RejectionType in result to be %v got %v", tc.expectedRejectionType, ctnActual.RejectionType)
+			}
 
 			// Pod scope Admit
 			podActual := podScopeManager.Admit(tCtx, &podAttr)
@@ -682,6 +698,9 @@ func TestAdmit(t *testing.T) {
 			}
 			if !podActual.Admit && podActual.Reason != tc.expectedReason {
 				t.Errorf("Error occurred, expected Reason in result to be %v got %v", tc.expectedReason, podActual.Reason)
+			}
+			if !podActual.Admit && podActual.RejectionType != tc.expectedRejectionType {
+				t.Errorf("Error occurred, expected RejectionType in result to be %v got %v", tc.expectedRejectionType, podActual.RejectionType)
 			}
 		})
 	}
@@ -846,6 +865,75 @@ func TestAdmitWithPodLevelResources(t *testing.T) {
 			}
 			if tracker.allocateContainerCalled != tc.expectedAllocateContainerCalled {
 				t.Errorf("Expected allocateContainerCalled to be %v got %v", tc.expectedAllocateContainerCalled, tracker.allocateContainerCalled)
+			}
+		})
+	}
+}
+
+func TestAdmitDryRun(t *testing.T) {
+	numaInfo := &NUMAInfo{
+		Nodes: []int{0, 1},
+		NUMADistances: NUMADistances{
+			0: {10, 11},
+			1: {11, 10},
+		},
+	}
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+		Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+	}
+	tcases := []struct {
+		name          string
+		scope         Scope
+		hints         []TopologyHint
+		expectedAdmit bool
+	}{{
+		name:          "container scope, aligned",
+		scope:         NewContainerScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0), Preferred: true}},
+		expectedAdmit: true,
+	}, {
+		name:          "container scope, not aligned",
+		scope:         NewContainerScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false}},
+		expectedAdmit: false,
+	}, {
+		name:          "pod scope, aligned",
+		scope:         NewPodScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0), Preferred: true}},
+		expectedAdmit: true,
+	}, {
+		name:          "pod scope, not aligned",
+		scope:         NewPodScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false}},
+		expectedAdmit: false,
+	}, {
+		name:          "none scope",
+		scope:         NewNoneScope(),
+		expectedAdmit: true,
+	}}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			tracker := &trackingHintProvider{hints: map[string][]TopologyHint{"resource": tc.hints}}
+			m := manager{scope: tc.scope}
+			tc.scope.AddHintProvider(tCtx.Logger(), tracker)
+
+			actual := m.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod, Operation: lifecycle.UpdateOperation, DryRun: true})
+			if actual.Admit != tc.expectedAdmit {
+				t.Errorf("Expected Admit to be %v got %v", tc.expectedAdmit, actual.Admit)
+			}
+			if !actual.Admit && actual.Reason != ErrorTopologyAffinity {
+				t.Errorf("Expected Reason to be %v got %v", ErrorTopologyAffinity, actual.Reason)
+			}
+			if tracker.allocatePodCalled || tracker.allocateContainerCalled {
+				t.Errorf("Expected no allocation in dry run")
+			}
+			if hint := tc.scope.GetAffinity(tCtx.Logger(), string(pod.UID), "c1"); hint.NUMANodeAffinity != nil {
+				t.Errorf("Expected no stored topology hint in dry run, got %v", hint)
 			}
 		})
 	}

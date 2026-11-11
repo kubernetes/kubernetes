@@ -36,6 +36,9 @@ type PodAdmitAttributes struct {
 	// Update holds information about the pod update being evaluated.
 	// It is set if and only if Operation == UpdateOperation (nil for AddOperation).
 	Update *PodUpdate
+	// DryRun indicates that the pod won't be admitted regardless of the result, and that the
+	// handler must not cause side effects. See PodAdmitHandler.
+	DryRun bool
 }
 
 // PodUpdate holds facts about the allocated -> desired change for an UpdateOperation,
@@ -65,11 +68,38 @@ type PodAdmitResult struct {
 	Reason string
 	// a brief message explaining why the pod could not be admitted.
 	Message string
+	// RejectionType classifies why the pod could not be admitted. Only meaningful if Admit is false.
+	RejectionType RejectionType
 }
+
+// RejectionType classifies a pod admission rejection by what can resolve it.
+// Rejection types are ordered by increasing precedence: when several handlers reject a pod, the rejection
+// with the highest rejection type is reported.
+type RejectionType int
+
+const (
+	// RejectionTransient means that retrying without any other change may succeed, for example
+	// after an internal error. This is the zero value, so an unclassified rejection is retried.
+	RejectionTransient RejectionType = iota
+	// RejectionResourceShortage means that the node doesn't have enough of a resource that the
+	// scheduler accounts for. Preempting, resizing or terminating other pods can resolve it.
+	RejectionResourceShortage
+	// RejectionBlocked means that the rejection can only be resolved by some other change
+	// in the state of the node or its pods, such as freeing NUMA-aligned resources or relieving
+	// node pressure. Retrying without that change won't help, and preemption based on aggregate
+	// resource requests is not expected to help either.
+	RejectionBlocked
+	// RejectionInfeasible means that the pod can't be admitted without changing the pod spec or
+	// the node configuration.
+	RejectionInfeasible
+)
 
 // PodAdmitHandler is notified during pod admission.
 type PodAdmitHandler interface {
 	// Admit evaluates if a pod can be admitted.
+	// If attrs.DryRun is set, Admit must not cause side effects, such as evicting or preempting
+	// pods, allocating resources, or making external calls that change state, but it should
+	// still report whether it would reject the pod. This mirrors dry run in API admission.
 	Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult
 }
 

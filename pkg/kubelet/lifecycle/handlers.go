@@ -207,9 +207,10 @@ func (a *appArmorAdmitHandler) Admit(_ context.Context, attrs *PodAdmitAttribute
 		return PodAdmitResult{Admit: true}
 	}
 	return PodAdmitResult{
-		Admit:   false,
-		Reason:  AppArmorNotAdmittedReason,
-		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+		Admit:         false,
+		Reason:        AppArmorNotAdmittedReason,
+		Message:       fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+		RejectionType: RejectionInfeasible,
 	}
 }
 
@@ -294,9 +295,10 @@ func (c *declaredFeaturesAdmitHandler) Admit(_ context.Context, attrs *PodAdmitA
 
 	if !matchResult.IsMatch {
 		return PodAdmitResult{
-			Admit:   false,
-			Reason:  PodFeatureUnsupported,
-			Message: fmt.Sprintf("Pod requires node features that are not available: %s", strings.Join(matchResult.UnsatisfiedRequirements, ", ")),
+			Admit:         false,
+			Reason:        PodFeatureUnsupported,
+			Message:       fmt.Sprintf("Pod requires node features that are not available: %s", strings.Join(matchResult.UnsatisfiedRequirements, ", ")),
+			RejectionType: RejectionInfeasible,
 		}
 	}
 

@@ -69,6 +69,18 @@ func (e SMTAlignmentError) Type() string {
 	return ErrorSMTAlignment
 }
 
+// RejectionType returns the rejection type of this error. A request that is not a multiple of the CPUs
+// per core can never be aligned, while a shortage of free physical CPUs may resolve once other
+// pods release CPUs.
+// TODO: Return RejectionInfeasible when the request exceeds the physical CPUs available on an
+// otherwise empty node.
+func (e SMTAlignmentError) RejectionType() lifecycle.RejectionType {
+	if e.CausedByPhysicalCPUs {
+		return lifecycle.RejectionBlocked
+	}
+	return lifecycle.RejectionInfeasible
+}
+
 // staticPolicy is a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.

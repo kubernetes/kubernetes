@@ -121,6 +121,9 @@ func TestAllowlist(t *testing.T) {
 		if status.Admit {
 			t.Errorf("expected to be rejected: %+v", test)
 		}
+		if status.RejectionType != lifecycle.RejectionInfeasible {
+			t.Errorf("expected rejection type %v, got %v", lifecycle.RejectionInfeasible, status.RejectionType)
+		}
 	}
 
 	// test for: len(pod.Spec.SecurityContext.Sysctls) == 0

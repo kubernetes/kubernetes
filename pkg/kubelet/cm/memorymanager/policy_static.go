@@ -247,7 +247,7 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 			return err
 		}
 		if !defaultHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the default preferred hint")
+			return admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the default preferred hint"))
 		}
 		bestHint = *defaultHint
 	}
@@ -258,13 +258,13 @@ func (p *staticPolicy) AllocatePod(logger klog.Logger, s state.State, pod *v1.Po
 			return err
 		}
 		if !extendedHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
+			return admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the extended preferred hint"))
 		}
 		bestHint = *extendedHint
 	}
 
 	if isAffinityViolatingNUMAAllocations(machineState, bestHint.NUMANodeAffinity) {
-		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
+		return admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation"))
 	}
 
 	maskBits := bestHint.NUMANodeAffinity.GetBits()
@@ -510,7 +510,7 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 		}
 
 		if !defaultHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the default preferred hint")
+			return admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the default preferred hint"))
 		}
 		bestHint = defaultHint
 	}
@@ -527,7 +527,7 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 		}
 
 		if !extendedHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
+			return admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the extended preferred hint"))
 		}
 		bestHint = extendedHint
 	}
@@ -536,7 +536,7 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 	// NUMA node cannot have both single and cross NUMA node allocations
 	// https://kubernetes.io/blog/2021/08/11/kubernetes-1-22-feature-memory-manager-moves-to-beta/#single-vs-cross-numa-node-allocation
 	if isAffinityViolatingNUMAAllocations(machineState, bestHint.NUMANodeAffinity) {
-		return fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")
+		return admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation"))
 	}
 
 	var containerBlocks []state.Block
@@ -1336,7 +1336,7 @@ func (p *staticPolicy) getResourceSystemReserved(nodeID int, resourceName v1.Res
 func (p *staticPolicy) getDefaultHint(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) (*topologymanager.TopologyHint, error) {
 	hints := p.calculateHints(machineState, pod, requestedResources)
 	if len(hints) < 1 {
-		return nil, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available")
+		return nil, admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"))
 	}
 
 	// hints for all memory types should be the same, so we will check hints only for regular memory type
@@ -1382,7 +1382,7 @@ func (p *staticPolicy) extendTopologyManagerHint(machineState state.NUMANodeMap,
 	}
 
 	if len(filteredHints) < 1 {
-		return nil, fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint")
+		return nil, admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint"))
 	}
 
 	// try to find the preferred hint with the minimal number of NUMA nodes, relevant for the restricted policy

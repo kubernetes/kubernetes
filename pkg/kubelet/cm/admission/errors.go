@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -31,6 +32,7 @@ const (
 type Error interface {
 	Error() string
 	Type() string
+	RejectionType() lifecycle.RejectionType
 }
 
 type unexpectedAdmissionError struct{ Err error }
@@ -45,12 +47,18 @@ func (e *unexpectedAdmissionError) Type() string {
 	return ErrorReasonUnexpected
 }
 
+func (e *unexpectedAdmissionError) RejectionType() lifecycle.RejectionType {
+	return lifecycle.RejectionTransient
+}
+
 // EmptyPodSharedPoolError represents an error due to a pod spec being invalid
 // when the Topology manager's scope is set to pod, because the pod spec
 // produces an empty pod shared pool and there are containers that require it.
 type EmptyPodSharedPoolError struct {
 	message string
 }
+
+var _ Error = (*EmptyPodSharedPoolError)(nil)
 
 // NewEmptyPodSharedPoolError returns a new EmptyPodSharedPoolError.
 func NewEmptyPodSharedPoolError(err error) *EmptyPodSharedPoolError {
@@ -65,6 +73,46 @@ func (e *EmptyPodSharedPoolError) Type() string {
 	return ErrorReasonEmptyPodSharedPool
 }
 
+func (e *EmptyPodSharedPoolError) RejectionType() lifecycle.RejectionType {
+	return lifecycle.RejectionInfeasible
+}
+
+// OutOfResourceError represents a failure to allocate exclusive resources, such as CPUs or
+// NUMA-aligned memory, because not enough suitable resources are free on the node.
+type OutOfResourceError struct {
+	Resource v1.ResourceName
+	Err      error
+}
+
+var _ Error = (*OutOfResourceError)(nil)
+
+// NewOutOfResourceError returns a new OutOfResourceError.
+func NewOutOfResourceError(resource v1.ResourceName, err error) *OutOfResourceError {
+	return &OutOfResourceError{Resource: resource, Err: err}
+}
+
+func (e *OutOfResourceError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *OutOfResourceError) Unwrap() error {
+	return e.Err
+}
+
+// Type returns the reason in the same form as the OutOf<resource> reasons of the predicate
+// admit handler, such as OutOfcpu.
+func (e *OutOfResourceError) Type() string {
+	return "OutOf" + string(e.Resource)
+}
+
+// RejectionType returns RejectionBlocked because resources may become available once other pods
+// release them.
+// TODO: Have the resource managers return an infeasible error instead when the request can't be
+// satisfied even on an otherwise empty node.
+func (e *OutOfResourceError) RejectionType() lifecycle.RejectionType {
+	return lifecycle.RejectionBlocked
+}
+
 func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {
 	if err == nil {
 		return lifecycle.PodAdmitResult{Admit: true}
@@ -76,8 +124,9 @@ func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {
 	}
 
 	return lifecycle.PodAdmitResult{
-		Message: admissionErr.Error(),
-		Reason:  admissionErr.Type(),
-		Admit:   false,
+		Message:       admissionErr.Error(),
+		Reason:        admissionErr.Type(),
+		Admit:         false,
+		RejectionType: admissionErr.RejectionType(),
 	}
 }

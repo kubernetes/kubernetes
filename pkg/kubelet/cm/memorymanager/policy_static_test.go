@@ -1470,7 +1470,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod2", "container2", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available")),
 			topologyHint:  &topologymanager.TopologyHint{},
 		},
 		{
@@ -1560,7 +1560,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod2", "container2", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to find the default preferred hint"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the default preferred hint")),
 			topologyHint:  &topologymanager.TopologyHint{Preferred: true},
 		},
 		{
@@ -1639,7 +1639,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod1", "container1", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint")),
 			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: false},
 		},
 		{
@@ -1729,7 +1729,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				},
 			},
 			pod:           getPod("pod2", "container2", requirementsGuaranteed),
-			expectedError: fmt.Errorf("[memorymanager] failed to find the extended preferred hint"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] failed to find the extended preferred hint")),
 			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(1), Preferred: true},
 		},
 		{
@@ -2050,7 +2050,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			},
 			pod:           getPod("pod2", "container1", requirementsGuaranteed),
 			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
-			expectedError: fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation"),
+			expectedError: admission.NewOutOfResourceError(v1.ResourceMemory, fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation")),
 		},
 		{
 			description:         "should do nothing for guaranteed pod with pod level resources",
@@ -6462,4 +6462,43 @@ func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStaticPolicyAdmissionRejectionType(t *testing.T) {
+	ctx := ktesting.Init(t)
+	logger := ctx.Logger()
+	systemReserved := systemReservedMemory{
+		0: map[v1.ResourceName]uint64{
+			v1.ResourceMemory: 512 * mb,
+		},
+	}
+	policy, err := NewPolicyStatic(logger, nil, systemReserved, topologymanager.NewFakeManagerWithHint(logger, &topologymanager.TopologyHint{}))
+	require.NoError(t, err)
+
+	st := state.NewMemoryState(logger)
+	st.SetMachineState(state.NUMANodeMap{
+		0: &state.NUMANodeState{
+			MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+				v1.ResourceMemory: {
+					Allocatable:    gb,
+					Free:           256 * mb,
+					Reserved:       768 * mb,
+					SystemReserved: 512 * mb,
+					TotalMemSize:   1536 * mb,
+				},
+				hugepages1Gi: {
+					Allocatable:  gb,
+					Free:         gb,
+					TotalMemSize: gb,
+				},
+			},
+			Cells: []int{0},
+		},
+	})
+
+	pod := getPod("pod1", "container1", requirementsGuaranteed)
+	res := admission.GetPodAdmitResult(policy.Allocate(ctx, st, pod, &pod.Spec.Containers[0], lifecycle.AddOperation))
+	require.False(t, res.Admit)
+	require.Equal(t, lifecycle.OutOfMemory, res.Reason)
+	require.Equal(t, lifecycle.RejectionBlocked, res.RejectionType)
 }
