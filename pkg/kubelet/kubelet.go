@@ -996,6 +996,9 @@ func NewMainKubelet(ctx context.Context,
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.ReloadKubeletClientCAFile) {
 				// kubelet configuration that reloads Client CA Bundle from the disk when updated
+				// Include ALPN before cloning so the dynamic config retains the protocols
+				// normally added by net/http to the listener config
+				kubeDeps.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
 				klet.clientCAManager = dynamiccertificates.NewDynamicServingCertificateController(kubeDeps.TLSConfig.Clone(), kubeDeps.Auth, nil, nil, nil)
 
 				err := klet.clientCAManager.RunOnce()
@@ -1003,7 +1006,17 @@ func NewMainKubelet(ctx context.Context,
 					return nil, fmt.Errorf("unable to load client CA file %s: %w", kubeDeps.TLSOptions.ClientCAFile, err)
 				}
 
-				kubeDeps.TLSConfig.GetConfigForClient = klet.clientCAManager.GetConfigForClient
+				kubeDeps.TLSConfig.GetConfigForClient = func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+					tlsConfig, err := klet.clientCAManager.GetConfigForClient(hello)
+					if err != nil {
+						return nil, err
+					}
+					// net/http may disable HTTP/2 after the controller's base config is set
+					if httpServer, ok := hello.Context().Value(http.ServerContextKey).(*http.Server); ok && httpServer.TLSNextProto["h2"] == nil {
+						tlsConfig.NextProtos = []string{"http/1.1"}
+					}
+					return tlsConfig, nil
+				}
 
 			} else {
 				// kubelet configuration that sets static Client CA Bundle

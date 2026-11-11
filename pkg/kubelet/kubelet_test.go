@@ -22,6 +22,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -4054,6 +4056,36 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	require.NotNil(t, kubeDep.TLSConfig.GetCertificate, "GetCertificate should not be nil")
 	require.NotNil(t, kubeDep.TLSConfig.GetConfigForClient, "GetConfigForClient should be nil")
 	require.Nil(t, kubeDep.TLSConfig.ClientCAs, "ClientCAs should be nil")
+
+	rootCAs := x509.NewCertPool()
+	require.True(t, rootCAs.AppendCertsFromPEM(ca))
+	for _, tc := range []struct {
+		name           string
+		godebug        string
+		wantProtoMajor int
+	}{
+		{name: "HTTP2", wantProtoMajor: 2},
+		{name: "HTTP2 disabled", godebug: "http2server=0", wantProtoMajor: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GODEBUG", tc.godebug)
+			tlsServer := httptest.NewUnstartedServer(http.NotFoundHandler())
+			tlsServer.TLS = kubeDep.TLSConfig.Clone()
+			tlsServer.EnableHTTP2 = true
+			tlsServer.StartTLS()
+			defer tlsServer.Close()
+
+			client := tlsServer.Client()
+			client.Timeout = 10 * time.Second
+			transport := client.Transport.(*http.Transport)
+			transport.TLSClientConfig.RootCAs = rootCAs
+			transport.TLSClientConfig.ServerName = "localhost"
+			response, err := client.Get(tlsServer.URL)
+			require.NoError(t, err)
+			defer response.Body.Close()
+			assert.Equal(t, tc.wantProtoMajor, response.ProtoMajor)
+		})
+	}
 }
 
 func TestSyncPodSpans(t *testing.T) {
