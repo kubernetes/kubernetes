@@ -173,8 +173,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	}
 
 	extraNodeAllocatableLimits := make(v1.ResourceList)
+	extraNodeAllocatableRequests := make(v1.ResourceList)
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
 		extraNodeAllocatableLimits = resourcehelper.GetExtraNodeAllocatableResourcesLimits(pod, container.Name)
+		extraNodeAllocatableRequests = resourcehelper.GetExtraNodeAllocatableResourcesRequests(pod, container.Name)
 	}
 	memoryLimit := getMemoryLimit(pod, container, extraNodeAllocatableLimits)
 	cpuLimit := getCPULimit(pod, container, extraNodeAllocatableLimits)
@@ -183,6 +185,12 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	// calculateLinuxResources from falling back to the DRA-inflated cpuLimit.
 	if cpuRequest == nil {
 		cpuRequest = getCPULimit(pod, container, nil)
+	}
+	// Unlike limits, a request that is omitted in the spec is zero, so DRA requests are always added.
+	if extraCPURequest := extraNodeAllocatableRequests.Cpu(); !extraCPURequest.IsZero() {
+		q := *cpuRequest
+		q.Add(*extraCPURequest)
+		cpuRequest = &q
 	}
 
 	// If pod has exclusive cpu and the container in question has integer cpu requests
@@ -202,7 +210,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	// Set memory.min and memory.high to enforce MemoryQoS
 	if enforceMemoryQoS {
 		unified := map[string]string{}
-		memoryRequest := container.Resources.Requests.Memory().Value()
+		memoryRequestSpec := container.Resources.Requests.Memory().Value()
+		memoryRequest := memoryRequestSpec + extraNodeAllocatableRequests.Memory().Value()
 		memoryLimitSpec := container.Resources.Limits.Memory().Value()
 		if memoryRequest != 0 && m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy {
 			// Guaranteed pods get memory.min (hard protection).
@@ -223,7 +232,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 			utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) &&
 			resourcehelper.IsPodLevelResourcesSet(pod) &&
 			!pod.Spec.Resources.Limits.Memory().IsZero()
-		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequest != memoryLimitSpec || memoryRequest == 0) {
+		if m.memoryThrottlingFactor != nil && !skipContainerMemoryHigh && (memoryRequestSpec != memoryLimitSpec || memoryRequestSpec == 0) {
 			memoryLimitVal := memoryLimitSpec
 			if _, exists := extraNodeAllocatableLimits[v1.ResourceMemory]; exists && memoryLimit != nil && memoryLimitSpec != 0 {
 				// memoryLimit computed above should include DRA already.

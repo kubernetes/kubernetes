@@ -731,6 +731,23 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		},
 	}
 
+	// Burstable + 256Mi DRA Memory, 64Mi of it per-container overhead (DRA version of pod1)
+	pod9 := pod1.DeepCopy()
+	pod9.Status = v1.PodStatus{
+		ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+			{
+				ContainerName: "",
+				Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+			{
+				ContainerName: "foo",
+				Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("64Mi")},
+				Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+		},
+	}
+
 	type expectedResult struct {
 		memoryLow  int64 // set to -1 if skipped for the pod
 		memoryHigh int64 // set to -1 if skipped for the pod
@@ -812,6 +829,15 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			expected: &expectedResult{
 				memoryLow:  128 * 1024 * 1024,
 				memoryHigh: calculateMemoryHigh(128*1024*1024, memoryNodeAllocatable.Value()),
+			},
+		},
+		{
+			name:               "Burstable pod with DRA (128Mi requests + 64Mi DRA, 256Mi limits + 256Mi DRA) - set memory.low and memory.high based on DRA-inflated requests and limits",
+			pod:                pod9,
+			draNodeAllocatable: true,
+			expected: &expectedResult{
+				memoryLow:  192 * 1024 * 1024,
+				memoryHigh: calculateMemoryHigh(192*1024*1024, 512*1024*1024),
 			},
 		},
 	}
@@ -1711,7 +1737,7 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
 				},
 			},
-			expectedCPUShares:   int64(cm.MilliCPUToShares(1 * 1000)),             // since request is omitted in the spec, we fallback to setting it to spec limit (without DRA inflated values)
+			expectedCPUShares:   int64(cm.MilliCPUToShares((1 + 2) * 1000)),       // spec 1 CPU + DRA per-container 2 CPUs
 			expectedCPUQuota:    cm.MilliCPUToQuota((1+1+2)*1000, cm.QuotaPeriod), // spec 1 CPU + DRA per-pod 1 CPU + DRA per-container 2 CPUs
 			expectedMemoryLimit: 0,
 			expectedHugepages:   map[string]uint64{"2MB": 0},
@@ -1732,9 +1758,51 @@ func TestGenerateLinuxContainerResourcesWithDRA(t *testing.T) {
 					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("4"), v1.ResourceMemory: resource.MustParse("600Mi")},
 				},
 			},
-			expectedCPUShares:   int64(cm.MilliCPUToShares(2 * 1000)),               // since request is omitted in the spec, we fallback to setting it to spec limit (without DRA inflated values)
+			expectedCPUShares:   int64(cm.MilliCPUToShares((2 + 2) * 1000)),         // spec 2 CPUs (requests omitted defaults to limits) + DRA per-container 2 CPUs
 			expectedCPUQuota:    cm.MilliCPUToQuota((2+1+1+2)*1000, cm.QuotaPeriod), // spec 2 CPU + DRA mapping 1 CPU + DRA per-pod 1 CPU + DRA per-container 2 CPU
 			expectedMemoryLimit: (500 + 300 + 100 + 200) * Mi,
+			expectedHugepages:   map[string]uint64{"2MB": 0},
+		},
+		{
+			name:               "explicit container spec requests + per-container DRA overhead",
+			draNodeAllocatable: true,
+			containerRequests:  v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+			containerLimits:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+				},
+			},
+			expectedCPUShares:   int64(cm.MilliCPUToShares((1 + 2) * 1000)),       // spec 1 CPU + DRA per-container 2 CPUs
+			expectedCPUQuota:    cm.MilliCPUToQuota((2+1+2)*1000, cm.QuotaPeriod), // spec 2 CPUs + DRA per-pod 1 CPU + DRA per-container 2 CPUs
+			expectedMemoryLimit: 0,
+			expectedHugepages:   map[string]uint64{"2MB": 0},
+		},
+		{
+			name:               "container requests and limits omitted + per-container DRA overhead",
+			draNodeAllocatable: true,
+			extraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+					Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("3")},
+				},
+			},
+			expectedCPUShares:   int64(cm.MilliCPUToShares(2 * 1000)), // DRA per-container 2 CPUs, an omitted request is zero
+			expectedCPUQuota:    0,                                    // default, DRA does not change the behavior when spec limits are omitted
+			expectedMemoryLimit: 0,
 			expectedHugepages:   map[string]uint64{"2MB": 0},
 		},
 		{

@@ -283,15 +283,15 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "4396Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
 				// Note: PerPod overhead is counted fully in both the containers, but counted only once at the pod level limiting the overall limit.
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1174, 1174}, // 1024 (c1) + 100 (PerContainer) + 100/2 (PerPod) = 1174Mi
 		},
@@ -311,14 +311,14 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "5396Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1674, 1674}, // 1024 (c1) + 1000/2 (Direct Mem) + 100 (PerContainer) + 100/2 (PerPod) = 1674Mi
 		},
@@ -338,14 +338,14 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "5396Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 1000m (Direct CPU) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 1000Mi (Direct Mem) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim -PerPod)
-				{CPUReq: "1000m", CPULim: "3200m", MemLim: "3248Mi"},
+				{CPUReq: "1100m", CPULim: "3200m", MemLim: "3248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1674, 1674}, // 1024 (c1) + 1000/2 (Direct Mem) + 100 (PerContainer) + 100/2 (PerPod) = 1674Mi
 		},
@@ -422,14 +422,14 @@ func doNodeAllocatableCgroupsTests(f *framework.Framework) {
 				MemLim: "4096Mi",
 			},
 			expectedContainersCgroup: []cgroups.ContainerResources{
-				// CPU request: 1000m (from spec)
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
-				// CPU request: 1000m (from spec)
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
+				// CPU request: 1000m (from spec) + 100m (CPU Claim - PerContainer)
 				// CPU limit: 2000m (from spec) + 100m (CPU Claim - PerContainer) + 100m (CPU Claim - PerPod)
 				// Memory limit: 2048Mi (from spec) + 100Mi (Memory Claim - PerContainer) + 100Mi (Memory Claim - PerPod)
-				{CPUReq: "1000m", CPULim: "2200m", MemLim: "2248Mi"},
+				{CPUReq: "1100m", CPULim: "2200m", MemLim: "2248Mi"},
 			},
 			expectedContainersScoreMemRequest: []int64{1250, 1250}, // c_effective (1174) + remaining ((2500-2348)/2) = 1174 + 76 = 1250Mi
 		},
@@ -744,7 +744,7 @@ func doNodeAllocatableResizeTests(f *framework.Framework) {
 			// Memory limit: 3000Mi (from resized spec) + 100Mi (DRA PerPod memory) + 100Mi (DRA PerContainer memory)
 			expectedPodCgroupAfterResize: cgroups.ContainerResources{CPUReq: "1700m", CPULim: "2700m", MemLim: "3200Mi"},
 			expectedContainersCgroupAfterResize: []cgroups.ContainerResources{
-				{CPUReq: "1500m", CPULim: "2700m", MemLim: "3200Mi"},
+				{CPUReq: "1600m", CPULim: "2700m", MemLim: "3200Mi"},
 			},
 			expectedPodAllocatedResourcesAfterResize: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("1700m"),
