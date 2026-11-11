@@ -9704,6 +9704,61 @@ func TestPriorityQueue_AddCompositePodGroup(t *testing.T) {
 	}
 }
 
+// When a root CompositePodGroup appears, every pod waiting for it has to reach the queue inside the
+// root at once. Pop doesn't take the queue lock, so if the root went to activeQ after each pod, a
+// scheduling cycle could take it with only the first child group in it. PreEnqueue runs every time
+// the root is offered to activeQ, so each pod must be seen by it exactly once.
+func TestPriorityQueue_AddCompositePodGroupEnqueuesWaitingPodsTogether(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+		features.CompositePodGroup:               true,
+	})
+	logger, ctx := ktesting.NewTestContext(t)
+
+	var preEnqueued []string
+	plugin := &recordingPreEnqueuePlugin{record: func(pod *v1.Pod) { preEnqueued = append(preEnqueued, pod.Name) }}
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(map[string]map[string]fwk.PreEnqueuePlugin{
+		"": {plugin.Name(): plugin},
+	}))
+	defer q.Close()
+
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg1").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj()))
+	q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(st.MakePodGroup().Name("pg2").Namespace("ns1").ParentCompositePodGroup("root-cpg").Obj()))
+	for i, pg := range []string{"pg1", "pg1", "pg2", "pg2"} {
+		name := fmt.Sprintf("pod%d", i+1)
+		q.Add(ctx, st.MakePod().Name(name).Namespace("ns1").UID(name).PodGroupName(pg).Obj())
+	}
+	if len(preEnqueued) != 0 {
+		t.Fatalf("PreEnqueue ran for %v before the root CompositePodGroup existed", preEnqueued)
+	}
+
+	q.AddGenericPodGroup(logger, fwk.NewGenericCompositePodGroup(st.MakeCompositePodGroup().Name("root-cpg").Namespace("ns1").Obj()))
+
+	cmpOpts := []cmp.Option{cmpopts.SortSlices(func(a, b string) bool { return a < b })}
+	want := []string{"pod1", "pod2", "pod3", "pod4"}
+	if diff := cmp.Diff(want, preEnqueued, cmpOpts...); diff != "" {
+		t.Errorf("Pods seen by PreEnqueue mismatch, the root was offered to activeQ more than once (-want,+got):\n%s", diff)
+	}
+	if diff := cmp.Diff(map[string][]string{"compositepodgroup/root-cpg": want}, getActivePodGroups(q), cmpOpts...); diff != "" {
+		t.Errorf("Active queue pod groups mismatch (-want,+got):\n%s", diff)
+	}
+}
+
+// recordingPreEnqueuePlugin admits every pod and reports each PreEnqueue call.
+type recordingPreEnqueuePlugin struct {
+	record func(*v1.Pod)
+}
+
+func (pl *recordingPreEnqueuePlugin) Name() string {
+	return "recordingPreEnqueuePlugin"
+}
+
+func (pl *recordingPreEnqueuePlugin) PreEnqueue(_ context.Context, p *v1.Pod) *fwk.Status {
+	pl.record(p)
+	return nil
+}
+
 func TestPriorityQueue_UpdateCompositePodGroup(t *testing.T) {
 	tests := []struct {
 		name                   string
