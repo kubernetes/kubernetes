@@ -39,21 +39,21 @@ func init() {
 	addCheck(CheckUlimitsBaseline)
 }
 
-// CheckUlimitsBaseline returns a baseline level check that forbids setting securityContext.ulimits in 1.37+.
+// CheckUlimitsBaseline returns a baseline level check that forbids setting securityContext.ulimits in 1.38+.
 func CheckUlimitsBaseline() Check {
 	return Check{
 		ID:    "ulimits",
 		Level: api.LevelBaseline,
 		Versions: []VersionedCheck{
 			{
-				MinimumVersion: api.MajorMinorVersion(1, 37),
-				CheckPod:       ulimitsBaseline1_37,
+				MinimumVersion: api.MajorMinorVersion(1, 38),
+				CheckPod:       ulimitsBaseline1_38,
 			},
 		},
 	}
 }
 
-func ulimitsBaseline1_37(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func ulimitsBaseline1_38(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var badContainers []string
 	visitContainers(podSpec, func(container *corev1.Container) {
 		if container.SecurityContext != nil && container.SecurityContext.Ulimits != nil {

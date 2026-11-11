@@ -24,7 +24,7 @@ import (
 )
 
 func init() {
-	fixtureData1_37 := fixtureGenerator{
+	fixtureData1_38 := fixtureGenerator{
 		generatePass: func(p *corev1.Pod, _ api.Level) []*corev1.Pod {
 			// minimal valid pod already captures all valid combinations
 			return nil
@@ -50,7 +50,7 @@ func init() {
 	}
 
 	registerFixtureGenerator(
-		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 37), check: "ulimits"},
-		fixtureData1_37,
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 38), check: "ulimits"},
+		fixtureData1_38,
 	)
 }

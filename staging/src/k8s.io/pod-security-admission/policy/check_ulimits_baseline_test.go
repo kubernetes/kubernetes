@@ -20,10 +20,11 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
 
-func TestUlimitsBaseline_1_37(t *testing.T) {
+func TestUlimitsBaseline_1_38(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *corev1.Pod
@@ -57,7 +58,7 @@ func TestUlimitsBaseline_1_37(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ulimitsBaseline1_37(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := ulimitsBaseline1_38(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if result.Allowed && !tc.allowed {
 				t.Fatal("expected disallowed")
 			}
@@ -71,5 +72,31 @@ func TestUlimitsBaseline_1_37(t *testing.T) {
 				t.Errorf("expected\n%s\ngot\n%s", e, a)
 			}
 		})
+	}
+}
+
+func TestUlimitsPolicyVersion(t *testing.T) {
+	evaluator, err := NewEvaluator([]Check{CheckUlimitsBaseline()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pod := &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{
+		Name:            "container",
+		SecurityContext: &corev1.SecurityContext{Ulimits: &corev1.Ulimits{Nofile: &corev1.Ulimit{Soft: ptr.To[int64](1024), Hard: ptr.To[int64](2048)}}},
+	}}}}
+	for _, level := range []api.Level{api.LevelBaseline, api.LevelRestricted} {
+		for _, minor := range []int{37, 38} {
+			lv := api.LevelVersion{Level: level, Version: api.MajorMinorVersion(1, minor)}
+			t.Run(string(level)+"/"+lv.Version.String(), func(t *testing.T) {
+				results := evaluator.EvaluatePod(lv, &pod.ObjectMeta, &pod.Spec)
+				denied := false
+				for _, result := range results {
+					denied = denied || !result.Allowed
+				}
+				if wantDenied := minor >= 38; denied != wantDenied {
+					t.Errorf("ulimits denied = %t, want %t for policy %v", denied, wantDenied, lv)
+				}
+			})
+		}
 	}
 }

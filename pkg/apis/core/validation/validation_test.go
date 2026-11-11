@@ -25190,7 +25190,7 @@ func TestValidateMsgqueueUlimit(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sc := &core.SecurityContext{Ulimits: &core.Ulimits{Msgqueue: &core.Ulimit{Soft: tc.soft, Hard: tc.hard}}}
-			errs := ValidateSecurityContext(sc, field.NewPath("securityContext"), true, false)
+			errs := ValidateSecurityContext(sc, field.NewPath("securityContext"), true, false, false)
 			if tc.errorType == "" {
 				if len(errs) != 0 {
 					t.Fatalf("expected valid msgqueue limits, got %v", errs)
@@ -33764,7 +33764,7 @@ func TestValidateUlimitRanges(t *testing.T) {
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					sc := &core.SecurityContext{Ulimits: resource.makeLimits(&core.Ulimit{Soft: &tc.soft, Hard: &tc.hard})}
-					errs := ValidateSecurityContext(sc, field.NewPath("securityContext"), true, false)
+					errs := ValidateSecurityContext(sc, field.NewPath("securityContext"), true, false, false)
 					if (len(errs) != 0) != tc.invalid {
 						t.Errorf("soft=%d hard=%d: expected invalid=%t, got %v", tc.soft, tc.hard, tc.invalid, errs)
 					}

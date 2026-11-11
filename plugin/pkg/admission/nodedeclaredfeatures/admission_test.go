@@ -762,7 +762,7 @@ func TestContainerUlimitsEphemeralAdmission(t *testing.T) {
 			target, err := NewPlugin()
 			require.NoError(t, err)
 			target.nodeDeclaredFeatureGateEnabled = true
-			target.version = version.MustParse("1.37")
+			target.version = version.MustParse("1.38")
 			target.nodeDeclaredFeatureFramework = ndf.New([]ndf.Feature{containerulimits.Feature})
 			target.SetExternalKubeInformerFactory(factory)
 			require.NoError(t, target.ValidateInitialization())

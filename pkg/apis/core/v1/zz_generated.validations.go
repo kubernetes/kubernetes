@@ -2499,6 +2499,7 @@ func Validate_SecurityContext(
 	}
 
 	// field corev1.SecurityContext.AppArmorProfile has no validation
+	// field corev1.SecurityContext.Ulimits has no validation
 	return errs
 }
 
