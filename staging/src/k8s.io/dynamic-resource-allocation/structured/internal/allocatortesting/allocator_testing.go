@@ -9923,7 +9923,6 @@ func runTestAllocator(tCtx ktesting.TContext,
 					if allocation.ShareID != nil {
 						results[ri].Devices.Results[ai].ShareID = &fixedShareID
 					}
-					tCtx.Logf("allocated capacity: %v", allocation.ConsumedCapacity)
 				}
 			}
 			tCtx.Require(results).To(g.ConsistOf(expectResults...))
