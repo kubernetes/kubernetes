@@ -82,6 +82,10 @@ const (
 	// watcherResyncPeriod defines how frequently unsynchronized watchers are resynced
 	// with the watch cache.
 	watcherResyncPeriod = 100 * time.Millisecond
+
+	// maxResyncEvents bounds the number of watch cache history events scanned in
+	// a single resyncStalledWatchersLocked pass while holding locks.
+	maxResyncEvents = 1000
 )
 
 // Config contains the configuration for a given Cache.
@@ -571,24 +575,126 @@ func (c *Cacher) resyncWatchers() {
 		return
 	}
 
+	var stalledWatchers indexedWatchers
+	var minResourceVersion uint64
+
 	for _, watcher := range c.unsyncedWatchers {
-		c.unsyncedWatchers.deleteWatcher(watcher)
 		if watcher.stopped {
+			c.unsyncedWatchers.deleteWatcher(watcher)
 			continue
 		}
-		// TODO: Once stalled watchers are moved back to unsyncedWatchers,
-		// compute and send only catchup events after the last dispatched
-		// resourceVersion instead of re-initializing the watcher interval.
-		cacheInterval, err := c.initWatcherIntervalLocked(watcher)
-		if err != nil {
+		if !watcher.synced.IsNotified() {
+			c.unsyncedWatchers.deleteWatcher(watcher)
+			cacheInterval, err := c.initWatcherIntervalLocked(watcher)
+			if err != nil {
+				watcher.input <- watcherInput{err: err}
+				// Drain input so watcher.done stays open until process() delivers
+				// the queued watch.Error event; non-draining stop closes watcher.done
+				// immediately, causing sendWatchError to drop the error.
+				c.stopWatcherLocked(watcher, true)
+				continue
+			}
+			c.registerWatcherLocked(watcher, cacheInterval)
+			continue
+		}
+
+		if len(watcher.input) == cap(watcher.input) {
+			continue
+		}
+		if err := c.watchCache.history.checkResourceVersionLocked(watcher.dispatchedResourceVersion); err != nil {
+			c.unsyncedWatchers.deleteWatcher(watcher)
+			metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 			watcher.input <- watcherInput{err: err}
-			// Drain input so watcher.done stays open until process() delivers
-			// the queued watch.Error event; non-draining stop closes watcher.done
-			// immediately, causing sendWatchError to drop the error.
 			c.stopWatcherLocked(watcher, true)
 			continue
 		}
-		c.registerWatcherLocked(watcher, cacheInterval)
+		if stalledWatchers.empty() {
+			stalledWatchers = indexedWatchers{
+				scopeWatchers: make(map[namespacedName]watchersMap),
+				indexWatchers: make(map[string]watchersMap),
+			}
+			minResourceVersion = watcher.dispatchedResourceVersion
+		} else if watcher.dispatchedResourceVersion < minResourceVersion {
+			minResourceVersion = watcher.dispatchedResourceVersion
+		}
+		stalledWatchers.addWatcher(watcher)
+	}
+
+	if !stalledWatchers.empty() {
+		c.resyncStalledWatchersLocked(&stalledWatchers, minResourceVersion)
+	}
+}
+
+func (c *Cacher) resyncStalledWatchersLocked(stalledWatchers *indexedWatchers, minResourceVersion uint64) {
+	processedEvents := 0
+	for rawEvent := range c.watchCache.history.eventsAfterLocked(minResourceVersion) {
+		if processedEvents >= maxResyncEvents {
+			for watcher := range stalledWatchers.allWatchers() {
+				watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, rawEvent.ResourceVersion-1)
+			}
+			return
+		}
+		processedEvents++
+
+		accessor, err := meta.Accessor(rawEvent.Object)
+		if err != nil {
+			klog.ErrorS(err, "Failed to access object metadata during stalled watcher resync", "resource", c.groupResource, "resourceVersion", rawEvent.ResourceVersion)
+			if consistency.PanicOnCacheInconsistency {
+				panic(fmt.Sprintf("Failed to access object metadata during stalled watcher resync, resource: %q, resourceVersion: %d, err: %v", c.groupResource, rawEvent.ResourceVersion, err))
+			}
+			return
+		}
+		namespace := accessor.GetNamespace()
+		name := accessor.GetName()
+		triggerValues, triggerSupported := c.triggerValuesThreadUnsafe(rawEvent)
+		var eventToSend *watchCacheEvent
+
+		for watcher := range stalledWatchers.allMatchingWatchers(namespace, name, triggerValues, triggerSupported) {
+			if rawEvent.ResourceVersion <= watcher.dispatchedResourceVersion {
+				continue
+			}
+			if eventToSend == nil {
+				eventToSend = c.prepareEventForDispatch(rawEvent)
+			}
+			if !watcher.nonblockingAdd(eventToSend) {
+				stalledWatchers.deleteWatcher(watcher)
+				if stalledWatchers.empty() {
+					break
+				}
+			}
+		}
+		if stalledWatchers.empty() {
+			return
+		}
+	}
+
+	for watcher := range stalledWatchers.allWatchers() {
+		watcher.dispatchedResourceVersion = max(watcher.dispatchedResourceVersion, c.watchCache.resourceVersion)
+		c.unsyncedWatchers.deleteWatcher(watcher)
+		c.watchers.addWatcher(watcher)
+	}
+}
+
+func (i *indexedWatchers) empty() bool {
+	return len(i.scopeWatchers) == 0 && len(i.indexWatchers) == 0
+}
+
+func (i *indexedWatchers) allWatchers() iter.Seq[*cacheWatcher] {
+	return func(yield func(*cacheWatcher) bool) {
+		for _, watchers := range i.scopeWatchers {
+			for _, watcher := range watchers {
+				if !yield(watcher) {
+					return
+				}
+			}
+		}
+		for _, watchers := range i.indexWatchers {
+			for _, watcher := range watchers {
+				if !yield(watcher) {
+					return
+				}
+			}
+		}
 	}
 }
 
@@ -1162,38 +1268,19 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			watcher.nonblockingAdd(event)
 		}
 	} else {
-		// Set up caching of object serializations only for dispatching this event.
-		//
-		// Storing serializations in memory would result in increased memory usage,
-		// but it would help for caching encodings for watches started from old
-		// versions. However, we still don't have a convincing data that the gain
-		// from it justifies increased memory usage, so for now we drop the cached
-		// serializations after dispatching this event.
-		//
-		// Given that CachingObject is just wrapping the object and not perfoming
-		// deep-copying (until some field is explicitly being modified), we create
-		// it unconditionally to ensure safety and reduce deep-copying.
-		//
-		// Make a shallow copy to allow overwriting Object and PrevObject.
-		wcEvent := *event
-		setCachingObjects(&wcEvent, c.versioner)
-		wcEvent.timeline.MarkAt(metrics.PointWatcherEnqueued, c.clock.Now())
-		event = &wcEvent
+		event = c.prepareEventForDispatch(event)
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
 			if event.ResourceVersion <= watcher.dispatchedResourceVersion {
 				continue
 			}
-			if watcher.nonblockingAdd(event) {
-				watcher.dispatchedResourceVersion = event.ResourceVersion
-			} else {
-				watcher.dispatchedResourceVersion = event.ResourceVersion - 1
+			if !watcher.nonblockingAdd(event) {
 				c.blockedWatchers = append(c.blockedWatchers, watcher)
 			}
 		}
 
-		if len(c.blockedWatchers) > 0 {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) && len(c.blockedWatchers) > 0 {
 			// dispatchEvent is called very often, so arrange
 			// to reuse timers instead of constantly allocating.
 			startTime := time.Now()
@@ -1207,9 +1294,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// is running, not only the first ones in the list.
 			timer := c.timer
 			for _, watcher := range c.blockedWatchers {
-				if watcher.add(event, timer) {
-					watcher.dispatchedResourceVersion = event.ResourceVersion
-				} else {
+				if !watcher.add(event, timer) {
 					// fired, clean the timer by set it to nil.
 					timer = nil
 				}
@@ -1227,6 +1312,26 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	}
 }
 
+func (c *Cacher) prepareEventForDispatch(event *watchCacheEvent) *watchCacheEvent {
+	// Set up caching of object serializations only for dispatching this event.
+	//
+	// Storing serializations in memory would result in increased memory usage,
+	// but it would help for caching encodings for watches started from old
+	// versions. However, we still don't have a convincing data that the gain
+	// from it justifies increased memory usage, so for now we drop the cached
+	// serializations after dispatching this event.
+	//
+	// Given that CachingObject is just wrapping the object and not perfoming
+	// deep-copying (until some field is explicitly being modified), we create
+	// it unconditionally to ensure safety and reduce deep-copying.
+	//
+	// Make a shallow copy to allow overwriting Object and PrevObject.
+	wcEvent := *event
+	setCachingObjects(&wcEvent, c.versioner)
+	wcEvent.timeline.MarkAt(metrics.PointWatcherEnqueued, c.clock.Now())
+	return &wcEvent
+}
+
 func (c *Cacher) startDispatchingBookmarkEventsLocked() {
 	// Pop already expired watchers. However, explicitly ignore stopped ones,
 	// as we don't delete watcher from bookmarkWatchers when it is stopped.
@@ -1237,8 +1342,13 @@ func (c *Cacher) startDispatchingBookmarkEventsLocked() {
 			if watcher.stopped {
 				continue
 			}
-			c.watchersBuffer = append(c.watchersBuffer, watcher)
 			c.expiredBookmarkWatchers = append(c.expiredBookmarkWatchers, watcher)
+			if _, unsynced := c.unsyncedWatchers[watcher.id]; unsynced {
+				// Keep unsynced watchers scheduled for future bookmarks without
+				// writing to watcher.input concurrently with resyncWatchers.
+				continue
+			}
+			c.watchersBuffer = append(c.watchersBuffer, watcher)
 		}
 	}
 }
@@ -1356,6 +1466,18 @@ func (c *Cacher) finishDispatching() {
 		toStop.watcher.stopLocked()
 	}
 	c.watchersToStop = c.watchersToStop[:0]
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+		for _, watcher := range c.blockedWatchers {
+			if watcher.stopped {
+				continue
+			}
+			c.watchers.deleteWatcher(watcher)
+			c.unsyncedWatchers.addWatcher(watcher)
+		}
+	}
+	clear(c.blockedWatchers)
+	c.blockedWatchers = c.blockedWatchers[:0]
 
 	for _, watcher := range c.expiredBookmarkWatchers {
 		if watcher.stopped {

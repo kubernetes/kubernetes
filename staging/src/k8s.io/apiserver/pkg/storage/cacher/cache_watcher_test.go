@@ -378,6 +378,16 @@ func TestCacheWatcherDraining(t *testing.T) {
 			},
 			expectedTypes: []watch.EventType{watch.Error},
 		},
+		{
+			name:     "events followed by terminal error",
+			chanSize: 2,
+			inputs: []watcherInput{
+				{interval: intervalFromEvents([]*watchCacheEvent{makeWatchCacheEvent(4), makeWatchCacheEvent(5), makeWatchCacheEvent(6)})},
+				{event: makeWatchCacheEvent(7)},
+				{err: apierrors.NewResourceExpired("expired")},
+			},
+			expectedTypes: []watch.EventType{watch.Added, watch.Added, watch.Added, watch.Added, watch.Error},
+		},
 	}
 
 	for _, tc := range scenarios {
@@ -446,6 +456,15 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 			name:     "initial error",
 			chanSize: 0,
 			inputs: []watcherInput{
+				{err: apierrors.NewResourceExpired("expired")},
+			},
+		},
+		{
+			name:     "events followed by terminal error",
+			chanSize: 2,
+			inputs: []watcherInput{
+				{interval: intervalFromEvents([]*watchCacheEvent{makeWatchCacheEvent(4), makeWatchCacheEvent(5), makeWatchCacheEvent(6)})},
+				{event: makeWatchCacheEvent(7)},
 				{err: apierrors.NewResourceExpired("expired")},
 			},
 		},
@@ -608,6 +627,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if !w.nonblockingAdd(&watchCacheEvent{Type: watch.Bookmark, ResourceVersion: 10, Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "10"}}}) {
 		t.Fatal("failed adding an even to the watcher")
 	}
+	require.Equal(t, uint64(10), w.dispatchedResourceVersion)
 	if !w.add(&watchCacheEvent{
 		Object:          makePod(15),
 		ResourceVersion: 15,
@@ -624,6 +644,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent(t *testing.T) {
 	if w.add(&watchCacheEvent{Object: makePod(20), ResourceVersion: 20}, time.NewTimer(1*time.Second)) {
 		t.Fatal("expected the add method to fail")
 	}
+	require.Equal(t, uint64(19), w.dispatchedResourceVersion)
 	if err := wait.PollImmediate(5*time.Millisecond, 5*time.Second, func() (bool, error) {
 		lock.RLock()
 		defer lock.RUnlock()

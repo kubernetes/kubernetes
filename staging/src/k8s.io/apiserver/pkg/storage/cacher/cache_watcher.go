@@ -191,8 +191,16 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 	select {
 	case c.input <- watcherInput{event: event}:
 		c.markBookmarkAfterRvAsReceived(event)
+		c.dispatchedResourceVersion = max(c.dispatchedResourceVersion, event.ResourceVersion)
 		return true
 	default:
+		if event.ResourceVersion > 0 {
+			// Safe to advance to event.ResourceVersion - 1: callers ensure no events
+			// after dispatchedResourceVersion were compacted, all earlier matching
+			// events were already enqueued in ascending order, and on failure the
+			// caller stops dispatching subsequent events to this watcher until resynced.
+			c.dispatchedResourceVersion = max(c.dispatchedResourceVersion, event.ResourceVersion-1)
+		}
 		return false
 	}
 }
@@ -247,6 +255,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	// OK, block sending, but only until timer fires.
 	select {
 	case c.input <- watcherInput{event: event}:
+		c.dispatchedResourceVersion = max(c.dispatchedResourceVersion, event.ResourceVersion)
 		return true
 	case <-timer.C:
 		closeFunc()
@@ -535,13 +544,6 @@ func (c *cacheWatcher) process(ctx context.Context) {
 				}
 				c.processEvent(item.event, resourceVersion)
 			case item.err != nil:
-				if initialized {
-					klog.ErrorS(nil, "Unexpected error after watch was already initialized", "resource", c.groupResource, "identifier", c.identifier)
-					if consistency.PanicOnCacheInconsistency {
-						panic(fmt.Sprintf("Unexpected error after watch was already initialized, resource: %q, identifier: %q", c.groupResource, c.identifier))
-					}
-					return
-				}
 				c.sendWatchError(item.err)
 				return
 			default:
@@ -697,4 +699,13 @@ func (s *notifier) Notify() {
 
 func (s *notifier) Wait() <-chan struct{} {
 	return s.done
+}
+
+func (s *notifier) IsNotified() bool {
+	select {
+	case <-s.done:
+		return true
+	default:
+		return false
+	}
 }
