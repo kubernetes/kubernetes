@@ -171,9 +171,9 @@ var _ = SIGDescribe("WebSocket streaming", func() {
 		/*
 			Release: v1.38
 			Testname: WebSocket streaming, port-forward over tunnel to localhost
-			Description: Port forwarding to a Pod container listening on localhost over the SPDY/3.1+portforward.k8s.io WebSocket tunnel subprotocol MUST forward client data and return the server response with an empty error stream.
+			Description: Port forwarding to a Pod container listening on localhost over the SPDY/3.1+portforward.k8s.io WebSocket tunnel subprotocol MUST forward client data and return the server response with an empty error stream. This test is marked LinuxOnly since Windows does not support port forwarding to localhost inside the container.
 		*/
-		framework.ConformanceIt("should forward to a server listening on localhost", func(ctx context.Context) {
+		framework.ConformanceIt("should forward to a server listening on localhost [LinuxOnly]", func(ctx context.Context) {
 			testPortForwardOverWebSocketTunnel(ctx, f, "localhost")
 		})
 	})
