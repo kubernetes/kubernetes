@@ -386,6 +386,11 @@ func New(ctx context.Context,
 		podSigners[profileName] = profile.SignPod
 	}
 
+	var nominationChangeHandler internalqueue.NominationChangeHandler
+	if feature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		nominationChangeHandler = newNominationChangeHandler(profiles)
+	}
+
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[comps.options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
@@ -401,6 +406,7 @@ func New(ctx context.Context,
 		internalqueue.WithMetricsRecorder(comps.metricsRecorder),
 		internalqueue.WithAPIDispatcher(comps.apiDispatcher),
 		internalqueue.WithPodSigners(podSigners),
+		internalqueue.WithNominationChangeHandler(nominationChangeHandler),
 	)
 
 	schedulerCache := comps.GetCache()
@@ -702,4 +708,27 @@ func (sched *Scheduler) initAlgorithms(algOpts []AlgorithmOption, podGroupAlgOpt
 	sched.algorithm = algorithm
 	sched.podGroupAlgorithm = NewPodGroupAlgorithm(sched.nodeInfoSnapshot, &schedulerPodStep{sched: sched}, podGroupAlgOpts...)
 	return nil
+}
+
+// newNominationChangeHandler forwards changes of nominated nodes in the
+// PodNominator to the NominationExtensions of the pod's profile, as the
+// removal of the old nomination followed by the addition of the new one, or
+// as an addition which replaces a nomination to the same node. It gets called
+// while the scheduling queue is locked.
+func newNominationChangeHandler(profiles profile.Map) internalqueue.NominationChangeHandler {
+	return func(logger klog.Logger, pod *v1.Pod, oldNodeName, newNodeName string) []framework.NominationEvent {
+		schedFramework, err := profiles.FrameworkForPod(pod)
+		if err != nil {
+			return nil
+		}
+		ctx := klog.NewContext(context.Background(), logger)
+		var events []framework.NominationEvent
+		if oldNodeName != "" && oldNodeName != newNodeName {
+			events = append(events, schedFramework.RunNominationExtensionsRemoveNomination(ctx, pod, oldNodeName)...)
+		}
+		if newNodeName != "" {
+			events = append(events, schedFramework.RunNominationExtensionsAddNomination(ctx, pod, newNodeName)...)
+		}
+		return events
+	}
 }

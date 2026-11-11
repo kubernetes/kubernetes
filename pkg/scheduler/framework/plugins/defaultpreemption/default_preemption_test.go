@@ -3514,9 +3514,10 @@ type preemptOnNodeTest struct {
 }
 
 // newPreemptOnNodeTest returns DefaultPreemption for preemptor in a cluster
-// with node1, which runs victim. Both pods are in the pod informer. Feature
+// with node1, which runs victim. Both pods are in the pod informer. plugins
+// are registered in addition to the plugins which every test needs. Feature
 // gates must be set before calling it.
-func newPreemptOnNodeTest(ctx context.Context, t *testing.T, client *clientsetfake.Clientset, preemptor, victim *v1.Pod) *preemptOnNodeTest {
+func newPreemptOnNodeTest(ctx context.Context, t *testing.T, client *clientsetfake.Clientset, preemptor, victim *v1.Pod, plugins ...tf.RegisterPluginFunc) *preemptOnNodeTest {
 	t.Helper()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -3531,11 +3532,11 @@ func newPreemptOnNodeTest(ctx context.Context, t *testing.T, client *clientsetfa
 	snapshot := internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{node})
 	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
 	schedFramework, err := tf.NewFramework(ctx,
-		[]tf.RegisterPluginFunc{
+		append([]tf.RegisterPluginFunc{
 			tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
 			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		},
+		}, plugins...),
 		"",
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
@@ -3604,6 +3605,82 @@ type fakePodActivator struct {
 }
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
+
+// TestPreemptNominationExtensions checks that preemption leaves plugins with
+// NominationExtensions alone. Preparing the nomination is up to the
+// framework, once PostFilter nominated the pod.
+func TestPreemptNominationExtensions(t *testing.T) {
+	metrics.Register()
+	preemptor := st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(veryLargeRes).Obj()
+	victim := st.MakePod().Name("v").UID("v").Namespace(v1.NamespaceDefault).Node("node1").Priority(lowPriority).Req(largeRes).Obj()
+
+	for _, tc := range []struct {
+		name            string
+		asyncPreemption bool
+		deleteErr       error
+	}{
+		{name: "sync"},
+		{
+			name:      "sync-failure",
+			deleteErr: errors.New("injected delete error"),
+		},
+		{
+			name:            "async",
+			asyncPreemption: true,
+		},
+		{
+			name:            "async-failure",
+			asyncPreemption: true,
+			deleteErr:       errors.New("injected delete error"),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.SchedulerAsyncPreemption: tc.asyncPreemption,
+				features.DRAPreemption:            true,
+			})
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			nominationExtensions := &tf.FakeNominationExtensionsPlugin{}
+			client := clientsetfake.NewClientset()
+			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, nil
+			})
+			deleted := make(chan []string, 1)
+			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				deleted <- nominationExtensions.Calls()
+				return true, nil, tc.deleteErr
+			})
+			test := newPreemptOnNodeTest(ctx, t, client, preemptor, victim,
+				tf.RegisterPreFilterPlugin(nominationExtensions.Name(), tf.NewFakeNominationExtensionsPlugin(nominationExtensions)))
+
+			if _, status := test.plugin.Evaluator.Preempt(ctx, test.cycleState, preemptor, test.nodeToStatus); status.Code() == fwk.Error && tc.deleteErr == nil {
+				t.Fatalf("Unexpected preemption error: %v", status.AsError())
+			}
+
+			select {
+			case callsAtDeletion := <-deleted:
+				if len(callsAtDeletion) > 0 {
+					t.Errorf("Unexpected calls when the victim got deleted: %v", callsAtDeletion)
+				}
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatal("victim was not deleted")
+			}
+			// The victim stays in the informer, so the asynchronous
+			// preemption is running until its goroutine is done.
+			if err := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, wait.ForeverTestTimeout, true /* immediate */, func(context.Context) (bool, error) {
+				return !test.plugin.Executor.IsPodRunningPreemption(preemptor.UID), nil
+			}); err != nil {
+				t.Errorf("Waiting for the end of the preemption: %v", err)
+			}
+			if calls := nominationExtensions.Calls(); len(calls) > 0 {
+				t.Errorf("Unexpected calls: %v", calls)
+			}
+		})
+	}
+}
 
 type mockProposedAssignment struct {
 	nodeName   string
