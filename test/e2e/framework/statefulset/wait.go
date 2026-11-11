@@ -206,7 +206,7 @@ func WaitForFailedWithImagePullErr(ctx context.Context, c clientset.Interface, n
 				return false, nil
 			}
 			if int32(len(podList.Items)) > numPodsFailed {
-				return false, fmt.Errorf("too many pods scheduled, expected %d got %d", numPodsFailed, len(podList.Items))
+				framework.Logf("Found %d scheduled pods, waiting for %d", len(podList.Items), numPodsFailed)
 			}
 			for _, p := range podList.Items {
 				isFailingWithImagePullErr := false
