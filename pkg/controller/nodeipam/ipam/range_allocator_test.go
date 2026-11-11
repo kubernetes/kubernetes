@@ -615,7 +615,7 @@ func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
 		// Initialize the range allocator.
 		allocator, err := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
 		if err != nil {
-			t.Logf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
+			t.Fatalf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 		}
 		rangeAllocator, ok := allocator.(*rangeAllocator)
 		if !ok {
@@ -758,7 +758,10 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
 	testFunc := func(tc releaseTestCase) {
 		// Initialize the range allocator.
-		allocator, _ := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		allocator, err := NewCIDRRangeAllocator(tCtx, tc.fakeNodeHandler, test.FakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		if err != nil {
+			t.Fatalf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
+		}
 		rangeAllocator, ok := allocator.(*rangeAllocator)
 		if !ok {
 			t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
@@ -782,7 +785,7 @@ func TestReleaseCIDRSuccess(t *testing.T) {
 			}
 		}
 
-		err := allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0])
+		err = allocator.AllocateOrOccupyCIDR(tCtx, tc.fakeNodeHandler.Existing[0])
 		if len(tc.expectedAllocatedCIDRFirstRound) != 0 {
 			if err != nil {
 				t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
