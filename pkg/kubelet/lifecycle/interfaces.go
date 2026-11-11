@@ -36,6 +36,9 @@ type PodAdmitAttributes struct {
 	// Update holds information about the pod update being evaluated.
 	// It is set if and only if Operation == UpdateOperation (nil for AddOperation).
 	Update *PodUpdate
+	// DryRun indicates that the pod won't be admitted regardless of the result, and that the
+	// handler must not cause side effects. See PodAdmitHandler.
+	DryRun bool
 }
 
 // PodUpdate holds facts about the allocated -> desired change for an UpdateOperation,
@@ -94,6 +97,9 @@ const (
 // PodAdmitHandler is notified during pod admission.
 type PodAdmitHandler interface {
 	// Admit evaluates if a pod can be admitted.
+	// If attrs.DryRun is set, Admit must not cause side effects, such as evicting or preempting
+	// pods, allocating resources, or making external calls that change state, but it should
+	// still report whether it would reject the pod. This mirrors dry run in API admission.
 	Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult
 }
 

@@ -53,6 +53,8 @@ type podResizesAdmitHandler struct {
 	allocationManager Manager
 }
 
+// Admit counts infeasible resizes in metrics, so it must be registered before any other admit
+// handler, which ensures it never runs in dry run.
 func (h *podResizesAdmitHandler) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	if attrs.Operation != lifecycle.UpdateOperation || !attrs.Update.Resize {
 		return lifecycle.PodAdmitResult{Admit: true}

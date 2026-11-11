@@ -190,7 +190,7 @@ func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttrib
 
 	reasons := w.generalFilter(ctx, podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0
-	if !fit {
+	if !fit && !attrs.DryRun {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(ctx, admitPod, reasons, attrs)
 		fit = len(reasons) == 0 && err == nil
 		if err != nil {

@@ -869,3 +869,72 @@ func TestAdmitWithPodLevelResources(t *testing.T) {
 		})
 	}
 }
+
+func TestAdmitDryRun(t *testing.T) {
+	numaInfo := &NUMAInfo{
+		Nodes: []int{0, 1},
+		NUMADistances: NUMADistances{
+			0: {10, 11},
+			1: {11, 10},
+		},
+	}
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+		Status: v1.PodStatus{QOSClass: v1.PodQOSGuaranteed},
+	}
+	tcases := []struct {
+		name          string
+		scope         Scope
+		hints         []TopologyHint
+		expectedAdmit bool
+	}{{
+		name:          "container scope, aligned",
+		scope:         NewContainerScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0), Preferred: true}},
+		expectedAdmit: true,
+	}, {
+		name:          "container scope, not aligned",
+		scope:         NewContainerScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false}},
+		expectedAdmit: false,
+	}, {
+		name:          "pod scope, aligned",
+		scope:         NewPodScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0), Preferred: true}},
+		expectedAdmit: true,
+	}, {
+		name:          "pod scope, not aligned",
+		scope:         NewPodScope(NewSingleNumaNodePolicy(numaInfo, PolicyOptions{})),
+		hints:         []TopologyHint{{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false}},
+		expectedAdmit: false,
+	}, {
+		name:          "none scope",
+		scope:         NewNoneScope(),
+		expectedAdmit: true,
+	}}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			tracker := &trackingHintProvider{hints: map[string][]TopologyHint{"resource": tc.hints}}
+			m := manager{scope: tc.scope}
+			tc.scope.AddHintProvider(tCtx.Logger(), tracker)
+
+			actual := m.Admit(tCtx, &lifecycle.PodAdmitAttributes{Pod: pod, Operation: lifecycle.UpdateOperation, DryRun: true})
+			if actual.Admit != tc.expectedAdmit {
+				t.Errorf("Expected Admit to be %v got %v", tc.expectedAdmit, actual.Admit)
+			}
+			if !actual.Admit && actual.Reason != ErrorTopologyAffinity {
+				t.Errorf("Expected Reason to be %v got %v", ErrorTopologyAffinity, actual.Reason)
+			}
+			if tracker.allocatePodCalled || tracker.allocateContainerCalled {
+				t.Errorf("Expected no allocation in dry run")
+			}
+			if hint := tc.scope.GetAffinity(tCtx.Logger(), string(pod.UID), "c1"); hint.NUMANodeAffinity != nil {
+				t.Errorf("Expected no stored topology hint in dry run, got %v", hint)
+			}
+		})
+	}
+}

@@ -50,22 +50,25 @@ func NewPodScope(policy Policy) Scope {
 	}
 }
 
-func (s *podScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
+func (s *podScope) Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, dryRun bool) lifecycle.PodAdmitResult {
 	// If the PodLevelResourceManagers feature is enabled, delegate the resource
 	// allocation to the hint providers (CPU and Memory managers) via the AllocatePod call.
 	// This is a one-time allocation for the entire pod.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		return s.admitUsingPodResources(ctx, pod, operation)
+		return s.admitUsingPodResources(ctx, pod, operation, dryRun)
 	}
-	return s.admitUsingContainerResources(ctx, pod, operation)
+	return s.admitUsingContainerResources(ctx, pod, operation, dryRun)
 }
 
-func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
+func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, dryRun bool) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
 	bestHint, admit := s.checkAffinity(logger, pod, operation)
 	if !admit {
 		return admission.GetPodAdmitResult(NewTopologyAffinityError())
+	}
+	if dryRun {
+		return admission.GetPodAdmitResult(nil)
 	}
 
 	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
@@ -83,12 +86,15 @@ func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod
 	return admission.GetPodAdmitResult(nil)
 }
 
-func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
+func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation, dryRun bool) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
 	bestHint, admit := s.checkAffinity(logger, pod, operation)
 	if !admit {
 		return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission under pod-scope topology manager"))
+	}
+	if dryRun {
+		return admission.GetPodAdmitResult(nil)
 	}
 
 	// If the PodLevelResourceManagers feature is enabled, delegate the resource

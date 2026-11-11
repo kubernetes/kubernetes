@@ -1036,3 +1036,49 @@ func TestPredicateAdmitHandlerRejectionType(t *testing.T) {
 		})
 	}
 }
+
+type recordingStubFailureHandler struct {
+	called bool
+}
+
+func (s *recordingStubFailureHandler) HandleAdmissionFailure(_ context.Context, _ *v1.Pod, failureReasons []PredicateFailureReason, _ *PodAdmitAttributes) ([]PredicateFailureReason, error) {
+	s.called = true
+	return nil, nil
+}
+
+func TestPredicateAdmitHandlerDryRun(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
+		Status:     v1.NodeStatus{Capacity: makeResources(1000, 1000, 32, 0, 0, 0), Allocatable: makeAllocatableResources(1000, 1000, 32, 0, 0, 0)},
+	}
+	pod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)})
+	pod.Spec.NodeName = "other-machine"
+	allocatedPod := newResourcePod(v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(200, resource.DecimalSI)})
+	allocatedPod.Spec.NodeName = "other-machine"
+
+	failureHandler := &recordingStubFailureHandler{}
+	handler := NewPredicateAdmitHandler(
+		func(_ context.Context, _ bool) (*v1.Node, error) { return node, nil },
+		failureHandler,
+		func(_ *schedulerframework.NodeInfo, _ *PodAdmitAttributes) error { return nil },
+	)
+	res := handler.Admit(tCtx, &PodAdmitAttributes{
+		Pod:       pod,
+		Operation: UpdateOperation,
+		Update:    &PodUpdate{AllocatedPod: allocatedPod, Resize: true},
+		DryRun:    true,
+	})
+	if res.Admit {
+		t.Fatalf("expected Admit=false, got true")
+	}
+	if res.Reason != nodename.Name {
+		t.Errorf("expected Reason=%q, got %q", nodename.Name, res.Reason)
+	}
+	if res.RejectionType != RejectionInfeasible {
+		t.Errorf("expected RejectionType=%v, got %v", RejectionInfeasible, res.RejectionType)
+	}
+	if failureHandler.called {
+		t.Errorf("expected the admission failure handler not to be called in dry run")
+	}
+}
