@@ -880,7 +880,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
 	klet.runner = kubecontainer.NewCommandRunner(kubeDeps.RemoteRuntimeService)
-	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, klet.containerManager, runtime, klet.allocationManager, klet.GetCachedNode)
+	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, klet.containerManager, runtime, klet.allocationManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
 	if err != nil {
@@ -1233,7 +1233,7 @@ func NewMainKubelet(ctx context.Context,
 
 	klet.allocationManager.AddPodAdmitHandlers(append([]lifecycle.PodAdmitHandler{resizeAdmitHandler}, handlers...))
 
-	// When node allocatable changes, pending pod resizes may become feasible or need to transition to Infeasible.
+	// When node allocatable changes, pending deferred pod allocations may have enough capacity to be admitted.
 	if nodeInformer != nil && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceNodeResourceResize) {
 		if _, err := nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
@@ -1245,7 +1245,7 @@ func NewMainKubelet(ctx context.Context,
 				if apiequality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
 					return
 				}
-				klet.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonNodeUpdated)
+				klet.allocationManager.RetryPendingAllocations(ctx, allocation.TriggerReasonNodeCapacityChanged)
 			},
 		}); err != nil {
 			return nil, fmt.Errorf("failed to add node informer event handler for resize: %w", err)
