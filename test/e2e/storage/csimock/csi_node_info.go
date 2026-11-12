@@ -61,6 +61,8 @@ var _ = utils.SIGDescribe("CSI Mock node info from controller", framework.WithFe
 		ginkgo.By(fmt.Sprintf("Waiting for kubelet to add driver %s to driverRegistrations of CSINode %s", driverName, nodeName))
 		gomega.Eventually(ctx, getCSINode).WithPolling(f.Timeouts.Poll).WithTimeout(f.Timeouts.PodStart).
 			Should(gomega.HaveField("Spec.DriverRegistrations", gomega.ContainElement(registration)))
+		registrationCalls := controllerGetNodeInfoTrue.Load()
+		gomega.Expect(registrationCalls).To(gomega.BeNumerically(">", 0), "NodeGetInfo calls with controller_get_node_info=true")
 
 		// kubelet must skip its periodic NodeGetInfo calls for the driver.
 		ginkgo.By(fmt.Sprintf("Enabling periodic node info updates for driver %s", driverName))
@@ -73,8 +75,8 @@ var _ = utils.SIGDescribe("CSI Mock node info from controller", framework.WithFe
 				gomega.Not(haveCSINodeDriver(driverName)),
 			))
 
-		ginkgo.By("Checking that kubelet called NodeGetInfo only with controller_get_node_info")
-		gomega.Expect(controllerGetNodeInfoTrue.Load()).To(gomega.BeNumerically(">", 0), "NodeGetInfo calls with controller_get_node_info=true")
+		ginkgo.By("Checking that kubelet did not call NodeGetInfo after the registration")
+		gomega.Expect(controllerGetNodeInfoTrue.Load()).To(gomega.Equal(registrationCalls), "NodeGetInfo calls with controller_get_node_info=true")
 		gomega.Expect(controllerGetNodeInfoFalse.Load()).To(gomega.BeZero(), "NodeGetInfo calls with controller_get_node_info=false")
 
 		ginkgo.By("Deleting the CSI mock driver to unregister it")

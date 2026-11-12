@@ -199,13 +199,16 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
 
-	nodeV1ClientCreator := defaultNodeV1ClientCreator
+	return newCsiDriverClientForEndpoint(driverName, existingDriver.endpoint), nil
+}
+
+func newCsiDriverClientForEndpoint(driverName csiDriverName, endpoint string) *csiDriverClient {
 	return &csiDriverClient{
 		driverName:          driverName,
-		addr:                csiAddr(existingDriver.endpoint),
-		nodeV1ClientCreator: nodeV1ClientCreator,
+		addr:                csiAddr(endpoint),
+		nodeV1ClientCreator: defaultNodeV1ClientCreator,
 		metricsManager:      NewCSIMetricsManager(string(driverName)),
-	}, nil
+	}
 }
 
 func (c *csiDriverClient) NodeGetInfo(ctx context.Context, controllerGetNodeInfo bool) (

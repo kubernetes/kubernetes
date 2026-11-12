@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -1596,6 +1598,16 @@ func TestRegisterPlugin(t *testing.T) {
 			expectErr:            true,
 		},
 		{
+			name:                "NodeGetInfo error in the node flow",
+			gateEnabled:         true,
+			advertiseCapability: true,
+			csiDriver:           attachNotRequired,
+			existingCSINodeSpec: completedRegistration,
+			nodeGetInfoResp:     nodeInfo,
+			nodeGetInfoErr:      errors.New("NodeGetInfo failed"),
+			expectErr:           true,
+		},
+		{
 			name:                         "NodeGetInfo error in the controller flow",
 			gateEnabled:                  true,
 			advertiseCapability:          true,
@@ -1981,6 +1993,53 @@ func TestVerifyExhaustedResource(t *testing.T) {
 				t.Errorf("expected CSINode update %v, got %v", tc.expectNodeGetInfo, updatedCSINode)
 			}
 		})
+	}
+}
+
+// tickingNodeClient runs updateCSIDriver when kubelet checks the capabilities of the driver.
+type tickingNodeClient struct {
+	*fakecsi.NodeClient
+	driverName string
+}
+
+func (c *tickingNodeClient) NodeGetCapabilities(ctx context.Context, in *csipbv1.NodeGetCapabilitiesRequest, opts ...grpc.CallOption) (*csipbv1.NodeGetCapabilitiesResponse, error) {
+	_ = updateCSIDriver(c.driverName)
+	return c.NodeClient.NodeGetCapabilities(ctx, in, opts...)
+}
+
+func TestRegisterPluginPeriodicUpdateDuringRegistration(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIControllerGetNodeInfo, true)
+	csiDrivers.Clear()
+	t.Cleanup(csiDrivers.Clear)
+	fakeNodeClient := fakecsi.NewNodeClientWithNodeInfoFromController(true)
+	fakeNodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{NodeId: "test-node-id", MaxVolumesPerNode: 10})
+	nodeClient := &tickingNodeClient{NodeClient: fakeNodeClient, driverName: testDriver}
+	originalCreator := defaultNodeV1ClientCreator
+	t.Cleanup(func() {
+		defaultNodeV1ClientCreator = originalCreator
+	})
+	defaultNodeV1ClientCreator = func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+		return nodeClient, fakecsi.NewCloser(t), nil
+	}
+	client := fakeclient.NewSimpleClientset()
+	_, tmpDir := newTestPlugin(t, client)
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+
+	err := PluginHandler.RegisterPlugin(t.Context(), testDriver, "endpoint", []string{"1.0.0"}, nil)
+	if err != nil {
+		t.Fatalf("RegisterPlugin failed: %v", err)
+	}
+
+	csiNode, err := client.StorageV1().CSINodes().Get(t.Context(), "fakeNode", meta.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get CSINode: %v", err)
+	}
+	expectedSpec := storage.CSINodeSpec{
+		DriverRegistrations: []storage.CSINodeDriverRegistration{{Name: testDriver, NodeID: "test-node-id"}},
+	}
+	diff := cmp.Diff(expectedSpec, csiNode.Spec, cmpopts.EquateEmpty())
+	if diff != "" {
+		t.Errorf("unexpected CSINode spec (-want +got):\n%s", diff)
 	}
 }
 
