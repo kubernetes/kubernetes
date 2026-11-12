@@ -25,6 +25,7 @@ import (
 	"cel.dev/cel-go/common/types"
 	"cel.dev/cel-go/common/types/ref"
 	"cel.dev/cel-go/common/types/traits"
+	"cel.dev/cel-go/ext"
 
 	"k8s.io/apiserver/pkg/cel"
 )
@@ -249,8 +250,8 @@ func (l *CostEstimator) CallCost(function, overloadID string, args []ref.Val, re
 			lhs := args[0]
 			switch lhs.(type) {
 			case *cel.Quantity, cel.Quantity,
-				*cel.IP, cel.IP,
-				*cel.CIDR, cel.CIDR,
+				*cel.IP, cel.IP, *ext.IP, ext.IP,
+				*cel.CIDR, cel.CIDR, *ext.CIDR, ext.CIDR,
 				*cel.Format, cel.Format, // Formats have a small max size. Format takes pointer receiver.
 				*cel.URL, cel.URL, // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
 				*cel.Semver, cel.Semver,
@@ -522,7 +523,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadID string, target *ce
 				t := lhs.Type()
 				if t.Kind() == types.OpaqueKind {
 					switch t.TypeName() {
-					case cel.IPType.TypeName(), cel.CIDRType.TypeName():
+					case ext.IPType.TypeName(), ext.CIDRType.TypeName():
 						return &celcost.CallEstimate{CostEstimate: celcost.Estimate{Min: 1, Max: 1}}
 					}
 				}

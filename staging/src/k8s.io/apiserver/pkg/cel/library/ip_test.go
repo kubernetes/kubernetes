@@ -24,16 +24,14 @@ import (
 	"cel.dev/cel-go/cel"
 	"cel.dev/cel-go/common/types"
 	"cel.dev/cel-go/common/types/ref"
+	"cel.dev/cel-go/ext"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiservercel "k8s.io/apiserver/pkg/cel"
-	"k8s.io/apiserver/pkg/cel/library"
 )
 
 func testIP(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErr string, expectCompileErrs []string) {
 	env, err := cel.NewEnv(
-		library.IP(),
-		library.CIDR(),
+		ext.Network(),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -119,11 +117,16 @@ func TestIP(t *testing.T) {
 		{
 			name:         "parse ipv4",
 			expr:         `ip("192.168.0.1")`,
-			expectResult: apiservercel.IP{Addr: ipv4Addr},
+			expectResult: ext.IP{Addr: ipv4Addr},
 		},
 		{
-			name:             "parse invalid ipv4",
-			expr:             `ip("192.168.0.1.0")`,
+			name:              "parse invalid ipv4",
+			expr:              `ip("192.168.0.1.0")`,
+			expectCompileErrs: []string{`invalid ip argument: IP Address "192.168.0.1.0" parse error during conversion from string: ParseAddr\("192.168.0.1.0"\): IPv4 address too long`},
+		},
+		{
+			name:             "parse invalid ipv4 at runtime",
+			expr:             `ip("192.168.0." + "1.0")`,
 			expectRuntimeErr: "IP Address \"192.168.0.1.0\" parse error during conversion from string: ParseAddr(\"192.168.0.1.0\"): IPv4 address too long",
 		},
 		{
@@ -204,11 +207,16 @@ func TestIP(t *testing.T) {
 		{
 			name:         "parse ipv6",
 			expr:         `ip("2001:db8::68")`,
-			expectResult: apiservercel.IP{Addr: ipv6Addr},
+			expectResult: ext.IP{Addr: ipv6Addr},
 		},
 		{
-			name:             "parse invalid ipv6",
-			expr:             `ip("2001:db8:::68")`,
+			name:              "parse invalid ipv6",
+			expr:              `ip("2001:db8:::68")`,
+			expectCompileErrs: []string{`invalid ip argument: IP Address "2001:db8:::68" parse error during conversion from string: ParseAddr\("2001:db8:::68"\): each colon-separated field must have at least one digit \(at ":68"\)`},
+		},
+		{
+			name:             "parse invalid ipv6 at runtime",
+			expr:             `ip("2001:db8:" + "::68")`,
 			expectRuntimeErr: "IP Address \"2001:db8:::68\" parse error during conversion from string: ParseAddr(\"2001:db8:::68\"): each colon-separated field must have at least one digit (at \":68\")",
 		},
 		{
