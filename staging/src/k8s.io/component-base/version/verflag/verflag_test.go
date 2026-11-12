@@ -30,6 +30,7 @@ import (
 func TestVersionFlag(t *testing.T) {
 	initialFlagValue := string(*versionFlag)
 	initialVersion := version.Get()
+	customVersion := fmt.Sprintf("v%s.%d-custom", version.DefaultKubeBinaryVersion, version.KubePatchVersion)
 
 	testcases := []struct {
 		name               string
@@ -81,8 +82,8 @@ func TestVersionFlag(t *testing.T) {
 
 		{
 			name:             "override",
-			flags:            []string{"--version=v0.0.0-custom"},
-			expectGitVersion: "v0.0.0-custom",
+			flags:            []string{"--version=" + customVersion},
+			expectGitVersion: customVersion,
 		},
 		{
 			name:        "invalid override semver",
@@ -107,10 +108,10 @@ func TestVersionFlag(t *testing.T) {
 
 		{
 			name:               "override and exit",
-			flags:              []string{"--version=v0.0.0-custom", "--version"},
-			expectGitVersion:   "v0.0.0-custom",
+			flags:              []string{"--version=" + customVersion, "--version"},
+			expectGitVersion:   customVersion,
 			expectExit:         true,
-			expectPrintVersion: "Kubernetes v0.0.0-custom",
+			expectPrintVersion: "Kubernetes " + customVersion,
 		},
 	}
 
