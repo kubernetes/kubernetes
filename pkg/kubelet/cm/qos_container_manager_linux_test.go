@@ -153,8 +153,13 @@ func TestHugePageSizeBytes(t *testing.T) {
 			t.Errorf("hugePageSizeBytes(%q) = %d, %v, want %d", pageSize, got, err, want)
 		}
 	}
-	if _, err := hugePageSizeBytes("2XB"); err == nil {
-		t.Error("hugePageSizeBytes(\"2XB\") succeeded, want an error")
+	for _, pageSize := range []string{
+		"", "MB", "2", "2M", "2mb", "2MiB", "2TB", "2 MB", "-2MB", "+2MB", "1.5GB",
+		"8589934592GB", // 1<<63 bytes
+	} {
+		if got, err := hugePageSizeBytes(pageSize); err == nil {
+			t.Errorf("hugePageSizeBytes(%q) = %d, want an error", pageSize, got)
+		}
 	}
 }
 

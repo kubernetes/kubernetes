@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
@@ -201,13 +200,26 @@ func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConf
 }
 
 // hugePageSizeBytes parses a size as libcontainercgroups.HugePageSizes prints
-// it: <n>KB, <n>MB or <n>GB, in powers of 1024.
+// it: <n>KB, <n>MB or <n>GB, in powers of 1024. It accepts nothing else.
 func hugePageSizeBytes(pageSize string) (int64, error) {
-	q, err := apiresource.ParseQuantity(strings.TrimSuffix(pageSize, "B") + "i")
-	if err != nil {
-		return 0, fmt.Errorf("parse hugepage size %q: %w", pageSize, err)
+	cut := max(len(pageSize)-2, 0)
+	var shift int
+	switch pageSize[cut:] {
+	case "KB":
+		shift = 10
+	case "MB":
+		shift = 20
+	case "GB":
+		shift = 30
+	default:
+		return 0, fmt.Errorf("hugepage size %q: want <n>KB, <n>MB or <n>GB", pageSize)
 	}
-	return q.Value(), nil
+	// 63-shift bits keep the size within int64.
+	n, err := strconv.ParseUint(pageSize[:cut], 10, 63-shift)
+	if err != nil {
+		return 0, fmt.Errorf("hugepage size %q: %w", pageSize, err)
+	}
+	return int64(n << shift), nil
 }
 
 func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
