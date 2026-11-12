@@ -81,6 +81,7 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		key                string
 		pred               storage.SelectionPredicate
 		watchWithoutPrevKV bool
+		keysOnly           bool
 		expectedWatchError error
 		watchTests         []*testWatchStruct
 	}{{
@@ -179,6 +180,12 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		namespace:          fmt.Sprintf("test-ns-10-%t", recursive),
 		expectedWatchError: errors.NewInternalError(fmt.Errorf("limit and continue are not supported for watch")),
 		pred:               storage.SelectionPredicate{Label: labels.Everything(), Field: fields.Everything(), Continue: "token"},
+	}, {
+		name:               "watch with keysOnly",
+		namespace:          fmt.Sprintf("test-ns-11-%t", recursive),
+		keysOnly:           true,
+		expectedWatchError: errors.NewInternalError(fmt.Errorf("keysOnly is not supported for watch")),
+		pred:               storage.Everything,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -196,7 +203,7 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 			}
 
 			w, err := store.Watch(ctx, watchKey, storage.ListOptions{
-				ResourceVersion: out.ResourceVersion, Predicate: tt.pred, Recursive: recursive, WatchWithoutPrevKV: tt.watchWithoutPrevKV,
+				ResourceVersion: out.ResourceVersion, Predicate: tt.pred, Recursive: recursive, WatchWithoutPrevKV: tt.watchWithoutPrevKV, KeysOnly: tt.keysOnly,
 			})
 			if w != nil {
 				t.Cleanup(w.Stop)

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2439,102 +2440,153 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// For some asynchronous implementations of storage interface (in particular watchcache),
-			// certain requests may impact result of further requests. As an example, if we first
-			// ensure that watchcache is synchronized up to ResourceVersion X (using Get/List requests
-			// with NotOlderThan semantic), the further requests (even specifying earlier resource
-			// version) will also return the result synchronized to at least ResourceVersion X.
-			// By parallelizing test cases we ensure that the order in which test cases are defined
-			// doesn't automatically preclude some scenarios from happening.
-			t.Parallel()
+			for _, keysOnly := range []bool{false, true} {
+				t.Run(fmt.Sprintf("keysOnly=%v", keysOnly), func(t *testing.T) {
+					// For some asynchronous implementations of storage interface (in particular watchcache),
+					// certain requests may impact result of further requests. As an example, if we first
+					// ensure that watchcache is synchronized up to ResourceVersion X (using Get/List requests
+					// with NotOlderThan semantic), the further requests (even specifying earlier resource
+					// version) will also return the result synchronized to at least ResourceVersion X.
+					// By parallelizing test cases we ensure that the order in which test cases are defined
+					// doesn't automatically preclude some scenarios from happening.
+					t.Parallel()
 
-			if watchCacheEnabled && tt.ignoreForWatchCache {
-				t.Skip()
-			}
+					if watchCacheEnabled && tt.ignoreForWatchCache {
+						t.Skip()
+					}
 
-			if tt.pred.GetAttrs == nil {
-				tt.pred.GetAttrs = getAttrs
-			}
+					pred := tt.pred
+					if pred.GetAttrs == nil {
+						pred.GetAttrs = getAttrs
+					}
 
-			out := &example.PodList{}
-			storageOpts := storage.ListOptions{
-				ResourceVersion:      tt.rv,
-				ResourceVersionMatch: tt.rvMatch,
-				Predicate:            tt.pred,
-				Recursive:            true,
-			}
-			recorderKey := t.Name()
-			listCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
-			err := store.GetList(listCtx, tt.prefix, storageOpts, out)
-			if tt.expectRVTooLarge {
-				if !storage.IsTooLargeResourceVersion(err) {
-					t.Fatalf("expecting resource version too high error, but get: %v", err)
-				}
-				return
-			}
-			if tt.expectRVTooOld {
-				if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
-					t.Fatalf("expecting resource version too old error, but get: %v", err)
-				}
-				return
-			}
-			if tt.expectContinueTooOld {
-				if err == nil || !strings.Contains(err.Error(), "The provided continue parameter is too old to display a consistent list result") {
-					t.Fatalf("expecting continue too old error, but get: %v", err)
-				}
-				return
-			}
+					out := &example.PodList{}
+					storageOpts := storage.ListOptions{
+						ResourceVersion:      tt.rv,
+						ResourceVersionMatch: tt.rvMatch,
+						Predicate:            pred,
+						Recursive:            true,
+						KeysOnly:             keysOnly,
+					}
+					recorderKey := t.Name()
+					listCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
+					err := store.GetList(listCtx, tt.prefix, storageOpts, out)
+					if keysOnly && !pred.Empty() {
+						if !apierrors.IsInternalError(err) {
+							t.Fatalf("expected internal error for keysOnly with non-empty predicate, got: %v", err)
+						}
+						if watchCacheEnabled {
+							if gotListRequests := recorder.ListRequestForKey(recorderKey); len(gotListRequests) > 0 {
+								t.Fatalf("unexpected etcd list requests: %v", gotListRequests)
+							}
+						}
+						return
+					}
+					if tt.expectRVTooLarge {
+						if !storage.IsTooLargeResourceVersion(err) {
+							t.Fatalf("expecting resource version too high error, but get: %v", err)
+						}
+						return
+					}
+					if tt.expectRVTooOld {
+						if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+							t.Fatalf("expecting resource version too old error, but get: %v", err)
+						}
+						return
+					}
+					if tt.expectContinueTooOld {
+						if err == nil || !strings.Contains(err.Error(), "The provided continue parameter is too old to display a consistent list result") {
+							t.Fatalf("expecting continue too old error, but get: %v", err)
+						}
+						return
+					}
 
-			if err != nil {
-				if !tt.expectError {
-					t.Fatalf("GetList failed: %v", err)
-				}
-				return
-			}
-			if tt.expectError {
-				t.Fatalf("expected error but got none")
-			}
-			if (len(out.Continue) > 0) != tt.expectContinue {
-				t.Errorf("unexpected continue token: %q", out.Continue)
-			}
+					if err != nil {
+						if !tt.expectError {
+							t.Fatalf("GetList failed: %v", err)
+						}
+						return
+					}
+					if tt.expectError {
+						t.Fatalf("expected error but got none")
+					}
+					if (len(out.Continue) > 0) != tt.expectContinue {
+						t.Errorf("unexpected continue token: %q", out.Continue)
+					}
 
-			if len(tt.expectContinueExact) > 0 {
-				ExpectContinueMatches(t, tt.expectContinueExact, out.Continue)
-			}
+					if len(tt.expectContinueExact) > 0 {
+						ExpectContinueMatches(t, tt.expectContinueExact, out.Continue)
+					}
 
-			// If a client requests an exact resource version, it must be echoed back to them.
-			if tt.expectRV != "" {
-				if tt.expectRV != out.ResourceVersion {
-					t.Errorf("resourceVersion in list response want=%s, got=%s", tt.expectRV, out.ResourceVersion)
-				}
-			}
-			if tt.expectRVFunc != nil {
-				if err := tt.expectRVFunc(out.ResourceVersion); err != nil {
-					t.Errorf("resourceVersion in list response invalid: %v", err)
-				}
-			}
+					// If a client requests an exact resource version, it must be echoed back to them.
+					if tt.expectRV != "" {
+						if tt.expectRV != out.ResourceVersion {
+							t.Errorf("resourceVersion in list response want=%s, got=%s", tt.expectRV, out.ResourceVersion)
+						}
+					}
+					if tt.expectRVFunc != nil {
+						if err := tt.expectRVFunc(out.ResourceVersion); err != nil {
+							t.Errorf("resourceVersion in list response invalid: %v", err)
+						}
+					}
 
-			if tt.expectedAlternatives == nil {
-				sort.Sort(sortablePodList(tt.expectedOut))
-				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
-			} else {
-				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
-			}
-			if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
-				t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
-			}
-			if watchCacheEnabled {
-				var expectedListRequests []RecordedList
-				if tt.expectCacherRequestsToEtcd != nil {
-					expectedListRequests = tt.expectCacherRequestsToEtcd()
-				}
-				gotListRequests := recorder.ListRequestForKey(recorderKey)
-				if !cmp.Equal(expectedListRequests, gotListRequests) {
-					t.Fatalf("unexpected etcd list requests, diff: %s", cmp.Diff(expectedListRequests, gotListRequests))
-				}
+					expectedOut := slices.Clone(tt.expectedOut)
+					expectedAlternatives := tt.expectedAlternatives
+					if keysOnly {
+						expectedOut = stripPodsToKeysOnly(expectedOut)
+						expectedAlternatives = stripPodAlternativesToKeysOnly(expectedAlternatives)
+					}
+					if expectedAlternatives == nil {
+						sort.Sort(sortablePodList(expectedOut))
+						expectNoDiff(t, "incorrect list pods", expectedOut, out.Items)
+					} else {
+						ExpectContains(t, "incorrect list pods", toInterfaceSlice(expectedAlternatives), out.Items)
+					}
+					if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
+						t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
+					}
+					if watchCacheEnabled {
+						var expectedListRequests []RecordedList
+						if tt.expectCacherRequestsToEtcd != nil {
+							expectedListRequests = tt.expectCacherRequestsToEtcd()
+						}
+						gotListRequests := recorder.ListRequestForKey(recorderKey)
+						if !cmp.Equal(expectedListRequests, gotListRequests) {
+							t.Fatalf("unexpected etcd list requests, diff: %s", cmp.Diff(expectedListRequests, gotListRequests))
+						}
+					}
+				})
 			}
 		})
 	}
+}
+
+func stripPodsToKeysOnly(pods []example.Pod) []example.Pod {
+	if pods == nil {
+		return nil
+	}
+	out := make([]example.Pod, len(pods))
+	for i := range pods {
+		out[i] = example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            pods[i].Name,
+				Namespace:       pods[i].Namespace,
+				ResourceVersion: pods[i].ResourceVersion,
+			},
+		}
+	}
+	return out
+}
+
+func stripPodAlternativesToKeysOnly(alts [][]example.Pod) [][]example.Pod {
+	if alts == nil {
+		return nil
+	}
+	out := make([][]example.Pod, len(alts))
+	for i := range alts {
+		out[i] = stripPodsToKeysOnly(alts[i])
+	}
+	return out
 }
 
 func ExpectContinueMatches(t *testing.T, expect, got string) {
@@ -2913,6 +2965,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 		rv                   string
 		rvMatch              metav1.ResourceVersionMatch
 		expectRVTooLarge     bool
+		expectError          bool
 	}{{
 		name:        "existing key",
 		key:         key,
@@ -3006,42 +3059,67 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// For some asynchronous implementations of storage interface (in particular watchcache),
-			// certain requests may impact result of further requests. As an example, if we first
-			// ensure that watchcache is synchronized up to ResourceVersion X (using Get/List requests
-			// with NotOlderThan semantic), the further requests (even specifying earlier resource
-			// version) will also return the result synchronized to at least ResourceVersion X.
-			// By parallelizing test cases we ensure that the order in which test cases are defined
-			// doesn't automatically preclude some scenarios from happening.
-			t.Parallel()
+			for _, keysOnly := range []bool{false, true} {
+				t.Run(fmt.Sprintf("keysOnly=%v", keysOnly), func(t *testing.T) {
+					// For some asynchronous implementations of storage interface (in particular watchcache),
+					// certain requests may impact result of further requests. As an example, if we first
+					// ensure that watchcache is synchronized up to ResourceVersion X (using Get/List requests
+					// with NotOlderThan semantic), the further requests (even specifying earlier resource
+					// version) will also return the result synchronized to at least ResourceVersion X.
+					// By parallelizing test cases we ensure that the order in which test cases are defined
+					// doesn't automatically preclude some scenarios from happening.
+					t.Parallel()
 
-			out := &example.PodList{}
-			storageOpts := storage.ListOptions{
-				ResourceVersion:      tt.rv,
-				ResourceVersionMatch: tt.rvMatch,
-				Predicate:            tt.pred,
-				Recursive:            false,
-			}
-			err := store.GetList(ctx, tt.key, storageOpts, out)
+					out := &example.PodList{}
+					storageOpts := storage.ListOptions{
+						ResourceVersion:      tt.rv,
+						ResourceVersionMatch: tt.rvMatch,
+						Predicate:            tt.pred,
+						Recursive:            false,
+						KeysOnly:             keysOnly,
+					}
+					err := store.GetList(ctx, tt.key, storageOpts, out)
 
-			if tt.expectRVTooLarge {
-				if err == nil || !storage.IsTooLargeResourceVersion(err) {
-					t.Errorf("%s: expecting resource version too high error, but get: %s", tt.name, err)
-				}
-				return
-			}
+					if keysOnly && !tt.pred.Empty() {
+						if !apierrors.IsInternalError(err) {
+							t.Fatalf("expected internal error for keysOnly with non-empty predicate, got: %v", err)
+						}
+						return
+					}
 
-			if err != nil {
-				t.Fatalf("GetList failed: %v", err)
-			}
-			if len(out.ResourceVersion) == 0 {
-				t.Errorf("%s: unset resourceVersion", tt.name)
-			}
+					if tt.expectError {
+						if err == nil {
+							t.Fatalf("expected error but got none")
+						}
+						return
+					}
 
-			if tt.expectedAlternatives == nil {
-				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
-			} else {
-				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
+					if tt.expectRVTooLarge {
+						if err == nil || !storage.IsTooLargeResourceVersion(err) {
+							t.Errorf("%s: expecting resource version too high error, but get: %s", tt.name, err)
+						}
+						return
+					}
+
+					if err != nil {
+						t.Fatalf("GetList failed: %v", err)
+					}
+					if len(out.ResourceVersion) == 0 {
+						t.Errorf("%s: unset resourceVersion", tt.name)
+					}
+
+					expectedOut := tt.expectedOut
+					expectedAlternatives := tt.expectedAlternatives
+					if keysOnly {
+						expectedOut = stripPodsToKeysOnly(expectedOut)
+						expectedAlternatives = stripPodAlternativesToKeysOnly(expectedAlternatives)
+					}
+					if expectedAlternatives == nil {
+						expectNoDiff(t, "incorrect list pods", expectedOut, out.Items)
+					} else {
+						ExpectContains(t, "incorrect list pods", toInterfaceSlice(expectedAlternatives), out.Items)
+					}
+				})
 			}
 		})
 	}

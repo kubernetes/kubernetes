@@ -1004,6 +1004,9 @@ type listResp struct {
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	if opts.KeysOnly && !opts.Predicate.Empty() {
+		return errors.NewInternalError(fmt.Errorf("keysOnly requires an empty predicate"))
+	}
 	preparedKey, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return err
@@ -1062,7 +1065,13 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			if err != nil {
 				return err
 			}
-			listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
+			if opts.KeysOnly {
+				if err := c.copyKeysOnly(listVal.Index(numFetched).Addr().Interface().(runtime.Object), elem.Object); err != nil {
+					return err
+				}
+			} else {
+				listVal.Index(numFetched).Set(reflect.ValueOf(elem.Object).Elem())
+			}
 			lastSelectedObjectKey = elem.Key
 			numFetched++
 			if numFetched == count {
@@ -1123,6 +1132,21 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	opts.Predicate.SetShardInfoOnList(listObj)
 	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, numFetched, listVal.Len())
+	return nil
+}
+
+func (c *Cacher) copyKeysOnly(dst, src runtime.Object) error {
+	srcMeta, err := meta.Accessor(src)
+	if err != nil {
+		return storage.NewInternalError(err)
+	}
+	resourceVersion, err := c.versioner.ObjectResourceVersion(src)
+	if err != nil {
+		return storage.NewInternalError(err)
+	}
+	if err := storage.SetObjectIdentity(dst, c.versioner, srcMeta.GetName(), srcMeta.GetNamespace(), resourceVersion); err != nil {
+		return storage.NewInternalError(err)
+	}
 	return nil
 }
 
