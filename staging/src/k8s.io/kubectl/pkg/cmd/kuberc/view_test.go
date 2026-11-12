@@ -17,6 +17,7 @@ limitations under the License.
 package kuberc
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,6 +106,44 @@ aliases:
 		}
 		if got := out.String(); !strings.Contains(got, "kuberc file not found") {
 			t.Errorf("expected the missing-file notice in output, got: %q", got)
+		}
+	})
+
+	t.Run("accepting to generate a default kuberc", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		kubercPath := filepath.Join(tmpDir, "kuberc")
+
+		streams, in, out, _ := genericiooptions.NewTestIOStreams()
+		in.WriteString("y\n")
+		o := &ViewOptions{
+			KubeRCFile: kubercPath,
+			PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml"),
+			IOStreams:  streams,
+		}
+
+		if err := o.Run(); err != nil {
+			t.Fatalf("Run() unexpected error = %v", err)
+		}
+		if _, err := os.Stat(kubercPath); err != nil {
+			t.Fatalf("expected kuberc file to be created, stat returned: %v", err)
+		}
+		expectedOutput := fmt.Sprintf(`kuberc file not found at %s
+Would you like to generate a default kuberc file with recommended options? (y/N): Updated %s
+aliases: []
+apiVersion: kubectl.config.k8s.io/v1
+defaults:
+- command: apply
+  options:
+  - default: "true"
+    name: server-side
+- command: delete
+  options:
+  - default: "true"
+    name: interactive
+kind: Preference
+`, kubercPath, kubercPath)
+		if diff := cmp.Diff(expectedOutput, out.String()); diff != "" {
+			t.Errorf("output mismatch (-expected +got):\n%s", diff)
 		}
 	})
 
