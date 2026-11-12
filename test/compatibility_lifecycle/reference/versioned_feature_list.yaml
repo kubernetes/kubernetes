@@ -1226,6 +1226,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: KubeProxyHealthCheckNodePortProxyProtocol
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.39"
 - name: KubeProxyIPVS
   versionedSpecs:
   - default: true
