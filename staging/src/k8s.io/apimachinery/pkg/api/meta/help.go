@@ -215,6 +215,15 @@ func ExtractListWithAlloc(obj runtime.Object) ([]runtime.Object, error) {
 func extractList(obj runtime.Object, allocNew bool) ([]runtime.Object, error) {
 	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {
+		// Unstructured types without an Items field, like StableUnstructured.
+		if u, ok := obj.(runtime.Unstructured); ok && u.IsList() {
+			list := []runtime.Object{}
+			err := eachListItem(obj, func(item runtime.Object) error {
+				list = append(list, item)
+				return nil
+			}, allocNew)
+			return list, err
+		}
 		return nil, err
 	}
 	items, err := conversion.EnforcePtr(itemsPtr)

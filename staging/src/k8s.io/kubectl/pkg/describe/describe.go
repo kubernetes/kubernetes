@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,6 +76,7 @@ import (
 	utilcsr "k8s.io/client-go/util/certificate/csr"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
@@ -266,16 +268,54 @@ func GenericDescriberFor(mapping *meta.RESTMapping, clientConfig *rest.Config) (
 	}
 	eventsClient := clientSet.CoreV1()
 
-	return &genericDescriber{mapping, dynamicClient, eventsClient}, true
+	g := &genericDescriber{mapping: mapping, dynamic: dynamicClient, events: eventsClient}
+	if !cmdutil.PreserveFieldOrder.IsDisabled() {
+		// The dynamic client only returns unstructured.Unstructured, which loses the field order.
+		cfg := rest.CopyConfig(clientConfig)
+		cfg.ContentConfig = runtimeresource.StableUnstructuredPlusDefaultContentConfig()
+		gv := mapping.Resource.GroupVersion()
+		cfg.GroupVersion = &gv
+		if len(gv.Group) == 0 {
+			cfg.APIPath = "/api"
+		} else {
+			cfg.APIPath = "/apis"
+		}
+		if g.stable, err = rest.RESTClientFor(cfg); err != nil {
+			return nil, false
+		}
+	}
+	return g, true
 }
 
 type genericDescriber struct {
 	mapping *meta.RESTMapping
 	dynamic dynamic.Interface
 	events  corev1client.EventsGetter
+	// stable is only set if the field order is to be preserved.
+	stable rest.Interface
+}
+
+// getStable fetches the object as unstructured.StableUnstructured.
+func (g *genericDescriber) getStable(namespace, name string) (*unstructured.StableUnstructured, error) {
+	req := g.stable.Get().Resource(g.mapping.Resource.Resource).Name(name)
+	if g.mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+		req = req.Namespace(namespace)
+	}
+	obj, err := req.Do(context.TODO()).Get()
+	if err != nil {
+		return nil, err
+	}
+	stable, ok := obj.(*unstructured.StableUnstructured)
+	if !ok {
+		return nil, fmt.Errorf("unexpected object type %T", obj)
+	}
+	return stable, nil
 }
 
 func (g *genericDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (output string, err error) {
+	if g.stable != nil {
+		return g.describeStable(namespace, name, describerSettings)
+	}
 	obj, err := g.dynamic.Resource(g.mapping.Resource).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -301,44 +341,61 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 	})
 }
 
-func printUnstructuredContent(w PrefixWriter, level int, content map[string]interface{}, skipPrefix string, skip ...string) {
-	fields := []string{}
-	for field := range content {
-		fields = append(fields, field)
+func (g *genericDescriber) describeStable(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	obj, err := g.getStable(namespace, name)
+	if err != nil {
+		return "", err
 	}
-	sort.Strings(fields)
 
-	for _, field := range fields {
-		value := content[field]
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = searchEvents(g.events, obj, describerSettings.ChunkSize)
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", obj.GetName())
+		w.Write(LEVEL_0, "Namespace:\t%s\n", obj.GetNamespace())
+		printLabelsMultiline(w, "Labels", obj.GetLabels())
+		printAnnotationsMultiline(w, "Annotations", obj.GetAnnotations())
+		printOrderedContent(w, LEVEL_0, obj.Object, "", ".metadata.managedFields", ".metadata.name",
+			".metadata.namespace", ".metadata.labels", ".metadata.annotations")
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+func printUnstructuredContent(w PrefixWriter, level int, content map[string]interface{}, skipPrefix string, skip ...string) {
+	printOrderedContent(w, level, unstructured.ObjectFromMap(content), skipPrefix, skip...)
+}
+
+// printOrderedContent prints the fields in the order of the object.
+func printOrderedContent(w PrefixWriter, level int, content unstructured.Object, skipPrefix string, skip ...string) {
+	for _, f := range content {
+		field, value := f.Name, f.Value
+		skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
+		if slices.Contains(skip, skipExpr) {
+			continue
+		}
 		switch typedValue := value.(type) {
-		case map[string]interface{}:
-			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slices.Contains(skip, skipExpr) {
-				continue
-			}
+		case unstructured.Object:
 			w.Write(level, "%s:\n", smartLabelFor(field))
-			printUnstructuredContent(w, level+1, typedValue, skipExpr, skip...)
+			printOrderedContent(w, level+1, typedValue, skipExpr, skip...)
 
 		case []interface{}:
-			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slices.Contains(skip, skipExpr) {
-				continue
-			}
 			w.Write(level, "%s:\n", smartLabelFor(field))
 			for _, child := range typedValue {
 				switch typedChild := child.(type) {
-				case map[string]interface{}:
-					printUnstructuredContent(w, level+1, typedChild, skipExpr, skip...)
+				case unstructured.Object:
+					printOrderedContent(w, level+1, typedChild, skipExpr, skip...)
 				default:
 					w.Write(level+1, "%v\n", typedChild)
 				}
 			}
 
 		default:
-			skipExpr := fmt.Sprintf("%s.%s", skipPrefix, field)
-			if slices.Contains(skip, skipExpr) {
-				continue
-			}
 			w.Write(level, "%s:\t%v\n", smartLabelFor(field), typedValue)
 		}
 	}

@@ -431,6 +431,15 @@ const (
 	//
 	// Improved kubectl apply --prune behavior.
 	ApplySet FeatureGate = "KUBECTL_APPLYSET"
+
+	// owner: @pohly
+	// beta: v1.38
+	//
+	// If enabled (the default), kubectl get -o json/yaml and kubectl describe
+	// for types without a dedicated describer preserve the order of fields as
+	// defined in the API types and sent by the apiserver instead of sorting
+	// them alphabetically.
+	PreserveFieldOrder FeatureGate = "KUBECTL_PRESERVE_FIELD_ORDER"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
