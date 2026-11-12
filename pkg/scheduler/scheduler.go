@@ -21,11 +21,13 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -49,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/gangscheduling"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -113,6 +116,8 @@ type Scheduler struct {
 	genericWorkloadEnabled                              bool
 	inPlacePodVerticalScalingSchedulerPreemptionEnabled bool
 	podGroupHierarchyTracker                            *gangscheduling.HierarchyTracker
+	// profilesWithoutDeferredPodScheduling can't evaluate deferred pod resizes, so their pods aren't queued for one.
+	profilesWithoutDeferredPodScheduling sets.Set[string]
 
 	algorithm *SchedulingAlgorithm
 
@@ -351,13 +356,18 @@ func New(ctx context.Context,
 	}
 
 	preEnqueuePluginMap := make(map[string]map[string]fwk.PreEnqueuePlugin)
+	resizePreEnqueuePluginMap := make(map[string]map[string]fwk.PreEnqueuePlugin)
 	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
 	var returnErr error
 	for profileName, profile := range profiles {
 		plugins := profile.PreEnqueuePlugins()
 		preEnqueuePluginMap[profileName] = make(map[string]fwk.PreEnqueuePlugin, len(plugins))
+		resizePreEnqueuePluginMap[profileName] = make(map[string]fwk.PreEnqueuePlugin)
 		for _, plugin := range plugins {
 			preEnqueuePluginMap[profileName][plugin.Name()] = plugin
+			if framework.IsRelevantForPodResize(plugin) {
+				resizePreEnqueuePluginMap[profileName][plugin.Name()] = plugin
+			}
 		}
 
 		queueingHintsPerProfile[profileName], err = buildQueueingHintMap(ctx, profile.EnqueueExtensions())
@@ -385,6 +395,7 @@ func New(ctx context.Context,
 		internalqueue.WithPodLister(podLister),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
+		internalqueue.WithResizePreEnqueuePluginMap(resizePreEnqueuePluginMap),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(comps.metricsRecorder),
@@ -414,6 +425,23 @@ func New(ctx context.Context,
 		compositePodGroupLister = informerFactory.Scheduling().V1beta1().CompositePodGroups().Lister()
 	}
 
+	// DeferredPodScheduling keeps a deferred resize pod on its node, honors the node's resize preemption
+	// policy, and binds it by marking the evaluation complete. A profile without it at Filter and Bind
+	// can't evaluate a deferred resize, so don't queue one for it.
+	profilesWithoutDeferredPodScheduling := sets.New[string]()
+	if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) {
+		hasDeferredPodScheduling := func(ps schedulerapi.PluginSet) bool {
+			return slices.ContainsFunc(ps.Enabled, func(p schedulerapi.Plugin) bool { return p.Name == names.DeferredPodScheduling })
+		}
+		for profileName, profile := range profiles {
+			plugins := profile.ListPlugins()
+			if !hasDeferredPodScheduling(plugins.Filter) || !hasDeferredPodScheduling(plugins.Bind) {
+				logger.Info("Profile doesn't enable DeferredPodScheduling at Filter and Bind, so deferred pod resizes won't be evaluated for it", "profile", profileName)
+				profilesWithoutDeferredPodScheduling.Insert(profileName)
+			}
+		}
+	}
+
 	sched := &Scheduler{
 		Cache:                                  schedulerCache,
 		client:                                 client,
@@ -428,6 +456,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		inPlacePodVerticalScalingSchedulerPreemptionEnabled: feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption),
 		podGroupHierarchyTracker:                            comps.podGroupHierarchyTracker,
+		profilesWithoutDeferredPodScheduling:                profilesWithoutDeferredPodScheduling,
 	}
 	if err = sched.initAlgorithms(
 		[]AlgorithmOption{WithAlgorithmPercentageOfNodesToScore(options.percentageOfNodesToScore)},

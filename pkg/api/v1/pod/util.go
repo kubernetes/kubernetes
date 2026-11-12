@@ -379,7 +379,8 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 		condition.Reason == oldCondition.Reason &&
 		condition.Message == oldCondition.Message &&
 		condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
-		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
+		condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime) &&
+		condition.ObservedGeneration == oldCondition.ObservedGeneration
 
 	status.Conditions[conditionIndex] = *condition
 	// Return true if one of the fields have changed.

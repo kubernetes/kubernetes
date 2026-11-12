@@ -1541,6 +1541,16 @@ func Test_isSchedulableAfterAssignedPodDelete(t *testing.T) {
 			oldObj:       st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 			expectedHint: fwk.Queue,
 		},
+		"queue-on-nominated-pod-deleted-same-node-when-deferred": {
+			pod:          st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").NominatedNodeName("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.Queue,
+		},
+		"skip-queue-on-nominated-pod-deleted-different-node-when-deferred": {
+			pod:          st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").NominatedNodeName("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -2079,115 +2089,6 @@ func Test_isSchedulableAfterDeviceClassChange(t *testing.T) {
 				t.Fatal(err)
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterDeviceClassEvent(logger, tc.pod, tc.oldObj, tc.newObj)
-			if tc.expectedErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
-				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func Test_isSchedulableAfterTargetPodScaleUp(t *testing.T) {
-	testcases := map[string]struct {
-		enablePreemptionGate bool
-		pod                  *v1.Pod
-		expectedHint         fwk.QueueingHint
-	}{
-		"skip-queue-on-pod-not-deferred": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Obj(),
-			expectedHint:         fwk.QueueSkip,
-		},
-		"queue-on-deferred-target-pod-scale-up": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			expectedHint:         fwk.Queue,
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScalingSchedulerPreemption: tc.enablePreemptionGate,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			actualHint, err := p.(*Fit).isSchedulableAfterTargetPodScaleUp(logger, tc.pod, nil, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if actualHint != tc.expectedHint {
-				t.Errorf("unexpected hint: got %v, want %v", actualHint, tc.expectedHint)
-			}
-		})
-	}
-}
-
-func Test_isSchedulableAfterAssignedPodScaleUp(t *testing.T) {
-	testcases := map[string]struct {
-		enablePreemptionGate bool
-		pod                  *v1.Pod
-		oldObj, newObj       interface{}
-		expectedHint         fwk.QueueingHint
-		expectedErr          bool
-	}{
-		"backoff-wrong-old-object": {
-			enablePreemptionGate: true,
-			pod:                  &v1.Pod{},
-			oldObj:               "not-a-pod",
-			expectedHint:         fwk.Queue,
-			expectedErr:          true,
-		},
-		"backoff-wrong-new-object": {
-			enablePreemptionGate: true,
-			pod:                  &v1.Pod{},
-			newObj:               "not-a-pod",
-			expectedHint:         fwk.Queue,
-			expectedErr:          true,
-		},
-		"skip-queue-on-pod-not-deferred": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Obj(),
-			oldObj:               st.MakePod().Name("pod2").Node("node1").Obj(),
-			newObj:               st.MakePod().Name("pod2").Node("node1").Obj(),
-			expectedHint:         fwk.QueueSkip,
-		},
-		"skip-queue-on-different-node-scale-up": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			oldObj:               st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			newObj:               st.MakePod().Name("pod2").Node("node2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			expectedHint:         fwk.QueueSkip,
-		},
-		"queue-on-same-node-scale-up": {
-			enablePreemptionGate: true,
-			pod:                  st.MakePod().Name("pod1").Node("node1").Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
-			oldObj:               st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			newObj:               st.MakePod().Name("pod2").Node("node1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			expectedHint:         fwk.Queue,
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScalingSchedulerPreemption: tc.enablePreemptionGate,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			actualHint, err := p.(*Fit).isSchedulableAfterAssignedPodScaleUp(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
@@ -3379,6 +3280,93 @@ func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext)
 	}
 }
 
+func TestDeferredResizeFitAtMaxPodCapacity(t *testing.T) {
+	testCtx := ktesting.Init(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1-uid",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "test-node",
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+		},
+	}
+
+	nodeInfo := framework.NewNodeInfo(pod)
+	nodeInfo.SetNode(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+		},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(2000, resource.BinarySI),
+				v1.ResourcePods:   *resource.NewQuantity(1, resource.DecimalSI),
+			},
+		},
+	})
+
+	fh, _ := runtime.NewFramework(testCtx, nil, nil)
+	testCtx.Cleanup(func() {
+		runtime.WaitForShutdown(fh)
+	})
+
+	p, err := NewFit(testCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	})
+	testCtx.ExpectNoError(err, "create fit plugin")
+
+	cycleState := framework.NewCycleState()
+	_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(testCtx, cycleState, pod, nil)
+	if !preFilterStatus.IsSuccess() {
+		testCtx.Fatalf("prefilter failed with status: %v", preFilterStatus)
+	}
+
+	if gotStatus := p.(fwk.FilterPlugin).Filter(testCtx, cycleState, pod, nodeInfo); !gotStatus.IsSuccess() {
+		testCtx.Errorf("expected Filter to succeed at max pod capacity for assigned resize pod, got: %v", gotStatus)
+	}
+	if gotInsufficient := Fits(pod, nodeInfo, nil, ResourceRequestsOptions{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	}); len(gotInsufficient) != 0 {
+		testCtx.Errorf("expected no insufficient resources from Fits at max pod capacity, got: %v", gotInsufficient)
+	}
+
+	// Without the deferred resize, nodeName alone doesn't mark a resize, so the pod counts in full.
+	notDeferred := pod.DeepCopy()
+	notDeferred.Status.Conditions = nil
+	var gotNames []v1.ResourceName
+	for _, r := range Fits(notDeferred, nodeInfo, nil, ResourceRequestsOptions{
+		EnablePodLevelResources:                            true,
+		EnableInPlacePodVerticalScalingSchedulerPreemption: true,
+	}) {
+		gotNames = append(gotNames, r.ResourceName)
+	}
+	if diff := cmp.Diff([]v1.ResourceName{v1.ResourcePods, v1.ResourceCPU, v1.ResourceMemory}, gotNames); diff != "" {
+		testCtx.Errorf("Unexpected insufficient resources for a pod without a deferred resize (-want,+got):\n%s", diff)
+	}
+}
+
 func TestDeferredResizeFit(t *testing.T) {
 	testCtx := ktesting.Init(t)
 
@@ -3432,8 +3420,8 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-										v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI),
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
 									},
 								},
 							},
@@ -3446,8 +3434,80 @@ func TestDeferredResizeFit(t *testing.T) {
 			wantStatus:              nil,
 		},
 		{
+			name: "deferred pod resize fits when pods in nodeInfo exceed allowedPodNumber due to nominated pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+						UID:  "pod1-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "nominated-pod",
+						UID:  "nominated-pod-uid",
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:         framework.Resource{MilliCPU: 1000, Memory: 2000, AllowedPodNumber: 1},
+			enablePreemptionFeature: true,
+			wantStatus:              nil,
+		},
+		{
 			// Exactly the same as the previous test case, but the flag is disabled.
-			// In this case, we will have double counting (diff between old and target) and it will fail to fit.
+			// In this case, we will have double counting and it will fail to fit.
 			name: "feature gate is false - double counting causes fit failure",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -3488,8 +3548,8 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-										v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI),
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
 									},
 								},
 							},
@@ -3541,7 +3601,7 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+										v1.ResourceCPU: *resource.NewMilliQuantity(800, resource.DecimalSI),
 									},
 								},
 							},
@@ -3611,7 +3671,7 @@ func TestDeferredResizeFit(t *testing.T) {
 							{
 								Resources: v1.ResourceRequirements{
 									Requests: v1.ResourceList{
-										v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI),
+										v1.ResourceCPU: *resource.NewMilliQuantity(1200, resource.DecimalSI),
 									},
 								},
 							},
@@ -3657,6 +3717,374 @@ func TestDeferredResizeFit(t *testing.T) {
 			enablePreemptionFeature: false,
 			wantStatus:              nil,
 		},
+		{
+			name: "deferred pod resize counts other deferred resize pods on the node at max(allocated, actual)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(1200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+						UID:  "pod1-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1200, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonDeferred,
+							},
+						},
+					},
+				},
+				// pod2 also has a deferred resize requesting 800m/1600, which inflates nodeInfo.GetRequested()
+				// to 1400m/2800 (> 1000m/2000), but only has 300m/600 allocated. Counting pod2 at max(allocated, actual)
+				// leaves 600m+300m = 900m <= 1000m and 1200+600 = 1800 <= 2000, so pod1 fits.
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod2",
+						UID:  "pod2-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(800, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1600, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "c1",
+								AllocatedResources: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(600, resource.BinarySI),
+								},
+							},
+						},
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonDeferred,
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:         framework.Resource{MilliCPU: 1000, Memory: 2000},
+			enablePreemptionFeature: true,
+			wantStatus:              nil,
+		},
+		{
+			name: "deferred pod resize drops newly added pod-level requests from other deferred resize pods on the node",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(1200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+						UID:  "pod1-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1200, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonDeferred,
+							},
+						},
+					},
+				},
+				// pod2 started with only a pod-level memory request (600) and added a pod-level CPU request (500m)
+				// while deferred, so Status.AllocatedResources has no CPU entry. Counting pod2 at max(allocated, actual)
+				// must drop the unactuated 500m CPU request so pod1 (600m) fits within 1000m.
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod2",
+						UID:  "pod2-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(600, resource.BinarySI),
+							},
+						},
+						Containers: []v1.Container{{Name: "c1"}},
+					},
+					Status: v1.PodStatus{
+						AllocatedResources: v1.ResourceList{
+							v1.ResourceMemory: *resource.NewQuantity(600, resource.BinarySI),
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: *resource.NewQuantity(600, resource.BinarySI),
+							},
+						},
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonDeferred,
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:         framework.Resource{MilliCPU: 1000, Memory: 2000},
+			enablePreemptionFeature: true,
+			wantStatus:              nil,
+		},
+		{
+			name: "deferred pod resize does not double-count overhead on other pod-level deferred resize pods",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1-uid",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(1400, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+						UID:  "pod1-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1400, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonDeferred,
+							},
+						},
+					},
+				},
+				// pod2 has pod-level requests (resized 200m -> 500m CPU, 400 -> 1000 memory) plus Overhead (100m CPU, 200 memory).
+				// Status.AllocatedResources (300m CPU, 600 memory) already includes Overhead; double-counting Overhead would
+				// treat pod2 as 400m CPU / 800 memory and reject pod1 (700m + 400m > 1000m).
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod2",
+						UID:  "pod2-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Overhead: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.BinarySI),
+						},
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+								v1.ResourceMemory: *resource.NewQuantity(1000, resource.BinarySI),
+							},
+						},
+						Containers: []v1.Container{{Name: "c1"}},
+					},
+					Status: v1.PodStatus{
+						AllocatedResources: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(600, resource.BinarySI),
+						},
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonDeferred,
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:         framework.Resource{MilliCPU: 1000, Memory: 2000},
+			enablePreemptionFeature: true,
+			wantStatus:              nil,
+		},
+		{
+			name: "unscheduled pod counts deferred resize pods on the node at max(desired, allocated, actual)",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1-uid",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(1200, resource.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+			existingPods: []*v1.Pod{
+				// pod2 fits alongside pod1 by allocated resources (300m+600m <= 1000m, 600+1200 <= 2000),
+				// but an unscheduled pod must still reserve pod2's desired resize (600m+600m > 1000m, 1200+1200 > 2000).
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod2",
+						UID:  "pod2-uid",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "test-node",
+						Containers: []v1.Container{
+							{
+								Name: "c1",
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceCPU:    *resource.NewMilliQuantity(600, resource.DecimalSI),
+										v1.ResourceMemory: *resource.NewQuantity(1200, resource.BinarySI),
+									},
+								},
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "c1",
+								AllocatedResources: v1.ResourceList{
+									v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+									v1.ResourceMemory: *resource.NewQuantity(600, resource.BinarySI),
+								},
+							},
+						},
+						Conditions: []v1.PodCondition{
+							{
+								Type:   v1.PodResizePending,
+								Reason: v1.PodReasonDeferred,
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatable:         framework.Resource{MilliCPU: 1000, Memory: 2000},
+			enablePreemptionFeature: true,
+			wantStatus:              fwk.NewStatus(fwk.Unschedulable, getErrReason(v1.ResourceCPU), getErrReason(v1.ResourceMemory)),
+		},
 	}
 
 	for _, test := range tests {
@@ -3666,6 +4094,10 @@ func TestDeferredResizeFit(t *testing.T) {
 				nodeInfo.AddPod(ep)
 			}
 
+			allowedPodNumber := int64(32)
+			if test.nodeAllocatable.AllowedPodNumber > 0 {
+				allowedPodNumber = int64(test.nodeAllocatable.AllowedPodNumber)
+			}
 			node := v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-node",
@@ -3674,7 +4106,7 @@ func TestDeferredResizeFit(t *testing.T) {
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:    *resource.NewMilliQuantity(test.nodeAllocatable.MilliCPU, resource.DecimalSI),
 						v1.ResourceMemory: *resource.NewQuantity(test.nodeAllocatable.Memory, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+						v1.ResourcePods:   *resource.NewQuantity(allowedPodNumber, resource.DecimalSI),
 					},
 				},
 			}

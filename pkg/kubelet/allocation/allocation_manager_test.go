@@ -5020,3 +5020,116 @@ func TestRetryPendingResizesNodeAffinityDrift(t *testing.T) {
 	assert.Equal(t, v1.PodReasonDeferred, conditions[0].Reason)
 	assert.True(t, allocationManager.HasPendingAllocations(), "resize should stay queued for retry")
 }
+
+type fixedProbeTimeStatusManager struct {
+	status.Manager
+}
+
+func (f fixedProbeTimeStatusManager) GetPodResizeConditions(podUID types.UID) []*v1.PodCondition {
+	conds := f.Manager.GetPodResizeConditions(podUID)
+	out := make([]*v1.PodCondition, len(conds))
+	for i, c := range conds {
+		cp := *c
+		cp.LastProbeTime = metav1.Time{}
+		out[i] = &cp
+	}
+	return out
+}
+
+func TestRetryPendingAllocationsSyncsSchedulerEvaluationCompletedRemoval(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingSchedulerPreemption, true)
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:        "1111",
+			Name:       "pod1",
+			Namespace:  "ns1",
+			Generation: 1,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "c1",
+				Image: "image:v1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("1"),
+						v1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				},
+			}},
+		},
+		Status: v1.PodStatus{Phase: v1.PodRunning},
+	}
+
+	podManager := kubepod.NewBasicPodManager()
+	podManager.SetPods([]*v1.Pod{pod})
+
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod}, nil)
+	am := allocationManager.(*manager)
+	// Strip sub-second LastProbeTime drift so unchanged Deferred conditions compare equal in retryPendingAllocations.
+	am.statusManager = fixedProbeTimeStatusManager{
+		Manager: status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
+	}
+	require.NoError(t, allocationManager.SetAllocatedPod(logger, pod))
+
+	syncCount := 0
+	am.podProvider.(*fakePodProvider).syncPodNow = func(context.Context, *v1.Pod) {
+		syncCount++
+	}
+
+	// Request more CPU than node Allocatable (4 cores) so the resize is deferred with RejectionResourceShortage.
+	resizedPod := pod.DeepCopy()
+	resizedPod.Generation = 2
+	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("5")
+	podManager.SetPods([]*v1.Pod{resizedPod})
+	am.podProvider.(*fakePodProvider).pods = []*v1.Pod{resizedPod}
+
+	allocationManager.PushPendingAllocation(logger, resizedPod.UID)
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	assert.Equal(t, 1, syncCount, "initial deferral should trigger SyncPodNow because resize conditions changed")
+	assert.False(t, am.statusManager.ShouldClearSchedulerEvaluationCompleted(resizedPod.UID))
+
+	// Retrying before SchedulerEvaluationCompleted=True is set keeps resize conditions unchanged and must not sync.
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	assert.Equal(t, 1, syncCount, "re-evaluation without SchedulerEvaluationCompleted should not trigger SyncPodNow")
+	assert.False(t, am.statusManager.ShouldClearSchedulerEvaluationCompleted(resizedPod.UID))
+
+	// A non-resource-shortage (RejectionBlocked) deferral must not clear SchedulerEvaluationCompleted even when set.
+	blockedPodWithSEC := pod.DeepCopy()
+	blockedPodWithSEC.Generation = 2
+	blockedPodWithSEC.Spec.NodeSelector = map[string]string{"pool": "a"}
+	blockedPodWithSEC.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+	blockedPodWithSEC.Status.Conditions = []v1.PodCondition{{
+		Type:   v1.SchedulerEvaluationCompleted,
+		Status: v1.ConditionTrue,
+		Reason: v1.PodReasonDeferredPodResize,
+	}}
+	podManager.SetPods([]*v1.Pod{blockedPodWithSEC})
+	am.podProvider.(*fakePodProvider).pods = []*v1.Pod{blockedPodWithSEC}
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	assert.False(t, am.statusManager.ShouldClearSchedulerEvaluationCompleted(resizedPod.UID), "RejectionBlocked deferral must not clear SchedulerEvaluationCompleted")
+
+	// Once SchedulerEvaluationCompleted=True is present on a RejectionResourceShortage resize, re-evaluating an unchanged Deferred resize must trigger SyncPodNow.
+	resizedPodWithSEC := resizedPod.DeepCopy()
+	resizedPodWithSEC.Status.Conditions = []v1.PodCondition{{
+		Type:   v1.SchedulerEvaluationCompleted,
+		Status: v1.ConditionTrue,
+		Reason: v1.PodReasonDeferredPodResize,
+	}}
+	podManager.SetPods([]*v1.Pod{resizedPodWithSEC})
+	am.podProvider.(*fakePodProvider).pods = []*v1.Pod{resizedPodWithSEC}
+	// Run once to stabilize the OutOfcpu message after switching back from blockedPodWithSEC, then reset clearSchedEvalCond via a fresh status manager with Deferred already set.
+	am.statusManager = fixedProbeTimeStatusManager{
+		Manager: status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
+	}
+	am.statusManager.SetPodResizePendingCondition(resizedPod.UID, v1.PodReasonDeferred, "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000", resizedPod.Generation)
+	syncCount = 0
+
+	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+	assert.True(t, am.statusManager.ShouldClearSchedulerEvaluationCompleted(resizedPod.UID))
+	assert.Equal(t, 1, syncCount, "re-evaluation with SchedulerEvaluationCompleted=True must trigger SyncPodNow even when resize conditions stay Deferred")
+}

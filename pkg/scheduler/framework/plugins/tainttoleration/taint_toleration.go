@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-helpers/resource"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -34,12 +33,10 @@ import (
 
 // TaintToleration is a plugin that checks if a pod tolerates a node's taints.
 type TaintToleration struct {
-	handle                                             fwk.Handle
-	enableTaintTolerationComparisonOperators           bool
-	enableInPlacePodVerticalScalingSchedulerPreemption bool
+	handle                                   fwk.Handle
+	enableTaintTolerationComparisonOperators bool
 }
 
-var _ fwk.PreFilterPlugin = &TaintToleration{}
 var _ fwk.FilterPlugin = &TaintToleration{}
 var _ fwk.PreScorePlugin = &TaintToleration{}
 var _ fwk.ScorePlugin = &TaintToleration{}
@@ -101,24 +98,8 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 	return fwk.QueueSkip, nil
 }
 
-// PreFilter invoked at the prefilter extension point.
-func (pl *TaintToleration) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil, fwk.NewStatus(fwk.Skip)
-	}
-	return nil, nil
-}
-
-// PreFilterExtensions do not exist for this plugin.
-func (pl *TaintToleration) PreFilterExtensions() fwk.PreFilterExtensions {
-	return nil
-}
-
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		return nil
-	}
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
@@ -223,7 +204,6 @@ func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features
 	return &TaintToleration{
 		handle:                                   h,
 		enableTaintTolerationComparisonOperators: fts.EnableTaintTolerationComparisonOperators,
-		enableInPlacePodVerticalScalingSchedulerPreemption: fts.EnableInPlacePodVerticalScalingSchedulerPreemption,
 	}, nil
 }
 

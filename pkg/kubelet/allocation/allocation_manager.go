@@ -272,9 +272,10 @@ func (m *manager) retryPendingAllocations(ctx context.Context, trigger string) [
 			}
 		}
 
-		// If the pod resize status has changed, we need to update the pod status.
+		// If the pod resize status has changed or SchedulerEvaluationCompleted needs to be cleared,
+		// trigger a pod sync to update the pod status.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
-		if allocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
+		if allocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) || m.statusManager.ShouldClearSchedulerEvaluationCompleted(uid) {
 			m.podProvider.SyncPodNow(ctx, pod)
 		}
 	}
@@ -637,6 +638,9 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 			}
 			msg := events.PodResizePendingMsg(logger, pod, result.Reason, result.Message, pod.Generation)
 			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+		}
+		if result.RejectionType == lifecycle.RejectionResourceShortage {
+			m.statusManager.ClearSchedulerEvaluationCompletedCondition(pod.UID)
 		}
 	}
 

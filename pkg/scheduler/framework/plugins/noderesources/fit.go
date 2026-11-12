@@ -47,6 +47,7 @@ var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
 var _ fwk.PlacementScorePlugin = &Fit{}
+var _ fwk.RelevancePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -99,6 +100,12 @@ type Fit struct {
 	handle                                             fwk.Handle
 	*resourceAllocationScorer
 	placementScorer *resourceAllocationScorer
+}
+
+// IsRelevantForPodResize returns true to indicate that NodeResourcesFit is relevant for pod resizes,
+// as it evaluates whether the node has sufficient resources for the resized pod.
+func (f *Fit) IsRelevantForPodResize() bool {
+	return true
 }
 
 // ScoreExtensions of the Score plugin.
@@ -318,11 +325,6 @@ func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, e
 			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
 	}
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption {
-		events = append(events,
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleUp},
-			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleUp}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleUp})
-	}
 	return events, nil
 }
 
@@ -339,9 +341,13 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 		return fwk.QueueSkip, nil
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
-		if deletedPod.Spec.NodeName != pod.Spec.NodeName {
-			logger.V(5).Info("another scheduled pod was deleted, but it's on a different node than the deferred resize pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
+		deletedNodeName := deletedPod.Spec.NodeName
+		if deletedNodeName == "" {
+			deletedNodeName = deletedPod.Status.NominatedNodeName
+		}
+		if deletedNodeName != pod.Spec.NodeName {
+			logger.V(5).Info("another scheduled or nominated pod was deleted, but it's on a different node than the deferred resize pod", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 			return fwk.QueueSkip, nil
 		}
 	}
@@ -354,38 +360,6 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 // isSchedulableAfterTargetPodScaleDown is invoked when the target pod is scaled down, making itself schedulable.
 func (f *Fit) isSchedulableAfterTargetPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	logger.V(5).Info("the target pod got scaled down and it may be schedulable now", "pod", klog.KObj(pod))
-	return fwk.Queue, nil
-}
-
-// isSchedulableAfterTargetPodScaleUp is invoked when the target pod is scaled up.
-// Requeuing is necessary because a pod parked in UnschedulableAndUnresolvable (fitting naturally)
-// may exceed available headroom upon scaling up further, requiring preemption to clear space.
-func (f *Fit) isSchedulableAfterTargetPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	if !resource.IsPodResizeDeferred(pod) {
-		logger.V(5).Info("the target pod got scaled up, but it is not a deferred resize pod", "pod", klog.KObj(pod))
-		return fwk.QueueSkip, nil
-	}
-	logger.V(5).Info("the target pod got scaled up, re-evaluating", "pod", klog.KObj(pod))
-	return fwk.Queue, nil
-}
-
-// isSchedulableAfterAssignedPodScaleUp checks if another assigned pod scaled up on the same node.
-// Requeuing is necessary because a competing scale-up can consume the free headroom a parked pod
-// was waiting for, forcing the deferred pod back into active evaluation to initiate preemption.
-func (f *Fit) isSchedulableAfterAssignedPodScaleUp(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	_, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
-	if err != nil {
-		return fwk.Queue, err
-	}
-	if !resource.IsPodResizeDeferred(pod) {
-		logger.V(5).Info("another assigned pod got scaled up, but target pod is not a deferred resize pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
-	}
-	if modifiedPod.Spec.NodeName != pod.Spec.NodeName {
-		logger.V(5).Info("another assigned pod got scaled up, but on a different node than the deferred resize pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
-	}
-	logger.V(5).Info("another assigned pod got scaled up on the same node as the deferred resize pod, re-evaluating", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return fwk.Queue, nil
 }
 
@@ -419,7 +393,7 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 		return false
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(targetPod) {
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(targetPod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(targetPod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedPod.Spec.NodeName != targetPod.Spec.NodeName {
 			return false
@@ -468,7 +442,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(pod) {
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedNode.Name != pod.Spec.NodeName {
 			logger.V(5).Info("node was updated, but it is a different node than the deferred resize pod's node", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
