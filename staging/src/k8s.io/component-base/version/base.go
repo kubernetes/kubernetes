@@ -19,13 +19,21 @@ package version
 // Base version information.
 //
 // The version itself is built from the constants below and the VCS information
-// recorded by the Go toolchain. gitCommit and gitRefs are only a fallback for
-// builds without that information; their in-tree values are replaced by
-// "git archive", which also works for GitHub tar downloads. buildDate is set
-// by the build process with ldflags -X.
+// recorded by the Go toolchain. The variables are optional overrides which
+// take precedence over that information. They are set with ldflags -X, but
+// only when building with KUBE_GIT_VERSION_FILE, i.e. when the build has to
+// use externally provided version information. gitCommit and gitRefs also get
+// replaced by "git archive", which works for GitHub tar downloads. buildDate
+// is always set with ldflags -X.
+//
+// TODO: reconsider whether KUBE_GIT_VERSION_FILE is needed. Removing it would
+// simplify the source code because ldflags injection would no longer be
+// necessary for anything except buildDate.
 var (
-	gitCommit = "$Format:%H$" // sha1 from git, only used as fallback if the Go toolchain did not record it
-	gitRefs   = "$Format:%D$" // refs of the archived commit, e.g. "HEAD -> master, tag: v1.38.0"
+	gitVersion   = ""            // complete semantic version, replaces the one built from the constants
+	gitCommit    = "$Format:%H$" // sha1 from git, ignored while it is still the unexpanded placeholder
+	gitRefs      = "$Format:%D$" // refs of the archived commit, e.g. "HEAD -> master, tag: v1.38.0"
+	gitTreeState = ""            // "clean" or "dirty"
 
 	buildDate = "1970-01-01T00:00:00Z" // build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
 )

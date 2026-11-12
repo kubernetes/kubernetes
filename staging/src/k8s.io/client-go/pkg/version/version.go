@@ -58,6 +58,8 @@ import (
 //   - "make build" in a container: same, provided that git works in the
 //     container. The build runs as the owner of the source tree, which
 //     avoids git's "dubious ownership" error.
+//   - Build with KUBE_GIT_VERSION_FILE: GitVersion, GitCommit and GitTreeState
+//     come from that file instead.
 //   - Library of a downstream application: the constants still describe the
 //     Kubernetes version of this package, but the VCS information describes
 //     the application, not Kubernetes. A tagged application also does not

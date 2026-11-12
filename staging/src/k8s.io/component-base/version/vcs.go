@@ -33,7 +33,8 @@ type vcsData struct {
 // the Go toolchain. Without VCS stamping, e.g. in a "git archive" export, it
 // falls back to the values that "git archive" put into base.go. The tree
 // state is then "archive" and a tag in the refs is treated like the main
-// module version of a tagged build.
+// module version of a tagged build. gitCommit and gitTreeState from base.go
+// take precedence if they are set.
 var vcsInfo = sync.OnceValue(func() vcsData {
 	var d vcsData
 	if info, ok := debug.ReadBuildInfo(); ok {
@@ -54,6 +55,13 @@ var vcsInfo = sync.OnceValue(func() vcsData {
 	}
 	if d.commit == "" {
 		d = archiveInfo(gitCommit, gitRefs)
+	}
+	// An unexpanded "git archive" placeholder is not a commit.
+	if gitCommit != "" && !strings.HasPrefix(gitCommit, "$") {
+		d.commit = gitCommit
+	}
+	if gitTreeState != "" {
+		d.treeState = gitTreeState
 	}
 	return d
 })
@@ -81,7 +89,7 @@ func archiveInfo(commit, refs string) (d vcsData) {
 // VCS information, e.g. v1.38.0-beta.0+69a8e1ff315563-dirty.
 var buildVersion = sync.OnceValue(func() string {
 	d := vcsInfo()
-	return formatVersion(d.commit, d.treeState, d.mainVersion)
+	return formatVersion(gitVersion, d.commit, d.treeState, d.mainVersion)
 })
 
 // baseVersion is the version from the constants, without build metadata.
@@ -93,15 +101,17 @@ func baseVersion() string {
 	return v
 }
 
-func formatVersion(commit, treeState, mainVersion string) string {
+func formatVersion(override, commit, treeState, mainVersion string) string {
+	if override != "" {
+		return override
+	}
 	v := baseVersion()
 	// The Go toolchain reports a clean tag as main module version, so there
 	// is no need for the commit.
 	if mainVersion == v {
 		return v
 	}
-	// The placeholder in gitCommit is not a hash when not expanded by "git archive".
-	hasCommit := len(commit) >= 14 && !strings.HasPrefix(commit, "$")
+	hasCommit := len(commit) >= 14
 	if hasCommit {
 		v += "+" + commit[:14]
 	}

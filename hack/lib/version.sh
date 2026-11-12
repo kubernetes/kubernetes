@@ -59,7 +59,12 @@ kube::version::source_version() {
 # Grovels through git to set a set of env variables.
 #
 # If KUBE_GIT_VERSION_FILE, this function will load from that file instead of
-# querying git.
+# querying git. The values from the file are also injected into the binaries
+# via ldflags (see kube::version::ldflags), overriding what Go records.
+#
+# TODO: reconsider whether KUBE_GIT_VERSION_FILE is needed. Removing it would
+# simplify the source code because ldflags injection would no longer be
+# necessary for anything except buildDate.
 kube::version::get_version_vars() {
   if [[ -n ${KUBE_GIT_VERSION_FILE-} ]]; then
     kube::version::load_version_vars "${KUBE_GIT_VERSION_FILE}"
@@ -197,6 +202,18 @@ kube::version::ldflags() {
   kube::util::ensure-gnu-compatible-date
 
   add_ldflag "buildDate" "$(${DATE} ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+  # Normally the Go toolchain records the VCS information in the binary. Only
+  # when the version information was provided externally, it must be injected.
+  if [[ -n ${KUBE_GIT_VERSION_FILE-} ]]; then
+    if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
+      add_ldflag "gitCommit" "${KUBE_GIT_COMMIT}"
+      add_ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"
+    fi
+    if [[ -n ${KUBE_GIT_VERSION-} ]]; then
+      add_ldflag "gitVersion" "${KUBE_GIT_VERSION}"
+    fi
+  fi
 
   # The -ldflags parameter takes a single string, so join the output.
   echo "${ldflags[*]-}"
