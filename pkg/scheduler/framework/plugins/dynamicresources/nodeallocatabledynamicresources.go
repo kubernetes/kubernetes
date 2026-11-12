@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	resourcehelper "k8s.io/component-helpers/resource"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -72,6 +73,11 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 
 	if len(nodeAllocatableClaims) == 0 {
 		return nil, nil // No nodeAllocatable resources to check
+	}
+
+	// The claims use node allocatable devices, check whether the node supports status.extraNodeAllocatableResources.
+	if node := nodeInfo.Node(); !slices.Contains(node.Status.DeclaredFeatures, dranodeallocatableresources.DRANodeAllocatableResourcesFeature) {
+		return nil, statusUnschedulable(logger, fmt.Sprintf("node does not declare the %s feature (requires a kubelet with the %s feature gate enabled)", dranodeallocatableresources.DRANodeAllocatableResourcesFeature, dranodeallocatableresources.DRANodeAllocatableResourcesFeatureGate), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(nodeAllocatableClaims))
 	}
 
 	otherEntries := state.extraNodeAllocatableResources.GetExcludingPlugin(nodeInfo.Node().Name, Name)
