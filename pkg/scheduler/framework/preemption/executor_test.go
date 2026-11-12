@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -278,6 +279,13 @@ func TestPrepareCandidate(t *testing.T) {
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
+		// The status patch carries the victim's uid as a precondition, so a victim that
+		// was recreated under the same name is rejected as invalid.
+		invalidVictim1 = st.MakePod().Name("invalid-victim").UID("victim1").
+				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
+				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+				Obj()
+
 		failVictim = st.MakePod().Name("fail-victim").UID("victim1").
 				Node(node1Name).SchedulerName(defaultSchedulerName).Priority(midPriority).
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
@@ -462,6 +470,20 @@ func TestPrepareCandidate(t *testing.T) {
 			candidate: newCandidate(&extenderv1.Victims{
 				Pods: []*v1.Pod{
 					notFoundVictim1,
+				},
+			}, node1Name, nil, node1Name),
+			preemptor:             preemptor,
+			testPods:              []*v1.Pod{},
+			nodeNames:             []string{node1Name},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
+		},
+		{
+			name: "one victim, but victim was recreated before the status patch",
+			candidate: newCandidate(&extenderv1.Victims{
+				Pods: []*v1.Pod{
+					invalidVictim1,
 				},
 			}, node1Name, nil, node1Name),
 			preemptor:             preemptor,
@@ -780,6 +802,12 @@ func TestPrepareCandidate(t *testing.T) {
 						// fake clientset does not return an error for not-found pods, so we simulate it here.
 						if name == "not-found-victim" {
 							return true, nil, apierrors.NewNotFound(v1.Resource("pods"), "not-found-victim")
+						}
+						// The fake clientset does not enforce the uid precondition either, so
+						// simulate what a real API server returns for a victim that is gone.
+						if action.(clienttesting.PatchAction).GetName() == "invalid-victim" {
+							return true, nil, apierrors.NewInvalid(v1.SchemeGroupVersion.WithKind("Pod").GroupKind(), "invalid-victim",
+								field.ErrorList{field.Invalid(field.NewPath("metadata").Child("uid"), "victim1", "field is immutable")})
 						}
 						return true, nil, nil
 					})
@@ -1442,7 +1470,7 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 			name:                     "Should make patch request to clear node name",
 			currentNominatedNodeName: "node1",
 			expectPatchRequest:       true,
-			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
+			expectedPatchData:        `{"metadata":{"uid":"foo-uid"},"status":{"nominatedNodeName":null}}`,
 		},
 		{
 			name:                     "Should not make patch request if nominated node is already cleared",
@@ -1469,7 +1497,7 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 				})
 
 				pod := &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "foo-uid"},
 					Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
 				}
 
