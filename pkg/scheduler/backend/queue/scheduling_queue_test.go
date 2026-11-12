@@ -1851,6 +1851,111 @@ func TestPriorityQueue_Update(t *testing.T) {
 	}
 }
 
+// TestPriorityQueue_UpdateWithMultipleEvents ensures that a Pod update producing several events
+// leaves the Pod in exactly one queue, chosen by the strongest queueing hint among those events.
+func TestPriorityQueue_UpdateWithMultipleEvents(t *testing.T) {
+	const (
+		unschedulablePlugin = "unschedulablePlugin"
+		pendingPlugin       = "pendingPlugin"
+	)
+	// PodSchedulingPropertiesChange reports the label change before the toleration change.
+	labelEvent := fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodLabel}
+	tolerationEvent := fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodToleration}
+
+	hint := func(plugin string, fn fwk.QueueingHintFn) []*QueueingHintFunction {
+		return []*QueueingHintFunction{{PluginName: plugin, QueueingHintFn: fn}}
+	}
+
+	tests := []struct {
+		name            string
+		queueingHintMap QueueingHintMap
+		pendingPlugins  sets.Set[string]
+		wantQ           string
+	}{
+		{
+			name: "no event makes the pod schedulable",
+			queueingHintMap: QueueingHintMap{
+				labelEvent:      hint(unschedulablePlugin, queueHintReturnSkip),
+				tolerationEvent: hint(unschedulablePlugin, queueHintReturnSkip),
+			},
+			wantQ: unschedulableQ,
+		},
+		{
+			name: "only the second event makes the pod schedulable",
+			queueingHintMap: QueueingHintMap{
+				labelEvent:      hint(unschedulablePlugin, queueHintReturnSkip),
+				tolerationEvent: hint(unschedulablePlugin, queueHintReturnQueue),
+			},
+			wantQ: backoffQ,
+		},
+		{
+			name: "only the first event makes the pod schedulable",
+			queueingHintMap: QueueingHintMap{
+				labelEvent:      hint(unschedulablePlugin, queueHintReturnQueue),
+				tolerationEvent: hint(unschedulablePlugin, queueHintReturnSkip),
+			},
+			wantQ: backoffQ,
+		},
+		{
+			name: "the first event requeues after backoff and the second one requeues immediately",
+			queueingHintMap: QueueingHintMap{
+				labelEvent:      hint(unschedulablePlugin, queueHintReturnQueue),
+				tolerationEvent: hint(pendingPlugin, queueHintReturnQueue),
+			},
+			pendingPlugins: sets.New(pendingPlugin),
+			wantQ:          activeQ,
+		},
+	}
+
+	for _, tt := range tests {
+		for _, popFromBackoffQEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s popFromBackoffQEnabled(%v)", tt.name, popFromBackoffQEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, popFromBackoffQEnabled)
+				tCtx := ktesting.Init(t)
+				logger := klog.FromContext(tCtx)
+
+				pod := st.MakePod().Name("pod").Namespace("ns").UID("pod").Obj()
+				// The clock never advances, so the pod is still backing off when it's updated.
+				c := testingclock.NewFakeClock(time.Now())
+				q := NewTestQueueWithObjects(tCtx, newDefaultQueueSort(), []runtime.Object{pod}, WithClock(c), WithQueueingHintMapPerProfile(QueueingHintMapPerProfile{"": tt.queueingHintMap}))
+
+				q.Add(tCtx, pod)
+				entity, err := q.Pop(logger)
+				if err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+				pInfo := entity.(*framework.QueuedPodInfo)
+				pInfo.UnschedulablePlugins = sets.New(unschedulablePlugin)
+				pInfo.PendingPlugins = tt.pendingPlugins
+				if err := q.AddUnschedulablePodIfNotPresent(tCtx, pInfo, q.SchedulingCycle()); err != nil {
+					t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
+				}
+				lookup := newQueuedPodInfoForLookup(pod)
+				if q.unschedulableEntities.get(lookup) == nil {
+					t.Fatalf("Expected pod %s to be in unschedulableEntities before the update", pod.Name)
+				}
+
+				newPod := st.MakePod().Name("pod").Namespace("ns").UID("pod").Label("foo", "bar").Toleration("foo").Obj()
+				q.Update(tCtx, pod, newPod)
+
+				var gotQs []string
+				if q.activeQ.has(lookup) {
+					gotQs = append(gotQs, activeQ)
+				}
+				if q.backoffQ.has(lookup) {
+					gotQs = append(gotQs, backoffQ)
+				}
+				if q.unschedulableEntities.get(lookup) != nil {
+					gotQs = append(gotQs, unschedulableQ)
+				}
+				if diff := cmp.Diff([]string{tt.wantQ}, gotQs); diff != "" {
+					t.Errorf("Unexpected queues holding the pod after the update (-want, +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
 // TestPriorityQueue_UpdateWhenInflight ensures to requeue a Pod back to activeQ/backoffQ
 // if it actually got an update that may make it schedulable while being scheduled.
 // See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
