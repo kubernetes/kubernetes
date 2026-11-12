@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
@@ -1240,8 +1241,8 @@ func TestDynamicContainers(t *testing.T) {
 			}
 			err := admit.Validate(t.Context(), attrs, nil)
 			if tc.expectErr {
-				if err == nil {
-					t.Fatal("expected an error")
+				if !apierrors.IsForbidden(err) {
+					t.Fatalf("expected Forbidden error, got: %v", err)
 				}
 				return
 			}
@@ -1259,4 +1260,149 @@ func TestDynamicContainers(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDynamicVolumes(t *testing.T) {
+	ns := "myns"
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	admit.SetExternalKubeInformerFactory(informerFactory)
+	admit.LimitSecretReferences = true
+	if err := informerFactory.Core().V1().ServiceAccounts().Informer().GetStore().Add(&corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: DefaultServiceAccountName, Namespace: ns},
+		Secrets:    []corev1.ObjectReference{{Name: "allowed"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	basePod := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "myname", Namespace: ns},
+			Spec: api.PodSpec{
+				ServiceAccountName: DefaultServiceAccountName,
+				Containers:         []api.Container{{Name: "existing"}},
+				// Stored secret volumes aren't re-checked, even if they no longer comply.
+				Volumes: []api.Volume{
+					{Name: "existing-secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "old-disallowed"}}},
+				},
+			},
+		}
+	}
+	withAddedVolume := func(vol api.Volume) *api.Pod {
+		pod := basePod()
+		pod.Spec.Volumes = append(pod.Spec.Volumes, vol)
+		return pod
+	}
+
+	testCases := []struct {
+		name      string
+		pod       *api.Pod
+		expectErr bool
+	}{
+		{
+			name: "added secret volume referencing an allowed secret",
+			pod:  withAddedVolume(api.Volume{Name: "added-secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "allowed"}}}),
+		},
+		{
+			name:      "added secret volume referencing a disallowed secret",
+			pod:       withAddedVolume(api.Volume{Name: "added-secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "disallowed"}}}),
+			expectErr: true,
+		},
+		{
+			name: "added projected volume referencing an allowed secret",
+			pod: withAddedVolume(api.Volume{
+				Name: "added-projected",
+				VolumeSource: api.VolumeSource{
+					Projected: &api.ProjectedVolumeSource{
+						Sources: []api.VolumeProjection{
+							{Secret: &api.SecretProjection{LocalObjectReference: api.LocalObjectReference{Name: "allowed"}}},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "added projected volume referencing a disallowed secret",
+			pod: withAddedVolume(api.Volume{
+				Name: "added-projected",
+				VolumeSource: api.VolumeSource{
+					Projected: &api.ProjectedVolumeSource{
+						Sources: []api.VolumeProjection{
+							{Secret: &api.SecretProjection{LocalObjectReference: api.LocalObjectReference{Name: "disallowed"}}},
+						},
+					},
+				},
+			}),
+			expectErr: true,
+		},
+		{
+			name: "added non-secret volume keeps existing disallowed secret volume untouched",
+			pod:  withAddedVolume(api.Volume{Name: "added-empty", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldPod := basePod()
+			attrs := admission.NewAttributesRecord(tc.pod, oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+			if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(t.Context(), attrs, nil); err != nil {
+				t.Fatalf("Unexpected Admit() error: %v", err)
+			}
+			err := admit.Validate(t.Context(), attrs, nil)
+			if tc.expectErr {
+				if !apierrors.IsForbidden(err) {
+					t.Fatalf("expected Forbidden error, got: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected Validate() error: %v", err)
+			}
+		})
+	}
+
+	t.Run("adding or removing kube-api-access-* volumes via /dynamic is forbidden and never auto-mounted", func(t *testing.T) {
+		oldPod := basePod()
+		newPod := oldPod.DeepCopy()
+		newPod.Spec.Volumes = append(newPod.Spec.Volumes, api.Volume{
+			Name:         ServiceAccountVolumeName + "-custom",
+			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+		})
+		newPod.Spec.Containers = append(newPod.Spec.Containers, api.Container{Name: "added"})
+		attrs := admission.NewAttributesRecord(newPod, oldPod, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(t.Context(), attrs, nil); err != nil {
+			t.Fatalf("Unexpected Admit() error: %v", err)
+		}
+		if len(newPod.Spec.Containers[1].VolumeMounts) != 0 {
+			t.Fatalf("expected dynamically added %s-custom volume not to be auto-mounted, got: %+v", ServiceAccountVolumeName, newPod.Spec.Containers[1].VolumeMounts)
+		}
+		if err := admit.Validate(t.Context(), attrs, nil); !apierrors.IsForbidden(err) {
+			t.Fatalf("expected Validate() to forbid adding %s-custom volume on /dynamic, got: %v", ServiceAccountVolumeName, err)
+		}
+
+		podWithToken := basePod()
+		podWithToken.Spec.Volumes = append(podWithToken.Spec.Volumes, api.Volume{
+			Name:         ServiceAccountVolumeName + "-abcde",
+			VolumeSource: api.VolumeSource{Projected: TokenVolumeSource()},
+		})
+		podRemovedToken := basePod()
+		removeAttrs := admission.NewAttributesRecord(podRemovedToken, podWithToken, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := admit.Validate(t.Context(), removeAttrs, nil); !apierrors.IsForbidden(err) {
+			t.Fatalf("expected Validate() to forbid removing %s-abcde volume on /dynamic, got: %v", ServiceAccountVolumeName, err)
+		}
+
+		// Two-step protection when AutomountServiceAccountToken=false even if pod was created with a user-defined kube-api-access-* volume.
+		automountFalse := false
+		podNoAutomount := podWithToken.DeepCopy()
+		podNoAutomount.Spec.AutomountServiceAccountToken = &automountFalse
+		podNoAutomountAdded := podNoAutomount.DeepCopy()
+		podNoAutomountAdded.Spec.Containers = append(podNoAutomountAdded.Spec.Containers, api.Container{Name: "added"})
+		noAutomountAttrs := admission.NewAttributesRecord(podNoAutomountAdded, podNoAutomount, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "dynamic", admission.Update, &metav1.UpdateOptions{}, false, nil)
+		if err := admissiontesting.WithReinvocationTesting(t, admit).Admit(t.Context(), noAutomountAttrs, nil); err != nil {
+			t.Fatalf("Unexpected Admit() error: %v", err)
+		}
+		if len(podNoAutomountAdded.Spec.Containers[1].VolumeMounts) != 0 {
+			t.Fatalf("expected AutomountServiceAccountToken=false to skip auto-mounting on /dynamic, got: %+v", podNoAutomountAdded.Spec.Containers[1].VolumeMounts)
+		}
+	})
 }
