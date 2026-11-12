@@ -4411,10 +4411,12 @@ func TestMutableSchedulingDirectivesForSuspendedJobs(t *testing.T) {
 func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableSchedulingDirectivesForSuspendedJobs, true)
 
-	closeFn, restConfig, clientSet, ns := setup(t, "mutable-scheduling-directives-not-started")
+	closeFn, _, clientSet, ns := setup(t, "mutable-scheduling-directives-not-started")
 	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(cancel)
+	// This exercises API validation before the controller has set JobSuspended.
+	// Running the controller here races its status write with the update below,
+	// and can also make the test miss the very precondition it intends to cover.
+	ctx := context.Background()
 
 	// Create a suspended Job.
 	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -4427,15 +4429,24 @@ func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) 
 	if err != nil {
 		t.Fatalf("Failed to create Job: %v", err)
 	}
+	if job.Status.StartTime != nil || len(job.Status.Conditions) != 0 {
+		t.Fatalf("Job already has controller status before the update: %+v", job.Status)
+	}
 
 	// Immediately update the nodeSelector without waiting for the JobSuspended
 	// condition to be set. This simulates external controllers (e.g. MultiKueue)
 	// that inject scheduling directives right after creating a suspended Job.
 	nodeSelector := map[string]string{"foo": "bar"}
 	job.Spec.Template.Spec.NodeSelector = nodeSelector
-	_, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	updated, err := clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update scheduling directives on suspended Job that was never started: %v", err)
+	}
+	if diff := cmp.Diff(nodeSelector, updated.Spec.Template.Spec.NodeSelector); diff != "" {
+		t.Errorf("scheduling directives were not persisted (-want +got):\n%s", diff)
+	}
+	if updated.Status.StartTime != nil || len(updated.Status.Conditions) != 0 {
+		t.Errorf("update did not exercise the before-controller-status case: %+v", updated.Status)
 	}
 }
 
@@ -4445,10 +4456,10 @@ func TestMutableSchedulingDirectivesForSuspendedJobsNotYetStarted(t *testing.T) 
 func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, true)
 
-	closeFn, restConfig, clientSet, ns := setup(t, "mutable-pod-resources-not-started")
+	closeFn, _, clientSet, ns := setup(t, "mutable-pod-resources-not-started")
 	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(cancel)
+	// Keep this API-validation case deterministically before controller status.
+	ctx := context.Background()
 
 	// Create a suspended Job.
 	job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -4460,6 +4471,9 @@ func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Failed to create Job: %v", err)
+	}
+	if job.Status.StartTime != nil || len(job.Status.Conditions) != 0 {
+		t.Fatalf("Job already has controller status before the update: %+v", job.Status)
 	}
 
 	// Immediately update the pod resources without waiting for the JobSuspended
@@ -4472,9 +4486,15 @@ func TestMutablePodResourcesForSuspendedJobsNotYetStarted(t *testing.T) {
 		},
 	}
 	job.Spec.Template.Spec.Containers[0].Resources = wantResources
-	_, err = clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
+	updated, err := clientSet.BatchV1().Jobs(ns.Name).Update(ctx, job, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update pod resources on suspended Job that was never started: %v", err)
+	}
+	if diff := cmp.Diff(wantResources, updated.Spec.Template.Spec.Containers[0].Resources); diff != "" {
+		t.Errorf("pod resources were not persisted (-want +got):\n%s", diff)
+	}
+	if updated.Status.StartTime != nil || len(updated.Status.Conditions) != 0 {
+		t.Errorf("update did not exercise the before-controller-status case: %+v", updated.Status)
 	}
 }
 
