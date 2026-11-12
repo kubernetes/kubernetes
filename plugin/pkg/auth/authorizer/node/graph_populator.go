@@ -202,8 +202,10 @@ func podSpecChanged(oldPod, newPod *corev1.Pod) bool {
 			return true
 		}
 	}
-	if !apiequality.Semantic.DeepEqual(oldPod.Spec.Volumes, newPod.Spec.Volumes) {
-		return true
+	for pair := range podutil.VolumePairs(newPod, oldPod) {
+		if pair.New == nil || pair.Old == nil || !apiequality.Semantic.DeepEqual(pair.New, pair.Old) {
+			return true
+		}
 	}
 	return false
 }
