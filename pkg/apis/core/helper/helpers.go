@@ -64,7 +64,7 @@ func IsPodLevelResourcesSet(pod *core.Pod) bool {
 // IsHugePageResourceName returns true if the resource name has the huge page
 // resource prefix.
 func IsHugePageResourceName(name core.ResourceName) bool {
-	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix)
+	return resourcehelper.IsHugePageResourceName(v1.ResourceName(name))
 }
 
 // IsHugePageResourceValueDivisible returns true if the resource value of storage is
@@ -226,23 +226,14 @@ func IsNodeAllocatableResourceName(name core.ResourceName) bool {
 // to avoid confusion with the convention in quota
 // 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name core.ResourceName) bool {
-	if IsNativeResource(name) || strings.HasPrefix(string(name), core.DefaultResourceRequestsPrefix) {
-		return false
-	}
-	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
-	nameForQuota := fmt.Sprintf("%s%s", core.DefaultResourceRequestsPrefix, string(name))
-	if errs := validation.IsQualifiedName(nameForQuota); len(errs) != 0 {
-		return false
-	}
-	return true
+	return resourcehelper.IsExtendedResourceName(v1.ResourceName(name))
 }
 
 // IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
 func IsNativeResource(name core.ResourceName) bool {
-	return !strings.Contains(string(name), "/") ||
-		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
+	return resourcehelper.IsNativeResource(v1.ResourceName(name))
 }
 
 // IsOvercommitAllowed returns true if the resource is in the default
