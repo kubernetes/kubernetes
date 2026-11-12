@@ -357,9 +357,9 @@ func (sched *Scheduler) bindingCycle(
 	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and Permit is the last one in the scheduling/binding cycle.
 	// If a Pod fails on PreBind or Bind, it should be moved to BackoffQ for retry.
 	//
-	// We can call Done() here because
-	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
-	sched.SchedulingQueue.Done(assumedPod.UID)
+	// We call DropInFlightEvents() here to free the cluster events stored in the scheduling queue sooner,
+	// while keeping the pod tracked in in-flight pods until binding finishes.
+	sched.SchedulingQueue.DropInFlightEvents(assumedPod.UID)
 
 	// If we are going to run prebind plugins we put the pod in binding map to optimize preemption.
 	if preFlightStatus.IsSuccess() {
@@ -398,6 +398,9 @@ func (sched *Scheduler) bindingCycle(
 		logger.V(4).Info("Pod scheduled after flush from unschedulableEntities", "pod", klog.KObj(assumedPodInfo.Pod), "unschedulablePlugins", assumedPodInfo.UnschedulablePlugins, "pendingPlugins", assumedPodInfo.PendingPlugins)
 		metrics.PodScheduledAfterFlush.Inc()
 	}
+	// Mark pod as done in scheduling queue after successful binding.
+	sched.SchedulingQueue.Done(assumedPod.UID)
+
 	// Run "postbind" plugins.
 	schedFramework.RunPostBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 

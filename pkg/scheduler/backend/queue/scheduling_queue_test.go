@@ -12094,3 +12094,368 @@ func TestPreQueueingHint_MultiProfileNarrowing(t *testing.T) {
 		t.Errorf("expected 0 pods in unschedulable, got %d", got)
 	}
 }
+
+func TestPriorityQueue_InFlightPods(t *testing.T) {
+	pg := st.MakePodGroup().Namespace("ns").Name("pg1").Obj()
+	tests := []struct {
+		name                      string
+		initialPodGroup           *schedulingv1beta1.PodGroup
+		initialPod                *v1.Pod
+		callDropEvents            bool
+		updatePod                 *v1.Pod
+		addPodBeforeDelete        *v1.Pod
+		deletePod                 *v1.Pod
+		overrideRequeuePodWithNew *v1.Pod
+		requeue                   bool
+		wantInQueue               bool
+		wantInFlight              bool
+		wantPodLabelInQueue       map[string]string
+		wantRequeuedPodLabel      map[string]string
+	}{
+		{
+			name:                 "update in-flight pod refreshes pod on requeue",
+			initialPod:           st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "bar").Obj(),
+			updatePod:            st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "baz").Obj(),
+			requeue:              true,
+			wantInQueue:          true,
+			wantInFlight:         false,
+			wantPodLabelInQueue:  map[string]string{"foo": "baz"},
+			wantRequeuedPodLabel: map[string]string{"foo": "baz"},
+		},
+		{
+			name:                      "unupdated in-flight pod does not overwrite newer cached pod on requeue",
+			initialPod:                st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "bar").Obj(),
+			overrideRequeuePodWithNew: st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "from-lister").Obj(),
+			requeue:                   true,
+			wantInQueue:               true,
+			wantInFlight:              false,
+			wantPodLabelInQueue:       map[string]string{"foo": "from-lister"},
+			wantRequeuedPodLabel:      map[string]string{"foo": "from-lister"},
+		},
+		{
+			name:         "delete in-flight pod removes from in-flight",
+			initialPod:   st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			deletePod:    st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			requeue:      false,
+			wantInQueue:  false,
+			wantInFlight: false,
+		},
+		{
+			name:                 "dropInFlightEvents keeps pod in-flight during binding until requeue",
+			initialPod:           st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "bar").Obj(),
+			callDropEvents:       true,
+			updatePod:            st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "baz").Obj(),
+			requeue:              true,
+			wantInQueue:          true,
+			wantInFlight:         false,
+			wantPodLabelInQueue:  map[string]string{"foo": "baz"},
+			wantRequeuedPodLabel: map[string]string{"foo": "baz"},
+		},
+		{
+			name:                 "update in-flight pod group member refreshes pod on requeue",
+			initialPodGroup:      pg,
+			initialPod:           st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Label("foo", "bar").Obj(),
+			updatePod:            st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Label("foo", "baz").Obj(),
+			requeue:              true,
+			wantInQueue:          true,
+			wantInFlight:         false,
+			wantPodLabelInQueue:  map[string]string{"foo": "baz"},
+			wantRequeuedPodLabel: map[string]string{"foo": "baz"},
+		},
+		{
+			name:            "delete in-flight pod group member removes from in-flight",
+			initialPodGroup: pg,
+			initialPod:      st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			deletePod:       st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			requeue:         false,
+			wantInQueue:     false,
+			wantInFlight:    false,
+		},
+		{
+			name:               "delete in-flight pod group member while another member is queued removes from in-flight",
+			initialPodGroup:    pg,
+			initialPod:         st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			callDropEvents:     true,
+			addPodBeforeDelete: st.MakePod().Namespace("ns").Name("p2").UID("p2").PodGroupName("pg1").Obj(),
+			deletePod:          st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Obj(),
+			requeue:            false,
+			wantInQueue:        false,
+			wantInFlight:       false,
+		},
+		{
+			name:                 "dropInFlightEvents keeps pod group member in-flight during binding until requeue",
+			initialPodGroup:      pg,
+			initialPod:           st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Label("foo", "bar").Obj(),
+			callDropEvents:       true,
+			updatePod:            st.MakePod().Namespace("ns").Name("p1").UID("p1").PodGroupName("pg1").Label("foo", "baz").Obj(),
+			requeue:              true,
+			wantInQueue:          true,
+			wantInFlight:         false,
+			wantPodLabelInQueue:  map[string]string{"foo": "baz"},
+			wantRequeuedPodLabel: map[string]string{"foo": "baz"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.initialPodGroup != nil {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			}
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			q := NewTestQueue(ctx, newDefaultQueueSort())
+			if tt.initialPodGroup != nil {
+				q.AddGenericPodGroup(logger, fwk.NewGenericPodGroup(tt.initialPodGroup))
+			}
+			q.Add(ctx, tt.initialPod)
+
+			popped, err := q.Pop(logger)
+			if err != nil {
+				t.Fatalf("Pop failed: %v", err)
+			}
+
+			if tt.callDropEvents {
+				q.DropInFlightEvents(tt.initialPod.UID)
+			}
+			if tt.updatePod != nil {
+				q.Update(ctx, tt.initialPod, tt.updatePod)
+			}
+			if tt.addPodBeforeDelete != nil {
+				// Simulate a pod group finishing its scheduling cycle while p1 is in binding,
+				// allowing newly added p2 to form a queued pod group entity.
+				if pgInfo, ok := popped.(*framework.QueuedPodGroupInfo); ok {
+					if err := q.AddAttemptedPodGroupIfNeeded(logger, pgInfo, q.SchedulingCycle(), fwk.NewStatus(fwk.Success)); err != nil {
+						t.Fatalf("AddAttemptedPodGroupIfNeeded: %v", err)
+					}
+				}
+				q.Add(ctx, tt.addPodBeforeDelete)
+			}
+			if tt.deletePod != nil {
+				q.Delete(logger, tt.deletePod)
+			}
+
+			if tt.requeue {
+				var pInfo *framework.QueuedPodInfo
+				for pi := range popped.ForEachPodInfo() {
+					pInfo = pi
+				}
+				if tt.overrideRequeuePodWithNew != nil {
+					pInfo.PodInfo, _ = framework.NewPodInfo(tt.overrideRequeuePodWithNew)
+				}
+				if err := q.AddUnschedulablePodIfNotPresent(ctx, pInfo, q.SchedulingCycle()); err != nil {
+					t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+				}
+				if pgInfo, ok := popped.(*framework.QueuedPodGroupInfo); ok {
+					if err := q.AddAttemptedPodGroupIfNeeded(logger, pgInfo, q.SchedulingCycle(), fwk.NewStatus(fwk.Unschedulable)); err != nil {
+						t.Fatalf("AddAttemptedPodGroupIfNeeded: %v", err)
+					}
+				}
+				for k, v := range tt.wantRequeuedPodLabel {
+					if pInfo.Pod.Labels[k] != v {
+						t.Fatalf("expected label %s=%s, got %s", k, v, pInfo.Pod.Labels[k])
+					}
+				}
+			}
+
+			if tt.wantInFlight {
+				if q.activeQ.inFlightPod(tt.initialPod.UID) == nil {
+					t.Fatalf("expected pod %s to be in flight", tt.initialPod.UID)
+				}
+			} else {
+				if q.activeQ.inFlightPod(tt.initialPod.UID) != nil {
+					t.Fatalf("expected pod %s not to be in flight", tt.initialPod.UID)
+				}
+			}
+
+			gotPInfo, ok := q.GetPod(ctx, tt.initialPod.Name, tt.initialPod.Namespace, tt.initialPod.Spec.SchedulingGroup)
+			if ok != tt.wantInQueue {
+				t.Fatalf("expected inQueue=%v, got %v", tt.wantInQueue, ok)
+			}
+			if ok {
+				for k, v := range tt.wantPodLabelInQueue {
+					if gotPInfo.Pod.Labels[k] != v {
+						t.Fatalf("expected queue pod label %s=%s, got %s", k, v, gotPInfo.Pod.Labels[k])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestPriorityQueue_MoveAllToActiveOrBackoffQueue_InFlight(t *testing.T) {
+	tests := []struct {
+		name               string
+		initialPods        []*v1.Pod
+		popCount           int
+		callDropEvents     []types.UID
+		clusterEvent       fwk.ClusterEvent
+		wantInFlightEvents int
+	}{
+		{
+			name: "cluster event recorded when pod in scheduling cycle",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			clusterEvent:       framework.EventUnschedulableTimeout,
+			wantInFlightEvents: 2, // 1 marker + 1 cluster event
+		},
+		{
+			name: "cluster event not recorded when pod in binding cycle (dropInFlightEvents called)",
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("ns").Name("p1").UID("p1").Obj(),
+			},
+			popCount:           1,
+			callDropEvents:     []types.UID{"p1"},
+			clusterEvent:       framework.EventUnschedulableTimeout,
+			wantInFlightEvents: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			q := NewTestQueue(ctx, newDefaultQueueSort())
+			for _, pod := range tt.initialPods {
+				q.Add(ctx, pod)
+			}
+			for i := 0; i < tt.popCount; i++ {
+				if _, err := q.Pop(logger); err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+			}
+			for _, uid := range tt.callDropEvents {
+				q.DropInFlightEvents(uid)
+			}
+
+			q.MoveAllToActiveOrBackoffQueue(logger, tt.clusterEvent, nil, nil, nil)
+
+			if got := len(q.activeQ.listInFlightEvents()); got != tt.wantInFlightEvents {
+				t.Fatalf("expected %d in-flight events, got %d", tt.wantInFlightEvents, got)
+			}
+		})
+	}
+}
+
+func TestPriorityQueue_UpdateIfPresent(t *testing.T) {
+	tests := []struct {
+		name               string
+		popBeforeUpdate    bool
+		dropEvents         bool
+		requeueToBackoff   bool
+		wantInFlightLabel  map[string]string
+		wantBackoffLabel   map[string]string
+		wantInActiveQCount int
+		wantInFlightEvents int
+		wantNominated      bool
+	}{
+		{
+			name:               "non-in-flight pod is ignored and not enqueued",
+			popBeforeUpdate:    false,
+			wantInActiveQCount: 0,
+			wantInFlightEvents: 0,
+		},
+		{
+			name:               "in-flight pod before DropInFlightEvents is updated and records events",
+			popBeforeUpdate:    true,
+			dropEvents:         false,
+			wantInFlightLabel:  map[string]string{"foo": "baz"},
+			wantInActiveQCount: 0,
+			wantInFlightEvents: 2, // 1 marker + 1 Pod/Update event
+		},
+		{
+			name:               "in-flight pod after DropInFlightEvents is updated without recording events",
+			popBeforeUpdate:    true,
+			dropEvents:         true,
+			wantInFlightLabel:  map[string]string{"foo": "baz"},
+			wantInActiveQCount: 0,
+			wantInFlightEvents: 0,
+		},
+		{
+			name:               "pod already requeued to backoffQ is updated in place",
+			popBeforeUpdate:    true,
+			dropEvents:         true,
+			requeueToBackoff:   true,
+			wantBackoffLabel:   map[string]string{"foo": "baz"},
+			wantInActiveQCount: 0,
+			wantInFlightEvents: 0,
+			wantNominated:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			initialPod := st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "bar").Obj()
+			updatedPod := st.MakePod().Namespace("ns").Name("p1").UID("p1").Label("foo", "baz").NominatedNodeName("node1").Obj()
+
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{initialPod})
+			if tt.popBeforeUpdate {
+				q.Add(ctx, initialPod)
+				popped, err := q.Pop(logger)
+				if err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+				if tt.dropEvents {
+					q.DropInFlightEvents(initialPod.UID)
+				}
+				if tt.requeueToBackoff {
+					if err := q.AddUnschedulablePodIfNotPresent(ctx, popped.(*framework.QueuedPodInfo), q.SchedulingCycle()); err != nil {
+						t.Fatalf("AddUnschedulablePodIfNotPresent: %v", err)
+					}
+				}
+			}
+
+			q.UpdateIfPresent(ctx, initialPod, updatedPod)
+
+			if got := len(q.PodsInActiveQ()); got != tt.wantInActiveQCount {
+				t.Fatalf("expected %d pods in activeQ, got %d", tt.wantInActiveQCount, got)
+			}
+			inFlightPod := q.InFlightPod(initialPod.UID)
+			if len(tt.wantInFlightLabel) == 0 {
+				if inFlightPod != nil {
+					t.Fatalf("expected no in-flight pod, got %v", inFlightPod)
+				}
+			} else {
+				if inFlightPod == nil {
+					t.Fatalf("expected in-flight pod to exist")
+				}
+				for k, v := range tt.wantInFlightLabel {
+					if inFlightPod.Labels[k] != v {
+						t.Fatalf("expected label %s=%s, got %s", k, v, inFlightPod.Labels[k])
+					}
+				}
+			}
+			backoffPods := q.PodsInBackoffQ()
+			if len(tt.wantBackoffLabel) == 0 {
+				if len(backoffPods) != 0 {
+					t.Fatalf("expected 0 pods in backoffQ, got %d", len(backoffPods))
+				}
+			} else {
+				if len(backoffPods) != 1 {
+					t.Fatalf("expected 1 pod in backoffQ, got %d", len(backoffPods))
+				}
+				for k, v := range tt.wantBackoffLabel {
+					if backoffPods[0].Labels[k] != v {
+						t.Fatalf("expected backoff pod label %s=%s, got %s", k, v, backoffPods[0].Labels[k])
+					}
+				}
+			}
+			if got := len(q.activeQ.listInFlightEvents()); got != tt.wantInFlightEvents {
+				t.Fatalf("expected %d in-flight events, got %d", tt.wantInFlightEvents, got)
+			}
+			gotNominated := len(q.NominatedPodsForNode(logger, "node1")) > 0
+			if gotNominated != tt.wantNominated {
+				t.Fatalf("expected pod nominated=%v, got %v", tt.wantNominated, gotNominated)
+			}
+		})
+	}
+}
