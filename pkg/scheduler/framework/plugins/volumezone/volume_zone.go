@@ -48,9 +48,14 @@ type VolumeZone struct {
 }
 
 var _ fwk.FilterPlugin = &VolumeZone{}
+var _ fwk.NodeLocalFilterPlugin = &VolumeZone{}
 var _ fwk.PreFilterPlugin = &VolumeZone{}
 var _ fwk.EnqueueExtensions = &VolumeZone{}
 var _ fwk.SignPlugin = &VolumeZone{}
+
+func (pl *VolumeZone) IsNodeLocal() bool {
+	return true
+}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.

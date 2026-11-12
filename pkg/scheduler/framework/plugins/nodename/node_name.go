@@ -32,6 +32,7 @@ type NodeName struct{}
 
 var _ fwk.PreFilterPlugin = &NodeName{}
 var _ fwk.FilterPlugin = &NodeName{}
+var _ fwk.NodeLocalFilterPlugin = &NodeName{}
 var _ fwk.EnqueueExtensions = &NodeName{}
 var _ fwk.SignPlugin = &NodeName{}
 
@@ -56,6 +57,10 @@ func (pl *NodeName) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithH
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeName) Name() string {
 	return Name
+}
+
+func (pl *NodeName) IsNodeLocal() bool {
+	return true
 }
 
 // NodeName scoring and feasibility are dependent on the NodeName field.

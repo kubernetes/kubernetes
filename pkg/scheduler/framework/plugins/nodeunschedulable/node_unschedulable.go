@@ -39,8 +39,13 @@ type NodeUnschedulable struct {
 
 var _ fwk.PreFilterPlugin = &NodeUnschedulable{}
 var _ fwk.FilterPlugin = &NodeUnschedulable{}
+var _ fwk.NodeLocalFilterPlugin = &NodeUnschedulable{}
 var _ fwk.EnqueueExtensions = &NodeUnschedulable{}
 var _ fwk.SignPlugin = &NodeUnschedulable{}
+
+func (pl *NodeUnschedulable) IsNodeLocal() bool {
+	return true
+}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.NodeUnschedulable
