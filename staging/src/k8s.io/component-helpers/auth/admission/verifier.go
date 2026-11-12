@@ -38,7 +38,7 @@ import (
 var (
 	// Keep in sync with allowedSigningAlgs in k8s.io/apiserver's OIDC JWT authenticator;
 	// component-helpers cannot import k8s.io/apiserver.
-	// https://github.com/kubernetes/kubernetes/blob/51072aa8e1954f42274dd7b76213f58f7ad7c87d/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc.go#L257-L268
+	// https://github.com/kubernetes/kubernetes/blob/0bf39fd17169a6c933a6cb403c88656cd020aabf/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc.go#L261-L274
 	allowedSigningAlgs = []jose.SignatureAlgorithm{
 		jose.RS256,
 		jose.RS384,
@@ -49,18 +49,17 @@ var (
 		jose.PS256,
 		jose.PS384,
 		jose.PS512,
+		jose.MLDSA44,
+		jose.MLDSA65,
+		jose.MLDSA87,
 	}
-	supportedSigningAlgs = []string{
-		oidc.RS256,
-		oidc.RS384,
-		oidc.RS512,
-		oidc.ES256,
-		oidc.ES384,
-		oidc.ES512,
-		oidc.PS256,
-		oidc.PS384,
-		oidc.PS512,
-	}
+	supportedSigningAlgs = func() []string {
+		algs := make([]string, len(allowedSigningAlgs))
+		for i, alg := range allowedSigningAlgs {
+			algs[i] = string(alg)
+		}
+		return algs
+	}()
 )
 
 type webhookPrivateClaims struct {
