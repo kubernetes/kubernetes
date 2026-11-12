@@ -226,8 +226,14 @@ func TestWatchdogDiagnosticsCancellationDoesNotSummarize(t *testing.T) {
 
 func TestWatchdogDiagnosticsRateLimit(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, true)
-	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
-	client := &mockWatchdogClient{notifyErr: errors.New("socket failed")}
+	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(5)))
+	client := &mockWatchdogClient{
+		notifyAcks: []bool{false, false, false, false},
+		notifyErrors: []error{
+			errors.New("socket failed 1"), errors.New("socket failed 2"),
+			errors.New("socket failed 3"), errors.New("socket failed 4"),
+		},
+	}
 	hc := &healthChecker{watchdog: client, interval: time.Second, retryBackoff: wait.Backoff{Steps: 2}}
 	ctx := klog.NewContext(context.Background(), logger)
 
@@ -240,6 +246,14 @@ func TestWatchdogDiagnosticsRateLimit(t *testing.T) {
 	}
 	if got := strings.Count(logs, "Watchdog notification retries exhausted"); got != 1 {
 		t.Errorf("retry summaries = %d, want 1: %s", got, logs)
+	}
+	if got := strings.Count(logs, "Failed to notify systemd watchdog, retrying"); got != 4 {
+		t.Errorf("verbose retry records = %d, want 4: %s", got, logs)
+	}
+	for _, want := range []string{"socket failed 1", "socket failed 2", "socket failed 3", "socket failed 4"} {
+		if !strings.Contains(logs, want) {
+			t.Errorf("missing retry error %q: %s", want, logs)
+		}
 	}
 	if client.notifyCalls != 4 {
 		t.Errorf("SdNotify calls = %d, want 4", client.notifyCalls)

@@ -173,12 +173,11 @@ func (hc *healthChecker) runOnce(ctx context.Context) {
 		ack, err := hc.watchdog.SdNotify(false)
 		if err != nil {
 			lastNotifyErr = err
+			logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
 			if diagnosticsEnabled {
 				if hc.shouldLogDiagnostic("notify-error") {
 					logger.Error(err, "Watchdog notification failed", "operation", "watchdog_notify", "attempt", attempt, "result", "error", "watchdog_interval", hc.interval)
 				}
-			} else {
-				logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
 			}
 			return false, nil
 		}
