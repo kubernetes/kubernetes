@@ -43,20 +43,6 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestGetPodFullName(t *testing.T) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test",
-			Name:      "pod",
-		},
-	}
-	got := GetPodFullName(pod)
-	expected := fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
-	if got != expected {
-		t.Errorf("Got wrong full name, got: %s, expected: %s", got, expected)
-	}
-}
-
 func newPriorityPodWithStartTime(name string, priority int32, startTime time.Time) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

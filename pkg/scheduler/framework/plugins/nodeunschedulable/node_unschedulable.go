@@ -46,8 +46,6 @@ var _ fwk.SignPlugin = &NodeUnschedulable{}
 const Name = names.NodeUnschedulable
 
 const (
-	// ErrReasonUnknownCondition is used for NodeUnknownCondition predicate error.
-	ErrReasonUnknownCondition = "node(s) had unknown conditions"
 	// ErrReasonUnschedulable is used for NodeUnschedulable predicate error.
 	ErrReasonUnschedulable = "node(s) were unschedulable"
 )
