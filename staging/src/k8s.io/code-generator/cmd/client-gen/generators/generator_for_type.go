@@ -182,14 +182,19 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"timeDuration":              c.Universe.Type(types.Name{Package: "time", Name: "Duration"}),
 		"timeSecond":                c.Universe.Type(types.Name{Package: "time", Name: "Second"}),
 		"applyNewRequest":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/apply", Name: "NewRequest"}),
-		"Client":                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "Client"}),
-		"ClientWithList":            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithList"}),
-		"ClientWithApply":           c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithApply"}),
-		"ClientWithListAndApply":    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithListAndApply"}),
-		"NewClient":                 c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClient"}),
-		"NewClientWithApply":        c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClientWithApply"}),
-		"NewClientWithList":         c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClientWithList"}),
-		"NewClientWithListAndApply": c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClientWithListAndApply"}),
+		"Client":                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "Client"}),
+		"ClientWithList":            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ClientWithList"}),
+		"ClientWithApply":           c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ClientWithApply"}),
+		"ClientWithListAndApply":    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ClientWithListAndApply"}),
+		"NewClient":                 c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClient"}),
+		"NewClientWithApply":        c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClientWithApply"}),
+		"NewClientWithList":         c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClientWithList"}),
+		"NewClientWithListAndApply": c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "NewClientWithListAndApply"}),
+		"ForResource":               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "ForResource"}),
+		"InNamespace":               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "InNamespace"}),
+		"PrefersProtobuf":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "PrefersProtobuf"}),
+		"UsingClient":               c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "UsingClient"}),
+		"UsingParameterCodec":       c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype/v2", Name: "UsingParameterCodec"}),
 	}
 
 	if generateApply {
@@ -357,7 +362,7 @@ func buildSubresourceDefaultVerbTemplates(generateApply bool) map[string]string 
 		"create": `Create(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
 		"list":   `List(ctx $.context|raw$, $.type|private$Name string, opts $.ListOptions|raw$) (*$.resultType|raw$List, error)`,
 		"update": `Update(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
-		"get":    `Get(ctx $.context|raw$, $.type|private$Name string, options $.GetOptions|raw$) (*$.resultType|raw$, error)`,
+		"get":    `Get(ctx $.context|raw$, $.type|private$Name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
 	}
 	if generateApply {
 		m["apply"] = `Apply(ctx $.context|raw$, $.type|private$Name string, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (*$.resultType|raw$, error)`
@@ -445,25 +450,25 @@ var structType = []string{
 	noList | noApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.Client|raw$[*$.resultType|raw$]
+		*$.Client|raw$[$.resultType|raw$, *$.resultType|raw$]
 	}
 	`,
 	withList | noApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.ClientWithList|raw$[*$.resultType|raw$, *$.resultType|raw$List]
+		*$.ClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List, *$.resultType|raw$, *$.resultType|raw$List]
 	}
 	`,
 	noList | withApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.ClientWithApply|raw$[*$.resultType|raw$, *$.inputApplyConfig|raw$]
+		*$.ClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$, *$.resultType|raw$, *$.inputApplyConfig|raw$]
 	}
 	`,
 	withList | withApply: `
 	// $.type|privatePlural$ implements $.type|public$Interface
 	type $.type|privatePlural$ struct {
-		*$.ClientWithListAndApply|raw$[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$]
+		*$.ClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$, *$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$]
 	}
 	`,
 }
@@ -475,13 +480,12 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClient|raw$[*$.resultType|raw$](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				namespace,
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClient|raw$[$.resultType|raw$](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$.InNamespace|raw$(namespace),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -490,13 +494,12 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithApply|raw$[*$.resultType|raw$, *$.inputApplyConfig|raw$](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				namespace,
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$.InNamespace|raw$(namespace),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -505,14 +508,12 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithList|raw$[*$.resultType|raw$, *$.resultType|raw$List](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				namespace,
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				func() *$.resultType|raw$List { return &$.resultType|raw$List{} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$.InNamespace|raw$(namespace),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -521,14 +522,12 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithListAndApply|raw$[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				namespace,
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				func() *$.resultType|raw$List { return &$.resultType|raw$List{} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$.InNamespace|raw$(namespace),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -537,13 +536,11 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClient|raw$[*$.resultType|raw$](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				"",
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClient|raw$[$.resultType|raw$](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -552,13 +549,11 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithApply|raw$[*$.resultType|raw$, *$.inputApplyConfig|raw$](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				"",
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClientWithApply|raw$[$.resultType|raw$, $.inputApplyConfig|raw$](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -567,14 +562,11 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithList|raw$[*$.resultType|raw$, *$.resultType|raw$List](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				"",
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				func() *$.resultType|raw$List { return &$.resultType|raw$List{} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClientWithList|raw$[$.resultType|raw$, $.resultType|raw$List](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -583,14 +575,11 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			$.NewClientWithListAndApply|raw$[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
-				"$.type|resource$",
-				c.RESTClient(),
-				$.schemeParameterCodec|raw$,
-				"",
-				func() *$.resultType|raw$ { return &$.resultType|raw${} },
-				func() *$.resultType|raw$List { return &$.resultType|raw$List{} },
-				$if .prefersProtobuf$gentype.PrefersProtobuf[*$.resultType|raw$](),$end$
+			$.NewClientWithListAndApply|raw$[$.resultType|raw$, $.resultType|raw$List, $.inputApplyConfig|raw$](
+				$.ForResource|raw$("$.type|resource$"),
+				$.UsingClient|raw$(c.RESTClient()),
+				$.UsingParameterCodec|raw$($.schemeParameterCodec|raw$),
+				$if .prefersProtobuf$$.PrefersProtobuf|raw$(),$end$
 			),
 		}
 	}
@@ -641,14 +630,14 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name 
 
 var getTemplate = `
 // $.verb$ takes name of the $.type|private$, and returns the corresponding $.resultType|private$ object, and an error if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, opts $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Get().
 		$if .prefersProtobuf$UseProtobufAsDefault().$end$
 		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name(name).
-		VersionedParams(&options, $.schemeParameterCodec|raw$).
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Do(ctx).
 		Into(result)
 	return
@@ -657,7 +646,7 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, name string, options
 
 var getSubresourceTemplate = `
 // $.verb$ takes name of the $.type|private$, and returns the corresponding $.resultType|raw$ object, and an error if there is any.
-func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
+func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name string, opts $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.GetClient().Get().
 		$if .prefersProtobuf$UseProtobufAsDefault().$end$
@@ -665,7 +654,7 @@ func (c *$.type|privatePlural$) $.verb$(ctx $.context|raw$, $.type|private$Name 
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
-		VersionedParams(&options, $.schemeParameterCodec|raw$).
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Do(ctx).
 		Into(result)
 	return
