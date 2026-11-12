@@ -94,34 +94,76 @@ func (m *mockWatchdogClient) SdNotify(unsetEnvironment bool) (bool, error) {
 	return m.notifyAck, m.notifyErr
 }
 
-func TestWatchdogDiagnosticsNotifyRetrySuccess(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, true)
-	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
-	client := &mockWatchdogClient{notifyAcks: []bool{false, true}, notifyErrors: []error{errors.New("temporary failure"), nil}}
-	hc := &healthChecker{watchdog: client, interval: time.Second, retryBackoff: wait.Backoff{Steps: 2}}
-
-	hc.runOnce(klog.NewContext(context.Background(), logger))
-
-	if client.notifyCalls != 2 {
-		t.Errorf("SdNotify calls = %d, want 2", client.notifyCalls)
+func TestWatchdogDiagnosticsNotify(t *testing.T) {
+	tests := []struct {
+		name               string
+		diagnosticsEnabled bool
+		client             mockWatchdogClient
+		wantCalls          int
+		wantLogs           []string
+		unwantedLogs       []string
+		wantSummaryCount   int
+	}{
+		{
+			name:               "retry succeeds",
+			diagnosticsEnabled: true,
+			client: mockWatchdogClient{
+				notifyAcks:   []bool{false, true},
+				notifyErrors: []error{errors.New("temporary failure"), nil},
+			},
+			wantCalls: 2,
+			wantLogs:  []string{"temporary failure"},
+		},
+		{
+			name:               "notification unsupported",
+			diagnosticsEnabled: true,
+			wantCalls:          1,
+			wantLogs:           []string{"notification not supported"},
+		},
+		{
+			name:         "diagnostics disabled",
+			client:       mockWatchdogClient{notifyErr: errors.New("socket failed")},
+			wantCalls:    2,
+			wantLogs:     []string{"Failed to notify watchdog"},
+			unwantedLogs: []string{"operation="},
+		},
+		{
+			name:               "retries exhausted",
+			diagnosticsEnabled: true,
+			client:             mockWatchdogClient{notifyErr: errors.New("socket failed")},
+			wantCalls:          2,
+			wantLogs:           []string{"operation=\"watchdog_notify\"", "attempt=1", "socket failed", "attempts=2"},
+			wantSummaryCount:   1,
+		},
 	}
-	logs := logger.GetSink().(klogtesting.Underlier).GetBuffer().String()
-	if !strings.Contains(logs, "temporary failure") || strings.Contains(logs, "retry_exhausted") {
-		t.Errorf("unexpected retry diagnostics: %s", logs)
-	}
-}
 
-func TestWatchdogDiagnosticsUnsupportedNotification(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, true)
-	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
-	client := &mockWatchdogClient{}
-	hc := &healthChecker{watchdog: client, interval: time.Second, retryBackoff: wait.Backoff{Steps: 2}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, tt.diagnosticsEnabled)
+			logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
+			client := tt.client
+			hc := &healthChecker{watchdog: &client, interval: time.Second, retryBackoff: wait.Backoff{Steps: 2}}
 
-	hc.runOnce(klog.NewContext(context.Background(), logger))
+			hc.runOnce(klog.NewContext(context.Background(), logger))
 
-	logs := logger.GetSink().(klogtesting.Underlier).GetBuffer().String()
-	if client.notifyCalls != 1 || !strings.Contains(logs, "notification not supported") || strings.Contains(logs, "retry_exhausted") {
-		t.Errorf("unsupported notification changed behavior: calls=%d logs=%s", client.notifyCalls, logs)
+			if client.notifyCalls != tt.wantCalls {
+				t.Errorf("SdNotify calls = %d, want %d", client.notifyCalls, tt.wantCalls)
+			}
+			logs := logger.GetSink().(klogtesting.Underlier).GetBuffer().String()
+			for _, want := range tt.wantLogs {
+				if !strings.Contains(logs, want) {
+					t.Errorf("expected %q in logs: %s", want, logs)
+				}
+			}
+			for _, unwanted := range tt.unwantedLogs {
+				if strings.Contains(logs, unwanted) {
+					t.Errorf("unexpected %q in logs: %s", unwanted, logs)
+				}
+			}
+			if got := strings.Count(logs, "result=\"retry_exhausted\""); got != tt.wantSummaryCount {
+				t.Errorf("retry summaries = %d, want %d: %s", got, tt.wantSummaryCount, logs)
+			}
+		})
 	}
 }
 
@@ -150,20 +192,6 @@ func TestWatchdogDiagnosticsGateToggle(t *testing.T) {
 	}
 }
 
-func TestWatchdogDiagnosticsDisabledNotify(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, false)
-	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
-	client := &mockWatchdogClient{notifyErr: errors.New("socket failed")}
-	hc := &healthChecker{watchdog: client, interval: time.Second, retryBackoff: wait.Backoff{Steps: 2}}
-
-	hc.runOnce(klog.NewContext(context.Background(), logger))
-
-	logs := logger.GetSink().(klogtesting.Underlier).GetBuffer().String()
-	if client.notifyCalls != 2 || !strings.Contains(logs, "Failed to notify watchdog") || strings.Contains(logs, "operation=") {
-		t.Errorf("gate-off behavior changed: calls=%d logs=%s", client.notifyCalls, logs)
-	}
-}
-
 func TestWatchdogDiagnosticsCheckerRateLimit(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, true)
 	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
@@ -183,28 +211,6 @@ func TestWatchdogDiagnosticsCheckerRateLimit(t *testing.T) {
 	}
 	if client.notifyCalls != 0 {
 		t.Errorf("SdNotify calls = %d, want 0", client.notifyCalls)
-	}
-}
-
-func TestWatchdogDiagnosticsNotifyExhausted(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletWatchdogDiagnostics, true)
-	logger := klogtesting.NewLogger(t, klogtesting.NewConfig(klogtesting.BufferLogs(true), klogtesting.Verbosity(0)))
-	client := &mockWatchdogClient{notifyErr: errors.New("socket failed")}
-	hc := &healthChecker{watchdog: client, interval: time.Second, retryBackoff: wait.Backoff{Steps: 2}}
-
-	hc.runOnce(klog.NewContext(context.Background(), logger))
-
-	if client.notifyCalls != 2 {
-		t.Errorf("SdNotify calls = %d, want 2", client.notifyCalls)
-	}
-	logs := logger.GetSink().(klogtesting.Underlier).GetBuffer().String()
-	for _, want := range []string{"operation=\"watchdog_notify\"", "attempt=1", "socket failed", "result=\"retry_exhausted\"", "attempts=2"} {
-		if !strings.Contains(logs, want) {
-			t.Errorf("expected %q in logs: %s", want, logs)
-		}
-	}
-	if got := strings.Count(logs, "result=\"retry_exhausted\""); got != 1 {
-		t.Errorf("retry summaries = %d, want 1: %s", got, logs)
 	}
 }
 
