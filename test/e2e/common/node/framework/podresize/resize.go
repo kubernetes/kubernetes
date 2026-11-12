@@ -78,6 +78,27 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	return tc
 }
 
+func makeResizableInitContainer(tcInfo ResizableContainerInfo) v1.Container {
+	resizePol := getTestResizePolicy(tcInfo)
+	if tcInfo.RestartPolicy == v1.ContainerRestartPolicyAlways {
+		cmdSidecar := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+		tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmdSidecar)
+		tc.ResizePolicy = resizePol
+		if tcInfo.RestartPolicy != "" {
+			tc.RestartPolicy = &tcInfo.RestartPolicy
+		}
+		return tc
+	} else {
+		cmd := "grep Cpus_allowed_list /proc/self/status"
+		tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmd)
+		tc.ResizePolicy = resizePol
+		if tcInfo.RestartPolicy != "" {
+			tc.RestartPolicy = &tcInfo.RestartPolicy
+		}
+		return tc
+	}
+}
+
 func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo, podResources *v1.ResourceRequirements) *v1.Pod {
 	testInitContainers, testContainers := separateContainers(tcInfo)
 
@@ -111,10 +132,11 @@ func separateContainers(tcInfo []ResizableContainerInfo) ([]v1.Container, []v1.C
 	var initContainers, containers []v1.Container
 
 	for _, ci := range tcInfo {
-		tc := makeResizableContainer(ci)
 		if ci.InitCtr {
+			tc := makeResizableInitContainer(ci)
 			initContainers = append(initContainers, tc)
 		} else {
+			tc := makeResizableContainer(ci)
 			containers = append(containers, tc)
 		}
 	}
