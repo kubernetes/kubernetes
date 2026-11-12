@@ -42,6 +42,7 @@ func (kl *Kubelet) discoverNodeDeclaredFeatures() []string {
 	if features := kl.runtimeState.runtimeFeatures(); features != nil {
 		runtimeFeatures.UserNamespacesHostNetwork = features.UserNamespacesHostNetwork
 		runtimeFeatures.MountOptions = features.MountOptions
+		runtimeFeatures.ContainerUlimits = features.ContainerUlimits
 	}
 
 	cfg := &nodedeclaredfeatures.NodeConfiguration{

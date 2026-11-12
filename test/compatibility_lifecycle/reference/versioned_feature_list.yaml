@@ -286,6 +286,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.38"
+- name: ContainerUlimits
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: ContextualLogging
   versionedSpecs:
   - default: false

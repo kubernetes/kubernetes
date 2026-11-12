@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/containerulimits"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
@@ -33,6 +34,7 @@ import (
 // New features are added to this list to be automatically included in both
 // discovery and inference logic.
 var AllFeatures = []types.Feature{
+	containerulimits.Feature,
 	restartallcontainers.Feature,
 	inplacepodresize.PodLevelResourcesResizeFeature,
 	extendwebsocketstokubelet.Feature,
