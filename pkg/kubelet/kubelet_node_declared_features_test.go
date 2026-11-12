@@ -28,6 +28,7 @@ import (
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 func TestDeclaredFeatureDiscovery(t *testing.T) {
@@ -110,4 +111,34 @@ func TestExtendWebSocketsToKubeletFeatureDiscovery(t *testing.T) {
 	// ExtendWebSocketsToKubelet is GA and locked on, so the kubelet always declares it.
 	features := kubelet.discoverNodeDeclaredFeatures()
 	assert.Contains(t, features, "ExtendWebSocketsToKubelet")
+}
+
+func TestCgroupNamespacesSupportFeatureDiscovery(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		gateEnabled bool
+		handlers    []kubecontainer.RuntimeHandler
+		expected    bool
+	}{
+		{name: "gate disabled", gateEnabled: false, handlers: []kubecontainer.RuntimeHandler{{Name: "", SupportsCgroupNamespaces: true}}, expected: false},
+		{name: "default handler supports cgroupns", gateEnabled: true, handlers: []kubecontainer.RuntimeHandler{{Name: "", SupportsCgroupNamespaces: true}}, expected: true},
+		{name: "only a non-default handler supports cgroupns", gateEnabled: true, handlers: []kubecontainer.RuntimeHandler{{Name: ""}, {Name: "other", SupportsCgroupNamespaces: true}}, expected: false},
+		{name: "runtime does not report handlers", gateEnabled: true, handlers: nil, expected: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CgroupNamespacesSupport, tc.gateEnabled)
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			kubelet.nodeDeclaredFeaturesFramework = ndf.New(ndffeatures.AllFeatures)
+			kubelet.runtimeState.setRuntimeHandlers(tc.handlers)
+
+			declared := kubelet.discoverNodeDeclaredFeatures()
+			if tc.expected {
+				assert.Contains(t, declared, "CgroupNamespacesSupport")
+			} else {
+				assert.NotContains(t, declared, "CgroupNamespacesSupport")
+			}
+		})
+	}
 }

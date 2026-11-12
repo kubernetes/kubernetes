@@ -1127,6 +1127,7 @@ func NewMainKubelet(ctx context.Context,
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
 		if status, err := klet.containerRuntime.Status(ctx); err == nil && status != nil {
 			klet.runtimeState.setRuntimeFeatures(status.Features)
+			klet.runtimeState.setRuntimeHandlers(status.Handlers)
 		} else if err != nil {
 			logger.V(4).Info("Unable to prefetch container runtime features for node declared features", "err", err)
 		}

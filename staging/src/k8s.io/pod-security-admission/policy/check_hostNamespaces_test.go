@@ -39,6 +39,29 @@ func TestHostNamespaces(t *testing.T) {
 			expectReason: `host namespaces`,
 			expectDetail: `hostNetwork=true, hostPID=true, hostIPC=true`,
 		},
+		{
+			name: "host cgroup namespace",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{{Name: "a", HostCgroupNamespace: new(true)}},
+				Containers: []corev1.Container{
+					{Name: "b", HostCgroupNamespace: new(false)},
+					{Name: "c", HostCgroupNamespace: new(true)},
+					{Name: "d"},
+				},
+				EphemeralContainers: []corev1.EphemeralContainer{{EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "e", HostCgroupNamespace: new(true)}}},
+			}},
+			expectReason: `host namespaces`,
+			expectDetail: `containers "a", "c", "e" must not set hostCgroupNamespace=true`,
+		},
+		{
+			name: "host network and host cgroup namespace",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				HostNetwork: true,
+				Containers:  []corev1.Container{{Name: "a", HostCgroupNamespace: new(true)}},
+			}},
+			expectReason: `host namespaces`,
+			expectDetail: `hostNetwork=true, container "a" must not set hostCgroupNamespace=true`,
+		},
 	}
 
 	for _, tc := range tests {
