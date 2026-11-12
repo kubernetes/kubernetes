@@ -5570,9 +5570,9 @@ func TestGetPodScopedExtraNodeAllocatableResourcesRequests(t *testing.T) {
 			expected:      v1.ResourceList{},
 		},
 		{
-			description: "init container counts at its peak",
+			description: "non-restartable init container entry does not count",
 			pod:         initContainerPod,
-			expected:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
+			expected:    v1.ResourceList{v1.ResourceCPU: resource.MustParse("2500m")},
 		},
 	}
 

@@ -621,16 +621,23 @@ func GetExtraNodeAllocatableResourcesRequests(pod *v1.Pod, containerName string)
 }
 
 // GetPodScopedExtraNodeAllocatableResourcesRequests returns the pod-scoped requests of the
-// pod.Status.ExtraNodeAllocatableResources: charged once for the pod and shared by the containers that can access
-// them (for DRA, the mapping and perPod overhead). If containerName is empty, it returns all of them: the requests
-// of the pod level entry minus the container entries' requests, aggregated like container requests. Otherwise it
-// returns the ones that the container can access: the limits of its entry minus its requests.
+// pod.Status.ExtraNodeAllocatableResources. They are charged once for the pod and shared by the containers that
+// can access them, for example the DRA mapping and perPod overhead. If containerName is empty, it returns the
+// requests of the pod level entry minus the requests of the regular and sidecar container entries. Otherwise it
+// returns the limits of the container entry minus its requests, which is the pod-scoped part the container can
+// access.
 func GetPodScopedExtraNodeAllocatableResourcesRequests(pod *v1.Pod, containerName string) v1.ResourceList {
 	if containerName == "" {
 		containerRequests := map[string]v1.ResourceList{}
 		for _, res := range pod.Status.ExtraNodeAllocatableResources {
 			if res.ContainerName != "" {
 				containerRequests[res.ContainerName] = res.Requests
+			}
+		}
+		// The pod level entry does not cover non-restartable init containers.
+		for i := range pod.Spec.InitContainers {
+			if !isRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+				delete(containerRequests, pod.Spec.InitContainers[i].Name)
 			}
 		}
 		podRequests := getExtraNodeAllocatableResources(pod, "").Requests

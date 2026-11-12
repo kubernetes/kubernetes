@@ -6311,14 +6311,18 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 		return allErrs
 	}
 	containerNames := sets.New[string]()
+	nonRestartableInitContainers := sets.New[string]()
 	for _, c := range podSpec.InitContainers {
 		containerNames.Insert(c.Name)
+		if c.RestartPolicy == nil || *c.RestartPolicy != core.ContainerRestartPolicyAlways {
+			nonRestartableInitContainers.Insert(c.Name)
+		}
 	}
 	for _, c := range podSpec.Containers {
 		containerNames.Insert(c.Name)
 	}
 
-	containerRequests := map[string]v1.ResourceList{}
+	containerRequests := core.ResourceList{}
 	podEntryIndex := -1
 	for i, res := range entries {
 		idxPath := fldPath.Index(i)
@@ -6329,15 +6333,18 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("requests").Key(string(name)), request.String(), fmt.Sprintf("must be less than or equal to %s limit of %s", name, limit.String())))
 			}
 		}
-		requests := v1.ResourceList{}
-		for name, request := range res.Requests {
-			requests[v1.ResourceName(name)] = request
-		}
 		switch {
 		case res.ContainerName == "":
 			podEntryIndex = i
 		case containerNames.Has(res.ContainerName):
-			containerRequests[res.ContainerName] = requests
+			// The pod level entry does not have to cover non restartable init container entries, because the regular containers may already cover them.
+			if !nonRestartableInitContainers.Has(res.ContainerName) {
+				for name, request := range res.Requests {
+					sum := containerRequests[name]
+					sum.Add(request)
+					containerRequests[name] = sum
+				}
+			}
 		default:
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerName"), res.ContainerName, "must be empty or match the name of an entry in `spec.initContainers` or `spec.containers`"))
 		}
@@ -6348,7 +6355,7 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 	podEntry := entries[podEntryIndex]
 
 	for i, res := range entries {
-		if res.ContainerName == "" {
+		if res.ContainerName == "" || nonRestartableInitContainers.Has(res.ContainerName) {
 			continue
 		}
 		for name, limit := range res.Limits {
@@ -6358,15 +6365,9 @@ func validateExtraNodeAllocatableResources(podStatus core.PodStatus, podSpec *co
 		}
 	}
 
-	// The container entries' requests are aggregated like container requests, which needs the
-	// init container order and restart policies from the spec.
-	v1Pod := &v1.Pod{}
-	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(podSpec, &v1Pod.Spec, nil); err != nil {
-		return append(allErrs, field.InternalError(fldPath, err))
-	}
-	for name, aggr := range resourcehelper.AggregateContainerRequestsFromSource(v1Pod, containerRequests) {
-		if podRequest := podEntry.Requests[core.ResourceName(name)]; aggr.Cmp(podRequest) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(podEntryIndex).Child("requests").Key(string(name)), podRequest.String(), fmt.Sprintf("must be greater than or equal to the aggregate requests of the container entries (%s)", aggr.String())))
+	for name, sum := range containerRequests {
+		if podRequest := podEntry.Requests[name]; sum.Cmp(podRequest) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(podEntryIndex).Child("requests").Key(string(name)), podRequest.String(), fmt.Sprintf("must be greater than or equal to the aggregate requests of the container entries (%s)", sum.String())))
 		}
 	}
 	return allErrs

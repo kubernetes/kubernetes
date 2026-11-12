@@ -620,8 +620,8 @@ func TestResourceConfigForPod(t *testing.T) {
 					ExtraNodeAllocatableResources: []v1.ExtraNodeAllocatableResource{
 						{
 							ContainerName: "",
-							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
-							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("300Mi")},
+							Requests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("1500m"), v1.ResourceMemory: resource.MustParse("200Mi")},
+							Limits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("1500m"), v1.ResourceMemory: resource.MustParse("200Mi")},
 						},
 						{
 							ContainerName: "ic1",
@@ -634,16 +634,18 @@ func TestResourceConfigForPod(t *testing.T) {
 			draNodeAllocatableResourcesEnabled: true,
 			enforceCPULimits:                   true,
 			quotaPeriod:                        defaultQuotaPeriod,
-			// The init container is the claim's only reference, so its PerContainer overhead counts
-			// only toward the init phase peak, which wins every resource here:
-			// CPUShares: max(c1 request (1), ic1 request (0.5) + PerContainer (2)) = 2.5 CPUs
-			// CPUQuota: max(c1 limit (2), ic1 limit (1) + PerContainer (2)) = 3 CPUs
-			// Memory: max(c1 limit (400), ic1 limit (200) + PerContainer (300)) = 500 Mi
+			// The pod level entry has what ic1's PerContainer overhead (2 CPUs, 300Mi) adds to the peak of
+			// the spec requests, in its requests and limits:
+			// max(c1 (1), ic1 (0.5) + 2) - max(c1 (1), ic1 (0.5)) = 1.5 CPUs
+			// max(c1 (200), ic1 (100) + 300) - max(c1 (200), ic1 (100)) = 200 Mi
+			// CPUShares: max(c1 request (1), ic1 request (0.5)) + 1.5 = 2.5 CPUs
+			// CPUQuota: max(c1 limit (2), ic1 limit (1)) + 1.5 = 3.5 CPUs
+			// Memory: max(c1 limit (400), ic1 limit (200)) + 200 = 600 Mi
 			expected: &ResourceConfig{
 				CPUShares: new(MilliCPUToShares(2500)),
-				CPUQuota:  new(MilliCPUToQuota(3000, int64(defaultQuotaPeriod))),
+				CPUQuota:  new(MilliCPUToQuota(3500, int64(defaultQuotaPeriod))),
 				CPUPeriod: &defaultQuotaPeriod,
-				Memory:    new(500 * Mi),
+				Memory:    new(600 * Mi),
 			},
 		},
 		{

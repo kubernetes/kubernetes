@@ -1695,6 +1695,114 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 			},
 		},
 		{
+			name: "Init container overhead within the peak of the spec",
+			pod: func() *v1.Pod {
+				pod := st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+					Containers([]v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					}}}).
+					Obj()
+				pod.Spec.InitContainers = []v1.Container{{Name: "init", Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Claims:   []v1.ResourceClaim{{Name: "claim1"}},
+				}}}
+				return pod
+			}(),
+			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: apiSlices(makeSlice("slice1", gpuDevicePerContainerMemory("gpu0"))),
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "gpu0"),
+			},
+			// init needs 1Gi + 1Gi and c1 needs 2Gi, so the init container's overhead does not raise the
+			// peak of the spec and the pod level entry is zero.
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("0")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("0")},
+				},
+				{
+					ContainerName: "init",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
+		},
+		{
+			name: "Init container overhead above the peak of the spec requests and limits",
+			pod: func() *v1.Pod {
+				pod := st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+					Containers([]v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					}}}).
+					Obj()
+				pod.Spec.InitContainers = []v1.Container{{Name: "init", Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					Claims:   []v1.ResourceClaim{{Name: "claim1"}},
+				}}}
+				return pod
+			}(),
+			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: apiSlices(makeSlice("slice1", gpuDevicePerContainerMemory("gpu0"))),
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "gpu0"),
+			},
+			// The spec requests peak at c1 (1Gi) and the spec limits at init (2Gi). The overhead raises
+			// the peak of the requests by 512Mi (512Mi + 1Gi) and of the limits by 1Gi (2Gi + 1Gi).
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+				{
+					ContainerName: "init",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
+		},
+		{
+			name: "Regular container overhead within the peak of the init container spec",
+			pod: func() *v1.Pod {
+				pod := st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").
+					Containers([]v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+						Claims:   []v1.ResourceClaim{{Name: "claim1"}},
+					}}}).
+					Obj()
+				pod.Spec.InitContainers = []v1.Container{{Name: "init", Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+					Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("4Gi")},
+				}}}
+				return pod
+			}(),
+			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},
+			resourceSlices: apiSlices(makeSlice("slice1", gpuDevicePerContainerMemory("gpu0"))),
+			nodeAllocatableClaimAllocations: map[v1.ObjectReference]*resourceapi.AllocationResult{
+				{Name: "claim1", UID: "claim1-uid"}: allocResult("pool1", "gpu0"),
+			},
+			// The init container's spec (4Gi) already covers c1 with its overhead (2Gi), but the pod
+			// level entry must still cover the entry of the regular container.
+			want: []v1.ExtraNodeAllocatableResource{
+				{
+					ContainerName: "",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+				{
+					ContainerName: "c1",
+					Requests:      v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					Limits:        v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
+		},
+		{
 			name:           "Invalid - Negative ConsumedCapacity",
 			pod:            st.MakePod().Name("test-pod").Namespace(claimNameSpace).UID("test-uid").Containers([]v1.Container{{Name: "c1", Resources: v1.ResourceRequirements{Claims: []v1.ResourceClaim{{Name: "claim1"}}}}}).Obj(),
 			claims:         []*resourceapi.ResourceClaim{makeClaim("claim1", "claim1-uid")},

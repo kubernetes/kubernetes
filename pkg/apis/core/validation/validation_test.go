@@ -17194,18 +17194,18 @@ func TestValidateExtraNodeAllocatableResources(t *testing.T) {
 				{ContainerName: "c2", Requests: resources("memory", "512Mi"), Limits: resources("cpu", "8", "memory", "1536Mi")},
 			},
 		},
-		"init container requests count at their peak": {
-			// The init container finishes before c1 starts: max(2Gi, 1Gi), not 3Gi.
+		"pod level entry does not have to cover the init container entry": {
+			// The init container finishes before c1 starts, so the spec of c1 may already cover it.
 			entries: []core.ExtraNodeAllocatableResource{
-				{Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
+				{Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 				{ContainerName: "init", Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
 				{ContainerName: "c1", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 			},
 		},
-		"sidecar requests count with the init container started after it": {
-			// max(sidecar + init, sidecar + c1) = max(3Gi, 2Gi).
+		"sidecar requests add to the regular container requests": {
+			// sidecar + c1 = 2Gi. The init container entry does not count.
 			entries: []core.ExtraNodeAllocatableResource{
-				{Requests: resources("memory", "3Gi"), Limits: resources("memory", "3Gi")},
+				{Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
 				{ContainerName: "sidecar", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 				{ContainerName: "init", Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
 				{ContainerName: "c1", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
@@ -17213,12 +17213,13 @@ func TestValidateExtraNodeAllocatableResources(t *testing.T) {
 		},
 		"aggregate container requests with a sidecar exceed the pod level requests": {
 			entries: []core.ExtraNodeAllocatableResource{
-				{Requests: resources("memory", "2Gi"), Limits: resources("memory", "3Gi")},
+				{Requests: resources("memory", "1Gi"), Limits: resources("memory", "3Gi")},
 				{ContainerName: "sidecar", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 				{ContainerName: "init", Requests: resources("memory", "2Gi"), Limits: resources("memory", "2Gi")},
+				{ContainerName: "c1", Requests: resources("memory", "1Gi"), Limits: resources("memory", "1Gi")},
 			},
 			wantErrs: field.ErrorList{
-				field.Invalid(fldPath.Index(0).Child("requests").Key("memory"), "2Gi", "must be greater than or equal to the aggregate requests of the container entries (3Gi)"),
+				field.Invalid(fldPath.Index(0).Child("requests").Key("memory"), "1Gi", "must be greater than or equal to the aggregate requests of the container entries (2Gi)"),
 			},
 		},
 		"aggregate requests of regular containers exceed the pod level requests": {

@@ -339,7 +339,15 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 	}
 
 	var containerEntries []v1.ExtraNodeAllocatableResource
-	for container := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+	specRequests := make(map[string]v1.ResourceList)
+	specLimits := make(map[string]v1.ResourceList)
+	persistentRequests := v1.ResourceList{}
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		specRequests[container.Name] = container.Resources.Requests
+		specLimits[container.Name] = container.Resources.Limits
+		if containerType == podutil.Containers || podutil.IsRestartableInitContainer(container) {
+			addResourceList(persistentRequests, containerRequests[container.Name])
+		}
 		limits := containerLimits[container.Name]
 		if len(limits) > 0 {
 			entry := v1.ExtraNodeAllocatableResource{ContainerName: container.Name, Limits: limits}
@@ -349,16 +357,64 @@ func (pl *DynamicResources) buildNodeAllocatableDRAInfo(pod *v1.Pod, nodeAllocat
 			containerEntries = append(containerEntries, entry)
 		}
 	}
-	// The pod entry has the pod contribution of each group once, plus the container's requests
-	// with init containers at their peak.
-	podRequests := resourcehelper.AggregateContainerRequestsFromSource(pod, containerRequests)
+	// Components reading extra resources add the pod level entry to the peak computed from the spec (considering
+	// init, sidecar and regular containers). We end up overcounting if we calculate the pod foot print as
+	// peak(spec) + peak(extra resources).
+	// For example,
+	//	                init   c1    peak
+	//	spec            1Gi    2Gi   2Gi
+	//	extra resources 2Gi    0Gi   2Gi
+	// peak(spec) + peak(extra resources) is 4Gi, while the real peak of the pod is 3Gi.
+	// So the pod level entry is peak(spec + extra resources) - peak(spec) = 1Gi, because the spec can
+	// subsume part of the init containerextra resources.
+	//
+	// TODO: Consider moving this logic to k8s.io/component-helpers/resource if other scheduler plugins write
+	// extraNodeAllocatableResources.
+	// TODO(pravk03): The pod level entry depends on the spec when non-restartable init containers have
+	// perContainer overhead, and it is not recomputed when a container is resized. The resize only matters
+	// when an init container needs more than the regular containers.
+	podRequests := peakIncrease(pod, specRequests, containerRequests)
+	podLimits := peakIncrease(pod, specLimits, containerRequests)
+	for name, request := range podRequests {
+		if persistent := persistentRequests[name]; persistent.Cmp(request) > 0 {
+			request = persistent
+			podRequests[name] = request
+		}
+		if limit := podLimits[name]; request.Cmp(limit) > 0 {
+			podLimits[name] = request
+		}
+	}
+	// The pod entry has the pod contribution of each group once.
 	addResourceList(podRequests, podContributions)
-	if len(podRequests) == 0 {
+	addResourceList(podLimits, podContributions)
+	if len(podLimits) == 0 {
 		return []v1.ExtraNodeAllocatableResource{}, nil
 	}
 
-	podEntry := v1.ExtraNodeAllocatableResource{Requests: podRequests, Limits: podRequests.DeepCopy()}
-	return append([]v1.ExtraNodeAllocatableResource{podEntry}, containerEntries...), nil
+	podLevelEntry := v1.ExtraNodeAllocatableResource{Requests: podRequests, Limits: podLimits}
+	return append([]v1.ExtraNodeAllocatableResource{podLevelEntry}, containerEntries...), nil
+}
+
+// peakIncrease returns how much adding the container entries to spec raises the peak that
+// AggregateContainerRequestsFromSource computes from spec, for each resource of the entries.
+func peakIncrease(pod *v1.Pod, specRes, contianerExtraRes map[string]v1.ResourceList) v1.ResourceList {
+	total := make(map[string]v1.ResourceList, len(specRes))
+	for name := range specRes {
+		total[name] = v1.ResourceList{}
+		addResourceList(total[name], specRes[name])
+		addResourceList(total[name], contianerExtraRes[name])
+	}
+	specPeak := resourcehelper.AggregateContainerRequestsFromSource(pod, specRes)
+	totalPeak := resourcehelper.AggregateContainerRequestsFromSource(pod, total)
+	increase := v1.ResourceList{}
+	for _, resources := range contianerExtraRes {
+		for name := range resources {
+			q := totalPeak[name]
+			q.Sub(specPeak[name])
+			increase[name] = q
+		}
+	}
+	return increase
 }
 
 // validateNodeAllocatableDRAClaimSharing ensures that a node-allocatable DRA claim is not already in use by another pod on this node.
