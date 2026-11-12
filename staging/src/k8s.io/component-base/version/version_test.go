@@ -68,8 +68,8 @@ func TestFormatVersion(t *testing.T) {
 	const hash = "69a8e1ff31556386089beebee70216693c229c10"
 
 	for name, tc := range map[string]struct {
-		commit, treeState, mainVersion string
-		expect                         string
+		override, commit, treeState, mainVersion string
+		expect                                   string
 	}{
 		"clean":               {commit: hash, treeState: "clean", expect: base + "+69a8e1ff315563"},
 		"dirty":               {commit: hash, treeState: "dirty", expect: base + "+69a8e1ff315563-dirty"},
@@ -81,10 +81,11 @@ func TestFormatVersion(t *testing.T) {
 		"tagged-dirty":        {commit: hash, treeState: "dirty", mainVersion: base + "+dirty", expect: base + "+69a8e1ff315563-dirty"},
 		"untagged-pseudo":     {commit: hash, treeState: "clean", mainVersion: "v1.37.1-0.20261112000000-69a8e1ff3155", expect: base + "+69a8e1ff315563"},
 		"other-tag":           {commit: hash, treeState: "clean", mainVersion: "v0.0.1", expect: base + "+69a8e1ff315563"},
+		"override":            {override: "v1.37.0-alpha.0.5+abcdef0123456a", commit: hash, treeState: "dirty", expect: "v1.37.0-alpha.0.5+abcdef0123456a"},
 		"short-commit":        {commit: "abc", treeState: "clean", expect: base},
 	} {
 		t.Run(name, func(t *testing.T) {
-			actual := formatVersion(tc.commit, tc.treeState, tc.mainVersion)
+			actual := formatVersion(tc.override, tc.commit, tc.treeState, tc.mainVersion)
 			if actual != tc.expect {
 				t.Errorf("expected %q, got %q", tc.expect, actual)
 			}
