@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/component-base/featuregate"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -3312,6 +3313,101 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 			if diff := cmp.Diff(tc.wantPod, newPod); diff != "" {
 				t.Errorf("new pod changed (- want, + got): %s", diff)
 			}
+		})
+	}
+}
+
+func TestDefaultPodLevelResourcesLimitOnly(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+
+	containersWithResources := []api.Container{
+		{
+			Name: "c1",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+	}
+	containersWithHugePages := []api.Container{
+		{
+			Name: "c1",
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:                   resource.MustParse("100m"),
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("4Mi"),
+					api.ResourceMemory:                resource.MustParse("100Mi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU:                   resource.MustParse("100m"),
+					api.ResourceName("hugepages-2Mi"): resource.MustParse("4Mi"),
+					api.ResourceMemory:                resource.MustParse("100Mi"),
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name              string
+		containers        []api.Container
+		podResources      *api.ResourceRequirements
+		expectedResources *api.ResourceRequirements
+	}{
+		{
+			// A pod whose only pod-level entry is limits.pids must come out of
+			// defaulting untouched: no requests materialized from container
+			// aggregates, no hugepage limits added.
+			name:         "pids-only pod-level limits are not expanded",
+			containers:   containersWithResources,
+			podResources: &api.ResourceRequirements{Limits: api.ResourceList{api.ResourcePID: resource.MustParse("2048")}},
+			expectedResources: &api.ResourceRequirements{
+				Limits: api.ResourceList{api.ResourcePID: resource.MustParse("2048")},
+			},
+		},
+		{
+			name:         "pids-only pod-level limits with hugepage containers are not expanded",
+			containers:   containersWithHugePages,
+			podResources: &api.ResourceRequirements{Limits: api.ResourceList{api.ResourcePID: resource.MustParse("2048")}},
+			expectedResources: &api.ResourceRequirements{
+				Limits: api.ResourceList{api.ResourcePID: resource.MustParse("2048")},
+			},
+		},
+		{
+			// Control: a pod-level cpu limit still triggers normal defaulting
+			// (requests from container aggregates, then the memory limit from
+			// aggregated container limits).
+			name:         "pod-level cpu limit still defaults requests",
+			containers:   containersWithResources,
+			podResources: &api.ResourceRequirements{Limits: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")}},
+			expectedResources: &api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("100m"),
+					api.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU:    resource.MustParse("200m"),
+					api.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &api.Pod{
+				Spec: api.PodSpec{
+					Containers: tc.containers,
+					Resources:  tc.podResources,
+				},
+			}
+			DefaultPodLevelResources(pod)
+			assert.Equal(t, tc.expectedResources, pod.Spec.Resources)
 		})
 	}
 }

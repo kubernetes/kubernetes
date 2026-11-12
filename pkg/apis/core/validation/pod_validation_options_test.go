@@ -1411,3 +1411,55 @@ func TestSecurityProfileOCIValidationOption(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateAllowPodPIDLimit(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldPodSpec *core.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "old pod spec is nil",
+			wantOption: false,
+		},
+		{
+			name:       "old pod spec has no pod-level resources",
+			oldPodSpec: &core.PodSpec{},
+			wantOption: false,
+		},
+		{
+			name: "old pod spec has pod-level resources without pids",
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m")},
+				},
+			},
+			wantOption: false,
+		},
+		{
+			name: "old pod spec has a pod-level pid limit",
+			oldPodSpec: &core.PodSpec{
+				Resources: &core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+				},
+			},
+			wantOption: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		for _, gateEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/gate=%t", tc.name, gateEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, gateEnabled)
+
+				gotOptions := GetValidationOptionsFromPodSpecAndMeta(&core.PodSpec{}, tc.oldPodSpec, nil, nil)
+				// The gate enables the option; an old pod already using the
+				// field ratchets it on even with the gate disabled.
+				expected := tc.wantOption || gateEnabled
+				if gotOptions.AllowPodPIDLimit != expected {
+					t.Errorf("Got AllowPodPIDLimit=%t, want %t", gotOptions.AllowPodPIDLimit, expected)
+				}
+			})
+		}
+	}
+}

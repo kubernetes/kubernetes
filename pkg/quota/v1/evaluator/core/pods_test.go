@@ -154,6 +154,25 @@ func TestPodConstraintsFunc(t *testing.T) {
 			podLevelResourcesEnabled: true,
 			err:                      ``,
 		},
+		"pod-level pids limit only does not bypass required container resources": {
+			// pids is limit-only and does not participate in requests
+			// accounting, so its presence at the pod level must not skip the
+			// enforcement that containers explicitly request quota'd resources.
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Resources: &api.ResourceRequirements{
+						Limits: api.ResourceList{api.ResourcePID: resource.MustParse("2048")},
+					},
+					Containers: []api.Container{{
+						Name:      "foo",
+						Resources: api.ResourceRequirements{},
+					}},
+				},
+			},
+			required:                 []corev1.ResourceName{corev1.ResourceCPU},
+			podLevelResourcesEnabled: true,
+			err:                      `must specify cpu for: foo`,
+		},
 	}
 	evaluator := NewPodEvaluator(nil, clock.RealClock{})
 	for testName, test := range testCases {
