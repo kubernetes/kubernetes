@@ -4787,6 +4787,31 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: security_profile_pull_duration_seconds
+  subsystem: kubelet
+  help: 'Duration in seconds to pull a security profile. The ''cached'' label is true
+    if the runtime served the profile from its storage; the ''result'' label is ''success''
+    or the failure reason: ''registry_unavailable'', ''signature_validation_failed'',
+    ''security_profile_invalid'', ''unauthenticated'' or ''other''.'
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - cached
+  - result
+  buckets:
+  - 0.001
+  - 0.004
+  - 0.016
+  - 0.064
+  - 0.256
+  - 1.024
+  - 4.096
+  - 16.384
+  - 65.536
+  - 262.144
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: server_expiration_renew_errors
   subsystem: kubelet
   help: Counter of certificate renewal errors.
