@@ -46,3 +46,20 @@ func TestContainerPairsAllocs(t *testing.T) {
 	assert.Positive(t, pairs)
 	assert.Zero(t, allocs)
 }
+
+func TestVolumePairsAllocs(t *testing.T) {
+	pod := &api.Pod{Spec: api.PodSpec{
+		Volumes: []api.Volume{{Name: "a"}, {Name: "x"}, {Name: "c"}},
+	}}
+	oldPod := &api.Pod{Spec: api.PodSpec{
+		Volumes: []api.Volume{{Name: "a"}, {Name: "b"}, {Name: "c"}},
+	}}
+	pairs := 0
+	allocs := testing.AllocsPerRun(10, func() {
+		for range podutil.VolumePairs(pod, oldPod) {
+			pairs++
+		}
+	})
+	assert.Positive(t, pairs)
+	assert.Zero(t, allocs)
+}

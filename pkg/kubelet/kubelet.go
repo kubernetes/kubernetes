@@ -3190,16 +3190,15 @@ func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) || oldPod == nil || newPod == nil {
 		return
 	}
-	for i, oldVol := range oldPod.Spec.Volumes {
-		if !allocation.VolHasMemoryBackedEmptyDir(&oldVol) {
+	for pair := range podutil.VolumePairs(newPod, oldPod) {
+		if pair.New == nil || pair.Old == nil {
 			continue
 		}
-		newVol := allocation.FindVolume(newPod.Spec.Volumes, oldVol.Name, i)
-		if newVol == nil || !allocation.VolHasMemoryBackedEmptyDir(newVol) {
+		if !allocation.VolHasMemoryBackedEmptyDir(pair.New) || !allocation.VolHasMemoryBackedEmptyDir(pair.Old) {
 			continue
 		}
-		if op := resizeOperationForResources(newVol.EmptyDir.SizeLimit, oldVol.EmptyDir.SizeLimit); op != "" {
-			metrics.VolumeRequestedResizes.WithLabelValues(strings.ToLower(string(newVol.EmptyDir.Medium)), op).Inc()
+		if op := resizeOperationForResources(pair.New.EmptyDir.SizeLimit, pair.Old.EmptyDir.SizeLimit); op != "" {
+			metrics.VolumeRequestedResizes.WithLabelValues(strings.ToLower(string(pair.New.EmptyDir.Medium)), op).Inc()
 		}
 	}
 }

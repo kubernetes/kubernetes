@@ -1603,3 +1603,70 @@ func TestContainerPairs(t *testing.T) {
 		assert.Equal(t, "init:init/init main:a/a main:x/- main:-/b ephemeral:debug/-", pairs(pod, oldPod, AllContainers))
 	})
 }
+
+func TestVolumePairs(t *testing.T) {
+	volumes := func(names ...string) []v1.Volume {
+		var vols []v1.Volume
+		for _, name := range names {
+			vols = append(vols, v1.Volume{Name: name})
+		}
+		return vols
+	}
+	// pairs returns each pair as "new/old", with "-" for a missing volume.
+	pairs := func(pod, oldPod *v1.Pod) string {
+		name := func(v *v1.Volume) string {
+			if v == nil {
+				return "-"
+			}
+			return v.Name
+		}
+		var out []string
+		for pair := range VolumePairs(pod, oldPod) {
+			out = append(out, name(pair.New)+"/"+name(pair.Old))
+		}
+		return strings.Join(out, " ")
+	}
+
+	tests := []struct {
+		name       string
+		names, old []string
+		expected   string
+	}{
+		{name: "no volumes"},
+		{name: "unchanged", names: []string{"a", "b"}, old: []string{"a", "b"}, expected: "a/a b/b"},
+		{name: "added in the middle", names: []string{"a", "x", "b"}, old: []string{"a", "b"}, expected: "a/a x/- b/b"},
+		{name: "removed first", names: []string{"b", "c"}, old: []string{"a", "b", "c"}, expected: "b/b c/c -/a"},
+		{name: "replaced", names: []string{"a", "x", "c"}, old: []string{"a", "b", "c"}, expected: "a/a x/- c/c -/b"},
+		{
+			name:     "added and removed in several places",
+			names:    []string{"x", "b", "y", "d", "z"},
+			old:      []string{"a", "b", "c", "d", "e"},
+			expected: "x/- b/b y/- d/d z/- -/a -/c -/e",
+		},
+		{name: "reordered", names: []string{"c", "a", "b"}, old: []string{"a", "b", "c"}, expected: "c/c a/a b/b"},
+		{name: "reordered with added", names: []string{"b", "x", "a"}, old: []string{"a", "b"}, expected: "b/b x/- a/a"},
+		{name: "reordered with removed", names: []string{"c", "a"}, old: []string{"a", "b", "c"}, expected: "c/c a/a -/b"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{Volumes: volumes(tc.names...)}}
+			oldPod := &v1.Pod{Spec: v1.PodSpec{Volumes: volumes(tc.old...)}}
+			assert.Equal(t, tc.expected, pairs(pod, oldPod))
+		})
+	}
+
+	t.Run("nil oldPod yields all volumes as added", func(t *testing.T) {
+		pod := &v1.Pod{Spec: v1.PodSpec{Volumes: volumes("a", "b")}}
+		assert.Equal(t, "a/- b/-", pairs(pod, nil))
+	})
+
+	t.Run("zero allocations", func(t *testing.T) {
+		pod := &v1.Pod{Spec: v1.PodSpec{Volumes: volumes("a", "x", "c")}}
+		oldPod := &v1.Pod{Spec: v1.PodSpec{Volumes: volumes("a", "b", "c")}}
+		allocs := testing.AllocsPerRun(100, func() {
+			for range VolumePairs(pod, oldPod) {
+			}
+		})
+		assert.Zero(t, allocs)
+	})
+}
