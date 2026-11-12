@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog/v2/ktesting"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
@@ -907,6 +908,68 @@ func TestValidatePodAndController(t *testing.T) {
 			expectWarning: "", // No pod template skips validation.
 			skipPod:       true,
 		},
+	}
+
+	for _, ns := range []struct {
+		name  string
+		level api.Level
+	}{{baselineNs, api.LevelBaseline}, {restrictedNs, api.LevelRestricted}} {
+		for _, sidecar := range []bool{false, true} {
+			for _, probeType := range []string{"liveness", "readiness", "startup"} {
+				for _, protocol := range []string{"http", "tcp"} {
+					for _, action := range []string{"add", "replace", "remove"} {
+						oldPod := restrictedPod.DeepCopy()
+						if sidecar {
+							oldPod.Spec.InitContainers[0].RestartPolicy = ptr.To(corev1.ContainerRestartPolicyAlways)
+						}
+						probe := &corev1.Probe{}
+						if protocol == "http" {
+							probe.HTTPGet = &corev1.HTTPGetAction{Host: "127.0.0.1", Port: intstr.FromInt32(8080)}
+						} else {
+							probe.TCPSocket = &corev1.TCPSocketAction{Host: "127.0.0.1", Port: intstr.FromInt32(8080)}
+						}
+						setProbe := func(pod *corev1.Pod, probe *corev1.Probe) {
+							container := &pod.Spec.Containers[0]
+							if sidecar {
+								container = &pod.Spec.InitContainers[0]
+							}
+							switch probeType {
+							case "liveness":
+								container.LivenessProbe = probe
+							case "readiness":
+								container.ReadinessProbe = probe
+							case "startup":
+								container.StartupProbe = probe
+							}
+						}
+						switch action {
+						case "replace":
+							setProbe(oldPod, &corev1.Probe{ProbeHandler: corev1.ProbeHandler{Exec: &corev1.ExecAction{Command: []string{"true"}}}})
+						case "remove":
+							setProbe(oldPod, probe)
+							probe = nil
+						}
+						updated := oldPod.DeepCopy()
+						setProbe(updated, probe)
+						tc := testCase{
+							desc:           fmt.Sprintf("%s probe update/%s/sidecar=%v/%s/%s", action, ns.name, sidecar, probeType, protocol),
+							namespace:      ns.name,
+							pod:            updated,
+							oldPod:         oldPod,
+							operation:      admissionv1.Update,
+							skipDeployment: true,
+							expectEnforce:  ns.level,
+							expectAllowed:  action == "remove",
+						}
+						if !tc.expectAllowed {
+							tc.expectReason = metav1.StatusReasonForbidden
+							tc.expectAudit = ns.level
+						}
+						podCases = append(podCases, tc)
+					}
+				}
+			}
+		}
 	}
 
 	podToDeployment := func(pod *corev1.Pod) *appsv1.Deployment {

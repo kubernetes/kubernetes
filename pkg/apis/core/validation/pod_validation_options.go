@@ -87,6 +87,8 @@ type PodValidationOptions struct {
 	AllowSecurityProfileOCI bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
+	// Allow probes on regular containers and restartable init containers to be updated.
+	AllowMutableContainerProbes bool
 }
 
 func hasIndivisibleHugePagesValue(list core.ResourceList) bool {

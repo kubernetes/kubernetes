@@ -185,6 +185,16 @@ const (
 	// Enable a single container to restart even if the pod has restart policy "Never".
 	ContainerRestartRules featuregate.Feature = "ContainerRestartRules"
 
+	// owner: @troychiu
+	//
+	// Binds the probe lifecycle to the container lifecycle: probe workers are
+	// started when a container starts and stopped when it is killed or observed
+	// dead, and each worker is bound to a single container instance for its
+	// whole life. Replaces the status-manager polling in the probe worker and
+	// the wall-clock heuristics used to reconstruct probe state after a kubelet
+	// restart.
+	ContainerScopedProbes featuregate.Feature = "ContainerScopedProbes"
+
 	// owner: @sreeram-venkitesh
 	// kep: https://kep.k8s.io/4960
 	//
@@ -728,6 +738,12 @@ const (
 	// Makes CSINode.Spec.Drivers[*].Allocatable.Count mutable, allowing CSI drivers to
 	// update the number of volumes that can be allocated on a node
 	MutableCSINodeAllocatableCount featuregate.Feature = "MutableCSINodeAllocatableCount"
+
+	// owner: @HirazawaUi
+	// kep: https://kep.k8s.io/6318
+	//
+	// Enables kubelet to reconcile probe configuration updates for running containers.
+	MutableContainerProbes featuregate.Feature = "MutableContainerProbes"
 
 	// owner: huww98
 	// kep: https://kep.k8s.io/5381
@@ -1338,6 +1354,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	ContainerScopedProbes: {
+		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	ContainerStopSignals: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
@@ -1726,6 +1746,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
+	},
+
+	MutableContainerProbes: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	MutablePVNodeAffinity: {
@@ -2384,6 +2408,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	ContainerRestartRules: {},
 
+	ContainerScopedProbes: {},
+
 	ContainerStopSignals: {},
 
 	CoordinatedLeaderElection: {},
@@ -2539,6 +2565,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MemoryQoS: {},
 
 	MutableCSINodeAllocatableCount: {},
+
+	MutableContainerProbes: {ContainerScopedProbes},
 
 	MutablePVNodeAffinity: {},
 
