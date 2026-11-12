@@ -75,10 +75,15 @@ type allocatedDevices struct {
 	capacities                structured.ConsumedCapacityCollection
 	invalidCapacities         map[types.UID]error
 	enabledConsumableCapacity bool
+	// shareCounts tracks how many entries in shareIDs belong to each device,
+	// so preemption can tell whether releasing shares frees a device
+	// completely. Nil unless both DRAConsumableCapacity and DRAPreemption are
+	// enabled.
+	shareCounts map[structured.DeviceID]int
 }
 
 func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
-	return &allocatedDevices{
+	a := &allocatedDevices{
 		logger:                    logger,
 		ids:                       sets.New[structured.DeviceID](),
 		shareIDs:                  sets.New[structured.SharedDeviceID](),
@@ -86,6 +91,10 @@ func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
 		invalidCapacities:         make(map[types.UID]error),
 		enabledConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
 	}
+	if a.enabledConsumableCapacity && utilfeature.DefaultFeatureGate.Enabled(features.DRAPreemption) {
+		a.shareCounts = make(map[structured.DeviceID]int)
+	}
+	return a
 }
 
 func (a *allocatedDevices) get() (sets.Set[structured.DeviceID], int64) {
@@ -104,6 +113,26 @@ func (a *allocatedDevices) getSharedDeviceIDs() (sets.Set[structured.DeviceID], 
 		result.Insert(sharedDeviceID.GetDeviceID())
 	}
 	return result, a.revision
+}
+
+func (a *allocatedDevices) getShareCounts() (map[structured.DeviceID]int, int64) {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	return maps.Clone(a.shareCounts), a.revision
+}
+
+func (a *allocatedDevices) uncachedShares(shares sets.Set[structured.SharedDeviceID]) []structured.SharedDeviceID {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	var result []structured.SharedDeviceID
+	for share := range shares {
+		if !a.shareIDs.Has(share) {
+			result = append(result, share)
+		}
+	}
+	return result
 }
 
 // getCapacities returns an error instead of the capacities if some allocated claim
@@ -229,6 +258,11 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		a.ids.Insert(deviceID)
 	}
 	for _, shareID := range shareIDs {
+		// Ignore shareIDs already in the set so duplicate events don't
+		// inflate the count.
+		if a.shareCounts != nil && !a.shareIDs.Has(shareID) {
+			a.shareCounts[shareID.GetDeviceID()]++
+		}
 		a.shareIDs.Insert(shareID)
 	}
 	for _, capacity := range deviceCapacities {
@@ -284,6 +318,13 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		a.ids.Delete(deviceID)
 	}
 	for _, shareID := range shareIDs {
+		if a.shareCounts != nil && a.shareIDs.Has(shareID) {
+			if id := shareID.GetDeviceID(); a.shareCounts[id] > 1 {
+				a.shareCounts[id]--
+			} else {
+				delete(a.shareCounts, id)
+			}
+		}
 		a.shareIDs.Delete(shareID)
 	}
 	for _, capacity := range deviceCapacities {
