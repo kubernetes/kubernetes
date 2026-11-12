@@ -8,64 +8,8 @@ rest. Real admission policies should be less arbitrary.
 ## Example Webhook
 
 The helper adds one package import, one verification option and the
-`authadmission.WithTokenVerification` call. The rest below is the toy policy and
-ordinary HTTPS-server setup:
-
-```go
-package main
-
-import (
-	"context"
-	"flag"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"strings"
-	"time"
-
-	admissionv1 "k8s.io/api/admission/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	authadmission "k8s.io/component-helpers/auth/admission"
-)
-
-const resourceNameMustContainForAdmission = "love-kittens"
-
-func main() {
-	cert := flag.String("tls-cert", "tls.crt", "PEM certificate for the webhook's HTTPS host")
-	key := flag.String("tls-key", "tls.key", "PEM private key for that certificate")
-	flag.Parse()
-
-	// Default to in-cluster Service verification; use WithIssuer for explicit OIDC discovery.
-	verificationOption := authadmission.WithServiceAudience("kittens", "/validate", 443)
-	if issuer := os.Getenv("WEBHOOK_LOVE_KITTENS_ISSUER"); issuer != "" {
-		audience := os.Getenv("WEBHOOK_LOVE_KITTENS_AUDIENCE")
-		verificationOption = authadmission.WithIssuer(issuer, audience, nil)
-	}
-	kittenPolicy := func(_ context.Context, req *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
-		if strings.Contains(req.Name, resourceNameMustContainForAdmission) || len(req.Name) == 0 {
-			return &admissionv1.AdmissionResponse{Allowed: true}
-		}
-		return &admissionv1.AdmissionResponse{
-			Allowed: false,
-			Result: &metav1.Status{
-				Message: fmt.Sprintf("we love kittens but your resource does not. Since %q is not in the name, rejected",
-					resourceNameMustContainForAdmission),
-			},
-		}
-	}
-	// Pass the webhook server's root lifecycle context (typically tied to signal handling).
-	handler, err := authadmission.WithTokenVerification(context.Background(), kittenPolicy, verificationOption)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	mux := http.NewServeMux()
-	mux.Handle("/validate", handler)
-	server := &http.Server{Addr: ":8443", Handler: mux, ReadHeaderTimeout: 5 * time.Second}
-	log.Fatal(server.ListenAndServeTLS(*cert, *key))
-}
-```
+`authadmission.WithTokenVerification` call. See [examples/main.go](examples/main.go)
+for the complete toy policy and HTTPS-server setup.
 
 Choose the verification option that matches your registration:
 
