@@ -74,3 +74,38 @@ func RemoveString(slice []string, s string, modifier func(s string) string) []st
 	}
 	return newSlice
 }
+
+// Pair is an element in two versions of a slice, matched by key. Old is nil for an element that
+// is only in the new slice (added), and New is nil for one that is only in the old slice (removed).
+type Pair[T any] struct {
+	New, Old *T
+}
+
+// PairByKey pairs elements of items and oldItems with matching keys (assumed unique within each
+// slice), calling yield for each element in items (matched or added) in order, followed by each
+// removed element in oldItems in order. unwrap projects each slice element to *T. PairByKey
+// returns false if yield returned false.
+func PairByKey[E, T any](items, oldItems []E, unwrap func(*E) *T, key func(*T) string, yield func(Pair[T]) bool) bool {
+	for i := range items {
+		item := unwrap(&items[i])
+		if !yield(Pair[T]{New: item, Old: findByKey(oldItems, unwrap, key, key(item))}) {
+			return false
+		}
+	}
+	for j := range oldItems {
+		old := unwrap(&oldItems[j])
+		if findByKey(items, unwrap, key, key(old)) == nil && !yield(Pair[T]{Old: old}) {
+			return false
+		}
+	}
+	return true
+}
+
+func findByKey[E, T any](items []E, unwrap func(*E) *T, key func(*T) string, target string) *T {
+	for i := range items {
+		if item := unwrap(&items[i]); key(item) == target {
+			return item
+		}
+	}
+	return nil
+}
