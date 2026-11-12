@@ -82,7 +82,11 @@ func capacityNameForStatus(name draapi.FullyQualifiedName, driver draapi.UniqueS
 //     far during this in-progress run (other requests it has tentatively assigned to this
 //     device in this backtracking search, not yet committed).
 //     Names are fully-qualified.
-func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedCapacity *resourceapi.CapacityRequirements, device deviceWithID, allocatingCapacity ConsumedCapacity, fractionalCapacityRange bool) (map[draapi.FullyQualifiedName]resource.Quantity, bool, error) {
+//
+// With adminAccess, the request is checked only against the device's total capacity, skipping the
+// capacity requestPolicy and any remaining capacity checks: admin access ignores other allocations
+// and does not consume capacity itself.
+func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedCapacity *resourceapi.CapacityRequirements, device deviceWithID, allocatingCapacity ConsumedCapacity, fractionalCapacityRange bool, adminAccess bool) (map[draapi.FullyQualifiedName]resource.Quantity, bool, error) {
 	resolvedRequests, ok, err := resolveCapacityRequests(requestedCapacity, device)
 	if err != nil {
 		return nil, false, err
@@ -92,6 +96,18 @@ func cmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, requestedC
 		// so report it as not satisfiable rather than a fatal error: false with a nil
 		// error means "skip this device", a non-nil error means "abort allocation".
 		return nil, false, nil
+	}
+	if adminAccess {
+		for name, requestedVal := range resolvedRequests {
+			if requestedVal.Sign() < 0 {
+				return nil, false, fmt.Errorf("capacity %q: %w", name, errNegativeCapacity)
+			}
+			cap, ok := device.Capacity.Lookup(name)
+			if !ok || requestedVal.Cmp(cap.Value) > 0 {
+				return nil, false, nil
+			}
+		}
+		return resolvedRequests, true, nil
 	}
 	// First resolve every requested capacity. A request that cannot be represented is a
 	// fatal error that must abort regardless of map iteration order, so representability

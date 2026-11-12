@@ -649,7 +649,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							// so capacity-blocked matching devices stay in allDevices and All fails.
 							apiDevice := slice.Spec.Devices[deviceIndex]
 							_, success, err := cmpRequestOverCapacity(emptyConsumedCapacity, requestData.request.capacities(),
-								device, emptyConsumedCapacity, alloc.features.FractionalCapacityRange)
+								device, emptyConsumedCapacity, alloc.features.FractionalCapacityRange, requestData.request.adminAccess())
 							if err != nil {
 								return requestData, fmt.Errorf("claim %s, request %s: checking capacity for device %s: %w", klog.KObj(claim), requestData.request.name(), apiDevice.Name, err)
 							}
@@ -1597,9 +1597,9 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 func (alloc *allocator) cmpRequestOverCapacity(request requestAccessor, device deviceWithID) (map[draapi.FullyQualifiedName]resource.Quantity, bool, error) {
 	allocatingCapacity := alloc.allocatingCapacity[device.id]
 	if allocatedCapacity, found := alloc.allocatedState.AggregatedCapacity[device.id]; found {
-		return cmpRequestOverCapacity(allocatedCapacity, request.capacities(), device, allocatingCapacity, alloc.features.FractionalCapacityRange)
+		return cmpRequestOverCapacity(allocatedCapacity, request.capacities(), device, allocatingCapacity, alloc.features.FractionalCapacityRange, request.adminAccess())
 	}
-	return cmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), device, allocatingCapacity, alloc.features.FractionalCapacityRange)
+	return cmpRequestOverCapacity(NewConsumedCapacity(), request.capacities(), device, allocatingCapacity, alloc.features.FractionalCapacityRange, request.adminAccess())
 }
 
 func (alloc *allocator) selectorsMatch(r requestIndices, slice *draapi.ResourceSlice, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
@@ -1772,7 +1772,16 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			}
 			return false, nil, nil
 		}
-		state.countersReserved = true
+		if request.adminAccess() && allowMultipleAllocations {
+			// The device passed the check for the counters it consumes (ConsumesCounters).
+			// Admin access creates no capacity entry, which is how a later share of this
+			// device knows those counters are already charged. Release them here, or that
+			// share charges them a second time.
+			// TODO: decide whether admin access should bypass the counter check entirely.
+			alloc.deallocateCountersForDevice(device)
+		} else {
+			state.countersReserved = true
+		}
 	}
 
 	// Might be tainted, in which case the taint has to be tolerated.
@@ -1834,7 +1843,8 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 			return false, nil, nil
 		}
 
-		if allowMultipleAllocations {
+		// Admin access does not consume capacity, so it must not reserve any either.
+		if allowMultipleAllocations && !request.adminAccess() {
 			consumedCapacity, err = getConsumedCapacityFromRequest(resolvedRequests, device, alloc.features.FractionalCapacityRange)
 			if err != nil {
 				alloc.rollbackDevice(r, device, &requestData, state)
