@@ -32,59 +32,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/utils/ptr"
 )
-
-// foreachAllocatedDevice invokes the provided callback for each
-// device in the claim's allocation result which was allocated
-// exclusively for the claim.
-//
-// Devices allocated with admin access can be shared with other
-// claims and are skipped without invoking the callback.
-//
-// foreachAllocatedDevice does nothing if the claim is not allocated.
-func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
-	dedicatedDeviceCallback func(deviceID structured.DeviceID),
-	enabledConsumableCapacity bool,
-	sharedDeviceCallback func(structured.SharedDeviceID),
-	consumedCapacityCallback func(structured.DeviceConsumedCapacity)) {
-	if claim.Status.Allocation == nil {
-		return
-	}
-	for _, result := range claim.Status.Allocation.Devices.Results {
-		// Kubernetes 1.31 did not set this, 1.32 always does.
-		// Supporting 1.31 is not worth the additional code that
-		// would have to be written (= looking up in request) because
-		// it is extremely unlikely that there really is a result
-		// that still exists in a cluster from 1.31 where this matters.
-		if ptr.Deref(result.AdminAccess, false) {
-			// Is not considered as allocated.
-			continue
-		}
-		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-
-		// None of the users of this helper need to abort iterating,
-		// therefore it's not supported as it only would add overhead.
-
-		// Execute sharedDeviceCallback and consumedCapacityCallback correspondingly
-		// if DRAConsumableCapacity feature is enabled
-		if enabledConsumableCapacity {
-			shared := result.ShareID != nil
-			if shared {
-				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
-				sharedDeviceCallback(sharedDeviceID)
-				if result.ConsumedCapacity != nil {
-					deviceConsumedCapacity := structured.NewDeviceConsumedCapacity(deviceID, result.ConsumedCapacity)
-					consumedCapacityCallback(deviceConsumedCapacity)
-				}
-				continue
-			}
-		}
-
-		// Otherwise, execute dedicatedDeviceCallback
-		dedicatedDeviceCallback(deviceID)
-	}
-}
 
 // consumedCapacityError checks the consumed capacity of each allocation result.
 // Checking only the aggregated capacity would not be enough, because a positive
@@ -250,7 +198,7 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 		capacityErr = consumedCapacityError(claim)
 	}
-	foreachAllocatedDevice(claim,
+	structured.ForEachAllocatedDevice(claim.Status.Allocation,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
 			deviceIDs = append(deviceIDs, deviceID)
@@ -307,7 +255,7 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 		deviceCapacities = make([]structured.DeviceConsumedCapacity, 0, 20)
 		capacityErr = consumedCapacityError(claim)
 	}
-	foreachAllocatedDevice(claim,
+	structured.ForEachAllocatedDevice(claim.Status.Allocation,
 		func(deviceID structured.DeviceID) {
 			a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
 			deviceIDs = append(deviceIDs, deviceID)

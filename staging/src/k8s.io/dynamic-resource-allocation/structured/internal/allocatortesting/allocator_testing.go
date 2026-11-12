@@ -7585,7 +7585,7 @@ func TestAllocator(t *testing.T,
 			node: node(node1, region1),
 			// The admin share is accounted like a regular share, so it leaves no capacity for the ordinary claim.
 			// Suspicious: this is not what the scheduler does. It does not record admin
-			// shares in the allocated state (foreachAllocatedDevice skips them), so with
+			// shares in the allocated state (ForEachAllocatedDevice skips them), so with
 			// the actual input of a later scheduling cycle the ordinary claim would get
 			// the capacity.
 			expectResults: nil,
