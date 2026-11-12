@@ -270,7 +270,8 @@ type PodWorkers interface {
 // intermediate runtime event.
 type podRelistSuspender interface {
 	SuspendRelist(podUID types.UID)
-	ResumeRelist(logger klog.Logger, podUID types.UID, changed bool)
+	ResumeRelist(podUID types.UID) (relistDeferred bool)
+	RequestPodRelist(logger klog.Logger, podUID types.UID)
 }
 
 // podSyncer describes the core lifecyle operations of the pod state machine. A pod is first
@@ -1344,15 +1345,21 @@ func (p *podWorkers) podWorkerLoop(parentCtx context.Context, podUID types.UID, 
 				isTerminal, postSync, err = p.podSyncer.SyncPod(ctx, update.Options.UpdateType, update.Options.Pod, update.Options.MirrorPod, status)
 			}
 
-			lastSyncTime = p.clock.Now()
-			// Resume after lastSyncTime is set, so any relist triggered from here produces a
-			// cache entry newer than lastSyncTime and unblocks the next sync. A non-nil postSync
-			// means the sync changed the pod and will request its own relist.
+			// Resume *before* setting lastSyncTime: any relist that starts after lastSyncTime then
+			// sees the pod as unsuspended and reconciles it, so a relist that skipped the pod can
+			// never advance a cache timestamp past lastSyncTime. Request the follow-up relist
+			// *after* setting lastSyncTime, so its cache update unblocks the next sync. A non-nil
+			// postSync means the sync changed the pod and requests its own relist, which also
+			// observes anything deferred during the suspension.
+			var relistDeferred bool
 			if relistSuspended {
-				p.relistSuspender.ResumeRelist(logger, podUID, postSync != nil)
+				relistDeferred = p.relistSuspender.ResumeRelist(podUID)
 			}
+			lastSyncTime = p.clock.Now()
 			if postSync != nil {
 				postSync()
+			} else if relistDeferred {
+				p.relistSuspender.RequestPodRelist(logger, podUID)
 			}
 
 			return err

@@ -75,9 +75,9 @@ type PodLifecycleEventGenerator interface {
 	// Any relist (on-demand or global) that would observe a change for the pod is deferred
 	// until ResumeRelist is called.
 	SuspendRelist(podUID types.UID)
-	// ResumeRelist ends the suspension started by SuspendRelist. If any relist was
-	// deferred during the suspension and the sync did not change the pod (changed == false),
-	// a single on-demand relist is requested. If the sync did change the pod, the caller is
-	// expected to request its own relist, which will observe the deferred changes as well.
-	ResumeRelist(logger klog.Logger, podUID types.UID, changed bool)
+	// ResumeRelist ends the suspension started by SuspendRelist and reports whether any relist
+	// was deferred during the suspension. It does not request a relist itself: the caller
+	// should request one (after recording its own sync time) if a relist was deferred and it
+	// is not already going to request one.
+	ResumeRelist(podUID types.UID) (relistDeferred bool)
 }

@@ -580,20 +580,15 @@ func (g *GenericPLEG) SuspendRelist(podUID types.UID) {
 	}
 }
 
-// ResumeRelist ends the suspension for the pod. If a relist was deferred during the
-// suspension and the sync did not change the pod, a single on-demand relist is requested.
-// If the sync changed the pod, the caller requests its own relist, which also observes any
-// deferred changes, so nothing more is needed here.
-func (g *GenericPLEG) ResumeRelist(logger klog.Logger, podUID types.UID, changed bool) {
+// ResumeRelist ends the suspension for the pod and reports whether a relist was deferred
+// while it was suspended. Requesting the follow-up relist is left to the caller, so that it
+// can do so after recording its sync time.
+func (g *GenericPLEG) ResumeRelist(podUID types.UID) bool {
 	g.suspendMu.Lock()
-	pending := g.suspendedPods[podUID]
+	defer g.suspendMu.Unlock()
+	relistDeferred := g.suspendedPods[podUID]
 	delete(g.suspendedPods, podUID)
-	g.suspendMu.Unlock()
-
-	if pending && !changed {
-		logger.V(4).Info("GenericPLEG: Resuming pod relist, requesting deferred relist", "podUID", podUID)
-		g.RequestRelist(logger, podUID)
-	}
+	return relistDeferred
 }
 
 // deferIfSuspended returns true if the pod's relist is suspended, recording that a relist

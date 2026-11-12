@@ -3645,8 +3645,8 @@ func (kl *Kubelet) SuspendRelist(podUID types.UID) {
 }
 
 // ResumeRelist implements podRelistSuspender.
-func (kl *Kubelet) ResumeRelist(logger klog.Logger, podUID types.UID, changed bool) {
-	kl.pleg.ResumeRelist(logger, podUID, changed)
+func (kl *Kubelet) ResumeRelist(podUID types.UID) bool {
+	return kl.pleg.ResumeRelist(podUID)
 }
 
 var _ allocation.PodProvider = &Kubelet{}
