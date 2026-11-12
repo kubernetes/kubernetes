@@ -754,7 +754,7 @@ func NewMainKubelet(ctx context.Context,
 		// while dynamic container changes are pending.
 		statusPodManager = &allocatedStatusPodManager{PodManager: klet.podManager, kl: klet}
 	}
-	klet.statusManager = status.NewManager(klet.kubeClient, statusPodManager, klet, kubeDeps.PodStartupLatencyTracker)
+	klet.statusManager = status.NewManager(klet.kubeClient, kubeDeps.Recorder, statusPodManager, klet, kubeDeps.PodStartupLatencyTracker)
 
 	broadcaster := pods.NewBroadcaster(ctx)
 	klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager, klet.sourcesReady)

@@ -77,7 +77,7 @@ func TestNewProbeManager(t *testing.T) {
 				livenessManager:  proberesults.NewManager(),
 				readinessManager: proberesults.NewManager(),
 				startupManager:   proberesults.NewManager(),
-				statusManager: status.NewManager(&fake.Clientset{}, podManager,
+				statusManager: status.NewManager(&fake.Clientset{}, &record.FakeRecorder{}, podManager,
 					&statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
 			}
 			kubeDeps := &Dependencies{Recorder: &record.FakeRecorder{}}
