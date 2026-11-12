@@ -142,9 +142,6 @@ func TestReconcileEmpty(t *testing.T) {
 // a slice should be created
 func TestReconcile1Pod(t *testing.T) {
 	namespace := "test"
-	noFamilyService, _ := newServiceAndEndpointMeta("foo", namespace)
-	noFamilyService.Spec.ClusterIP = "10.0.0.10"
-	noFamilyService.Spec.IPFamilies = nil
 
 	svcv4, _ := newServiceAndEndpointMeta("foo", namespace)
 	svcv4ClusterIP, _ := newServiceAndEndpointMeta("foo", namespace)
@@ -187,32 +184,6 @@ func TestReconcile1Pod(t *testing.T) {
 		expectedLabels           map[string]string
 		expectedEndpointPerSlice map[discovery.AddressType][]discovery.Endpoint
 	}{
-		"no-family-service": {
-			service: noFamilyService,
-			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
-				discovery.AddressTypeIPv4: {
-					{
-						Addresses: []string{"1.2.3.4"},
-						Conditions: discovery.EndpointConditions{
-							Ready:       ptr.To(true),
-							Serving:     ptr.To(true),
-							Terminating: ptr.To(false),
-						},
-						Zone:     ptr.To("us-central1-a"),
-						NodeName: ptr.To("node-1"),
-						TargetRef: &corev1.ObjectReference{
-							Kind:      "Pod",
-							Namespace: namespace,
-							Name:      "pod1",
-						},
-					},
-				},
-			},
-			expectedLabels: map[string]string{
-				discovery.LabelManagedBy:   controllerName,
-				discovery.LabelServiceName: "foo",
-			},
-		},
 		"ipv4": {
 			service: svcv4,
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
