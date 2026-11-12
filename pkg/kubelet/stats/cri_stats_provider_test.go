@@ -770,6 +770,132 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(containerStats9.Memory.Timestamp, p6.Memory.Time.UnixNano())
 }
 
+func TestCRIListPodCPUAndMemoryStatsMemoryUsage(t *testing.T) {
+	memory := func(usage *uint64) *runtimeapi.MemoryUsage {
+		result := &runtimeapi.MemoryUsage{
+			Timestamp:       time.Unix(123, 0).UnixNano(),
+			WorkingSetBytes: &runtimeapi.UInt64Value{Value: 100},
+		}
+		if usage != nil {
+			result.UsageBytes = &runtimeapi.UInt64Value{Value: *usage}
+		}
+		return result
+	}
+	tests := []struct {
+		name       string
+		memories   []*runtimeapi.MemoryUsage
+		wantUsage  *uint64
+		linuxUsage uint64
+	}{
+		{
+			name:       "complete committed memory",
+			memories:   []*runtimeapi.MemoryUsage{memory(ptr.To[uint64](200)), memory(ptr.To[uint64](300))},
+			wantUsage:  ptr.To[uint64](500),
+			linuxUsage: 500,
+		},
+		{
+			name:     "missing committed memory",
+			memories: []*runtimeapi.MemoryUsage{memory(nil), memory(nil)},
+		},
+		{
+			name:       "missing first container usage",
+			memories:   []*runtimeapi.MemoryUsage{memory(nil), memory(ptr.To[uint64](300))},
+			linuxUsage: 300,
+		},
+		{
+			name:       "missing last container usage",
+			memories:   []*runtimeapi.MemoryUsage{memory(ptr.To[uint64](200)), memory(nil)},
+			linuxUsage: 200,
+		},
+		{
+			name:       "missing first container memory",
+			memories:   []*runtimeapi.MemoryUsage{nil, memory(ptr.To[uint64](300))},
+			linuxUsage: 300,
+		},
+		{
+			name:       "missing last container memory",
+			memories:   []*runtimeapi.MemoryUsage{memory(ptr.To[uint64](200)), nil},
+			linuxUsage: 200,
+		},
+		{
+			name:     "missing all memory stats",
+			memories: []*runtimeapi.MemoryUsage{nil, nil},
+		},
+		{
+			name:      "genuine zero committed memory",
+			memories:  []*runtimeapi.MemoryUsage{memory(ptr.To[uint64](0)), memory(ptr.To[uint64](0))},
+			wantUsage: ptr.To[uint64](0),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			sandbox := makeFakePodSandbox("pod", "uid", "namespace", false)
+			container0 := makeFakeContainer(sandbox, cName0, 0, false)
+			container1 := makeFakeContainer(sandbox, cName1, 0, false)
+			stats0 := makeFakeContainerStats(container0, "")
+			stats1 := makeFakeContainerStats(container1, "")
+			stats0.Memory, stats1.Memory = tc.memories[0], tc.memories[1]
+			runtimeService := critest.NewFakeRuntimeService()
+			runtimeService.SetFakeSandboxes([]*critest.FakePodSandbox{sandbox})
+			runtimeService.SetFakeContainers([]*critest.FakeContainer{container0, container1})
+			runtimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{stats0, stats1})
+			mockCadvisor := cadvisortest.NewMockInterface(t)
+			mockCadvisor.EXPECT().ContainerInfoV2("/", cadvisorapi.RequestOptions{
+				IdType: cadvisorapi.TypeName, Count: 2, Recursive: true,
+			}).Return(map[string]cadvisorapi.ContainerInfo{
+				"/": getTestContainerInfo(seedRoot, "", "", ""),
+			}, nil)
+			provider := newCRIStatsProvider(mockCadvisor, nil, runtimeService, nil, nil, false, false, nil)
+			pods, err := provider.ListPodCPUAndMemoryStats(tCtx)
+			require.NoError(t, err)
+			require.Len(t, pods, 1)
+			require.Len(t, pods[0].Containers, 2)
+			require.NotNil(t, pods[0].Memory)
+			wantUsage := tc.wantUsage
+			if runtime.GOOS != "windows" {
+				wantUsage = ptr.To(tc.linuxUsage)
+			}
+			assert.Equal(t, wantUsage, pods[0].Memory.UsageBytes)
+			for _, cs := range pods[0].Containers {
+				index := 0
+				if cs.Name == cName1 {
+					index = 1
+				}
+				var wantContainerUsage *uint64
+				if tc.memories[index] != nil {
+					wantContainerUsage = valueOfUInt64Value(tc.memories[index].UsageBytes)
+				}
+				wantFullUsage := wantContainerUsage
+				if runtime.GOOS != "windows" && tc.memories[index] == nil {
+					wantFullUsage = ptr.To[uint64](0)
+				}
+				logPath := kuberuntime.BuildContainerLogsDirectory(testPodLogDirectory, "namespace", "pod", types.UID("uid"), cs.Name)
+				fullProvider := &criStatsProvider{
+					hostStatsProvider: NewFakeHostStatsProviderWithData(map[string]*volume.Metrics{
+						logPath: {
+							Used:       resource.NewQuantity(0, resource.BinarySI),
+							InodesUsed: resource.NewQuantity(0, resource.BinarySI),
+						},
+					}, &kubecontainertest.FakeOS{}),
+				}
+				full, err := fullProvider.makeContainerStats(tCtx.Logger(), &runtimeapi.ContainerStats{
+					Attributes: &runtimeapi.ContainerAttributes{Metadata: &runtimeapi.ContainerMetadata{Name: cs.Name}},
+					Memory:     tc.memories[index],
+				}, &runtimeapi.Container{Metadata: &runtimeapi.ContainerMetadata{Name: cs.Name}},
+					&cadvisorapi.FsInfo{}, nil, sandbox.PodSandboxStatus.Metadata, false)
+				require.NoError(t, err)
+				assert.Equal(t, wantFullUsage, full.Memory.UsageBytes, "full stats for container %s", cs.Name)
+				if runtime.GOOS != "windows" && wantContainerUsage == nil {
+					wantContainerUsage = ptr.To[uint64](0)
+				}
+				require.NotNil(t, cs.Memory)
+				assert.Equal(t, wantContainerUsage, cs.Memory.UsageBytes, "container %s", cs.Name)
+			}
+		})
+	}
+}
+
 func TestCRIPodCPUAndMemoryStats(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
