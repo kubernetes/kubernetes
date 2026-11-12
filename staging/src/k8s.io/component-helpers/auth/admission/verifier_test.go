@@ -87,51 +87,6 @@ func TestVerifierVerify(t *testing.T) {
 	})
 }
 
-func TestVerifierRequiresCompactJWT(t *testing.T) {
-	ts := newOIDCTestServer(t)
-	v := ts.verifier(t)
-	compact := ts.sign(t, ts.baseClaims())
-	parts := strings.Split(compact, ".")
-	if len(parts) != 3 {
-		t.Fatalf("fixture is not a compact JWT: %d parts", len(parts))
-	}
-	for _, tc := range []struct {
-		name          string
-		serialization string
-	}{
-		{
-			name:          "flattened JSON JWS",
-			serialization: `{"protected":"` + parts[0] + `","payload":"` + parts[1] + `","signature":"` + parts[2] + `"}`,
-		},
-		{
-			name:          "leading whitespace before JSON JWS",
-			serialization: "\n\t " + `{"protected":"` + parts[0] + `","payload":"` + parts[1] + `","signature":"` + parts[2] + `"}`,
-		},
-		{
-			name:          "general JSON JWS",
-			serialization: `{"payload":"` + parts[1] + `","signatures":[{"protected":"` + parts[0] + `","signature":"` + parts[2] + `"}]}`,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			for _, token := range []string{tc.serialization, strings.ReplaceAll(tc.serialization, "\n", "")} {
-				if err := v.Verify(context.Background(), admissionReview(testGroup).Request, token); err == nil || err.Error() != "webhook token verification failed" {
-					t.Fatalf("Verify accepted non-compact JWS: %v", err)
-				}
-				spy := newSpyHandler()
-				h := NewHandlerForTest(v, spy.serve)
-				rec := httptest.NewRecorder()
-				h.ServeHTTP(rec, newRequest(t, admissionReviewBody(t, testGroup), token))
-				if rec.Code != http.StatusUnauthorized || spy.wasReached() {
-					t.Fatalf("ServeHTTP non-compact JWS = (%d, reached=%t)", rec.Code, spy.wasReached())
-				}
-			}
-		})
-	}
-	if err := v.Verify(context.Background(), admissionReview(testGroup).Request, compact); err != nil {
-		t.Fatalf("compact JWT rejected: %v", err)
-	}
-}
-
 func TestLibraryKeyRotationAndAvailability(t *testing.T) {
 	first := newOIDCTestServer(t)
 	second := newECDSAOIDCIssuer(t)

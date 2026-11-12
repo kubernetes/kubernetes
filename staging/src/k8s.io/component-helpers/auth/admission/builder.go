@@ -18,6 +18,7 @@ package admission
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	jose "github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -208,12 +210,12 @@ func extractLocalIssuer(tokenFile string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("admission: reading projected ServiceAccount token file: %w", err)
 	}
-	token, err := jwt.ParseSigned(strings.TrimSpace(string(tokenData)), allowedSigningAlgs)
+	token, err := jose.ParseSignedCompact(strings.TrimSpace(string(tokenData)), allowedSigningAlgs)
 	if err != nil {
 		return "", fmt.Errorf("admission: parsing projected ServiceAccount token: %w", err)
 	}
 	var claims jwt.Claims
-	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+	if err := json.Unmarshal(token.UnsafePayloadWithoutVerification(), &claims); err != nil {
 		return "", fmt.Errorf("admission: reading projected ServiceAccount issuer: %w", err)
 	}
 	return claims.Issuer, nil

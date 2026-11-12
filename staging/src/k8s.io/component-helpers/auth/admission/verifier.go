@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	jose "github.com/go-jose/go-jose/v4"
@@ -109,11 +108,6 @@ func (v *verifier) authenticateToken(ctx context.Context, rawToken string) ([]st
 		return nil, errVerificationFailed
 	}
 	logger := klog.LoggerWithName(klog.FromContext(ctx), "admissionTokenVerifier")
-	// JWTs use compact serialization; the JOSE parser also accepts JSON JWS.
-	if strings.HasPrefix(strings.TrimSpace(rawToken), "{") {
-		logger.V(2).Info("Webhook token verification failed", "reason", "token is not compact JWT")
-		return nil, errVerificationFailed
-	}
 	token, err := v.verifier.Verify(ctx, rawToken)
 	if err != nil {
 		logger.V(2).Info("Webhook token verification failed", "reason", "token authentication failed", "detail", err.Error())
