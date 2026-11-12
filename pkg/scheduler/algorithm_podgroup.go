@@ -682,6 +682,9 @@ func (p *PodGroupSchedulingAlgorithm) evaluateCompositePlacement(ctx context.Con
 	if err := p.nodeInfoSnapshot.AssumePlacement(placement); err != nil {
 		return &PodGroupScheduledResult{podGroupInfo: podGroupInfo, status: fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err))}, nil
 	}
+	// Ranks compare the nodes of one placement with each other,
+	// so what was cached by rank for another placement doesn't apply here.
+	schedFwk.InvalidateAllNodeRanks()
 	placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
 	subtreeResult := map[fwk.EntityKey]*PodGroupScheduledResult{}
 	result, placementRevertFns := p.compositePodGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, root, podGroupInfo, subtreeResult)
@@ -793,6 +796,9 @@ func (p *PodGroupSchedulingAlgorithm) evaluatePlacement(ctx context.Context, sch
 			status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
 		}
 	}
+	// Ranks compare the nodes of one placement with each other,
+	// so what was cached by rank for another placement doesn't apply here.
+	schedFwk.InvalidateAllNodeRanks()
 	placementCycleState := newPlacementCycleState(podGroupCycleState, placement)
 	result, placementRevertFns := p.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, placementCycleState, podGroupInfo, queuedPodGroupInfo)
 	placementRevertFns.revert()

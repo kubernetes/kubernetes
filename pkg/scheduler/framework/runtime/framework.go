@@ -1008,6 +1008,8 @@ func (f *frameworkImpl) RunRankNodesPlugins(ctx context.Context, state fwk.Cycle
 			continue
 		}
 		if plStatus.IsSuccess() {
+			// Opportunistic batching has to know which of its results depend on ranks.
+			f.batch.nodesRanked()
 			return rankedNodes, nil
 		}
 		if plStatus.IsError() {
@@ -1322,12 +1324,15 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PodGroupPostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
-	// Disable opportunistic batching during PodGroupPostFilter so preemption evaluations
-	// neither reuse node hints cached from the normal pass nor bypass RankNodes when
-	// dynamic victim condemnations change node ranks across pods in the group.
-	// TODO(#142718): Implement support for batching with RankNodes during preemption.
-	f.batch.SetDisabled(true)
-	defer f.batch.SetDisabled(false)
+	// Plugins call pgSchedulingFunc on a snapshot they have changed, e.g. by removing all
+	// potential preemption victims. What opportunistic batching cached before the call doesn't
+	// apply to that snapshot, and what it caches during the call doesn't apply after it.
+	// Flushing around each call also separates the calls of a plugin that makes several of them.
+	schedulingFunc := func(ctx context.Context, state fwk.PodGroupCycleState) (*fwk.PodGroupAssignments, *fwk.Status) {
+		f.batch.flush()
+		defer f.batch.flush()
+		return pgSchedulingFunc(ctx, state)
+	}
 
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -1343,7 +1348,7 @@ func (f *frameworkImpl) RunPodGroupPostFilterPlugins(ctx context.Context, state 
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		res, status := f.runPodGroupPostFilterPlugin(ctx, pl, state, podGroupInfo, pgSchedulingFunc)
+		res, status := f.runPodGroupPostFilterPlugin(ctx, pl, state, podGroupInfo, schedulingFunc)
 		if status.IsSuccess() {
 			return res, status
 		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
@@ -1871,12 +1876,14 @@ func (f *frameworkImpl) StoreScheduleResults(ctx context.Context, signature fwk.
 	f.batch.StoreScheduleResults(ctx, signature, hintedNode, chosenNode, otherNodes, cycleCount)
 }
 
-func (f *frameworkImpl) IsBatchingDisabled() bool {
-	return f.batch.IsDisabled()
+// InvalidateNodeRank implements framework.NodeRankInvalidator.
+func (f *frameworkImpl) InvalidateNodeRank(nodeName string) {
+	f.batch.InvalidateNodeRank(nodeName)
 }
 
-func (f *frameworkImpl) SetBatchingDisabled(disabled bool) {
-	f.batch.SetDisabled(disabled)
+// InvalidateAllNodeRanks implements framework.NodeRankInvalidator.
+func (f *frameworkImpl) InvalidateAllNodeRanks() {
+	f.batch.InvalidateAllNodeRanks()
 }
 
 // RunPreBindPlugins runs the set of configured prebind plugins. It returns a

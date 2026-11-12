@@ -135,7 +135,9 @@ const (
 	BatchFlushNodeMissing     = "node_missing"
 	BatchFlushExpired         = "expired"
 	BatchFlushPodIncompatible = "pod_incompatible"
+	BatchFlushRankInvalidated = "rank_invalidated"
 	BatchFlushFilterError     = "filter_error"
+	BatchFlushRankError       = "rank_error"
 	BatchFlushPreScoreError   = "prescore_error"
 	BatchFlushRescoreError    = "rescore_error"
 	BatchFlushNormalizeError  = "normalize_error"
@@ -375,7 +377,7 @@ func InitMetrics() {
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "batch_cache_flushed_total",
-			Help:           "Counts of batch cache flushes by reason and scheduler profile. A flush is counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'pod_nominated' means the pod has a nominated node, 'pod_incompatible' means the pod's signature is missing or differs from the batch's, 'expired' means the state is older than the maximum batch age, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, and 'filter_error', 'prescore_error', 'rescore_error' and 'normalize_error' mean that phase failed while rescoring.",
+			Help:           "Counts of batch cache flushes by reason and scheduler profile. A flush is counted when an existing batch state is dropped instead of providing a hint. 'pod_skipped' means the previous pod was handled by another profile or failed to schedule, 'pod_nominated' means the pod has a nominated node, 'pod_incompatible' means the pod's signature is missing or differs from the batch's, 'expired' means the state is older than the maximum batch age, 'node_missing' means a node needed to reuse the state is no longer in the snapshot, 'rank_invalidated' means the ranks that order the nodes of the state no longer hold, and 'filter_error', 'rank_error', 'prescore_error', 'rescore_error' and 'normalize_error' mean that phase failed while rescoring.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"profile", "reason"})
 	StoreScheduleResultsTotal = metrics.NewCounterVec(

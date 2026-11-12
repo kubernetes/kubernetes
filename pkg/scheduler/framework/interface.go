@@ -176,13 +176,34 @@ type RankNodesPlugin interface {
 	// RankNodes ranks the given nodes for the pod. Nodes should be returned
 	// ordered by non-decreasing Rank (0 is best). If the plugin does not wish
 	// to rank nodes for this cycle, it may return a Skip status.
+	//
+	// Opportunistic batching reuses the order for the following pods of the cycle, which
+	// puts two requirements on the plugin:
+	//   - whether a node ranks before, after or equal to another one must not depend on
+	//     the other nodes passed in the same call, so that a subset can be ranked again
+	//     on its own;
+	//   - whenever the rank of a node changes, the plugin has to report it through
+	//     NodeRankInvalidator.
 	RankNodes(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]NodeWithRank, *fwk.Status)
+}
+
+// NodeRankInvalidator is implemented by the handle that the framework passes to plugins.
+// It lets a plugin report that the order returned by a RankNodesPlugin no longer holds,
+// typically from Reserve or Unreserve, where the state that the ranks are derived from changes.
+// The framework then stops reusing the results it cached for that order.
+// Both methods are safe for concurrent use.
+type NodeRankInvalidator interface {
+	// InvalidateNodeRank reports that the rank of the given node may have changed.
+	InvalidateNodeRank(nodeName string)
+	// InvalidateAllNodeRanks reports that the rank of any node may have changed.
+	InvalidateAllNodeRanks()
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	fwk.Handle
+	NodeRankInvalidator
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []fwk.PreEnqueuePlugin
@@ -232,12 +253,6 @@ type Framework interface {
 
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
 	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
-
-	// IsBatchingDisabled reports whether opportunistic batching is currently disabled on the framework.
-	IsBatchingDisabled() bool
-
-	// SetBatchingDisabled disables or re-enables opportunistic batching on the framework.
-	SetBatchingDisabled(disabled bool)
 
 	// RunRawScorePlugins runs only the Score() phase of each active scoring plugin for a single node,
 	// without NormalizeScore or weighting and returns pre-NormalizeScore values.

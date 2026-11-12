@@ -6468,8 +6468,9 @@
     means the pod has a nominated node, 'pod_incompatible' means the pod's signature
     is missing or differs from the batch's, 'expired' means the state is older than
     the maximum batch age, 'node_missing' means a node needed to reuse the state is
-    no longer in the snapshot, and 'filter_error', 'prescore_error', 'rescore_error'
-    and 'normalize_error' mean that phase failed while rescoring.
+    no longer in the snapshot, 'rank_invalidated' means the ranks that order the nodes
+    of the state no longer hold, and 'filter_error', 'rank_error', 'prescore_error',
+    'rescore_error' and 'normalize_error' mean that phase failed while rescoring.
   type: Counter
   stabilityLevel: ALPHA
   labels:

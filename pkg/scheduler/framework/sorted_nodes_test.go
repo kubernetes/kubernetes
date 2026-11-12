@@ -101,6 +101,69 @@ func TestSortedScoredNodes_Pop(t *testing.T) {
 	}
 }
 
+func TestSortedRankedNodes_Pop(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []fwk.NodePluginScores
+		ranks    []int
+		expected []string
+	}{
+		{
+			name:     "empty",
+			input:    []fwk.NodePluginScores{},
+			ranks:    []int{},
+			expected: nil,
+		},
+		{
+			name: "nil ranks leave the order to the scores",
+			input: []fwk.NodePluginScores{
+				{Name: "node1", TotalScore: 1},
+				{Name: "node3", TotalScore: 3},
+				{Name: "node2", TotalScore: 2},
+			},
+			expected: []string{"node3", "node2", "node1"},
+		},
+		{
+			name: "lower rank goes first regardless of the score",
+			input: []fwk.NodePluginScores{
+				{Name: "node1", TotalScore: 100},
+				{Name: "node2", TotalScore: 50},
+				{Name: "node3", TotalScore: 1},
+			},
+			ranks:    []int{2, 1, 0},
+			expected: []string{"node3", "node2", "node1"},
+		},
+		{
+			name: "score and then Randomizer order the nodes of a rank",
+			input: []fwk.NodePluginScores{
+				{Name: "node1", TotalScore: 5, Randomizer: 1},
+				{Name: "node2", TotalScore: 100},
+				{Name: "node3", TotalScore: 7},
+				{Name: "node4", TotalScore: 5, Randomizer: 2},
+				{Name: "node5", TotalScore: 90},
+			},
+			ranks:    []int{0, 1, 0, 0, 1},
+			expected: []string{"node3", "node4", "node1", "node2", "node5"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewSortedRankedNodes(tc.input, tc.ranks)
+			if got := len(s.UnorderedList()); got != len(tc.input) {
+				t.Errorf("len(UnorderedList()) = %d, want %d", got, len(tc.input))
+			}
+			var got []string
+			for s.Len() > 0 {
+				got = append(got, s.Pop().Name)
+			}
+			if diff := cmp.Diff(tc.expected, got); diff != "" {
+				t.Errorf("pop order mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestSortedScoredNodes_Len(t *testing.T) {
 	nodes := []fwk.NodePluginScores{
 		{Name: "node1", TotalScore: 10},

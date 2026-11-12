@@ -83,6 +83,9 @@ type DefaultPreemption struct {
 	Evaluator         *preemption.Evaluator
 	pgLister          fwk.PodGroupLister
 	podGroupEvaluator podGroupEvaluator
+	// rankInvalidator is told when condemning or reprieving victims changes what RankNodes
+	// would return. It is nil when the handle doesn't track node ranks.
+	rankInvalidator framework.NodeRankInvalidator
 
 	// IsEligiblePod returns whether a victim (individual pod/pod group) is allowed to be preempted by a preemptor pod.
 	// This filtering is in addition to the internal requirement that the victim pod have lower
@@ -133,6 +136,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	if pl.fts.EnableGenericWorkload {
 		pl.pgLister = fh.PodGroupManager().PodGroups()
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh)
+		pl.rankInvalidator, _ = fh.(framework.NodeRankInvalidator)
 	}
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim
@@ -589,6 +593,7 @@ func (pl *DefaultPreemption) Reserve(ctx context.Context, state fwk.CycleState, 
 	if victims := pl.computeDeltaVictimsOnNode(nodeName, preemptionState); len(victims) > 0 {
 		state.Write(reserveStateKey, &reserveState{condemnedByPod: victims})
 		preemptionState.AddCondemned(victims)
+		pl.invalidateNodeRanks(nodeName, victims)
 	}
 	return nil
 }
@@ -613,8 +618,27 @@ func (pl *DefaultPreemption) Unreserve(ctx context.Context, state fwk.CycleState
 	}
 	if len(s.condemnedByPod) > 0 {
 		preemptionState.RemoveCondemned(s.condemnedByPod)
+		pl.invalidateNodeRanks(nodeName, s.condemnedByPod)
 		s.condemnedByPod = nil
 	}
+}
+
+// invalidateNodeRanks reports that RankNodes would no longer return the same order, because the
+// given victims of nodeName were condemned or reprieved. That changes the preemption cost of
+// every node they have pods on, which is more than nodeName for PodGroup victims.
+func (pl *DefaultPreemption) invalidateNodeRanks(nodeName string, victims []fwk.PreemptionVictim) {
+	if pl.rankInvalidator == nil {
+		return
+	}
+	for _, v := range victims {
+		for _, pi := range v.Pods() {
+			if pi.GetPod().Spec.NodeName != nodeName {
+				pl.rankInvalidator.InvalidateAllNodeRanks()
+				return
+			}
+		}
+	}
+	pl.rankInvalidator.InvalidateNodeRank(nodeName)
 }
 
 // computeDeltaVictimsOnNode returns the surviving victims on nodeName that would be

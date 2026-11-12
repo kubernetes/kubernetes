@@ -4739,6 +4739,23 @@ type podGroupPreemptionRankNodesTestCase struct {
 	expectedInitialRanked      []rankedNode
 	reserveNode                string
 	expectedRankedAfterReserve []rankedNode
+	// expectedInvalidations are the node ranks that Reserve reports as changed, and Unreserve again.
+	expectedInvalidations []string
+}
+
+// allNodeRanks stands for InvalidateAllNodeRanks in what rankInvalidationRecorder records.
+const allNodeRanks = "*"
+
+type rankInvalidationRecorder struct {
+	invalidations []string
+}
+
+func (r *rankInvalidationRecorder) InvalidateNodeRank(nodeName string) {
+	r.invalidations = append(r.invalidations, nodeName)
+}
+
+func (r *rankInvalidationRecorder) InvalidateAllNodeRanks() {
+	r.invalidations = append(r.invalidations, allNodeRanks)
 }
 
 func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
@@ -4834,6 +4851,64 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes(t *testing.T) {
 				{Node: "node-pod", Rank: 1},
 				{Node: "node-high", Rank: 2},
 			},
+			// The PodGroup victim takes node-pg-2 along.
+			expectedInvalidations: []string{allNodeRanks},
+		},
+		{
+			name:      "Reserve and Unreserve on a node with a standalone pod change the rank of that node only",
+			nodeNames: []string{"node-high", "node-pod", "node-free"},
+			victims: []fwk.PreemptionVictim{
+				makeVictim(10, fwk.PodKeyType, 0, st.MakePod().Name("victim-pod").UID("victim-pod").Node("node-pod").Priority(10).Obj()),
+				makeVictim(20, fwk.PodKeyType, 0, st.MakePod().Name("victim-high").UID("victim-high").Node("node-high").Priority(20).Obj()),
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-free", Rank: 0},
+				{Node: "node-pod", Rank: 1},
+				{Node: "node-high", Rank: 2},
+			},
+			reserveNode: "node-pod",
+			expectedRankedAfterReserve: []rankedNode{
+				{Node: "node-pod", Rank: 0},
+				{Node: "node-free", Rank: 0},
+				{Node: "node-high", Rank: 1},
+			},
+			expectedInvalidations: []string{"node-pod"},
+		},
+		{
+			name:      "Reserve and Unreserve on a node whose PodGroup victim has all its pods there change the rank of that node only",
+			nodeNames: []string{"node-pg", "node-free"},
+			victims: []fwk.PreemptionVictim{
+				makeVictim(10, fwk.PodGroupKeyType, 0,
+					st.MakePod().Name("victim-pg-1").UID("victim-pg-1").Node("node-pg").Priority(10).PodGroupName("pg-victim").Obj(),
+					st.MakePod().Name("victim-pg-2").UID("victim-pg-2").Node("node-pg").Priority(10).PodGroupName("pg-victim").Obj(),
+				),
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-free", Rank: 0},
+				{Node: "node-pg", Rank: 1},
+			},
+			reserveNode: "node-pg",
+			expectedRankedAfterReserve: []rankedNode{
+				{Node: "node-pg", Rank: 0},
+				{Node: "node-free", Rank: 0},
+			},
+			expectedInvalidations: []string{"node-pg"},
+		},
+		{
+			name:      "Reserve and Unreserve on a node without victims change no rank",
+			nodeNames: []string{"node-pod", "node-free"},
+			victims: []fwk.PreemptionVictim{
+				makeVictim(10, fwk.PodKeyType, 0, st.MakePod().Name("victim-pod").UID("victim-pod").Node("node-pod").Priority(10).Obj()),
+			},
+			expectedInitialRanked: []rankedNode{
+				{Node: "node-free", Rank: 0},
+				{Node: "node-pod", Rank: 1},
+			},
+			reserveNode: "node-free",
+			expectedRankedAfterReserve: []rankedNode{
+				{Node: "node-free", Rank: 0},
+				{Node: "node-pod", Rank: 1},
+			},
 		},
 	}
 
@@ -4891,6 +4966,18 @@ func runPodGroupPreemptionRankNodesTests(
 			if err != nil {
 				t.Fatal(err)
 			}
+			if pl.rankInvalidator == nil {
+				t.Fatal("expected the plugin to report changed node ranks to the framework")
+			}
+			invalidationRecorder := &rankInvalidationRecorder{}
+			pl.rankInvalidator = invalidationRecorder
+			checkInvalidations := func(after string) {
+				t.Helper()
+				if diff := cmp.Diff(tt.expectedInvalidations, invalidationRecorder.invalidations); diff != "" {
+					t.Errorf("Invalidated node ranks after %s mismatch (-want, +got):\n%s", after, diff)
+				}
+				invalidationRecorder.invalidations = nil
+			}
 
 			nodeInfos := make([]fwk.NodeInfo, 0, len(nodes))
 			for _, n := range nodes {
@@ -4946,6 +5033,7 @@ func runPodGroupPreemptionRankNodesTests(
 			if status := pl.Reserve(ctx, state1, preemptor1, tt.reserveNode); !status.IsSuccess() {
 				t.Fatalf("Reserve failed: %v", status)
 			}
+			checkInvalidations("Reserve")
 
 			state2 := newCycleStateWithPreemption()
 			gotAfterReserve := rankAllNodes(state2, preemptor2)
@@ -4954,6 +5042,7 @@ func runPodGroupPreemptionRankNodesTests(
 			}
 
 			pl.Unreserve(ctx, state1, preemptor1, tt.reserveNode)
+			checkInvalidations("Unreserve")
 			state3 := newCycleStateWithPreemption()
 			gotAfterUnreserve := rankAllNodes(state3, preemptor2)
 			if diff := cmp.Diff(tt.expectedInitialRanked, gotAfterUnreserve); diff != "" {
@@ -5055,6 +5144,7 @@ func TestDefaultPreemption_PodGroupPreemptionRankNodes_CustomPreemptionManager(t
 				{Node: "node-shared-2", Rank: 1},
 				{Node: "node-single-20", Rank: 2},
 			},
+			expectedInvalidations: []string{allNodeRanks},
 		},
 	}
 

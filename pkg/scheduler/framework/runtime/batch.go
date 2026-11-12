@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +36,7 @@ type batchHandle interface {
 	ProfileName() string
 	SnapshotSharedLister() fwk.SharedLister
 	RunFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status
+	RunRankNodesPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) ([]framework.NodeWithRank, *fwk.Status)
 	RunPreScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status
 	RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status)
 	NormalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores []fwk.NodePluginScores) *fwk.Status
@@ -46,7 +49,12 @@ type OpportunisticBatch struct {
 	lastCycle   schedulingCycle
 	handle      batchHandle
 	maxBatchAge time.Duration
-	disabled    bool
+
+	// cycleRanked tells whether a RankNodes plugin ordered the nodes evaluated in the
+	// scheduling cycle in progress, which is recorded with the results stored for it.
+	cycleRanked bool
+	// rankInvalidations collects what plugins reported since the last hint.
+	rankInvalidations rankInvalidations
 
 	// Used primarily for tests, count the total pods we
 	// have successfully batched.
@@ -59,6 +67,9 @@ type batchState struct {
 	signature    fwk.PodSignature
 	sortedNodes  framework.SortedScoredNodes
 	creationTime time.Time
+	// ranked tells whether sortedNodes is ordered by the ranks of a RankNodes plugin
+	// in the first place. Invalidated ranks don't matter to a state that isn't.
+	ranked bool
 }
 
 type schedulingCycle struct {
@@ -66,36 +77,95 @@ type schedulingCycle struct {
 	chosenNode string
 }
 
+// rankInvalidations tracks the nodes whose ranks plugins reported as outdated.
+// Unlike the rest of the batch it has a lock, because plugins may report from binding cycles.
+//
+// One node name is all there is to remember: the batch can only make up for a new rank
+// of the node chosen for the previous pod, which it evaluates again before every hint.
+// A second node means that some other node changed, which is no better than all of them.
+type rankInvalidations struct {
+	lock sync.Mutex
+	node string
+	all  bool
+}
+
+func (r *rankInvalidations) add(nodeName string) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	if nodeName == "" || (r.node != "" && r.node != nodeName) {
+		r.all = true
+		return
+	}
+	r.node = nodeName
+}
+
+func (r *rankInvalidations) addAll() {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.all = true
+}
+
+// takeOtherThan tells whether the rank of any node other than nodeName was invalidated
+// since the previous call.
+func (r *rankInvalidations) takeOtherThan(nodeName string) bool {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	invalidated := r.all || (r.node != "" && r.node != nodeName)
+	r.node, r.all = "", false
+	return invalidated
+}
+
 const (
 	// DefaultMaxBatchAge defines the default maximum duration a batch state is considered valid.
 	DefaultMaxBatchAge = 500 * time.Millisecond
 )
 
-// SetDisabled disables or re-enables opportunistic batching and clears any cached batch state.
-func (b *OpportunisticBatch) SetDisabled(disabled bool) {
+// flush drops the cached results without counting a flush in the metrics. It is meant for
+// callers that switch to scheduling pods against another view of the cluster: nothing is
+// wrong with the results, they just don't describe that view.
+func (b *OpportunisticBatch) flush() {
 	if b == nil {
 		return
 	}
-	b.disabled = disabled
 	b.state = nil
 	b.lastCycle = schedulingCycle{}
 }
 
-// IsDisabled reports whether opportunistic batching is currently disabled.
-func (b *OpportunisticBatch) IsDisabled() bool {
-	return b == nil || b.disabled
+// nodesRanked records that a RankNodes plugin ordered the nodes that are evaluated in the
+// scheduling cycle in progress.
+func (b *OpportunisticBatch) nodesRanked() {
+	if b == nil {
+		return
+	}
+	b.cycleRanked = true
+}
+
+// InvalidateNodeRank records that the rank of the given node may have changed since
+// a RankNodes plugin returned it.
+func (b *OpportunisticBatch) InvalidateNodeRank(nodeName string) {
+	if b == nil {
+		return
+	}
+	b.rankInvalidations.add(nodeName)
+}
+
+// InvalidateAllNodeRanks records that the rank of any node may have changed since
+// a RankNodes plugin returned it.
+func (b *OpportunisticBatch) InvalidateAllNodeRanks() {
+	if b == nil {
+		return
+	}
+	b.rankInvalidations.addAll()
 }
 
 // GetNodeHint provides a hint for the pod based on the filtering and scoring results of previous cycles. Caching works
 // only for consecutive pods with the same signature (pods of one PodGroup scheduling cycle also qualify). The node
-// chosen for the previous pod is re-checked first: if it is still feasible it is rescored and competes with the cached
-// candidates, otherwise the cached ranking is reused as it stands. Returns "" and drops the state when it can't be used.
+// chosen for the previous pod is re-checked first: if it is still feasible it is ranked and rescored and competes with
+// the cached candidates, otherwise the cached order is reused as it stands. Returns "" and drops the state when it can't be used.
 func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature, state fwk.CycleState, cycleCount int64) string {
-	if b.disabled {
-		return ""
-	}
 	logger := klog.FromContext(ctx)
 	var hint string
+	b.cycleRanked = false
 
 	startTime := time.Now()
 	defer func() {
@@ -109,15 +179,19 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 		metrics.GetNodeHintDuration.WithLabelValues(hinted, b.handle.ProfileName()).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
+	// Invalidations are taken even when there is nothing to drop,
+	// so that they can't hit a state that is created after them.
+	ranksInvalidated := b.rankInvalidations.takeOtherThan(b.lastCycle.chosenNode)
+
 	// If we don't have state that we can use, then return an empty hint.
 	// The state is dropped, otherwise the following pods would find it unusable again and
 	// report the same incompatibility.
-	if !b.batchStateCompatible(ctx, pod, signature, cycleCount) {
+	if !b.batchStateCompatible(ctx, pod, signature, cycleCount, ranksInvalidated) {
 		b.state = nil
 		return ""
 	}
 
-	// Re-check the previously chosen node and re-score it if still feasible.
+	// Re-check the previously chosen node and rank and re-score it if still feasible.
 	if !b.refreshHintCandidates(ctx, pod, cycleCount, state) {
 		b.state = nil
 		return ""
@@ -135,9 +209,6 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 
 // StoreScheduleResults stores results from scheduling for use as a batch later.
 func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes framework.SortedScoredNodes, cycleCount int64) {
-	if b.disabled {
-		return
-	}
 	logger := klog.FromContext(ctx)
 
 	defer metrics.StoreScheduleResultsDuration.ObserveSince(time.Now(), b.handle.ProfileName())()
@@ -173,6 +244,7 @@ func (b *OpportunisticBatch) StoreScheduleResults(ctx context.Context, signature
 			signature:    signature,
 			sortedNodes:  otherNodes,
 			creationTime: time.Now(),
+			ranked:       b.cycleRanked,
 		}
 		metrics.StoreScheduleResultsTotal.WithLabelValues(b.handle.ProfileName(), metrics.StoreResultStored).Inc()
 		if loggerV := logger.V(6); loggerV.Enabled() {
@@ -204,8 +276,10 @@ func (b *OpportunisticBatch) logUnusableState(logger klog.Logger, cycleCount int
 }
 
 // batchStateCompatible checks whether the cached batch state is still valid for the new pod.
+// ranksInvalidated tells whether a plugin invalidated the rank of a node other than the one
+// chosen for the previous pod.
 func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.Pod, signature fwk.PodSignature,
-	cycleCount int64) bool {
+	cycleCount int64, ranksInvalidated bool) bool {
 	// Just return if we don't have any state to use.
 	if b.stateEmpty() {
 		return false
@@ -243,6 +317,13 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		return false
 	}
 
+	// The cached order relies on ranks that no longer hold. The node chosen for the previous
+	// pod is the exception, as it is about to be evaluated again anyway.
+	if b.state.ranked && ranksInvalidated {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushRankInvalidated)
+		return false
+	}
+
 	// Our state matches with our new pod and is useable
 	return true
 }
@@ -273,7 +354,7 @@ func (b *OpportunisticBatch) refreshHintCandidates(ctx context.Context, pod *v1.
 }
 
 // rescoreHintedNode re-runs Score() for the last chosen node. It adds the node back into the candidate
-// list with fresh scores, re-normalizes across all candidates, then rebuilds the sorted list.
+// list with fresh scores, ranks and re-normalizes across all candidates, then rebuilds the sorted list.
 func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod, state fwk.CycleState, cycleCount int64,
 	lastChosenNodeInfo fwk.NodeInfo) bool {
 	logger := klog.FromContext(ctx)
@@ -287,9 +368,18 @@ func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod,
 	}
 	// PreScore must be called with full candidate set, including the node being rescored.
 	nodeInfos = append(nodeInfos, lastChosenNodeInfo)
+
+	// Taking the previous pod may have changed the rank of the node. Ranks from different
+	// RankNodes calls can't be compared, hence all candidates are ranked together.
+	ranks, status := b.rankCandidates(ctx, pod, state, nodeInfos)
+	if !status.IsSuccess() {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushRankError, status.AsError())
+		return false
+	}
+
 	// Clone the live CycleState so writes from the rescore path don't leak back.
 	rescoreState := state.Clone()
-	status := b.handle.RunPreScorePlugins(ctx, rescoreState, pod, nodeInfos)
+	status = b.handle.RunPreScorePlugins(ctx, rescoreState, pod, nodeInfos)
 	if !status.IsSuccess() {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPreScoreError, status.AsError())
 		return false
@@ -315,8 +405,35 @@ func (b *OpportunisticBatch) rescoreHintedNode(ctx context.Context, pod *v1.Pod,
 		return false
 	}
 
-	b.state.sortedNodes = framework.NewSortedScoredNodes(filteredScores)
+	b.state.sortedNodes = framework.NewSortedRankedNodes(filteredScores, ranks)
+	b.state.ranked = ranks != nil
 	return true
+}
+
+// rankCandidates returns the rank of each of the given nodes, or nil when no RankNodes plugin
+// ranks nodes for the pod.
+func (b *OpportunisticBatch) rankCandidates(ctx context.Context, pod *v1.Pod, state fwk.CycleState, nodeInfos []fwk.NodeInfo) ([]int, *fwk.Status) {
+	// Nodes are only ranked in PodGroup scheduling cycles, see SchedulingAlgorithm.
+	if !state.IsPodGroupSchedulingCycle() {
+		return nil, nil
+	}
+	rankedNodes, status := b.handle.RunRankNodesPlugins(ctx, state, pod, nodeInfos)
+	if !status.IsSuccess() || len(rankedNodes) == 0 {
+		return nil, status
+	}
+	rankByNode := make(map[string]int, len(rankedNodes))
+	for _, n := range rankedNodes {
+		rankByNode[n.NodeInfo.Node().Name] = n.Rank
+	}
+	ranks := make([]int, len(nodeInfos))
+	for i, nodeInfo := range nodeInfos {
+		rank, ok := rankByNode[nodeInfo.Node().Name]
+		if !ok {
+			return nil, fwk.AsStatus(fmt.Errorf("RankNodes plugins returned no rank for node %q", nodeInfo.Node().Name))
+		}
+		ranks[i] = rank
+	}
+	return ranks, nil
 }
 
 // resolveCachedCandidates resolves the cached sorted nodes to NodeInfos paired

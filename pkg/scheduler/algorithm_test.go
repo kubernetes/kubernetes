@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -806,7 +807,7 @@ func TestFindNodesThatPassFiltersBudget(t *testing.T) {
 			}
 
 			got, err := algo.findNodesThatPassFilters(
-				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind, true /* allowRankNodes */)
+				ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nodes, tt.numNodesToFind, true /* allowRankNodes */, false /* keepHigherRanks */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned error: %v", err)
 			}
@@ -865,7 +866,7 @@ func TestFindNodesThatPassFiltersEmptyNodes(t *testing.T) {
 			diagnosis := framework.Diagnosis{
 				NodeToStatus: framework.NewDefaultNodeToStatus(),
 			}
-			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1, true /* allowRankNodes */)
+			res, err := algo.findNodesThatPassFilters(ctx, schedFwk, framework.NewCycleState(), pod, &diagnosis, nil, 1, true /* allowRankNodes */, false /* keepHigherRanks */)
 			if err != nil {
 				t.Fatalf("findNodesThatPassFilters returned unexpected error: %v", err)
 			}
@@ -1326,7 +1327,6 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
-			schedFwk.SetBatchingDisabled(true)
 
 			algo, err := NewSchedulingAlgorithm(snapshot, internalcache.New(ctx, nil, true, false), WithCurrentCycleProvider(func() int64 { return 1 }))
 			if err != nil {
@@ -1390,5 +1390,156 @@ func TestSchedulePodWithRankNodes(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestSchedulePodWithRankNodesBatching schedules pods that share a signature one after another within
+// one PodGroup scheduling cycle and checks how opportunistic batching reuses ranked nodes for them.
+func TestSchedulePodWithRankNodesBatching(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:       true,
+		features.OpportunisticBatching: true,
+	})
+	logger, ctx := ktesting.NewTestContext(t)
+
+	allNodes := sets.New("node1", "node2", "node3", "node4")
+	plugin := &rankNodesTestPlugin{
+		name:          names.DefaultPreemption,
+		ranksByNode:   map[string]int{"node1": 0, "node2": 1, "node3": 1, "node4": 2},
+		scoresByNode:  map[string]int64{"node1": 10, "node2": 50, "node3": 90, "node4": 100},
+		rejectedNodes: sets.New[string](),
+	}
+
+	cache := internalcache.New(ctx, nil, true, false)
+	for _, name := range sets.List(allNodes) {
+		cache.AddNode(logger, st.MakeNode().Name(name).Obj())
+	}
+	snapshot := internalcache.NewEmptySnapshot()
+	if err := cache.UpdateSnapshot(logger, snapshot); err != nil {
+		t.Fatalf("Failed to update snapshot: %v", err)
+	}
+	registry := frameworkruntime.Registry{
+		queuesort.Name:     queuesort.New,
+		defaultbinder.Name: defaultbinder.New,
+		plugin.name: func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+			return plugin, nil
+		},
+	}
+	enabled := schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: plugin.name, Weight: 1}}}
+	profileCfg := schedulerapi.KubeSchedulerProfile{
+		SchedulerName: "default-scheduler",
+		Plugins: &schedulerapi.Plugins{
+			QueueSort:          schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
+			Filter:             enabled,
+			Score:              enabled,
+			Reserve:            enabled,
+			PodGroupPostFilter: enabled,
+			Bind:               schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
+		},
+	}
+	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+		frameworkruntime.WithParallelism(1),
+		// The steps below depend on the cache surviving from one pod to the next.
+		frameworkruntime.WithMaxBatchAge(time.Hour),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+	algo, err := NewSchedulingAlgorithm(snapshot, cache, WithCurrentCycleProvider(func() int64 { return 1 }))
+	if err != nil {
+		t.Fatalf("Failed to create algorithm: %v", err)
+	}
+
+	// Pods are never assumed here. A node that received one is rejected for the pods after it instead.
+	steps := []struct {
+		name string
+		// prepare changes what the plugin returns from now on and reports changed ranks, as a plugin would.
+		prepare  func()
+		wantHost string
+		// wantRankedNodes are the nodes that RankNodes was called with for the pod, if at all.
+		wantRankedNodes sets.Set[string]
+		// wantFilteredNodes are the nodes that Filter was called with for the pod, in that order.
+		wantFilteredNodes []string
+	}{
+		{
+			name:              "first pod evaluates the nodes of all ranks and takes the best of the lowest one",
+			wantHost:          "node1",
+			wantRankedNodes:   allNodes,
+			wantFilteredNodes: []string{"node1", "node2", "node3", "node4"},
+		},
+		{
+			name: "next rank is hinted without ranking the nodes again",
+			prepare: func() {
+				plugin.rejectedNodes.Insert("node1")
+				schedFwk.InvalidateNodeRank("node1")
+			},
+			wantHost:          "node3",
+			wantFilteredNodes: []string{"node1", "node3"},
+		},
+		{
+			name: "previous node that is still feasible is ranked together with the cached nodes",
+			prepare: func() {
+				plugin.ranksByNode["node3"] = 3
+				schedFwk.InvalidateNodeRank("node3")
+			},
+			wantHost:          "node2",
+			wantRankedNodes:   sets.New("node2", "node3", "node4"),
+			wantFilteredNodes: []string{"node3", "node2"},
+		},
+		{
+			name: "new rank of a node other than the previous one makes the pod start over",
+			prepare: func() {
+				plugin.rejectedNodes.Insert("node2")
+				plugin.ranksByNode["node4"] = 0
+				schedFwk.InvalidateNodeRank("node4")
+			},
+			wantHost:          "node4",
+			wantRankedNodes:   allNodes,
+			wantFilteredNodes: []string{"node1", "node4", "node2", "node3"},
+		},
+		{
+			name: "new ranks of all nodes make the pod start over",
+			prepare: func() {
+				plugin.rejectedNodes.Insert("node4")
+				schedFwk.InvalidateAllNodeRanks()
+			},
+			wantHost:          "node3",
+			wantRankedNodes:   allNodes,
+			wantFilteredNodes: []string{"node1", "node4", "node2", "node3"},
+		},
+	}
+
+	for i, step := range steps {
+		if step.prepare != nil {
+			step.prepare()
+		}
+		plugin.rankNodesInvoked, plugin.rankInputOrder, plugin.filteredNodes = false, nil, nil
+
+		podName := fmt.Sprintf("pod%d", i+1)
+		podInfo, err := framework.NewPodInfo(st.MakePod().Name(podName).Namespace("default").UID(podName).Obj())
+		if err != nil {
+			t.Fatalf("%s: failed to create PodInfo: %v", step.name, err)
+		}
+		queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo, PodSignature: fwk.PodSignature("sig")}
+
+		res, err := algo.SchedulePod(ctx, schedFwk, newPodGroupCycleState(), queuedPodInfo)
+		if err != nil {
+			t.Fatalf("%s: SchedulePod failed: %v", step.name, err)
+		}
+		if res.SuggestedHost != step.wantHost {
+			t.Errorf("%s: SuggestedHost = %q, want %q", step.name, res.SuggestedHost, step.wantHost)
+		}
+		var gotRankedNodes sets.Set[string]
+		if plugin.rankNodesInvoked {
+			gotRankedNodes = sets.New(plugin.rankInputOrder...)
+		}
+		if diff := cmp.Diff(step.wantRankedNodes, gotRankedNodes); diff != "" {
+			t.Errorf("%s: unexpected nodes passed to RankNodes (-want, +got):\n%s", step.name, diff)
+		}
+		if diff := cmp.Diff(step.wantFilteredNodes, plugin.filteredNodes); diff != "" {
+			t.Errorf("%s: unexpected filteredNodes (-want, +got):\n%s", step.name, diff)
+		}
 	}
 }
