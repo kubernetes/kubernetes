@@ -929,10 +929,12 @@
   file: test/e2e/apimachinery/websocket_streaming.go
 - testname: WebSocket streaming, port-forward over tunnel to localhost
   codename: '[sig-api-machinery] WebSocket streaming port forwarding over the WebSocket
-    tunnel should forward to a server listening on localhost [Conformance]'
+    tunnel should forward to a server listening on localhost [LinuxOnly] [Conformance]'
   description: Port forwarding to a Pod container listening on localhost over the
     SPDY/3.1+portforward.k8s.io WebSocket tunnel subprotocol MUST forward client data
-    and return the server response with an empty error stream.
+    and return the server response with an empty error stream. This test is marked
+    LinuxOnly since Windows does not support port forwarding to localhost inside the
+    container.
   release: v1.38
   file: test/e2e/apimachinery/websocket_streaming.go
 - testname: WebSocket streaming, attach over v5.channel.k8s.io
