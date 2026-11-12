@@ -95,7 +95,7 @@ func (CapacityRequirements) SwaggerDoc() map[string]string {
 
 var map_Counter = map[string]string{
 	"":      "Counter describes a quantity associated with a device.",
-	"value": "value defines how much of a certain device counter is available.",
+	"value": "value defines how much of a certain device counter is available.\n\nMust be greater than or equal to zero.",
 }
 
 func (Counter) SwaggerDoc() map[string]string {
