@@ -140,6 +140,24 @@ func createTestQOSContainerManager(logger klog.Logger) (*qosContainerManagerImpl
 	return qosContainerManager, nil
 }
 
+func TestHugePageSizeBytes(t *testing.T) {
+	for pageSize, want := range map[string]int64{
+		"64KB": 64 << 10,
+		"2MB":  2 << 20,
+		"32MB": 32 << 20,
+		"1GB":  1 << 30,
+		"16GB": 16 << 30,
+	} {
+		got, err := hugePageSizeBytes(pageSize)
+		if err != nil || got != want {
+			t.Errorf("hugePageSizeBytes(%q) = %d, %v, want %d", pageSize, got, err, want)
+		}
+	}
+	if _, err := hugePageSizeBytes("2XB"); err == nil {
+		t.Error("hugePageSizeBytes(\"2XB\") succeeded, want an error")
+	}
+}
+
 func TestQoSContainerCgroup(t *testing.T) {
 	burstableMin := resource.MustParse("384Mi")
 	guaranteedMin := resource.MustParse("128Mi")

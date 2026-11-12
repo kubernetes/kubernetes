@@ -27,9 +27,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	units "github.com/docker/go-units"
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -190,7 +190,7 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConfig) error {
 	hugePageLimit := map[int64]int64{}
 	for _, pageSize := range libcontainercgroups.HugePageSizes() {
-		pageSizeBytes, err := units.RAMInBytes(pageSize)
+		pageSizeBytes, err := hugePageSizeBytes(pageSize)
 		if err != nil {
 			return err
 		}
@@ -198,6 +198,16 @@ func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConf
 	}
 	cgroupConfig.ResourceParameters.HugePageLimit = hugePageLimit
 	return nil
+}
+
+// hugePageSizeBytes parses a size as libcontainercgroups.HugePageSizes prints
+// it: <n>KB, <n>MB or <n>GB, in powers of 1024.
+func hugePageSizeBytes(pageSize string) (int64, error) {
+	q, err := apiresource.ParseQuantity(strings.TrimSuffix(pageSize, "B") + "i")
+	if err != nil {
+		return 0, fmt.Errorf("parse hugepage size %q: %w", pageSize, err)
+	}
+	return q.Value(), nil
 }
 
 func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
