@@ -4397,15 +4397,17 @@ func makeCPUManagerInitContainersPod(podName string, ctnAttributes []ctnAttribut
 }
 
 type cpuManagerKubeletArguments struct {
-	policyName                     string
-	topologyManagerPolicy          string
-	topologyManagerScope           string
-	enableCPUManagerOptions        bool
-	enablePodLevelResources        bool
-	customCPUCFSQuotaPeriod        time.Duration
-	enablePodLevelResourceManagers bool
-	reservedSystemCPUs             cpuset.CPUSet
-	options                        map[string]string
+	policyName                                   string
+	topologyManagerPolicy                        string
+	topologyManagerScope                         string
+	enableCPUManagerOptions                      bool
+	enablePodLevelResources                      bool
+	customCPUCFSQuotaPeriod                      time.Duration
+	enablePodLevelResourceManagers               bool
+	reservedSystemCPUs                           cpuset.CPUSet
+	options                                      map[string]string
+	enableInPlacePodVerticalScalingExclusiveCPUs bool
+	topologyManagerPolicyOptions                 map[string]string
 }
 
 func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
@@ -4424,6 +4426,7 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 		newCfg.FeatureGates["PodLevelResourcesFixKubeletQOSClass"] = kubeletArguments.enablePodLevelResources
 	}
 	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers
+	newCfg.FeatureGates["InPlacePodVerticalScalingExclusiveCPUs"] = kubeletArguments.enableInPlacePodVerticalScalingExclusiveCPUs
 
 	if kubeletArguments.customCPUCFSQuotaPeriod != 0 {
 		newCfg.FeatureGates["CustomCPUCFSQuotaPeriod"] = true
@@ -4436,6 +4439,10 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	newCfg.TopologyManagerPolicy = kubeletArguments.topologyManagerPolicy
 	newCfg.TopologyManagerScope = kubeletArguments.topologyManagerScope
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
+
+	if kubeletArguments.topologyManagerPolicyOptions != nil {
+		newCfg.TopologyManagerPolicyOptions = kubeletArguments.topologyManagerPolicyOptions
+	}
 
 	if kubeletArguments.options != nil {
 		newCfg.CPUManagerPolicyOptions = kubeletArguments.options
