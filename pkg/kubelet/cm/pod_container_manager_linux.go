@@ -22,11 +22,13 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -63,6 +65,10 @@ type podContainerManagerImpl struct {
 	memoryReservationPolicy kubeletconfig.MemoryReservationPolicy
 	// memoryThrottlingFactor is used to compute pod-level memory.high
 	memoryThrottlingFactor *float64
+	// configuredPodsMu guards configuredPods
+	configuredPodsMu sync.RWMutex
+	// configuredPods tracks pods whose cgroup configuration has succeeded
+	configuredPods sets.Set[types.UID]
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -75,41 +81,60 @@ func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 }
 
 // EnsureExists takes a pod as argument and makes sure that
-// pod cgroup exists if qos cgroup hierarchy flag is enabled.
-// If the pod level container doesn't already exist it is created.
+// pod cgroup exists and is configured if qos cgroup hierarchy flag is enabled.
+// If the pod level container doesn't already exist it is created; if it already
+// exists on disk without having been configured in this kubelet lifecycle, its
+// cgroup parameters are reapplied via Update.
 func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) error {
-	// check if container already exist
-	alreadyExists := m.Exists(pod)
-	if !alreadyExists {
-		enforceCPULimits := m.enforceCPULimits
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
-			logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
-			enforceCPULimits = false
-		}
-		enforceMemoryQoS := false
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
-			libcontainercgroups.IsCgroup2UnifiedMode() {
-			enforceMemoryQoS = true
-		}
-		// Create the pod container
-		podContainerName, _ := m.GetPodContainerName(pod)
-		containerConfig := &CgroupConfig{
-			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
-		}
-		if m.podPidsLimit > 0 {
-			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
-		}
-		if enforceMemoryQoS {
-			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
-			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
-		}
-		applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
-		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
-			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
-		}
-
+	m.configuredPodsMu.RLock()
+	configured := m.configuredPods.Has(pod.UID)
+	m.configuredPodsMu.RUnlock()
+	if configured {
+		return nil
 	}
+
+	enforceCPULimits := m.enforceCPULimits
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.podContainerManager != nil && m.podContainerManager.PodHasExclusiveCPUs(logger, pod) {
+		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
+		enforceCPULimits = false
+	}
+	enforceMemoryQoS := false
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() {
+		enforceMemoryQoS = true
+	}
+
+	podContainerName, _ := m.GetPodContainerName(pod)
+	containerConfig := &CgroupConfig{
+		Name:               podContainerName,
+		ResourceParameters: ResourceConfigForPod(pod, enforceCPULimits, m.cpuCFSQuotaPeriod, enforceMemoryQoS, m.memoryReservationPolicy),
+	}
+	if m.podPidsLimit > 0 {
+		containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
+	}
+	if enforceMemoryQoS {
+		m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
+		logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
+	}
+	applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
+
+	if m.Exists(pod) {
+		if err := m.cgroupManager.Update(logger, containerConfig); err != nil {
+			return fmt.Errorf("failed to update container for %v : %w", podContainerName, err)
+		}
+	} else {
+		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
+			return fmt.Errorf("failed to create container for %v : %w", podContainerName, err)
+		}
+	}
+
+	m.configuredPodsMu.Lock()
+	if m.configuredPods == nil {
+		m.configuredPods = sets.New[types.UID]()
+	}
+	m.configuredPods.Insert(pod.UID)
+	m.configuredPodsMu.Unlock()
+
 	return nil
 }
 
@@ -266,6 +291,11 @@ func (m *podContainerManagerImpl) Destroy(logger klog.Logger, podCgroup CgroupNa
 	if err := m.cgroupManager.Destroy(logger, containerConfig); err != nil {
 		logger.Info("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err)
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
+	}
+	if isPod, podUID := m.IsPodCgroup(m.cgroupManager.Name(podCgroup)); isPod {
+		m.configuredPodsMu.Lock()
+		m.configuredPods.Delete(podUID)
+		m.configuredPodsMu.Unlock()
 	}
 	return nil
 }

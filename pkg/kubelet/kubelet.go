@@ -2284,14 +2284,14 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				if err := kl.containerManager.UpdateQOSCgroups(logger); err != nil {
 					logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
 				}
-				if err := pcm.EnsureExists(logger, pod); err != nil {
-					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
-					return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
-				}
+			}
+			if err := pcm.EnsureExists(logger, pod); err != nil {
+				kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
+				return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+			}
 
-				if err = kl.containerRuntime.UpdateActuatedPodLevelResources(logger, pod); err != nil {
-					return false, nil, fmt.Errorf("failed to update the state of pod-level resources for the pod %v : %w", pod.UID, err)
-				}
+			if err = kl.containerRuntime.UpdateActuatedPodLevelResources(logger, pod); err != nil {
+				return false, nil, fmt.Errorf("failed to update the state of pod-level resources for the pod %v : %w", pod.UID, err)
 			}
 		}
 	}

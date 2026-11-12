@@ -34,7 +34,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/mount-utils"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -442,7 +441,7 @@ func (m *cgroupCommon) Create(logger klog.Logger, cgroupConfig *CgroupConfig) er
 	// it may confuse why we call set after we do apply, but the issue is that runc
 	// follows a similar pattern.  it's needed to ensure cpu quota is set properly.
 	if err := manager.Set(libcontainerCgroupConfig.Resources); err != nil {
-		utilruntime.HandleError(fmt.Errorf("cgroup manager.Set failed: %w", err))
+		return fmt.Errorf("cgroup manager.Set failed: %w", err)
 	}
 
 	return nil
