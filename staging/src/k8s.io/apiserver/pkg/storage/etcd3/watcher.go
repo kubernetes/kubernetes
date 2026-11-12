@@ -862,13 +862,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 			return nil, nil, fmt.Errorf("failed to reverse watch event key %q: %w", e.key, err)
 		}
 		oldObj = wc.watcher.newFunc()
-		accessor, err := meta.Accessor(oldObj)
-		if err != nil {
-			return nil, nil, err
-		}
-		accessor.SetName(name)
-		accessor.SetNamespace(namespace)
-		if err := wc.watcher.versioner.UpdateObject(oldObj, uint64(e.rev)); err != nil {
+		if err := storage.SetObjectIdentity(oldObj, wc.watcher.versioner, name, namespace, uint64(e.rev)); err != nil {
 			return nil, nil, err
 		}
 		return nil, oldObj, nil
