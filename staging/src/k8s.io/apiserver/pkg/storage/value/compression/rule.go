@@ -16,7 +16,11 @@ limitations under the License.
 
 package compression
 
-import "strconv"
+import (
+	"strconv"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
 
 // Rule tells WithCompression how to write one resource's values; any reader
 // accepts what any Rule writes. The zero Rule compresses nothing, and a new
@@ -28,6 +32,13 @@ type Rule struct {
 	// MinSize is the smallest value, in bytes, that the writer compresses. Zero or
 	// less sets no floor; a configuration file that omits minSize gets 1Ki.
 	MinSize int
+}
+
+// ResourceRules gives each resource the Rule its store writes with.
+// *compressionconfig.CompressionConfiguration implements it.
+type ResourceRules interface {
+	// RuleFor returns gr's Rule, or the zero Rule if gr isn't compressed.
+	RuleFor(gr schema.GroupResource) Rule
 }
 
 // Algorithm says how a Rule compresses new writes.
