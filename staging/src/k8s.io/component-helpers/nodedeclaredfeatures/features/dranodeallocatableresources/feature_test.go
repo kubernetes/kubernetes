@@ -32,8 +32,8 @@ func TestRequirements(t *testing.T) {
 		t.Fatalf("Feature %s returned nil Requirements", feature.Name())
 	}
 
-	if len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != DRANodeAllocatableResourcesFeature {
-		t.Fatalf("Feature %s Requirements should declare exactly the %s feature gate", feature.Name(), DRANodeAllocatableResourcesFeature)
+	if len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != DRANodeAllocatableResourcesFeatureGate {
+		t.Fatalf("Feature %s Requirements should declare exactly the %s feature gate", feature.Name(), DRANodeAllocatableResourcesFeatureGate)
 	}
 }
 
@@ -59,7 +59,7 @@ func TestDiscover(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			config := &types.NodeConfiguration{
-				FeatureGates: types.FeatureGateMap{DRANodeAllocatableResourcesFeature: tc.featureGateEnabled},
+				FeatureGates: types.FeatureGateMap{DRANodeAllocatableResourcesFeatureGate: tc.featureGateEnabled},
 			}
 			enabled := feature.Discover(config)
 			if want, got := tc.expected, enabled; want != got {

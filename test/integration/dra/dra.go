@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	"k8s.io/klog/v2"
 	"k8s.io/ktesting/format"
@@ -470,8 +471,9 @@ func createNodes(tCtx ktesting.TContext) []*v1.Node {
 				v1.ResourcePods:   *resource.NewScaledQuantity(maxPodsPerNode, 0),
 			},
 			// Required for tests in test/integration/dra/node_allocatable_resources.go.
-			// DeclaredFeatures must include DRANodeAllocatableResources to pass node feature validation during admission.
-			DeclaredFeatures: []string{"DRANodeAllocatableResources"},
+			// DeclaredFeatures must include the node allocatable resources feature to pass node feature validation
+			// during admission and the DRA Filter.
+			DeclaredFeatures: []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature},
 			Phase:            v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
 				{

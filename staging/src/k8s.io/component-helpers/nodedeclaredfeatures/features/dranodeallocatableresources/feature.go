@@ -24,7 +24,10 @@ import (
 var _ types.Feature = &draNodeAllocatableResourcesFeature{}
 
 const (
-	DRANodeAllocatableResourcesFeature = "DRANodeAllocatableResources"
+	DRANodeAllocatableResourcesFeatureGate = "DRANodeAllocatableResources"
+	// The declared name changed from "DRANodeAllocatableResources" to "DRAExtraNodeAllocatableResources" in 1.38, because the pod status API changed between
+	// alpha and beta. 1.38+ kubelets use the updated API for cgroup adjustments so pods that use status.extraNodeAllocatableResources must only run on nodes that declare the new name.
+	DRANodeAllocatableResourcesFeature = "DRAExtraNodeAllocatableResources"
 )
 
 var Feature = &draNodeAllocatableResourcesFeature{}
@@ -36,17 +39,20 @@ func (f *draNodeAllocatableResourcesFeature) Name() string {
 }
 
 func (f *draNodeAllocatableResourcesFeature) Discover(cfg *types.NodeConfiguration) bool {
-	return cfg.FeatureGates.Enabled(DRANodeAllocatableResourcesFeature)
+	return cfg.FeatureGates.Enabled(DRANodeAllocatableResourcesFeatureGate)
 }
 
 func (f *draNodeAllocatableResourcesFeature) Requirements() *types.FeatureRequirements {
 	return &types.FeatureRequirements{
-		EnabledFeatureGates: []string{DRANodeAllocatableResourcesFeature},
+		EnabledFeatureGates: []string{DRANodeAllocatableResourcesFeatureGate},
 	}
 }
 
 func (f *draNodeAllocatableResourcesFeature) InferForScheduling(podInfo *types.PodInfo) bool {
-	// This feature does not affect pod scheduling.
+	// Whether a pod needs this feature depends on the devices allocated to its claims, which is not known
+	// before Filter. Instead, node.status.declaredFeatures is checked in
+	// 1. ResourceSlice admission, which rejects node allocatable devices on nodes without this feature.
+	// 2. The DRA scheduler plugin Filter.
 	return false
 }
 

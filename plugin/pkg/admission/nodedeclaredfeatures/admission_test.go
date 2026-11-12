@@ -344,7 +344,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 		},
 		Status: v1.NodeStatus{
 			DeclaredFeatures: []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature},
-			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.37.0"},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.38.0"},
 		},
 	}
 	nodeWithFeature2 := &v1.Node{
@@ -354,7 +354,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 		},
 		Status: v1.NodeStatus{
 			DeclaredFeatures: []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature},
-			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.37.0"},
+			NodeInfo:         v1.NodeSystemInfo{KubeletVersion: "1.38.0"},
 		},
 	}
 	nodeWithoutFeature := &v1.Node{
@@ -493,7 +493,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -580,7 +580,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -602,7 +602,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -668,7 +668,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -712,7 +712,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 				},
 			},
 			nodes: []runtime.Object{nodeWithFeature, nodeWithoutFeature}, expectErr: true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{
@@ -735,7 +735,7 @@ func TestNodeAllocatableResourceSliceAdmission(t *testing.T) {
 			},
 			nodes:       []runtime.Object{nodeWithFeature, nodeWithoutFeature},
 			expectErr:   true,
-			errContains: "does not support DRANodeAllocatableResources feature",
+			errContains: "does not support DRAExtraNodeAllocatableResources feature",
 			operation:   admission.Create,
 		},
 		{

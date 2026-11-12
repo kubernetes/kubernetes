@@ -56,6 +56,7 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	baseversion "k8s.io/component-base/version"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/dranodeallocatableresources"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/draoptionalnodeoperations"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
@@ -295,7 +296,7 @@ var (
 	workerNode                                 = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
 	workerNodeSlice                            = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 	largeWorkerNodeSlice                       = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Device("instance-3").Device("instance-4").Obj()
-	workerNodeWithCapacity                     = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10", v1.ResourceMemory: "10Gi"}).Node
+	workerNodeWithCapacity                     = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "10", v1.ResourceMemory: "10Gi"}).DeclaredFeatures([]string{dranodeallocatableresources.DRANodeAllocatableResourcesFeature}).Node
 	workerNodeSliceWithNodeAllocatableResource = func() *resourceapi.ResourceSlice {
 		nativeSlice := st.MakeResourceSlice(nodeName, nodeAllocatableResourceDriver).Device("numa-0-cpus",
 			map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
@@ -4373,6 +4374,32 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.Unschedulable, `Insufficient cpu`)},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"node-allocatable-node-without-declared-feature": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRANodeAllocatableResources: true},
+			nodes: []*v1.Node{func() *v1.Node {
+				node := workerNodeWithCapacity.DeepCopy()
+				node.Status.DeclaredFeatures = []string{dranodeallocatableresources.DRANodeAllocatableResourcesFeatureGate}
+				return node
+			}()},
+			pod:     podWithClaimReferenceInContainer,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs: func() []apiruntime.Object {
+				slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+				slice.Spec.Devices[0].NodeAllocatableResources = map[v1.ResourceName]resourceapi.NodeAllocatableResource{
+					v1.ResourceCPU: {Mapping: &resourceapi.NodeAllocatableMapping{DeviceMultiplier: new(apiresource.MustParse("1"))}},
+				}
+				return []apiruntime.Object{slice, podWithClaimReferenceInContainer}
+			}(),
+			want: want{
+				filter: perNodeResult{
+					workerNodeWithCapacity.Name: {status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "node does not declare the "+dranodeallocatableresources.DRANodeAllocatableResourcesFeature+" feature (requires a kubelet with the "+dranodeallocatableresources.DRANodeAllocatableResourcesFeatureGate+" feature gate enabled)")},
 				},
 				postfilter: result{
 					status: fwk.NewStatus(fwk.Unschedulable),
