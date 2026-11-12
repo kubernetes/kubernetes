@@ -24,8 +24,37 @@
 #        "dirty" indicates source code changes after the git commit id
 #        "archive" indicates the tree was produced by 'git archive'
 #    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
-#    KUBE_GIT_MAJOR - The major part of the version
-#    KUBE_GIT_MINOR - The minor component of the version
+#    KUBE_GIT_MAJOR - The major part of DefaultKubeBinaryVersion
+#    KUBE_GIT_MINOR - The minor part of DefaultKubeBinaryVersion
+
+# Derives KUBE_GIT_MAJOR and KUBE_GIT_MINOR from DefaultKubeBinaryVersion, the
+# same way as k8s.io/component-base/version does.
+kube::version::set_major_minor() {
+  local base_go="${KUBE_ROOT}/staging/src/k8s.io/component-base/version/base.go"
+  local default_version
+  default_version=$(sed -n 's/^[[:space:]]*DefaultKubeBinaryVersion = "\([0-9]*\)\.\([0-9]*\)"$/\1.\2/p' "${base_go}")
+  if [[ -z "${default_version}" ]]; then
+    kube::log::error "Unable to extract DefaultKubeBinaryVersion from ${base_go}"
+    exit 1
+  fi
+  KUBE_GIT_MAJOR="${default_version%%.*}"
+  KUBE_GIT_MINOR="${default_version#*.}"
+}
+
+# Prints the version of the source code (vX.Y.Z[-pre]) as defined by the
+# constants in k8s.io/component-base/version.
+kube::version::source_version() {
+  local base_go="${KUBE_ROOT}/staging/src/k8s.io/component-base/version/base.go"
+  local patch pre
+  patch=$(sed -n 's/^[[:space:]]*KubePatchVersion = \([0-9]*\)$/\1/p' "${base_go}")
+  pre=$(sed -n 's/^[[:space:]]*KubePreReleaseVersion = "\(.*\)"$/\1/p' "${base_go}")
+  if [[ -z "${patch}" ]]; then
+    kube::log::error "Unable to extract KubePatchVersion from ${base_go}"
+    exit 1
+  fi
+  kube::version::set_major_minor
+  echo "v${KUBE_GIT_MAJOR}.${KUBE_GIT_MINOR}.${patch}${pre:+-${pre}}"
+}
 
 # Grovels through git to set a set of env variables.
 #
@@ -52,6 +81,8 @@ kube::version::get_version_vars() {
      KUBE_GIT_VERSION="${BASH_REMATCH[1]}"
     fi
   fi
+
+  kube::version::set_major_minor
 
   local git=(git --work-tree "${KUBE_ROOT}")
 
@@ -95,14 +126,16 @@ kube::version::get_version_vars() {
       fi
 
 
-      # Try to match the "git describe" output to a regex to try to extract
-      # the "major" and "minor" versions and whether this is the exact tagged
-      # version or whether the tree is between two tagged versions.
-      if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?([+].*)?$ ]]; then
-        KUBE_GIT_MAJOR=${BASH_REMATCH[1]}
-        KUBE_GIT_MINOR=${BASH_REMATCH[2]}
-        if [[ -n "${BASH_REMATCH[4]}" ]]; then
-          KUBE_GIT_MINOR+="+"
+      # If HEAD is exactly on a tag (no commit distance, i.e. no build metadata),
+      # then the tag must match the constants in the source code because
+      # those are what the binaries report.
+      if [[ "${KUBE_GIT_VERSION%-dirty}" != *+* ]]; then
+        local source_version
+        source_version=$(kube::version::source_version)
+        if [[ "${KUBE_GIT_VERSION%-dirty}" != "${source_version}" ]]; then
+          kube::log::error "Tag ${KUBE_GIT_VERSION%-dirty} does not match the version in staging/src/k8s.io/component-base/version/base.go: ${source_version}"
+          kube::log::error "Update DefaultKubeBinaryVersion, KubePatchVersion and KubePreReleaseVersion there."
+          exit 1
         fi
       fi
 
@@ -164,19 +197,6 @@ kube::version::ldflags() {
   kube::util::ensure-gnu-compatible-date
 
   add_ldflag "buildDate" "$(${DATE} ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} -u +'%Y-%m-%dT%H:%M:%SZ')"
-  if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
-    add_ldflag "gitCommit" "${KUBE_GIT_COMMIT}"
-    add_ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"
-  fi
-
-  if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-    add_ldflag "gitVersion" "${KUBE_GIT_VERSION}"
-  fi
-
-  if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
-    add_ldflag "gitMajor" "${KUBE_GIT_MAJOR}"
-    add_ldflag "gitMinor" "${KUBE_GIT_MINOR}"
-  fi
 
   # The -ldflags parameter takes a single string, so join the output.
   echo "${ldflags[*]-}"

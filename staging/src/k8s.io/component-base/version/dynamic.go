@@ -26,13 +26,13 @@ import (
 var dynamicGitVersion atomic.Value
 
 func init() {
-	// initialize to static gitVersion
-	dynamicGitVersion.Store(gitVersion)
+	// initialize to the version of the build
+	dynamicGitVersion.Store(buildVersion())
 }
 
 // SetDynamicVersion overrides the version returned as the GitVersion from Get().
 // The specified version must be non-empty, a valid semantic version, and must
-// match the major/minor/patch version of the default gitVersion.
+// match the major/minor/patch version of the build version.
 func SetDynamicVersion(dynamicVersion string) error {
 	if err := ValidateDynamicVersion(dynamicVersion); err != nil {
 		return err
@@ -42,9 +42,9 @@ func SetDynamicVersion(dynamicVersion string) error {
 }
 
 // ValidateDynamicVersion ensures the given version is non-empty, a valid semantic version,
-// and matched the major/minor/patch version of the default gitVersion.
+// and matched the major/minor/patch version of the build version.
 func ValidateDynamicVersion(dynamicVersion string) error {
-	return validateDynamicVersion(dynamicVersion, gitVersion)
+	return validateDynamicVersion(dynamicVersion, buildVersion())
 }
 
 func validateDynamicVersion(dynamicVersion, defaultVersion string) error {
@@ -60,13 +60,7 @@ func validateDynamicVersion(dynamicVersion, defaultVersion string) error {
 		return err
 	}
 	// must match major/minor/patch of default version
-	var vDefault *utilversion.Version
-	if defaultVersion == "v0.0.0-master+$Format:%H$" {
-		// special-case the placeholder value which doesn't parse as a semantic version
-		vDefault, err = utilversion.ParseSemantic("v0.0.0-master")
-	} else {
-		vDefault, err = utilversion.ParseSemantic(defaultVersion)
-	}
+	vDefault, err := utilversion.ParseSemantic(defaultVersion)
 	if err != nil {
 		return err
 	}
