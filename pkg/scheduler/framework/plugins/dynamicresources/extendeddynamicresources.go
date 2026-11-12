@@ -239,9 +239,12 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 			continue
 		}
 		allocatable, okScalar := nodeInfo.GetAllocatable().GetScalarResources()[rName]
-		isBackedByDRA := cache.GetDeviceClass(rName) != nil
-		if isBackedByDRA && allocatable == 0 {
+		class := cache.GetDeviceClass(rName)
+		if class != nil && allocatable == 0 {
 			// node needs to provide the resource via DRA
+			if status := pl.checkExtendedResourceCapacity(logger, pod, nodeInfo, rName, class); status != nil {
+				return nil, nil, status
+			}
 			extendedResources[rName] = rQuant
 			hasExtendedResource = true
 		} else if !okScalar {
@@ -275,6 +278,16 @@ func (pl *DynamicResources) filterExtendedResources(state *stateData, pod *v1.Po
 	nodeExtendedResourceClaim.Spec.Devices.Requests = reqs
 
 	return nodeExtendedResourceClaim, mappings, nil
+}
+
+// checkExtendedResourceCapacity aborts pod scheduling by returning a non-nil status if a referenced
+// class uses the extended resource capacity feature and that feature is disabled.
+func (pl *DynamicResources) checkExtendedResourceCapacity(logger klog.Logger, pod *v1.Pod, nodeInfo fwk.NodeInfo, rName v1.ResourceName, class *resourceapi.DeviceClass) *fwk.Status {
+	if pl.fts.EnableDRAExtendedResourceCapacity || class.Spec.ExtendedResourceCapacityRequests == nil {
+		return nil
+	}
+	return statusUnschedulable(logger, fmt.Sprintf("device class %s sets extendedResourceCapacityRequests, which requires the DRAExtendedResourceCapacity feature", class.Name),
+		"pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()), "resource", rName, "deviceClass", klog.KObj(class))
 }
 
 // isSpecialClaimName return true when the name is the specialClaimInMemName.
@@ -339,7 +352,7 @@ func partitionContainerIndices(containers []v1.Container, numInitContainers int)
 // items in reusableRequests may be nil.
 // The returned request may be nil if no additional request was required.
 // The returned mappings may be empty if this container does not use this resource.
-func createResourceRequestAndMappings(containerIndex int, container *v1.Container, rName v1.ResourceName, className string, reusableRequests []*resourceapi.DeviceRequest) (*resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
+func createResourceRequestAndMappings(containerIndex int, container *v1.Container, rName v1.ResourceName, class *resourceapi.DeviceClass, reusableRequests []*resourceapi.DeviceRequest) (*resourceapi.DeviceRequest, []v1.ContainerExtendedResourceRequest) {
 	var mappings []v1.ContainerExtendedResourceRequest
 	creqs := container.Resources.Requests
 	if creqs == nil {
@@ -389,9 +402,10 @@ func createResourceRequestAndMappings(containerIndex int, container *v1.Containe
 	deviceReq := resourceapi.DeviceRequest{
 		Name: reqName, // need to be container name index - extended resource name index
 		Exactly: &resourceapi.ExactDeviceRequest{
-			DeviceClassName: className,
+			DeviceClassName: class.Name,
 			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 			Count:           crq - sum, // the extra devices to request
+			Capacity:        class.Spec.ExtendedResourceCapacityRequests,
 		},
 	}
 	mappings = append(mappings, v1.ContainerExtendedResourceRequest{
@@ -439,7 +453,7 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 		// Requests at later indices are reusable by non-sidecar initContainers at earlier indices.
 		longLivedResourceRequests := make([]*resourceapi.DeviceRequest, len(containers))
 		for _, i := range longLivedContainerIndices {
-			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, nil)
+			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class, nil)
 			longLivedResourceRequests[i] = containerRequest                                     // might be nil
 			longLivedResourceMappings = append(longLivedResourceMappings, containerMappings...) // might be zero-length
 		}
@@ -450,7 +464,7 @@ func createRequestsAndMappings(pod *v1.Pod, extendedResources map[v1.ResourceNam
 		// this set will be replaced by maxShortLivedResourceRequest.Name.
 		shortLivedRequestNames := sets.New[string]()
 		for _, i := range shortLivedInitContainerIndices {
-			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class.Name, longLivedResourceRequests[i:])
+			containerRequest, containerMappings := createResourceRequestAndMappings(i, &containers[i], resource, class, longLivedResourceRequests[i:])
 			if containerRequest != nil {
 				shortLivedRequestNames.Insert(containerRequest.Name)
 				if maxShortLivedResourceRequest == nil || maxShortLivedResourceRequest.Exactly.Count < containerRequest.Exactly.Count {

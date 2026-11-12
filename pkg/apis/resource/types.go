@@ -2102,6 +2102,25 @@ type DeviceClassSpec struct {
 	// +optional
 	// +featureGate=DRAExtendedResource
 	ExtendedResourceName *string
+
+	// ExtendedResourceCapacityRequests defines the fixed capacity
+	// amounts that the scheduler requests on every ResourceClaim it
+	// synthesizes to satisfy the extended resource of this class.
+	//
+	// The value is copied, unmodified, onto the Capacity field of each
+	// ExactDeviceRequest synthesized for this class, so it has the same
+	// semantics as DeviceRequest.Capacity: it applies to each device
+	// allocation. A pod requesting more than one device through the
+	// extended resource gets that capacity once per device, not once
+	// per pod.
+	//
+	// The devices selected by this class must advertise the referenced
+	// capacities. Otherwise the extended resource requests cannot be
+	// satisfied, the same way as with a selector that matches no devices.
+	//
+	// +optional
+	// +featureGate=DRAExtendedResourceCapacity
+	ExtendedResourceCapacityRequests *CapacityRequirements
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

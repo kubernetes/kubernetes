@@ -13183,6 +13183,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1.DeviceClassConfiguration
           elementRelationship: atomic
+    - name: extendedResourceCapacityRequests
+      type:
+        namedType: io.k8s.api.resource.v1.CapacityRequirements
     - name: extendedResourceName
       type:
         scalar: string
@@ -14245,6 +14248,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceClassConfiguration
           elementRelationship: atomic
+    - name: extendedResourceCapacityRequests
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CapacityRequirements
     - name: extendedResourceName
       type:
         scalar: string
@@ -15019,6 +15025,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.DeviceClassConfiguration
           elementRelationship: atomic
+    - name: extendedResourceCapacityRequests
+      type:
+        namedType: io.k8s.api.resource.v1beta2.CapacityRequirements
     - name: extendedResourceName
       type:
         scalar: string

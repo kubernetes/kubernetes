@@ -139,6 +139,19 @@ var (
 			ExtendedResourceName: &extendedResourceName,
 		},
 	}
+	deviceClassWithExtendedResourceCapacity = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
+			ExtendedResourceCapacityRequests: &resourceapi.CapacityRequirements{
+				Requests: map[resourceapi.QualifiedName]apiresource.Quantity{
+					"shares": apiresource.MustParse("1"),
+				},
+			},
+		},
+	}
 	deviceClassWithExtendResourceName2 = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className + "2",
@@ -1078,6 +1091,32 @@ func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 		slice.Spec.Devices[i].Taints = append(slice.Spec.Devices[i].Taints, deviceTaint)
 	}
 	return slice
+}
+
+var (
+	// Node with one "instance-1" device that several claims can share, with 4 "shares".
+	workerNodeSliceWithShares = func() *resourceapi.ResourceSlice {
+		slice := st.MakeResourceSlice(nodeName, driver).Device("instance-1",
+			map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				"shares": {Value: apiresource.MustParse("4")},
+			},
+		).Obj()
+		slice.Spec.Devices[0].AllowMultipleAllocations = new(true)
+		return slice
+	}()
+	extendedResourceClaimWithCapacity       = withExtendedResourceCapacity(extendedResourceClaim)
+	extendedResourceClaimWithCapacityNoName = withExtendedResourceCapacity(extendedResourceClaimNoName)
+)
+
+// withExtendedResourceCapacity returns claim with the capacity request of
+// deviceClassWithExtendedResourceCapacity, and that capacity consumed from
+// the device allocated for it.
+func withExtendedResourceCapacity(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+	claim = claim.DeepCopy()
+	capacity := deviceClassWithExtendedResourceCapacity.Spec.ExtendedResourceCapacityRequests
+	claim.Spec.Devices.Requests[0].Exactly.Capacity = capacity
+	claim.Status.Allocation.Devices.Results[0].ConsumedCapacity = capacity.Requests
+	return claim
 }
 
 func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
@@ -2610,6 +2649,47 @@ func testPlugin(tCtx ktesting.TContext) {
 					assumedClaim: reserve(extendedResourceClaim, podWithExtendedResourceName),
 				},
 			},
+		},
+		"extended-resource-capacity-requests": {
+			featureOverrides: featuregatetesting.FeatureOverrides{features.DRAConsumableCapacity: true, features.DRAExtendedResourceCapacity: true},
+			nodes:            []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:              podWithExtendedResourceName,
+			classes:          []*resourceapi.DeviceClass{deviceClassWithExtendedResourceCapacity},
+			objs:             []apiruntime.Object{workerNodeSliceWithShares, podWithExtendedResourceName},
+			want: want{
+				reserve: result{
+					inFlightClaims: []metav1.Object{extendedResourceClaimWithCapacityNoName},
+				},
+				prebind: result{
+					assumedClaim: addAllocationTimestamp(reserve(extendedResourceClaimWithCapacity, podWithExtendedResourceName)),
+					added:        []metav1.Object{addAllocationTimestamp(reserve(extendedResourceClaimWithCapacity, podWithExtendedResourceName))},
+				},
+				postbind: result{
+					assumedClaim: reserve(extendedResourceClaimWithCapacity, podWithExtendedResourceName),
+				},
+			},
+		},
+		"extended-resource-capacity-requests-feature-disabled": {
+			nodes:   []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendedResourceCapacity},
+			objs:    []apiruntime.Object{workerNodeSlice, podWithExtendedResourceName},
+			want: want{
+				filter: perNodeResult{
+					nodeName: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "device class my-resource-class sets extendedResourceCapacityRequests, which requires the DRAExtendedResourceCapacity feature"),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable),
+				},
+			},
+		},
+		"extended-resource-capacity-requests-feature-disabled-node-resource": {
+			nodes:   []*v1.Node{workerNodeWithExtendedResource},
+			pod:     podWithExtendedResourceName,
+			classes: []*resourceapi.DeviceClass{deviceClassWithExtendedResourceCapacity},
+			want:    want{},
 		},
 		"non-DRA-extended-resource-name-with-zero-allocatable": {
 			nodes:   []*v1.Node{workerNodeWithExtendedResourceZeroAllocatable},
@@ -6244,9 +6324,8 @@ func TestPodGroupPostFilter(t *testing.T) {
 			},
 		},
 		"delete-pod-level-extended-claim": {
-			enableDRAExtendedResource: true,
-			podGroups:                 []*schedulingapi.PodGroup{podGroupWithClaimName},
-			unscheduledPods:           []*v1.Pod{groupedPodWithClaimName},
+			podGroups:       []*schedulingapi.PodGroup{podGroupWithClaimName},
+			unscheduledPods: []*v1.Pod{groupedPodWithClaimName},
 			claims: func() []*resourceapi.ResourceClaim {
 				// Create an extended resource claim owned by the pod
 				claim := inUseClaim.DeepCopy()
