@@ -77,7 +77,7 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 
 	// The claims use node allocatable devices, check whether the node supports status.extraNodeAllocatableResources.
 	if node := nodeInfo.Node(); !slices.Contains(node.Status.DeclaredFeatures, dranodeallocatableresources.DRANodeAllocatableResourcesFeature) {
-		return nil, statusUnschedulable(logger, fmt.Sprintf("node does not declare the %s feature (requires a kubelet with the %s feature gate enabled)", dranodeallocatableresources.DRANodeAllocatableResourcesFeature, dranodeallocatableresources.DRANodeAllocatableResourcesFeatureGate), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(nodeAllocatableClaims))
+		return nil, statusUnschedulableAndUnresolvable(logger, fmt.Sprintf("node does not declare the %s feature (requires a kubelet with the %s feature gate enabled)", dranodeallocatableresources.DRANodeAllocatableResourcesFeature, dranodeallocatableresources.DRANodeAllocatableResourcesFeatureGate), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(nodeAllocatableClaims))
 	}
 
 	otherEntries := state.extraNodeAllocatableResources.GetExcludingPlugin(nodeInfo.Node().Name, Name)
