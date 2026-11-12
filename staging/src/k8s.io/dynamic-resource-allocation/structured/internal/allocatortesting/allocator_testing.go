@@ -2329,6 +2329,49 @@ func TestAllocator(t *testing.T,
 			},
 			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")),
 		},
+		"admin-access-after-regular-claim-single-device": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1)),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+				),
+				matchAllocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, true),
+				),
+			},
+			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")),
+		},
+		"admin-access-before-regular-claim-single-device": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA, device(device1)),
+			),
+			node: node(node1, region1),
+			// Suspicious: the result depends on the order of the claims. Admin
+			// access should not block a regular request for the same device.
+			expectResults:              nil,
+			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")),
+		},
 		"all-devices-slice-without-devices-prioritized-list": {
 			features: Features{
 				PrioritizedList: true,
@@ -7613,6 +7656,33 @@ func TestAllocator(t *testing.T,
 				return expectResults, expectError, expectErrorIs
 			},
 		},
+		"consumable-capacity-admin-access-capacity-request-exceeds-remaining-capacity-below-total": {
+			features: Features{ConsumableCapacity: true, AdminAccess: true},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess().withCapacityRequest(capacity0, two)),
+			),
+			allocations: []resourceapi.AllocationResult{
+				allocationResult(
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				),
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, pool1, driverA,
+					device(device1).withCapacity(capacity0, three).withAllowMultipleAllocations(),
+				),
+			),
+			node: node(node1, region1),
+			// Suspicious: the request is within the total capacity, but admin access
+			// is still blocked by the capacity consumed by the regular allocation.
+			expectResults: nil,
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess || !features.ConsumableCapacity {
+					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
+		},
 		"consumable-capacity-admin-access-consumes-capacity-from-later-claim": {
 			features: Features{ConsumableCapacity: true, AdminAccess: true},
 			claimsToAllocate: objects(
@@ -9609,6 +9679,13 @@ func TestAllocator(t *testing.T,
 					deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one),
 					deviceRequest(req1, classA, 1).withCapacityRequest(capacity0, one),
 				),
+				// Only fits on device1 if the rolled back share of claim0 was released.
+				claim(claim1).withRequests(
+					deviceRequest(req0, classA, 1).withCapacityRequest(capacity0, one).withSelectors(resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "stringAttributeValue1"`, driverA),
+						},
+					})),
 			),
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrapResourceSlices(
@@ -9630,7 +9707,11 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
 				deviceRequestAllocationResult(req1, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
-			)},
+			),
+				matchAllocationResult(
+					localNodeSelector(node1),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+				)},
 			expectErrorWithoutFeatures: g.MatchError(g.ContainSubstring("has capacity requests, but the DRAConsumableCapacity feature is disabled")),
 		},
 		"consumable-capacity-admin-access-backtrack-releases-capacity": {
@@ -9640,6 +9721,13 @@ func TestAllocator(t *testing.T,
 					deviceRequest(req0, classA, 1).withAdminAccess().withCapacityRequest(capacity0, one),
 					deviceRequest(req1, classA, 1).withAdminAccess().withCapacityRequest(capacity0, one),
 				),
+				// Only fits on device1 if the rolled back share of claim0 was released.
+				claim(claim1).withRequests(
+					deviceRequest(req0, classA, 1).withAdminAccess().withCapacityRequest(capacity0, one).withSelectors(resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].stringAttribute == "stringAttributeValue1"`, driverA),
+						},
+					})),
 			),
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrapResourceSlices(
@@ -9662,7 +9750,11 @@ func TestAllocator(t *testing.T,
 				localNodeSelector(node1),
 				withAdminAccess(deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one})),
 				withAdminAccess(deviceRequestAllocationResult(req1, driverA, pool1, device2).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one})),
-			)},
+			),
+				matchAllocationResult(
+					localNodeSelector(node1),
+					withAdminAccess(deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one})),
+				)},
 			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
 				if !features.AdminAccess || !features.ConsumableCapacity {
 					return nil, g.MatchError(g.ContainSubstring("feature is disabled")), nil
@@ -9704,7 +9796,7 @@ func TestAllocator(t *testing.T,
 				return expectResults, expectError, expectErrorIs
 			},
 		},
-		"partitionable-devices-admin-access-then-regular-allocation": {
+		"partitionable-devices-regular-allocation-then-regular-allocation": {
 			features: Features{AdminAccess: true, PartitionableDevices: true},
 			claimsToAllocate: objects(
 				claim(claim0).withRequests(deviceRequest(req0, classA, 1)),
@@ -9729,9 +9821,8 @@ func TestAllocator(t *testing.T,
 				),
 			),
 			node: node(node1, region1),
-			// Suspicious: device1 is allocated (e.g. via admin access in the scenario
-			// above) and its counters are exhausted, so a regular request cannot
-			// share it. Admin access should not block regular workloads.
+			// device1 is allocated to a regular claim and uses up the counters, so
+			// device2 is not available.
 			expectResults: nil,
 		},
 		"partitionable-devices-regular-allocation-then-admin-access": {
