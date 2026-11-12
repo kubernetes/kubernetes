@@ -21,6 +21,7 @@ package emptydir
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -136,6 +138,18 @@ func (plugin *emptyDirPlugin) ResizeEphemeralVolume(spec *volume.Spec, pod *v1.P
 	}
 
 	options := []string{"remount", fmt.Sprintf("size=%d", desiredSize.Value())}
+	// Kernels before 6.12.60 and 6.6.118 reject a remount that drops noswap,
+	// and every kernel rejects a remount that adds it.
+	mountPoints, err := mounter.List()
+	if err != nil {
+		return fmt.Errorf("error listing mount points: %w", err)
+	}
+	for _, mp := range mountPoints {
+		if mp.Path == dir && slices.Contains(mp.Opts, swap.TmpfsNoswapOption) {
+			options = append(options, swap.TmpfsNoswapOption)
+			break
+		}
+	}
 
 	klog.V(2).InfoS("Resizing emptyDir volume", "pod", klog.KObj(pod), "volume", spec.Name(), "desiredSize", desiredSize)
 	return mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)

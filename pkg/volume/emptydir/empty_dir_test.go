@@ -1234,6 +1234,7 @@ func TestResizeEphemeralVolume(t *testing.T) {
 		expectError          bool
 		expectedMountAction  string
 		expectedMountOpts    []string
+		unexpectedMountOpts  []string
 	}{
 		{
 			name:                 "resize memory volume when mount point does not exist yet",
@@ -1254,6 +1255,17 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			expectError:          false,
 			expectedMountAction:  "mount",
 			expectedMountOpts:    []string{"remount", "size=209715200"},
+			unexpectedMountOpts:  []string{swap.TmpfsNoswapOption},
+		},
+		{
+			name:                 "resize memory volume mounted with noswap keeps noswap",
+			medium:               v1.StorageMediumMemory,
+			isMountPoint:         true,
+			currentMountSizeOpts: []string{"rw", "relatime", "size=104857600", swap.TmpfsNoswapOption},
+			newSize:              &quantity200Mi,
+			expectError:          false,
+			expectedMountAction:  "mount",
+			expectedMountOpts:    []string{"remount", "size=209715200", swap.TmpfsNoswapOption},
 		},
 		{
 			name:                 "resize disk-backed volume should return error",
@@ -1350,6 +1362,9 @@ func TestResizeEphemeralVolume(t *testing.T) {
 			require.NotNil(t, targetMp, "expected a mount point at %s, but got none", volPath)
 			for _, expectedOpt := range tt.expectedMountOpts {
 				assert.Contains(t, targetMp.Opts, expectedOpt)
+			}
+			for _, unexpectedOpt := range tt.unexpectedMountOpts {
+				assert.NotContains(t, targetMp.Opts, unexpectedOpt)
 			}
 		})
 	}
