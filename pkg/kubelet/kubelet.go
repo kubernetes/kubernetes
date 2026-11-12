@@ -735,7 +735,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+	klet.statusManager = status.NewManager(klet.kubeClient, kubeDeps.Recorder, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 
 	broadcaster := pods.NewBroadcaster(ctx)
 	klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager, klet.sourcesReady)

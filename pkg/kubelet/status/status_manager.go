@@ -28,6 +28,7 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -35,12 +36,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
@@ -69,6 +72,7 @@ type versionedPodStatus struct {
 // All methods are thread-safe.
 type manager struct {
 	kubeClient clientset.Interface
+	recorder   record.EventRecorderLogger
 	podManager PodManager
 	// Map from pod UID to sync status of the corresponding pod.
 	podStatuses         map[types.UID]versionedPodStatus
@@ -215,9 +219,10 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
+func NewManager(kubeClient clientset.Interface, recorder record.EventRecorderLogger, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
+		recorder:                recorder,
 		podManager:              podManager,
 		podStatuses:             make(map[types.UID]versionedPodStatus),
 		podResizeConditions:     make(map[types.UID]podResizeConditions),
@@ -927,6 +932,76 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 	return nil
 }
 
+// oomKilledReason is the container termination reason the CRI runtime reports
+// when the kernel OOM killer kills a process in the container's cgroup. The CRI
+// API contract requires this exact value (see ContainerStatus.reason).
+const oomKilledReason = "OOMKilled"
+
+// oomKilledContainerIDs returns the terminated container IDs the statuses report as
+// OOMKilled, across both the current and last termination states. Each OOM kill is
+// identified by its terminated container ID.
+func oomKilledContainerIDs(status v1.PodStatus) sets.Set[string] {
+	ids := sets.New[string]()
+	collect := func(statuses []v1.ContainerStatus) {
+		for _, cs := range statuses {
+			for _, term := range []*v1.ContainerStateTerminated{cs.State.Terminated, cs.LastTerminationState.Terminated} {
+				if term != nil && term.Reason == oomKilledReason && term.ContainerID != "" {
+					ids.Insert(term.ContainerID)
+				}
+			}
+		}
+	}
+	collect(status.InitContainerStatuses)
+	collect(status.ContainerStatuses)
+	collect(status.EphemeralContainerStatuses)
+	return ids
+}
+
+// recordNewOOMKills emits a Warning event for every container whose terminated
+// container ID is reported as OOMKilled in newStatus but was not already OOMKilled
+// in oldStatus. Comparing terminated container IDs across both the current and last
+// termination states ensures each OOM-killed container instance is reported exactly
+// once, even when the kill is only ever observed in the last termination state (a
+// fast restart) or when a replacement container OOMs before the next status update.
+func (m *manager) recordNewOOMKills(logger klog.Logger, oldStatus, newStatus v1.PodStatus, pod *v1.Pod) {
+	if m.recorder == nil {
+		return
+	}
+	reported := oomKilledContainerIDs(oldStatus)
+	record := func(statuses []v1.ContainerStatus) {
+		for _, cs := range statuses {
+			for _, term := range []*v1.ContainerStateTerminated{cs.State.Terminated, cs.LastTerminationState.Terminated} {
+				if term == nil || term.Reason != oomKilledReason || term.ContainerID == "" || reported.Has(term.ContainerID) {
+					continue
+				}
+				reported.Insert(term.ContainerID)
+				m.recordContainerOOMKill(logger, pod, cs.Name, term)
+			}
+		}
+	}
+	record(newStatus.InitContainerStatuses)
+	record(newStatus.ContainerStatuses)
+	record(newStatus.EphemeralContainerStatuses)
+}
+
+// recordContainerOOMKill logs the OOM kill and emits a Warning OOMKilled event
+// scoped to the named container, so the kill is discoverable on the Pod, e.g. via
+// `kubectl describe pod`. Callers determine that the container was OOM-killed and
+// ensure each kill is reported only once.
+func (m *manager) recordContainerOOMKill(logger klog.Logger, pod *v1.Pod, containerName string, terminated *v1.ContainerStateTerminated) {
+	ref, err := kubecontainer.GenerateContainerRef(pod, &v1.Container{Name: containerName})
+	if err != nil {
+		logger.Error(err, "Failed to generate container reference for OOMKilled event", "pod", klog.KObj(pod), "containerName", containerName)
+		return
+	}
+	// The event broadcaster logs events only at -v>=3. Log the OOM kill at V(2) as
+	// well so it is visible at the kubelet's common -v=2 without raising verbosity
+	// to -v=3.
+	logger.V(2).Info("Container was OOMKilled", "pod", klog.KObj(pod), "containerName", containerName, "exitCode", terminated.ExitCode)
+	m.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, events.OOMKilledContainer,
+		"Container %s was OOMKilled (exit code %d)", containerName, terminated.ExitCode)
+}
+
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
@@ -1056,6 +1131,8 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	checkAndRecordTerminations(oldStatus.InitContainerStatuses, status.InitContainerStatuses, metrics.InitContainer)
 	checkAndRecordTerminations(oldStatus.ContainerStatuses, status.ContainerStatuses, metrics.Container)
 	checkAndRecordTerminations(oldStatus.EphemeralContainerStatuses, status.EphemeralContainerStatuses, metrics.EphemeralContainer)
+
+	m.recordNewOOMKills(logger, oldStatus, status, pod)
 
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
