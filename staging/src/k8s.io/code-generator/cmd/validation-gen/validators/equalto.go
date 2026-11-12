@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	equalToTagName = "k8s:equalTo"
+	equalToTagName = "equalTo"
 )
 
 func init() {
