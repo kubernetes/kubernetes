@@ -620,20 +620,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		},
 	}
 
-	nodeAllocatableOverheadResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	nodeAllocatableOverheadResourceClaimPod.Status.ExtraNodeAllocatableResources = []api.ExtraNodeAllocatableResource{
-		{
-			ContainerName: "",
-			Requests:      api.ResourceList{api.ResourceMemory: resource.MustParse("1524Mi")},
-			Limits:        api.ResourceList{api.ResourceMemory: resource.MustParse("1524Mi")},
-		},
-		{
-			ContainerName: "mycontainer",
-			Requests:      api.ResourceList{api.ResourceMemory: resource.MustParse("500Mi")},
-			Limits:        api.ResourceList{api.ResourceMemory: resource.MustParse("1524Mi")},
-		},
-	}
-
 	pcrServiceAccountIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 	pcrServiceAccounts := corev1lister.NewServiceAccountLister(pcrServiceAccountIndex)
 
@@ -1194,16 +1180,10 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "annot update extended resource claim status",
 		},
 		{
-			name:       "forbid update of pod's node allocatable resource claim status",
+			name:       "allow update of pod's extra node allocatable resources",
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nodeAllocatableResourceClaimPod, claimpod, podKind, nodeAllocatableResourceClaimPod.Namespace, nodeAllocatableResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update extra node allocatable resources",
-		},
-		{
-			name:       "forbid update of pod's node allocatable overhead resource claim status",
-			podsGetter: existingPods,
-			attributes: admission.NewAttributesRecord(nodeAllocatableOverheadResourceClaimPod, claimpod, podKind, nodeAllocatableOverheadResourceClaimPod.Namespace, nodeAllocatableOverheadResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
-			err:        "cannot update extra node allocatable resources",
+			err:        "",
 		},
 
 		// My node object

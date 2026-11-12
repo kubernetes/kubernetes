@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"slices"
 	"strings"
 
@@ -29,7 +28,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -367,9 +365,6 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
 		}
-		if !extraNodeAllocatableResourcesEqual(oldPod.Status.ExtraNodeAllocatableResources, newPod.Status.ExtraNodeAllocatableResources) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extra node allocatable resources", nodeName))
-		}
 		return nil
 
 	default:
@@ -414,27 +409,6 @@ func extendedResourceClaimStatusEqual(statusA, statusB *api.PodExtendedResourceC
 	// But this cannot be guaranteed, so for the sake of correctness in all
 	// cases this code here has to check.
 	return slices.Equal(statusA.RequestMappings, statusB.RequestMappings)
-}
-
-func extraNodeAllocatableResourcesEqual(statusA, statusB []api.ExtraNodeAllocatableResource) bool {
-	if len(statusA) != len(statusB) {
-		return false
-	}
-	// In most cases, status entries only get added once and not modified.
-	// But this cannot be guaranteed, so for the sake of correctness in all
-	// cases this code here has to check.
-	for i := range statusA {
-		if statusA[i].ContainerName != statusB[i].ContainerName {
-			return false
-		}
-		if !maps.EqualFunc(statusA[i].Requests, statusB[i].Requests, apiresource.Quantity.Equal) {
-			return false
-		}
-		if !maps.EqualFunc(statusA[i].Limits, statusB[i].Limits, apiresource.Quantity.Equal) {
-			return false
-		}
-	}
-	return true
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
