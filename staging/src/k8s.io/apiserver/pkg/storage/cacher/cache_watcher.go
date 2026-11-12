@@ -411,14 +411,7 @@ func updateResourceVersion(object runtime.Object, versioner storage.Versioner, r
 
 func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event {
 	if event.Type == watch.Bookmark {
-		e := &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
-		if !c.wasBookmarkAfterRvSent() {
-			if err := storage.AnnotateInitialEventsEndBookmark(e.Object); err != nil {
-				utilruntime.HandleError(fmt.Errorf("error while accessing object's metadata gr: %v, identifier: %v, obj: %#v, err: %v", c.groupResource, c.identifier, e.Object, err))
-				return nil
-			}
-		}
-		return e
+		return &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
 	}
 
 	curObjPasses := event.Type != watch.Deleted && c.filter.filterWithAttrsAndPrefix(event.Key, event.ObjLabels, event.ObjFields, event.Object)

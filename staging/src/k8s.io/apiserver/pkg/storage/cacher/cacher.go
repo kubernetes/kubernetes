@@ -884,7 +884,8 @@ func (c *Cacher) initWatcherIntervalLocked(watcher *cacheWatcher) (*watchCacheIn
 		return nil, err
 	}
 
-	if isListWatchRequest(opts) {
+	switch {
+	case isListWatchRequest(opts):
 		bookmark, err := c.getInitialEventsEndBookmark(cacheInterval.resourceVersion)
 		if err != nil {
 			return nil, err
@@ -892,7 +893,10 @@ func (c *Cacher) initWatcherIntervalLocked(watcher *cacheWatcher) (*watchCacheIn
 		cacheInterval.initialEventsEndBookmark = bookmark
 		watcher.bookmarkAfterResourceVersion = cacheInterval.resourceVersion
 		watcher.state = cacheWatcherBookmarkReceived
-	} else {
+	case opts.Predicate.AllowWatchBookmarks:
+		watcher.bookmarkAfterResourceVersion = cacheInterval.resourceVersion
+		watcher.state = cacheWatcherWaitingForBookmark
+	default:
 		watcher.state = cacheWatcherBookmarkSent
 	}
 	return cacheInterval, nil
@@ -1651,8 +1655,6 @@ func (c *Cacher) Wait(ctx context.Context) error {
 
 // getInitialEventsEndBookmark returns an initialEventsEndBookmark for the given resourceVersion
 func (c *Cacher) getInitialEventsEndBookmark(resourceVersion uint64) (*watchCacheEvent, error) {
-	// We don't need to set the InitialEventsAnnotation for this bookmark event,
-	// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
 	initialEventsEndBookmark := &watchCacheEvent{
 		Type:            watch.Bookmark,
 		Object:          c.newFunc(),
@@ -1664,6 +1666,12 @@ func (c *Cacher) getInitialEventsEndBookmark(resourceVersion uint64) (*watchCach
 			panic(fmt.Sprintf("Failure to set resourceVersion to %d on initialEventsEndBookmark event %+v, resource: %q, err: %v", initialEventsEndBookmark.ResourceVersion, initialEventsEndBookmark.Object, c.groupResource, err))
 		}
 		return nil, fmt.Errorf("failure to set resourceVersion to %d on initialEventsEndBookmark event %+v, resource: %q, err: %w", initialEventsEndBookmark.ResourceVersion, initialEventsEndBookmark.Object, c.groupResource, err)
+	}
+	if err := storage.AnnotateInitialEventsEndBookmark(initialEventsEndBookmark.Object); err != nil {
+		if consistency.PanicOnCacheInconsistency {
+			panic(fmt.Sprintf("Failure to annotate initialEventsEndBookmark event %+v, resource: %q, err: %v", initialEventsEndBookmark.Object, c.groupResource, err))
+		}
+		return nil, fmt.Errorf("failure to annotate initialEventsEndBookmark event %+v, resource: %q, err: %w", initialEventsEndBookmark.Object, c.groupResource, err)
 	}
 	return initialEventsEndBookmark, nil
 }
