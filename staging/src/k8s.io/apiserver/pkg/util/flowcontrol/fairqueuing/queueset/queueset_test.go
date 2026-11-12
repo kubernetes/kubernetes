@@ -1585,3 +1585,111 @@ func qsComplete(qsc fq.QueueSetCompleter, concurrencyLimit int) fq.QueueSet {
 	}
 	return qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: concurrencyLimit, ConcurrencyDenominator: concurrencyDenominator})
 }
+
+// TestRemoveQueueOnlyWhenNoSeatsInUse tests that an excess queue is not
+// removed while a lingering request still holds seats in it.
+//
+// A request whose work estimate has AdditionalLatency is removed from the
+// queue's set of executing requests when its main service finishes, but it
+// keeps holding its seats until the AdditionalLatency elapses. When the
+// operator shrinks DesiredNumQueues, the excess queues drain by attrition:
+// each is removed the first time a finishing request would leave it empty.
+// That removal must be deferred while a lingering request still occupies
+// seats, because the queue is then removed a second time through the
+// lingering request's stale index when its seats are finally released --
+// which either removes a different, live queue or panics with a slice
+// bounds out of range when the stale index is at the end of the shortened
+// slice.
+func TestRemoveQueueOnlyWhenNoSeatsInUse(t *testing.T) {
+	metrics.Register()
+	metrics.Reset()
+	defer metrics.Reset()
+	now := time.Now()
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qCfg := fq.QueuingConfig{
+		Name:             "TestRemoveQueueOnlyWhenNoSeatsInUse",
+		DesiredNumQueues: 3,
+		QueueLengthLimit: 10,
+		HandSize:         1,
+	}
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsComplete(qsc, 10)
+	counter.Add(1) // account for the goroutine running this test
+
+	qsImpl, ok := qs.(*queueSet)
+	if !ok {
+		t.Fatalf("expected a QueueSet of type: %T but got: %T", &queueSet{}, qs)
+	}
+
+	// Pick a hash that maps to the last queue, so that the stale index of a
+	// prematurely removed queue is past the end of the shortened slice and
+	// the old code panics when the lingering request releases its seats.
+	hash := uint64(0)
+	for i := uint64(1); i < 1000; i++ {
+		if qsImpl.shuffleShardLocked(i, nil, nil) == 2 {
+			hash = i
+			break
+		}
+	}
+	if hash == 0 {
+		t.Fatal("no hash value maps to queue index 2")
+	}
+
+	ctx := context.Background()
+	// Lingering request: one seat through main service, held for another
+	// second by AdditionalLatency.
+	r, _ := qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 1, AdditionalLatency: time.Second}, hash, "", "fs", "test", "lingering", nil)
+	if r == nil {
+		t.Fatal("lingering request was rejected")
+	}
+	// Ordinary request dispatched from the same queue.
+	s, _ := qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: 1}, hash, "", "fs", "test", "ordinary", nil)
+	if s == nil {
+		t.Fatal("ordinary request was rejected")
+	}
+	if got := len(qsImpl.queues); got != 3 {
+		t.Fatalf("precondition: got %d queues, want 3", got)
+	}
+
+	// Shrink DesiredNumQueues so that all three queues are excess and drain
+	// by attrition.
+	qCfg.DesiredNumQueues = 1
+	completer, err := qs.BeginConfigChange(qCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs = qsComplete(completer, 10)
+
+	// The lingering request finishes its main service but keeps its seats.
+	if idle := r.Finish(func() {}); idle {
+		t.Error("Finish of the lingering request returned idle")
+	}
+	// The ordinary request finishes. Its queue must not be removed while the
+	// lingering request still holds seats in it. (The QueueSet is idle from
+	// its point of view at this moment: the lingering request stopped
+	// counting as executing when its main service finished.)
+	_ = s.Finish(func() {})
+	if got := len(qsImpl.queues); got != 3 {
+		t.Fatalf("got %d queues while the lingering request still holds seats, want 3", got)
+	}
+
+	// Let the lingering request release its seats. The queue is removed
+	// exactly once, through the still-valid index.
+	counter.Add(-1) // completion of the main activity of the goroutine running this test
+	clk.Run(nil)
+
+	if got := len(qsImpl.queues); got != 2 {
+		t.Errorf("got %d queues after the lingering request released its seats, want 2", got)
+	}
+	if !qs.IsIdle() {
+		t.Error("QueueSet is not idle at the end")
+	}
+	if n := qsImpl.totSeatsInUse; n != 0 {
+		t.Errorf("totSeatsInUse=%d, want 0", n)
+	}
+}
