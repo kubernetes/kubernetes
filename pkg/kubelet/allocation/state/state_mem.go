@@ -261,6 +261,7 @@ func (s *stateMemory) updateContainer(podUID types.UID, containerName string, co
 func (s *stateMemory) SetContainer(logger klog.Logger, podUID types.UID, containerType podutil.ContainerType, container v1.Container) error {
 	err := s.updateContainer(podUID, container.Name, containerType, func(c *v1.Container) {
 		c.Resources = *container.Resources.DeepCopy()
+		c.DynamicVolumeMountPolicy = container.DynamicVolumeMountPolicy.DeepCopy()
 		if len(container.VolumeMounts) == 0 {
 			c.VolumeMounts = nil
 			return
