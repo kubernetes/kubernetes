@@ -298,6 +298,39 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 			Buckets:        []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5},
 		}, []string{"group", "resource", "stage"})
+
+	StalledWatchers = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "stalled_watchers",
+			Help:           "Number of watchers that fell behind and are served from the watch cache history until they catch up, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatcherStalls = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_stalls_total",
+			Help:           "Counter of watchers that fell behind because their buffer was full, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatcherSkippedEvents = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "watcher_skipped_events_total",
+			Help:           "Counter of events not dispatched to a watcher because their resourceVersion is not newer than the last one dispatched to it, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -328,6 +361,11 @@ func Register() {
 			legacyregistry.MustRegister(WatchFilteredEventsTotal)
 		}
 		legacyregistry.MustRegister(DispatchStageDuration)
+		if utilfeature.DefaultFeatureGate.Enabled(features.WatchCacheStallResume) {
+			legacyregistry.MustRegister(StalledWatchers)
+			legacyregistry.MustRegister(WatcherStalls)
+			legacyregistry.MustRegister(WatcherSkippedEvents)
+		}
 	})
 }
 
@@ -369,6 +407,25 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// ResyncMetrics holds the resync metrics resolved for one resource.
+type ResyncMetrics struct {
+	// StalledWatchers is shared by every Cacher of the resource, so it must only
+	// be moved with Inc and Dec.
+	StalledWatchers compbasemetrics.GaugeMetric
+	Stalls          compbasemetrics.CounterMetric
+	SkippedEvents   compbasemetrics.CounterMetric
+}
+
+// NewResyncMetrics resolves the resync metrics for a resource.
+func NewResyncMetrics(groupResource schema.GroupResource) ResyncMetrics {
+	group, resource := groupResource.Group, groupResource.Resource
+	return ResyncMetrics{
+		StalledWatchers: StalledWatchers.WithLabelValues(group, resource),
+		Stalls:          WatcherStalls.WithLabelValues(group, resource),
+		SkippedEvents:   WatcherSkippedEvents.WithLabelValues(group, resource),
+	}
 }
 
 // WatcherMetricsObservers holds pre-resolved (group, resource) observers for

@@ -2235,6 +2235,45 @@
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
+- name: stalled_watchers
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Number of watchers that fell behind and are served from the watch cache history
+    until they catch up, broken by resource type.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watcher_skipped_events_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of events not dispatched to a watcher because their resourceVersion
+    is not newer than the last one dispatched to it, broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: watcher_stalls_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watchers that fell behind because their buffer was full, broken
+    by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
 - name: dispatch_duration_seconds
   subsystem: watch_events
   namespace: apiserver
