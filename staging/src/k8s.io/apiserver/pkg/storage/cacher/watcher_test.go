@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher"
+	"k8s.io/apiserver/pkg/storage/cacher/consistency"
 	"k8s.io/apiserver/pkg/storage/cacher/testing/setup"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -66,6 +67,15 @@ func testWatch(t *testing.T, watchCacheStallResume bool) {
 		ctx, cacher, terminate := setup.Setup(t)
 		t.Cleanup(terminate)
 		storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
+	})
+	t.Run("WatchMultiKeyTransaction", func(t *testing.T) {
+		if consistency.PanicOnCacheInconsistency {
+			t.Skip("the consistency checker panics on events that share a resourceVersion")
+		}
+		t.Parallel()
+		ctx, delegator, server, terminate := setup.SetupWithEtcdServer(t)
+		t.Cleanup(terminate)
+		storagetesting.RunTestWatchMultiKeyTransaction(ctx, t, delegator, server.V3Client.Client)
 	})
 	t.Run("WatchFromNonZero", func(t *testing.T) {
 		t.Parallel()
