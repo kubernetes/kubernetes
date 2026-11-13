@@ -81,6 +81,10 @@ type worker struct {
 	// for the ProberDuration metric by result.
 	proberDurationSuccessfulMetricLabels metrics.Labels
 	proberDurationUnknownMetricLabels    metrics.Labels
+
+	// activeProbeProtocolLabels holds the labels attached to this worker for the
+	// ActiveProbeProtocol metric, or nil if the worker is not probing over HTTP.
+	activeProbeProtocolLabels metrics.Labels
 }
 
 // isInitContainer checks if the worker's container is in the pod's init containers
@@ -151,7 +155,23 @@ func newWorker(
 	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 
+	if w.spec != nil && w.spec.HTTPGet != nil {
+		w.activeProbeProtocolLabels = metrics.Labels{"protocol": resolveHTTPProbeProtocol(w.spec.HTTPGet)}
+		ActiveProbeProtocol.With(w.activeProbeProtocolLabels).Inc()
+	}
+
 	return w
+}
+
+// resolveHTTPProbeProtocol returns the wire protocol an HTTP probe actually uses, accounting for
+// the H2CContainerProbe gate: an HTTP2-configured probe silently falls back to HTTP1 when the
+// gate is disabled, so the metric must reflect that instead of the raw spec value.
+func resolveHTTPProbeProtocol(httpGet *v1.HTTPGetAction) string {
+	if httpGet.Protocol != nil && *httpGet.Protocol == v1.HTTPProtocolHTTP2 &&
+		utilfeature.DefaultFeatureGate.Enabled(features.H2CContainerProbe) {
+		return string(v1.HTTPProtocolHTTP2)
+	}
+	return string(v1.HTTPProtocolHTTP1)
 }
 
 // run periodically probes the container.
@@ -181,6 +201,9 @@ func (w *worker) run(ctx context.Context) {
 		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
 		ProberDuration.Delete(w.proberDurationSuccessfulMetricLabels)
 		ProberDuration.Delete(w.proberDurationUnknownMetricLabels)
+		if w.activeProbeProtocolLabels != nil {
+			ActiveProbeProtocol.With(w.activeProbeProtocolLabels).Dec()
+		}
 	}()
 
 probeLoop:

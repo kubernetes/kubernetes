@@ -68,6 +68,19 @@ var ProberDuration = metrics.NewHistogramVec(
 		"namespace"},
 )
 
+// ActiveProbeProtocol tracks the number of currently active HTTP probes by wire protocol,
+// independent of ProberResults' per-pod/container labels, so cluster admins can watch H2C
+// migration progress.
+var ActiveProbeProtocol = metrics.NewGaugeVec(
+	&metrics.GaugeOpts{
+		Subsystem:      "kubelet",
+		Name:           "active_probe_protocol",
+		Help:           "Number of currently active HTTP probes by protocol.",
+		StabilityLevel: metrics.ALPHA,
+	},
+	[]string{"protocol"},
+)
+
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when

@@ -591,14 +591,26 @@ func dropHTTPProbeProtocol(podSpec, oldPodSpec *api.PodSpec) {
 		return
 	}
 
+	// Only drop supported values. Unsupported values must survive the drop so
+	// that validation can reject them with NotSupported, regardless of the
+	// feature gate state.
+	clearProtocol := func(action *api.HTTPGetAction) {
+		if action == nil || action.Protocol == nil {
+			return
+		}
+		switch *action.Protocol {
+		case api.HTTPProtocolHTTP1, api.HTTPProtocolHTTP2:
+			action.Protocol = nil
+		}
+	}
 	dropProbeProtocol := func(p *api.Probe) {
-		if p != nil && p.HTTPGet != nil {
-			p.HTTPGet.Protocol = nil
+		if p != nil {
+			clearProtocol(p.HTTPGet)
 		}
 	}
 	dropHandlerProtocol := func(h *api.LifecycleHandler) {
-		if h != nil && h.HTTPGet != nil {
-			h.HTTPGet.Protocol = nil
+		if h != nil {
+			clearProtocol(h.HTTPGet)
 		}
 	}
 
