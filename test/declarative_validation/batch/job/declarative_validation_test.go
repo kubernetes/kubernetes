@@ -24,6 +24,7 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -595,6 +596,14 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Invalid(field.NewPath("spec", "scheduling", "resourceClaims"), nil, "").WithOrigin("immutable"),
 			},
 		},
+		"ephemeral volume volumeName modified": {
+			old:    mkJob(setResourceVersion("1"), tweakEphemeralVolumeName("pv-old")),
+			update: mkJob(setResourceVersion("1"), tweakEphemeralVolumeName("pv-new")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "template", "spec", "volumes").Index(0).Child("ephemeral", "volumeClaimTemplate", "spec", "volumeName"), "", "").WithOrigin("update"),
+				field.Invalid(field.NewPath("spec", "template"), nil, "").MarkFromImperative(),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -777,6 +786,29 @@ func tweakBackoffLimitPerIndex(v *int32) func(*batch.Job) {
 func tweakTolerations(tolerations ...api.Toleration) func(*batch.Job) {
 	return func(job *batch.Job) {
 		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+}
+
+func tweakEphemeralVolumeName(volumeName string) func(*batch.Job) {
+	return func(job *batch.Job) {
+		job.Spec.Template.Spec.Volumes = []api.Volume{
+			{
+				Name: "ephemeral-vol",
+				VolumeSource: api.VolumeSource{
+					Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{
+								VolumeName:  volumeName,
+								AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+								Resources: api.VolumeResourceRequirements{
+									Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 }
 
