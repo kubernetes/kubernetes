@@ -65,10 +65,11 @@ type reloadableAuthorizerResolver struct {
 	reloadInterval         time.Duration
 	requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]
 
-	nodeAuthorizer *node.NodeAuthorizer
-	rbacAuthorizer *rbac.RBACAuthorizer
-	abacAuthorizer abac.PolicyList
-	compiler       authorizationcel.Compiler // non-nil and shared across reloads.
+	nodeAuthorizer                    *node.NodeAuthorizer
+	rbacAuthorizer                    *rbac.RBACAuthorizer
+	abacAuthorizer                    abac.PolicyList
+	compiler                          authorizationcel.Compiler                    // non-nil and shared across reloads.
+	builtinConditionsEvaluatorBuilder authorizer.BuiltinConditionsEvaluatorBuilder // non-nil when tbe ConditionalAuthorization feature is on, shared across reloads.
 
 	lastLoadedLock   sync.Mutex
 	lastLoadedConfig *authzconfig.AuthorizationConfiguration
@@ -205,6 +206,7 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if err != nil {
 				return nil, nil, err
 			}
+
 			webhookAuthorizer, err := webhook.New(sarClientConfig,
 				configuredAuthorizer.Webhook.SubjectAccessReviewVersion,
 				authorizedTTL,
@@ -216,6 +218,7 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				webhookMetrics,
 				conditionsReviewConfig,
 				conditionsReviewVersion,
+				r.builtinConditionsEvaluatorBuilder,
 			)
 			if err != nil {
 				return nil, nil, err
