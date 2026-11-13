@@ -605,6 +605,12 @@ const (
 	// serves localhost NodePort services on IPv4 and IPv6.
 	KubeProxyNFTablesLocalhostNodePorts featuregate.Feature = "KubeProxyNFTablesLocalhostNodePorts"
 
+	// owner: @stlaz
+	// kep: https://kep.k8s.io/6283
+	//
+	// Add a signer for Pod/Service serving certificates
+	KubeServingCertificatesSigner featuregate.Feature = "KubeServingCertificatesSigner"
+
 	// owner: @tallclair
 	//
 	// Enables the kubelet allocated pods endpoint.
@@ -1649,6 +1655,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	KubeServingCertificatesSigner: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	KubeletAllocatedPodsEndpoint: {
 		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2527,6 +2537,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeProxyIPVS: {},
 
 	KubeProxyNFTablesLocalhostNodePorts: {},
+
+	KubeServingCertificatesSigner: {ClusterTrustBundle, PodCertificateRequest},
 
 	KubeletAllocatedPodsEndpoint: {},
 
