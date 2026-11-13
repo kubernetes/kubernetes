@@ -112,13 +112,14 @@ PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
 ENABLE_TRACING=${ENABLE_TRACING:-false}
 
 # Enable ML-DSA post-quantum cryptography for all cluster certificates.
-# When true, generates ML-DSA CAs and certs, enables the CertificateSigningRequestMLDSA
-# feature gate, and configures the kubelet to use ML-DSA keys for certificate rotation.
+# When true, generates ML-DSA CAs, certs and signing keys, enables the CertificateSigningRequestMLDSA,
+# PodCertificateMLDSA, and ServiceAccountTokenMLDSA feature gates, and configures
+# the kubelet to use ML-DSA keys for certificate rotation.
 # ML-DSA API server health checks require curl using OpenSSL 3.5.0 or newer.
 ENABLE_MLDSA=${ENABLE_MLDSA:-false}
 MLDSA_ALGORITHM=${MLDSA_ALGORITHM:-"ML-DSA-65"}
 if [[ "${ENABLE_MLDSA}" == "true" ]]; then
-  FEATURE_GATES="${FEATURE_GATES},CertificateSigningRequestMLDSA=true,PodCertificateMLDSA=true"
+  FEATURE_GATES="${FEATURE_GATES},CertificateSigningRequestMLDSA=true,PodCertificateMLDSA=true,ServiceAccountTokenMLDSA=true"
   case "${MLDSA_ALGORITHM}" in
     ML-DSA-44) KUBE_CERT_KEY_ALGO="mldsa44" ;;
     ML-DSA-65) KUBE_CERT_KEY_ALGO="mldsa65" ;;
@@ -586,7 +587,11 @@ function set_service_accounts {
     # Generate ServiceAccount key if needed
     if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
       mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
-      openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+       if [[ "${ENABLE_MLDSA}" == "true" ]]; then
+            openssl genpkey -algorithm "${MLDSA_ALGORITHM}" -provparam ml-dsa.output_formats=seed-only -out "${SERVICE_ACCOUNT_KEY}" 2>/dev/null
+       else
+            openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+       fi
     fi
 }
 
