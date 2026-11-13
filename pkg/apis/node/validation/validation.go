@@ -41,12 +41,14 @@ var NodeNormalizationRules = []field.NormalizationRule{
 	},
 }
 
-// ValidateRuntimeClass validates the RuntimeClass
-func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
+// ValidateRuntimeClass validates the RuntimeClass. opts is used only to ratchet an overhead value
+// the stored object already carries (see ValidateRuntimeClassUpdate); pass the zero value on
+// create, where there is nothing to ratchet against.
+func ValidateRuntimeClass(rc *node.RuntimeClass, opts corevalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 
 	if rc.Overhead != nil {
-		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...)
+		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"), opts)...)
 	}
 	if rc.Scheduling != nil {
 		allErrs = append(allErrs, validateScheduling(rc.Scheduling, field.NewPath("scheduling"))...)
@@ -62,10 +64,10 @@ func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 	return allErrs
 }
 
-func validateOverhead(overhead *node.Overhead, fldPath *field.Path) field.ErrorList {
-	// reuse the ResourceRequirements validation logic
-	return corevalidation.ValidateContainerResourceRequirements(&core.ResourceRequirements{Limits: overhead.PodFixed}, nil, fldPath,
-		corevalidation.PodValidationOptions{})
+func validateOverhead(overhead *node.Overhead, fldPath *field.Path, opts corevalidation.PodValidationOptions) field.ErrorList {
+	// reuse the pod overhead validation, which looks stored values up where
+	// runtimeclass.strategy's ValidateUpdate stores them (StoredResourceQuantitiesOfOverhead).
+	return corevalidation.ValidateOverhead(overhead.PodFixed, fldPath, opts)
 }
 
 func validateScheduling(s *node.Scheduling, fldPath *field.Path) field.ErrorList {

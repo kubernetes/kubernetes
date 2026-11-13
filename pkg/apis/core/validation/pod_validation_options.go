@@ -26,14 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-// PodValidationOptions contains the different settings for pod validation
+// PodValidationOptions contains the different settings for pod validation. It holds a map field
+// (StoredResourceQuantities), so values of this type cannot be compared with == or !=; use
+// reflect.DeepEqual or cmp.Diff instead.
 type PodValidationOptions struct {
 	// Allow invalid pod-deletion-cost annotation value for backward compatibility.
 	AllowInvalidPodDeletionCost bool
 	// Allow invalid label-value in LabelSelector
 	AllowInvalidLabelValueInSelector bool
-	// Allow pod spec to use non-integer multiple of huge page unit size
-	AllowIndivisibleHugePagesValues bool
 	// Allow invalid topologySpreadConstraint labelSelector for backward compatibility
 	AllowInvalidTopologySpreadConstraintLabelSelector bool
 	// Allow projected token volumes with non-local paths
@@ -63,6 +63,13 @@ type PodValidationOptions struct {
 	OldPodViolatesMatchLabelKeysValidation bool
 	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.34) validation
 	OldPodViolatesLegacyMatchLabelKeysValidation bool
+	// StoredResourceQuantities holds the resource quantities the stored pod already carries, so an
+	// update that leaves one of them untouched is not rejected by a check that has since tightened
+	// (#141166); a changed value is still validated as on create. This intentionally also lets an
+	// already-stored value that was never valid persist unchanged, the standard ratchet trade-off:
+	// re-validating on every update would make already-stored, previously-accepted objects
+	// unupdatable. Nil on create.
+	StoredResourceQuantities StoredResourceQuantitySet
 	// Allows containers to consume environment variables via environment variable files.
 	AllowEnvFilesValidation bool
 	// Allows containers have restart policy and restart policy rules.
@@ -87,48 +94,6 @@ type PodValidationOptions struct {
 	AllowSecurityProfileOCI bool
 	// Allow podCertificate volumes to specify ML-DSA algorithms in the keyType field
 	AllowMLDSAPodCertificateKeyTypes bool
-}
-
-func hasIndivisibleHugePagesValue(list core.ResourceList) bool {
-	for resourceName, quantity := range list {
-		if helper.IsHugePageResourceName(resourceName) && !helper.IsHugePageResourceValueDivisible(resourceName, quantity) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func checkContainerUseIndivisibleHugePagesValues(container core.Container) bool {
-	return hasIndivisibleHugePagesValue(container.Resources.Limits) ||
-		hasIndivisibleHugePagesValue(container.Resources.Requests)
-}
-
-// usesIndivisibleHugePagesValues returns true if the pod spec asks for a non-integer
-// multiple of huge page unit size anywhere validation checks for one.
-func usesIndivisibleHugePagesValues(podSpec *core.PodSpec) bool {
-	foundIndivisibleHugePagesValue := false
-	podutil.VisitContainers(podSpec, podutil.AllContainers, func(c *core.Container, containerType podutil.ContainerType) bool {
-		if checkContainerUseIndivisibleHugePagesValues(*c) {
-			foundIndivisibleHugePagesValue = true
-		}
-		return !foundIndivisibleHugePagesValue // continue visiting if we haven't seen an invalid value yet
-	})
-
-	if foundIndivisibleHugePagesValue {
-		return true
-	}
-
-	// Pod-level resources go through the same check, so an old pod carrying an
-	// indivisible one has to stay updatable.
-	if podSpec.Resources != nil {
-		if hasIndivisibleHugePagesValue(podSpec.Resources.Limits) ||
-			hasIndivisibleHugePagesValue(podSpec.Resources.Requests) {
-			return true
-		}
-	}
-
-	return hasIndivisibleHugePagesValue(podSpec.Overhead)
 }
 
 // hasInvalidTopologySpreadConstraintLabelSelector return true if spec.TopologySpreadConstraints have any entry with invalid labelSelector
@@ -186,9 +151,7 @@ func hasNonLocalProjectedTokenPath(spec *core.PodSpec) bool {
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) PodValidationOptions {
 	// default pod validation options based on feature gate
 	opts := PodValidationOptions{
-		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
-		// Do not allow pod spec to use non-integer multiple of huge page unit size default
-		AllowIndivisibleHugePagesValues:                     false,
+		AllowInvalidPodDeletionCost:                         !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
 		AllowInvalidLabelValueInSelector:                    false,
 		AllowInvalidTopologySpreadConstraintLabelSelector:   false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
@@ -219,9 +182,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 	opts.AllowTaintTolerationComparisonOperators = allowTaintTolerationComparisonOperators(oldPodSpec)
 
 	if oldPodSpec != nil {
-		// if old spec used non-integer multiple of huge page unit size, we must allow it
-		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
-
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
 		opts.AllowInvalidLabelValueInRequiredNodeAffinity = hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
@@ -237,6 +197,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *core.PodSpec, p
 		}
 		// if old spec has an invalid projected token volume path, we must allow it
 		opts.AllowNonLocalProjectedTokenPath = hasNonLocalProjectedTokenPath(oldPodSpec)
+		// a resource quantity the stored spec already holds was accepted when it was written
+		opts.StoredResourceQuantities = StoredResourceQuantitiesOf(oldPodSpec)
 
 		// if old spec has invalid sysctl with hostNet or hostIPC, we must allow it when update
 		if oldPodSpec.SecurityContext != nil && len(oldPodSpec.SecurityContext.Sysctls) != 0 {
