@@ -197,6 +197,7 @@ type UnaryConfig struct {
 
 type WatchConfig struct {
 	Concurrency         int
+	MinOperations       int
 	Duration            time.Duration
 	SlowDelay           time.Duration
 	HiccupDuration      time.Duration
@@ -293,22 +294,29 @@ func RunUnaryTraffic(ctx context.Context, store storage.Interface, objects []typ
 }
 
 // RunWatchTraffic keeps cfg.Concurrency watches open until stop is closed and
-// records what each of them received. Watches still open at that point run to
-// their own deadline, so the events they already collected are not discarded.
+// at least cfg.MinOperations watches have completed, recording what each of
+// them received. Watches still open at that point run to their own deadline,
+// so the events they already collected are not discarded.
 func RunWatchTraffic(ctx context.Context, store storage.Interface, objects []types.NamespacedName, cfg WatchConfig, stop <-chan struct{}) []correctness.WatchOperation {
 	var mu sync.Mutex
 	var watches []correctness.WatchOperation
+	shouldStop := func() bool {
+		select {
+		case <-stop:
+			mu.Lock()
+			defer mu.Unlock()
+			return len(watches) >= cfg.MinOperations
+		default:
+			return false
+		}
+	}
 	var wg sync.WaitGroup
 	for range cfg.Concurrency {
 		wg.Go(func() {
 			var cachedObj runtime.Object
 			for {
-				select {
-				case <-ctx.Done():
+				if ctx.Err() != nil || shouldStop() {
 					return
-				case <-stop:
-					return
-				default:
 				}
 				request := randomWatchRequest(ctx, store, objects, cfg.RequestDistribution, cachedObj)
 				if request == nil {
@@ -328,11 +336,12 @@ func RunWatchTraffic(ctx context.Context, store storage.Interface, objects []typ
 				watches = append(watches, correctness.WatchOperation{Request: *request, Response: response})
 				mu.Unlock()
 
+				if shouldStop() {
+					return
+				}
 				if elapsed := time.Since(start); elapsed < cfg.HiccupDuration {
 					select {
 					case <-ctx.Done():
-						return
-					case <-stop:
 						return
 					case <-time.After(cfg.HiccupDuration - elapsed):
 					}
@@ -517,7 +526,14 @@ func resolveResourceVersion(ctx context.Context, store storage.Interface, rvType
 	case RVCurrent:
 		return relativeRV(ctx, store, 0), true
 	case RVPast:
-		return relativeRV(ctx, store, -int64(1+rand.Intn(200))), true
+		currentRV, err := store.GetCurrentResourceVersion(ctx)
+		if err != nil {
+			panic(err)
+		}
+		if currentRV <= 1 {
+			return "1", true
+		}
+		return strconv.FormatInt(1+rand.Int63n(int64(currentRV-1)), 10), true
 	case RVFuture:
 		return relativeRV(ctx, store, int64(1+rand.Intn(200))), true
 	default:

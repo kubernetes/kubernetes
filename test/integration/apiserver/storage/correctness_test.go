@@ -259,7 +259,8 @@ var (
 
 	watchCfg = WatchConfig{
 		Concurrency:         16,
-		Duration:            500 * time.Millisecond,
+		MinOperations:       128,
+		Duration:            250 * time.Millisecond,
 		SlowDelay:           2 * time.Millisecond,
 		HiccupDuration:      150 * time.Millisecond,
 		MaxEvents:           200,
@@ -365,13 +366,13 @@ func TestCorrectness(t *testing.T) {
 			},
 		},
 		{
-			// Covers watch history cyclic buffer eviction and snapshot compaction under a short freshness window (50ms):
+			// Covers watch history cyclic buffer eviction and snapshot compaction under a short freshness window (10ms):
 			// - watchCacheHistory dynamic capacity resize (grow and shrink), event eviction, and B-tree snapshot compaction
 			// - watchCacheHistory.GetIntervalLocked returning 410 ResourceExpired when a watch requests an evicted RV
 			name: "cacher_small_history",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
 				origFreshDuration := cacher.DefaultEventFreshDuration
-				cacher.DefaultEventFreshDuration = 50 * time.Millisecond
+				cacher.DefaultEventFreshDuration = 10 * time.Millisecond
 				tCtx.Cleanup(func() {
 					cacher.DefaultEventFreshDuration = origFreshDuration
 				})
@@ -434,6 +435,7 @@ func testCorrectness(t *testing.T, store storage.Interface, storagePrefix string
 	}
 	t.Logf("Watches: %s events=%d", watchTotal, watchEvents)
 	require.GreaterOrEqual(t, unaryTotal.succeeded, unaryCfg.SucceededOperations, "expected at least %d succeeded unary operations", unaryCfg.SucceededOperations)
+	require.GreaterOrEqual(t, watchTotal.executed, watchCfg.MinOperations, "expected at least %d watch operations", watchCfg.MinOperations)
 
 	model := ToPorcupineModel(initialState)
 	res, info := porcupine.CheckOperationsVerbose(model, toPorcupineOperations(operations), time.Minute)
