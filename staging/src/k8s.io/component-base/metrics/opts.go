@@ -211,6 +211,12 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 		nativeOpts := internalmetrics.NativeHistogramConfig()
 		opts.NativeHistogramBucketFactor = nativeOpts.BucketFactor
 		opts.NativeHistogramMaxBucketNumber = nativeOpts.MaxBucketNumber
+		// prometheus.NewHistogram only defaults empty Buckets to DefBuckets when
+		// NativeHistogramBucketFactor <= 1. Populate DefBuckets explicitly so
+		// histograms that omit Buckets retain classic buckets alongside native buckets.
+		if len(opts.Buckets) == 0 {
+			opts.Buckets = prometheus.DefBuckets
+		}
 	}
 
 	return opts
