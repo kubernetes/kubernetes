@@ -157,3 +157,52 @@ func TestBestEffortPolicyAllocateFollowsCPUManager(t *testing.T) {
 		})
 	}
 }
+
+func TestBestEffortPolicyStartWhenExceedingNUMANodeCapacity(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	machineInfo := &cadvisorapi.MachineInfo{
+		Topology: []cadvisorapi.Node{
+			{Id: 0, Memory: 1*gb + 512*mb},
+			{Id: 1, Memory: 10 * gb},
+		},
+	}
+	systemReserved := systemReservedMemory{
+		0: map[v1.ResourceName]uint64{v1.ResourceMemory: 512 * mb},
+	}
+	requirements := &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("2"),
+			v1.ResourceMemory: resource.MustParse("4Gi"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("2"),
+			v1.ResourceMemory: resource.MustParse("4Gi"),
+		},
+	}
+	affinity := &fakeBestEffortAffinity{
+		hint:              topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: false},
+		hintAuthoritative: true,
+	}
+
+	s := state.NewMemoryState(logger)
+	p, err := NewPolicyBestEffort(logger, machineInfo, systemReserved, affinity)
+	if err != nil {
+		t.Fatalf("NewPolicyBestEffort() failed: %v", err)
+	}
+	if err := p.Start(logger, s); err != nil {
+		t.Fatalf("Start() failed: %v", err)
+	}
+	pod := getPod("pod1", "container1", requirements)
+	if err := p.Allocate(tCtx, s, pod, &pod.Spec.Containers[0], lifecycle.AddOperation); err != nil {
+		t.Fatalf("Allocate() failed: %v", err)
+	}
+
+	restarted, err := NewPolicyBestEffort(logger, machineInfo, systemReserved, affinity)
+	if err != nil {
+		t.Fatalf("NewPolicyBestEffort() failed: %v", err)
+	}
+	if err := restarted.Start(logger, s); err != nil {
+		t.Fatalf("Start() after a restart failed: %v", err)
+	}
+}

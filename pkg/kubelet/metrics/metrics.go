@@ -150,6 +150,8 @@ const (
 	// Metrics to track the Memory manager behavior
 	MemoryManagerPinningRequestsTotalKey = "memory_manager_pinning_requests_total"
 	MemoryManagerPinningErrorsTotalKey   = "memory_manager_pinning_errors_total"
+	MemoryManagerDriftToleranceBytesKey  = "memory_manager_drift_tolerance_bytes"
+	MemoryManagerDriftBytesKey           = "memory_manager_drift_bytes"
 
 	// Metrics to track the Topology manager behavior
 	TopologyManagerAdmissionRequestsTotalKey = "topology_manager_admission_requests_total"
@@ -1045,6 +1047,27 @@ var (
 		},
 	)
 
+	// MemoryManagerDriftToleranceBytes tracks the per-NUMA-node memory drift the memory manager tolerates across a restart
+	MemoryManagerDriftToleranceBytes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerDriftToleranceBytesKey,
+			Help:           "The per-NUMA-node memory drift in bytes the memory manager tolerates across a restart. 0 means the persisted state has to match the machine exactly.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// MemoryManagerDriftBytes tracks the absolute difference between the memory recorded for a NUMA node and the memory it reports, as seen at the last memory manager start
+	MemoryManagerDriftBytes = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryManagerDriftBytesKey,
+			Help:           "The absolute difference in bytes between the memory recorded for a NUMA node and the memory the node reports, as seen at the last memory manager start.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{AlignedNUMANode},
+	)
+
 	// MemoryQoSNodeMemoryMinBytes tracks total cgroup v2 memory.min (hard protection) for Guaranteed pods.
 	MemoryQoSNodeMemoryMinBytes = metrics.NewGauge(
 		&metrics.GaugeOpts{
@@ -1603,6 +1626,10 @@ func Register() {
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManagerDriftTolerance) {
+			legacyregistry.MustRegister(MemoryManagerDriftToleranceBytes)
+			legacyregistry.MustRegister(MemoryManagerDriftBytes)
+		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
 			legacyregistry.MustRegister(MemoryQoSNodeMemoryMinBytes)
 			legacyregistry.MustRegister(MemoryQoSNodeMemoryLowBytes)
