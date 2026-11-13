@@ -5898,6 +5898,7 @@ func TestStaticPolicyAllocateCPUsForResize(t *testing.T) {
 		baselineCPUs cpuset.CPUSet
 		// otherCPUs are exclusively allocated to another container.
 		otherCPUs    cpuset.CPUSet
+		reusableCPUs cpuset.CPUSet
 		numRequested int
 		numaAffinity bitmask.BitMask
 		expCSet      cpuset.CPUSet
@@ -5909,6 +5910,18 @@ func TestStaticPolicyAllocateCPUsForResize(t *testing.T) {
 			currentCPUs:  cpuset.New(0, 6),
 			baselineCPUs: cpuset.New(0, 6),
 			otherCPUs:    cpuset.New(),
+			numRequested: 4,
+			numaAffinity: newNUMAAffinity(0),
+			expCSet:      cpuset.New(0, 2, 6, 8),
+		},
+		{
+			// CPUs {2,8} are held in state by a completed init container of the
+			// same pod, hence out of the default CPUSet, and are reusable.
+			description:  "scale up, NUMA affinity satisfiable only via reusable CPUs of a completed init container",
+			currentCPUs:  cpuset.New(0, 6),
+			baselineCPUs: cpuset.New(0, 6),
+			otherCPUs:    cpuset.New(2, 4, 8, 10),
+			reusableCPUs: cpuset.New(2, 8),
 			numRequested: 4,
 			numaAffinity: newNUMAAffinity(0),
 			expCSet:      cpuset.New(0, 2, 6, 8),
@@ -6151,7 +6164,7 @@ func TestStaticPolicyAllocateCPUsForResize(t *testing.T) {
 			}
 			expDefaultCPUSet := st.defaultCPUSet
 
-			cpuAlloc, err := policy.allocateCPUsForResize(logger, st, tc.numRequested, tc.numaAffinity, cpuset.New(), tc.currentCPUs, tc.baselineCPUs)
+			cpuAlloc, err := policy.allocateCPUsForResize(logger, st, tc.numRequested, tc.numaAffinity, tc.reusableCPUs, tc.currentCPUs, tc.baselineCPUs)
 			if tc.expErr != "" {
 				if err == nil || err.Error() != tc.expErr {
 					t.Fatalf("expected error %q but got %v", tc.expErr, err)

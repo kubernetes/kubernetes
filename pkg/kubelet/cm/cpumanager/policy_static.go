@@ -1171,7 +1171,7 @@ func (p *staticPolicy) allocateCPUsForResize(logger klog.Logger, s state.State, 
 	// for pod container using exclusive CPUs, making the resize Infeasible.
 	allocatableCPUs := baselineCPUs.Clone()
 	if requestedCPUs >= currentlyAllocatedCPUs.Size() {
-		allocatableCPUs = allocatableCPUs.Union(p.GetAvailableCPUs(s).Union(currentlyAllocatedCPUs.Clone()))
+		allocatableCPUs = allocatableCPUs.Union(p.GetAvailableCPUs(s).Union(reusableCPUs).Union(currentlyAllocatedCPUs.Clone()))
 	} else if requestedCPUs < currentlyAllocatedCPUs.Size() {
 		allocatableCPUs = currentlyAllocatedCPUs.Clone()
 	}
