@@ -41,6 +41,13 @@ import (
 // PluginName indicates name of admission plugin.
 const PluginName = "AlwaysPullImages"
 
+// ephemeralcontainers is the pods subresource through which ephemeral containers are added to a
+// running pod. It is handled in addition to the main pods resource because an ephemeral container
+// can carry its own imagePullPolicy and would otherwise escape this plugin's enforcement
+// (consistent with the ImagePolicyWebhook and ServiceAccount plugins, which guard the same
+// subresource since CVE-2023-2727 / CVE-2023-2728).
+const ephemeralcontainers = "ephemeralcontainers"
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
@@ -59,13 +66,29 @@ var _ admission.ValidationInterface = &AlwaysPullImages{}
 
 // Admit makes an admission decision based on the request attributes
 func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	// Ignore all calls to subresources or resources other than pods.
+	// Ignore all calls to subresources other than ephemeralcontainers or resources other than pods.
 	if shouldIgnore(attributes) {
 		return nil
 	}
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
+
+	// Existing ephemeral containers are immutable. Only newly added containers can have their
+	// pull policy changed, even when they reuse an image already referenced by the pod.
+	if attributes.GetSubresource() == ephemeralcontainers {
+		oldNames, err := oldEphemeralContainerNames(attributes)
+		if err != nil {
+			return err
+		}
+		for i := range pod.Spec.EphemeralContainers {
+			if oldNames.Has(pod.Spec.EphemeralContainers[i].Name) {
+				continue
+			}
+			pod.Spec.EphemeralContainers[i].ImagePullPolicy = api.PullAlways
+		}
+		return nil
 	}
 
 	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, _ *field.Path) bool {
@@ -95,6 +118,30 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	}
 
 	var allErrs []error
+
+	// Existing ephemeral containers may predate this enforcement and cannot be changed.
+	if attributes.GetSubresource() == ephemeralcontainers {
+		oldNames, err := oldEphemeralContainerNames(attributes)
+		if err != nil {
+			return err
+		}
+		ephemeralContainersPath := field.NewPath("spec").Child("ephemeralContainers")
+		for i := range pod.Spec.EphemeralContainers {
+			if oldNames.Has(pod.Spec.EphemeralContainers[i].Name) {
+				continue
+			}
+			if policy := pod.Spec.EphemeralContainers[i].ImagePullPolicy; policy != api.PullAlways {
+				allErrs = append(allErrs, admission.NewForbidden(attributes,
+					field.NotSupported(ephemeralContainersPath.Index(i).Child("imagePullPolicy"), policy, []string{string(api.PullAlways)}),
+				))
+			}
+		}
+		if len(allErrs) > 0 {
+			return utilerrors.NewAggregate(allErrs)
+		}
+		return nil
+	}
+
 	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
 		if c.ImagePullPolicy != api.PullAlways {
 			allErrs = append(allErrs, admission.NewForbidden(attributes,
@@ -159,15 +206,30 @@ func isUpdateWithNoNewImages(attributes admission.Attributes) bool {
 }
 
 func shouldIgnore(attributes admission.Attributes) bool {
-	// Ignore all calls to subresources or resources other than pods.
-	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
+	// Ignore all calls to subresources other than ephemeralcontainers, or resources other than pods.
+	subresource := attributes.GetSubresource()
+	if (len(subresource) != 0 && subresource != ephemeralcontainers) || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return true
 	}
 
-	if isUpdateWithNoNewImages(attributes) {
+	// Adding a container requires enforcement even when its image string is already present.
+	if subresource != ephemeralcontainers && isUpdateWithNoNewImages(attributes) {
 		return true
 	}
 	return false
+}
+
+func oldEphemeralContainerNames(attributes admission.Attributes) (sets.Set[string], error) {
+	oldPod, ok := attributes.GetOldObject().(*api.Pod)
+	if !ok || oldPod == nil {
+		return nil, apierrors.NewBadRequest("Resource was marked with kind Pod but old pod was unable to be converted")
+	}
+	// Patch does not preserve list order, so use names rather than positions to find additions.
+	names := sets.New[string]()
+	for i := range oldPod.Spec.EphemeralContainers {
+		names.Insert(oldPod.Spec.EphemeralContainers[i].Name)
+	}
+	return names, nil
 }
 
 // NewAlwaysPullImages creates a new always pull images admission control handler
