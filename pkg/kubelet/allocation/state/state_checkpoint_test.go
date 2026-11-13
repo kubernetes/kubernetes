@@ -316,6 +316,24 @@ func Test_stateCheckpoint_currentFormatIsNotRewritten(t *testing.T) {
 	require.Equal(t, blob, actual, "a checkpoint in the current format should not be rewritten on startup")
 }
 
+// Test_stateCheckpoint_keepsGeneration checks that the generation of a pod survives a restore from
+// the checkpoint.
+func Test_stateCheckpoint_keepsGeneration(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	testDir := getTestDir(t)
+	sc, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	pod := newTestPod("pod1", "1", false, false)
+	pod.Generation = 5
+	require.NoError(t, sc.SetPod(logger, pod))
+
+	restored, err := NewStateCheckpoint(logger, testDir, testCheckpoint, nil)
+	require.NoError(t, err)
+	stored, ok := restored.GetPod(pod.UID)
+	require.True(t, ok)
+	assert.Equal(t, int64(5), stored.Generation)
+}
+
 // blockingCheckpointManager holds every write of a checkpoint until release is called, as a slow disk
 // would, so that a test can use the state while a write is in progress.
 type blockingCheckpointManager struct {

@@ -891,6 +891,7 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 // all SetPod initializes in the actuated state (mounted volumes are recorded via SetPodVolume
 // and preserved by SetPod).
 func KeepOnlyResourceValues(pod *v1.Pod) {
+	pod.Generation = 0
 	var spec v1.PodSpec
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
 		spec.Resources = pod.Spec.Resources

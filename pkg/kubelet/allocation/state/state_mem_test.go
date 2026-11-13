@@ -229,7 +229,7 @@ func TestStateMemory_SetPod(t *testing.T) {
 	state := NewStateMemory(logger, PodMap{}, nil)
 
 	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "name", Namespace: "namespace", Labels: map[string]string{"a": "b"}},
+		ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "name", Namespace: "namespace", Generation: 3, Labels: map[string]string{"a": "b"}},
 		Spec: v1.PodSpec{
 			NodeName: "node",
 			Containers: []v1.Container{{
@@ -242,11 +242,11 @@ func TestStateMemory_SetPod(t *testing.T) {
 	}
 	require.NoError(t, state.SetPod(logger, pod))
 
-	// Only the identity and the spec are stored.
+	// Only the identity, the generation and the spec are stored.
 	stored, ok := state.GetPod(pod.UID)
 	require.True(t, ok)
 	expected := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace},
+		ObjectMeta: metav1.ObjectMeta{UID: pod.UID, Name: pod.Name, Namespace: pod.Namespace, Generation: pod.Generation},
 		Spec:       *pod.Spec.DeepCopy(),
 	}
 	assert.True(t, apiequality.Semantic.DeepEqual(expected, stored))

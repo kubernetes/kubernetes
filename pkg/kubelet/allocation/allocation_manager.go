@@ -73,7 +73,7 @@ type Manager interface {
 	// field that is gated on allocation is pending. Callers must not mutate the returned pod.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
-	// SetAllocatedPod checkpoints the allocation for a pod.
+	// SetAllocatedPod checkpoints the allocation for a pod, including its generation.
 	SetAllocatedPod(logger klog.Logger, allocatedPod *v1.Pod) error
 
 	// AddPodAdmitHandlers adds the admit handlers to the allocation manager.
@@ -543,7 +543,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 
 	// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 	// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
-	pod, _ = m.UpdatePodFromAllocation(pod)
+	pod, pending := m.UpdatePodFromAllocation(pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := slices.DeleteFunc(m.getAllocatedPods(activePods), func(p *v1.Pod) bool { return p.UID == pod.UID })
@@ -554,6 +554,21 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 	})
 
 	if result.Admit {
+		// On a kubelet restart, the pod is admitted again as it was allocated, so keep the generation
+		// it was allocated at rather than that of a newer change that may still be pending. If that
+		// generation wasn't recorded and a change is pending, it stays unknown.
+		var generation int64
+		if allocated, ok := m.allocated.GetPodReadOnly(pod.UID); ok {
+			generation = allocated.Generation
+		}
+		if generation == 0 && !pending {
+			generation = pod.Generation
+		}
+		if generation != pod.Generation {
+			allocatedPod := *pod
+			allocatedPod.Generation = generation
+			pod = &allocatedPod
+		}
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedPod(logger, pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
