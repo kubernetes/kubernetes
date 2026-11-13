@@ -94,6 +94,7 @@ func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState fwk.Cycle
 		}
 		if draPreScoreState != nil {
 			state.draPreScoreState = draPreScoreState
+			ba.DRACaches.resetMatchCaches()
 		}
 	}
 	cycleState.Write(balancedAllocationPreScoreStateKey, state)
@@ -145,8 +146,12 @@ func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.S
 
 // Score invoked at the score extension point.
 func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	scorer := &ba.resourceAllocationScorer
 	s, err := getBalancedAllocationPreScoreState(state)
 	if err != nil {
+		if ba.enableDRAExtendedResource {
+			scorer = scorer.withFreshMatchCaches()
+		}
 		s = &balancedAllocationPreScoreState{podRequests: ba.calculatePodResourceRequestList(pod, ba.resources)}
 		if ba.isBestEffortPod(s.podRequests) {
 			return 0, nil
@@ -167,7 +172,7 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state fwk.CycleState, p
 	// Detail: score = (1 - std) * MaxNodeScore, where std is calculated by the root square of Σ((fraction(i)-mean)^2)/len(resources)
 	// The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-	return ba.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	return scorer.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
 }
 
 // ScoreExtensions of the Score plugin.

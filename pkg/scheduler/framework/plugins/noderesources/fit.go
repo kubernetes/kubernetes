@@ -151,6 +151,7 @@ func (f *Fit) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.P
 		}
 		if draPreScoreState != nil {
 			state.draPreScoreState = draPreScoreState
+			f.DRACaches.resetMatchCaches()
 		}
 	}
 
@@ -637,8 +638,12 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 
 // Score invoked at the Score extension point.
 func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
+	scorer := f.resourceAllocationScorer
 	s, err := getPreScoreState(state)
 	if err != nil {
+		if f.enableDRAExtendedResource {
+			scorer = scorer.withFreshMatchCaches()
+		}
 		s = &preScoreState{
 			podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 		}
@@ -653,7 +658,7 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 		}
 	}
 
-	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+	return scorer.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
 }
 
 // PlacementScoreExtensions is not used by this plugin.
