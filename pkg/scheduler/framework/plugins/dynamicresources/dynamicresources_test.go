@@ -1457,6 +1457,76 @@ func TestFilterReusesPendingAllocationRequiresDRAOptionalNodeOperations(t *testi
 	assert.True(t, statusWithFeature.IsSuccess(), "expected success when node has DRAOptionalNodeOperations feature")
 }
 
+// TestReserveMixedPendingAndFreshClaims covers a Pod whose first claim reuses
+// a pending allocation made by another Pod of the same PodGroup, while its
+// second claim needs a fresh allocation. Reserve maps the results collected in
+// Filter onto the claims by position, so each result must end up on its own
+// claim: the pending claim keeps the pending allocation's device, the fresh
+// claim gets a different one.
+func TestReserveMixedPendingAndFreshClaims(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAWorkloadResourceClaims: true,
+		features.GenericWorkload:           true,
+	})
+
+	feats := feature.Features{
+		EnableDRAWorkloadResourceClaims: true,
+	}
+
+	pod := st.MakePod().Name(podName).Namespace(namespace).
+		UID(podUID).
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+		PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
+		PodGroupName(podGroupName).
+		Obj()
+
+	testCtx := setup(tCtx, &config.DynamicResourcesArgs{}, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{pendingPodGroupClaim, claim2}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{largeWorkerNodeSlice}, feats, false, nil)
+
+	pendingClaim, err := testCtx.draManager.ResourceClaims().Get(namespace, claimName)
+	if err != nil {
+		t.Fatalf("Get claim: %v", err)
+	}
+	pendingClaimAllocated := pendingClaim.DeepCopy()
+	// "instance-1" is the device the other Pod reserved for the shared claim.
+	pendingClaimAllocated.Status.Allocation = allocationResult.DeepCopy()
+	tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(pendingClaimAllocated.UID, pendingClaimAllocated))
+
+	podGroupCycleState := framework.NewCycleState()
+	podGroupCycleState.Write(stateKey, &podGroupStateData{
+		pendingAllocations: map[types.UID]sets.Set[types.UID]{
+			pendingClaimAllocated.UID: sets.New(types.UID("previous-pod")),
+		},
+	})
+	cycleState := framework.NewCycleState()
+	cycleState.SetPodGroupCycleState(podGroupCycleState)
+	testCtx.state = cycleState
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(workerNode)
+
+	if _, status := testCtx.p.PreFilter(tCtx, testCtx.state, pod, []fwk.NodeInfo{nodeInfo}); !status.IsSuccess() {
+		t.Fatalf("PreFilter status: %v", status)
+	}
+	if status := testCtx.p.Filter(tCtx, testCtx.state, pod, nodeInfo); !status.IsSuccess() {
+		t.Fatalf("Filter status: %v", status)
+	}
+	if status := testCtx.p.Reserve(tCtx, testCtx.state, pod, nodeName); !status.IsSuccess() {
+		t.Fatalf("Reserve status: %v", status)
+	}
+
+	pluginState, err := getStateData(testCtx.state)
+	if err != nil {
+		t.Fatalf("getStateData: %v", err)
+	}
+	if got := pluginState.informationsForClaim[0].allocation.Devices.Results[0].Device; got != "instance-1" {
+		t.Errorf("claim with pending allocation: got device %q, want instance-1", got)
+	}
+	if got := pluginState.informationsForClaim[1].allocation.Devices.Results[0].Device; got != "instance-2" {
+		t.Errorf("claim needing fresh allocation: got device %q, want instance-2", got)
+	}
+}
+
 // TestUnreserveSharedPendingAllocation covers two Pods of a PodGroup which
 // share a pending allocation. The first Pod stores the allocation in PreBind
 // and then times out waiting for binding conditions. The second Pod fails in
