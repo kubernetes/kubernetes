@@ -411,7 +411,7 @@ func newServerTestWithDebuggingHandlers(ctx context.Context, kubeCfg *kubeletcon
 	server := NewServer(
 		ctx,
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(ctx, fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
+		stats.NewResourceAnalyzer(ctx, fw.fakeKubelet, time.Minute, &record.FakeRecorder{}, nil),
 		[]healthz.HealthChecker{},
 		flagz.NamedFlagSetsReader{},
 		fw.fakeAuth,
@@ -2205,7 +2205,7 @@ func TestFineGrainedAuthz(t *testing.T) {
 func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	host := &fakeKubelet{}
-	resourceAnalyzer := stats.NewResourceAnalyzer(tCtx, nil, time.Minute, &record.FakeRecorder{})
+	resourceAnalyzer := stats.NewResourceAnalyzer(tCtx, nil, time.Minute, &record.FakeRecorder{}, nil)
 
 	server1 := NewServer(tCtx, host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)
 	server2 := NewServer(tCtx, host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)
