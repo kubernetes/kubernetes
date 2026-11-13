@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	compresource "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -199,7 +198,7 @@ func (sched *Scheduler) schedulingCycle(
 // refreshResizingPodFromCache updates the queued pod snapshot from the node's cache snapshot
 // so all plugins evaluate the exact same pod resources that contributed to nodeInfo.Requested.
 func (sched *Scheduler) refreshResizingPodFromCache(podInfo *framework.QueuedPodInfo) error {
-	if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !compresource.IsPodResizeDeferred(podInfo.Pod) {
+	if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !util.IsPodResizePreemptable(podInfo.Pod) {
 		return nil
 	}
 	nodeInfo, err := sched.nodeInfoSnapshot.NodeInfos().Get(podInfo.Pod.Spec.NodeName)
@@ -213,7 +212,7 @@ func (sched *Scheduler) refreshResizingPodFromCache(podInfo *framework.QueuedPod
 			// the pod off the resize path mid-cycle, so it would be assumed and bound like a new pod. The stale
 			// copy is harmless, because PostFilter and DeferredPodScheduling.Bind re-read the pod and finish
 			// the cycle without preempting or patching.
-			if !compresource.IsPodResizeDeferred(cachedPod) || util.IsPodResizeSchedulerEvaluationCompleted(cachedPod) {
+			if !util.IsPodResizePreemptable(cachedPod) || util.IsPodResizeSchedulerEvaluationCompleted(cachedPod) {
 				return nil
 			}
 			_, err := podInfo.Update(cachedPod)
@@ -287,7 +286,7 @@ func (sched *Scheduler) schedulingAlgorithm(
 	start time.Time,
 ) (ScheduleResult, *fwk.Status) {
 	defer func() {
-		if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(podInfo.Pod) {
+		if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && util.IsPodResizePreemptable(podInfo.Pod) {
 			metrics.ResizeSchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 		} else {
 			metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -310,7 +309,7 @@ func (sched *Scheduler) schedulingAlgorithm(
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.AsStatus(err)
 		}
 		// A deferred resize pod can only stay on its assigned node, so report on that node alone.
-		if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod) {
+		if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && util.IsPodResizePreemptable(pod) {
 			fitError.NumAllNodes = 1
 		}
 
@@ -355,7 +354,7 @@ func (sched *Scheduler) bindingCycle(
 	logger := klog.FromContext(ctx)
 
 	assumedPod := assumedPodInfo.Pod
-	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && len(assumedPod.Spec.NodeName) > 0 && compresource.IsPodResizeDeferred(assumedPod)
+	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && len(assumedPod.Spec.NodeName) > 0 && util.IsPodResizePreemptable(assumedPod)
 
 	var preFlightStatus *fwk.Status
 	if !isDeferredResize && sched.nominatedNodeNameForExpectationEnabled {
@@ -437,7 +436,7 @@ func (sched *Scheduler) bindingCycle(
 
 	// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 	logger.V(2).Info("Successfully bound pod to node", "pod", klog.KObj(assumedPod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
-	if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !compresource.IsPodResizeDeferred(assumedPod) {
+	if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !util.IsPodResizePreemptable(assumedPod) {
 		metrics.PodScheduled(schedFramework.ProfileName(), metrics.SinceInSeconds(start))
 		metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
 		if assumedPodInfo.InitialAttemptTimestamp != nil {
@@ -476,7 +475,7 @@ func (sched *Scheduler) handleBindingCycleError(
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
 	if forgetErr := sched.algorithm.UnreserveAndForgetFromCache(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
 		utilruntime.HandleErrorWithContext(ctx, forgetErr, "ForgetPod failed")
-	} else if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !compresource.IsPodResizeDeferred(assumedPod) {
+	} else if !sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled || !util.IsPodResizePreemptable(assumedPod) {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 		// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
 		//
@@ -498,7 +497,7 @@ func (sched *Scheduler) handleBindingCycleError(
 			return
 		}
 		if cachedPod.UID == assumedPod.UID &&
-			compresource.IsPodResizeDeferred(cachedPod) &&
+			util.IsPodResizePreemptable(cachedPod) &&
 			!util.IsPodResizeSchedulerEvaluationCompleted(cachedPod) {
 			sched.SchedulingQueue.Update(ctx, assumedPod, cachedPod.DeepCopy())
 		}
@@ -570,7 +569,7 @@ func hasExtenderFilters(fwk framework.Framework) bool {
 }
 
 func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, pod *v1.Pod, feasibleNodes []framework.NodeWithRank, statuses *framework.NodeToStatus) ([]framework.NodeWithRank, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && compresource.IsPodResizeDeferred(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) && util.IsPodResizePreemptable(pod) {
 		return feasibleNodes, nil
 	}
 	logger := klog.FromContext(ctx)
@@ -645,7 +644,7 @@ func prioritizeNodes(
 ) ([]fwk.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
 	var extenders []fwk.Extender
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !compresource.IsPodResizeDeferred(pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !util.IsPodResizePreemptable(pod) {
 		extenders = schedFramework.Extenders()
 	}
 
@@ -787,7 +786,7 @@ func (sched *Scheduler) bind(ctx context.Context, schedFramework framework.Frame
 
 // TODO(#87159): Move this to a Plugin.
 func (sched *Scheduler) extendersBinding(logger klog.Logger, schedFramework framework.Framework, pod *v1.Pod, node string) (bool, error) {
-	if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod) {
+	if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && util.IsPodResizePreemptable(pod) {
 		return false, nil
 	}
 	for _, extender := range schedFramework.Extenders() {
@@ -812,7 +811,7 @@ func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framewor
 		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
 		return
 	}
-	if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(assumed) {
+	if sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && util.IsPodResizePreemptable(assumed) {
 		return
 	}
 
@@ -850,7 +849,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 
 	pod := podInfo.Pod
 	nominatedPodInfo := podInfo.PodInfo
-	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(pod)
+	isDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && util.IsPodResizePreemptable(pod)
 
 	if !isDeferredResize {
 		switch reason {
@@ -898,7 +897,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		// For deferred resize pods, being assigned to a node in the cache is expected only while the pod still has a deferred resize
 		// awaiting scheduler evaluation.
-		isCachedPodDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && compresource.IsPodResizeDeferred(cachedPod) && !util.IsPodResizeSchedulerEvaluationCompleted(cachedPod)
+		isCachedPodDeferredResize := sched.inPlacePodVerticalScalingSchedulerPreemptionEnabled && util.IsPodResizePreemptable(cachedPod) && !util.IsPodResizeSchedulerEvaluationCompleted(cachedPod)
 		if len(cachedPod.Spec.NodeName) != 0 && !isCachedPodDeferredResize {
 			if isDeferredResize {
 				// The resize was resolved or already evaluated since the pod was queued, so there is

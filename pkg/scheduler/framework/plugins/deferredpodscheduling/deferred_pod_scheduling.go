@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -64,7 +63,7 @@ func (pl *DeferredPodScheduling) IsRelevantForPodResize() bool {
 // depends on pod-specific resize requests, and nil for regular pods so opportunistic
 // batching remains enabled for the default scheduler profile.
 func (pl *DeferredPodScheduling) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *fwk.Status) {
-	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
+	if pl.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && util.IsPodResizePreemptable(pod) {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "pods with deferred resize are not signable")
 	}
 	return nil, nil
@@ -89,7 +88,7 @@ func (pl *DeferredPodScheduling) EventsToRegister(_ context.Context) ([]fwk.Clus
 }
 
 func (pl *DeferredPodScheduling) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !resource.IsPodResizeDeferred(pod) {
+	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !util.IsPodResizePreemptable(pod) {
 		return fwk.QueueSkip, nil
 	}
 	oldNode, ok := oldObj.(*v1.Node)
@@ -118,7 +117,7 @@ func (pl *DeferredPodScheduling) isSchedulableAfterNodeChange(logger klog.Logger
 }
 
 func (pl *DeferredPodScheduling) isSchedulableAfterNodeAdd(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
-	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !resource.IsPodResizeDeferred(pod) {
+	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !util.IsPodResizePreemptable(pod) {
 		return fwk.QueueSkip, nil
 	}
 	node, ok := newObj.(*v1.Node)
@@ -140,7 +139,7 @@ func (pl *DeferredPodScheduling) isSchedulableAfterNodeAdd(logger klog.Logger, p
 }
 
 func (pl *DeferredPodScheduling) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !resource.IsPodResizeDeferred(pod) {
+	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !util.IsPodResizePreemptable(pod) {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	return &fwk.PreFilterResult{NodeNames: sets.New(pod.Spec.NodeName)}, nil
@@ -151,7 +150,7 @@ func (pl *DeferredPodScheduling) PreFilterExtensions() fwk.PreFilterExtensions {
 }
 
 func (pl *DeferredPodScheduling) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !resource.IsPodResizeDeferred(pod) {
+	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(pod.Spec.NodeName) == 0 || !util.IsPodResizePreemptable(pod) {
 		return nil
 	}
 
@@ -173,7 +172,7 @@ func (pl *DeferredPodScheduling) Filter(ctx context.Context, _ fwk.CycleState, p
 // Bind sets the SchedulerEvaluationCompleted condition on deferred resize pods that pass
 // scheduling evaluation, skipping DefaultBinder because the pod is already bound to its node.
 func (pl *DeferredPodScheduling) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(p.Spec.NodeName) == 0 || !resource.IsPodResizeDeferred(p) {
+	if !pl.enableInPlacePodVerticalScalingSchedulerPreemption || len(p.Spec.NodeName) == 0 || !util.IsPodResizePreemptable(p) {
 		return fwk.NewStatus(fwk.Skip)
 	}
 
@@ -186,7 +185,7 @@ func (pl *DeferredPodScheduling) Bind(ctx context.Context, state fwk.CycleState,
 	}
 	// Complete the binding cycle without a patch if the pod was deleted or recreated, its deferred resize was
 	// resolved while in flight, or an earlier cycle already set the condition.
-	if cachedPod.UID != p.UID || !resource.IsPodResizeDeferred(cachedPod) || util.IsPodResizeSchedulerEvaluationCompleted(cachedPod) {
+	if cachedPod.UID != p.UID || !util.IsPodResizePreemptable(cachedPod) || util.IsPodResizeSchedulerEvaluationCompleted(cachedPod) {
 		return nil
 	}
 	// The queue drops updates received while the pod is in flight, so signal bindingCycle to requeue

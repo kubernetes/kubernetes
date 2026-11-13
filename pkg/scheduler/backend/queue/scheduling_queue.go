@@ -44,7 +44,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	listersv1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -553,7 +552,7 @@ func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
 	if !p.isGenericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
 		return false
 	}
-	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
+	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled && len(pod.Spec.NodeName) > 0 && util.IsPodResizePreemptable(pod) {
 		// Deferred resize pods must be queued and evaluated individually rather than as a pod group because they are
 		// already running on assigned nodes and undergo atomic individual resource adjustments rather than group gang-scheduling.
 		return false
@@ -767,7 +766,7 @@ func (p *PriorityQueue) runPreEnqueuePluginsForPod(ctx context.Context, pInfo *f
 	}()
 
 	plugins := p.preEnqueuePluginMap[pod.Spec.SchedulerName]
-	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
+	if p.isInPlacePodVerticalScalingSchedulerPreemptionEnabled && len(pod.Spec.NodeName) > 0 && util.IsPodResizePreemptable(pod) {
 		// As in the scheduling cycle, irrelevant plugins sit out a resize.
 		plugins = p.resizePreEnqueuePluginMap[pod.Spec.SchedulerName]
 	}

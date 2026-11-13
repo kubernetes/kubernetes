@@ -341,7 +341,7 @@ func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Po
 		return fwk.QueueSkip, nil
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && schedutil.IsPodResizePreemptable(pod) {
 		deletedNodeName := deletedPod.Spec.NodeName
 		if deletedNodeName == "" {
 			deletedNodeName = deletedPod.Status.NominatedNodeName
@@ -393,7 +393,7 @@ func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPo
 		return false
 	}
 
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(targetPod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(targetPod) {
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(targetPod.Spec.NodeName) > 0 && schedutil.IsPodResizePreemptable(targetPod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedPod.Spec.NodeName != targetPod.Spec.NodeName {
 			return false
@@ -442,7 +442,7 @@ func (f *Fit) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldO
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod) {
+	if f.enableInPlacePodVerticalScalingSchedulerPreemption && len(pod.Spec.NodeName) > 0 && schedutil.IsPodResizePreemptable(pod) {
 		// A pod with deferred resize is already bound to a specific node, so changes to other nodes do not affect its schedulability.
 		if modifiedNode.Name != pod.Spec.NodeName {
 			logger.V(5).Info("node was updated, but it is a different node than the deferred resize pod's node", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))

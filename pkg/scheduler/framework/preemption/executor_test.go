@@ -43,7 +43,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -62,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 type fakeHandleForLister struct {
@@ -872,7 +872,7 @@ func TestPrepareCandidate(t *testing.T) {
 						pgInfo := &framework.PodGroupInfo{GenericPodGroup: tt.preemptorGenericPodGroup}
 						preemptor = &podGroupExecutorPreemptor{PodGroupInfo: pgInfo, pods: []*v1.Pod{tt.preemptor}}
 					} else {
-						preemptor = &podExecutorPreemptor{Pod: tt.preemptor, isResize: resource.IsPodResizeDeferred(tt.preemptor)}
+						preemptor = &podExecutorPreemptor{Pod: tt.preemptor, isResize: schedutil.IsPodResizePreemptable(tt.preemptor)}
 					}
 					metricsBefore := capturePreemptionMetricsState(testRegistry, preemptor)
 

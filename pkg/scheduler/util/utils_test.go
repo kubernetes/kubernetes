@@ -1484,3 +1484,91 @@ func TestIsPodResizeSchedulerEvaluationCompleted(t *testing.T) {
 		t.Errorf("expected IsPodResizeSchedulerEvaluationCompleted to be false when status is False")
 	}
 }
+
+func TestIsPodResizePreemptable(t *testing.T) {
+	cases := []struct {
+		name       string
+		conditions []v1.PodCondition
+		want       bool
+	}{
+		{
+			name: "no conditions",
+			want: false,
+		},
+		{
+			name: "PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			want: true,
+		},
+		{
+			name: "PodResizePending Infeasible",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonInfeasible},
+			},
+			want: false,
+		},
+		{
+			name: "PodAllocationPending InsufficientResources",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInsufficientResources},
+			},
+			want: true,
+		},
+		{
+			name: "PodAllocationPending Blocked",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonBlocked},
+			},
+			want: false,
+		},
+		{
+			name: "PodAllocationPending Error",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonError},
+			},
+			want: false,
+		},
+		{
+			name: "PodAllocationPending Infeasible",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInfeasible},
+			},
+			want: false,
+		},
+		{
+			name: "PodAllocationPending InsufficientResources with PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInsufficientResources},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			want: true,
+		},
+		{
+			name: "PodAllocationPending Blocked takes precedence over PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonBlocked},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			want: false,
+		},
+		{
+			name: "PodAllocationPending Error takes precedence over PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonError},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Status: v1.PodStatus{Conditions: tc.conditions}}
+			if got := IsPodResizePreemptable(pod); got != tc.want {
+				t.Errorf("IsPodResizePreemptable() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

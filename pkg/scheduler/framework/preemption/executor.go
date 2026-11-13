@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/component-helpers/resource"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -172,7 +171,7 @@ func NewExecutor(fh fwk.Handle, fts feature.Features) *Executor {
 func (e *Executor) ActuatePodPreemption(ctx context.Context, candidate fwk.PreemptionCandidate, preemptorPod *v1.Pod, pluginName string) *fwk.Status {
 	podPreemptor := &podExecutorPreemptor{
 		Pod:      preemptorPod,
-		isResize: e.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && resource.IsPodResizeDeferred(preemptorPod),
+		isResize: e.fts.EnableInPlacePodVerticalScalingSchedulerPreemption && schedutil.IsPodResizePreemptable(preemptorPod),
 	}
 	if e.fts.EnableAsyncPreemption {
 		e.prepareCandidateAsync(candidate, podPreemptor, pluginName)

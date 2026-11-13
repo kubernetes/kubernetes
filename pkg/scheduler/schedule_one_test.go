@@ -55,7 +55,6 @@ import (
 	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentmetrics "k8s.io/component-base/metrics"
-	compresource "k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -6364,8 +6363,8 @@ func TestSchedulingCycle_RefreshesDeferredResizePodFromSnapshot(t *testing.T) {
 			if gotMilliCPU := assumedPodInfo.CalculateResource().Resource.GetMilliCPU(); gotMilliCPU != tc.wantMilliCPU {
 				t.Errorf("expected refreshed podInfo CalculateResource().Resource.GetMilliCPU() %d, got %d", tc.wantMilliCPU, gotMilliCPU)
 			}
-			if !compresource.IsPodResizeDeferred(assumedPodInfo.Pod) {
-				t.Errorf("expected refreshed pod to retain Deferred condition during scheduling cycle")
+			if !schedutil.IsPodResizePreemptable(assumedPodInfo.Pod) {
+				t.Errorf("expected refreshed pod to retain preemptable resize condition during scheduling cycle")
 			}
 		})
 	}

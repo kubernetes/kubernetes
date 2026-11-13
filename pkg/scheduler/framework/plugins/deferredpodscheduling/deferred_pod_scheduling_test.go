@@ -84,6 +84,22 @@ func TestDeferredPodScheduling_PreFilter(t *testing.T) {
 			wantResult: &fwk.PreFilterResult{NodeNames: sets.New("node1")},
 			wantStatus: nil,
 		},
+		{
+			name: "feature gate on, PodAllocationPending InsufficientResources -> narrows to assigned node",
+			pod: st.MakePod().Name("pod1").Node("node1").
+				Condition(v1.PodAllocationPending, v1.ConditionTrue, v1.PodReasonInsufficientResources).Obj(),
+			gateOn:     true,
+			wantResult: &fwk.PreFilterResult{NodeNames: sets.New("node1")},
+			wantStatus: nil,
+		},
+		{
+			name: "feature gate on, PodAllocationPending Blocked with PodResizePending Deferred -> skip",
+			pod: st.MakePod().Name("pod1").Node("node1").
+				Condition(v1.PodAllocationPending, v1.ConditionTrue, v1.PodReasonBlocked).
+				Condition(v1.PodResizePending, v1.ConditionTrue, v1.PodReasonDeferred).Obj(),
+			gateOn:     true,
+			wantStatus: fwk.NewStatus(fwk.Skip),
+		},
 	}
 
 	for _, tt := range tests {

@@ -36,7 +36,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -47,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -657,7 +657,7 @@ func relevantPlugins[T fwk.Plugin](plugins []T, pluginsMap map[string]fwk.Plugin
 }
 
 func (f *frameworkImpl) isPodResize(pod *v1.Pod) bool {
-	return f.enableInPlacePodVerticalScalingSchedulerPreemption && pod != nil && len(pod.Spec.NodeName) > 0 && resource.IsPodResizeDeferred(pod)
+	return f.enableInPlacePodVerticalScalingSchedulerPreemption && pod != nil && len(pod.Spec.NodeName) > 0 && util.IsPodResizePreemptable(pod)
 }
 
 func pluginsForPod[T fwk.Plugin](f *frameworkImpl, pod *v1.Pod, all, resize []T) []T {
@@ -2475,7 +2475,7 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Stat
 
 	startTime := time.Now()
 	s := <-waitingPod.s
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !resource.IsPodResizeDeferred(pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) || !util.IsPodResizePreemptable(pod) {
 		metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 	}
 

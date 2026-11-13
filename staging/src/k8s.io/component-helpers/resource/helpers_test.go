@@ -5343,6 +5343,91 @@ func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
 		},
 		{
+			name: "PodAllocationPending Infeasible uses status resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("20")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodAllocationPending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonInfeasible,
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               "c1",
+							AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+			},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+		},
+		{
+			name: "PodAllocationPending Blocked with PodResizePending Deferred keeps spec resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("20")},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodAllocationPending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonBlocked,
+						},
+						{
+							Type:   v1.PodResizePending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonDeferred,
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:               "c1",
+							AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+							Resources: &v1.ResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+								Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("6")},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+			},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10")},
+			expectedLimits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("20")},
+		},
+		{
 			name: "non missing container requests applied to init container",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -5409,26 +5494,121 @@ func TestPodRequestsAndLimitsVerticalScalingWrappers(t *testing.T) {
 }
 
 func TestResizeConditionsAndSupportedResources(t *testing.T) {
-	pod := &v1.Pod{
-		Status: v1.PodStatus{
-			Conditions: []v1.PodCondition{
-				{
-					Type:   v1.PodResizePending,
-					Status: v1.ConditionTrue,
-					Reason: v1.PodReasonDeferred,
-				},
+	cases := []struct {
+		name           string
+		conditions     []v1.PodCondition
+		wantDeferred   bool
+		wantInfeasible bool
+	}{
+		{
+			name:           "no conditions",
+			wantDeferred:   false,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
 			},
+			wantDeferred:   true,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodResizePending Infeasible",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonInfeasible},
+			},
+			wantDeferred:   false,
+			wantInfeasible: true,
+		},
+		{
+			name: "PodResizePending other reason",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: "Other"},
+			},
+			wantDeferred:   false,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodAllocationPending InsufficientResources",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInsufficientResources},
+			},
+			wantDeferred:   false,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodAllocationPending Blocked",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonBlocked},
+			},
+			wantDeferred:   false,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodAllocationPending Error",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonError},
+			},
+			wantDeferred:   false,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodAllocationPending Infeasible",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInfeasible},
+			},
+			wantDeferred:   false,
+			wantInfeasible: true,
+		},
+		{
+			name: "PodAllocationPending InsufficientResources with PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInsufficientResources},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			wantDeferred:   true,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodAllocationPending Error with PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonError},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			wantDeferred:   true,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodAllocationPending Blocked with PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonBlocked},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			wantDeferred:   true,
+			wantInfeasible: false,
+		},
+		{
+			name: "PodAllocationPending Infeasible takes precedence over PodResizePending Deferred",
+			conditions: []v1.PodCondition{
+				{Type: v1.PodAllocationPending, Status: v1.ConditionTrue, Reason: v1.PodReasonInfeasible},
+				{Type: v1.PodResizePending, Status: v1.ConditionTrue, Reason: v1.PodReasonDeferred},
+			},
+			wantDeferred:   true,
+			wantInfeasible: true,
 		},
 	}
-	if !IsPodResizeDeferred(pod) {
-		t.Errorf("expected IsPodResizeDeferred to be true")
-	}
-	if IsPodResizeInfeasible(pod) {
-		t.Errorf("expected IsPodResizeInfeasible to be false")
-	}
-	pod.Status.Conditions[0].Reason = "Other"
-	if IsPodResizeDeferred(pod) {
-		t.Errorf("expected IsPodResizeDeferred to be false")
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Status: v1.PodStatus{Conditions: tc.conditions}}
+			if got := IsPodResizeDeferred(pod); got != tc.wantDeferred {
+				t.Errorf("IsPodResizeDeferred() = %v, want %v", got, tc.wantDeferred)
+			}
+			if got := IsPodResizeInfeasible(pod); got != tc.wantInfeasible {
+				t.Errorf("IsPodResizeInfeasible() = %v, want %v", got, tc.wantInfeasible)
+			}
+		})
 	}
 
 	if !SupportedPodLevelResources().Has(v1.ResourceCPU) {

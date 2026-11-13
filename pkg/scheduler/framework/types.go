@@ -750,7 +750,7 @@ func (pqi *QueuedPodInfo) Type() fwk.EntityKeyType {
 
 func (pqi *QueuedPodInfo) IsResize() bool {
 	return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingSchedulerPreemption) &&
-		resourcehelper.IsPodResizeDeferred(pqi.Pod)
+		schedutil.IsPodResizePreemptable(pqi.Pod)
 }
 
 func (pqi *QueuedPodInfo) ForEachPodInfo() iter.Seq[*QueuedPodInfo] {

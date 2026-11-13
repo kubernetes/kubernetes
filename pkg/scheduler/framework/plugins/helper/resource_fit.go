@@ -26,6 +26,7 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
@@ -225,7 +226,7 @@ func FitsRequest(podRequest *framework.Resource, nodeInfo fwk.NodeInfo, ignoredE
 }
 
 func isPodResizeOnNode(opts ResourceRequestsOptions, nodeInfo fwk.NodeInfo, pod *v1.Pod) bool {
-	return opts.EnableInPlacePodVerticalScalingSchedulerPreemption && pod != nil && len(pod.Spec.NodeName) > 0 && nodeInfo.Node() != nil && pod.Spec.NodeName == nodeInfo.Node().Name && resource.IsPodResizeDeferred(pod)
+	return opts.EnableInPlacePodVerticalScalingSchedulerPreemption && pod != nil && len(pod.Spec.NodeName) > 0 && nodeInfo.Node() != nil && pod.Spec.NodeName == nodeInfo.Node().Name && util.IsPodResizePreemptable(pod)
 }
 
 // effectiveRequestedForResize returns nodeInfo.GetRequested() with other deferred resize pods on
