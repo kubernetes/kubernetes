@@ -43,6 +43,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -51,7 +52,10 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	// Registers the core API group with legacyscheme so GenerateContainerRef can build container object references.
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
@@ -103,7 +107,7 @@ func newTestManager(kubeClient clientset.Interface) *manager {
 	podManager := kubepod.NewBasicPodManager()
 	podManager.(mutablePodManager).AddPod(getTestPod())
 	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
-	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
+	return NewManager(kubeClient, &record.FakeRecorder{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 }
 
 func generateRandomMessage() string {
@@ -1392,7 +1396,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
-			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
+			syncer := NewManager(&fake.Clientset{}, &record.FakeRecorder{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 
 			original := tc.pod.DeepCopy()
 			syncer.SetPodStatus(logger, original, original.Status)
@@ -1481,7 +1485,7 @@ func TestTerminatePod_EnsurePodPhaseIsTerminal(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
-			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
+			syncer := NewManager(&fake.Clientset{}, &record.FakeRecorder{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 
 			pod := getTestPod()
 			pod.Status = tc.status
@@ -2932,8 +2936,123 @@ func TestContainerTerminationMetric(t *testing.T) {
 	assert.InDelta(t, 1.0, count, 0)
 }
 
+func TestOOMKilledContainerEvent(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	oomTerminated := func(containerID string) v1.ContainerState {
+		return v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 137, Reason: "OOMKilled", ContainerID: containerID}}
+	}
+	running := v1.ContainerState{Running: &v1.ContainerStateRunning{}}
+	newManager := func() (*manager, *record.FakeRecorder, *v1.Pod) {
+		podManager := kubepod.NewBasicPodManager()
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "oom-pod", Namespace: "test", UID: "oom-uid"},
+			Spec: v1.PodSpec{
+				RestartPolicy:       v1.RestartPolicyAlways,
+				InitContainers:      []v1.Container{{Name: "init-c"}},
+				Containers:          []v1.Container{{Name: "c"}},
+				EphemeralContainers: []v1.EphemeralContainer{{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "eph-c"}}},
+			},
+		}
+		podManager.(mutablePodManager).AddPod(pod)
+		recorder := record.NewFakeRecorder(10)
+		m := NewManager(&fake.Clientset{}, recorder, podManager, &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker()).(*manager)
+		return m, recorder, pod
+	}
+	drain := func(recorder *record.FakeRecorder) []string {
+		var got []string
+		for {
+			select {
+			case e := <-recorder.Events:
+				got = append(got, e)
+			default:
+				return got
+			}
+		}
+	}
+
+	t.Run("OOM kill emits one event and is not repeated on an unchanged status", func(t *testing.T) {
+		m, recorder, pod := newManager()
+		status := v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "c", State: oomTerminated("id-1")}}}
+
+		m.SetPodStatus(logger, pod, status)
+		got := drain(recorder)
+		require.Len(t, got, 1)
+		assert.Contains(t, got[0], "Warning "+events.OOMKilledContainer)
+		assert.Contains(t, got[0], "Container c was OOMKilled (exit code 137)")
+
+		m.SetPodStatus(logger, pod, status)
+		assert.Empty(t, drain(recorder), "OOM event must not be re-emitted for an already-reported termination")
+	})
+
+	t.Run("non-OOM termination emits no OOM event", func(t *testing.T) {
+		m, recorder, pod := newManager()
+		status := v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{
+			Name:  "c",
+			State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 1, Reason: "Error", ContainerID: "id-1"}},
+		}}}
+
+		m.SetPodStatus(logger, pod, status)
+		assert.Empty(t, drain(recorder))
+	})
+
+	t.Run("init and ephemeral container OOM kills emit events", func(t *testing.T) {
+		m, recorder, pod := newManager()
+		status := v1.PodStatus{
+			InitContainerStatuses:      []v1.ContainerStatus{{Name: "init-c", State: oomTerminated("init-id")}},
+			EphemeralContainerStatuses: []v1.ContainerStatus{{Name: "eph-c", State: oomTerminated("eph-id")}},
+		}
+
+		m.SetPodStatus(logger, pod, status)
+		got := drain(recorder)
+		require.Len(t, got, 2)
+		joined := strings.Join(got, "\n")
+		assert.Contains(t, joined, "Container init-c was OOMKilled")
+		assert.Contains(t, joined, "Container eph-c was OOMKilled")
+	})
+
+	t.Run("OOM kill observed only in last termination state emits an event", func(t *testing.T) {
+		m, recorder, pod := newManager()
+		// The container already restarted, so the kill is only ever reported in the
+		// last termination state, never as the current State.Terminated.
+		status := v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{
+			Name:                 "c",
+			State:                running,
+			LastTerminationState: oomTerminated("id-1"),
+		}}}
+
+		m.SetPodStatus(logger, pod, status)
+		got := drain(recorder)
+		require.Len(t, got, 1)
+		assert.Contains(t, got[0], "Container c was OOMKilled")
+
+		m.SetPodStatus(logger, pod, status)
+		assert.Empty(t, drain(recorder))
+	})
+
+	t.Run("a replacement container that OOMs is reported as a distinct kill", func(t *testing.T) {
+		m, recorder, pod := newManager()
+
+		first := v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{Name: "c", State: oomTerminated("id-1")}}}
+		m.SetPodStatus(logger, pod, first)
+		require.Len(t, drain(recorder), 1)
+
+		// The replacement container (id-2) OOMs too; the previous kill (id-1) moves
+		// to the last termination state. Only the new container ID must be reported.
+		second := v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{{
+			Name:                 "c",
+			State:                oomTerminated("id-2"),
+			LastTerminationState: oomTerminated("id-1"),
+		}}}
+		m.SetPodStatus(logger, pod, second)
+		got := drain(recorder)
+		require.Len(t, got, 1)
+		assert.Contains(t, got[0], "Container c was OOMKilled")
+	})
+}
+
 func TestPodResizeConditions(t *testing.T) {
-	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
+	m := NewManager(&fake.Clientset{}, &record.FakeRecorder{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
 	podUID := types.UID("12345")
 
 	testCases := []struct {
@@ -3134,7 +3253,7 @@ func TestPodResizeConditions(t *testing.T) {
 }
 
 func TestClearPodResizeInProgressCondition(t *testing.T) {
-	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
+	m := NewManager(&fake.Clientset{}, &record.FakeRecorder{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
 	podUID := types.UID("12345")
 
 	testCases := []struct {
@@ -3843,7 +3962,7 @@ func TestSyncBatch_EvictionPublishedAfterCleanExit(t *testing.T) {
 	podManager := kubepod.NewBasicPodManager()
 	podManager.(mutablePodManager).AddPod(pod)
 	deletionSafety := &statustest.FakePodDeletionSafetyProvider{HasRunning: true}
-	syncer := NewManager(client, podManager, deletionSafety, util.NewPodStartupLatencyTracker()).(*manager)
+	syncer := NewManager(client, &record.FakeRecorder{}, podManager, deletionSafety, util.NewPodStartupLatencyTracker()).(*manager)
 
 	apiPod := func() *v1.Pod {
 		got, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
