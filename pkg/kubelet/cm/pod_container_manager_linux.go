@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -103,6 +104,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			m.applyPodLevelMemoryHigh(pod, containerConfig.ResourceParameters)
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
+		applyWritableCgroupLimits(pod, containerConfig.ResourceParameters)
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
 		}
@@ -118,6 +120,38 @@ func (m *podContainerManagerImpl) applyPodLevelMemoryHigh(pod *v1.Pod, rc *Resou
 	if m.memoryThrottlingFactor != nil {
 		ApplyPodLevelMemoryHigh(pod, rc, *m.memoryThrottlingFactor)
 	}
+}
+
+const (
+	defaultWritableCgroupMaxDescendants = "250"
+	defaultWritableCgroupMaxDepth       = "50"
+)
+
+func applyWritableCgroupLimits(pod *v1.Pod, rc *ResourceConfig) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CgroupOptions) || !podRequestsWritableCgroups(pod) {
+		return
+	}
+	if rc.Unified == nil {
+		rc.Unified = map[string]string{}
+	}
+	rc.Unified[Cgroup2MaxDescendants] = defaultWritableCgroupMaxDescendants
+	rc.Unified[Cgroup2MaxDepth] = defaultWritableCgroupMaxDepth
+}
+
+func containerRequestsWritableCgroups(sc *v1.SecurityContext) bool {
+	if sc == nil || sc.CgroupOptions == nil || sc.CgroupOptions.MountMode == nil {
+		return false
+	}
+	return *sc.CgroupOptions.MountMode == v1.CgroupMountModeReadWrite
+}
+
+func podRequestsWritableCgroups(pod *v1.Pod) bool {
+	for c := range podutil.ContainerIter(&pod.Spec, podutil.AllContainers) {
+		if containerRequestsWritableCgroups(c.SecurityContext) {
+			return true
+		}
+	}
+	return false
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.

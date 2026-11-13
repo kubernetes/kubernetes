@@ -8794,6 +8794,9 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		"Single Container": {
 			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
+		"Empty SecurityContext": {
+			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: &core.SecurityContext{}}},
+		},
 		"Multiple Containers": {
 			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug2", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
@@ -8862,6 +8865,39 @@ func TestValidateEphemeralContainers(t *testing.T) {
 		ephemeralContainers []core.EphemeralContainer
 		expectedErrors      field.ErrorList
 	}{{
+		"Forbidden CgroupOptions",
+		line(),
+		[]core.EphemeralContainer{{
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "empty",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				SecurityContext:          &core.SecurityContext{CgroupOptions: &core.CgroupOptions{}},
+			},
+		}, {
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "readonly",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				SecurityContext:          &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadOnly)}},
+			},
+		}, {
+			EphemeralContainerCommon: core.EphemeralContainerCommon{
+				Name:                     "readwrite",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				SecurityContext:          &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}},
+			},
+		}},
+		field.ErrorList{
+			{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].securityContext.cgroupOptions"},
+			{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[1].securityContext.cgroupOptions"},
+			{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[2].securityContext.cgroupOptions"},
+		},
+	}, {
 		"Name Collision with Container.Containers",
 		line(),
 		[]core.EphemeralContainer{
@@ -24651,6 +24687,12 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorMsg:    "cannot be set for a windows pod",
 		errorType:   "FieldValueForbidden",
 	}, {
+		name:        "pod with CgroupOptions",
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}}}}},
+		expectError: true,
+		errorMsg:    "cannot be set for a windows pod",
+		errorType:   "FieldValueForbidden",
+	}, {
 		name:        "pod with WindowsOptions, no error",
 		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("dummy")}}}}},
 		expectError: false,
@@ -24686,6 +24728,7 @@ func TestValidateOSFields(t *testing.T) {
 	osSpecificFields := sets.NewString(
 		"Containers[*].SecurityContext.AppArmorProfile",
 		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
+		"Containers[*].SecurityContext.CgroupOptions",
 		"Containers[*].SecurityContext.Capabilities",
 		"Containers[*].SecurityContext.Privileged",
 		"Containers[*].SecurityContext.ProcMount",
@@ -24697,6 +24740,7 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].SecurityContext.WindowsOptions",
 		"InitContainers[*].SecurityContext.AppArmorProfile",
 		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
+		"InitContainers[*].SecurityContext.CgroupOptions",
 		"InitContainers[*].SecurityContext.Capabilities",
 		"InitContainers[*].SecurityContext.Privileged",
 		"InitContainers[*].SecurityContext.ProcMount",
@@ -24708,6 +24752,7 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].SecurityContext.WindowsOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AppArmorProfile",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.CgroupOptions",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Capabilities",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Privileged",
 		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.ProcMount",
@@ -25081,6 +25126,14 @@ func TestValidateLinuxSecurityContext(t *testing.T) {
 }
 
 func TestValidateSecurityContext(t *testing.T) {
+	originalCapabilities := capabilities.Get()
+	capabilities.ResetForTest()
+	capabilities.Initialize(capabilities.Capabilities{AllowPrivileged: true})
+	t.Cleanup(func() {
+		capabilities.ResetForTest()
+		capabilities.Initialize(originalCapabilities)
+	})
+
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
 		return &core.SecurityContext{
@@ -25126,19 +25179,50 @@ func TestValidateSecurityContext(t *testing.T) {
 		Add: []core.Capability{"CAP_SYS_ADMIN"},
 	}
 
+	cgroupOptionsEmpty := fullValidSC()
+	cgroupOptionsEmpty.CgroupOptions = &core.CgroupOptions{}
+
+	cgroupMountModeReadOnly := fullValidSC()
+	cgroupMountModeReadOnly.CgroupOptions = &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadOnly)}
+
+	cgroupMountModeReadWrite := fullValidSC()
+	cgroupMountModeReadWrite.CgroupOptions = &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}
+
+	cgroupMountModeReadOnlyNoPrivRequest := fullValidSC()
+	cgroupMountModeReadOnlyNoPrivRequest.Privileged = nil
+	cgroupMountModeReadOnlyNoPrivRequest.CgroupOptions = &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadOnly)}
+
+	privWithCgroupMountModeReadWrite := fullValidSC()
+	privWithCgroupMountModeReadWrite.Privileged = new(true)
+	privWithCgroupMountModeReadWrite.CgroupOptions = &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}
+
+	privWithoutCgroupOptions := fullValidSC()
+	privWithoutCgroupOptions.Privileged = new(true)
+
+	privWithCgroupOptionsEmpty := fullValidSC()
+	privWithCgroupOptionsEmpty.Privileged = new(true)
+	privWithCgroupOptionsEmpty.CgroupOptions = &core.CgroupOptions{}
+
 	successCases := map[string]struct {
 		sc            *core.SecurityContext
 		hostUsers     bool
 		allowSysAdmin bool
 	}{
-		"all settings":                           {allSettings, false, false},
-		"no capabilities":                        {noCaps, false, false},
-		"no selinux":                             {noSELinux, false, false},
-		"no priv request":                        {noPrivRequest, false, false},
-		"no run as user":                         {noRunAsUser, false, false},
-		"proc mount set":                         {procMountSet, true, false},
-		"proc mount unmasked":                    {procMountUnmasked, false, false},
-		"sys admin without privilege escalation": {sysAdminPriv, false, true},
+		"all settings":                                     {allSettings, false, false},
+		"no capabilities":                                  {noCaps, false, false},
+		"no selinux":                                       {noSELinux, false, false},
+		"no priv request":                                  {noPrivRequest, false, false},
+		"no run as user":                                   {noRunAsUser, false, false},
+		"proc mount set":                                   {procMountSet, true, false},
+		"proc mount unmasked":                              {procMountUnmasked, false, false},
+		"sys admin without privilege escalation":           {sysAdminPriv, false, true},
+		"cgroup options empty":                             {cgroupOptionsEmpty, false, false},
+		"cgroup mount mode read-only":                      {cgroupMountModeReadOnly, false, false},
+		"cgroup mount mode read-write":                     {cgroupMountModeReadWrite, false, false},
+		"cgroup mount mode read-only with no priv request": {cgroupMountModeReadOnlyNoPrivRequest, false, false},
+		"privileged with read-write cgroup mount mode":     {privWithCgroupMountModeReadWrite, false, false},
+		"privileged without cgroup options":                {privWithoutCgroupOptions, false, false},
+		"privileged with empty cgroup options":             {privWithCgroupOptionsEmpty, false, false},
 	}
 	for k, v := range successCases {
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), v.hostUsers, v.allowSysAdmin, false); len(errs) != 0 {
@@ -25161,10 +25245,15 @@ func TestValidateSecurityContext(t *testing.T) {
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
 	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
 
+	privWithCgroupMountModeReadOnly := fullValidSC()
+	privWithCgroupMountModeReadOnly.Privileged = new(true)
+	privWithCgroupMountModeReadOnly.CgroupOptions = &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadOnly)}
+
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
 		errorType    field.ErrorType
 		errorDetail  string
+		errorField   string
 		capAllowPriv bool
 	}{
 		"request privileged when capabilities forbids": {
@@ -25193,6 +25282,13 @@ func TestValidateSecurityContext(t *testing.T) {
 			errorType:   "FieldValueInvalid",
 			errorDetail: "`hostUsers` must be false to use `Unmasked`",
 		},
+		"with privileged and read-only cgroup mount mode": {
+			sc:           privWithCgroupMountModeReadOnly,
+			errorType:    "FieldValueInvalid",
+			errorDetail:  "cannot be set to ReadOnly when `privileged` is true",
+			errorField:   "field.cgroupOptions.mountMode",
+			capAllowPriv: true,
+		},
 	}
 	for k, v := range errorCases {
 		capabilities.ResetForTest()
@@ -25201,8 +25297,12 @@ func TestValidateSecurityContext(t *testing.T) {
 		})
 		// note the unconditional `true` here for hostUsers. The failure case to test for ProcMount only includes it being true,
 		// and the field is ignored if ProcMount isn't set. Thus, we can unconditionally set to `true` and simplify the test matrix setup.
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true, false, false); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+		errs := ValidateSecurityContext(v.sc, field.NewPath("field"), true, false, false)
+		if len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+		}
+		if v.errorField != "" && (len(errs) != 1 || errs[0].Field != v.errorField) {
+			t.Errorf("[%s] Expected one error on field %q, got %v", k, v.errorField, errs)
 		}
 	}
 }
@@ -27994,6 +28094,65 @@ func TestValidateHostUsers(t *testing.T) {
 			HostUsers:   &falseVar,
 			HostNetwork: true,
 		},
+	}, {
+		name:    "hostUsers=false & HostNetwork & container cgroupOptions ReadWrite",
+		success: false,
+		spec: &core.PodSpec{
+			HostUsers:   &falseVar,
+			HostNetwork: true,
+			Containers: []core.Container{{
+				Name:            "test-container",
+				SecurityContext: &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}},
+			}},
+		},
+		opts: PodValidationOptions{AllowUserNamespacesHostNetworkSupport: true},
+	}, {
+		name:    "hostUsers=false & HostNetwork & initContainer cgroupOptions ReadWrite",
+		success: false,
+		spec: &core.PodSpec{
+			HostUsers:   &falseVar,
+			HostNetwork: true,
+			InitContainers: []core.Container{{
+				Name:            "test-container",
+				SecurityContext: &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}},
+			}},
+		},
+		opts: PodValidationOptions{AllowUserNamespacesHostNetworkSupport: true},
+	}, {
+		name:    "hostUsers=false & HostNetwork & container cgroupOptions ReadOnly",
+		success: true,
+		spec: &core.PodSpec{
+			HostUsers:   &falseVar,
+			HostNetwork: true,
+			Containers: []core.Container{{
+				Name:            "test-container",
+				SecurityContext: &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadOnly)}},
+			}},
+		},
+		opts: PodValidationOptions{AllowUserNamespacesHostNetworkSupport: true},
+	}, {
+		name:    "hostUsers=false & container cgroupOptions ReadWrite without HostNetwork",
+		success: true,
+		spec: &core.PodSpec{
+			HostUsers: &falseVar,
+			Containers: []core.Container{{
+				Name:            "test-container",
+				SecurityContext: &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}},
+			}},
+		},
+		opts: PodValidationOptions{AllowUserNamespacesHostNetworkSupport: true},
+	}, {
+		name:    "hostUsers=true & HostNetwork & container cgroupOptions ReadWrite",
+		success: true,
+		spec: &core.PodSpec{
+			HostUsers:   &trueVar,
+			HostNetwork: true,
+			Containers: []core.Container{{
+				Name:            "test-container",
+				SecurityContext: &core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: ptr.To(core.CgroupMountModeReadWrite)}},
+			}},
+		},
+		opts: PodValidationOptions{AllowUserNamespacesHostNetworkSupport: true},
 	}, {
 		name:    "hostUsers=false & HostPID",
 		success: false,
@@ -33884,6 +34043,14 @@ func TestValidatePodDynamicUpdate(t *testing.T) {
 	}, {
 		name: "remove privileged container",
 		old:  combine(addCtr(mkCtr("c3", podtest.SetContainerSecurityContext(core.SecurityContext{Privileged: new(true)}))), addStatus(runningStatus("c3"))),
+		new:  removeCtr("c3"),
+	}, {
+		name: "add container with cgroupOptions",
+		new:  addCtr(mkCtr("c3", podtest.SetContainerSecurityContext(core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: new(core.CgroupMountModeReadOnly)}}))),
+		err:  "spec.containers[2].securityContext.cgroupOptions: Forbidden",
+	}, {
+		name: "remove container with cgroupOptions",
+		old:  combine(addCtr(mkCtr("c3", podtest.SetContainerSecurityContext(core.SecurityContext{CgroupOptions: &core.CgroupOptions{MountMode: new(core.CgroupMountModeReadWrite)}}))), addStatus(runningStatus("c3"))),
 		new:  removeCtr("c3"),
 	}, {
 		name: "add container with host port",
