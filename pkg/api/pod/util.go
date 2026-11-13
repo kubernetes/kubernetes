@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 // ContainerType signifies container type
@@ -102,9 +103,7 @@ func ContainerIter(podSpec *api.PodSpec, mask ContainerType) iter.Seq2[*api.Cont
 // ContainerPair is a container in two versions of a pod, matched by name. Old is nil for a
 // container that is only in the new pod (added), and New is nil for one that is only in the old
 // pod (removed).
-type ContainerPair struct {
-	New, Old *api.Container
-}
+type ContainerPair = slice.Pair[api.Container]
 
 // ContainerPairs yields the containers of pod and oldPod of the types in mask, paired by name,
 // with their type. Containers are only matched within their type, where names are assumed to be
@@ -117,22 +116,22 @@ func ContainerPairs(pod, oldPod *api.Pod, mask ContainerType) iter.Seq2[Containe
 	}
 }
 
-// containerPairs implements ContainerPairs. It keeps the calls to the generic pairContainers out
+// containerPairs implements ContainerPairs. It keeps the calls to the generic slice.PairByKey out
 // of the iterator, which is inlined into callers: called from another package, a generic function
 // makes the closures passed to it escape, and allocate.
 func containerPairs(pod, oldPod *api.Pod, mask ContainerType, yield func(ContainerPair, ContainerType) bool) {
-	if mask&InitContainers != 0 && !pairContainers(pod.Spec.InitContainers, oldPod.Spec.InitContainers, identityContainer, func(p ContainerPair) bool {
+	if mask&InitContainers != 0 && !slice.PairByKey(pod.Spec.InitContainers, oldPod.Spec.InitContainers, identityContainer, containerName, func(p ContainerPair) bool {
 		return yield(p, InitContainers)
 	}) {
 		return
 	}
-	if mask&Containers != 0 && !pairContainers(pod.Spec.Containers, oldPod.Spec.Containers, identityContainer, func(p ContainerPair) bool {
+	if mask&Containers != 0 && !slice.PairByKey(pod.Spec.Containers, oldPod.Spec.Containers, identityContainer, containerName, func(p ContainerPair) bool {
 		return yield(p, Containers)
 	}) {
 		return
 	}
 	if mask&EphemeralContainers != 0 {
-		pairContainers(pod.Spec.EphemeralContainers, oldPod.Spec.EphemeralContainers, ephemeralAsContainer, func(p ContainerPair) bool {
+		slice.PairByKey(pod.Spec.EphemeralContainers, oldPod.Spec.EphemeralContainers, ephemeralAsContainer, containerName, func(p ContainerPair) bool {
 			return yield(p, EphemeralContainers)
 		})
 	}
@@ -146,32 +145,38 @@ func ephemeralAsContainer(ec *api.EphemeralContainer) *api.Container {
 	return (*api.Container)(&ec.EphemeralContainerCommon)
 }
 
-// pairContainers pairs containers and oldContainers by name, and calls yield for each container in
-// containers (matched or added) followed by each removed container in oldContainers, in order.
-// unwrap returns the container of a slice element. It returns false if yield did.
-func pairContainers[E any](containers, oldContainers []E, unwrap func(*E) *api.Container, yield func(ContainerPair) bool) bool {
-	for i := range containers {
-		c := unwrap(&containers[i])
-		if !yield(ContainerPair{New: c, Old: findContainer(oldContainers, unwrap, c.Name)}) {
-			return false
-		}
-	}
-	for j := range oldContainers {
-		old := unwrap(&oldContainers[j])
-		if findContainer(containers, unwrap, old.Name) == nil && !yield(ContainerPair{Old: old}) {
-			return false
-		}
-	}
-	return true
+func containerName(c *api.Container) string {
+	return c.Name
 }
 
-func findContainer[E any](containers []E, unwrap func(*E) *api.Container, name string) *api.Container {
-	for i := range containers {
-		if c := unwrap(&containers[i]); c.Name == name {
-			return c
-		}
+// VolumePair is a volume in two versions of a pod, matched by name. Old is nil for a volume
+// that is only in the new pod (added), and New is nil for one that is only in the old pod
+// (removed).
+type VolumePair = slice.Pair[api.Volume]
+
+// VolumePairs yields the volumes of pod and oldPod (which may be nil on create), paired by name,
+// where names are assumed to be unique. The volumes of pod are yielded in order, followed by
+// removed volumes from oldPod in order.
+func VolumePairs(pod, oldPod *api.Pod) iter.Seq[VolumePair] {
+	return func(yield func(VolumePair) bool) {
+		volumePairs(pod, oldPod, yield)
 	}
-	return nil
+}
+
+func volumePairs(pod, oldPod *api.Pod, yield func(VolumePair) bool) {
+	var oldVolumes []api.Volume
+	if oldPod != nil {
+		oldVolumes = oldPod.Spec.Volumes
+	}
+	slice.PairByKey(pod.Spec.Volumes, oldVolumes, identityVolume, volumeName, yield)
+}
+
+func identityVolume(v *api.Volume) *api.Volume {
+	return v
+}
+
+func volumeName(v *api.Volume) string {
+	return v.Name
 }
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -462,6 +467,10 @@ func dropDisabledFields(
 		dropContainerRestartRules(podSpec)
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && !dynamicVolumeMountPolicyInUse(oldPodSpec) {
+		dropDynamicVolumeMountPolicy(podSpec)
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirVolumeMode) && !emptyDirVolumeModeInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			if podSpec.Volumes[i].EmptyDir != nil {
@@ -742,9 +751,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 
 	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && !volumeHealthInUse(oldPodStatus) {
-		podStatus.VolumeStatuses = nil
-	}
+	dropDisabledPodVolumeStatuses(podStatus, oldPodStatus)
 }
 
 func draExendedResourceInUse(podStatus *api.PodStatus) bool {
@@ -768,6 +775,35 @@ func draNodeAllocatableResourceStatusInUse(podStatus *api.PodStatus) bool {
 	return len(podStatus.NodeAllocatableResourceClaimStatuses) > 0
 }
 
+func dropDisabledPodVolumeStatuses(podStatus, oldPodStatus *api.PodStatus) {
+	healthEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) || volumeHealthInUse(oldPodStatus)
+	hostPhaseEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) || volumeHostPhaseInUse(oldPodStatus)
+	if !healthEnabled && !hostPhaseEnabled {
+		podStatus.VolumeStatuses = nil
+		return
+	}
+	if healthEnabled && hostPhaseEnabled || len(podStatus.VolumeStatuses) == 0 {
+		return
+	}
+	filtered := make([]api.PodVolumeStatus, 0, len(podStatus.VolumeStatuses))
+	for _, vs := range podStatus.VolumeStatuses {
+		if !healthEnabled {
+			vs.HealthStatus = nil
+		}
+		if !hostPhaseEnabled {
+			vs.HostPhase = ""
+		}
+		if vs.HealthStatus != nil || vs.HostPhase != "" {
+			filtered = append(filtered, vs)
+		}
+	}
+	if len(filtered) == 0 {
+		podStatus.VolumeStatuses = nil
+	} else {
+		podStatus.VolumeStatuses = filtered
+	}
+}
+
 func volumeHealthInUse(podStatus *api.PodStatus) bool {
 	if podStatus == nil {
 		return false
@@ -775,6 +811,69 @@ func volumeHealthInUse(podStatus *api.PodStatus) bool {
 	for _, volumeStatus := range podStatus.VolumeStatuses {
 		if volumeStatus.HealthStatus != nil {
 			return true
+		}
+	}
+	return false
+}
+
+func volumeHostPhaseInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+	for _, volumeStatus := range podStatus.VolumeStatuses {
+		if volumeStatus.HostPhase != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func dropDynamicVolumeMountPolicy(podSpec *api.PodSpec) {
+	if podSpec == nil {
+		return
+	}
+	for c := range ContainerIter(podSpec, AllContainers) {
+		c.DynamicVolumeMountPolicy = nil
+	}
+}
+
+func dynamicVolumeMountPolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for c := range ContainerIter(podSpec, AllContainers) {
+		if c.DynamicVolumeMountPolicy != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSupportedDynamicVolumeSource reports whether vs is a node-local ephemeral volume source
+// supported by DynamicNodeLocalEphemeralVolumes (ConfigMap, Secret, Projected, EmptyDir, or Image).
+// Note: keep this in sync with k8s.io/kubernetes/pkg/api/v1/pod.IsSupportedDynamicVolumeSource.
+func IsSupportedDynamicVolumeSource(vs *api.VolumeSource) bool {
+	if vs == nil {
+		return false
+	}
+	return vs.ConfigMap != nil ||
+		vs.Secret != nil ||
+		vs.Projected != nil ||
+		vs.EmptyDir != nil ||
+		vs.Image != nil
+}
+
+// IsVolumeMountedInPodSpec reports whether any container (init, main, or ephemeral)
+// in spec has a VolumeMount referencing volName.
+func IsVolumeMountedInPodSpec(spec *api.PodSpec, volName string) bool {
+	if spec == nil {
+		return false
+	}
+	for c := range ContainerIter(spec, AllContainers) {
+		for i := range c.VolumeMounts {
+			if c.VolumeMounts[i].Name == volName {
+				return true
+			}
 		}
 	}
 	return false

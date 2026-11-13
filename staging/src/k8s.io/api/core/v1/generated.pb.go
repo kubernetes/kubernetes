@@ -94,6 +94,8 @@ func (m *ConfigMapVolumeSource) Reset() { *m = ConfigMapVolumeSource{} }
 
 func (m *Container) Reset() { *m = Container{} }
 
+func (m *ContainerDynamicVolumeMountPolicy) Reset() { *m = ContainerDynamicVolumeMountPolicy{} }
+
 func (m *ContainerExtendedResourceRequest) Reset() { *m = ContainerExtendedResourceRequest{} }
 
 func (m *ContainerImage) Reset() { *m = ContainerImage{} }
@@ -2087,6 +2089,20 @@ func (m *Container) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.DynamicVolumeMountPolicy != nil {
+		{
+			size, err := m.DynamicVolumeMountPolicy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd2
+	}
 	if len(m.RestartPolicyRules) > 0 {
 		for iNdEx := len(m.RestartPolicyRules) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -2352,6 +2368,34 @@ func (m *Container) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i -= len(m.Name)
 	copy(dAtA[i:], m.Name)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ContainerDynamicVolumeMountPolicy) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerDynamicVolumeMountPolicy) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ContainerDynamicVolumeMountPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.RestartPolicy)
+	copy(dAtA[i:], m.RestartPolicy)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.RestartPolicy)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -3687,6 +3731,20 @@ func (m *EphemeralContainerCommon) MarshalToSizedBuffer(dAtA []byte) (int, error
 	_ = i
 	var l int
 	_ = l
+	if m.DynamicVolumeMountPolicy != nil {
+		{
+			size, err := m.DynamicVolumeMountPolicy.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd2
+	}
 	if len(m.RestartPolicyRules) > 0 {
 		for iNdEx := len(m.RestartPolicyRules) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -10955,6 +11013,11 @@ func (m *PodVolumeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	i -= len(m.HostPhase)
+	copy(dAtA[i:], m.HostPhase)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.HostPhase)))
+	i--
+	dAtA[i] = 0x1a
 	if m.HealthStatus != nil {
 		{
 			size, err := m.HealthStatus.MarshalToSizedBuffer(dAtA[:i])
@@ -16299,6 +16362,21 @@ func (m *Container) Size() (n int) {
 			n += 2 + l + sovGenerated(uint64(l))
 		}
 	}
+	if m.DynamicVolumeMountPolicy != nil {
+		l = m.DynamicVolumeMountPolicy.Size()
+		n += 2 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *ContainerDynamicVolumeMountPolicy) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.RestartPolicy)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -16899,6 +16977,10 @@ func (m *EphemeralContainerCommon) Size() (n int) {
 			l = e.Size()
 			n += 2 + l + sovGenerated(uint64(l))
 		}
+	}
+	if m.DynamicVolumeMountPolicy != nil {
+		l = m.DynamicVolumeMountPolicy.Size()
+		n += 2 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -19502,6 +19584,8 @@ func (m *PodVolumeStatus) Size() (n int) {
 		l = m.HealthStatus.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	l = len(m.HostPhase)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -21715,6 +21799,17 @@ func (this *Container) String() string {
 		`ResizePolicy:` + repeatedStringForResizePolicy + `,`,
 		`RestartPolicy:` + valueToStringGenerated(this.RestartPolicy) + `,`,
 		`RestartPolicyRules:` + repeatedStringForRestartPolicyRules + `,`,
+		`DynamicVolumeMountPolicy:` + strings.Replace(this.DynamicVolumeMountPolicy.String(), "ContainerDynamicVolumeMountPolicy", "ContainerDynamicVolumeMountPolicy", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerDynamicVolumeMountPolicy) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerDynamicVolumeMountPolicy{`,
+		`RestartPolicy:` + fmt.Sprintf("%v", this.RestartPolicy) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -22159,6 +22254,7 @@ func (this *EphemeralContainerCommon) String() string {
 		`ResizePolicy:` + repeatedStringForResizePolicy + `,`,
 		`RestartPolicy:` + valueToStringGenerated(this.RestartPolicy) + `,`,
 		`RestartPolicyRules:` + repeatedStringForRestartPolicyRules + `,`,
+		`DynamicVolumeMountPolicy:` + strings.Replace(this.DynamicVolumeMountPolicy.String(), "ContainerDynamicVolumeMountPolicy", "ContainerDynamicVolumeMountPolicy", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24104,6 +24200,7 @@ func (this *PodVolumeStatus) String() string {
 	s := strings.Join([]string{`&PodVolumeStatus{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`HealthStatus:` + strings.Replace(this.HealthStatus.String(), "VolumeHealthStatus", "VolumeHealthStatus", 1) + `,`,
+		`HostPhase:` + fmt.Sprintf("%v", this.HostPhase) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -31098,6 +31195,124 @@ func (m *Container) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 26:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DynamicVolumeMountPolicy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DynamicVolumeMountPolicy == nil {
+				m.DynamicVolumeMountPolicy = &ContainerDynamicVolumeMountPolicy{}
+			}
+			if err := m.DynamicVolumeMountPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerDynamicVolumeMountPolicy) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerDynamicVolumeMountPolicy: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerDynamicVolumeMountPolicy: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RestartPolicy", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RestartPolicy = DynamicVolumeMountRestartPolicy(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -36056,6 +36271,42 @@ func (m *EphemeralContainerCommon) Unmarshal(dAtA []byte) error {
 			}
 			m.RestartPolicyRules = append(m.RestartPolicyRules, ContainerRestartRule{})
 			if err := m.RestartPolicyRules[len(m.RestartPolicyRules)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 26:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DynamicVolumeMountPolicy", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.DynamicVolumeMountPolicy == nil {
+				m.DynamicVolumeMountPolicy = &ContainerDynamicVolumeMountPolicy{}
+			}
+			if err := m.DynamicVolumeMountPolicy.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -58384,6 +58635,38 @@ func (m *PodVolumeStatus) Unmarshal(dAtA []byte) error {
 			if err := m.HealthStatus.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HostPhase", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HostPhase = PodVolumeHostPhase(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

@@ -56,6 +56,10 @@ func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
 	return doCleanSubPaths(sp.mounter, podDir, volumeName)
 }
 
+func (sp *subpath) CleanContainerSubPaths(podDir string, containerName string, keepSubPathIndices map[string]map[int]struct{}) error {
+	return doCleanContainerSubPaths(sp.mounter, podDir, containerName, keepSubPathIndices)
+}
+
 func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
 	realBase, err := filepath.EvalSymlinks(base)
 	if err != nil {
@@ -141,7 +145,18 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		return false, "", fmt.Errorf("lstat %s failed: %s", subpath.Path, err)
 	}
 
-	if t.Mode()&os.ModeDir > 0 {
+	wantDir := t.Mode()&os.ModeDir > 0
+	if existing, statErr := os.Lstat(bindPathTarget); statErr == nil {
+		if (existing.Mode()&os.ModeDir > 0) != wantDir {
+			// When a dynamic volumeMount update switches a subpath index between a file and a
+			// directory (after lazy unmount above), remove the leftover stub before recreating it.
+			if rmErr := os.Remove(bindPathTarget); rmErr != nil && !os.IsNotExist(rmErr) {
+				return false, "", fmt.Errorf("error removing stale subpath target %s: %w", bindPathTarget, rmErr)
+			}
+		}
+	}
+
+	if wantDir {
 		if err = os.Mkdir(bindPathTarget, 0750); err != nil && !os.IsExist(err) {
 			return false, "", fmt.Errorf("error creating directory %s: %s", bindPathTarget, err)
 		}
@@ -314,6 +329,50 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 		return fmt.Errorf("error deleting %s: %s", podSubPathDir, err)
 	}
 	klog.V(5).Infof("Removed %s", podSubPathDir)
+	return nil
+}
+
+// doCleanContainerSubPaths tears down any subpath bind mounts for containerName under podDir
+// whose (volumeName, volumeMountIndex) is not in keepSubPathIndices.
+func doCleanContainerSubPaths(mounter mount.Interface, podDir string, containerName string, keepSubPathIndices map[string]map[int]struct{}) error {
+	podSubPathDir := filepath.Join(podDir, containerSubPathDirectoryName)
+	volDirs, err := os.ReadDir(podSubPathDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("error reading %s: %w", podSubPathDir, err)
+	}
+
+	for _, volDir := range volDirs {
+		if !volDir.IsDir() {
+			continue
+		}
+		volName := volDir.Name()
+		fullContainerDirPath := filepath.Join(podSubPathDir, volName, containerName)
+		entries, err := os.ReadDir(fullContainerDirPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("error reading %s: %w", fullContainerDirPath, err)
+		}
+		keptForVol := keepSubPathIndices[volName]
+		for _, entry := range entries {
+			idx, convErr := strconv.Atoi(entry.Name())
+			if convErr == nil && keptForVol != nil {
+				if _, keep := keptForVol[idx]; keep {
+					continue
+				}
+			}
+			if err := doCleanSubPath(mounter, fullContainerDirPath, entry.Name()); err != nil {
+				return err
+			}
+		}
+		if err := removeEmptyDirs(podDir, fullContainerDirPath); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

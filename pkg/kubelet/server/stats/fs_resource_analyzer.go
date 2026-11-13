@@ -24,9 +24,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 )
 
 type statCache map[types.UID]*volumeStatCalculator
@@ -43,16 +46,18 @@ type fsResourceAnalyzer struct {
 	cachedVolumeStats atomic.Value
 	startOnce         sync.Once
 	eventRecorder     record.EventRecorder
+	actuatedState     state.Reader
 }
 
 var _ fsResourceAnalyzerInterface = &fsResourceAnalyzer{}
 
 // newFsResourceAnalyzer returns a new fsResourceAnalyzer implementation
-func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration, eventRecorder record.EventRecorder) *fsResourceAnalyzer {
+func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration, eventRecorder record.EventRecorder, actuatedState state.Reader) *fsResourceAnalyzer {
 	r := &fsResourceAnalyzer{
 		statsProvider: statsProvider,
 		calcPeriod:    calcVolumePeriod,
 		eventRecorder: eventRecorder,
+		actuatedState: actuatedState,
 	}
 	r.cachedVolumeStats.Store(make(statCache))
 	return r
@@ -79,8 +84,11 @@ func (s *fsResourceAnalyzer) updateCachedPodVolumeStats(logger klog.Logger) {
 	// Copy existing entries to new map, creating/starting new entries for pods missing from the cache
 	for _, pod := range s.statsProvider.GetPods() {
 		if value, found := oldCache[pod.GetUID()]; !found {
-			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder).StartOnce(logger)
+			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder, s.actuatedState).StartOnce(logger)
 		} else {
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+				value.SetPod(pod)
+			}
 			newCache[pod.GetUID()] = value
 		}
 	}

@@ -805,6 +805,12 @@ message Container {
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
 
+  // dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container.
+  // +featureGate=DynamicNodeLocalEphemeralVolumes
+  // +optional
+  // +k8s:optional
+  optional ContainerDynamicVolumeMountPolicy dynamicVolumeMountPolicy = 26;
+
   // restartPolicy defines the restart behavior of individual containers in a pod.
   // This overrides the pod-level restart policy. When this field is not specified,
   // the restart behavior is defined by the Pod's restart policy and the container type.
@@ -940,6 +946,16 @@ message Container {
   // Default is false.
   // +optional
   optional bool tty = 18;
+}
+
+// ContainerDynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for a container.
+message ContainerDynamicVolumeMountPolicy {
+  // restartPolicy defines whether dynamic volume mount additions or removals
+  // require restarting the container. Supported values: RestartContainer, "".
+  // Defaults to "".
+  // +optional
+  // +k8s:optional
+  optional string restartPolicy = 1;
 }
 
 // ContainerExtendedResourceRequest has the mapping of container name,
@@ -1631,6 +1647,13 @@ message EphemeralContainerCommon {
   // +optional
   // +listType=atomic
   repeated ContainerResizePolicy resizePolicy = 23;
+
+  // dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container.
+  // This field cannot be set on ephemeral containers.
+  // +featureGate=DynamicNodeLocalEphemeralVolumes
+  // +optional
+  // +k8s:optional
+  optional ContainerDynamicVolumeMountPolicy dynamicVolumeMountPolicy = 26;
 
   // restartPolicy is the restart policy for the container to manage the restart behavior of each
   // container within a pod.
@@ -5321,8 +5344,8 @@ message PodStatus {
   repeated NodeAllocatableResourceClaimStatus nodeAllocatableResourceClaimStatuses = 21;
 
   // VolumeStatuses contains the status of individual volumes used by this pod.
-  // This is an alpha field and requires enabling the CSIVolumeHealth feature gate.
-  // +featureGate=CSIVolumeHealth
+  // This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.
+  // +featureGate=CSIVolumeHealth,DynamicNodeLocalEphemeralVolumes
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
@@ -5386,6 +5409,16 @@ message PodVolumeStatus {
   // +optional
   // +k8s:optional
   optional VolumeHealthStatus healthStatus = 2;
+
+  // hostPhase represents the host-level preparation phase of the volume:
+  // Pending, HostMounted, Unmounting. Currently populated only for node-local
+  // ephemeral volume types supported for dynamic updates (configMap, secret,
+  // projected, emptyDir, and image).
+  // This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.
+  // +featureGate=DynamicNodeLocalEphemeralVolumes
+  // +optional
+  // +k8s:optional
+  optional string hostPhase = 3;
 }
 
 // PortStatus represents the error condition of a service port

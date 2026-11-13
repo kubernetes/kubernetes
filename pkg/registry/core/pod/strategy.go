@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -255,6 +256,9 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		preservePendingVolumeStatuses(newPod, oldPod)
+	}
 }
 
 // If a client request tries to clear `observedGeneration`, in the pod status or
@@ -515,6 +519,9 @@ func (podDynamicStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	}
 
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		updateDynamicVolumeStatuses(newPod, oldPod)
+	}
 	updatePodGeneration(newPod, oldPod)
 }
 
@@ -1080,5 +1087,117 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 func updatePodGeneration(newPod, oldPod *api.Pod) {
 	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
 		newPod.Generation++
+	}
+}
+
+// updateDynamicVolumeStatuses seeds Pending entries in newPod.Status.VolumeStatuses
+// for supported dynamic volumes newly mounted on /dynamic updates. Unreferenced
+// volumes in spec.volumes are omitted because VolumeManager never mounts them.
+// Keeping removed Pending entries on scheduled pods prevents a volume name from
+// being reused with different parameters before kubelet observes the removal; on
+// unscheduled pods no kubelet owns status, so unmounted Pending entries are pruned.
+func updateDynamicVolumeStatuses(newPod, oldPod *api.Pod) {
+	statuses := oldPod.Status.VolumeStatuses
+	cloned := false
+	ensureCloned := func() {
+		if !cloned {
+			statuses = slices.Clone(statuses)
+			cloned = true
+		}
+	}
+	for i := range newPod.Spec.Volumes {
+		vol := &newPod.Spec.Volumes[i]
+		if !podutil.IsSupportedDynamicVolumeSource(&vol.VolumeSource) {
+			continue
+		}
+		if !podutil.IsVolumeMountedInPodSpec(&newPod.Spec, vol.Name) || podutil.IsVolumeMountedInPodSpec(&oldPod.Spec, vol.Name) {
+			continue
+		}
+		idx := slices.IndexFunc(statuses, func(vs api.PodVolumeStatus) bool { return vs.Name == vol.Name })
+		if idx >= 0 {
+			if statuses[idx].HostPhase == "" {
+				ensureCloned()
+				statuses[idx].HostPhase = api.PodVolumeHostPending
+			}
+			continue
+		}
+		ensureCloned()
+		statuses = append(statuses, api.PodVolumeStatus{
+			Name:      vol.Name,
+			HostPhase: api.PodVolumeHostPending,
+		})
+	}
+	if newPod.Spec.NodeName == "" && len(statuses) > 0 {
+		needsPrune := slices.ContainsFunc(statuses, func(vs api.PodVolumeStatus) bool {
+			if vs.HostPhase == api.PodVolumeHostPending && !podutil.IsVolumeMountedInPodSpec(&newPod.Spec, vs.Name) {
+				return true
+			}
+			return vs.HealthStatus == nil && vs.HostPhase == ""
+		})
+		if needsPrune {
+			filtered := make([]api.PodVolumeStatus, 0, len(statuses))
+			for _, vs := range statuses {
+				if vs.HostPhase == api.PodVolumeHostPending && !podutil.IsVolumeMountedInPodSpec(&newPod.Spec, vs.Name) {
+					vs.HostPhase = ""
+				}
+				if vs.HealthStatus != nil || vs.HostPhase != "" {
+					filtered = append(filtered, vs)
+				}
+			}
+			statuses = filtered
+			cloned = true
+		}
+	}
+	if len(statuses) == 0 {
+		newPod.Status.VolumeStatuses = nil
+		return
+	}
+	if cloned {
+		slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+	}
+	newPod.Status.VolumeStatuses = statuses
+}
+
+// preservePendingVolumeStatuses retains apiserver-seeded Pending VolumeStatuses
+// across stale status updates computed against an older pod generation. Once
+// kubelet reports status for the current generation, its VolumeStatuses is authoritative.
+func preservePendingVolumeStatuses(newPod, oldPod *api.Pod) {
+	if len(oldPod.Status.VolumeStatuses) == 0 || newPod.Status.ObservedGeneration >= oldPod.Generation {
+		return
+	}
+	var statuses []api.PodVolumeStatus
+	cloned := false
+	added := false
+	for _, oldVS := range oldPod.Status.VolumeStatuses {
+		if oldVS.HostPhase != api.PodVolumeHostPending {
+			continue
+		}
+		idx := slices.IndexFunc(newPod.Status.VolumeStatuses, func(vs api.PodVolumeStatus) bool { return vs.Name == oldVS.Name })
+		if idx >= 0 && newPod.Status.VolumeStatuses[idx].HostPhase != "" {
+			continue
+		}
+		if !cloned {
+			statuses = slices.Clone(newPod.Status.VolumeStatuses)
+			cloned = true
+		}
+		if idx >= 0 {
+			statuses[idx].HostPhase = api.PodVolumeHostPending
+		} else {
+			statuses = append(statuses, api.PodVolumeStatus{
+				Name:      oldVS.Name,
+				HostPhase: api.PodVolumeHostPending,
+			})
+			added = true
+		}
+	}
+	if cloned {
+		if added {
+			slices.SortFunc(statuses, func(a, b api.PodVolumeStatus) int {
+				return strings.Compare(a.Name, b.Name)
+			})
+		}
+		newPod.Status.VolumeStatuses = statuses
 	}
 }

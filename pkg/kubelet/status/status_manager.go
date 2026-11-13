@@ -878,6 +878,21 @@ func (m *manager) TerminatePod(logger klog.Logger, pod *v1.Pod) {
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && len(status.VolumeStatuses) > 0 {
+		filtered := status.VolumeStatuses[:0]
+		for _, vs := range status.VolumeStatuses {
+			vs.HostPhase = ""
+			if vs.HealthStatus != nil {
+				filtered = append(filtered, vs)
+			}
+		}
+		if len(filtered) == 0 {
+			status.VolumeStatuses = nil
+		} else {
+			status.VolumeStatuses = filtered
+		}
+	}
+
 	logger.V(5).Info("TerminatePod calling updateStatusInternal", "pod", klog.KObj(pod), "podUID", pod.UID)
 	_, notification = m.updateStatusInternal(logger, pod, status, true, true)
 }
@@ -1565,6 +1580,12 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 				normalizeTimeStamp(&health.LastTransitionTime)
 			}
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		slices.SortFunc(status.VolumeStatuses, func(a, b v1.PodVolumeStatus) int {
+			return strings.Compare(a.Name, b.Name)
+		})
 	}
 
 	return status

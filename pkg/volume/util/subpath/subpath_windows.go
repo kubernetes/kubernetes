@@ -267,6 +267,11 @@ func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
 	return nil
 }
 
+// No bind-mounts for subpaths are necessary on Windows
+func (sp *subpath) CleanContainerSubPaths(podDir string, containerName string, keepSubPathIndices map[string]map[int]struct{}) error {
+	return nil
+}
+
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
 func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
 	realBase, err := evalSymlink(base)

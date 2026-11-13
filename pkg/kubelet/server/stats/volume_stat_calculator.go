@@ -24,10 +24,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	utiltrace "k8s.io/utils/trace"
@@ -37,12 +40,13 @@ import (
 type volumeStatCalculator struct {
 	statsProvider Provider
 	jitterPeriod  time.Duration
-	pod           *v1.Pod
+	pod           atomic.Pointer[v1.Pod]
 	stopChannel   chan struct{}
 	startO        sync.Once
 	stopO         sync.Once
 	latest        atomic.Value
 	eventRecorder record.EventRecorder
+	actuatedState state.Reader
 }
 
 // PodVolumeStats encapsulates the VolumeStats for a pod.
@@ -53,14 +57,21 @@ type PodVolumeStats struct {
 }
 
 // newVolumeStatCalculator creates a new VolumeStatCalculator
-func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod, eventRecorder record.EventRecorder) *volumeStatCalculator {
-	return &volumeStatCalculator{
+func newVolumeStatCalculator(statsProvider Provider, jitterPeriod time.Duration, pod *v1.Pod, eventRecorder record.EventRecorder, actuatedState state.Reader) *volumeStatCalculator {
+	c := &volumeStatCalculator{
 		statsProvider: statsProvider,
 		jitterPeriod:  jitterPeriod,
-		pod:           pod,
 		stopChannel:   make(chan struct{}),
 		eventRecorder: eventRecorder,
+		actuatedState: actuatedState,
 	}
+	c.pod.Store(pod)
+	return c
+}
+
+// SetPod updates the pod spec used to classify volumes on subsequent calculations.
+func (s *volumeStatCalculator) SetPod(pod *v1.Pod) {
+	s.pod.Store(pod)
 }
 
 // StartOnce starts pod volume calc that will occur periodically in the background until s.StopOnce is called
@@ -94,9 +105,14 @@ func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
 // calcAndStoreStats calculates PodVolumeStats for a given pod and writes the result to the s.latest cache.
 // If the pod references PVCs, the prometheus metrics for those are updated with the result.
 func (s *volumeStatCalculator) calcAndStoreStats(logger klog.Logger) {
+	pod := s.pod.Load()
+	if pod == nil {
+		return
+	}
+
 	// Find all Volumes for the Pod
-	volumes, found := s.statsProvider.ListVolumesForPod(s.pod.UID)
-	blockVolumes, bvFound := s.statsProvider.ListBlockVolumesForPod(s.pod.UID)
+	volumes, found := s.statsProvider.ListVolumesForPod(pod.UID)
+	blockVolumes, bvFound := s.statsProvider.ListBlockVolumesForPod(pod.UID)
 	if !found && !bvFound {
 		return
 	}
@@ -123,9 +139,41 @@ func (s *volumeStatCalculator) calcAndStoreStats(logger klog.Logger) {
 	}
 
 	// Get volume specs for the pod - key'd by volume name
-	volumesSpec := make(map[string]v1.Volume, len(s.pod.Spec.Volumes))
-	for _, v := range s.pod.Spec.Volumes {
+	volumesSpec := make(map[string]v1.Volume, len(pod.Spec.Volumes))
+	for _, v := range pod.Spec.Volumes {
 		volumesSpec[v.Name] = v
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		// Overlay actuated volume specs unconditionally so mounted volumes (including removed volumes
+		// still being torn down, or volumes removed and re-added under the same name) are always
+		// classified against the spec actually mounted on the host.
+		var actuatedVols []v1.Volume
+		if s.actuatedState != nil {
+			actuatedVols, _ = s.actuatedState.GetPodVolumes(pod.UID)
+			for _, v := range actuatedVols {
+				volumesSpec[v.Name] = v
+			}
+		}
+		missingSpec := false
+		for name := range metricVolumes {
+			if _, exists := volumesSpec[name]; !exists {
+				missingSpec = true
+				break
+			}
+		}
+		if missingSpec {
+			if latestPod, ok := s.statsProvider.GetPodByName(pod.Namespace, pod.Name); ok && latestPod != nil && latestPod.UID == pod.UID {
+				s.SetPod(latestPod)
+				pod = latestPod
+				clear(volumesSpec)
+				for _, v := range pod.Spec.Volumes {
+					volumesSpec[v.Name] = v
+				}
+				for _, v := range actuatedVols {
+					volumesSpec[v.Name] = v
+				}
+			}
+		}
 	}
 
 	// Call GetMetrics on each Volume and copy the result to a new VolumeStats.FsStats
@@ -133,14 +181,14 @@ func (s *volumeStatCalculator) calcAndStoreStats(logger klog.Logger) {
 	var persistentStats []stats.VolumeStats
 	for name, v := range metricVolumes {
 		metric, err := func() (*volume.Metrics, error) {
-			trace := utiltrace.New(fmt.Sprintf("Calculate volume metrics of %v for pod %v/%v", name, s.pod.Namespace, s.pod.Name))
+			trace := utiltrace.New(fmt.Sprintf("Calculate volume metrics of %v for pod %v/%v", name, pod.Namespace, pod.Name))
 			defer trace.LogIfLong(1 * time.Second)
 			return v.GetMetrics()
 		}()
 		if err != nil {
 			// Expected for Volumes that don't support Metrics
 			if !volume.IsNotSupported(err) {
-				logger.V(4).Info("Failed to calculate volume metrics", "pod", klog.KObj(s.pod), "podUID", s.pod.UID, "volumeName", name, "err", err)
+				logger.V(4).Info("Failed to calculate volume metrics", "pod", klog.KObj(pod), "podUID", pod.UID, "volumeName", name, "err", err)
 			}
 			continue
 		}
@@ -150,12 +198,12 @@ func (s *volumeStatCalculator) calcAndStoreStats(logger klog.Logger) {
 		if pvcSource := volSpec.PersistentVolumeClaim; pvcSource != nil {
 			pvcRef = &stats.PVCReference{
 				Name:      pvcSource.ClaimName,
-				Namespace: s.pod.GetNamespace(),
+				Namespace: pod.GetNamespace(),
 			}
 		} else if volSpec.Ephemeral != nil {
 			pvcRef = &stats.PVCReference{
-				Name:      ephemeral.VolumeClaimName(s.pod, &volSpec),
-				Namespace: s.pod.GetNamespace(),
+				Name:      ephemeral.VolumeClaimName(pod, &volSpec),
+				Namespace: pod.GetNamespace(),
 			}
 		}
 		volumeStats := s.parsePodVolumeStats(name, pvcRef, metric, volSpec)

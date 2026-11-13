@@ -201,6 +201,9 @@ func GetBackoffKey(pod *v1.Pod, container *v1.Container) string {
 		container.Image,
 		container.Resources.String(),
 	}
+	for _, vm := range container.VolumeMounts {
+		key = append(key, vm.String())
+	}
 	hash := fnv.New64a()
 	hash.Write([]byte(strings.Join(key, "/")))
 	return strconv.FormatUint(hash.Sum64(), 16)

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,11 +39,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -2635,4 +2641,130 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 
 	// assert volume unmount succeed
 	waitForUnmount(t, generatedVolumeName, podName, asw)
+}
+
+type fakePodState struct {
+	pods           map[k8stypes.UID]*v1.Pod
+	runtimeRemoved map[k8stypes.UID]bool
+}
+
+func (f *fakePodState) GetPodByUID(uid k8stypes.UID) (*v1.Pod, bool) {
+	p, ok := f.pods[uid]
+	return p, ok
+}
+
+func (f *fakePodState) ShouldPodRuntimeBeRemoved(uid k8stypes.UID) bool {
+	return f.runtimeRemoved[uid]
+}
+
+func TestUnmountVolumesRemovesNonUnmountVolumeFromActuatedState(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	logger, _ := ktesting.NewTestContext(t)
+
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	actuatedState := state.NewStateMemory(logger, nil, nil)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr, actuatedState)
+	kubeClient := createTestClient()
+	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		volumePluginMgr,
+		&record.FakeRecorder{},
+		volumetesting.NewBlockVolumePathHandler()))
+	podState := &fakePodState{
+		pods:           map[k8stypes.UID]*v1.Pod{},
+		runtimeRemoved: map[k8stypes.UID]bool{},
+	}
+	rc := NewReconcilerWithPodState(
+		kubeClient,
+		true,
+		reconcilerLoopSleepDuration,
+		waitForAttachTimeout,
+		nodeName,
+		dsw,
+		asw,
+		hasAddedPods,
+		oex,
+		mount.NewFakeMounter(nil),
+		hostutil.NewFakeHostUtil(nil),
+		volumePluginMgr,
+		kubeletPodsDir,
+		actuatedState,
+		podState,
+		podState).(*reconciler)
+
+	podUID := k8stypes.UID("pod-img-uid")
+	imgVol := v1.Volume{
+		Name: "img-vol",
+		VolumeSource: v1.VolumeSource{
+			Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/pause:3.10"},
+		},
+	}
+	edVol := v1.Volume{
+		Name: "ed-vol",
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{},
+		},
+	}
+	podState.pods[podUID] = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "pod-img", Namespace: "default"},
+		Spec:       v1.PodSpec{Volumes: []v1.Volume{imgVol, edVol}},
+	}
+	require.NoError(t, actuatedState.SetPodVolume(logger, podUID, imgVol))
+	require.NoError(t, actuatedState.SetPodVolume(logger, podUID, edVol))
+	require.NoError(t, actuatedState.SetContainer(logger, podUID, pod.Containers, v1.Container{
+		Name: "c1",
+	}))
+
+	// Before DSWP populates DSW or c1 restarts to mount img-vol, unmountVolumes must keep img-vol
+	// because the active pod still declares it in spec.Volumes.
+	rc.unmountVolumes(logger)
+	vols, ok := actuatedState.GetPodVolumes(podUID)
+	require.True(t, ok)
+	require.Equal(t, []v1.Volume{imgVol, edVol}, vols)
+
+	// Once c1 mounts img-vol and img-vol is later removed from spec.Volumes, unmountVolumes must
+	// still keep img-vol until c1 restarts without it.
+	require.NoError(t, actuatedState.SetContainer(logger, podUID, pod.Containers, v1.Container{
+		Name: "c1",
+		VolumeMounts: []v1.VolumeMount{
+			{Name: "img-vol", MountPath: "/mnt/img"},
+		},
+	}))
+	podState.pods[podUID] = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: podUID, Name: "pod-img", Namespace: "default"},
+		Spec:       v1.PodSpec{Volumes: []v1.Volume{edVol}},
+	}
+	rc.unmountVolumes(logger)
+	vols, ok = actuatedState.GetPodVolumes(podUID)
+	require.True(t, ok)
+	require.Equal(t, []v1.Volume{imgVol, edVol}, vols)
+
+	// Once c1 restarts without img-vol, unmountVolumes removes img-vol while leaving ed-vol intact.
+	require.NoError(t, actuatedState.SetContainer(logger, podUID, pod.Containers, v1.Container{
+		Name: "c1",
+	}))
+	rc.unmountVolumes(logger)
+
+	vols, ok = actuatedState.GetPodVolumes(podUID)
+	require.True(t, ok)
+	require.Equal(t, []v1.Volume{edVol}, vols)
+
+	// When a pod's runtime has terminated, unmountVolumes prunes non-unmount volumes even if the
+	// terminated pod still exists in podManager with the volume in spec.Volumes and actuated mounts.
+	termUID := k8stypes.UID("pod-terminated-uid")
+	podState.pods[termUID] = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: termUID, Name: "pod-term", Namespace: "default"},
+		Spec:       v1.PodSpec{Volumes: []v1.Volume{imgVol}},
+	}
+	podState.runtimeRemoved[termUID] = true
+	require.NoError(t, actuatedState.SetPodVolume(logger, termUID, imgVol))
+	require.NoError(t, actuatedState.SetContainer(logger, termUID, pod.Containers, v1.Container{
+		Name:         "c1",
+		VolumeMounts: []v1.VolumeMount{{Name: "img-vol", MountPath: "/mnt/img"}},
+	}))
+	rc.unmountVolumes(logger)
+	_, ok = actuatedState.GetPodVolumes(termUID)
+	assert.False(t, ok)
 }

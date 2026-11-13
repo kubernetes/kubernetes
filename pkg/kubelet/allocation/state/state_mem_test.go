@@ -645,4 +645,29 @@ func TestStateMemory_GetPodReadOnly(t *testing.T) {
 	}))
 	require.NoError(t, sm.RemovePodVolume(logger, "pod-ro", "vol-1"))
 	assert.Equal(t, snapshot, readOnly1, "previously returned read-only pod must remain immutable across updates")
+
+	// SetContainer preserves DynamicVolumeMountPolicy and clears VolumeMounts when empty.
+	policy := &v1.ContainerDynamicVolumeMountPolicy{RestartPolicy: v1.DynamicVolumeMountRestartContainer}
+	require.NoError(t, sm.SetContainer(logger, "pod-ro", podutil.Containers, v1.Container{
+		Name:                     "c1",
+		Resources:                v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu200m}},
+		DynamicVolumeMountPolicy: policy,
+		VolumeMounts:             []v1.VolumeMount{{Name: "vol-2", MountPath: "/mnt/vol-2"}},
+	}))
+	policy.RestartPolicy = ""
+	roWithPolicy, ok := sm.GetPodReadOnly("pod-ro")
+	require.True(t, ok)
+	require.NotNil(t, roWithPolicy.Spec.Containers[0].DynamicVolumeMountPolicy)
+	assert.Equal(t, v1.DynamicVolumeMountRestartContainer, roWithPolicy.Spec.Containers[0].DynamicVolumeMountPolicy.RestartPolicy)
+	assert.Equal(t, []v1.VolumeMount{{Name: "vol-2", MountPath: "/mnt/vol-2"}}, roWithPolicy.Spec.Containers[0].VolumeMounts)
+
+	require.NoError(t, sm.SetContainer(logger, "pod-ro", podutil.Containers, v1.Container{
+		Name:                     "c1",
+		Resources:                v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu200m}},
+		DynamicVolumeMountPolicy: &v1.ContainerDynamicVolumeMountPolicy{},
+	}))
+	roCleared, ok := sm.GetPodReadOnly("pod-ro")
+	require.True(t, ok)
+	assert.Empty(t, roCleared.Spec.Containers[0].VolumeMounts)
+	assert.Equal(t, v1.DynamicVolumeMountRestartContainer, roWithPolicy.Spec.Containers[0].DynamicVolumeMountPolicy.RestartPolicy, "read-only snapshot must remain immutable")
 }

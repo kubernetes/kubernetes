@@ -350,7 +350,16 @@ func newTestKubeletWithImageList(
 	)
 	kubelet.actuatedState = state.NewStateMemory(logger, nil, kuberuntime.KeepOnlyResourceValues)
 	volumeStatsAggPeriod := time.Second * 10
-	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
+	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(
+		tCtx,
+		&allocatedStatsProvider{
+			Provider:   kubelet,
+			podManager: &allocatedPodManager{baseManager: kubelet.podManager, allocationManager: kubelet.allocationManager},
+		},
+		volumeStatsAggPeriod,
+		kubelet.recorder,
+		kubelet.actuatedState,
+	)
 
 	fakeHostStatsProvider := stats.NewFakeHostStatsProvider(&containertest.FakeOS{})
 
@@ -459,7 +468,8 @@ func newTestKubeletWithImageList(
 		volumetest.NewBlockVolumePathHandler(),
 		kubelet.statusManager,
 		0,
-		kubelet.actuatedState)
+		kubelet.actuatedState,
+		nil)
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
@@ -6546,7 +6556,6 @@ func TestHandlePodUpdates_ResizeTerminatingPods(t *testing.T) {
 }
 
 func TestAllocatedPodManager(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, true)
 	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
@@ -6557,7 +6566,27 @@ func TestAllocatedPodManager(t *testing.T) {
 		allocationManager: kl.allocationManager,
 	}
 
-	// Pod without a memory-backed emptyDir should bypass UpdatePodFromAllocation and return the desired pod directly.
+	// Unallocated pod falls back to returning the desired pod as-is.
+	unallocatedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "pod-unallocated",
+			Name:      "pod-unallocated",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "c1"}},
+		},
+	}
+	kl.podManager.SetPods([]*v1.Pod{unallocatedPod})
+	gotPod, found := apm.GetPodByUID(unallocatedPod.UID)
+	require.True(t, found)
+	assert.Same(t, unallocatedPod, gotPod)
+
+	// Allocated pod returns the allocated view regardless of feature gates, including across
+	// kubelet feature-gate rollback.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+
 	podWithoutMemVol := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "pod-no-mem-vol",
@@ -6587,15 +6616,29 @@ func TestAllocatedPodManager(t *testing.T) {
 	}
 	require.NoError(t, kl.allocationManager.SetAllocatedPod(logger, podWithoutMemVol))
 
-	desiredPodWithoutMemVol := podWithoutMemVol.DeepCopy()
-	desiredPodWithoutMemVol.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("200Mi")
-	kl.podManager.SetPods([]*v1.Pod{desiredPodWithoutMemVol})
+	desiredWithDynVol := podWithoutMemVol.DeepCopy()
+	desiredWithDynVol.Spec.Volumes = append(desiredWithDynVol.Spec.Volumes, v1.Volume{
+		Name: "dyn-secret",
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{SecretName: "my-secret"},
+		},
+	})
+	kl.podManager.SetPods([]*v1.Pod{desiredWithDynVol})
 
-	gotPod, found := apm.GetPodByUID(podWithoutMemVol.UID)
+	gotPod, found = apm.GetPodByUID(podWithoutMemVol.UID)
 	require.True(t, found)
-	assert.Same(t, desiredPodWithoutMemVol, gotPod)
+	require.Len(t, gotPod.Spec.Volumes, 1)
+	assert.Equal(t, "disk-vol", gotPod.Spec.Volumes[0].Name)
 
-	// Pod with a memory-backed emptyDir should consult UpdatePodFromAllocation and return the allocated pod.
+	asp := &allocatedStatsProvider{Provider: kl, podManager: apm}
+	gotByName, found := asp.GetPodByName(podWithoutMemVol.Namespace, podWithoutMemVol.Name)
+	require.True(t, found)
+	require.Len(t, gotByName.Spec.Volumes, 1)
+	assert.Equal(t, "disk-vol", gotByName.Spec.Volumes[0].Name)
+	require.Len(t, asp.GetPods(), 1)
+	assert.Equal(t, "disk-vol", asp.GetPods()[0].Spec.Volumes[0].Name)
+
+	// Pod with a memory-backed emptyDir also returns the allocated SizeLimit.
 	size100Mi := resource.MustParse("100Mi")
 	size200Mi := resource.MustParse("200Mi")
 	podWithMemVol := &v1.Pod{
@@ -6785,4 +6828,81 @@ func TestCollectSecurityProfiles(t *testing.T) {
 			assert.Equal(t, tc.collections, gc.collections)
 		})
 	}
+}
+
+func TestSyncTerminatedPodClearsDynamicVolumeStatuses(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	pod := podWithUIDNameNs("pod-term-dyn-vol", "pod-term-dyn-vol", "default")
+	pod.Spec = v1.PodSpec{
+		RestartPolicy: v1.RestartPolicyNever,
+		Containers: []v1.Container{
+			{
+				Name:  "c1",
+				Image: "busybox",
+				VolumeMounts: []v1.VolumeMount{
+					{Name: "vol-img", MountPath: "/mnt/img"},
+					{Name: "vol-pending", MountPath: "/mnt/pending"},
+				},
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				Name: "vol-img",
+				VolumeSource: v1.VolumeSource{
+					Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/pause:3.10"},
+				},
+			},
+			{
+				Name: "vol-pending",
+				VolumeSource: v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{},
+				},
+			},
+		},
+	}
+	kl.podManager.SetPods([]*v1.Pod{pod})
+
+	initialActuated := pod.DeepCopy()
+	initialActuated.Spec.Volumes = nil
+	require.NoError(t, kl.actuatedState.SetPod(logger, initialActuated))
+	require.NoError(t, kl.actuatedState.SetPodVolume(logger, pod.UID, pod.Spec.Volumes[0]))
+
+	stoppedPodStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:       kubecontainer.ContainerID{Type: "test", ID: "c1-id"},
+				Name:     "c1",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+		},
+	}
+
+	// Before SyncTerminatedPod cleans up actuatedState, a terminal status generation
+	// reports still-actuated dynamic volumes as Unmounting and omits unmounted ones.
+	beforeUnmount := kl.generateAPIPodStatus(tCtx, pod, stoppedPodStatus, TerminatedPod)
+	assert.Equal(t, v1.PodSucceeded, beforeUnmount.Phase)
+	assert.Equal(t, []v1.PodVolumeStatus{
+		{Name: "vol-img", HostPhase: v1.PodVolumeHostUnmounting},
+	}, beforeUnmount.VolumeStatuses)
+
+	require.NoError(t, kl.SyncTerminatedPod(tCtx, pod, stoppedPodStatus))
+
+	finalStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	require.True(t, found)
+	assert.Equal(t, v1.PodSucceeded, finalStatus.Phase)
+	assert.Empty(t, finalStatus.VolumeStatuses)
+
+	vols, _ := kl.actuatedState.GetPodVolumes(pod.UID)
+	assert.Empty(t, vols)
 }

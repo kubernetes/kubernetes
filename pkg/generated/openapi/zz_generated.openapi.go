@@ -513,6 +513,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.ConfigMapProjection{}.OpenAPIModelName():                                                                 schema_k8sio_api_core_v1_ConfigMapProjection(ref),
 		corev1.ConfigMapVolumeSource{}.OpenAPIModelName():                                                               schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref),
 		corev1.Container{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_Container(ref),
+		corev1.ContainerDynamicVolumeMountPolicy{}.OpenAPIModelName():                                                   schema_k8sio_api_core_v1_ContainerDynamicVolumeMountPolicy(ref),
 		corev1.ContainerExtendedResourceRequest{}.OpenAPIModelName():                                                    schema_k8sio_api_core_v1_ContainerExtendedResourceRequest(ref),
 		corev1.ContainerImage{}.OpenAPIModelName():                                                                      schema_k8sio_api_core_v1_ContainerImage(ref),
 		corev1.ContainerPort{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_ContainerPort(ref),
@@ -21432,6 +21433,12 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							},
 						},
 					},
+					"dynamicVolumeMountPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container.",
+							Ref:         ref(corev1.ContainerDynamicVolumeMountPolicy{}.OpenAPIModelName()),
+						},
+					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "restartPolicy defines the restart behavior of individual containers in a pod. This overrides the pod-level restart policy. When this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Additionally, setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
@@ -21582,7 +21589,28 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			corev1.ContainerPort{}.OpenAPIModelName(), corev1.ContainerResizePolicy{}.OpenAPIModelName(), corev1.ContainerRestartRule{}.OpenAPIModelName(), corev1.EnvFromSource{}.OpenAPIModelName(), corev1.EnvVar{}.OpenAPIModelName(), corev1.Lifecycle{}.OpenAPIModelName(), corev1.Probe{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeDevice{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
+			corev1.ContainerDynamicVolumeMountPolicy{}.OpenAPIModelName(), corev1.ContainerPort{}.OpenAPIModelName(), corev1.ContainerResizePolicy{}.OpenAPIModelName(), corev1.ContainerRestartRule{}.OpenAPIModelName(), corev1.EnvFromSource{}.OpenAPIModelName(), corev1.EnvVar{}.OpenAPIModelName(), corev1.Lifecycle{}.OpenAPIModelName(), corev1.Probe{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeDevice{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_core_v1_ContainerDynamicVolumeMountPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ContainerDynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for a container.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"restartPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "restartPolicy defines whether dynamic volume mount additions or removals require restarting the container. Supported values: RestartContainer, \"\". Defaults to \"\".\n\nPossible enum values:\n - `\"RestartContainer\"` indicates that Kubelet must restart the container in-place to actuate volume mount additions or removals on a running container.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"RestartContainer"},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -22875,6 +22903,12 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							},
 						},
 					},
+					"dynamicVolumeMountPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container. This field cannot be set on ephemeral containers.",
+							Ref:         ref(corev1.ContainerDynamicVolumeMountPolicy{}.OpenAPIModelName()),
+						},
+					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "restartPolicy is the restart policy for the container to manage the restart behavior of each container within a pod. You cannot set this field on ephemeral containers.",
@@ -23032,7 +23066,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 			},
 		},
 		Dependencies: []string{
-			corev1.ContainerPort{}.OpenAPIModelName(), corev1.ContainerResizePolicy{}.OpenAPIModelName(), corev1.ContainerRestartRule{}.OpenAPIModelName(), corev1.EnvFromSource{}.OpenAPIModelName(), corev1.EnvVar{}.OpenAPIModelName(), corev1.Lifecycle{}.OpenAPIModelName(), corev1.Probe{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeDevice{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
+			corev1.ContainerDynamicVolumeMountPolicy{}.OpenAPIModelName(), corev1.ContainerPort{}.OpenAPIModelName(), corev1.ContainerResizePolicy{}.OpenAPIModelName(), corev1.ContainerRestartRule{}.OpenAPIModelName(), corev1.EnvFromSource{}.OpenAPIModelName(), corev1.EnvVar{}.OpenAPIModelName(), corev1.Lifecycle{}.OpenAPIModelName(), corev1.Probe{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeDevice{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
 	}
 }
 
@@ -23193,6 +23227,12 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							},
 						},
 					},
+					"dynamicVolumeMountPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "dynamicVolumeMountPolicy defines dynamic volume mount mutation behavior for this container. This field cannot be set on ephemeral containers.",
+							Ref:         ref(corev1.ContainerDynamicVolumeMountPolicy{}.OpenAPIModelName()),
+						},
+					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "restartPolicy is the restart policy for the container to manage the restart behavior of each container within a pod. You cannot set this field on ephemeral containers.",
@@ -23343,7 +23383,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			corev1.ContainerPort{}.OpenAPIModelName(), corev1.ContainerResizePolicy{}.OpenAPIModelName(), corev1.ContainerRestartRule{}.OpenAPIModelName(), corev1.EnvFromSource{}.OpenAPIModelName(), corev1.EnvVar{}.OpenAPIModelName(), corev1.Lifecycle{}.OpenAPIModelName(), corev1.Probe{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeDevice{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
+			corev1.ContainerDynamicVolumeMountPolicy{}.OpenAPIModelName(), corev1.ContainerPort{}.OpenAPIModelName(), corev1.ContainerResizePolicy{}.OpenAPIModelName(), corev1.ContainerRestartRule{}.OpenAPIModelName(), corev1.EnvFromSource{}.OpenAPIModelName(), corev1.EnvVar{}.OpenAPIModelName(), corev1.Lifecycle{}.OpenAPIModelName(), corev1.Probe{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), corev1.SecurityContext{}.OpenAPIModelName(), corev1.VolumeDevice{}.OpenAPIModelName(), corev1.VolumeMount{}.OpenAPIModelName()},
 	}
 }
 
@@ -29804,7 +29844,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
+							Description: "VolumeStatuses contains the status of individual volumes used by this pod. This is an alpha field and requires enabling the CSIVolumeHealth or DynamicNodeLocalEphemeralVolumes feature gate.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -29964,6 +30004,14 @@ func schema_k8sio_api_core_v1_PodVolumeStatus(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "healthStatus contains health reported by the CSI node plugin for this volume on the pod's node. Populated by the kubelet. This is an alpha field and requires enabling the CSIVolumeHealth feature gate.",
 							Ref:         ref(corev1.VolumeHealthStatus{}.OpenAPIModelName()),
+						},
+					},
+					"hostPhase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "hostPhase represents the host-level preparation phase of the volume: Pending, HostMounted, Unmounting. Currently populated only for node-local ephemeral volume types supported for dynamic updates (configMap, secret, projected, emptyDir, and image). This is an alpha field and requires enabling the DynamicNodeLocalEphemeralVolumes feature gate.\n\nPossible enum values:\n - `\"HostMounted\"` indicates that VolumeManager has successfully prepared and mounted the volume on the node host (marked ready in ActualStateOfWorld).\n - `\"Pending\"` indicates that the volume has been added to pod.Spec.Volumes, and is waiting node allocation or host preparation/mounting by VolumeManager.\n - `\"Unmounting\"` indicates that volume removal has been admitted and allocated by Kubelet, and Kubelet is actively unmounting container bind mounts and executing host TearDownAt.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"HostMounted", "Pending", "Unmounting"},
 						},
 					},
 				},

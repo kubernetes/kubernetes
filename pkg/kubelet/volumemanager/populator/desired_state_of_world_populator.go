@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
@@ -102,7 +104,8 @@ func NewDesiredStateOfWorldPopulator(
 	actualStateOfWorld cache.ActualStateOfWorld,
 	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
-	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
+	volumePluginMgr *volume.VolumePluginMgr,
+	actuatedState state.Reader) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:          kubeClient,
 		loopSleepDuration:   loopSleepDuration,
@@ -117,6 +120,7 @@ func NewDesiredStateOfWorldPopulator(
 		csiMigratedPluginManager: csiMigratedPluginManager,
 		intreeToCSITranslator:    intreeToCSITranslator,
 		volumePluginMgr:          volumePluginMgr,
+		actuatedState:            actuatedState,
 	}
 }
 
@@ -133,6 +137,7 @@ type desiredStateOfWorldPopulator struct {
 	csiMigratedPluginManager csimigration.PluginManager
 	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 	volumePluginMgr          *volume.VolumePluginMgr
+	actuatedState            state.Reader
 }
 
 type processedPods struct {
@@ -202,7 +207,23 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
 		podsFromCache[volumetypes.UniquePodName(volumeToMount.Pod.UID)] = struct{}{}
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
+		volumeRemovedFromPodSpec := false
 		if podExists {
+			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+				inPodSpec := slices.ContainsFunc(pod.Spec.Volumes, func(podVol v1.Volume) bool {
+					return slices.Contains(volumeToMount.OuterVolumeSpecNames, podVol.Name)
+				})
+				volumeRemovedFromPodSpec = !inPodSpec
+				// Defer removing the volume from desiredStateOfWorld while a container in actuatedState
+				// still mounts it. Once SyncPod restarts the container in-place without the volumeMount
+				// (or terminates a removed container) and updates actuatedState, a subsequent DSWP
+				// iteration will observe isVolumeInUseByActuatedPod == false and remove the volume from
+				// desiredStateOfWorld so the reconciler unmounts it from the host.
+				if volumeRemovedFromPodSpec && dswp.isVolumeInUseByActuatedPod(pod.UID, volumeToMount.OuterVolumeSpecNames) {
+					logger.V(4).Info("Volume was removed from pod spec, but is still in use by one or more containers in actuated state; skipping removal from desired state", "pod", klog.KObj(pod), "podUID", pod.UID, "volumeName", volumeToMount.VolumeName)
+					continue
+				}
+			}
 
 			// check if the attachability has changed for this volume
 			if volumeToMount.PluginIsAttachable {
@@ -218,8 +239,8 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 				}
 			}
 
-			// Exclude known pods that we expect to be running
-			if !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
+			// Exclude known pods that we expect to be running unless the volume was dynamically removed from the pod spec
+			if !volumeRemovedFromPodSpec && !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
 				continue
 			}
 		}
@@ -227,8 +248,8 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 		// Once a pod has been deleted from kubelet pod manager, do not delete
 		// it immediately from volume manager. Instead, check the kubelet
 		// pod state provider to verify that all containers in the pod have been
-		// terminated.
-		if !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(volumeToMount.Pod.UID) {
+		// terminated (unless the volume was dynamically removed from a running pod).
+		if !volumeRemovedFromPodSpec && !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(volumeToMount.Pod.UID) {
 			logger.V(4).Info("Pod still has one or more containers in the non-exited state and will not be removed from desired state", "pod", klog.KObj(volumeToMount.Pod))
 			continue
 		}
@@ -237,14 +258,20 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 			volumeToMountSpecName = volumeToMount.VolumeSpec.Name()
 		}
 		removed := dswp.actualStateOfWorld.PodRemovedFromVolume(volumeToMount.PodName, volumeToMount.VolumeName)
-		if removed && podExists {
+		if removed && podExists && !volumeRemovedFromPodSpec {
 			logger.V(4).Info("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
 			continue
 		}
-		logger.V(4).Info("Removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
+		if volumeRemovedFromPodSpec {
+			logger.Info("Removing dynamically removed volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
+		} else {
+			logger.V(4).Info("Removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
+		}
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
-		dswp.deleteProcessedPod(volumeToMount.PodName)
+		if !volumeRemovedFromPodSpec {
+			dswp.deleteProcessedPod(volumeToMount.PodName)
+		}
 	}
 
 	// Cleanup orphanded entries from processedPods
@@ -272,6 +299,26 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 	}
 }
 
+// isVolumeInUseByActuatedPod returns true if any container in the pod's actuated
+// state still has a VolumeMount referencing any of the given outerVolumeNames.
+func (dswp *desiredStateOfWorldPopulator) isVolumeInUseByActuatedPod(podUID types.UID, outerVolumeNames []string) bool {
+	if dswp.actuatedState == nil {
+		return false
+	}
+	actuatedPod, ok := dswp.actuatedState.GetPodReadOnly(podUID)
+	if !ok || actuatedPod == nil {
+		return false
+	}
+	for c := range podutil.ContainerIter(&actuatedPod.Spec, podutil.AllContainers) {
+		for _, vm := range c.VolumeMounts {
+			if slices.Contains(outerVolumeNames, vm.Name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // processPodVolumes processes the volumes in the given pod and adds them to the
 // desired state of the world.
 func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context, pod *v1.Pod) {
@@ -281,43 +328,115 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 
 	logger := klog.FromContext(ctx)
 	uniquePodName := util.GetUniquePodName(pod)
-	if dswp.podPreviouslyProcessed(uniquePodName) {
+	dynamicVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
+	previouslyProcessed := dswp.podPreviouslyProcessed(uniquePodName)
+	if !dynamicVolumesEnabled && previouslyProcessed {
 		return
 	}
 
-	allVolumesAdded := true
 	collectSELinuxOptions := utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod)
 	mounts, devices, seLinuxContainerContexts := util.GetPodVolumeNames(pod, collectSELinuxOptions)
 
-	// Process volume spec for each volume defined in pod
-	for _, podVolume := range pod.Spec.Volumes {
-		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
-			// Volume is not used in the pod, ignore it.
-			logger.V(4).Info("Skipping unused volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
-			continue
+	var actuatedPod *v1.Pod
+	var actuatedMounts, actuatedDevices sets.Set[string]
+	var actuatedSELinux map[string][]*v1.SELinuxOptions
+	if dynamicVolumesEnabled && dswp.actuatedState != nil && !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
+		if ap, ok := dswp.actuatedState.GetPodReadOnly(pod.UID); ok && ap != nil {
+			actuatedPod = ap
+			actuatedMounts, actuatedDevices, actuatedSELinux = util.GetPodVolumeNames(actuatedPod, collectSELinuxOptions)
 		}
+	}
 
+	shouldIncludePodVolume := func(volName string) bool {
+		if mounts.Has(volName) || devices.Has(volName) {
+			return true
+		}
+		// Keep volumes still present in pod.Spec.Volumes that were already mounted on the host
+		// (recorded in actuatedPod.Spec.Volumes) so a kubelet restart does not tear down an
+		// unmounted volume kept in spec.volumes.
+		return actuatedPod != nil && slices.ContainsFunc(actuatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == volName })
+	}
+
+	// Note: previouslyProcessed is reset to false by ReprocessPod on pod updates so DownwardAPI
+	// remounting (MarkRemountRequired) and memory-backed EmptyDir SizeLimit updates re-run even
+	// when all volume names are already present in existingVolumes.
+	if previouslyProcessed {
+		existingVolumes := dswp.desiredStateOfWorld.GetVolumeNamesForPod(uniquePodName)
+		hasUnprocessedVolume := false
+		for _, podVolume := range pod.Spec.Volumes {
+			if !shouldIncludePodVolume(podVolume.Name) {
+				continue
+			}
+			if _, ok := existingVolumes[podVolume.Name]; !ok {
+				hasUnprocessedVolume = true
+				break
+			}
+		}
+		if !hasUnprocessedVolume && actuatedPod != nil {
+			for _, actuatedVol := range actuatedPod.Spec.Volumes {
+				if !actuatedMounts.Has(actuatedVol.Name) && !actuatedDevices.Has(actuatedVol.Name) {
+					continue
+				}
+				if _, ok := existingVolumes[actuatedVol.Name]; !ok {
+					hasUnprocessedVolume = true
+					break
+				}
+			}
+		}
+		if !hasUnprocessedVolume {
+			return
+		}
+	}
+
+	allVolumesAdded := true
+
+	addVolumeToDesiredState := func(podVolume v1.Volume, volMounts, volDevices sets.Set[string], seLinuxCtxs []*v1.SELinuxOptions) {
 		pvc, volumeSpec, volumeGIDValue, err :=
-			dswp.createVolumeSpec(ctx, podVolume, pod, mounts, devices)
+			dswp.createVolumeSpec(ctx, podVolume, pod, volMounts, volDevices)
 		if err != nil {
 			logger.Error(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
-			continue
+			return
 		}
 
 		// Add volume to desired state of world
 		uniqueVolumeName, err := dswp.desiredStateOfWorld.AddPodToVolume(
-			logger, uniquePodName, pod, volumeSpec, podVolume.Name, volumeGIDValue, seLinuxContainerContexts[podVolume.Name])
+			logger, uniquePodName, pod, volumeSpec, podVolume.Name, volumeGIDValue, seLinuxCtxs)
 		if err != nil {
 			logger.Error(err, "Failed to add volume to desiredStateOfWorld", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
-			continue
+			return
 		}
 
 		logger.V(4).Info("Added volume to desired state", "pod", klog.KObj(pod), "volumeName", podVolume.Name, "volumeSpecName", volumeSpec.Name())
 		dswp.checkVolumeFSResize(logger, pod, podVolume, pvc, volumeSpec, uniqueVolumeName)
+	}
+
+	// Process volume spec for each volume defined in pod
+	for _, podVolume := range pod.Spec.Volumes {
+		if !shouldIncludePodVolume(podVolume.Name) {
+			// Volume is not used in the pod, ignore it.
+			logger.V(4).Info("Skipping unused volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
+			continue
+		}
+		addVolumeToDesiredState(podVolume, mounts, devices, seLinuxContainerContexts[podVolume.Name])
+	}
+
+	// Across a kubelet restart, also populate volumes removed from pod.Spec.Volumes that are
+	// still mounted by a running container in actuatedState so the reconciler does not tear
+	// them down before the container restarts.
+	if actuatedPod != nil {
+		for _, actuatedVol := range actuatedPod.Spec.Volumes {
+			if slices.ContainsFunc(pod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == actuatedVol.Name }) {
+				continue
+			}
+			if !actuatedMounts.Has(actuatedVol.Name) && !actuatedDevices.Has(actuatedVol.Name) {
+				continue
+			}
+			addVolumeToDesiredState(actuatedVol, actuatedMounts, actuatedDevices, actuatedSELinux[actuatedVol.Name])
+		}
 	}
 
 	// some of the volume additions may have failed, should not mark this pod as fully processed

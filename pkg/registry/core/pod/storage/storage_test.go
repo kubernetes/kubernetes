@@ -1511,6 +1511,7 @@ func TestBindingValidation(t *testing.T) {
 }
 
 func TestEtcdUpdateDynamic(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.DynamicContainers, true)
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	defer server.Terminate(t)
 	restOptions := generic.RESTOptions{

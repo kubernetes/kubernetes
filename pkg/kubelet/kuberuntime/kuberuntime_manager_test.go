@@ -7523,3 +7523,578 @@ func TestInitializeActuatedPod_PreservesActuatedVolumes(t *testing.T) {
 	require.NoError(t, m.GarbageCollect(tCtx, kubecontainer.GCPolicy{}, true, false))
 	require.False(t, m.actuatedState.HasPod(pod.UID))
 }
+
+func TestSyncPod_ActuatedContainerMountsClearedOnStopExitAndRemoval(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("DynamicNodeLocalEphemeralVolumes is only supported on linux")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	// Verify KeepOnlyResourceValues is idempotent for restartable init containers when SetPod re-runs.
+	sidecarAlways := v1.ContainerRestartPolicyAlways
+	cpu100m := resource.MustParse("100m")
+	sidecarPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "sidecar-idempotent-uid", Name: "sidecar-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{{
+				Name:          "sidecar",
+				RestartPolicy: &sidecarAlways,
+				Resources:     v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: cpu100m}},
+			}},
+		},
+	}
+	require.NoError(t, m.actuatedState.SetPod(tCtx.Logger(), sidecarPod))
+	roSidecar, ok := m.actuatedState.GetPodReadOnly(sidecarPod.UID)
+	require.True(t, ok)
+	require.NoError(t, m.actuatedState.SetPod(tCtx.Logger(), roSidecar.DeepCopy()))
+	sidecarRes, hasSidecarRes := m.actuatedState.GetContainerResources(sidecarPod.UID, "sidecar")
+	require.True(t, hasSidecarRes, "SetPod on DeepCopy of GetPodReadOnly must preserve restartable init container resources")
+	assert.True(t, cpu100m.Equal(sidecarRes.Requests[v1.ResourceCPU]))
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "actuated-cleanup-uid",
+			Name:      "actuated-cleanup-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{Name: "vol-old", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+				{Name: "vol-new", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+			},
+			Containers: []v1.Container{
+				{
+					Name:            "c1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					DynamicVolumeMountPolicy: &v1.ContainerDynamicVolumeMountPolicy{
+						RestartPolicy: v1.DynamicVolumeMountRestartContainer,
+					},
+					VolumeMounts: []v1.VolumeMount{{Name: "vol-old", MountPath: "/mnt/old"}},
+				},
+				{
+					Name:            "c2",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					VolumeMounts:    []v1.VolumeMount{{Name: "vol-old", MountPath: "/mnt/old2"}},
+				},
+			},
+		},
+	}
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, pod.Spec.Volumes[0]))
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, pod.Spec.Volumes[1]))
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	apiPodStatus, err := m.GetPodStatus(tCtx, &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace})
+	require.NoError(t, err)
+	syncRes := m.SyncPod(tCtx, pod, apiPodStatus, nil, backOff, false)
+	require.NoError(t, syncRes.Error())
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	runningPod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	apiPodStatus, err = m.GetPodStatus(tCtx, runningPod)
+	require.NoError(t, err)
+
+	// Switch c1 from vol-old to vol-new AND remove c2 from pod.Spec while CreateContainer fails:
+	// removed exited c2 is pruned from actuatedState and vol-new is not marked actuated because CreateContainer failed.
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "vol-new", MountPath: "/mnt/new"}}
+	for _, cs := range apiPodStatus.ContainerStatuses {
+		if cs.Name == "c2" {
+			cs.State = kubecontainer.ContainerStateExited
+		}
+	}
+	fakeRuntime.InjectError("CreateContainer", errors.New("create failed"))
+
+	syncRes = m.SyncPod(tCtx, pod, apiPodStatus, nil, backOff, false)
+	require.Error(t, syncRes.Error())
+
+	c1Mounts, found := m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.NotEqual(t, []v1.VolumeMount{{Name: "vol-new", MountPath: "/mnt/new"}}, c1Mounts)
+
+	_, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c2")
+	assert.False(t, found, "removed exited container c2 must be removed from actuatedState")
+
+	// While c1 is exited and still scheduled to restart, its previously actuated mounts remain
+	// recorded until StartContainer succeeds, rather than prematurely treating volumes as unactuated.
+	stoppedPod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	apiPodStatus, err = m.GetPodStatus(tCtx, stoppedPod)
+	require.NoError(t, err)
+	fakeRuntime.InjectError("CreateContainer", errors.New("create failed"))
+	syncRes = m.SyncPod(tCtx, pod, apiPodStatus, nil, backOff, false)
+	require.Error(t, syncRes.Error())
+
+	c1Mounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, []v1.VolumeMount{{Name: "vol-old", MountPath: "/mnt/old"}}, c1Mounts, "mounts must not be prematurely cleared while container is pending restart")
+
+	// Once CreateContainer succeeds and StartContainer runs, vol-new replaces vol-old in actuatedState.
+	backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
+	syncRes = m.SyncPod(tCtx, pod, apiPodStatus, nil, backOff, false)
+	require.NoError(t, syncRes.Error())
+	c1Mounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, []v1.VolumeMount{{Name: "vol-new", MountPath: "/mnt/new"}}, c1Mounts)
+
+	// Simulate first SyncPod after a node reboot (no container status yet) where StartContainer fails:
+	// previously actuated mounts must remain intact because the container will restart.
+	rebootStatus := &kubecontainer.PodStatus{
+		ID:              pod.UID,
+		Name:            pod.Name,
+		Namespace:       pod.Namespace,
+		SandboxStatuses: apiPodStatus.SandboxStatuses,
+	}
+	fakeRuntime.InjectError("CreateContainer", errors.New("create failed after reboot"))
+	syncRes = m.SyncPod(tCtx, pod, rebootStatus, nil, backOff, false)
+	require.Error(t, syncRes.Error())
+	c1Mounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Equal(t, []v1.VolumeMount{{Name: "vol-new", MountPath: "/mnt/new"}}, c1Mounts, "first SyncPod after node reboot must preserve actuated mounts while StartContainer has not completed")
+
+	// When an OnFailure container permanently exits 0 with no pending volumeMount update,
+	// reconcileNonRunningActuatedContainers clears its actuated mounts immediately.
+	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+	exitedZeroStatus := &kubecontainer.PodStatus{
+		ID:              pod.UID,
+		Name:            pod.Name,
+		Namespace:       pod.Namespace,
+		SandboxStatuses: apiPodStatus.SandboxStatuses,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:       kubecontainer.ContainerID{Type: "fake", ID: "c1-done"},
+				Name:     "c1",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+		},
+	}
+	actions := m.computePodActions(tCtx, pod, exitedZeroStatus, false)
+	assert.Empty(t, actions.ContainersToStart)
+	assert.True(t, actions.KillPod)
+	c1Mounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c1")
+	require.True(t, found)
+	assert.Empty(t, c1Mounts, "permanently exited OnFailure container must have its actuated mounts cleared")
+}
+
+func TestComputePodActions_OnFailureWithDynamicVolumeMounts(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("DynamicNodeLocalEphemeralVolumes is only supported on linux")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, status := makeBasePodAndStatus()
+	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+	status.ContainerStatuses = status.ContainerStatuses[:1]
+	pod.Spec.Containers[0].DynamicVolumeMountPolicy = &v1.ContainerDynamicVolumeMountPolicy{
+		RestartPolicy: v1.DynamicVolumeMountRestartContainer,
+	}
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	vol1 := v1.Volume{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	pod.Spec.Volumes = []v1.Volume{vol1}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, vol1))
+
+	// Dynamic volumeMount restart queues kill + start; if StartContainer fails after the OnFailure
+	// container traps SIGTERM and exits 0 (even across a kubelet restart), actuatedState still holds
+	// the pre-update mounts so computePodActions restarts the container instead of killing the pod.
+	actions := m.computePodActions(tCtx, pod, status, false)
+	require.Len(t, actions.ContainersToKill, 1)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+
+	status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+	status.ContainerStatuses[0].ExitCode = 0
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Equal(t, []int{0}, actions.ContainersToStart, "OnFailure container killed for dynamic volumeMount update must restart even after exiting 0")
+	assert.False(t, actions.KillPod)
+
+	// Once startContainer succeeds (updating actuatedState to match spec) and the restarted container
+	// later exits 0 naturally, ShouldContainerBeRestarted returns false, mounts are cleared, and
+	// subsequent spec mount removals do not revive the completed container.
+	require.NoError(t, m.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[0]))
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToStart)
+	assert.True(t, actions.KillPod)
+
+	pod.Spec.Containers[0].VolumeMounts = nil
+	pod.Spec.Volumes = nil
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToStart, "removing volumeMounts from an already completed OnFailure container must not restart it")
+	assert.True(t, actions.KillPod)
+}
+
+func TestInitializeActuatedPod_BackfillsVolumeMountsAfterGateEnablement(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("DynamicNodeLocalEphemeralVolumes is only supported on linux")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, false)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, status := makeBasePodAndStatus()
+	vol1 := v1.Volume{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	pod.Spec.Volumes = []v1.Volume{vol1}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}
+	pod.Spec.Containers[0].DynamicVolumeMountPolicy = &v1.ContainerDynamicVolumeMountPolicy{
+		RestartPolicy: v1.DynamicVolumeMountRestartContainer,
+	}
+
+	// Checkpoint written while DynamicNodeLocalEphemeralVolumes is disabled has no VolumeMounts or DynamicVolumeMountPolicy.
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+	mounts, found := m.actuatedState.GetContainerVolumeMounts(pod.UID, pod.Spec.Containers[0].Name)
+	require.True(t, found)
+	require.Empty(t, mounts)
+
+	// Enabling the feature gate on kubelet must backfill VolumeMounts from the allocated pod rather than restarting c1.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	mounts, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, pod.Spec.Containers[0].Name)
+	require.True(t, found)
+	require.Equal(t, pod.Spec.Containers[0].VolumeMounts, mounts)
+
+	actions := m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill, "running container must not be restarted on feature gate enablement")
+	assert.Empty(t, actions.ContainersToStart)
+
+	// A newly added dynamic container (not yet in stored) must NOT have its unmounted volumes backfilled prematurely.
+	vol2 := v1.Volume{Name: "vol2", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm2"}}}}
+	pod.Spec.Volumes = []v1.Volume{vol1, vol2}
+	pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+		Name:         "c2-dynamic",
+		Image:        "busybox",
+		VolumeMounts: []v1.VolumeMount{{Name: "vol2", MountPath: "/mnt/vol2"}},
+	})
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+	_, found = m.actuatedState.GetContainerVolumeMounts(pod.UID, "c2-dynamic")
+	assert.False(t, found, "unstarted dynamic container must not be backfilled in actuatedState")
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToStart, "c2-dynamic must wait for vol2 to mount")
+}
+
+func TestComputePodActions_DynamicVolumeMounts(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("DynamicNodeLocalEphemeralVolumes is only supported on linux")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, status := makeBasePodAndStatus()
+	vol1 := v1.Volume{Name: "vol1", VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}}
+	vol2 := v1.Volume{Name: "vol2", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm2"}}}}
+	imgVol := v1.Volume{Name: "img-vol", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/pause:3.10"}}}
+	vol3 := v1.Volume{Name: "vol3", VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{SecretName: "sec3"}}}
+
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{}
+	pod.Spec.Containers[0].VolumeMounts = nil
+	pod.Spec.Containers[0].DynamicVolumeMountPolicy = &v1.ContainerDynamicVolumeMountPolicy{
+		RestartPolicy: v1.DynamicVolumeMountRestartContainer,
+	}
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	// Steady state with zero mounts: no container restarts.
+	actions := m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill)
+	assert.Empty(t, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+
+	// Step 1: Dynamically add vol1 before vol1 is mounted on host -> restart deferred (even if container image also changes).
+	pod.Spec.Volumes = []v1.Volume{vol1}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}
+	origImg := pod.Spec.Containers[0].Image
+	pod.Spec.Containers[0].Image = "busybox:v2"
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill, "container restart should be deferred while vol1 is not mounted in actuatedState")
+	assert.Empty(t, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+	pod.Spec.Containers[0].Image = origImg
+
+	// VolumeManager mounts vol1 and records it in actuatedState -> restart proceeds.
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, vol1))
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Contains(t, actions.ContainersToKill, status.ContainerStatuses[0].ID)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+	require.NoError(t, m.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[0]))
+
+	// Step 2: Combined dynamic volume addition (vol2) + CPU resize (RestartContainer) defers both until vol2 mounts.
+	pod.Spec.Volumes = []v1.Volume{vol1, vol2}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+		{Name: "vol1", MountPath: "/mnt/vol1"},
+		{Name: "vol2", MountPath: "/mnt/vol2"},
+	}
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+	}
+	pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+		{ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer},
+	}
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill, "combined resize and volumeMount restart should be deferred until vol2 mounts")
+	assert.Empty(t, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, vol2))
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Contains(t, actions.ContainersToKill, status.ContainerStatuses[0].ID)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	assert.True(t, actions.UpdatePodResources)
+	assert.False(t, actions.KillPod)
+	require.NoError(t, m.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[0]))
+
+	// Step 3: Dynamically adding an Image volume defers restart until pre-pull records SetPodVolume.
+	pod.Spec.Volumes = []v1.Volume{vol1, vol2, imgVol}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+		{Name: "vol1", MountPath: "/mnt/vol1"},
+		{Name: "vol2", MountPath: "/mnt/vol2"},
+		{Name: "img-vol", MountPath: "/mnt/img"},
+	}
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill, "unpulled Image volume must defer container restart")
+	assert.Empty(t, actions.ContainersToStart)
+
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, imgVol))
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Contains(t, actions.ContainersToKill, status.ContainerStatuses[0].ID)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	require.NoError(t, m.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[0]))
+
+	// Step 4: Removing vol2 and img-vol from VolumeMounts restarts immediately without waiting.
+	pod.Spec.Volumes = []v1.Volume{vol1}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Contains(t, actions.ContainersToKill, status.ContainerStatuses[0].ID)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	assert.False(t, actions.KillPod)
+	require.NoError(t, m.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[0]))
+
+	// Step 5: Exited regular container and new EphemeralContainer mounting unmounted vol3 defer start without killing pod.
+	status.ContainerStatuses = status.ContainerStatuses[:1]
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+	status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+	pod.Spec.Volumes = []v1.Volume{vol1, vol3}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
+		{Name: "vol1", MountPath: "/mnt/vol1"},
+		{Name: "vol3", MountPath: "/mnt/vol3"},
+	}
+	pod.Spec.EphemeralContainers = []v1.EphemeralContainer{
+		{
+			EphemeralContainerCommon: v1.EphemeralContainerCommon{
+				Name:         "debugger",
+				Image:        "busybox",
+				VolumeMounts: []v1.VolumeMount{{Name: "vol3", MountPath: "/mnt/vol3"}},
+			},
+		},
+	}
+
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToStart)
+	assert.Empty(t, actions.EphemeralContainersToStart)
+	assert.False(t, actions.KillPod, "pod sandbox must not be killed while container start is deferred on dynamic volume")
+
+	require.NoError(t, m.actuatedState.SetPodVolume(tCtx.Logger(), pod.UID, vol3))
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Equal(t, []int{0}, actions.ContainersToStart)
+	assert.Equal(t, []int{0}, actions.EphemeralContainersToStart)
+	assert.False(t, actions.KillPod)
+}
+
+func TestSyncPod_DynamicImageVolumePrePull(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("DynamicNodeLocalEphemeralVolumes is only supported on linux")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "dyn-img-pod-uid",
+			Name:      "dyn-img-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "c1",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					DynamicVolumeMountPolicy: &v1.ContainerDynamicVolumeMountPolicy{
+						RestartPolicy: v1.DynamicVolumeMountRestartContainer,
+					},
+				},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	apiPodStatus, err := m.GetPodStatus(tCtx, &kubecontainer.Pod{ID: pod.UID, Name: pod.Name, Namespace: pod.Namespace})
+	require.NoError(t, err)
+	syncRes := m.SyncPod(tCtx, pod, apiPodStatus, nil, backOff, false)
+	require.NoError(t, syncRes.Error())
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	runningPod, err := m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	apiPodStatus, err = m.GetPodStatus(tCtx, runningPod)
+	require.NoError(t, err)
+	require.Len(t, apiPodStatus.ContainerStatuses, 1)
+	origContainerID := apiPodStatus.ContainerStatuses[0].ID
+
+	// Dynamically add an OCI Image volume while the registry fails PullImage:
+	// running container c1 stays alive and unkilled, HostMounted is not recorded, and SyncPod returns retry error.
+	imgVol := v1.Volume{
+		Name: "dyn-img",
+		VolumeSource: v1.VolumeSource{
+			Image: &v1.ImageVolumeSource{
+				Reference:  "registry.example.com/data:v1",
+				PullPolicy: v1.PullAlways,
+			},
+		},
+	}
+	pod.Spec.Volumes = []v1.Volume{imgVol}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "dyn-img", MountPath: "/mnt/img"}}
+
+	fakeRuntime.Called = nil
+	fakeImage.Called = nil
+	fakeImage.InjectError("PullImage", errors.New("registry unreachable"))
+
+	syncRes = m.SyncPod(tCtx, pod, apiPodStatus, nil, backOff, false)
+	require.Error(t, syncRes.Error(), "SyncPod must return error so pod worker retries image pull")
+	assert.NotContains(t, fakeRuntime.Called, "StopContainer", "healthy running container must not be killed when dynamic Image volume pull fails")
+	_, hasVols := m.actuatedState.GetPodVolumes(pod.UID)
+	assert.False(t, hasVols, "failed dynamic Image volume must not be recorded in actuatedState")
+
+	// Clear image pull error via valid reference: pre-pull succeeds once, records volume in actuatedState,
+	// and restarts c1 in-place without double-pulling.
+	pod.Spec.Volumes[0].Image.Reference = "registry.example.com/data:v2"
+	fakeRuntime.Called = nil
+	fakeImage.Called = nil
+
+	syncRes = m.SyncPod(tCtx, pod, apiPodStatus, nil, backOff, false)
+	require.NoError(t, syncRes.Error())
+	assert.Contains(t, fakeRuntime.Called, "StopContainer")
+	assert.Contains(t, fakeRuntime.Called, "CreateContainer")
+
+	pullCalls := 0
+	for _, call := range fakeImage.Called {
+		if call == "PullImage" {
+			pullCalls++
+		}
+	}
+	assert.Equal(t, 1, pullCalls, "dynamic Image volume should be pulled once in pre-pull and reused when starting container")
+
+	recordedVols, hasVols := m.actuatedState.GetPodVolumes(pod.UID)
+	require.True(t, hasVols)
+	require.Len(t, recordedVols, 1)
+	assert.Equal(t, "dyn-img", recordedVols[0].Name)
+
+	runningPod, err = m.GetPod(tCtx, pod.UID)
+	require.NoError(t, err)
+	apiPodStatus, err = m.GetPodStatus(tCtx, runningPod)
+	require.NoError(t, err)
+	for _, cs := range apiPodStatus.ContainerStatuses {
+		if cs.State == kubecontainer.ContainerStateRunning {
+			assert.NotEqual(t, origContainerID, cs.ID, "container should be running with a new container ID after restart")
+		}
+	}
+
+	// Unreferenced Image volumes in pod.Spec.Volumes are skipped by getImageVolumesWithCache and not recorded in actuatedState.
+	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+		Name: "unreferenced-img",
+		VolumeSource: v1.VolumeSource{
+			Image: &v1.ImageVolumeSource{Reference: "registry.example.com/unused:v1", PullPolicy: v1.PullIfNotPresent},
+		},
+	})
+	sandboxCfg, err := m.generatePodSandboxConfig(tCtx, pod, 0)
+	require.NoError(t, err)
+	fakeImage.Called = nil
+	pulledMap, err := m.getImageVolumesWithCache(tCtx, pod, sandboxCfg, nil, imageVolumePulls{
+		"dyn-img": {spec: &runtimeapi.ImageSpec{Image: "registry.example.com/data:v2"}},
+	})
+	require.NoError(t, err)
+	assert.NotContains(t, pulledMap, "unreferenced-img")
+	assert.NotContains(t, fakeImage.Called, "PullImage")
+}
+
+func TestComputePodActions_ResizeDuringDeferredDynamicVolumeMount(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("DynamicNodeLocalEphemeralVolumes is only supported on linux")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicNodeLocalEphemeralVolumes, true)
+
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	pod, status := makeBasePodAndStatus()
+	mem200 := resource.MustParse("200Mi")
+	mem100 := resource.MustParse("100Mi")
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceMemory: mem200},
+		Limits:   v1.ResourceList{v1.ResourceMemory: mem200},
+	}
+	pod.Spec.Containers[0].DynamicVolumeMountPolicy = &v1.ContainerDynamicVolumeMountPolicy{
+		RestartPolicy: v1.DynamicVolumeMountRestartContainer,
+	}
+	m.InitializeActuatedPod(tCtx.Logger(), pod)
+
+	// Case 1: In-place (NotRequired) memory downsize proceeds immediately even while unmounted vol1 defers container restart.
+	vol1 := v1.Volume{Name: "vol1", VolumeSource: v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: "cm1"}}}}
+	pod.Spec.Volumes = []v1.Volume{vol1}
+	pod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{{Name: "vol1", MountPath: "/mnt/vol1"}}
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceMemory: mem100},
+		Limits:   v1.ResourceList{v1.ResourceMemory: mem100},
+	}
+
+	actions := m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill, "volumeMount restart remains deferred")
+	require.Len(t, actions.ContainersToUpdate[v1.ResourceMemory], 1, "in-place memory resize should still execute")
+
+	// Case 2: If foo1's memory resize requires RestartContainer while vol1 is unmounted, resize-related
+	// changes (including another container foo2's resize or UpdatePodResources) are withheld so
+	// doPodResizeAction does not lower pod cgroups before foo1's resize can be actuated.
+	pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceMemory: mem200},
+		Limits:   v1.ResourceList{v1.ResourceMemory: mem200},
+	}
+	require.NoError(t, m.actuatedState.SetContainer(tCtx.Logger(), pod.UID, podutil.Containers, pod.Spec.Containers[1]))
+	pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceMemory: mem100},
+		Limits:   v1.ResourceList{v1.ResourceMemory: mem100},
+	}
+	pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+		{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
+	}
+	actions = m.computePodActions(tCtx, pod, status, false)
+	assert.Empty(t, actions.ContainersToKill)
+	assert.Empty(t, actions.ContainersToUpdate)
+	assert.False(t, actions.UpdatePodResources)
+	assert.False(t, actions.UpdatePodLevelResources)
+}

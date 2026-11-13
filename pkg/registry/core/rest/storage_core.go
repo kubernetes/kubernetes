@@ -251,7 +251,7 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		if podStorage.Eviction != nil {
 			subresources["eviction"] = podStorage.Eviction
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) || utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
 			subresources["dynamic"] = podStorage.Dynamic
 		}
 		for subresource, subresourceStorage := range subresources {

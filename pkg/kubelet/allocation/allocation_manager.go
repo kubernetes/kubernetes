@@ -266,9 +266,14 @@ func (m *manager) retryPendingAllocations(ctx context.Context, trigger string) [
 			newPendingAllocations = append(newPendingAllocations, uid)
 		default:
 			logger.V(4).Info("Pod allocation successfully updated", "pod", klog.KObj(pod))
-			successfulAllocations = append(successfulAllocations, pod)
-			if isDeferred {
-				metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+			// TODO: Non-resize rejections are still marked Deferred or Infeasible under the
+			// PodResizePending condition (and counted in resize metrics below); revisit how
+			// non-resize allocation rejections are reported.
+			if allocated {
+				successfulAllocations = append(successfulAllocations, pod)
+				if isDeferred {
+					metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+				}
 			}
 		}
 
@@ -488,11 +493,54 @@ func copyPassthroughFields(spec, desired *v1.PodSpec) {
 	spec.ActiveDeadlineSeconds = desired.ActiveDeadlineSeconds
 	spec.Tolerations = desired.Tolerations
 	spec.TerminationGracePeriodSeconds = desired.TerminationGracePeriodSeconds
-	spec.EphemeralContainers = desired.EphemeralContainers
+	spec.EphemeralContainers = copyAllocatedEphemeralContainers(spec, desired.EphemeralContainers)
 	// TODO: The image becomes gated with dynamic containers, at which point we
 	// should stop copying the image here.
 	spec.Containers = copyImages(spec.Containers, desired.Containers)
 	spec.InitContainers = copyImages(spec.InitContainers, desired.InitContainers)
+}
+
+// copyAllocatedEphemeralContainers returns the desired ephemeral containers whose volume mounts and
+// volume devices are all present in the allocated pod's spec.Volumes (or that were already present
+// in spec.EphemeralContainers), deferring ephemeral containers that reference not-yet-allocated
+// dynamic volumes without mutating stored slices.
+func copyAllocatedEphemeralContainers(spec *v1.PodSpec, desired []v1.EphemeralContainer) []v1.EphemeralContainer {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) || len(desired) == 0 {
+		return desired
+	}
+	ephemeralContainerVolumesAllocated := func(ec *v1.EphemeralContainer) bool {
+		if slices.ContainsFunc(spec.EphemeralContainers, func(existing v1.EphemeralContainer) bool { return existing.Name == ec.Name }) {
+			return true
+		}
+		for _, vm := range ec.VolumeMounts {
+			if !slices.ContainsFunc(spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name }) {
+				return false
+			}
+		}
+		for _, vd := range ec.VolumeDevices {
+			if !slices.ContainsFunc(spec.Volumes, func(v v1.Volume) bool { return v.Name == vd.Name }) {
+				return false
+			}
+		}
+		return true
+	}
+	allAllocated := true
+	for i := range desired {
+		if !ephemeralContainerVolumesAllocated(&desired[i]) {
+			allAllocated = false
+			break
+		}
+	}
+	if allAllocated {
+		return desired
+	}
+	filtered := make([]v1.EphemeralContainer, 0, len(desired))
+	for i := range desired {
+		if ephemeralContainerVolumesAllocated(&desired[i]) {
+			filtered = append(filtered, desired[i])
+		}
+	}
+	return filtered
 }
 
 // copyImages returns containers with each container's image set to the one of the container with
@@ -585,9 +633,6 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 	}
 
 	resizeRequested := isResizeRequested(pod, allocatedPod)
-	if !resizeRequested {
-		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
-	}
 
 	// Desired pod != allocated pod. Can we update the allocation to the desired pod?
 	allocatedPods := slices.DeleteFunc(m.getAllocatedPods(m.podProvider.GetActivePods()), func(p *v1.Pod) bool { return p.UID == pod.UID })
@@ -619,29 +664,28 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 		return result, true, nil
 	}
 
-	// TODO: Report rejected pod updates that aren't resizes in the pod status.
-	if resizeRequested {
-		// TODO: Distinguish resource shortages, which scheduler preemption can resolve, from other
-		// deferred rejections in the pod status.
-		reason := v1.PodReasonDeferred
-		if result.RejectionType == lifecycle.RejectionInfeasible {
-			reason = v1.PodReasonInfeasible
-			// podResizesAdmitHandler counts its own rejections with a more specific reason.
-			if result.Reason != v1.PodReasonInfeasible {
-				metrics.PodInfeasibleResizes.WithLabelValues(result.Reason).Inc()
-			}
+	// TODO: Reevaluate what to do with resize conditions and Deferred/Infeasible status for
+	// allocation failures unrelated to resize.
+	// TODO: Distinguish resource shortages, which scheduler preemption can resolve, from other
+	// deferred rejections in the pod status.
+	reason := v1.PodReasonDeferred
+	if result.RejectionType == lifecycle.RejectionInfeasible {
+		reason = v1.PodReasonInfeasible
+		// podResizesAdmitHandler counts its own rejections with a more specific reason.
+		if result.Reason != v1.PodReasonInfeasible {
+			metrics.PodInfeasibleResizes.WithLabelValues(result.Reason).Inc()
 		}
-		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, result.Message, pod.Generation) {
-			eventType := events.ResizeDeferred
-			if reason == v1.PodReasonInfeasible {
-				eventType = events.ResizeInfeasible
-			}
-			msg := events.PodResizePendingMsg(logger, pod, result.Reason, result.Message, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+	}
+	if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, result.Message, pod.Generation) {
+		eventType := events.ResizeDeferred
+		if reason == v1.PodReasonInfeasible {
+			eventType = events.ResizeInfeasible
 		}
-		if result.RejectionType == lifecycle.RejectionResourceShortage {
-			m.statusManager.ClearSchedulerEvaluationCompletedCondition(pod.UID)
-		}
+		msg := events.PodResizePendingMsg(logger, pod, result.Reason, result.Message, pod.Generation)
+		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+	}
+	if result.RejectionType == lifecycle.RejectionResourceShortage {
+		m.statusManager.ClearSchedulerEvaluationCompletedCondition(pod.UID)
 	}
 
 	return result, false, nil

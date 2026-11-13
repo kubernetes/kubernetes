@@ -838,6 +838,15 @@ func shouldRecordVolumeInActuatedState(vol *v1.Volume) bool {
 		allocation.VolHasMemoryBackedEmptyDir(vol)
 }
 
+func shouldRecordVolumeOnMount(vol *v1.Volume) bool {
+	// Image volumes use a no-op volume plugin whose SetUp succeeds before any OCI image pull;
+	// kuberuntime records them in actuatedState only after EnsureImageExists succeeds.
+	if vol == nil || vol.Image != nil {
+		return false
+	}
+	return shouldRecordVolumeInActuatedState(vol)
+}
+
 func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
 	podName := markVolumeOpts.PodName
 	podUID := markVolumeOpts.PodUID
@@ -903,7 +912,7 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	}
 	asw.Unlock()
 
-	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted && volumeSpec != nil && shouldRecordVolumeInActuatedState(volumeSpec.Volume) {
+	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted && volumeSpec != nil && shouldRecordVolumeOnMount(volumeSpec.Volume) {
 		logger := klog.TODO()
 		volToRecord := *volumeSpec.Volume
 		if markVolumeOpts.Pod != nil && asw.volumePluginMgr != nil && allocation.VolHasMemoryBackedEmptyDir(&volToRecord) {

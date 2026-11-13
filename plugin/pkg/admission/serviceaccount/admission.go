@@ -207,8 +207,13 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("expected an old pod but got a %T", a.GetOldObject()))
 		}
-		// Only added containers can reference new secrets.
+		// Only added containers or added volumes can reference new secrets.
 		for pair := range podutil.ContainerPairs(pod, oldPod, podutil.Containers) {
+			if pair.Old == nil {
+				return s.limitUpdateSecretReferences(pod, a)
+			}
+		}
+		for pair := range podutil.VolumePairs(pod, oldPod) {
 			if pair.Old == nil {
 				return s.limitUpdateSecretReferences(pod, a)
 			}
@@ -379,7 +384,10 @@ func (s *Plugin) limitUpdateSecretReferences(pod *api.Pod, a admission.Attribute
 	}
 	// Ensure all secrets newly referenced by the update are allowed by the service account
 	oldPod, _ := a.GetOldObject().(*api.Pod)
-	return checkMountableSecrets(serviceAccount, pod, oldPod)
+	if err := checkMountableSecrets(serviceAccount, pod, oldPod); err != nil {
+		return admission.NewForbidden(a, err)
+	}
+	return nil
 }
 
 // checkMountableSecrets returns an error listing the secrets referenced by pod that are not in
