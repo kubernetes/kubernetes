@@ -850,6 +850,53 @@ func TestApplyOverride(t *testing.T) {
 			},
 			expectedErr: fmt.Errorf("alias testalias can not be overridden"),
 		},
+		{
+			name: "invalid duplicate default command",
+			nestedCmds: []fakeCmds[string]{
+				{
+					name: "command1",
+					flags: []fakeFlag[string]{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"command1",
+			},
+			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+				return &config.Preference{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Preference",
+						APIVersion: "kubectl.config.k8s.io/v1alpha1",
+					},
+					Defaults: []config.CommandDefaults{
+						{
+							Command: "command1",
+							Options: []config.CommandOptionDefault{
+								{
+									Name:    "firstflag",
+									Default: "changed",
+								},
+							},
+						},
+						{
+							Command: "command1",
+							Options: []config.CommandOptionDefault{
+								{
+									Name:    "firstflag",
+									Default: "changed2",
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedErr: fmt.Errorf("duplicate default command command1"),
+		},
 	}
 
 	for _, test := range tests {

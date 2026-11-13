@@ -535,10 +535,16 @@ func (p *Preferences) validate(plugin *config.Preference) error {
 		aliases[alias.Name] = struct{}{}
 	}
 
+	commands := make(map[string]struct{})
 	for _, override := range plugin.Defaults {
 		if err := validateFlag(override.Options); err != nil {
 			return err
 		}
+
+		if _, ok := commands[override.Command]; ok {
+			return fmt.Errorf("duplicate default command %s", override.Command)
+		}
+		commands[override.Command] = struct{}{}
 	}
 
 	if err := exec.ValidatePluginPolicy(p.policy); err != nil {
