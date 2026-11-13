@@ -138,6 +138,14 @@ func (cm *containerManagerStub) GetPodCgroupRoot() string {
 	return ""
 }
 
+func (cm *containerManagerStub) GetSystemPartitionCgroupRoot() string {
+	return ""
+}
+
+func (cm *containerManagerStub) PartitionStats(_ klog.Logger) map[string]PartitionStats {
+	return nil
+}
+
 func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	return nil
 }

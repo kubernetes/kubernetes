@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -725,6 +726,61 @@ func TestPodHasExclusiveCPUs(t *testing.T) {
 
 			result := cm.PodHasExclusiveCPUs(logger, tc.pod)
 			assert.Equal(t, tc.expectExclusiveCPUs, result)
+		})
+	}
+}
+
+// fakeQOSContainerManager records its updates and fails them with err.
+type fakeQOSContainerManager struct {
+	qosContainerManagerNoop
+	err     error
+	updates int
+}
+
+func (m *fakeQOSContainerManager) UpdateCgroups(_ klog.Logger) error {
+	m.updates++
+	return m.err
+}
+
+func TestUpdateQOSCgroupsUpdatesEveryPartition(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	partitionErr := errors.New("partition update failed")
+	defaultErr := errors.New("default update failed")
+
+	testCases := []struct {
+		name         string
+		partitionErr error
+		defaultErr   error
+		wantErrs     []error
+	}{
+		{
+			name:         "the system partition fails",
+			partitionErr: partitionErr,
+			wantErrs:     []error{partitionErr},
+		},
+		{
+			name:         "both fail",
+			partitionErr: partitionErr,
+			defaultErr:   defaultErr,
+			wantErrs:     []error{partitionErr, defaultErr},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			partition := &fakeQOSContainerManager{err: tc.partitionErr}
+			defaultPartition := &fakeQOSContainerManager{err: tc.defaultErr}
+			cm := &containerManagerImpl{
+				qosContainerManager:       defaultPartition,
+				systemPartitionQOSManager: partition,
+			}
+
+			err := cm.UpdateQOSCgroups(logger)
+			for _, want := range tc.wantErrs {
+				require.ErrorIs(t, err, want)
+			}
+			assert.Equal(t, 1, partition.updates, "the system partition should be updated")
+			assert.Equal(t, 1, defaultPartition.updates,
+				"the default partition should be updated whatever happened to the system partition")
 		})
 	}
 }

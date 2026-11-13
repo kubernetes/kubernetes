@@ -95,6 +95,10 @@ type Provider interface {
 
 	// GetPodCgroupRoot returns the literal cgroupfs value for the cgroup containing all pods
 	GetPodCgroupRoot() string
+	// GetSystemPartitionCgroupRoot returns the literal cgroupfs value for the cgroup
+	// containing the system partition's pods, or an empty string when the node has
+	// no system partition.
+	GetSystemPartitionCgroupRoot() string
 
 	// GetPodByCgroupfs provides the pod that maps to the specified cgroup literal, as well
 	// as whether the pod was found.
