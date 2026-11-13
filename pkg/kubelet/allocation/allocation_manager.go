@@ -273,9 +273,14 @@ func (m *manager) retryPendingAllocations(ctx context.Context, trigger string) [
 			newPendingAllocations = append(newPendingAllocations, uid)
 		default:
 			logger.V(4).Info("Pod allocation successfully updated", "pod", klog.KObj(pod))
-			successfulAllocations = append(successfulAllocations, pod)
-			if isDeferred {
-				metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+			// TODO: Non-resize rejections are still marked Deferred or Infeasible under the
+			// PodResizePending condition when DynamicContainers or DynamicNodeLocalEphemeralVolumes
+			// is enabled; revisit how non-resize allocation rejections are reported.
+			if allocated {
+				successfulAllocations = append(successfulAllocations, pod)
+				if isDeferred {
+					metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
+				}
 			}
 		}
 
@@ -624,7 +629,8 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 
 	resizeRequested := isResizeRequested(pod, allocatedPod)
 	dynamicContainers := utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers)
-	if !resizeRequested && !dynamicContainers {
+	dynamicVolumes := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
+	if !resizeRequested && !dynamicContainers && !dynamicVolumes {
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, metrics.DeferredResizeResolutionReverted)
 	}
 
@@ -659,10 +665,14 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 		return result, true, nil
 	}
 
-	// With DynamicContainers, a blocked change that isn't a resize (e.g. an image update, or adding a
-	// container without resources) is reported too, so that it doesn't go unnoticed.
+	// With DynamicContainers or DynamicNodeLocalEphemeralVolumes, a blocked change that isn't a
+	// resize (e.g. an image update, adding a container without resources, or a dynamic volume
+	// change) is reported too, so that it doesn't go unnoticed.
 	// TODO(KEP-5972): Revisit reporting blocked changes that aren't resizes as PodResizePending.
-	if resizeRequested || dynamicContainers {
+	// TODO(KEP-6395): Also report rejected dynamic volume changes (e.g. by NodeDeclaredFeatures
+	// when DynamicNodeLocalEphemeralVolumes is disabled), and revisit reporting non-resize changes
+	// as PodResizePending.
+	if resizeRequested || dynamicContainers || dynamicVolumes {
 		// TODO: Distinguish resource shortages, which scheduler preemption can resolve, from other
 		// deferred rejections in the pod status.
 		reason := v1.PodReasonDeferred
