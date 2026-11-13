@@ -1476,6 +1476,36 @@ func TestActualStateOfWorld_ActuatedVolumes(t *testing.T) {
 	require.NoError(t, asw.MarkVolumeAsUnmounted(podName, generatedVolumeName))
 	_, ok = actuatedState.GetPodVolumes(pod.UID)
 	require.False(t, ok)
+
+	// Image volume stub SetUp must not prematurely record HostMounted in actuatedState before OCI pull,
+	// whereas MarkVolumeAsUnmounted must still clear a pull-recorded Image volume.
+	imgVol := v1.Volume{
+		Name: "img-vol",
+		VolumeSource: v1.VolumeSource{
+			Image: &v1.ImageVolumeSource{Reference: "registry.k8s.io/pause:3.10"},
+		},
+	}
+	imgSpec := &volume.Spec{Volume: &imgVol}
+	imgGenName, err := util.GetUniqueVolumeNameFromSpec(plugin, imgSpec)
+	require.NoError(t, err)
+	require.NoError(t, asw.MarkVolumeAsAttached(logger, emptyVolumeName, imgSpec, "", "fake/device/path"))
+	imgMounter, err := plugin.NewMounter(imgSpec, pod)
+	require.NoError(t, err)
+	require.NoError(t, asw.MarkVolumeAsMounted(operationexecutor.MarkVolumeOpts{
+		PodName:          podName,
+		PodUID:           pod.UID,
+		VolumeName:       imgGenName,
+		Mounter:          imgMounter,
+		VolumeSpec:       imgSpec,
+		VolumeMountState: operationexecutor.VolumeMounted,
+	}))
+	_, ok = actuatedState.GetPodVolumes(pod.UID)
+	require.False(t, ok, "Image volume should not be recorded in actuatedState by volume plugin SetUp before OCI image pull")
+
+	require.NoError(t, actuatedState.SetPodVolume(logger, pod.UID, imgVol))
+	require.NoError(t, asw.MarkVolumeAsUnmounted(podName, imgGenName))
+	_, ok = actuatedState.GetPodVolumes(pod.UID)
+	require.False(t, ok, "MarkVolumeAsUnmounted should remove pull-recorded Image volume from actuatedState")
 }
 
 func TestActualStateOfWorld_ActuatedVolumes_MemoryBackedOnlyWhenDynamicVolumesDisabled(t *testing.T) {
