@@ -42,6 +42,7 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 	testCases := []struct {
 		name             string
 		allocatedCPU     string
+		overheadCPU      string
 		readbackShares   uint64
 		expectedMilliCPU int64
 	}{
@@ -50,6 +51,15 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 			// Round-trip match: preserve allocated 50m.
 			name:             "preserve allocated request for lossy v2 roundtrip readback",
 			allocatedCPU:     "50m",
+			readbackShares:   28,
+			expectedMilliCPU: 50,
+		},
+		{
+			// 40m spec + 10m overhead = 50m -> shares=51 -> weight=2 -> shares(readback)=28.
+			// Round-trip match: preserve allocated 50m (spec + overhead).
+			name:             "preserve allocated request with overhead for lossy v2 roundtrip readback",
+			allocatedCPU:     "40m",
+			overheadCPU:      "10m",
 			readbackShares:   28,
 			expectedMilliCPU: 50,
 		},
@@ -82,6 +92,11 @@ func TestConvertToAPIPodLevelResourcesStatus(t *testing.T) {
 					Containers: []v1.Container{{Name: "pause"}},
 				},
 				Status: v1.PodStatus{Phase: v1.PodRunning},
+			}
+			if tc.overheadCPU != "" {
+				pod.Spec.Overhead = v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse(tc.overheadCPU),
+				}
 			}
 
 			cpuPeriod := uint64(100000)

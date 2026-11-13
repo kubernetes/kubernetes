@@ -2266,46 +2266,18 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 	cpuRequest := cm.CPURequestsFromConfig(cpuConfig)
 	cpuLimit := cm.CPULimitsFromConfig(cpuConfig)
 
-	// preserveOldStatusValue preserves old pod status resources if already present.
-	preserveOldStatusValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) bool {
+	preserveOldResourcesValue := func(rName v1.ResourceName, oldStatusResource, resource v1.ResourceList) {
 		if allocatedPod.Status.Phase == v1.PodRunning && oldPodStatus.Phase == v1.PodRunning && oldPodStatus.Resources != nil {
 			if r, exists := oldStatusResource[rName]; exists {
 				resource[rName] = r.DeepCopy()
-				return true
-			}
-		}
-		return false
-	}
-
-	// addOverheadToFallbackValue adds pod overhead when falling back to spec resources.
-	addOverheadToFallbackValue := func(rName v1.ResourceName, resource v1.ResourceList, isLimit bool) {
-		if val, found := resource[rName]; found && allocatedPod.Spec.Overhead != nil {
-			if overhead, ok := allocatedPod.Spec.Overhead[rName]; ok {
-				// Add overhead for requests, but for limits only add if a non-zero limit is set.
-				if !isLimit || !val.IsZero() {
-					val.Add(overhead)
-					resource[rName] = val
-				}
 			}
 		}
 	}
 
-	resources := allocatedPod.Spec.Resources.DeepCopy()
+	resources := getEffectiveAllocatedResources(allocatedPod)
 
 	if oldPodStatus.Resources == nil {
 		oldPodStatus.Resources = &v1.ResourceRequirements{}
-	}
-
-	if resources == nil {
-		resources = &v1.ResourceRequirements{}
-	}
-
-	if resources.Requests == nil {
-		resources.Requests = make(v1.ResourceList)
-	}
-
-	if resources.Limits == nil {
-		resources.Limits = make(v1.ResourceList)
 	}
 
 	if cpuRequest != nil {
@@ -2329,23 +2301,8 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 				resources.Requests[v1.ResourceCPU] = cpuRequest.DeepCopy()
 			}
 		}
-	} else if !preserveOldStatusValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests) {
-		addOverheadToFallbackValue(v1.ResourceCPU, resources.Requests, false)
-	}
-
-	// Memory requests are not read from cgroups because cgroups do not track or enforce memory requests.
-	// Always aggregate/derive memory requests from pod spec and overhead.
-	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources:                          !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		UseStatusResources:                             true,
-		InPlacePodLevelResourcesVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-		UseDRANodeAllocatableResourceClaimStatus:       utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
-	}
-	aggregatedResources := resourcehelper.PodRequests(allocatedPod, opts)
-	if val, ok := aggregatedResources[v1.ResourceMemory]; ok {
-		resources.Requests[v1.ResourceMemory] = val
 	} else {
-		delete(resources.Requests, v1.ResourceMemory)
+		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Requests, resources.Requests)
 	}
 
 	if cpuLimit != nil {
@@ -2355,14 +2312,14 @@ func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, alloc
 		if cpuLimit.MilliValue() > cm.MinMilliCPULimit || resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
 			resources.Limits[v1.ResourceCPU] = cpuLimit.DeepCopy()
 		}
-	} else if !preserveOldStatusValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits) {
-		addOverheadToFallbackValue(v1.ResourceCPU, resources.Limits, true)
+	} else {
+		preserveOldResourcesValue(v1.ResourceCPU, oldPodStatus.Resources.Limits, resources.Limits)
 	}
 
 	if memoryLimit != nil {
 		resources.Limits[v1.ResourceMemory] = memoryLimit.DeepCopy()
-	} else if !preserveOldStatusValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits) {
-		addOverheadToFallbackValue(v1.ResourceMemory, resources.Limits, true)
+	} else {
+		preserveOldResourcesValue(v1.ResourceMemory, oldPodStatus.Resources.Limits, resources.Limits)
 	}
 
 	return resources
