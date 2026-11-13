@@ -92,10 +92,6 @@ func (m *defaultPreemptionManager) CompareVictimSets(_ context.Context, set1, se
 		return cmp.Compare(len(set1), len(set2))
 	}
 
-	// TODO(#142718): NumPDBViolations() is computed statically across all potential victims
-	// in the domain, which is exact for DisruptionsAllowed == 0 but can miscount when
-	// DisruptionsAllowed > 0 and earlier victims sharing the same PDB were not condemned.
-	// Track DisruptionsAllowed dynamically in PodGroupPreemptionState.
 	pdb1, split1 := countPDBViolations(set1)
 	pdb2, split2 := countPDBViolations(set2)
 	if c := cmp.Compare(pdb1, pdb2); c != 0 {
@@ -237,6 +233,8 @@ func getPreemptionPolicy(pgInfo fwk.PodGroupInfo) v1.PreemptionPolicy {
 type victimWithPDBViolations struct {
 	Victim
 	numPDBViolations int
+	// pdbsPerPod stores matching PDBs for each pod in Victim.Pods() that is protected by at least one PDB (ignoring already disrupted pods).
+	pdbsPerPod [][]*policy.PodDisruptionBudget
 }
 
 var _ fwk.PreemptionVictim = &victimWithPDBViolations{}
@@ -266,12 +264,14 @@ func prepareDomainVictims(victims []Victim, preemptorPriority int32, pdbs []*pol
 		orderedVictims = append(orderedVictims, &victimWithPDBViolations{
 			Victim:           nv,
 			numPDBViolations: 0,
+			pdbsPerPod:       getPDBsPerPod(nv, pdbs),
 		})
 	}
 	for _, vv := range slices.Backward(violatingVictims) {
 		orderedVictims = append(orderedVictims, &victimWithPDBViolations{
 			Victim:           vv.Victim,
 			numPDBViolations: vv.ViolateCount,
+			pdbsPerPod:       getPDBsPerPod(vv.Victim, pdbs),
 		})
 	}
 	return orderedVictims

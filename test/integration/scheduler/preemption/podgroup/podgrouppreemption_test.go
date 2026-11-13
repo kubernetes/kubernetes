@@ -310,6 +310,32 @@ func TestPodGroupPreemption(t *testing.T) {
 			expectedPodsPreemptedByWAP:      1,
 		},
 		{
+			name: "PDB DisruptionsAllowed=1 across nodes preempts lower-priority PDB pod first and avoids PDB violation on second pod",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+				st.MakeNode().Name("node3").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
+			},
+			podGroups: []*schedulingv1beta1.PodGroup{
+				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Name("pdb-mid").Node("node1").Label("app", "foo").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(20).Obj(),
+				st.MakePod().Name("pdb-low").Node("node2").Label("app", "foo").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(10).Obj(),
+				st.MakePod().Name("unprotected-high").Node("node3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").ZeroTerminationGracePeriod().Priority(50).Obj(),
+			},
+			pdb: st.MakePDB().Name("foo-pdb").MatchLabel("app", "foo").MinAvailable("50%").DisruptionsAllowed(1).Obj(),
+			preemptorPods: []*v1.Pod{
+				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+				st.MakePod().Name("high-2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").ZeroTerminationGracePeriod().Priority(100).Obj(),
+			},
+			expectedScheduled:               []string{"high-1", "high-2", "pdb-mid"},
+			expectedCandidatesForPreemption: []string{"pdb-low", "unprotected-high"},
+			expectedToHaveNNNInfo:           []string{"high-1", "high-2"},
+			expectedPodsPreemptedByWAP:      2,
+			tempRemovePG:                    true,
+		},
+		{
 			name: "Multi-node Preemption",
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
@@ -1289,8 +1315,13 @@ func TestPodGroupPreemption(t *testing.T) {
 				// Create PDB if specified
 				if tt.pdb != nil {
 					tt.pdb.Namespace = ns
-					if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, tt.pdb, metav1.CreateOptions{}); err != nil {
+					pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(testCtx.Ctx, tt.pdb, metav1.CreateOptions{})
+					if err != nil {
 						t.Fatalf("Failed to create PDB: %v", err)
+					}
+					pdb.Status = tt.pdb.Status
+					if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).UpdateStatus(testCtx.Ctx, pdb, metav1.UpdateOptions{}); err != nil {
+						t.Fatalf("Failed to update PDB status: %v", err)
 					}
 				}
 

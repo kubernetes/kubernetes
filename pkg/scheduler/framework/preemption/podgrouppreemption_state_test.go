@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -284,4 +285,173 @@ func TestPodGroupPreemptionState(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestPodGroupPreemptionState_DynamicPDBTracking(t *testing.T) {
+	appLabels := map[string]string{"app": "web"}
+	dbLabels := map[string]string{"app": "db"}
+
+	makePodVictim := func(name, node string, priority int32, lbls map[string]string) Victim {
+		pod := st.MakePod().Name(name).UID(name).Namespace("default").Node(node).Priority(priority).Labels(lbls).Obj()
+		pi, err := framework.NewPodInfo(pod)
+		if err != nil {
+			t.Fatalf("NewPodInfo failed: %v", err)
+		}
+		return NewPodVictim(pi)
+	}
+
+	makeGroupVictim := func(priority int32, pods ...*v1.Pod) Victim {
+		podInfos := make([]fwk.PodInfo, len(pods))
+		for i, p := range pods {
+			pi, err := framework.NewPodInfo(p)
+			if err != nil {
+				t.Fatalf("NewPodInfo failed: %v", err)
+			}
+			podInfos[i] = pi
+		}
+		v, err := NewVictim(podInfos, priority, fwk.PodGroupKeyType)
+		if err != nil {
+			t.Fatalf("NewVictim failed: %v", err)
+		}
+		return v
+	}
+
+	type nodeVictim struct {
+		podName       string
+		pdbViolations int
+	}
+
+	gotNodeVictims := func(state *PodGroupPreemptionState, node string) []nodeVictim {
+		var res []nodeVictim
+		for _, v := range state.SurvivingVictimsOnNode(node) {
+			res = append(res, nodeVictim{
+				podName:       v.Pods()[0].GetPod().Name,
+				pdbViolations: v.NumPDBViolations(),
+			})
+		}
+		return res
+	}
+
+	tests := []struct {
+		name             string
+		victims          []Victim
+		pdbs             []*policy.PodDisruptionBudget
+		wantInitial      map[string][]nodeVictim
+		condemnNode      string
+		wantAfterCondemn map[string][]nodeVictim
+	}{
+		{
+			name: "cross-node DisruptionsAllowed=1 updates dynamically on AddCondemned, Clone, and RemoveCondemned",
+			victims: []Victim{
+				makePodVictim("web-high", "node1", 50, appLabels),
+				makePodVictim("web-low", "node2", 10, appLabels),
+				makePodVictim("unprotected-mid", "node3", 30, nil),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				st.MakePDB().Name("pdb-web").Namespace("default").MatchLabel("app", "web").DisruptionsAllowed(1).Obj(),
+			},
+			wantInitial: map[string][]nodeVictim{
+				"node1": {{podName: "web-high", pdbViolations: 0}},
+				"node2": {{podName: "web-low", pdbViolations: 0}},
+				"node3": {{podName: "unprotected-mid", pdbViolations: 0}},
+			},
+			condemnNode: "node2",
+			wantAfterCondemn: map[string][]nodeVictim{
+				"node1": {{podName: "web-high", pdbViolations: 1}},
+				"node2": nil,
+				"node3": {{podName: "unprotected-mid", pdbViolations: 0}},
+			},
+		},
+		{
+			name: "multiple victims on the same node consume PDB budget from least to most important and partition violating before non-violating",
+			victims: []Victim{
+				makePodVictim("high-unprotected", "node1", 50, nil),
+				makePodVictim("mid-web", "node1", 30, appLabels),
+				makePodVictim("low-web", "node1", 10, appLabels),
+				makePodVictim("other-node-web", "node2", 20, appLabels),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				st.MakePDB().Name("pdb-web").Namespace("default").MatchLabel("app", "web").DisruptionsAllowed(1).Obj(),
+			},
+			wantInitial: map[string][]nodeVictim{
+				"node1": {
+					{podName: "mid-web", pdbViolations: 1},
+					{podName: "high-unprotected", pdbViolations: 0},
+					{podName: "low-web", pdbViolations: 0},
+				},
+			},
+			condemnNode: "node2",
+			wantAfterCondemn: map[string][]nodeVictim{
+				"node1": {
+					{podName: "mid-web", pdbViolations: 1},
+					{podName: "low-web", pdbViolations: 1},
+					{podName: "high-unprotected", pdbViolations: 0},
+				},
+			},
+		},
+		{
+			name: "PodGroup victim with multiple pods consumes PDB disruptions equivalent to pod count when condemned",
+			victims: []Victim{
+				makeGroupVictim(20,
+					st.MakePod().Name("pg-db-1").UID("pg-db-1").Namespace("default").Node("node1").Priority(20).Labels(dbLabels).Obj(),
+					st.MakePod().Name("pg-db-2").UID("pg-db-2").Namespace("default").Node("node2").Priority(20).Labels(dbLabels).Obj(),
+				),
+				makePodVictim("single-db", "node3", 10, dbLabels),
+			},
+			pdbs: []*policy.PodDisruptionBudget{
+				st.MakePDB().Name("pdb-db").Namespace("default").MatchLabel("app", "db").DisruptionsAllowed(2).Obj(),
+			},
+			wantInitial: map[string][]nodeVictim{
+				"node1": {{podName: "pg-db-1", pdbViolations: 0}},
+				"node3": {{podName: "single-db", pdbViolations: 0}},
+			},
+			condemnNode: "node1",
+			wantAfterCondemn: map[string][]nodeVictim{
+				"node1": nil,
+				"node2": nil,
+				"node3": {{podName: "single-db", pdbViolations: 1}},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			preemptionState := NewPodGroupPreemptionState(prepareDomainVictims(tc.victims, 100, tc.pdbs))
+
+			for node, want := range tc.wantInitial {
+				if diff := cmp.Diff(want, gotNodeVictims(preemptionState, node), cmp.AllowUnexported(nodeVictim{})); diff != "" {
+					t.Fatalf("initial %s victims mismatch (-want +got):\n%s", node, diff)
+				}
+			}
+
+			condemned := preemptionState.SurvivingVictimsOnNode(tc.condemnNode)
+			preemptionState.AddCondemned(condemned)
+
+			for node, want := range tc.wantAfterCondemn {
+				if diff := cmp.Diff(want, gotNodeVictims(preemptionState, node), cmp.AllowUnexported(nodeVictim{})); diff != "" {
+					t.Fatalf("after condemning %s, %s victims mismatch (-want +got):\n%s", tc.condemnNode, node, diff)
+				}
+			}
+
+			cloned := preemptionState.Clone().(*PodGroupPreemptionState)
+			cloned.RemoveCondemned(condemned)
+			for node, want := range tc.wantInitial {
+				if diff := cmp.Diff(want, gotNodeVictims(cloned, node), cmp.AllowUnexported(nodeVictim{})); diff != "" {
+					t.Fatalf("cloned state after RemoveCondemned on %s mismatch (-want +got):\n%s", node, diff)
+				}
+			}
+			for node, want := range tc.wantAfterCondemn {
+				if diff := cmp.Diff(want, gotNodeVictims(preemptionState, node), cmp.AllowUnexported(nodeVictim{})); diff != "" {
+					t.Fatalf("original state on %s after mutating clone mismatch (-want +got):\n%s", node, diff)
+				}
+			}
+
+			preemptionState.RemoveCondemned(condemned)
+			for node, want := range tc.wantInitial {
+				if diff := cmp.Diff(want, gotNodeVictims(preemptionState, node), cmp.AllowUnexported(nodeVictim{})); diff != "" {
+					t.Fatalf("after RemoveCondemned, %s victims mismatch (-want +got):\n%s", node, diff)
+				}
+			}
+		})
+	}
 }
