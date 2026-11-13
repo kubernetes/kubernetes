@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	resourcehelpers "k8s.io/component-helpers/resource"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/features"
@@ -465,29 +464,25 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 // calculateRequests computes the request value for each pod for the specified
 // resource.
 // If container is non-empty, it uses the request of that specific container.
-// If container is empty, it uses pod-level requests if pod-level requests are
-// set on the pod. Otherwise, it sums the requests of all containers in the pod
+// If container is empty, it uses the pod-level request if one is set for the
+// resource. Otherwise, it sums the requests of all containers in the pod
 // (including restartable init containers).
 // It returns a map of pod names to their calculated request values.
 func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
-	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		(resource != v1.ResourceEphemeralStorage || feature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage))
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
-		var request int64
-		var err error
-		// Determine if we should use pod-level requests: see KEP-2837
+		// See KEP-2837:
 		// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md
-		usePodLevelRequests := podLevelResourcesEnabled &&
-			resourcehelpers.IsPodLevelRequestsSet(pod) &&
-			// If a container name is specified in the HPA, it takes precedence over
-			// the pod-level requests.
-			container == ""
-
-		if usePodLevelRequests {
-			request, err = calculatePodLevelRequests(pod, resource)
-		} else {
-			request, err = calculatePodRequestsFromContainers(pod, container, resource)
+		// A container named in the HPA takes precedence over pod-level requests.
+		if podLevelResourcesEnabled && container == "" {
+			if request, ok := podLevelRequest(pod, resource); ok {
+				requests[pod.Name] = request
+				continue
+			}
 		}
+		request, err := calculatePodRequestsFromContainers(pod, container, resource)
 		if err != nil {
 			return nil, err
 		}
@@ -496,17 +491,19 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 	return requests, nil
 }
 
-// calculatePodLevelRequests computes the requests for the specific resource at
-// the pod level.
-func calculatePodLevelRequests(pod *v1.Pod, resource v1.ResourceName) (int64, error) {
-	podLevelRequests := resourcehelpers.PodRequests(pod, resourcehelpers.PodResourcesOptions{
-		ExcludeOverhead: true,
-	})
-	podRequest, ok := podLevelRequests[resource]
-	if !ok {
-		return 0, fmt.Errorf("missing pod-level request for %s in Pod %s", resource, pod.Name)
+// podLevelRequest returns the pod-level request for the resource, if set.
+// The spec value is read directly rather than via PodRequests: when set, it is
+// exactly what PodRequests would return (overhead excluded, no status
+// resources), and it avoids aggregating container requests only to discard them.
+func podLevelRequest(pod *v1.Pod, resource v1.ResourceName) (int64, bool) {
+	if pod.Spec.Resources == nil {
+		return 0, false
 	}
-	return podRequest.MilliValue(), nil
+	podRequest, ok := pod.Spec.Resources.Requests[resource]
+	if !ok {
+		return 0, false
+	}
+	return podRequest.MilliValue(), true
 }
 
 // calculatePodRequestsFromContainers computes the requests for the specified

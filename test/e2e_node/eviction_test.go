@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -454,6 +455,142 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 			},
 		})
 	})
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod-level ephemeral-storage limit violations"), feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesEphemeralStorage), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
+		})
+		sizeLimit := resource.MustParse("100Mi")
+		useOverLimit := 101 /* Mb */
+		useUnderLimit := 99 /* Mb */
+		podLimit := v1.ResourceRequirements{
+			Limits: v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit},
+		}
+
+		overLimitPod := diskConsumingPod("pod-level-disk-limit", useOverLimit, nil, v1.ResourceRequirements{})
+		overLimitPod.Spec.Resources = podLimit.DeepCopy()
+
+		underLimitPod := diskConsumingPod("pod-level-disk-below-limit", useUnderLimit, nil, v1.ResourceRequirements{})
+		underLimitPod.Spec.Resources = podLimit.DeepCopy()
+
+		// Neither container writable layer (60Mi) nor emptyDir (50Mi) exceeds 100Mi on its own; together (110Mi) they do.
+		sharedEmptyDirPod := multiContainerWritableLayerAndEmptyDirPod("pod-level-shared-emptydir", 60, 50, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}})
+		sharedEmptyDirPod.Spec.Resources = podLimit.DeepCopy()
+
+		// The emptyDir sizeLimit is hit long before the pod-level limit.
+		emptyDirSizeLimit := resource.MustParse("50Mi")
+		emptyDirPrecedencePod := diskConsumingPod("pod-level-emptydir-sizelimit", 60, &v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &emptyDirSizeLimit},
+		}, v1.ResourceRequirements{})
+		emptyDirPrecedencePod.Spec.Resources = &v1.ResourceRequirements{
+			Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")},
+		}
+
+		// Container limit (50Mi) is enforced even when total pod usage (60Mi) is below the pod-level limit (200Mi).
+		containerLimit := resource.MustParse("50Mi")
+		containerLimitPrecedencePod := diskConsumingPod("pod-level-with-container-limit", 60, nil, v1.ResourceRequirements{
+			Limits: v1.ResourceList{v1.ResourceEphemeralStorage: containerLimit},
+		})
+		containerLimitPrecedencePod.Spec.Resources = &v1.ResourceRequirements{
+			Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")},
+		}
+
+		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
+			{
+				evictionPriority: 1,
+				pod:              overLimitPod,
+			},
+			{
+				evictionPriority: 0,
+				pod:              underLimitPod,
+			},
+			{
+				evictionPriority:    1,
+				pod:                 sharedEmptyDirPod,
+				wantEvictionMessage: fmt.Sprintf("exceeds pod-level limit (%s)", sizeLimit.String()),
+			},
+			{
+				evictionPriority:    1,
+				pod:                 emptyDirPrecedencePod,
+				wantEvictionMessage: fmt.Sprintf("Usage of EmptyDir volume %q exceeds the limit %q", volumeName, emptyDirSizeLimit.String()),
+			},
+			{
+				evictionPriority:    1,
+				pod:                 containerLimitPrecedencePod,
+				wantEvictionMessage: fmt.Sprintf("exceeded its local ephemeral storage limit %q", containerLimit.String()),
+			},
+		})
+	})
+})
+
+// PriorityLocalStoragePodLevelEvictionOrdering tests that under disk pressure, a pod staying
+// below its pod-level ephemeral-storage request is protected while pods exceeding their
+// pod-level request are evicted in priority order.
+var _ = SIGDescribe("PriorityLocalStoragePodLevelEvictionOrdering", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), framework.WithFeatureGate(features.PodLevelResourcesEphemeralStorage), func() {
+	f := framework.NewDefaultFramework("pod-level-localstorage-eviction-ordering-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	const expectedNodeCondition = v1.NodeDiskPressure
+	const expectedStarvedResource = v1.ResourceEphemeralStorage
+	const pressureTimeout = 15 * time.Minute
+
+	highPriorityClassName := f.BaseName + "-high-priority"
+	const highPriority = int32(999999999)
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			diskConsumed := resource.MustParse("4Gi")
+			summary := eventuallyGetSummary(ctx)
+			availableBytes := *(summary.Node.Fs.AvailableBytes)
+			if availableBytes <= uint64(diskConsumed.Value()) {
+				e2eskipper.Skipf("Too little disk free on the host for the PriorityLocalStoragePodLevelEvictionOrdering test to run")
+			}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+		})
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				framework.ExpectNoError(err, "failed to create priority class")
+			}
+		})
+		ginkgo.AfterEach(func(ctx context.Context) {
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		lowPriorityExceedsRequest := diskConsumingPod("pod-level-low-priority-exceeds-request", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{})
+		lowPriorityExceedsRequest.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")},
+		}
+
+		highPriorityExceedsRequest := diskConsumingPod("pod-level-high-priority-exceeds-request", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{})
+		highPriorityExceedsRequest.Spec.PriorityClassName = highPriorityClassName
+		highPriorityExceedsRequest.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")},
+		}
+
+		// Only require 99% accuracy (297/300 Mb) because on some OS distributions, the file itself (excluding contents), consumes disk space.
+		belowRequest := diskConsumingPod("pod-level-below-request", 297 /* Mb */, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{})
+		belowRequest.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("300Mi")},
+			Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("300Mi")},
+		}
+
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
+			{
+				evictionPriority: 2,
+				pod:              lowPriorityExceedsRequest,
+			},
+			{
+				evictionPriority: 1,
+				pod:              highPriorityExceedsRequest,
+			},
+			{
+				evictionPriority: 0,
+				pod:              belowRequest,
+			},
+		})
+	})
 })
 
 // PriorityMemoryEvictionOrdering tests that the node responds to node memory pressure by evicting pods.
@@ -766,6 +903,9 @@ type podEvictSpec struct {
 	// When set, the pod's container is expected to handle SIGTERM by exiting
 	// 0 and the published status is expected to still report the eviction.
 	wantEvictionAfterCleanExit *cleanExitEviction
+
+	// When set, the evicted pod's status message is expected to contain it.
+	wantEvictionMessage string
 }
 
 // cleanExitEviction describes the status expected on the API object for a
@@ -859,6 +999,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 
 			ginkgo.By("checking the published status of evicted pods whose container exited 0")
 			verifyEvictionAfterCleanExit(ctx, f, testSpecs)
+
+			ginkgo.By("checking the eviction message of evicted pods")
+			verifyEvictionMessages(ctx, f, testSpecs)
 
 			// We observe pressure from the API server.  The eviction manager observes pressure from the kubelet internal stats.
 			// This means the eviction manager will observe pressure before we will, creating a delay between when the eviction manager
@@ -1065,6 +1208,19 @@ func verifyEvictionAfterCleanExit(ctx context.Context, f *framework.Framework, t
 			return checkEvictionAfterCleanExit(&pod.Status, spec.wantEvictionAfterCleanExit.message)
 		}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(gomega.Succeed(),
 			"pod %s did not publish the expected eviction status after a clean exit, last status: %#v", spec.pod.Name, lastStatus)
+	}
+}
+
+// verifyEvictionMessages checks that evicted pods report the expected eviction message.
+func verifyEvictionMessages(ctx context.Context, f *framework.Framework, testSpecs []podEvictSpec) {
+	for _, spec := range testSpecs {
+		if spec.wantEvictionMessage == "" {
+			continue
+		}
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, spec.pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get pod %q", spec.pod.Name)
+		gomega.Expect(pod.Status.Reason).To(gomega.Equal(eviction.Reason), "pod %s status: %#v", pod.Name, pod.Status)
+		gomega.Expect(pod.Status.Message).To(gomega.ContainSubstring(spec.wantEvictionMessage), "pod %s status: %#v", pod.Name, pod.Status)
 	}
 }
 
@@ -1358,6 +1514,22 @@ func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSo
 	}
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
 	return podWithCommand(volumeSource, resources, diskConsumedMB, name, fmt.Sprintf("dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1;", filepath.Join(path, "file")), true)
+}
+
+// multiContainerWritableLayerAndEmptyDirPod returns a pod whose first container writes
+// emptyDirMB MB into the shared emptyDir volume and whose second container writes
+// writableLayerMB MB into its container writable layer.
+func multiContainerWritableLayerAndEmptyDirPod(name string, writableLayerMB, emptyDirMB int, volumeSource *v1.VolumeSource) *v1.Pod {
+	pod := diskConsumingPod(name, emptyDirMB, volumeSource, v1.ResourceRequirements{})
+	second := pod.Spec.Containers[0].DeepCopy()
+	second.Name = fmt.Sprintf("%s-container-2", name)
+	second.Command = []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("i=0; while [ $i -lt %d ]; do dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1; i=$(($i+1)); done; while true; do sleep 5; done", writableLayerMB, "file-2-"),
+	}
+	pod.Spec.Containers = append(pod.Spec.Containers, *second)
+	return pod
 }
 
 // diskConsumingCleanExitPod returns a pod that writes diskConsumedMB MB to

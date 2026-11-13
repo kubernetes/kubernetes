@@ -2373,13 +2373,14 @@ func TestCalculateRequests(t *testing.T) {
 	testPod := "test-pod"
 
 	tests := []struct {
-		name                    string
-		pods                    []*v1.Pod
-		container               string
-		resource                v1.ResourceName
-		enablePodLevelResources bool
-		expectedRequests        map[string]int64
-		expectedError           error
+		name                                    string
+		pods                                    []*v1.Pod
+		container                               string
+		resource                                v1.ResourceName
+		enablePodLevelResources                 bool
+		enablePodLevelResourcesEphemeralStorage bool
+		expectedRequests                        map[string]int64
+		expectedError                           error
 	}{
 		{
 			name:             "void",
@@ -2605,11 +2606,111 @@ func TestCalculateRequests(t *testing.T) {
 			expectedRequests: map[string]int64{testPod: 100},
 			expectedError:    nil,
 		},
+		{
+			name:                    "Pod-level request set only for another resource: fail if a container is missing the request",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: nil,
+			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
+		},
+		{
+			name:                    "Pod-level request set only for another resource: sum container requests, ignoring non-restartable init containers",
+			enablePodLevelResources: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+					InitContainers: []v1.Container{
+						{Name: "init-container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceCPU,
+			expectedRequests: map[string]int64{testPod: 100},
+			expectedError:    nil,
+		},
+		{
+			name:                                    "Pod-level ephemeral-storage overrides container requests when gate enabled",
+			enablePodLevelResources:                 true,
+			enablePodLevelResourcesEphemeralStorage: true,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(800, resource.DecimalSI)},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceEphemeralStorage,
+			expectedRequests: map[string]int64{testPod: 800},
+			expectedError:    nil,
+		},
+		{
+			name:                                    "Pod-level ephemeral-storage ignored when gate disabled",
+			enablePodLevelResources:                 true,
+			enablePodLevelResourcesEphemeralStorage: false,
+			pods: []*v1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPod,
+					Namespace: testNamespace,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              *resource.NewMilliQuantity(500, resource.DecimalSI),
+							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(800, resource.DecimalSI),
+						},
+					},
+					Containers: []v1.Container{
+						{Name: "container1", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(100, resource.DecimalSI)}}},
+						{Name: "container2", Resources: v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(50, resource.DecimalSI)}}},
+					},
+				},
+			}},
+			container:        "",
+			resource:         v1.ResourceEphemeralStorage,
+			expectedRequests: map[string]int64{testPod: 150},
+			expectedError:    nil,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.enablePodLevelResources)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesEphemeralStorage, tc.enablePodLevelResourcesEphemeralStorage)
 
 			requests, err := calculateRequests(tc.pods, tc.container, tc.resource)
 			assert.Equal(t, tc.expectedRequests, requests, "requests should be as expected")

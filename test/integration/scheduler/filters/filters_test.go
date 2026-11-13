@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	plrfeature "k8s.io/component-helpers/nodedeclaredfeatures/features/podlevelresources"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -3159,6 +3160,202 @@ func TestNodeDeclaredFeaturesFilter(t *testing.T) {
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, schedulerutils.PodUnschedulable(cs, tt.pod.Namespace, tt.pod.Name))
 				if err != nil {
 					t.Errorf("Expected pod to be unschedulable, but it was not: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestNodeDeclaredFeaturesPodLevelEphemeralStorage(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                 true,
+		features.PodLevelResourcesEphemeralStorage: true,
+	})
+
+	nodeCap := map[v1.ResourceName]string{
+		v1.ResourceCPU:              "4",
+		v1.ResourceMemory:           "8Gi",
+		v1.ResourceEphemeralStorage: "10Gi",
+	}
+	nodeWithFeature := st.MakeNode().Name("node-with-plr-ephemeral").Capacity(nodeCap).
+		DeclaredFeatures([]string{plrfeature.EphemeralStorageFeature.Name()}).Obj()
+	nodeWithoutFeature := st.MakeNode().Name("node-without-plr-ephemeral").Capacity(nodeCap).
+		DeclaredFeatures([]string{}).Obj()
+
+	podWithPLREphemeral := st.MakePod().Name("pod-with-plr-ephemeral").
+		Containers([]v1.Container{{Name: "c1", Image: imageutils.GetPauseImageName()}}).Obj()
+	podWithPLREphemeral.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+	}
+
+	podWithPLRCPUOnly := st.MakePod().Name("pod-with-plr-cpu").
+		Containers([]v1.Container{{Name: "c1", Image: imageutils.GetPauseImageName()}}).Obj()
+	podWithPLRCPUOnly.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+	}
+
+	podWithContainerEphemeralOnly := st.MakePod().Name("pod-with-container-ephemeral").
+		Containers([]v1.Container{{
+			Name:  "c1",
+			Image: imageutils.GetPauseImageName(),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+		}}).Obj()
+
+	// When PodLevelResourcesEphemeralStorage is enabled on the apiserver, a PLR pod whose
+	// containers request ephemeral-storage gets pod-level ephemeral-storage defaulted and
+	// therefore requires a node declaring PodLevelResourcesEphemeralStorage.
+	podWithPLRCPUAndContainerEphemeral := st.MakePod().Name("pod-with-plr-cpu-container-ephemeral").
+		Containers([]v1.Container{{
+			Name:  "c1",
+			Image: imageutils.GetPauseImageName(),
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+		}}).Obj()
+	podWithPLRCPUAndContainerEphemeral.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+	}
+
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		nodes        []*v1.Node
+		expectedNode string
+	}{
+		{
+			name:         "pod with pod-level ephemeral-storage scheduled onto node declaring feature",
+			pod:          podWithPLREphemeral.DeepCopy(),
+			nodes:        []*v1.Node{nodeWithoutFeature.DeepCopy(), nodeWithFeature.DeepCopy()},
+			expectedNode: "node-with-plr-ephemeral",
+		},
+		{
+			name:         "pod with pod-level ephemeral-storage unschedulable when node does not declare feature",
+			pod:          podWithPLREphemeral.DeepCopy(),
+			nodes:        []*v1.Node{nodeWithoutFeature.DeepCopy()},
+			expectedNode: "",
+		},
+		{
+			name:         "pod with only pod-level CPU schedulable onto node not declaring ephemeral-storage feature",
+			pod:          podWithPLRCPUOnly.DeepCopy(),
+			nodes:        []*v1.Node{nodeWithoutFeature.DeepCopy()},
+			expectedNode: "node-without-plr-ephemeral",
+		},
+		{
+			name:         "pod with only container-level ephemeral-storage schedulable onto node not declaring feature",
+			pod:          podWithContainerEphemeralOnly.DeepCopy(),
+			nodes:        []*v1.Node{nodeWithoutFeature.DeepCopy()},
+			expectedNode: "node-without-plr-ephemeral",
+		},
+		{
+			name:         "pod with defaulted pod-level ephemeral-storage unschedulable when node does not declare feature",
+			pod:          podWithPLRCPUAndContainerEphemeral.DeepCopy(),
+			nodes:        []*v1.Node{nodeWithoutFeature.DeepCopy()},
+			expectedNode: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "ndf-plr-ephemeral")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+			for _, node := range tt.nodes {
+				if _, err := schedulerutils.CreateNode(cs, node); err != nil {
+					t.Fatalf("Failed to create node %s: %v", node.Name, err)
+				}
+			}
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+			tt.pod.Namespace = ns
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, tt.pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod %s: %v", tt.pod.Name, err)
+			}
+			if tt.expectedNode != "" {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, schedulerutils.PodScheduledIn(cs, ns, tt.pod.Name, []string{tt.expectedNode})); err != nil {
+					t.Errorf("Expected pod to be scheduled on %s, got: %v", tt.expectedNode, err)
+				}
+			} else {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, schedulerutils.PodUnschedulable(cs, ns, tt.pod.Name)); err != nil {
+					t.Errorf("Expected pod to be unschedulable, got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestPodLevelEphemeralStorageFit(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.PodLevelResources:                 true,
+		features.PodLevelResourcesEphemeralStorage: true,
+	})
+
+	declared := []string{plrfeature.EphemeralStorageFeature.Name()}
+	smallNode := st.MakeNode().Name("node-small-ephemeral").Capacity(map[v1.ResourceName]string{
+		v1.ResourceCPU:              "4",
+		v1.ResourceMemory:           "8Gi",
+		v1.ResourceEphemeralStorage: "4Gi",
+	}).DeclaredFeatures(declared).Obj()
+	largeNode := st.MakeNode().Name("node-large-ephemeral").Capacity(map[v1.ResourceName]string{
+		v1.ResourceCPU:              "4",
+		v1.ResourceMemory:           "8Gi",
+		v1.ResourceEphemeralStorage: "10Gi",
+	}).DeclaredFeatures(declared).Obj()
+
+	podRequesting := func(name, request string) *v1.Pod {
+		pod := st.MakePod().Name(name).
+			Containers([]v1.Container{{Name: "c1", Image: imageutils.GetPauseImageName()}}).Obj()
+		pod.Spec.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse(request)},
+		}
+		return pod
+	}
+
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		expectedNode string
+	}{
+		{
+			name:         "pod-level ephemeral-storage request fits only the larger node",
+			pod:          podRequesting("plr-ephemeral-6gi", "6Gi"),
+			expectedNode: "node-large-ephemeral",
+		},
+		{
+			name:         "pod-level ephemeral-storage request exceeding every node is unschedulable",
+			pod:          podRequesting("plr-ephemeral-12gi", "12Gi"),
+			expectedNode: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := schedulerutils.InitTestSchedulerWithNS(t, "plr-ephemeral-fit")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+			for _, node := range []*v1.Node{smallNode.DeepCopy(), largeNode.DeepCopy()} {
+				if _, err := schedulerutils.CreateNode(cs, node); err != nil {
+					t.Fatalf("Failed to create node %s: %v", node.Name, err)
+				}
+			}
+			if err := schedulerutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
+			tt.pod.Namespace = ns
+			if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, tt.pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod %s: %v", tt.pod.Name, err)
+			}
+			if tt.expectedNode != "" {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, schedulerutils.PodScheduledIn(cs, ns, tt.pod.Name, []string{tt.expectedNode})); err != nil {
+					t.Errorf("Expected pod to be scheduled on %s, got: %v", tt.expectedNode, err)
+				}
+			} else {
+				if err := wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false, schedulerutils.PodUnschedulable(cs, ns, tt.pod.Name)); err != nil {
+					t.Errorf("Expected pod to be unschedulable, got: %v", err)
 				}
 			}
 		})

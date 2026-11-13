@@ -1514,6 +1514,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.34"
+- name: PodLevelResourcesEphemeralStorage
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.38"
 - name: PodLevelResourcesFixDefaulting
   versionedSpecs:
   - default: true

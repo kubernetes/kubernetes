@@ -74,11 +74,12 @@ func TestDefaultResourceHelpers(t *testing.T) {
 
 func TestGetResourceRequest(t *testing.T) {
 	cases := []struct {
-		pod                      *v1.Pod
-		cName                    string
-		resourceName             v1.ResourceName
-		expectedValue            int64
-		podLevelResourcesEnabled bool
+		pod                             *v1.Pod
+		cName                           string
+		resourceName                    v1.ResourceName
+		expectedValue                   int64
+		podLevelResourcesEnabled        bool
+		podLevelEphemeralStorageEnabled bool
 	}{
 		{
 			pod:           getPod(containerName, resources{cpuRequest: "9"}),
@@ -157,6 +158,27 @@ func TestGetResourceRequest(t *testing.T) {
 			podLevelResourcesEnabled: true,
 		},
 		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: cpu",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceCPU,
+			expectedValue:            10000,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: mem",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceMemory,
+			expectedValue:            52428800,
+			podLevelResourcesEnabled: true,
+		},
+		{
+			cName:                    "pod level cpu req only, container cpu, mem and ephemeral-storage req: ephemeral-storage",
+			pod:                      getPodWithPodLevelResources(containerName, resources{cpuRequest: "10"}, resources{cpuRequest: "8", memoryRequest: "50Mi", ephemeralStorageRequest: "1Gi"}),
+			resourceName:             v1.ResourceEphemeralStorage,
+			expectedValue:            1073741824,
+			podLevelResourcesEnabled: true,
+		},
+		{
 			cName:                    "cpu pod without pod level resources but pod level resources feature enabled",
 			pod:                      getPod(containerName, resources{cpuRequest: "9"}),
 			resourceName:             v1.ResourceCPU,
@@ -170,13 +192,57 @@ func TestGetResourceRequest(t *testing.T) {
 			expectedValue:            94371840,
 			podLevelResourcesEnabled: true,
 		},
+		{
+			cName:                           "pod level resources ephemeral-storage req, container ephemeral-storage req",
+			pod:                             getPodWithPodLevelResources(containerName, resources{ephemeralStorageRequest: "100Mi"}, resources{ephemeralStorageRequest: "50Mi"}),
+			resourceName:                    v1.ResourceEphemeralStorage,
+			expectedValue:                   104857600,
+			podLevelResourcesEnabled:        true,
+			podLevelEphemeralStorageEnabled: true,
+		},
+		{
+			cName:                           "pod level resources ephemeral-storage req skipped when gate disabled",
+			pod:                             getPodWithPodLevelResources(containerName, resources{ephemeralStorageRequest: "100Mi"}, resources{ephemeralStorageRequest: "50Mi"}),
+			resourceName:                    v1.ResourceEphemeralStorage,
+			expectedValue:                   52428800,
+			podLevelResourcesEnabled:        true,
+			podLevelEphemeralStorageEnabled: false,
+		},
+		{
+			cName:                           "pod level resources ephemeral-storage req, container no req",
+			pod:                             getPodWithPodLevelResources(containerName, resources{ephemeralStorageRequest: "100Mi"}, resources{}),
+			resourceName:                    v1.ResourceEphemeralStorage,
+			expectedValue:                   104857600,
+			podLevelResourcesEnabled:        true,
+			podLevelEphemeralStorageEnabled: true,
+		},
+		{
+			cName:                           "pod level cpu req keeps container ephemeral-storage req",
+			pod:                             getPodWithPodLevelResources(containerName, resources{cpuRequest: "1"}, resources{ephemeralStorageRequest: "50Mi"}),
+			resourceName:                    v1.ResourceEphemeralStorage,
+			expectedValue:                   52428800,
+			podLevelResourcesEnabled:        true,
+			podLevelEphemeralStorageEnabled: false,
+		},
+		{
+			cName:                           "pod level ephemeral-storage req keeps container cpu req",
+			pod:                             getPodWithPodLevelResources(containerName, resources{ephemeralStorageRequest: "100Mi"}, resources{cpuRequest: "2"}),
+			resourceName:                    v1.ResourceCPU,
+			expectedValue:                   2000,
+			podLevelResourcesEnabled:        true,
+			podLevelEphemeralStorageEnabled: true,
+		},
 	}
-	as := assert.New(t)
 	for idx, tc := range cases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+		t.Run(tc.cName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.PodLevelResources:                 tc.podLevelResourcesEnabled,
+				features.PodLevelResourcesEphemeralStorage: tc.podLevelResourcesEnabled && tc.podLevelEphemeralStorageEnabled,
+			})
 
-		actual := GetResourceRequest(tc.pod, tc.resourceName)
-		as.Equal(tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+			actual := GetResourceRequest(tc.pod, tc.resourceName)
+			assert.Equal(t, tc.expectedValue, actual, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
+		})
 	}
 }
 
@@ -335,7 +401,7 @@ func TestExtractResourceValue(t *testing.T) {
 }
 
 type resources struct {
-	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
+	cpuRequest, cpuLimit, memoryRequest, memoryLimit, ephemeralStorageRequest, ephemeralStorageLimit, cpuOverhead, memoryOverhead string
 }
 
 func defineResources(resources resources) v1.ResourceRequirements {
@@ -350,11 +416,17 @@ func defineResources(resources resources) v1.ResourceRequirements {
 	if resources.memoryLimit != "" {
 		r.Limits[v1.ResourceMemory] = resource.MustParse(resources.memoryLimit)
 	}
+	if resources.ephemeralStorageLimit != "" {
+		r.Limits[v1.ResourceEphemeralStorage] = resource.MustParse(resources.ephemeralStorageLimit)
+	}
 	if resources.cpuRequest != "" {
 		r.Requests[v1.ResourceCPU] = resource.MustParse(resources.cpuRequest)
 	}
 	if resources.memoryRequest != "" {
 		r.Requests[v1.ResourceMemory] = resource.MustParse(resources.memoryRequest)
+	}
+	if resources.ephemeralStorageRequest != "" {
+		r.Requests[v1.ResourceEphemeralStorage] = resource.MustParse(resources.ephemeralStorageRequest)
 	}
 
 	return r

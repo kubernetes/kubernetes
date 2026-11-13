@@ -4916,6 +4916,24 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 			}
 		}
 	}
+
+	// InitContainer limits are checked for all resources except CPU and memory, where
+	// enforcing this retroactively without ratcheting would reject existing valid pods.
+	for i, ctr := range spec.InitContainers {
+		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			if resourceName == core.ResourceCPU || resourceName == core.ResourceMemory {
+				continue
+			}
+			podSpecLimits, hasPodLimit := spec.Resources.Limits[resourceName]
+			if !hasPodLimit {
+				continue
+			}
+			if ctrLimit.Cmp(podSpecLimits) > 0 {
+				initFldPath := fldPath.Child("initContainers").Index(i).Key(resourceName.String()).Child("limits")
+				allErrs = append(allErrs, field.Invalid(initFldPath, ctrLimit.String(), fmt.Sprintf("must be less than or equal to pod limits of %s", podSpecLimits.String())))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -6709,7 +6727,7 @@ func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, podSpecToMutate *
 		} else {
 			// TODO(pravk03): Explore optimization to avoid double aggregation of container resources
 			// in validatePodResourceConsistency and validatePodLevelResourcesCoverDRA.
-			if ok, msg := validatePodLevelResourcesCoverDRA(v1Pod); !ok {
+			if ok, msg := validatePodLevelResourcesCoverDRA(v1Pod, opts.PodLevelResourcesEphemeralStorageEnabled); !ok {
 				allErrs = append(allErrs, field.Invalid(specPath.Child("resources"), newPod.Spec.Resources, msg))
 			}
 		}
@@ -6783,7 +6801,7 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 	return resources
 }
 
-func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
+func validatePodLevelResourcesCoverDRA(pod *v1.Pod, podLevelResourcesEphemeralStorageEnabled bool) (bool, string) {
 	if pod.Spec.Resources == nil {
 		return true, ""
 	}
@@ -6796,7 +6814,7 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 		requestWithoutPodLevel := resourcehelper.AggregateContainerRequests(pod, opts)
 
 		for resName, podLevelReq := range pod.Spec.Resources.Requests {
-			if !resourcehelper.IsSupportedPodLevelResource(resName) {
+			if !resourcehelper.IsSupportedPodLevelResource(resName) || (resName == v1.ResourceEphemeralStorage && !podLevelResourcesEphemeralStorageEnabled) {
 				continue
 			}
 			val, ok := requestWithoutPodLevel[resName]
@@ -6844,6 +6862,9 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 				if helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
 					continue
 				}
+				if !resourcehelper.IsSupportedPodLevelResource(resourceName) || (resourceName == v1.ResourceEphemeralStorage && !podLevelResourcesEphemeralStorageEnabled) {
+					continue
+				}
 
 				// Skip if the pod-level limit of the resource is not set.
 				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
@@ -6857,6 +6878,33 @@ func validatePodLevelResourcesCoverDRA(pod *v1.Pod) (bool, string) {
 
 				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
 					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for container %s", resourceName, ctr.Name)
+				}
+			}
+		}
+
+		// Init container limits are also validated against pod-level limits for all resources
+		// except CPU, memory, and hugepages to stay consistent with validatePodResourceConsistency.
+		for _, ctr := range pod.Spec.InitContainers {
+			initDRAAllocations := resourcehelper.GetContainerDRAAllocations(pod, ctr.Name)
+			for resourceName, ctrLimit := range ctr.Resources.Limits {
+				if resourceName == v1.ResourceCPU || resourceName == v1.ResourceMemory || helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+					continue
+				}
+				if !resourcehelper.IsSupportedPodLevelResource(resourceName) || (resourceName == v1.ResourceEphemeralStorage && !podLevelResourcesEphemeralStorageEnabled) {
+					continue
+				}
+
+				podLevelResLimit, exists := pod.Spec.Resources.Limits[resourceName]
+				if !exists {
+					continue
+				}
+
+				draResAllocation := initDRAAllocations[resourceName]
+				effectiveLimit := ctrLimit.DeepCopy()
+				effectiveLimit.Add(draResAllocation)
+
+				if effectiveLimit.Cmp(podLevelResLimit) > 0 {
+					return false, fmt.Sprintf("pod level limit for %s is insufficient to cover the limit and DRA overhead for init container %s", resourceName, ctr.Name)
 				}
 			}
 		}
@@ -7822,16 +7870,22 @@ func ValidateContainerResourceName(value core.ResourceName, fldPath *field.Path)
 }
 
 // validatePodResourceName verifies that:
-// 1. The resource name is a valid compute resource name for pod-level specification.
-// 2. The resource is supported by the PodLevelResources feature.
-func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+// 1. The resource name is a valid resource name for pod-level specification.
+// 2. The resource is supported by the PodLevelResources (and PodLevelResourcesEphemeralStorage) feature.
+func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := validateResourceName(resourceName, fldPath)
 	if len(allErrs) != 0 {
 		return allErrs
 	}
 
-	if !resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(resourceName)) {
-		return append(allErrs, field.NotSupported(fldPath, resourceName, sets.List(resourcehelper.SupportedPodLevelResources())))
+	isSupported := resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(resourceName)) &&
+		(resourceName != core.ResourceEphemeralStorage || opts.PodLevelResourcesEphemeralStorageEnabled)
+	if !isSupported {
+		supported := resourcehelper.SupportedPodLevelResources()
+		if !opts.PodLevelResourcesEphemeralStorageEnabled {
+			supported.Delete(v1.ResourceEphemeralStorage)
+		}
+		return append(allErrs, field.NotSupported(fldPath, resourceName, sets.List(supported)))
 	}
 
 	return allErrs
@@ -8193,7 +8247,10 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts)
+	validateNameFn := func(resourceName core.ResourceName, fldPath *field.Path) field.ErrorList {
+		return validatePodResourceName(resourceName, fldPath, opts)
+	}
+	return validateResourceRequirements(requirements, validateNameFn, podClaimNames, fldPath, opts)
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {

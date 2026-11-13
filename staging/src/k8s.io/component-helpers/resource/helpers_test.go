@@ -1646,23 +1646,37 @@ func TestIsPodLevelResourcesSet(t *testing.T) {
 		{
 			name: "only unsupported resource requests set",
 			podResources: &v1.ResourceRequirements{
-				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+				Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
 			},
 			expected: false,
 		},
 		{
 			name: "only unsupported resource limits set",
 			podResources: &v1.ResourceRequirements{
-				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+				Limits: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
 			},
 			expected: false,
+		},
+		{
+			name: "only ephemeral-storage requests set",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+			},
+			expected: true,
+		},
+		{
+			name: "only ephemeral-storage limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+			},
+			expected: true,
 		},
 		{
 			name: "unsupported and suported resources requests set",
 			podResources: &v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceEphemeralStorage: resource.MustParse("1Mi"),
-					v1.ResourceCPU:              resource.MustParse("1m"),
+					v1.ResourceStorage: resource.MustParse("1Mi"),
+					v1.ResourceCPU:     resource.MustParse("1m"),
 				},
 			},
 			expected: true,
@@ -1671,8 +1685,8 @@ func TestIsPodLevelResourcesSet(t *testing.T) {
 			name: "unsupported and suported resources limits set",
 			podResources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceEphemeralStorage: resource.MustParse("1Mi"),
-					v1.ResourceCPU:              resource.MustParse("1m"),
+					v1.ResourceStorage: resource.MustParse("1Mi"),
+					v1.ResourceCPU:     resource.MustParse("1m"),
 				},
 			},
 			expected: true,
@@ -1715,16 +1729,23 @@ func TestIsPodLevelLimitsSet(t *testing.T) {
 		{
 			name: "only unsupported resource limits set",
 			podResources: &v1.ResourceRequirements{
-				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+				Limits: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")},
 			},
 			expected: false,
+		},
+		{
+			name: "only ephemeral-storage limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+			},
+			expected: true,
 		},
 		{
 			name: "unsupported and suported resources limits set",
 			podResources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceEphemeralStorage: resource.MustParse("1Mi"),
-					v1.ResourceCPU:              resource.MustParse("1m"),
+					v1.ResourceStorage: resource.MustParse("1Mi"),
+					v1.ResourceCPU:     resource.MustParse("1m"),
 				},
 			},
 			expected: true,
@@ -2130,6 +2151,11 @@ func TestIsSupportedPodLevelResource(t *testing.T) {
 		{
 			name:     v1.ResourceEphemeralStorage.String(),
 			resource: v1.ResourceEphemeralStorage,
+			expected: true,
+		},
+		{
+			name:     v1.ResourceStorage.String(),
+			resource: v1.ResourceStorage,
 			expected: false,
 		},
 		{
@@ -5433,5 +5459,487 @@ func TestResizeConditionsAndSupportedResources(t *testing.T) {
 
 	if !SupportedPodLevelResources().Has(v1.ResourceCPU) {
 		t.Errorf("expected SupportedPodLevelResources to contain CPU")
+	}
+	if !SupportedPodLevelResources().Has(v1.ResourceEphemeralStorage) {
+		t.Errorf("expected SupportedPodLevelResources to contain ephemeral-storage")
+	}
+}
+
+func TestPodLevelEphemeralStorageRequestsAndLimits(t *testing.T) {
+	cases := []struct {
+		name             string
+		pod              *v1.Pod
+		opts             PodResourcesOptions
+		expectedRequests v1.ResourceList
+		expectedLimits   v1.ResourceList
+	}{
+		{
+			name: "pod-level ephemeral-storage used when PodLevelResourcesEphemeralStorageEnabled is true",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("4"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("1"),
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("2"),
+				v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("4"),
+				v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+			},
+		},
+		{
+			name: "pod-level ephemeral-storage skipped while pod-level cpu still honored when PodLevelResourcesEphemeralStorageEnabled is false",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("4"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("1"),
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled: false,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("2"),
+				v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("4"),
+				v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+			},
+		},
+		{
+			name: "pod with only pod-level ephemeral-storage treated as non-PLR when PodLevelResourcesEphemeralStorageEnabled is false",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name:      "c2",
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled: false,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+			},
+		},
+		{
+			name: "PLR pod without pod ephemeral-storage limit omits partially set container ephemeral-storage limits",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name:      "c2",
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			name: "PLR pod without pod ephemeral-storage limit omits ephemeral-storage limit when init container omits it",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name:      "init-1",
+							Resources: v1.ResourceRequirements{},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("1"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			name: "PLR pod without pod ephemeral-storage limit aggregates container ephemeral-storage limits when all containers set it",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1"),
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "init-1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("1"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+			},
+		},
+		{
+			name: "PodLevelResourcesEphemeralStorageEnabled false with UseStatusResources and PLR vertical scaling ignores pod-level status ephemeral-storage",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("4"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("1"),
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+						{
+							Name: "c2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("1"),
+									v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("2"),
+						v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("4"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled:       false,
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("2"),
+				v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("4"),
+				v1.ResourceEphemeralStorage: resource.MustParse("5Gi"),
+			},
+		},
+		{
+			name: "PodLevelResourcesEphemeralStorageEnabled false with infeasible resize preserves container ephemeral-storage",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("4"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("8"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("500m"),
+									v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:              resource.MustParse("1"),
+									v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+								},
+							},
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodResizePending,
+							Status: v1.ConditionTrue,
+							Reason: v1.PodReasonInfeasible,
+						},
+					},
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("2"),
+						v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("2"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("4"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20Gi"),
+						},
+					},
+				},
+			},
+			opts: PodResourcesOptions{
+				PodLevelResourcesEphemeralStorageEnabled:       false,
+				UseStatusResources:                             true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("2"),
+				v1.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceCPU:              resource.MustParse("4"),
+				v1.ResourceEphemeralStorage: resource.MustParse("3Gi"),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotReqs := PodRequests(tc.pod, tc.opts)
+			if !equality.Semantic.DeepEqual(gotReqs, tc.expectedRequests) {
+				t.Errorf("PodRequests() mismatch (-want +got):\n%s", diff.Diff(tc.expectedRequests, gotReqs))
+			}
+			gotLimits := PodLimits(tc.pod, tc.opts)
+			if !equality.Semantic.DeepEqual(gotLimits, tc.expectedLimits) {
+				t.Errorf("PodLimits() mismatch (-want +got):\n%s", diff.Diff(tc.expectedLimits, gotLimits))
+			}
+		})
+	}
+}
+
+func TestIsPodLevelComputeResourcesSet(t *testing.T) {
+	tests := []struct {
+		name          string
+		podResources  *v1.ResourceRequirements
+		wantResources bool
+	}{
+		{
+			name:          "nil pod resources",
+			podResources:  nil,
+			wantResources: false,
+		},
+		{
+			name: "ephemeral-storage only",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Gi")},
+				Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+			wantResources: false,
+		},
+		{
+			name: "cpu request and ephemeral-storage limit",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+				Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+			wantResources: true,
+		},
+		{
+			name: "memory limit only",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			},
+			wantResources: true,
+		},
+		{
+			name: "hugepages limit only",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceName("hugepages-2Mi"): resource.MustParse("64Mi")},
+			},
+			wantResources: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{Spec: v1.PodSpec{Resources: tc.podResources}}
+			if got := IsPodLevelComputeResourcesSet(pod); got != tc.wantResources {
+				t.Errorf("IsPodLevelComputeResourcesSet() = %v, want %v", got, tc.wantResources)
+			}
+		})
 	}
 }

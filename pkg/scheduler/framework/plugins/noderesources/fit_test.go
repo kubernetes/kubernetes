@@ -1679,6 +1679,7 @@ func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnablePodLevelResources:                            true,
 				EnableInPlacePodVerticalScalingSchedulerPreemption: true,
 			})
 			if err != nil {
@@ -2948,6 +2949,54 @@ func TestScorePlacement_Resources(t *testing.T) {
 				{Name: "memory", Weight: 1},
 			},
 			expectedScore: 40,
+		},
+		{
+			name: "Ignores pod-level ephemeral-storage when PodLevelResourcesEphemeralStorage is disabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "10Gi"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "10Gi"}).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "1Gi"}).PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "4Gi"}).Obj(),
+				st.MakePod().UID("bar").Req(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "1Gi"}).PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "6Gi"}).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: string(v1.ResourceEphemeralStorage), Weight: 1},
+			},
+			features: plfeature.Features{
+				EnablePodLevelResources:                 true,
+				EnablePodLevelResourcesEphemeralStorage: false,
+			},
+			expectedScore: 10,
+		},
+		{
+			name: "Honors pod-level ephemeral-storage when PodLevelResourcesEphemeralStorage is enabled",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "10Gi"}).Obj(),
+				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "10Gi"}).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "1Gi"}).PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "4Gi"}).Obj(),
+				st.MakePod().UID("bar").Req(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "1Gi"}).PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "6Gi"}).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: string(v1.ResourceEphemeralStorage), Weight: 1},
+			},
+			features: plfeature.Features{
+				EnablePodLevelResources:                 true,
+				EnablePodLevelResourcesEphemeralStorage: true,
+			},
+			expectedScore: 50,
 		},
 		{
 			name: "Ignores pod-level status resources when InPlacePodLevelResourcesVerticalScaling is disabled",
@@ -4378,6 +4427,134 @@ func TestFitScoreFeatureGates(t *testing.T) {
 					if diff := cmp.Diff(test.expectedScores[strategy.Type], gotScores); diff != "" {
 						tCtx.Errorf("strategy=%s runPreScore=%v: unexpected scores (-want,+got):\n%s", strategy.Type, runPreScore, diff)
 					}
+				}
+			}
+		})
+	}
+}
+
+func TestFitFilterAndScorePodLevelEphemeralStorage(t *testing.T) {
+	testCtx := ktesting.Init(t)
+
+	pod := st.MakePod().
+		Req(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "2Gi"}).
+		PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceEphemeralStorage: "5Gi"}).
+		Obj()
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node-4gi").Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:             "32",
+			v1.ResourceEphemeralStorage: "4Gi",
+		}).Obj(),
+		st.MakeNode().Name("node-10gi").Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:             "32",
+			v1.ResourceEphemeralStorage: "10Gi",
+		}).Obj(),
+		st.MakeNode().Name("node-20gi").Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:             "32",
+			v1.ResourceEphemeralStorage: "20Gi",
+		}).Obj(),
+	}
+
+	scoringResources := []config.ResourceSpec{
+		{Name: string(v1.ResourceEphemeralStorage), Weight: 1},
+	}
+	strategies := []*config.ScoringStrategy{
+		{
+			Type:      config.LeastAllocated,
+			Resources: scoringResources,
+		},
+		{
+			Type:      config.MostAllocated,
+			Resources: scoringResources,
+		},
+		{
+			Type:      config.RequestedToCapacityRatio,
+			Resources: scoringResources,
+			RequestedToCapacityRatio: &config.RequestedToCapacityRatioParam{
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 0, Score: 0},
+					{Utilization: 50, Score: 10},
+					{Utilization: 100, Score: 0},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		features       plfeature.Features
+		wantNode4Gi    *fwk.Status
+		expectedScores map[config.ScoringStrategyType]fwk.NodeScoreList
+	}{
+		{
+			name: "PodLevelResourcesEphemeralStorage disabled uses container ephemeral-storage",
+			features: plfeature.Features{
+				EnablePodLevelResources:                 true,
+				EnablePodLevelResourcesEphemeralStorage: false,
+			},
+			wantNode4Gi: nil,
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node-10gi", Score: 80}, {Name: "node-20gi", Score: 90}},
+				config.MostAllocated:            {{Name: "node-10gi", Score: 20}, {Name: "node-20gi", Score: 10}},
+				config.RequestedToCapacityRatio: {{Name: "node-10gi", Score: 40}, {Name: "node-20gi", Score: 20}},
+			},
+		},
+		{
+			name: "PodLevelResourcesEphemeralStorage enabled uses pod-level ephemeral-storage",
+			features: plfeature.Features{
+				EnablePodLevelResources:                 true,
+				EnablePodLevelResourcesEphemeralStorage: true,
+			},
+			wantNode4Gi: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Insufficient ephemeral-storage"),
+			expectedScores: map[config.ScoringStrategyType]fwk.NodeScoreList{
+				config.LeastAllocated:           {{Name: "node-10gi", Score: 50}, {Name: "node-20gi", Score: 75}},
+				config.MostAllocated:            {{Name: "node-10gi", Score: 50}, {Name: "node-20gi", Score: 25}},
+				config.RequestedToCapacityRatio: {{Name: "node-10gi", Score: 100}, {Name: "node-20gi", Score: 50}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		testCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
+			snapshot := cache.NewSnapshot(nil, nodes)
+			fh, err := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			tCtx.ExpectNoError(err, "create framework")
+			tCtx.Cleanup(func() {
+				runtime.WaitForShutdown(fh)
+			})
+
+			for _, strategy := range strategies {
+				p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
+					ScoringStrategy: strategy,
+				}, fh, test.features)
+				tCtx.ExpectNoError(err, "create fit plugin")
+
+				cycleState := framework.NewCycleState()
+				_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(tCtx, cycleState, pod, nil)
+				tCtx.ExpectNoError(preFilterStatus.AsError(), "PreFilter")
+
+				node4GiInfo, err := snapshot.Get("node-4gi")
+				tCtx.ExpectNoError(err, "get node-4gi")
+				gotFilterStatus := p.(fwk.FilterPlugin).Filter(tCtx, cycleState, pod, node4GiInfo)
+				if diff := cmp.Diff(test.wantNode4Gi, gotFilterStatus); diff != "" {
+					tCtx.Errorf("strategy=%s node-4gi Filter status mismatch (-want,+got):\n%s", strategy.Type, diff)
+				}
+
+				scoreNodes := nodes[1:]
+				preScoreStatus := p.(fwk.PreScorePlugin).PreScore(tCtx, cycleState, pod, tf.BuildNodeInfos(scoreNodes))
+				tCtx.ExpectNoError(preScoreStatus.AsError(), "PreScore")
+
+				var gotScores fwk.NodeScoreList
+				for _, n := range scoreNodes {
+					nodeInfo, err := snapshot.Get(n.Name)
+					tCtx.ExpectNoError(err, "get node")
+					score, status := p.(fwk.ScorePlugin).Score(tCtx, cycleState, pod, nodeInfo)
+					tCtx.ExpectNoError(status.AsError(), "Score")
+					gotScores = append(gotScores, fwk.NodeScore{Name: n.Name, Score: score})
+				}
+				if diff := cmp.Diff(test.expectedScores[strategy.Type], gotScores); diff != "" {
+					tCtx.Errorf("strategy=%s Score mismatch (-want,+got):\n%s", strategy.Type, diff)
 				}
 			}
 		})

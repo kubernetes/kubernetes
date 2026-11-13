@@ -1621,6 +1621,65 @@ func TestPodResourcesDefaults(t *testing.T) {
 	}
 }
 
+func TestSetDefaultPodRequestsEphemeralStorage(t *testing.T) {
+	tests := []struct {
+		name          string
+		podResources  *v1.ResourceRequirements
+		containers    []v1.Container
+		wantResources *v1.ResourceRequirements
+	}{
+		{
+			name: "legacy SetDefaults_Pod: pod cpu limit does not default ephemeral-storage request",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+			},
+			containers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("200m"),
+						v1.ResourceEphemeralStorage: resource.MustParse("1Gi"),
+					},
+				},
+			}},
+			wantResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m")},
+			},
+		},
+		{
+			name: "legacy SetDefaults_Pod: pod ephemeral-storage limit only does not trigger defaulting",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+			containers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+				},
+			}},
+			wantResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("2Gi")},
+			},
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourcesFixDefaulting, false)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: tc.containers,
+					Resources:  tc.podResources.DeepCopy(),
+				},
+			}
+			corev1.SetDefaults_Pod(&p)
+			if diff := cmp.Diff(tc.wantResources, p.Spec.Resources); diff != "" {
+				t.Errorf("SetDefaults_Pod() Resources mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestPodHostNetworkDefaults(t *testing.T) {
 	cases := []struct {
 		name                 string

@@ -24,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
@@ -48,12 +47,11 @@ func (kl *Kubelet) defaultPodLimitsForDownwardAPI(ctx context.Context, pod *core
 		return nil, nil, fmt.Errorf("failed to find node object, expected a node")
 	}
 	allocatable := node.Status.Allocatable
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelLimitsSet(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && pod.Spec.Resources != nil {
 		allocatable = allocatable.DeepCopy()
 		// Resources supported by the Downward API
 		for _, resource := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage} {
-			// Skip resources not supported by Pod Level Resources
-			if !resourcehelper.IsSupportedPodLevelResource(resource) {
+			if resource == corev1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourcesEphemeralStorage) {
 				continue
 			}
 			if val, exists := pod.Spec.Resources.Limits[resource]; exists && !val.IsZero() {

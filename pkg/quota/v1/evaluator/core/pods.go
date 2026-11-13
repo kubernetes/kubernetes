@@ -140,7 +140,8 @@ func (p *podEvaluator) Constraints(required []corev1.ResourceName, item runtime.
 	// missing container requests, for CPU/memory resources that have quotas set,
 	// is skipped when pod-level resources feature is enabled and resources are set
 	// at pod level.
-	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if feature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		resourcehelper.IsPodLevelComputeResourcesSet(pod) {
 		return nil
 	}
 
@@ -401,7 +402,8 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 	opts := resourcehelper.PodResourcesOptions{
 		UseStatusResources: true,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources:                    !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		PodLevelResourcesEphemeralStorageEnabled: feature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage),
 	}
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)

@@ -42,22 +42,18 @@ import (
 // Applies when PodLevelResources is enabled and the pod has memory limits declared
 // (either pod-level or all containers). Skips Guaranteed-like pods where request == limit.
 func ApplyPodLevelMemoryHigh(pod *v1.Pod, rc *ResourceConfig, throttlingFactor float64) {
-	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
-	if !podLevelResourcesEnabled || !resourcehelper.IsPodLevelResourcesSet(pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) {
+		return
+	}
+	// PodLimits() omits the memory limit unless every container declares it or a pod-level
+	// limit is set, so memory.high stays unset otherwise.
+	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
+	memoryLimit := limits.Memory().Value()
+	if memoryLimit == 0 {
 		return
 	}
 	reqs := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{})
-	// PodLimits() omits the memory limit unless every container declares it or a pod-level
-	// limit is set, so memoryLimit stays 0 (and memory.high stays unset) otherwise.
-	limits := resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{})
-	memoryRequest := int64(0)
-	memoryLimit := int64(0)
-	if req, found := reqs[v1.ResourceMemory]; found {
-		memoryRequest = req.Value()
-	}
-	if lim, found := limits[v1.ResourceMemory]; found {
-		memoryLimit = lim.Value()
-	}
+	memoryRequest := reqs.Memory().Value()
 	if val := memoryHighForPod(memoryRequest, memoryLimit, throttlingFactor); val != "" {
 		if rc.Unified == nil {
 			rc.Unified = map[string]string{}

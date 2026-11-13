@@ -1369,6 +1369,7 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 		return *pi.cachedResource
 	}
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	podLevelResourcesEphemeralStorageEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesEphemeralStorage)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
 
@@ -1377,21 +1378,18 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		PodLevelResourcesEphemeralStorageEnabled: podLevelResourcesEphemeralStorageEnabled,
 		UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
 	})
-	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
-	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
-	non0Requests := requests
-	if len(nonMissingContainerRequests) > 0 {
-		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-			UseStatusResources: true,
-			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
-			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:                    !podLevelResourcesEnabled,
-			NonMissingContainerRequests:              nonMissingContainerRequests,
-			UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
-		})
-	}
+	non0Requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
+		UseStatusResources: true,
+		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		PodLevelResourcesEphemeralStorageEnabled: podLevelResourcesEphemeralStorageEnabled,
+		NonMissingContainerRequests:              getNonMissingContainerRequests(),
+		UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
+	})
 	non0CPU := non0Requests[v1.ResourceCPU]
 	non0Mem := non0Requests[v1.ResourceMemory]
 
@@ -1713,54 +1711,16 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 }
 
 // getNonMissingContainerRequests returns the default non-zero CPU and memory
-// requests for a container that the scheduler uses when container-level and
-// pod-level requests are not set for a resource. It returns a ResourceList that
-// includes these default non-zero requests, which are essential for the
-// scheduler to function correctly.
-// The method's behavior depends on whether pod-level resources are set or not:
-// 1. When the pod level resources are not set, the method returns a ResourceList
-// with the following defaults:
-//   - CPU: schedutil.DefaultMilliCPURequest
-//   - Memory: schedutil.DefaultMemoryRequest
-//
-// These defaults ensure that each container has a minimum resource request,
-// allowing the scheduler to aggregate these requests and find a suitable node
-// for the pod.
-//
-// 2. When the pod level resources are set, if a CPU or memory request is
-// missing at the container-level *and* at the pod-level, the corresponding
-// default value (schedutil.DefaultMilliCPURequest or schedutil.DefaultMemoryRequest)
-// is included in the returned ResourceList.
-// Note that these default values are not set in the Pod object itself, they are only used
-// by the scheduler during node selection.
-func getNonMissingContainerRequests(requests v1.ResourceList, podLevelResourcesSet bool) v1.ResourceList {
-	if !podLevelResourcesSet {
-		return v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
-		}
+// requests that the scheduler substitutes for missing container-level requests
+// when computing Non0CPU and Non0Mem. Pod-level requests, where set, take
+// precedence over the container aggregate, so these defaults only matter for
+// resources without a pod-level request.
+// The defaults are not set on the Pod object; they are used only for scoring.
+func getNonMissingContainerRequests() v1.ResourceList {
+	return v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI),
 	}
-
-	nonMissingContainerRequests := make(v1.ResourceList, 2)
-	// DefaultMilliCPURequest serves as the fallback value when both
-	// pod-level and container-level CPU requests are not set.
-	// Note that the apiserver defaulting logic will propagate a non-zero
-	// container-level CPU request to the pod level if a pod-level request
-	// is not explicitly set.
-	if _, exists := requests[v1.ResourceCPU]; !exists {
-		nonMissingContainerRequests[v1.ResourceCPU] = *resource.NewMilliQuantity(schedutil.DefaultMilliCPURequest, resource.DecimalSI)
-	}
-
-	// DefaultMemoryRequest serves as the fallback value when both
-	// pod-level and container-level CPU requests are unspecified.
-	// Note that the apiserver defaulting logic will propagate a non-zero
-	// container-level memory request to the pod level if a pod-level request
-	// is not explicitly set.
-	if _, exists := requests[v1.ResourceMemory]; !exists {
-		nonMissingContainerRequests[v1.ResourceMemory] = *resource.NewQuantity(schedutil.DefaultMemoryRequest, resource.DecimalSI)
-	}
-	return nonMissingContainerRequests
-
 }
 
 // GetPodKey returns the string key of a pod.
