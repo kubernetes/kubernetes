@@ -938,6 +938,8 @@ func TestRetryPendingResizes(t *testing.T) {
 		expectPodSyncTriggered       string
 		annotations                  map[string]string
 		inPlacePodLevelResizeEnabled bool
+		// newGeneration is the generation of the resized pod.
+		newGeneration int64
 	}{
 		{
 			name:                  "Request CPU and memory decrease - expect InProgress",
@@ -1073,12 +1075,14 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
 			originalInProgress:    true,
 			originalPending:       true,
+			newGeneration:         1,
 
 			expectedResize: []*v1.PodCondition{
 				{
-					Type:    v1.PodResizeInProgress,
-					Status:  "True",
-					Message: "",
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					Message:            "", // A new generation resets the condition.
+					ObservedGeneration: 1,
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -1281,6 +1285,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				}
 
 				newPod := originalPod.DeepCopy()
+				newPod.Generation = tt.newGeneration
 				if isInitContainer {
 					newPod.Spec.InitContainers[0].Resources.Requests = tt.newRequests
 					newPod.Spec.InitContainers[0].Resources.Limits = tt.newLimits

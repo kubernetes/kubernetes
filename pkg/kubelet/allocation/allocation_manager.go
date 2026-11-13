@@ -650,15 +650,11 @@ func (m *manager) handlePendingAllocation(ctx context.Context, pod *v1.Pod) (lif
 			resolution = metrics.DeferredResizeResolutionReverted
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID, resolution)
-
 		if resizeRequested {
-			// Clear any errors that may have been surfaced from a previous resize and update the
-			// generation of the resize in-progress condition.
-			m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
-			m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
-
-			msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+			if _, started := m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation); started {
+				msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
+				m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+			}
 		}
 		return result, true, nil
 	}

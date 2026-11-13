@@ -2199,16 +2199,21 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
+	// The allocation manager starts a resize when it allocates it. This sync actuates the allocation
+	// at allocatedGeneration, and the status manager ignores updates for a resize that a newer
+	// allocation has superseded since.
 	if kl.containerRuntime.IsPodResizeInProgress(pod, podStatus) {
-		kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
-	} else if generation, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID); cleared {
+		if _, started := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", allocatedGeneration); started {
+			msg := events.PodResizeStartedMsg(logger, pod, allocatedGeneration)
+			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+		}
+	} else if _, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID, allocatedGeneration); cleared {
 		// (Allocated == Actual) => clear the resize in-progress status.
-		msg := events.PodResizeCompletedMsg(logger, pod, generation)
+		// TODO(#144234): Track the actuated pod-level resources, so that a failure to resize the pod
+		// cgroup doesn't alternate between Error and Completed.
+		msg := events.PodResizeCompletedMsg(logger, pod, allocatedGeneration)
 		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "%s", msg)
 	}
-	// TODO(natasha41575): There is a race condition here, where the goroutine in the
-	// allocation manager may allocate a new resize and unconditionally set the
-	// PodResizeInProgressCondition before we set the status below.
 
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(ctx, pod, podStatus, SyncPod)
@@ -2427,9 +2432,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	for _, r := range result.SyncResults {
 		if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {
-			// If the condition already exists, the observedGeneration does not get updated.
-			if generation, updated := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, pod.Generation); updated {
-				msg := events.PodResizeErrorMsg(logger, pod, generation, r.Message)
+			// This creates the condition if it doesn't exist, e.g. if the runtime failed to update the
+			// pod cgroup for a resize the kubelet didn't consider in progress. ResizeStarted is not
+			// emitted for it on purpose: the error is the first thing to report about the resize. The
+			// error is ignored if a newer resize was allocated while the runtime actuated this one.
+			if updated, _ := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, allocatedGeneration); updated {
+				msg := events.PodResizeErrorMsg(logger, pod, allocatedGeneration, r.Message)
 				kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.ResizeError, "%s", msg)
 			}
 		}
@@ -3051,6 +3059,8 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
 	sortPodsForAdmission(pods, kl.allocationManager.HasPodAllocatedResources)
+	// Backfill the resize conditions before any pod worker syncs the pods and updates them.
+	kl.statusManager.BackfillPodResizeConditions(pods)
 	var pendingAllocations []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
@@ -3113,7 +3123,6 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			StartTime:  start,
 		})
 	}
-	kl.statusManager.BackfillPodResizeConditions(pods)
 	// Admitted pods with DeletionTimestamp set are still pushed here so RetryPendingAllocations
 	// clears any backfilled PodResizePending condition with DeferredResizeResolutionTerminated.
 	for _, uid := range pendingAllocations {
