@@ -21,9 +21,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -316,6 +319,18 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 		},
 	}
 
+	// The DRA cases without selectors would not catch an uninitialized CEL cache.
+	for _, test := range tests {
+		if test.draObjects == nil {
+			continue
+		}
+		class := deviceClassWithExtendResourceName.DeepCopy()
+		class.Spec.Selectors = []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{Expression: `device.driver == "test-driver"`}}}
+		test.name += " with CEL selector"
+		test.draObjects = append([]apiruntime.Object{class}, test.draObjects[1:]...)
+		tests = append(tests, test)
+	}
+
 	for _, test := range tests {
 		tCtx.SyncTest(test.name, func(tCtx ktesting.TContext) {
 			if test.draObjects == nil {
@@ -323,7 +338,7 @@ func testNodeResourcesBalancedAllocation(tCtx ktesting.TContext) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, test.draObjects != nil)
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
-			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)))
 			tCtx.Cleanup(func() {
 				runtime.WaitForShutdown(fh)
 			})
@@ -436,7 +451,7 @@ func testBalancedAllocationSignPod(tCtx ktesting.TContext) {
 
 	for name, test := range tests {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
-			runOpts := []runtime.Option{}
+			runOpts := []runtime.Option{runtime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0))}
 			var testDRAManager *dynamicresources.DefaultDRAManager
 			if !test.disableDRAExtendedResource {
 				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)

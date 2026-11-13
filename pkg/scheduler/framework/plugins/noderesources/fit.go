@@ -215,7 +215,7 @@ func getScorer(strategy *config.ScoringStrategy, fts feature.Features) (*resourc
 }
 
 // NewFit initializes a new plugin and returns it.
-func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+func NewFit(ctx context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, ok := plArgs.(*config.NodeResourcesFitArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
@@ -229,6 +229,9 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, err
 	}
 	if fts.EnableDRAExtendedResource {
+		if err := scorer.watchResourceSlices(ctx, h.SharedInformerFactory().Resource().V1().ResourceSlices().TypedInformer()); err != nil {
+			return nil, err
+		}
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
 		scorer.draFeatures = dynamicresources.AllocatorFeatures(fts)

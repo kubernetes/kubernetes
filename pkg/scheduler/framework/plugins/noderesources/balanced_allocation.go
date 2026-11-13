@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -176,7 +177,7 @@ func (ba *BalancedAllocation) ScoreExtensions() fwk.ScoreExtensions {
 }
 
 // NewBalancedAllocation initializes a new plugin and returns it.
-func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+func NewBalancedAllocation(ctx context.Context, baArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, ok := baArgs.(*config.NodeResourcesBalancedAllocationArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesBalancedAllocationArgs, got %T", baArgs)
@@ -186,7 +187,7 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 		return nil, err
 	}
 
-	return &BalancedAllocation{
+	pl := &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
 			Name:                      BalancedAllocationName,
@@ -198,7 +199,17 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 			draManager: h.SharedDRAManager(),
 		},
-	}, nil
+	}
+	if fts.EnableDRAExtendedResource {
+		pl.celCache = cel.NewCache(10, cel.Features{
+			EnableConsumableCapacity: fts.EnableDRAConsumableCapacity,
+			EnableListTypeAttributes: fts.EnableDRAListTypeAttributes,
+		})
+		if err := pl.watchResourceSlices(ctx, h.SharedInformerFactory().Resource().V1().ResourceSlices().TypedInformer()); err != nil {
+			return nil, err
+		}
+	}
+	return pl, nil
 }
 
 func balancedResourceScorer(requested, allocated, allocatable []int64) int64 {
