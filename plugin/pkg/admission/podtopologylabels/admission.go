@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -152,14 +153,14 @@ func (p *Plugin) admitBinding(ctx context.Context, a admission.Attributes, o adm
 }
 
 func (p *Plugin) admitPod(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
-	pod := a.GetObject().(*api.Pod)
-	if pod.Spec.NodeName == "" {
+	pod := podutil.MustAccessor(a.GetObject())
+	if pod.GetSpecNodeName() == "" {
 		// pod has not been scheduled yet
 		return nil
 	}
 
 	// Determine the topology labels from the assigned node to be copied.
-	labelsToCopy, err := p.topologyLabelsForNodeName(pod.Spec.NodeName)
+	labelsToCopy, err := p.topologyLabelsForNodeName(pod.GetSpecNodeName())
 	if err != nil {
 		return err
 	}
@@ -169,11 +170,13 @@ func (p *Plugin) admitPod(ctx context.Context, a admission.Attributes, o admissi
 	}
 
 	// copy the topology labels into the Pod's labels.
-	if pod.Labels == nil {
-		pod.Labels = make(map[string]string)
+	podLabels := pod.GetLabels()
+	if podLabels == nil {
+		podLabels = make(map[string]string)
 	}
 	// overwrite any existing labels on the pod
-	mergeLabels(pod.Labels, labelsToCopy)
+	mergeLabels(podLabels, labelsToCopy)
+	pod.SetLabels(podLabels)
 
 	return nil
 }
@@ -225,8 +228,8 @@ func (p *Plugin) shouldAdmit(a admission.Attributes) (bool, admitFunc, error) {
 
 	switch a.GetSubresource() {
 	case "": // regular Pod endpoint
-		_, ok := a.GetObject().(*api.Pod)
-		if !ok {
+		_, err := podutil.Accessor(a.GetObject())
+		if err != nil {
 			return false, nil, fmt.Errorf("expected Pod but got %T", a.GetObject())
 		}
 		return true, p.admitPod, nil
