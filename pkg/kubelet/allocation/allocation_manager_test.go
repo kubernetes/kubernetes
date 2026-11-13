@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -1328,7 +1329,7 @@ func TestRetryPendingResizes(t *testing.T) {
 					allocationManager.(*manager).statusManager.SetPodResizeInProgressCondition(originalPod.UID, "", originalInProgressMsg, 0)
 				}
 				if tt.originalPending {
-					allocationManager.(*manager).statusManager.SetPodResizePendingCondition(originalPod.UID, v1.PodReasonDeferred, originalPendingMsg, 0)
+					allocationManager.(*manager).statusManager.SetPodAllocationPendingCondition(originalPod.UID, v1.PodReasonInsufficientResources, originalPendingMsg, 0, true)
 				}
 
 				allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -2315,7 +2316,7 @@ func TestRetryPendingResizesNonResourceChange(t *testing.T) {
 			}
 			statusManager := allocationManager.(*manager).statusManager
 			if tc.deferred {
-				statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonDeferred, "deferred by the test", pod.Generation)
+				statusManager.SetPodAllocationPendingCondition(pod.UID, v1.PodReasonInsufficientResources, "deferred by the test", pod.Generation, true)
 			}
 
 			allocationManager.PushPendingAllocation(logger, pod.UID)
@@ -2363,71 +2364,103 @@ func TestRetryPendingResizesDynamicContainers(t *testing.T) {
 		// change makes the pod differ from its allocated pod.
 		change func(pod *v1.Pod)
 		reject func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
-		// expectedCondition is the type and reason of the expected resize condition, if any.
-		expectedCondition *v1.PodCondition
+		// expectedConditions are the types and reasons of the expected conditions, if any.
+		expectedConditions []v1.PodCondition
 		// expectedEvent is the prefix of the expected event, if any.
 		expectedEvent   string
 		expectAllocated bool
 		// expectRetry is whether the pod stays queued for another retry.
 		expectRetry bool
 	}{{
-		name:              "container added",
-		change:            addContainer(cpu("1")),
-		expectedCondition: &v1.PodCondition{Type: v1.PodResizeInProgress},
-		expectedEvent:     "Normal ResizeStarted",
-		expectAllocated:   true,
+		name:               "container added",
+		change:             addContainer(cpu("1")),
+		expectedConditions: []v1.PodCondition{{Type: v1.PodResizeInProgress}},
+		expectedEvent:      "Normal ResizeStarted",
+		expectAllocated:    true,
 	}, {
-		name:              "container added beyond capacity",
-		change:            addContainer(cpu("10")),
-		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
-		expectedEvent:     "Warning ResizeDeferred",
-		expectRetry:       true,
+		name:   "container added beyond capacity",
+		change: addContainer(cpu("10")),
+		expectedConditions: []v1.PodCondition{
+			{Type: v1.PodAllocationPending, Reason: v1.PodReasonInsufficientResources},
+			{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
+		},
+		expectedEvent: "Warning ResizeDeferred",
+		expectRetry:   true,
 	}, {
 		name: "container added beyond capacity with an image update",
 		change: func(pod *v1.Pod) {
 			addContainer(cpu("10"))(pod)
 			updateImage(pod)
 		},
-		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
-		expectedEvent:     "Warning ResizeDeferred",
-		expectRetry:       true,
+		expectedConditions: []v1.PodCondition{
+			{Type: v1.PodAllocationPending, Reason: v1.PodReasonInsufficientResources},
+			{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
+		},
+		expectedEvent: "Warning ResizeDeferred",
+		expectRetry:   true,
 	}, {
 		name: "container added and removed",
 		change: func(pod *v1.Pod) {
 			pod.Spec.Containers = pod.Spec.Containers[1:]
 			addContainer(cpu("2"))(pod)
 		},
-		expectedCondition: &v1.PodCondition{Type: v1.PodResizeInProgress},
-		expectedEvent:     "Normal ResizeStarted",
-		expectAllocated:   true,
+		expectedConditions: []v1.PodCondition{{Type: v1.PodResizeInProgress}},
+		expectedEvent:      "Normal ResizeStarted",
+		expectAllocated:    true,
 	}, {
-		name:              "container removed",
-		change:            func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[1:] },
-		expectedCondition: &v1.PodCondition{Type: v1.PodResizeInProgress},
-		expectedEvent:     "Normal ResizeStarted",
-		expectAllocated:   true,
+		name:               "container removed",
+		change:             func(pod *v1.Pod) { pod.Spec.Containers = pod.Spec.Containers[1:] },
+		expectedConditions: []v1.PodCondition{{Type: v1.PodResizeInProgress}},
+		expectedEvent:      "Normal ResizeStarted",
+		expectAllocated:    true,
 	}, {
 		name:            "container added without resources",
 		change:          addContainer(v1.ResourceRequirements{}),
 		expectAllocated: true,
 	}, {
-		name:              "container added without resources, rejected by an admit handler",
-		change:            addContainer(v1.ResourceRequirements{}),
-		reject:            rejectAll,
-		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
-		expectedEvent:     "Warning ResizeDeferred",
-		expectRetry:       true,
+		name:               "container added without resources, rejected by an admit handler",
+		change:             addContainer(v1.ResourceRequirements{}),
+		reject:             rejectAll,
+		expectedConditions: []v1.PodCondition{{Type: v1.PodAllocationPending, Reason: v1.PodReasonError}},
+		expectRetry:        true,
 	}, {
 		name:            "image update",
 		change:          updateImage,
 		expectAllocated: true,
 	}, {
-		name:              "image update, rejected by an admit handler",
-		change:            updateImage,
-		reject:            rejectAll,
-		expectedCondition: &v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
-		expectedEvent:     "Warning ResizeDeferred",
-		expectRetry:       true,
+		name:               "image update, rejected by an admit handler",
+		change:             updateImage,
+		reject:             rejectAll,
+		expectedConditions: []v1.PodCondition{{Type: v1.PodAllocationPending, Reason: v1.PodReasonError}},
+		expectRetry:        true,
+	}, {
+		name:   "container added with resources, rejected as blocked by an admit handler",
+		change: addContainer(cpu("1")),
+		reject: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+			return lifecycle.PodAdmitResult{Admit: false, Reason: "Blocked", Message: "blocked", RejectionType: lifecycle.RejectionBlocked}
+		},
+		expectedConditions: []v1.PodCondition{
+			{Type: v1.PodAllocationPending, Reason: v1.PodReasonBlocked},
+			{Type: v1.PodResizePending, Reason: v1.PodReasonDeferred},
+		},
+		expectedEvent: "Warning ResizeDeferred",
+		expectRetry:   true,
+	}, {
+		name:   "image update, rejected as blocked by an admit handler",
+		change: updateImage,
+		reject: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+			return lifecycle.PodAdmitResult{Admit: false, Reason: "Blocked", Message: "blocked", RejectionType: lifecycle.RejectionBlocked}
+		},
+		expectedConditions: []v1.PodCondition{{Type: v1.PodAllocationPending, Reason: v1.PodReasonBlocked}},
+		expectRetry:        true,
+	}, {
+		name:   "image update, rejected as infeasible by an admit handler",
+		change: updateImage,
+		reject: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+			return lifecycle.PodAdmitResult{Admit: false, Reason: "Infeasible", Message: "infeasible", RejectionType: lifecycle.RejectionInfeasible}
+		},
+		expectedConditions: []v1.PodCondition{{Type: v1.PodAllocationPending, Reason: v1.PodReasonInfeasible}},
+		expectRetry:        false,
 	}, {
 		name:            "image update with the gate disabled",
 		disabled:        true,
@@ -2462,11 +2495,13 @@ func TestRetryPendingResizesDynamicContainers(t *testing.T) {
 			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
-			if tc.expectedCondition == nil {
+			if len(tc.expectedConditions) == 0 {
 				assert.Empty(t, conditions, "conditions")
-			} else if assert.Len(t, conditions, 1, "conditions") {
-				assert.Equal(t, tc.expectedCondition.Type, conditions[0].Type)
-				assert.Equal(t, tc.expectedCondition.Reason, conditions[0].Reason)
+			} else if assert.Len(t, conditions, len(tc.expectedConditions), "conditions") {
+				for i, exp := range tc.expectedConditions {
+					assert.Equal(t, exp.Type, conditions[i].Type)
+					assert.Equal(t, exp.Reason, conditions[i].Reason)
+				}
 			}
 			fakeRecorder := allocationManager.(*manager).recorder.(*record.FakeRecorder)
 			if tc.expectedEvent != "" {
@@ -2576,10 +2611,13 @@ func TestRetryPendingResizesDynamicContainersExclusiveResources(t *testing.T) {
 				return
 			}
 			assert.True(t, pending, "pending")
-			if assert.Len(t, conditions, 1, "conditions") {
-				assert.Equal(t, v1.PodResizePending, conditions[0].Type)
+			if assert.Len(t, conditions, 2, "conditions") {
+				assert.Equal(t, v1.PodAllocationPending, conditions[0].Type)
 				assert.Equal(t, v1.PodReasonInfeasible, conditions[0].Reason)
 				assert.Equal(t, tc.expectedInfeasible, conditions[0].Message)
+				assert.Equal(t, v1.PodResizePending, conditions[1].Type)
+				assert.Equal(t, v1.PodReasonInfeasible, conditions[1].Reason)
+				assert.Equal(t, tc.expectedInfeasible, conditions[1].Message)
 			}
 		})
 	}
@@ -2597,6 +2635,9 @@ func TestRetryPendingResizesDynamicContainersPodLevelExclusiveResources(t *testi
 		change                   func(pod *v1.Pod)
 		podLevelResourceManagers bool
 		expectInfeasible         bool
+		// expectResizePending is whether PodResizePending is set too, which it is only if the change
+		// is a resize.
+		expectResizePending bool
 		// expectMetric is whether the rejection is counted as an infeasible resize, which it is only
 		// if the change is a resize.
 		expectMetric bool
@@ -2616,6 +2657,7 @@ func TestRetryPendingResizesDynamicContainersPodLevelExclusiveResources(t *testi
 		},
 		podLevelResourceManagers: true,
 		expectInfeasible:         true,
+		expectResizePending:      true,
 		expectMetric:             true,
 	}, {
 		name:                     "container removed",
@@ -2666,7 +2708,20 @@ func TestRetryPendingResizesDynamicContainersPodLevelExclusiveResources(t *testi
 
 			_, pending := allocationManager.UpdatePodFromAllocation(pod)
 			assert.Equal(t, tc.expectInfeasible, pending, "pending")
-			assert.Equal(t, tc.expectInfeasible, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(pod.UID), "infeasible")
+			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+			var expectedConditions []v1.PodCondition
+			if tc.expectInfeasible {
+				expectedConditions = append(expectedConditions, v1.PodCondition{Type: v1.PodAllocationPending, Reason: v1.PodReasonInfeasible})
+			}
+			if tc.expectResizePending {
+				expectedConditions = append(expectedConditions, v1.PodCondition{Type: v1.PodResizePending, Reason: v1.PodReasonInfeasible})
+			}
+			if assert.Len(t, conditions, len(expectedConditions), "conditions") {
+				for i, exp := range expectedConditions {
+					assert.Equal(t, exp.Type, conditions[i].Type)
+					assert.Equal(t, exp.Reason, conditions[i].Reason)
+				}
+			}
 			expectedMetrics := ""
 			if tc.expectMetric {
 				expectedMetrics = `
@@ -2731,7 +2786,10 @@ func TestRetryPendingAllocationsInfeasibleMetric(t *testing.T) {
 			allocationManager.PushPendingAllocation(logger, pod.UID)
 			allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
-			require.True(t, allocationManager.(*manager).statusManager.IsPodResizeInfeasible(pod.UID), "infeasible")
+			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+			require.NotEmpty(t, conditions, "conditions")
+			assert.Equal(t, v1.PodAllocationPending, conditions[0].Type)
+			assert.Equal(t, v1.PodReasonInfeasible, conditions[0].Reason)
 			expectedMetrics := ""
 			if tc.expectMetric {
 				expectedMetrics = `
@@ -3553,12 +3611,14 @@ func TestSortPendingResizes(t *testing.T) {
 	testPods[7].Spec.PreemptionPolicy = new(v1.PreemptNever)
 	testPods[8].Spec.PreemptionPolicy = new(v1.PreemptNever)
 
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[7].UID, v1.PodReasonDeferred, "some-message", 1)
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[8].UID, v1.PodReasonDeferred, "some-message", 1)
-	time.Sleep(5 * time.Millisecond)
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message", 1)
-	time.Sleep(5 * time.Millisecond)
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[5].UID, v1.PodReasonDeferred, "some-message", 1)
+	synctest.Test(t, func(t *testing.T) {
+		allocationManager.(*manager).statusManager.SetPodAllocationPendingCondition(testPods[7].UID, v1.PodReasonInsufficientResources, "some-message", 1, true)
+		allocationManager.(*manager).statusManager.SetPodAllocationPendingCondition(testPods[8].UID, v1.PodReasonInsufficientResources, "some-message", 1, true)
+		time.Sleep(time.Second)
+		allocationManager.(*manager).statusManager.SetPodAllocationPendingCondition(testPods[4].UID, v1.PodReasonInsufficientResources, "some-message", 1, true)
+		time.Sleep(time.Second)
+		allocationManager.(*manager).statusManager.SetPodAllocationPendingCondition(testPods[5].UID, v1.PodReasonInsufficientResources, "some-message", 1, true)
+	})
 
 	allocationManager.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 		pods := make(map[types.UID]*v1.Pod)
@@ -3682,7 +3742,7 @@ func TestRecordPodDeferredAcceptedResizes(t *testing.T) {
 			am := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{original}, nil)
 			require.NoError(t, am.SetAllocatedPod(logger, original))
 			if tc.hasPendingCondition {
-				am.(*manager).statusManager.SetPodResizePendingCondition(original.UID, v1.PodReasonDeferred, "message", 1)
+				am.(*manager).statusManager.SetPodAllocationPendingCondition(original.UID, v1.PodReasonInsufficientResources, "message", 1, true)
 			}
 
 			am.(*manager).podProvider.(*fakePodProvider).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
@@ -5142,7 +5202,7 @@ func TestRetryPendingResizesTerminatingPods(t *testing.T) {
 			am := allocationManager.(*manager)
 
 			if tc.hadDeferredCondition {
-				am.statusManager.SetPodResizePendingCondition(resizedPod.UID, v1.PodReasonDeferred, "deferred", resizedPod.Generation)
+				am.statusManager.SetPodAllocationPendingCondition(resizedPod.UID, v1.PodReasonInsufficientResources, "deferred", resizedPod.Generation, true)
 			}
 
 			allocationManager.PushPendingAllocation(logger, resizedPod.UID)
@@ -5592,11 +5652,13 @@ func TestCanAdmitPodNoPreemptionAfterRejection(t *testing.T) {
 }
 
 // TestRetryPendingResizesNodeAffinityDrift checks that a resize of a running pod whose node
-// selector no longer matches the node labels stays deferred and queued for retry.
+// selector no longer matches the node labels is marked Blocked on PodAllocationPending (and
+// Deferred on PodResizePending) while staying queued for retry.
 func TestRetryPendingResizesNodeAffinityDrift(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
+	setDynamicContainersGate(t, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
@@ -5615,9 +5677,11 @@ func TestRetryPendingResizesNodeAffinityDrift(t *testing.T) {
 	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 
 	conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(pod.UID)
-	require.Len(t, conditions, 1)
-	assert.Equal(t, v1.PodResizePending, conditions[0].Type)
-	assert.Equal(t, v1.PodReasonDeferred, conditions[0].Reason)
+	require.Len(t, conditions, 2)
+	assert.Equal(t, v1.PodAllocationPending, conditions[0].Type)
+	assert.Equal(t, v1.PodReasonBlocked, conditions[0].Reason)
+	assert.Equal(t, v1.PodResizePending, conditions[1].Type)
+	assert.Equal(t, v1.PodReasonDeferred, conditions[1].Reason)
 	assert.True(t, allocationManager.HasPendingAllocations(), "resize should stay queued for retry")
 }
 
@@ -5726,10 +5790,102 @@ func TestRetryPendingAllocationsSyncsSchedulerEvaluationCompletedRemoval(t *test
 	am.statusManager = fixedProbeTimeStatusManager{
 		Manager: status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker()),
 	}
-	am.statusManager.SetPodResizePendingCondition(resizedPod.UID, v1.PodReasonDeferred, "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000", resizedPod.Generation)
+	am.statusManager.SetPodAllocationPendingCondition(resizedPod.UID, v1.PodReasonInsufficientResources, "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000", resizedPod.Generation, true)
 	syncCount = 0
 
 	allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
 	assert.True(t, am.statusManager.ShouldClearSchedulerEvaluationCompleted(resizedPod.UID))
 	assert.Equal(t, 1, syncCount, "re-evaluation with SchedulerEvaluationCompleted=True must trigger SyncPodNow even when resize conditions stay Deferred")
+}
+
+func TestRetryPendingAllocationsRevertResizeWithPendingNonResizeChange(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	setDynamicContainersGate(t, true)
+
+	synctest.Test(t, func(t *testing.T) {
+		logger, tCtx := ktesting.NewTestContext(t)
+
+		cpu1 := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}}
+		cpu2 := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}}
+		allocatedPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: "1111", Name: "pod", Namespace: "ns", Generation: 1},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{Name: "c1", Image: "i1", Resources: cpu1}},
+			},
+		}
+
+		// Step 1: Resize + image update rejected by admit handler (RejectionBlocked).
+		desiredPod := allocatedPod.DeepCopy()
+		desiredPod.Generation = 2
+		desiredPod.Spec.Containers[0].Image = "i2"
+		desiredPod.Spec.Containers[0].Resources = cpu2
+
+		allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{desiredPod}, nil)
+		require.NoError(t, allocationManager.SetAllocatedPod(logger, allocatedPod))
+		allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{
+			admitFunc: func(*lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+				return lifecycle.PodAdmitResult{Admit: false, Reason: "Blocked", Message: "blocked", RejectionType: lifecycle.RejectionBlocked}
+			},
+		}})
+
+		allocationManager.PushPendingAllocation(logger, desiredPod.UID)
+		allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+		statusManager := allocationManager.(*manager).statusManager
+		conds := statusManager.GetPodResizeConditions(desiredPod.UID)
+		require.Len(t, conds, 2)
+		assert.Equal(t, v1.PodAllocationPending, conds[0].Type)
+		assert.Equal(t, v1.PodReasonBlocked, conds[0].Reason)
+		assert.Equal(t, v1.PodResizePending, conds[1].Type)
+		assert.Equal(t, v1.PodReasonDeferred, conds[1].Reason)
+		initialAllocLTT := conds[0].LastTransitionTime
+
+		// Step 2: Revert the resource change while keeping the image update pending and still rejected with Blocked.
+		time.Sleep(time.Second)
+		revertedPod := allocatedPod.DeepCopy()
+		revertedPod.Generation = 3
+		revertedPod.Spec.Containers[0].Image = "i2"
+		allocationManager.(*manager).podProvider.(*fakePodProvider).pods = []*v1.Pod{revertedPod}
+
+		allocationManager.RetryPendingAllocations(tCtx, TriggerReasonPodUpdated)
+
+		conds = statusManager.GetPodResizeConditions(desiredPod.UID)
+		require.Len(t, conds, 1, "PodResizePending must be cleared when resize is reverted")
+		assert.Equal(t, v1.PodAllocationPending, conds[0].Type)
+		assert.Equal(t, v1.PodReasonBlocked, conds[0].Reason)
+		assert.Equal(t, int64(3), conds[0].ObservedGeneration)
+		assert.Equal(t, initialAllocLTT, conds[0].LastTransitionTime, "PodAllocationPending LTT must be preserved")
+		assert.True(t, allocationManager.HasPendingAllocations(), "non-resize change must remain queued for retry")
+	})
+}
+
+func TestSortPendingAllocationsUsesPodAllocationPendingLTT(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	setDynamicContainersGate(t, true)
+
+	synctest.Test(t, func(t *testing.T) {
+		logger, _ := ktesting.NewTestContext(t)
+
+		pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod-1", Name: "pod-1", Namespace: "ns"}}
+		pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "pod-2", Name: "pod-2", Namespace: "ns"}}
+
+		allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{pod1, pod2}, nil)
+		require.NoError(t, allocationManager.SetAllocatedPod(logger, pod1))
+		require.NoError(t, allocationManager.SetAllocatedPod(logger, pod2))
+
+		am := allocationManager.(*manager)
+		// Set non-resize PodAllocationPending on pod2 first, then on pod1.
+		am.statusManager.SetPodAllocationPendingCondition(pod2.UID, v1.PodReasonBlocked, "blocked", 1, false)
+		time.Sleep(time.Second)
+		am.statusManager.SetPodAllocationPendingCondition(pod1.UID, v1.PodReasonBlocked, "blocked", 1, false)
+
+		allocationManager.PushPendingAllocation(logger, pod1.UID)
+		allocationManager.PushPendingAllocation(logger, pod2.UID)
+
+		require.Equal(t, []types.UID{pod2.UID, pod1.UID}, am.podsWithPendingAllocations)
+	})
 }
