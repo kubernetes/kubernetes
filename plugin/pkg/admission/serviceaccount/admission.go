@@ -145,10 +145,19 @@ func (s *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if shouldIgnore(a) {
 		return nil
 	}
-	if a.GetOperation() != admission.Create {
-		// we only mutate pods during create requests
+	switch {
+	case a.GetOperation() == admission.Create:
+		return s.admitCreate(ctx, a, o)
+	case a.GetOperation() == admission.Update && a.GetSubresource() == "dynamic":
+		s.admitDynamicUpdate(a)
+		return nil
+	default:
+		// we only mutate pods during create and dynamic update requests
 		return nil
 	}
+}
+
+func (s *Plugin) admitCreate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	pod := a.GetObject().(*api.Pod)
 
 	// Don't modify the spec of mirror pods.
@@ -187,18 +196,31 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	if shouldIgnore(a) {
 		return nil
 	}
-
 	pod := a.GetObject().(*api.Pod)
-
-	if a.GetOperation() == admission.Update && a.GetSubresource() == "ephemeralcontainers" {
-		return s.limitEphemeralContainerSecretReferences(pod, a)
-	}
-
-	if a.GetOperation() != admission.Create {
-		// we only validate pod specs during create requests
+	switch {
+	case a.GetOperation() == admission.Create:
+		return s.validateCreate(pod, a)
+	case a.GetOperation() == admission.Update && a.GetSubresource() == "ephemeralcontainers":
+		return s.limitUpdateSecretReferences(pod, a)
+	case a.GetOperation() == admission.Update && a.GetSubresource() == "dynamic":
+		oldPod, ok := a.GetOldObject().(*api.Pod)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("expected an old pod but got a %T", a.GetOldObject()))
+		}
+		// Only added containers can reference new secrets.
+		for pair := range podutil.ContainerPairs(pod, oldPod, podutil.Containers) {
+			if pair.Old == nil {
+				return s.limitUpdateSecretReferences(pod, a)
+			}
+		}
+		return nil
+	default:
+		// we only validate pod specs during create, ephemeral container, and dynamic update requests
 		return nil
 	}
+}
 
+func (s *Plugin) validateCreate(pod *api.Pod, a admission.Attributes) error {
 	// Mirror pods have restrictions on what they can reference
 	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
@@ -244,7 +266,8 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 }
 
 func shouldIgnore(a admission.Attributes) bool {
-	if a.GetResource().GroupResource() != api.Resource("pods") || (a.GetSubresource() != "" && a.GetSubresource() != "ephemeralcontainers") {
+	subresource := a.GetSubresource()
+	if a.GetResource().GroupResource() != api.Resource("pods") || (subresource != "" && subresource != "ephemeralcontainers" && subresource != "dynamic") {
 		return true
 	}
 	obj := a.GetObject()
@@ -339,8 +362,10 @@ func (s *Plugin) limitSecretReferences(serviceAccount *corev1.ServiceAccount, po
 	return nil
 }
 
-func (s *Plugin) limitEphemeralContainerSecretReferences(pod *api.Pod, a admission.Attributes) error {
-	// Require ephemeral container pods to have service accounts
+// limitUpdateSecretReferences checks the secrets newly referenced by an update through the
+// ephemeralcontainers or dynamic subresource.
+func (s *Plugin) limitUpdateSecretReferences(pod *api.Pod, a admission.Attributes) error {
+	// Require pods with added containers to have service accounts
 	if len(pod.Spec.ServiceAccountName) == 0 {
 		return admission.NewForbidden(a, fmt.Errorf("no service account specified for pod %s/%s", a.GetNamespace(), pod.Name))
 	}
@@ -388,6 +413,52 @@ func checkMountableSecrets(serviceAccount *corev1.ServiceAccount, pod, oldPod *a
 		return fmt.Errorf("pod references secrets %q which are not allowed because service account %s does not reference them", sets.List(disallowed), serviceAccount.Name)
 	}
 	return nil
+}
+
+// admitDynamicUpdate mounts the pod's existing service account token volume into containers
+// added through the dynamic subresource, as mountServiceAccountToken would have at creation. The
+// automount decision was made at creation, so the token volume is never added here: added
+// containers can only reference volumes the pod already has.
+func (s *Plugin) admitDynamicUpdate(a admission.Attributes) {
+	if !s.MountServiceAccountToken {
+		return
+	}
+	pod := a.GetObject().(*api.Pod)
+	oldPod, ok := a.GetOldObject().(*api.Pod)
+	if !ok {
+		return
+	}
+	tokenVolumeName := ""
+	for _, volume := range pod.Spec.Volumes {
+		if strings.HasPrefix(volume.Name, ServiceAccountVolumeName+"-") {
+			tokenVolumeName = volume.Name
+			break
+		}
+	}
+	if tokenVolumeName == "" {
+		return
+	}
+	for pair := range podutil.ContainerPairs(pod, oldPod, podutil.Containers) {
+		if pair.Old != nil {
+			continue
+		}
+		container := pair.New
+		existingContainerMount := false
+		for _, volumeMount := range container.VolumeMounts {
+			// Existing mounts at the default mount path prevent mounting of the API token
+			if volumeMount.MountPath == DefaultAPITokenMountPath {
+				existingContainerMount = true
+				break
+			}
+		}
+		if !existingContainerMount {
+			container.VolumeMounts = append(container.VolumeMounts, api.VolumeMount{
+				Name:      tokenVolumeName,
+				ReadOnly:  true,
+				MountPath: DefaultAPITokenMountPath,
+			})
+		}
+	}
 }
 
 func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) {

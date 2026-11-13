@@ -35,6 +35,7 @@ import (
 	"k8s.io/utils/clock"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -194,9 +195,39 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 		return op == admission.Create
 	case "resize":
 		return op == admission.Update
+	case "dynamic":
+		if op != admission.Update {
+			return false
+		}
+		pod, err1 := toExternalPodOrError(a.GetObject())
+		oldPod, err2 := toExternalPodOrError(a.GetOldObject())
+		if err1 != nil || err2 != nil {
+			return true
+		}
+		// Updates that don't change usage or scope aren't charged, as on the main resource, so a
+		// pod that predates a quota's constraints can still get e.g. an image update.
+		return IsTerminating(oldPod) != IsTerminating(pod) || resourcesChanged(oldPod, pod) || containersAdded(oldPod, pod)
 	default:
 		return false
 	}
+}
+
+// resourcesChanged returns true if the pod's total requests or limits changed.
+func resourcesChanged(oldPod, pod *corev1.Pod) bool {
+	opts := podResourcesOptions()
+	return !quota.Equals(resourcehelper.PodRequests(oldPod, opts), resourcehelper.PodRequests(pod, opts)) ||
+		!quota.Equals(resourcehelper.PodLimits(oldPod, opts), resourcehelper.PodLimits(pod, opts))
+}
+
+// containersAdded returns true if pod has a container that oldPod doesn't. Added containers must
+// meet the quota's per-container constraints even if the totals don't change.
+func containersAdded(oldPod, pod *corev1.Pod) bool {
+	for pair := range podutil.ContainerPairs(pod, oldPod, podutil.Containers) {
+		if pair.Old == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -398,16 +429,20 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		return result, nil
 	}
 
-	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: true,
-		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-	}
+	opts := podResourcesOptions()
 	requests := resourcehelper.PodRequests(pod, opts)
 	limits := resourcehelper.PodLimits(pod, opts)
 
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil
+}
+
+func podResourcesOptions() resourcehelper.PodResourcesOptions {
+	return resourcehelper.PodResourcesOptions{
+		UseStatusResources: true,
+		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
+		SkipPodLevelResources: !feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+	}
 }
 
 func isBestEffort(pod *corev1.Pod) bool {

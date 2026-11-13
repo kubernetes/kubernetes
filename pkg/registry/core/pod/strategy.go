@@ -489,6 +489,48 @@ func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]field
 	}
 }
 
+// podDynamicStrategy is the strategy for the pods/dynamic subresource, which
+// allows an expanded set of mutations.
+type podDynamicStrategy struct {
+	podStrategy
+}
+
+// DynamicStrategy wraps and exports the used podStrategy for the storage package.
+var DynamicStrategy = podDynamicStrategy{Strategy}
+
+func (podDynamicStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
+
+	// Pod-level resources are defaulted the same way as for a resize.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourcesFixDefaulting) {
+		if newPod.Spec.Resources == nil && oldPod.Spec.Resources != nil {
+			// preserve existing PLR for requests from potentially PLR-unaware clients that completely dropped the field
+			newPod.Spec.Resources = oldPod.Spec.Resources.DeepCopy()
+		}
+		if newPod.Spec.Resources != nil {
+			podutil.DefaultPodLevelResources(newPod)
+		}
+	}
+
+	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
+}
+
+func (podDynamicStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	opts := corevalidation.GetValidationOptionsFromPodSpecAndMeta(&newPod.Spec, &oldPod.Spec, &newPod.ObjectMeta, &oldPod.ObjectMeta)
+	opts.ResourceIsPod = true
+	return corevalidation.ValidatePodDynamicUpdate(newPod, oldPod, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDynamicStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*api.Pod)
@@ -643,7 +685,7 @@ func LogLocation(
 	// Try to figure out a container
 	// If a container was provided, it must be valid
 	container := opts.Container
-	container, err = validateContainer(container, pod)
+	container, err = validateContainer(container, pod, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -792,7 +834,7 @@ func streamLocation(
 
 	// Try to figure out a container
 	// If a container was provided, it must be valid
-	container, err = validateContainer(container, pod)
+	container, err = validateContainer(container, pod, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -854,8 +896,9 @@ func PortForwardLocation(
 	return loc, nodeInfo, nil
 }
 
-// validateContainer validate container is valid for pod, return valid container
-func validateContainer(container string, pod *api.Pod) (string, error) {
+// validateContainer validate container is valid for pod, return valid container. If allowRemoved
+// is set, a regular container removed through pods/dynamic that still has a status is also valid.
+func validateContainer(container string, pod *api.Pod, allowRemoved bool) (string, error) {
 	if len(container) == 0 {
 		switch len(pod.Spec.Containers) {
 		case 1:
@@ -871,8 +914,11 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.Name, containerNames)
 			return "", errors.NewBadRequest(errStr)
 		}
-	} else {
-		if !podHasContainerWithName(pod, container) {
+	} else if !podHasContainerWithName(pod, container) {
+		// A container removed through pods/dynamic keeps its status until the kubelet has cleaned
+		// it up, and can be inspected until then.
+		_, hasStatus := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container)
+		if !allowRemoved || !utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) || !hasStatus {
 			return "", errors.NewBadRequest(fmt.Sprintf("container %s is not valid for pod %s", container, pod.Name))
 		}
 	}

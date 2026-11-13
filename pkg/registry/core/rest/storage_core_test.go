@@ -31,8 +31,11 @@ import (
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	podregistry "k8s.io/kubernetes/pkg/registry/core/pod"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )
@@ -143,6 +146,8 @@ func podSubresourcesFromStorage(t *testing.T, v1Storage map[string]rest.Storage)
 }
 
 func TestPodSubresourceClassification(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+
 	if overlap := podregistry.DisableablePodSubresources().Intersection(podregistry.NonDisableablePodSubresources()); overlap.Len() > 0 {
 		t.Errorf("DisableablePodSubresources() and NonDisableablePodSubresources() overlap: %v", sets.List(overlap))
 	}
@@ -158,6 +163,8 @@ func TestPodSubresourceClassification(t *testing.T) {
 }
 
 func TestDisabledPodSubresources(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicContainers, true)
+
 	allSubresources := podregistry.DisableablePodSubresources().Union(podregistry.NonDisableablePodSubresources())
 
 	testCases := []struct {

@@ -86,6 +86,16 @@ func TestResizeAdmission(t *testing.T) {
 		},
 	}
 
+	// A pod whose requests exceed the node allocatable, e.g. because it shrank.
+	overAllocatablePod := testPod.DeepCopy()
+	overAllocatablePod.Spec.Containers[0].Resources.Requests[core.ResourceCPU] = resource.MustParse("10")
+	limitsOnlyResize := func() *core.Pod {
+		p := overAllocatablePod.DeepCopy()
+		p.Generation = 2
+		p.Spec.Containers[0].Resources.Limits = core.ResourceList{core.ResourceMemory: resource.MustParse("2Gi")}
+		return p
+	}
+
 	testCases := []struct {
 		name        string
 		subresource string
@@ -244,6 +254,127 @@ func TestResizeAdmission(t *testing.T) {
 			},
 			expectErr:   true,
 			errContains: "node \"missing-node\" not found",
+		},
+		{
+			name:        "Dynamic: successful container add on Linux node",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, *p.Spec.Containers[0].DeepCopy())
+				p.Spec.Containers[1].Name = "added"
+				return p
+			},
+			expectErr: false,
+		},
+		{
+			name:        "Dynamic: reject container add exceeding allocatable",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, *p.Spec.Containers[0].DeepCopy())
+				p.Spec.Containers[1].Name = "added"
+				p.Spec.Containers[1].Resources.Requests[core.ResourceCPU] = resource.MustParse("10")
+				return p
+			},
+			expectErr:   true,
+			errContains: "node didn't have enough allocatable resources: cpu",
+		},
+		{
+			name:        "Dynamic: reject resize exceeding allocatable",
+			subresource: "dynamic",
+			oldPod:      testPod,
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers[0].Resources.Requests[core.ResourceMemory] = resource.MustParse("10Gi")
+				return p
+			},
+			expectErr:   true,
+			errContains: "node didn't have enough allocatable resources: memory",
+		},
+		{
+			name:        "Dynamic: reject container swap on non-Linux node",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers[0].Name = "replacement"
+				return p
+			},
+			expectErr:   true,
+			errContains: "pod resize is only supported on linux nodes",
+		},
+		{
+			name:        "Dynamic: reject adding a container without resources on non-Linux node",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, core.Container{Name: "added", Image: "image"})
+				return p
+			},
+			expectErr:   true,
+			errContains: "pod resize is only supported on linux nodes",
+		},
+		{
+			name:        "Dynamic: reject image update on non-Linux node",
+			subresource: "dynamic",
+			oldPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				return p
+			}(),
+			newPod: func() *core.Pod {
+				p := testPod.DeepCopy()
+				p.Spec.NodeName = "windows-node"
+				p.Generation = 2
+				p.Spec.Containers[0].Image = "new-image"
+				return p
+			},
+			expectErr:   true,
+			errContains: "pod resize is only supported on linux nodes",
+		},
+		{
+			name:        "Dynamic: skip allocatable check for adding a container without resources",
+			subresource: "dynamic",
+			oldPod:      overAllocatablePod,
+			newPod: func() *core.Pod {
+				p := overAllocatablePod.DeepCopy()
+				p.Generation = 2
+				p.Spec.Containers = append(p.Spec.Containers, core.Container{Name: "added", Image: "image"})
+				return p
+			},
+			expectErr: false,
+		},
+		{
+			name:        "Skip allocatable check for limits-only resize",
+			subresource: "resize",
+			oldPod:      overAllocatablePod,
+			newPod:      limitsOnlyResize,
+			expectErr:   false,
+		},
+		{
+			name:        "Dynamic: skip allocatable check for limits-only resize",
+			subresource: "dynamic",
+			oldPod:      overAllocatablePod,
+			newPod:      limitsOnlyResize,
+			expectErr:   false,
 		},
 	}
 

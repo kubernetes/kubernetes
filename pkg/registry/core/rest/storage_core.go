@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/kubernetes"
 	admissionregistrationv1client "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
@@ -248,6 +250,9 @@ func (p *legacyProvider) NewRESTStorage(apiResourceConfigSource serverstorage.AP
 		}
 		if podStorage.Eviction != nil {
 			subresources["eviction"] = podStorage.Eviction
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicContainers) {
+			subresources["dynamic"] = podStorage.Dynamic
 		}
 		for subresource, subresourceStorage := range subresources {
 			if !p.DisabledPodSubresources.Has(subresource) {

@@ -75,3 +75,15 @@ func (c *fakePods) UpdateResize(ctx context.Context, podName string, pod *v1.Pod
 	}
 	return obj.(*v1.Pod), err
 }
+
+// UpdateDynamic takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *fakePods) UpdateDynamic(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
+	emptyResult := &v1.Pod{}
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(c.Resource(), "dynamic", c.Namespace(), pod, opts), &v1.Pod{})
+
+	if obj == nil {
+		return emptyResult, err
+	}
+	return obj.(*v1.Pod), err
+}

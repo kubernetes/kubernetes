@@ -293,6 +293,17 @@
     },
     {
       "kind": "Pod",
+      "name": "pods/dynamic",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "Pod",
       "name": "pods/ephemeralcontainers",
       "namespaced": true,
       "singularName": "",

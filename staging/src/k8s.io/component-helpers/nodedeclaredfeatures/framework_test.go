@@ -513,7 +513,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				},
 			},
 			targetVersion: version.MustParse("1.36.0"),
-			expectedReqs:  []string{"RestartAllContainersOnContainerExits"},
+			expectedReqs:  []string{"DynamicContainers", "RestartAllContainersOnContainerExits"},
 			expectErr:     false,
 		},
 		{
@@ -545,7 +545,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				},
 			},
 			targetVersion: version.MustParse("1.36.0"),
-			expectedReqs:  nil,
+			expectedReqs:  []string{"DynamicContainers"},
 			expectErr:     false,
 		},
 		{
@@ -566,7 +566,7 @@ func TestInferForPodUpdate(t *testing.T) {
 				},
 			},
 			targetVersion: version.MustParse("1.36.0"),
-			expectedReqs:  []string{"VolumeBindMountOptions"},
+			expectedReqs:  []string{"DynamicContainers", "VolumeBindMountOptions"},
 			expectErr:     false,
 		},
 		{

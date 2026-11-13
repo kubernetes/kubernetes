@@ -101,8 +101,8 @@ var (
 // It also resolves the priority of Pods, PodGroups and CompositePodGroups based on their PriorityClass.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
-	// Ignore all calls to subresources
-	if len(a.GetSubresource()) != 0 {
+	// Ignore calls to subresources that can't modify the pod spec.
+	if len(a.GetSubresource()) != 0 && (a.GetResource().GroupResource() != podResource || a.GetSubresource() != "dynamic") {
 		return nil
 	}
 	switch a.GetResource().GroupResource() {

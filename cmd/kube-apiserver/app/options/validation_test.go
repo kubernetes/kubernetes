@@ -356,7 +356,7 @@ func TestValidateDisablePodSubresources(t *testing.T) {
 			name:         "unknown",
 			subresources: []string{"pods/exec", ""},
 			expectedErrs: []string{
-				`unknown pod subresource "pods/exec", valid values are: attach, ephemeralcontainers,`,
+				`unknown pod subresource "pods/exec", valid values are: attach, dynamic, ephemeralcontainers,`,
 				`unknown pod subresource ""`,
 			},
 		},

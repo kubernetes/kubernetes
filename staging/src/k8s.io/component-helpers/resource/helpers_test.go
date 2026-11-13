@@ -5435,3 +5435,227 @@ func TestResizeConditionsAndSupportedResources(t *testing.T) {
 		t.Errorf("expected SupportedPodLevelResources to contain CPU")
 	}
 }
+
+func TestPodResourcesRunningRemovedContainers(t *testing.T) {
+	resources := func(cpu, memory string) v1.ResourceList {
+		return v1.ResourceList{v1.ResourceCPU: resource.MustParse(cpu), v1.ResourceMemory: resource.MustParse(memory)}
+	}
+	running := v1.ContainerState{Running: &v1.ContainerStateRunning{}}
+	newPod := func(removed ...v1.ContainerStatus) *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:      "c",
+					Resources: v1.ResourceRequirements{Requests: resources("1", "1Gi"), Limits: resources("2", "2Gi")},
+				}},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: append([]v1.ContainerStatus{{Name: "c", State: running}}, removed...),
+			},
+		}
+	}
+	removedStatus := func(state v1.ContainerState, limits v1.ResourceList) v1.ContainerStatus {
+		return v1.ContainerStatus{
+			Name:      "removed",
+			State:     state,
+			Resources: &v1.ResourceRequirements{Requests: resources("500m", "512Mi"), Limits: limits},
+		}
+	}
+	useStatus := PodResourcesOptions{UseStatusResources: true}
+	// The scheduler recorded the claim's containers from the spec before "removed" was removed.
+	removedOverhead := []v1.NodeAllocatableResourceClaimStatus{{
+		ResourceClaimName: "node-allocatable-claim",
+		Containers:        []string{"removed"},
+		Overhead: []v1.NodeAllocatableOverheadResources{
+			{Name: v1.ResourceMemory, PerContainer: new(resource.MustParse("512Mi"))},
+		},
+	}}
+
+	cases := []struct {
+		name             string
+		pod              *v1.Pod
+		opts             PodResourcesOptions
+		expectedRequests v1.ResourceList
+		expectedLimits   v1.ResourceList
+	}{
+		{
+			name:             "running removed container is counted",
+			pod:              newPod(removedStatus(running, resources("1", "1Gi"))),
+			opts:             useStatus,
+			expectedRequests: resources("1500m", "1536Mi"),
+			expectedLimits:   resources("3", "3Gi"),
+		},
+		{
+			name: "terminated removed container is not counted",
+			pod: newPod(removedStatus(v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}},
+				resources("1", "1Gi"))),
+			opts:             useStatus,
+			expectedRequests: resources("1", "1Gi"),
+			expectedLimits:   resources("2", "2Gi"),
+		},
+		{
+			name:             "waiting removed container is not counted",
+			pod:              newPod(removedStatus(v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}, resources("1", "1Gi"))),
+			opts:             useStatus,
+			expectedRequests: resources("1", "1Gi"),
+			expectedLimits:   resources("2", "2Gi"),
+		},
+		{
+			name:             "running removed container is not counted without UseStatusResources",
+			pod:              newPod(removedStatus(running, resources("1", "1Gi"))),
+			opts:             PodResourcesOptions{},
+			expectedRequests: resources("1", "1Gi"),
+			expectedLimits:   resources("2", "2Gi"),
+		},
+		{
+			name: "per-container DRA overhead of a running removed container is counted",
+			pod: func() *v1.Pod {
+				pod := newPod(removedStatus(running, resources("1", "1Gi")))
+				pod.Status.ContainerStatuses[1].Resources.Requests = resources("500m", "64Mi")
+				pod.Status.NodeAllocatableResourceClaimStatuses = removedOverhead
+				return pod
+			}(),
+			opts:             PodResourcesOptions{UseStatusResources: true, UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: resources("1500m", "1536Mi"),
+			expectedLimits:   resources("3", "3Gi"),
+		},
+		{
+			name: "per-container DRA overhead of a terminated removed container is not counted",
+			pod: func() *v1.Pod {
+				pod := newPod(removedStatus(v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}, resources("1", "1Gi")))
+				pod.Status.NodeAllocatableResourceClaimStatuses = removedOverhead
+				return pod
+			}(),
+			opts:             PodResourcesOptions{UseStatusResources: true, UseDRANodeAllocatableResourceClaimStatus: true},
+			expectedRequests: resources("1", "1Gi"),
+			expectedLimits:   resources("2", "2Gi"),
+		},
+		{
+			name: "pod-level resources override running removed containers",
+			pod: func() *v1.Pod {
+				pod := newPod(removedStatus(running, resources("1", "1Gi")))
+				pod.Spec.Resources = &v1.ResourceRequirements{Requests: resources("2", "2Gi"), Limits: resources("4", "4Gi")}
+				return pod
+			}(),
+			opts:             useStatus,
+			expectedRequests: resources("2", "2Gi"),
+			expectedLimits:   resources("4", "4Gi"),
+		},
+		{
+			name: "pod-level status resources are used as reported",
+			pod: func() *v1.Pod {
+				pod := newPod(removedStatus(running, resources("1", "1Gi")))
+				pod.Status.AllocatedResources = resources("1", "1Gi")
+				pod.Status.Resources = &v1.ResourceRequirements{Requests: resources("1200m", "1Gi"), Limits: resources("2", "2Gi")}
+				return pod
+			}(),
+			opts: PodResourcesOptions{
+				UseStatusResources: true,
+				InPlacePodLevelResourcesVerticalScalingEnabled: true,
+			},
+			expectedRequests: resources("1200m", "1Gi"),
+			expectedLimits:   resources("2", "2Gi"),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if requests := PodRequests(tc.pod, tc.opts); !equality.Semantic.DeepEqual(tc.expectedRequests, requests) {
+				t.Errorf("unexpected requests: %s", diff.Diff(tc.expectedRequests, requests))
+			}
+			if limits := PodLimits(tc.pod, tc.opts); !equality.Semantic.DeepEqual(tc.expectedLimits, limits) {
+				t.Errorf("unexpected limits: %s", diff.Diff(tc.expectedLimits, limits))
+			}
+		})
+	}
+}
+
+func TestContainerStatusPairs(t *testing.T) {
+	containers := func(names ...string) []v1.Container {
+		var cs []v1.Container
+		for _, n := range names {
+			cs = append(cs, v1.Container{Name: n})
+		}
+		return cs
+	}
+	statuses := func(names ...string) []v1.ContainerStatus {
+		var ss []v1.ContainerStatus
+		for _, n := range names {
+			ss = append(ss, v1.ContainerStatus{Name: n, State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}})
+		}
+		return ss
+	}
+	cases := []struct {
+		name       string
+		containers []v1.Container
+		statuses   []v1.ContainerStatus
+		expected   []string
+	}{
+		{
+			name:       "statuses in a different order",
+			containers: containers("a", "b", "c"),
+			statuses:   statuses("c", "a", "b"),
+			expected:   []string{"a/a", "b/b", "c/c"},
+		},
+		{
+			name:       "containers without statuses",
+			containers: containers("a", "b"),
+			statuses:   statuses("b"),
+			expected:   []string{"a/", "b/b"},
+		},
+		{
+			name:       "statuses without containers",
+			containers: containers("a", "c"),
+			statuses:   statuses("a", "b", "c", "d"),
+			expected:   []string{"a/a", "c/c", "/b", "/d"},
+		},
+		{
+			name:       "statuses of containers that aren't running and match no container",
+			containers: containers("a"),
+			statuses: func() []v1.ContainerStatus {
+				ss := statuses("a", "b", "c", "d")
+				ss[1].State = v1.ContainerState{Terminated: &v1.ContainerStateTerminated{}}
+				ss[2].State = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}
+				return ss
+			}(),
+			expected: []string{"a/a", "/d"},
+		},
+		{
+			name:     "no containers",
+			statuses: statuses("a"),
+			expected: []string{"/a"},
+		},
+		{
+			name:       "no statuses",
+			containers: containers("a"),
+			expected:   []string{"a/"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var actual []string
+			for pair := range containerStatusPairs(tc.containers, tc.statuses) {
+				var c, s string
+				if pair.container != nil {
+					c = pair.container.Name
+				}
+				if pair.status != nil {
+					s = pair.status.Name
+				}
+				actual = append(actual, c+"/"+s)
+			}
+			if !equality.Semantic.DeepEqual(tc.expected, actual) {
+				t.Errorf("unexpected pairs: %s", diff.Diff(tc.expected, actual))
+			}
+		})
+	}
+
+	cs, ss := containers("a", "b", "c"), statuses("c", "b", "d")
+	allocs := testing.AllocsPerRun(100, func() {
+		for pair := range containerStatusPairs(cs, ss) {
+			_ = pair
+		}
+	})
+	if allocs != 0 {
+		t.Errorf("expected no allocations, got %v", allocs)
+	}
+}

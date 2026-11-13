@@ -1194,6 +1194,51 @@ func TestPodEvaluatorUsageResourceResize(t *testing.T) {
 	}
 }
 
+func TestPodEvaluatorUsageRemovedContainers(t *testing.T) {
+	resources := func(cpu, memory string) api.ResourceList {
+		return api.ResourceList{api.ResourceCPU: resource.MustParse(cpu), api.ResourceMemory: resource.MustParse(memory)}
+	}
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{{
+				Name:      "c",
+				Resources: api.ResourceRequirements{Requests: resources("100m", "200Mi"), Limits: resources("200m", "400Mi")},
+			}},
+		},
+		Status: api.PodStatus{
+			ContainerStatuses: []api.ContainerStatus{{
+				Name:  "c",
+				State: api.ContainerState{Running: &api.ContainerStateRunning{}},
+			}, {
+				Name:      "removed",
+				State:     api.ContainerState{Running: &api.ContainerStateRunning{}},
+				Resources: &api.ResourceRequirements{Requests: resources("300m", "100Mi"), Limits: resources("300m", "100Mi")},
+			}, {
+				Name:      "stopped",
+				State:     api.ContainerState{Terminated: &api.ContainerStateTerminated{}},
+				Resources: &api.ResourceRequirements{Requests: resources("1", "1Gi"), Limits: resources("1", "1Gi")},
+			}},
+		},
+	}
+	expected := corev1.ResourceList{
+		corev1.ResourceRequestsCPU:    resource.MustParse("400m"),
+		corev1.ResourceRequestsMemory: resource.MustParse("300Mi"),
+		corev1.ResourceLimitsCPU:      resource.MustParse("500m"),
+		corev1.ResourceLimitsMemory:   resource.MustParse("500Mi"),
+		corev1.ResourceCPU:            resource.MustParse("400m"),
+		corev1.ResourceMemory:         resource.MustParse("300Mi"),
+		corev1.ResourcePods:           resource.MustParse("1"),
+		generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+	}
+	actual, err := NewPodEvaluator(nil, testingclock.NewFakeClock(time.Now())).Usage(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !quota.Equals(expected, actual) {
+		t.Errorf("expected: %v, actual: %v", expected, actual)
+	}
+}
+
 func BenchmarkPodMatchesScopeFunc(b *testing.B) {
 	pod, _ := toExternalPodOrError(makePod("p1", "high-priority",
 		api.ResourceList{api.ResourceCPU: resource.MustParse("1")}, api.PodRunning))
@@ -1335,6 +1380,50 @@ func TestPodEvaluatorHandles(t *testing.T) {
 		{
 			name:  "update-resize",
 			attrs: admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "resize", admission.Update, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update-dynamic-image",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Image: "new"}}}}, &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Image: "old"}}}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name:  "update-dynamic-add-container-without-resources",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}, {Name: "added"}}}}, &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want:  true,
+		},
+		{
+			name:  "update-dynamic-remove-container-without-resources",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}}}, &corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}, {Name: "removed"}}}}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want:  false,
+		},
+		{
+			name: "update-dynamic-add-container-with-resources",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}, {Name: "added", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}}},
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want: true,
+		},
+		{
+			name: "update-dynamic-remove-container-same-totals",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}}},
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}, {Name: "removed"}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want: false,
+		},
+		{
+			name: "update-dynamic-resize",
+			attrs: admission.NewAttributesRecord(
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("2")}}}}}},
+				&corev1.Pod{Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "c", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1")}}}}}},
+				schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
+			want: true,
+		},
+		{
+			name:  "update-dynamic-activeDeadlineSeconds-from-nil",
+			attrs: admission.NewAttributesRecord(&corev1.Pod{Spec: corev1.PodSpec{ActiveDeadlineSeconds: ptr.To[int64](1)}}, &corev1.Pod{}, schema.GroupVersionKind{Group: "core", Version: "v1", Kind: "Pod"}, "", "", schema.GroupVersionResource{Group: "core", Version: "v1", Resource: "pods"}, "dynamic", admission.Update, nil, false, nil),
 			want:  true,
 		},
 	}
