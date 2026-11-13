@@ -3185,6 +3185,15 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
+- name: failed_evictions_total
+  subsystem: imperative_eviction_responder_controller
+  help: Total number of failed evictions where at least three unsuccessful calls have
+    been made to pods/<name>/eviction subresource, corresponding to the Eviction .spec.target.pod.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: processing_latency_seconds
   subsystem: informer
   help: Time taken to process events after popping from the queue.
