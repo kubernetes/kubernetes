@@ -648,6 +648,9 @@ type podActions struct {
 	ContainersToReset []containerToRemoveInfo
 	// UpdatePodLevelResources is true if pod-level resources need to be updated
 	UpdatePodLevelResources bool
+	// deferResize withholds pod-wide resize actions when a container's RestartContainer resize
+	// is deferred waiting on an unready dynamic volume.
+	deferResize bool
 }
 
 // resourceRequirements summarizes the set of resources applicable to the
@@ -799,6 +802,16 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	resizeCPULim, restartCPULim := determineContainerResize(v1.ResourceCPU, desiredResources.cpuLimit, currentResources.cpuLimit)
 	resizeCPUReq, restartCPUReq := determineContainerResize(v1.ResourceCPU, desiredResources.cpuRequest, currentResources.cpuRequest)
 	if restartCPULim || restartCPUReq || restartMemLim || restartMemReq {
+		if !initContainer && utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+			if actuatedPod, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok && actuatedPod != nil && actuatedPod.Name != "" {
+				if unreadyVol, ready := containerVolumesReady(pod, &container, actuatedPod, true); !ready {
+					logger.Info("Deferring resize-triggered container restart until dynamic volume is ready",
+						"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", unreadyVol)
+					changes.deferResize = true
+					return true
+				}
+			}
+		}
 		// resize policy requires this container to restart
 		changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
 			name:      kubeContainerStatus.Name,
@@ -1514,9 +1527,37 @@ func (m *kubeGenericRuntimeManager) reconcileNonRunningActuatedContainers(logger
 	return actuatedPod
 }
 
+func isVolumeMountedInPodSpec(spec *v1.PodSpec, volumeName string) bool {
+	for c := range podutil.ContainerIter(spec, podutil.AllContainers) {
+		if slices.ContainsFunc(c.VolumeMounts, func(vm v1.VolumeMount) bool { return vm.Name == volumeName }) {
+			return true
+		}
+	}
+	return false
+}
+
+// containerVolumesReady reports whether every volume mounted by container is ready on the node.
+func containerVolumesReady(pod *v1.Pod, container *v1.Container, actuatedPod *v1.Pod, containerRunning bool) (string, bool) {
+	if actuatedPod == nil {
+		return "", true
+	}
+	for _, vm := range container.VolumeMounts {
+		if !containerRunning && slices.ContainsFunc(pod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name && v.Image != nil }) {
+			// Non-running containers pull OCI Image volumes (and surface ErrImagePull/ImagePullBackOff) in startContainer.
+			continue
+		}
+		if isVolumeMountedInPodSpec(&actuatedPod.Spec, vm.Name) ||
+			slices.ContainsFunc(actuatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vm.Name }) {
+			continue
+		}
+		return vm.Name, false
+	}
+	return "", true
+}
+
 // computeContainerVolumeMountAction determines whether a running container needs to be restarted
 // in-place due to dynamic volumeMount changes. Returns true to keep the container, false to restart.
-func (m *kubeGenericRuntimeManager) computeContainerVolumeMountAction(ctx context.Context, pod, actuatedPod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) bool {
+func (m *kubeGenericRuntimeManager) computeContainerVolumeMountAction(ctx context.Context, pod, actuatedPod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions, volumesReady bool, unreadyVolName string) bool {
 	if actuatedPod == nil || kubeContainerStatus.State != kubecontainer.ContainerStateRunning {
 		return true
 	}
@@ -1531,7 +1572,14 @@ func (m *kubeGenericRuntimeManager) computeContainerVolumeMountAction(ctx contex
 		return true
 	}
 
-	klog.FromContext(ctx).Info("Restarting container in-place for dynamic volumeMount change",
+	logger := klog.FromContext(ctx)
+	if !volumesReady {
+		logger.Info("Deferring container restart for dynamic volumeMount change until volume is ready",
+			"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", unreadyVolName)
+		return true
+	}
+
+	logger.Info("Restarting container in-place for dynamic volumeMount change",
 		"pod", klog.KObj(pod), "containerName", container.Name)
 	changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
 		name:      kubeContainerStatus.Name,
@@ -1647,6 +1695,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 		// Ephemeral Containers are never restarted
 		if podStatus.FindContainerStatusByName(c.Name) == nil {
+			if volName, ready := containerVolumesReady(pod, c, actuatedPod, false); !ready {
+				logger.Info("Deferring ephemeral container start until dynamic volume is ready",
+					"pod", klog.KObj(pod), "containerName", c.Name, "volumeName", volName)
+				continue
+			}
 			changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
 		}
 	}
@@ -1667,9 +1720,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 	// Number of running containers to keep.
 	keepCount := 0
+	hasDeferredContainerStart := false
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		isRunning := containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateRunning
+		unreadyVolName, volumesReady := containerVolumesReady(pod, &container, actuatedPod, isRunning)
 
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
@@ -1693,8 +1749,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 					pod.DeletionTimestamp == nil &&
 					hasPendingDynamicVolumeMountUpdate(&container, actCtr))
 			if shouldRestart {
-				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
-				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
 					// If container is in unknown state, we don't know whether it
 					// is actually running or not, always try killing it before
@@ -1707,6 +1761,14 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 						reason: reasonUnknown,
 					}
 				}
+				if !volumesReady {
+					logger.Info("Deferring container start until dynamic volume is ready",
+						"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", unreadyVolName)
+					hasDeferredContainerStart = true
+					continue
+				}
+				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
+				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 			}
 			continue
 		}
@@ -1734,7 +1796,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
-		} else if !m.computeContainerVolumeMountAction(ctx, pod, actuatedPod, idx, containerStatus, &changes) {
+		} else if !m.computeContainerVolumeMountAction(ctx, pod, actuatedPod, idx, containerStatus, &changes, volumesReady, unreadyVolName) {
 			continue
 		} else if !m.computePodResizeAction(ctx, pod, idx, false, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
@@ -1749,6 +1811,12 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// container afterwards, make the intent clear in the message. Also do
 		// not kill the entire pod since we expect container to be running eventually.
 		if restart {
+			if !volumesReady {
+				logger.Info("Deferring container restart until dynamic volume is ready",
+					"pod", klog.KObj(pod), "containerName", container.Name, "volumeName", unreadyVolName)
+				keepCount++
+				continue
+			}
 			message = fmt.Sprintf("%s, will be restarted", message)
 			changes.ContainersToStart = append(changes.ContainersToStart, idx)
 		}
@@ -1762,15 +1830,25 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		logger.V(2).Info("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
 	}
 
-	// Check for volume resize actions
-	m.computeVolumeResizeAction(ctx, pod, &changes)
-
-	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
+	if keepCount == 0 && len(changes.ContainersToStart) == 0 && !hasDeferredContainerStart {
 		changes.KillPod = true
 		// To prevent the restartable init containers to keep pod alive, we should
 		// not restart them.
 		changes.InitContainersToStart = nil
 	}
+
+	if changes.deferResize {
+		// When any running container's resize restart is deferred on an unready dynamic volume,
+		// withhold pod-wide resize actions so pod cgroups are not reconciled against pod.Spec
+		// before that container's resize can be actuated.
+		clear(changes.ContainersToUpdate)
+		changes.UpdatePodResources = false
+		changes.UpdatePodLevelResources = false
+		return changes
+	}
+
+	// Check for volume resize actions
+	m.computeVolumeResizeAction(ctx, pod, &changes)
 
 	changes.UpdatePodLevelResources = m.computePodLevelResourcesResizeAction(ctx, pod)
 	if !changes.UpdatePodLevelResources && !changes.UpdatePodResources {
@@ -1877,6 +1955,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 	}()
 	logger := klog.FromContext(ctx)
+	// Pre-pull newly mounted OCI Image volumes before computing container actions so a failing or
+	// slow image pull never terminates a healthy running container.
+	prePulledImageVolumes, prePulledSandboxConfig, deferredImagePullErr, prePullErr := m.prePullUnactuatedImageVolumes(ctx, pod, podStatus, pullSecrets)
+	if prePullErr != nil {
+		logger.Error(prePullErr, "Failed to prepare dynamic image volumes for pod", "pod", klog.KObj(pod))
+		result.Fail(prePullErr)
+		return
+	}
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(ctx, pod, podStatus, restartAllContainers)
 	logger.V(3).Info("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
@@ -2162,9 +2248,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 	// State required only if we need to start any containers.
 	var (
-		podSandboxConfig       *runtimeapi.PodSandboxConfig
+		podSandboxConfig       = prePulledSandboxConfig
 		imageVolumePullResults imageVolumePulls
 	)
+	if podContainerChanges.CreateSandbox {
+		podSandboxConfig = nil
+	}
 
 	// lazyStart initializes state required to start containers and returns a start function.
 	lazyStart := func() func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
@@ -2180,7 +2269,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 
 		if imageVolumePullResults == nil {
-			imageVolumePullResults, err = m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
+			imageVolumePullResults, err = m.getImageVolumesWithCache(ctx, pod, podSandboxConfig, pullSecrets, prePulledImageVolumes)
 			if err != nil {
 				// Don't start any containers until we have all image volumes.
 				logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
@@ -2254,6 +2343,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
 	}
 
+	if deferredImagePullErr != nil && result.Error() == nil {
+		result.Fail(deferredImagePullErr)
+	}
+
 	return result
 }
 
@@ -2325,7 +2418,91 @@ func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(ctx context.Cont
 	return imageVolumes, nil
 }
 
+// prePullUnactuatedImageVolumes pulls any newly mounted OCI Image volume before computePodActions
+// decides whether to kill or start containers, recording SetPodVolume on success so containerVolumesReady
+// only restarts running containers after the image pull succeeds.
+func (m *kubeGenericRuntimeManager) prePullUnactuatedImageVolumes(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret) (imageVolumePulls, *runtimeapi.PodSandboxConfig, error, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) ||
+		m.actuatedState == nil {
+		return nil, nil, nil, nil
+	}
+	actuatedPod, ok := m.actuatedState.GetPodReadOnly(pod.UID)
+	if !ok || actuatedPod == nil || actuatedPod.Name == "" {
+		return nil, nil, nil, nil
+	}
+	logger := klog.FromContext(ctx)
+	createPodSandbox, attempt, _, _ := runtimeutil.PodSandboxChanged(logger, pod, podStatus)
+	if createPodSandbox {
+		return nil, nil, nil, nil
+	}
+
+	var unactuated []v1.Volume
+	for _, vol := range pod.Spec.Volumes {
+		if vol.Image == nil || !isVolumeMountedInPodSpec(&pod.Spec, vol.Name) {
+			continue
+		}
+		if isVolumeMountedInPodSpec(&actuatedPod.Spec, vol.Name) ||
+			slices.ContainsFunc(actuatedPod.Spec.Volumes, func(v v1.Volume) bool { return v.Name == vol.Name }) {
+			continue
+		}
+		unactuated = append(unactuated, vol)
+	}
+	if len(unactuated) == 0 {
+		return nil, nil, nil, nil
+	}
+
+	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, attempt)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("GeneratePodSandboxConfig for pod %q failed: %w", format.Pod(pod), err)
+	}
+	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
+	if err != nil {
+		return nil, podSandboxConfig, nil, err
+	}
+
+	pulled := make(imageVolumePulls, len(unactuated))
+	var pullErr error
+	for _, vol := range unactuated {
+		res := m.ensureImageVolume(ctx, pod, vol, podSandboxConfig, podRuntimeHandler, pullSecrets)
+		pulled[vol.Name] = res
+		if res.err != nil && pullErr == nil {
+			pullErr = res.err
+		}
+	}
+	return pulled, podSandboxConfig, pullErr, nil
+}
+
+func (m *kubeGenericRuntimeManager) ensureImageVolume(ctx context.Context, pod *v1.Pod, volume v1.Volume, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullSecrets []v1.Secret) imageVolumePullResult {
+	logger := klog.FromContext(ctx)
+	objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+	imgRef, msg, err := m.imagePuller.EnsureImageExists(
+		ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
+	)
+	if err != nil {
+		logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod), "volumeName", volume.Name)
+		return imageVolumePullResult{err: err, msg: msg}
+	}
+
+	logger.V(4).Info("Pulled image", "ref", imgRef, "pod", klog.KObj(pod), "volumeName", volume.Name)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) && m.actuatedState != nil {
+		if setErr := m.actuatedState.SetPodVolume(logger, pod.UID, volume); setErr != nil {
+			logger.Error(setErr, "Failed to record image volume in actuated state", "pod", klog.KObj(pod), "volumeName", volume.Name)
+		}
+	}
+	return imageVolumePullResult{spec: &runtimeapi.ImageSpec{
+		Image:              imgRef,
+		UserSpecifiedImage: volume.Image.Reference,
+		RuntimeHandler:     podRuntimeHandler,
+		Annotations:        pod.Annotations,
+	}}
+}
+
 func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret) (imageVolumePulls, error) {
+	return m.getImageVolumesWithCache(ctx, pod, podSandboxConfig, pullSecrets, nil)
+}
+
+func (m *kubeGenericRuntimeManager) getImageVolumesWithCache(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret, prePulled imageVolumePulls) (imageVolumePulls, error) {
 	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 		return nil, nil
@@ -2337,29 +2514,22 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 		return nil, err
 	}
 
+	dynamicVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes)
 	res := make(imageVolumePulls)
 	for _, volume := range pod.Spec.Volumes {
-		if volume.Image == nil {
+		if volume.Image == nil || (dynamicVolumesEnabled && !isVolumeMountedInPodSpec(&pod.Spec, volume.Name)) {
 			continue
 		}
-
-		objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
-		ref, msg, err := m.imagePuller.EnsureImageExists(
-			ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
-		)
-		if err != nil {
-			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod))
-			res[volume.Name] = imageVolumePullResult{err: err, msg: msg}
+		if prev, ok := prePulled[volume.Name]; ok {
+			if prev.err == nil && dynamicVolumesEnabled && m.actuatedState != nil {
+				if setErr := m.actuatedState.SetPodVolume(logger, pod.UID, volume); setErr != nil {
+					logger.Error(setErr, "Failed to record image volume in actuated state", "pod", klog.KObj(pod), "volumeName", volume.Name)
+				}
+			}
+			res[volume.Name] = prev
 			continue
 		}
-
-		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod))
-		res[volume.Name] = imageVolumePullResult{spec: &runtimeapi.ImageSpec{
-			Image:              ref,
-			UserSpecifiedImage: volume.Image.Reference,
-			RuntimeHandler:     podRuntimeHandler,
-			Annotations:        pod.Annotations,
-		}}
+		res[volume.Name] = m.ensureImageVolume(ctx, pod, volume, podSandboxConfig, podRuntimeHandler, pullSecrets)
 	}
 
 	return res, nil
