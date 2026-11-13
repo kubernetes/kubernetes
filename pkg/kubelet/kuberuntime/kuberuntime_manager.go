@@ -33,6 +33,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -837,6 +838,9 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	// because SyncPod calls UpdateActuatedPodLevelResources and WaitForAttachAndMount before
 	// InitializeActuatedPod, which creates a nameless pod entry.
 	if hasPod && !state.IsMigratedFromV1(stored) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+			m.backfillActuatedVolumeMounts(logger, allocatedPod, stored)
+		}
 		return
 	}
 	// If there is no actuated checkpoint for the pod, seed it with the allocated pod.
@@ -875,10 +879,44 @@ func (m *kubeGenericRuntimeManager) InitializeActuatedPod(logger klog.Logger, al
 	}
 }
 
+// backfillActuatedVolumeMounts populates container VolumeMounts and DynamicVolumeMountPolicy on
+// checkpoints written while DynamicNodeLocalEphemeralVolumes was disabled, without overwriting
+// containers whose mounts were already recorded as empty while the gate was enabled or touching
+// newly added containers not yet present in stored.
+func (m *kubeGenericRuntimeManager) backfillActuatedVolumeMounts(logger klog.Logger, allocatedPod, stored *v1.Pod) {
+	for c, cType := range podutil.ContainerIter(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers) {
+		storedCtr := findContainerInPodSpec(&stored.Spec, c.Name, cType)
+		if storedCtr == nil {
+			continue
+		}
+		needsBackfill := false
+		if c.DynamicVolumeMountPolicy != nil {
+			// DynamicVolumeMountPolicy is immutable on existing containers and always persisted when the
+			// gate is enabled, so nil in storedCtr means the checkpoint predates gate enablement.
+			needsBackfill = storedCtr.DynamicVolumeMountPolicy == nil
+		} else {
+			// Without DynamicVolumeMountPolicy, VolumeMounts are immutable, so an existing stored
+			// container with empty mounts when allocated has mounts also predates gate enablement.
+			needsBackfill = len(c.VolumeMounts) > 0 && len(storedCtr.VolumeMounts) == 0
+		}
+		if !needsBackfill {
+			continue
+		}
+		backfilled := *storedCtr
+		backfilled.VolumeMounts = c.VolumeMounts
+		backfilled.DynamicVolumeMountPolicy = c.DynamicVolumeMountPolicy
+		if err := m.actuatedState.SetContainer(logger, allocatedPod.UID, cType, backfilled); err != nil {
+			logger.Error(err, "Failed to backfill actuated container volume mounts", "pod", klog.KObj(allocatedPod), "containerName", c.Name)
+		} else {
+			logger.Info("Backfilled actuated container volume mounts after feature gate enablement", "pod", klog.KObj(allocatedPod), "containerName", c.Name)
+		}
+	}
+}
+
 // KeepOnlyResourceValues strips everything from pod.Spec except the resizable resources (and
-// container volume mounts when DynamicNodeLocalEphemeralVolumes is enabled), because those are
-// all SetPod initializes in the actuated state (mounted volumes are recorded via SetPodVolume
-// and preserved by SetPod).
+// container volume mounts and dynamic volume mount policies when DynamicNodeLocalEphemeralVolumes
+// is enabled), because those are all SetPod initializes in the actuated state (mounted volumes are
+// recorded via SetPodVolume and preserved by SetPod).
 func KeepOnlyResourceValues(pod *v1.Pod) {
 	var spec v1.PodSpec
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
@@ -888,15 +926,22 @@ func KeepOnlyResourceValues(pod *v1.Pod) {
 	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		resizable := allocation.IsResizableContainer(container, containerType)
 		hasVolumeMounts := keepVolumeMounts && len(container.VolumeMounts) > 0
-		if !resizable && !hasVolumeMounts {
+		hasDynamicVolumeMountPolicy := keepVolumeMounts && container.DynamicVolumeMountPolicy != nil
+		if !resizable && !hasVolumeMounts && !hasDynamicVolumeMountPolicy {
 			continue
 		}
 		actuated := v1.Container{Name: container.Name}
+		if podutil.IsRestartableInitContainer(container) {
+			actuated.RestartPolicy = container.RestartPolicy
+		}
 		if resizable {
 			actuated.Resources = container.Resources
 		}
 		if hasVolumeMounts {
 			actuated.VolumeMounts = container.VolumeMounts
+		}
+		if hasDynamicVolumeMountPolicy {
+			actuated.DynamicVolumeMountPolicy = container.DynamicVolumeMountPolicy
 		}
 		if containerType == podutil.InitContainers {
 			spec.InitContainers = append(spec.InitContainers, actuated)
@@ -1361,6 +1406,142 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Cont
 	return nil
 }
 
+func findContainerInPodSpec(spec *v1.PodSpec, name string, containerType podutil.ContainerType) *v1.Container {
+	for c := range podutil.ContainerIter(spec, containerType) {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
+func actuatedMountsForContainer(actuatedPod *v1.Pod, containerName string, containerType podutil.ContainerType) []v1.VolumeMount {
+	if actuatedPod == nil {
+		return nil
+	}
+	switch containerType {
+	case podutil.InitContainers, podutil.Containers:
+		if c := findContainerInPodSpec(&actuatedPod.Spec, containerName, containerType); c != nil {
+			return c.VolumeMounts
+		}
+	case podutil.EphemeralContainers:
+		for i := range actuatedPod.Spec.EphemeralContainers {
+			if actuatedPod.Spec.EphemeralContainers[i].Name == containerName {
+				return actuatedPod.Spec.EphemeralContainers[i].VolumeMounts
+			}
+		}
+	}
+	return nil
+}
+
+// hasPendingDynamicVolumeMountUpdate returns true when a container with RestartContainer policy
+// still has its pre-update mounts recorded in actuatedState that differ from its desired spec.
+func hasPendingDynamicVolumeMountUpdate(specCtr, actCtr *v1.Container) bool {
+	if specCtr == nil || actCtr == nil {
+		return false
+	}
+	if specCtr.DynamicVolumeMountPolicy == nil || specCtr.DynamicVolumeMountPolicy.RestartPolicy != v1.DynamicVolumeMountRestartContainer {
+		return false
+	}
+	if actCtr.DynamicVolumeMountPolicy == nil || actCtr.DynamicVolumeMountPolicy.RestartPolicy != v1.DynamicVolumeMountRestartContainer {
+		return false
+	}
+	return (len(actCtr.VolumeMounts) > 0 || len(specCtr.VolumeMounts) > 0) &&
+		!apiequality.Semantic.DeepEqual(actCtr.VolumeMounts, specCtr.VolumeMounts)
+}
+
+// reconcileNonRunningActuatedContainers clears actuated VolumeMounts for permanently
+// non-running containers and removes entries for containers no longer present in pod.Spec so
+// host volume unmounts are never blocked by containers that will not run again.
+func (m *kubeGenericRuntimeManager) reconcileNonRunningActuatedContainers(logger klog.Logger, pod *v1.Pod, podStatus *kubecontainer.PodStatus, actuatedPod *v1.Pod) *v1.Pod {
+	if actuatedPod == nil || podStatus == nil {
+		return actuatedPod
+	}
+	var podWithoutRemoved *v1.Pod
+	updated := false
+	for actCtr, cType := range podutil.ContainerIter(&actuatedPod.Spec, podutil.AllContainers) {
+		cs := podStatus.FindContainerStatusByName(actCtr.Name)
+		if cs != nil && (cs.State == kubecontainer.ContainerStateRunning || cs.State == kubecontainer.ContainerStateUnknown) {
+			continue
+		}
+		specCtr := findContainerInPodSpec(&pod.Spec, actCtr.Name, cType)
+		if specCtr == nil {
+			if podWithoutRemoved == nil {
+				podWithoutRemoved = actuatedPod.DeepCopy()
+			}
+			podWithoutRemoved.Spec.InitContainers = slices.DeleteFunc(podWithoutRemoved.Spec.InitContainers, func(c v1.Container) bool { return c.Name == actCtr.Name })
+			podWithoutRemoved.Spec.Containers = slices.DeleteFunc(podWithoutRemoved.Spec.Containers, func(c v1.Container) bool { return c.Name == actCtr.Name })
+			podWithoutRemoved.Spec.EphemeralContainers = slices.DeleteFunc(podWithoutRemoved.Spec.EphemeralContainers, func(c v1.EphemeralContainer) bool { return c.Name == actCtr.Name })
+			continue
+		}
+		if actCtr.DynamicVolumeMountPolicy == nil {
+			continue
+		}
+		willRestart := kubecontainer.ShouldContainerBeRestarted(logger, specCtr, pod, podStatus) ||
+			(pod.DeletionTimestamp == nil && hasPendingDynamicVolumeMountUpdate(specCtr, actCtr))
+		if willRestart {
+			continue
+		}
+		if len(actCtr.VolumeMounts) > 0 || actCtr.DynamicVolumeMountPolicy.RestartPolicy != "" {
+			cleared := *actCtr
+			cleared.VolumeMounts = nil
+			// Keep a non-nil policy with an empty RestartPolicy so subsequent syncs do not
+			// treat cleared mounts on a completed OnFailure container as a pending update.
+			cleared.DynamicVolumeMountPolicy = &v1.ContainerDynamicVolumeMountPolicy{}
+			if podWithoutRemoved != nil {
+				if c := findContainerInPodSpec(&podWithoutRemoved.Spec, actCtr.Name, cType); c != nil {
+					*c = cleared
+				}
+			} else if err := m.actuatedState.SetContainer(logger, pod.UID, cType, cleared); err != nil {
+				logger.Error(err, "Failed to clear actuated volume mounts for non-running container", "pod", klog.KObj(pod), "containerName", actCtr.Name)
+			} else {
+				updated = true
+			}
+		}
+	}
+	if podWithoutRemoved != nil {
+		if err := m.actuatedState.SetPod(logger, podWithoutRemoved); err != nil {
+			logger.Error(err, "Failed to remove non-running deleted containers from actuated state", "pod", klog.KObj(pod))
+		} else {
+			updated = true
+		}
+	}
+	if updated {
+		if refreshed, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok {
+			return refreshed
+		}
+	}
+	return actuatedPod
+}
+
+// computeContainerVolumeMountAction determines whether a running container needs to be restarted
+// in-place due to dynamic volumeMount changes. Returns true to keep the container, false to restart.
+func (m *kubeGenericRuntimeManager) computeContainerVolumeMountAction(ctx context.Context, pod, actuatedPod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) bool {
+	if actuatedPod == nil || kubeContainerStatus.State != kubecontainer.ContainerStateRunning {
+		return true
+	}
+
+	container := &pod.Spec.Containers[containerIdx]
+	if container.DynamicVolumeMountPolicy == nil || container.DynamicVolumeMountPolicy.RestartPolicy != v1.DynamicVolumeMountRestartContainer {
+		return true
+	}
+
+	actuatedMounts := actuatedMountsForContainer(actuatedPod, container.Name, podutil.Containers)
+	if (len(actuatedMounts) == 0 && len(container.VolumeMounts) == 0) || apiequality.Semantic.DeepEqual(actuatedMounts, container.VolumeMounts) {
+		return true
+	}
+
+	klog.FromContext(ctx).Info("Restarting container in-place for dynamic volumeMount change",
+		"pod", klog.KObj(pod), "containerName", container.Name)
+	changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
+		name:      kubeContainerStatus.Name,
+		container: container,
+		message:   fmt.Sprintf("Container %s volumeMounts changed, will be restarted", container.Name),
+	}
+	changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
+	return false
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, restartAllContainers bool) podActions {
 	logger := klog.FromContext(ctx)
@@ -1453,6 +1634,13 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		return changes
 	}
 
+	var actuatedPod *v1.Pod
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) {
+		if p, ok := m.actuatedState.GetPodReadOnly(pod.UID); ok && p != nil && p.Name != "" {
+			actuatedPod = m.reconcileNonRunningActuatedContainers(logger, pod, podStatus, p)
+		}
+	}
+
 	// Ephemeral containers may be started even if initialization is not yet complete.
 	for i := range pod.Spec.EphemeralContainers {
 		c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
@@ -1496,7 +1684,15 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// If container does not exist, or is not running, check whether we
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			if kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) {
+			var actCtr *v1.Container
+			if actuatedPod != nil {
+				actCtr = findContainerInPodSpec(&actuatedPod.Spec, container.Name, podutil.Containers)
+			}
+			shouldRestart := kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) ||
+				(utilfeature.DefaultFeatureGate.Enabled(features.DynamicNodeLocalEphemeralVolumes) &&
+					pod.DeletionTimestamp == nil &&
+					hasPendingDynamicVolumeMountUpdate(&container, actCtr))
+			if shouldRestart {
 				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
@@ -1538,6 +1734,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
+		} else if !m.computeContainerVolumeMountAction(ctx, pod, actuatedPod, idx, containerStatus, &changes) {
+			continue
 		} else if !m.computePodResizeAction(ctx, pod, idx, false, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 			continue

@@ -278,12 +278,6 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	// When creating a container, mark the resources and volume mounts as actuated.
-	if err := m.setActuatedContainer(logger, pod, container, spec.containerType); err != nil {
-		m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
-		return err.Error(), ErrCreateContainerConfig
-	}
-
 	err = m.internalLifecycle.PreCreateContainer(logger, pod, container, containerConfig)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
@@ -311,6 +305,11 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", s.Message())
 		return s.Message(), kubecontainer.ErrRunContainer
+	}
+	// Record actuated resources and volume mounts once the container is running so a failed
+	// CreateContainer or StartContainer never leaves unmounted volumes marked in-use.
+	if err := m.setActuatedContainer(logger, pod, container, spec.containerType); err != nil {
+		logger.Error(err, "Failed to update actuated container state", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	m.recordContainerEvent(ctx, pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Container started")
 
