@@ -59,10 +59,13 @@ type containerGCInfo struct {
 	// The name of the container.
 	name string
 	// Creation time for the container.
-	createTime time.Time
+	createTime int64
 	// If true, the container is in unknown state. Garbage collector should try
 	// to stop containers before removal.
 	unknown bool
+
+	// Attempt for the container
+	attempt uint32
 }
 
 // sandboxGCInfo is the internal information kept for sandboxes being considered for GC.
@@ -70,9 +73,12 @@ type sandboxGCInfo struct {
 	// The ID of the sandbox.
 	id string
 	// Creation time for the sandbox.
-	createTime time.Time
+	createTime int64
 	// If true, the sandbox is ready or still has containers.
 	active bool
+
+	// Attempt for the sandbox
+	attempt uint32
 }
 
 // evictUnit is considered for eviction as units of (UID, container name) pair.
@@ -103,16 +109,28 @@ func (cu containersByEvictUnit) NumEvictUnits() int {
 // Newest first.
 type byCreated []containerGCInfo
 
-func (a byCreated) Len() int           { return len(a) }
-func (a byCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
+func (a byCreated) Len() int      { return len(a) }
+func (a byCreated) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byCreated) Less(i, j int) bool {
+	return kubecontainer.SortContainersByAttributes(
+		a[i].attempt, a[j].attempt,
+		a[i].createTime, a[j].createTime,
+		a[i].id, a[j].id,
+	)
+}
 
 // Newest first.
 type sandboxByCreated []sandboxGCInfo
 
-func (a sandboxByCreated) Len() int           { return len(a) }
-func (a sandboxByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a sandboxByCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
+func (a sandboxByCreated) Len() int      { return len(a) }
+func (a sandboxByCreated) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a sandboxByCreated) Less(i, j int) bool {
+	return kubecontainer.SortContainersByAttributes(
+		a[i].attempt, a[j].attempt,
+		a[i].createTime, a[j].createTime,
+		a[i].id, a[j].id,
+	)
+}
 
 // enforceMaxContainersPerEvictUnit enforces MaxPerPodContainer for each evictUnit.
 func (cgc *containerGC) enforceMaxContainersPerEvictUnit(ctx context.Context, evictUnits containersByEvictUnit, MaxContainers int) {
@@ -209,11 +227,16 @@ func (cgc *containerGC) evictableContainers(ctx context.Context, minAge time.Dur
 		}
 
 		labeledInfo := getContainerInfoFromLabels(ctx, container.Labels)
+		var attempt uint32
+		if container.Metadata != nil {
+			attempt = container.Metadata.Attempt
+		}
 		containerInfo := containerGCInfo{
 			id:         container.Id,
 			name:       container.Metadata.Name,
-			createTime: createdAt,
+			createTime: container.CreatedAt,
 			unknown:    container.State == runtimeapi.ContainerState_CONTAINER_UNKNOWN,
+			attempt:    attempt,
 		}
 		key := evictUnit{
 			uid:  labeledInfo.PodUID,
@@ -298,9 +321,14 @@ func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods 
 	sandboxesByPod := make(sandboxesByPodUID, len(sandboxes))
 	for _, sandbox := range sandboxes {
 		podUID := types.UID(sandbox.Metadata.Uid)
+		var attempt uint32
+		if sandbox.Metadata != nil {
+			attempt = sandbox.Metadata.Attempt
+		}
 		sandboxInfo := sandboxGCInfo{
 			id:         sandbox.Id,
-			createTime: time.Unix(0, sandbox.CreatedAt),
+			createTime: sandbox.CreatedAt,
+			attempt:    attempt,
 		}
 
 		// Set ready sandboxes and sandboxes that still have containers to be active.
