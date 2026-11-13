@@ -177,6 +177,9 @@ func NewUncertainProgressError(msg string) *UncertainProgressError {
 // IsOperationFinishedError checks if given error is of type that indicates
 // operation is finished with a FINAL error.
 func IsOperationFinishedError(err error) bool {
+	if recovery, ok := err.(*StageRecoveryRequiredError); ok {
+		return IsOperationFinishedError(recovery.Unwrap())
+	}
 	if _, ok := err.(*UncertainProgressError); ok {
 		return false
 	}
@@ -196,6 +199,9 @@ func IsFilesystemMismatchError(err error) bool {
 // IsUncertainProgressError checks if given error is of type that indicates
 // operation might be in-progress in background.
 func IsUncertainProgressError(err error) bool {
+	if recovery, ok := err.(*StageRecoveryRequiredError); ok {
+		return IsUncertainProgressError(recovery.Unwrap())
+	}
 	if _, ok := err.(*UncertainProgressError); ok {
 		return true
 	}

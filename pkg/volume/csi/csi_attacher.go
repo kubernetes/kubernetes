@@ -261,7 +261,7 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 	return deviceMountPath, nil
 }
 
-func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, deviceMounterArgs volume.DeviceMounterArgs) error {
+func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, deviceMounterArgs volume.DeviceMounterArgs) (retErr error) {
 	klog.V(4).Info(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 
 	if deviceMountPath == "" {
@@ -275,6 +275,25 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	csiSource, err := getPVSourceFromSpec(spec)
 	if err != nil {
 		return errors.New(log("attacher.MountDevice failed to get CSIPersistentVolumeSource: %v", err))
+	}
+
+	recoveryData, recovery, recoveryErr := loadStageRecovery(deviceMountPath)
+	recoveryEnabled := c.plugin.stageRecoveryEnabled(csiSource.Driver)
+	if recoveryErr != nil && recoveryEnabled {
+		return volumetypes.NewTransientOperationFailure(recoveryErr.Error())
+	}
+	recovering := recovery != nil && recovery.Pending
+	if recovering {
+		// Existing consumers may still be published. A failed re-Stage must
+		// neither erase their metadata nor mark the global device unmounted.
+		defer func() {
+			if retErr != nil {
+				retErr = volumetypes.NewUncertainProgressError(retErr.Error())
+			}
+		}()
+		if !recoveryEnabled || !matchingStageRecovery(recoveryData, recovery, spec) {
+			return fmt.Errorf("CSI stage recovery requires its opt-in and matching volume identity")
+		}
 	}
 
 	// lets check if node/unstage is supported
@@ -353,6 +372,9 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 
 	if !stageUnstageSet {
+		if recovering {
+			return fmt.Errorf("CSI stage recovery requires STAGE_UNSTAGE_VOLUME")
+		}
 		klog.Info(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
 		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
 		return nil
@@ -370,19 +392,36 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return volumetypes.NewTransientOperationFailure(log("attacher.MountDevice failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
 	}
 
-	err = saveVolumeData(dataDir, volDataFileName, data)
-	if err != nil {
-		errMsg := log("failed to save volume info data: %v", err)
-		klog.Error(errMsg)
-		if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-			klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
-		}
-		return errors.New(errMsg)
-	}
-
 	if driverSupportsCSIVolumeMountGroup {
 		klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodeStageVolume.", csiSource.Driver)
 		nodeStageFSGroupArg = deviceMounterArgs.FsGroup
+	}
+	requestHash := ""
+	if recoveryEnabled {
+		supportsHealth, err := csi.NodeSupportsVolumeHealth(ctx)
+		if err != nil || !supportsHealth {
+			if recovering {
+				return fmt.Errorf("CSI stage recovery requires GET_VOLUME_HEALTH: %v", err)
+			}
+			recoveryEnabled = false
+		} else {
+			requestHash = stageRecoveryRequestHash(spec, deviceMountPath, accessMode, mountOptions, nodeStageFSGroupArg, publishContext)
+		}
+	}
+	if recovering {
+		if recovery.RequestHash != requestHash {
+			return fmt.Errorf("CSI stage recovery requires unchanged Stage parameters")
+		}
+	} else {
+		err = saveVolumeData(dataDir, volDataFileName, data)
+		if err != nil {
+			errMsg := log("failed to save volume info data: %v", err)
+			klog.Error(errMsg)
+			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
+				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
+			}
+			return errors.New(errMsg)
+		}
 	}
 
 	fsType := csiSource.FSType
@@ -398,7 +437,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		nodeStageFSGroupArg)
 
 	if csiRPCError != nil {
-		if volumetypes.IsOperationFinishedError(csiRPCError) {
+		if !recovering && volumetypes.IsOperationFinishedError(csiRPCError) {
 			// clean up metadata
 			klog.Error(log("attacher.MountDevice failed: %v", csiRPCError))
 			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
@@ -406,6 +445,13 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 			}
 		}
 		return csiRPCError
+	}
+
+	if recoveryEnabled && spec.PersistentVolume.UID != "" {
+		state := &stageRecoveryState{Version: 1, PVUID: string(spec.PersistentVolume.UID), Path: deviceMountPath, RequestHash: requestHash}
+		if err := saveStageRecovery(deviceMountPath, data, state); err != nil {
+			return volumetypes.NewUncertainProgressError(fmt.Sprintf("failed to persist CSI Stage result: %v", err))
+		}
 	}
 
 	klog.V(4).Info(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
@@ -554,6 +600,10 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 		}
 	}
 	csi := c.csiClient
+
+	if err := os.Remove(filepath.Join(dataDir, stageRecoveryTemporaryFile)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to remove CSI recovery temporary metadata: %w", err)
+	}
 
 	// could not get whether this is migrated because there is no spec
 	ctx, cancel := createCSIOperationContext(nil, csiTimeout)
